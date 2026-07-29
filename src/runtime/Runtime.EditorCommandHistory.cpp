@@ -19,9 +19,6 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        namespace ECSC = Extrinsic::ECS::Components;
-        namespace G = Extrinsic::Graphics::Components;
-
         [[nodiscard]] bool IsSuccessfulStatus(
             const EditorCommandHistoryStatus status) noexcept
         {
@@ -56,39 +53,6 @@ namespace Extrinsic::Runtime
             return label;
         }
 
-        [[nodiscard]] ECS::EntityHandle ResolveLiveEntity(
-            ECS::Scene::Registry& registry,
-            const std::uint32_t stableEntityId) noexcept
-        {
-            const ECS::EntityHandle entity =
-                SelectionController::ToEntityHandle(stableEntityId);
-            if (entity == ECS::InvalidEntityHandle || !registry.Raw().valid(entity))
-                return ECS::InvalidEntityHandle;
-            return entity;
-        }
-
-        [[nodiscard]] EditorCommandHistoryStatus ApplyTransform(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const ECSC::Transform::Component& value)
-        {
-            if (scene == nullptr)
-                return EditorCommandHistoryStatus::MissingScene;
-
-            entt::registry& raw = scene->Raw();
-            const ECS::EntityHandle entity = ResolveLiveEntity(*scene, stableEntityId);
-            if (entity == ECS::InvalidEntityHandle)
-                return EditorCommandHistoryStatus::StaleEntity;
-
-            auto* transform = raw.try_get<ECSC::Transform::Component>(entity);
-            if (transform == nullptr)
-                return EditorCommandHistoryStatus::MissingTransform;
-
-            *transform = value;
-            raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(entity);
-            return EditorCommandHistoryStatus::Applied;
-        }
-
         [[nodiscard]] EditorCommandHistoryStatus ApplySelection(
             ECS::Scene::Registry* scene,
             SelectionController* selection,
@@ -107,45 +71,6 @@ namespace Extrinsic::Runtime
 
             if (!selection->SetSelectedByStableEntityId(*scene, *stableEntityId))
                 return EditorCommandHistoryStatus::StaleEntity;
-            return EditorCommandHistoryStatus::Applied;
-        }
-
-        [[nodiscard]] EditorCommandHistoryStatus ApplyPrimitiveViewSettings(
-            const EditorPrimitiveViewSettingsCommand& command,
-            const MeshPrimitiveViewSettings settings)
-        {
-            if (!command.SetSettings || !command.ClearSettings)
-                return EditorCommandHistoryStatus::UnsupportedOperation;
-
-            if (settings.AnyEnabled())
-                command.SetSettings(command.StableEntityId, settings);
-            else
-                command.ClearSettings(command.StableEntityId);
-            return EditorCommandHistoryStatus::Applied;
-        }
-
-        [[nodiscard]] EditorCommandHistoryStatus ApplyVisualizationConfig(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const std::optional<G::VisualizationConfig>& value)
-        {
-            if (scene == nullptr)
-                return EditorCommandHistoryStatus::MissingScene;
-
-            entt::registry& raw = scene->Raw();
-            const ECS::EntityHandle entity = ResolveLiveEntity(*scene, stableEntityId);
-            if (entity == ECS::InvalidEntityHandle)
-                return EditorCommandHistoryStatus::StaleEntity;
-
-            if (!value.has_value())
-            {
-                if (!raw.all_of<G::VisualizationConfig>(entity))
-                    return EditorCommandHistoryStatus::NoChange;
-                raw.remove<G::VisualizationConfig>(entity);
-                return EditorCommandHistoryStatus::Applied;
-            }
-
-            raw.emplace_or_replace<G::VisualizationConfig>(entity, *value);
             return EditorCommandHistoryStatus::Applied;
         }
 
@@ -370,26 +295,6 @@ namespace Extrinsic::Runtime
             ++m_Revision;
     }
 
-    EditorCommandRecord MakeTransformEditCommand(EditorTransformEditCommand command)
-    {
-        return EditorCommandRecord{
-            .Label = NonEmptyLabel(std::move(command.Label)),
-            .Redo = [command]()
-            {
-                return ApplyTransform(command.Scene,
-                                      command.StableEntityId,
-                                      command.After);
-            },
-            .Undo = [command]()
-            {
-                return ApplyTransform(command.Scene,
-                                      command.StableEntityId,
-                                      command.Before);
-            },
-            .Dirtying = true,
-        };
-    }
-
     EditorCommandRecord MakeSelectionReplaceCommand(
         EditorSelectionReplaceCommand command)
     {
@@ -408,45 +313,6 @@ namespace Extrinsic::Runtime
                                       command.BeforeStableEntityId);
             },
             .Dirtying = false,
-        };
-    }
-
-    EditorCommandRecord MakePrimitiveViewSettingsCommand(
-        EditorPrimitiveViewSettingsCommand command)
-    {
-        const bool dirtying = command.Dirtying;
-        return EditorCommandRecord{
-            .Label = NonEmptyLabel(command.Label),
-            .Redo = [command]()
-            {
-                return ApplyPrimitiveViewSettings(command, command.After);
-            },
-            .Undo = [command]()
-            {
-                return ApplyPrimitiveViewSettings(command, command.Before);
-            },
-            .Dirtying = dirtying,
-        };
-    }
-
-    EditorCommandRecord MakeVisualizationConfigCommand(
-        EditorVisualizationConfigCommand command)
-    {
-        return EditorCommandRecord{
-            .Label = NonEmptyLabel(std::move(command.Label)),
-            .Redo = [command]()
-            {
-                return ApplyVisualizationConfig(command.Scene,
-                                                command.StableEntityId,
-                                                command.After);
-            },
-            .Undo = [command]()
-            {
-                return ApplyVisualizationConfig(command.Scene,
-                                                command.StableEntityId,
-                                                command.Before);
-            },
-            .Dirtying = true,
         };
     }
 

@@ -12,9 +12,8 @@ Each active task should include:
 ## Currently active
 
 - [`PROC-028` — Enforce agent evidence, review, and experiment custody](PROC-028-enforced-agent-evidence-review-experiment-workflow.md)
-  is in progress on `codex/proc-028-enforced-agent-workflow` in an isolated
-  worktree. Next gate: focused workflow and benchmark Python regressions after
-  Slices A and B.
+  is implemented and integrated on local `main`. Retirement remains blocked
+  on a distinct fixed-revision review and pre-existing `BUG-120`.
 
 ## History
 

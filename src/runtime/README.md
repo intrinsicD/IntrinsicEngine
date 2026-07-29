@@ -13,7 +13,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.ServiceRegistry` | Two-phase runtime-module service registry from ADR-0024 D3/D13. Synchronous infrastructure is provided during module registration, required/optionally found during resolution, and boot fails closed with diagnostics naming the requester and missing service. `Withdraw<T>(expected)` is an owner-only, exact-instance lifetime operation: it is phase-independent for registration rollback and locked shutdown, and a missing or mismatched rollback entry returns an error without recording a boot error. Providers withdraw borrowed instances before destroying them so modules that stop later cannot discover stale pointers. |
 | `Extrinsic.Runtime.Module` | Runtime module composition contract from ADR-0024 D1/D3/D12/D13, pruned by `RUNTIME-185`. Exports `IRuntimeModule`, `EngineSetup`, five generic frame phases, the narrow `RuntimeViewportInputHookContext`/callback, and shutdown announce context; modules receive command/event/job/world/service plus startup recipe/state capabilities and never an `Engine&`. Frame and viewport registrars are registration-phase-only. The viewport-input context borrows the completed editor-capture snapshot, active world, platform input, viewport, config, frame delta, and mutable `RenderFrameInput` only at the stable pre-gizmo insertion point; it does not widen `RuntimeFrameHookContext` or add another generic phase. There are ten production implementors (nine runtime-owned plus Sandbox's optional frame-pacing capture), seven generic hook registrations, two viewport hooks, and no module sim-system seam. |
 | `Extrinsic.Runtime.ModuleSchedule` | Retained runtime-module hook schedule after `RUNTIME-185`. Owns only generic frame-hook and typed viewport-input-hook records; frame hooks sort by phase/module/registration sequence and viewport hooks by module/registration sequence. `Clear()` removes both record sets and resets the shared sequence. The removed sim-system descriptor/context/registrar, fixed-step registration, and causal signal DAG had zero production consumers. `Runtime.Engine` still owns module objects, five built-in service provisions, registration/resolution sequencing, dispatch locations, and shutdown calls. |
-| `Extrinsic.Runtime.ClusteringModule` | Sole typed runtime owner for K-Means (`ARCH-012`, `RUNTIME-196`). It exports one `RunKMeans` request, typed `KMeansRunCompleted`/`ClusterLabelsChanged` events, `ClusteringService`, and `ClusteringModule`. The request carries canonical input/output `GeometryPropertyRef` identities, parameters, selected entity, and CPU-reference or Vulkan-compute backend data. The module snapshots active-world mesh/graph/point-cloud positions, routes CPU work through world-scoped `JobService`, and owns one private Vulkan state plus one `JobService` GPU participant using shared `Graphics::GpuTransfer` readback. Both paths rejoin one main-thread stale/cancellation gate, commit label/color properties, publish the same completion/change events, and report requested/actual backend plus fallback diagnostics truthfully. UI, config, agent/CLI, smoke, and benchmark callers use this service; backend recorder/cache/readback details are a non-exported module partition. `Extrinsic.Runtime.Engine` does not import or name clustering. |
+| `Extrinsic.Runtime.ClusteringModule` | Sole typed runtime owner for K-Means (`ARCH-012`, `RUNTIME-196`). It exports one `RunKMeans` request, typed `KMeansRunCompleted`/`ClusterLabelsChanged` events, `ClusteringService`, and `ClusteringModule`. The request carries canonical input/output `GeometryPropertyRef` identities, parameters, selected entity, and CPU-reference or Vulkan-compute backend data. The module snapshots active-world mesh/graph/point-cloud positions plus the exact optional label/color/scalar outputs, routes CPU work through world-scoped `JobService`, and owns one private Vulkan state plus one `JobService` GPU participant using shared `Graphics::GpuTransfer` readback. Both paths rejoin one main-thread stale/cancellation gate and atomically commit the output cohort. When the optional document owner is composed, `RUNTIME-201` routes that commit through its generation-validated `EditorCommandHistory` transaction; standalone clustering remains operational without undo. Both paths publish the same completion/change events and report requested/actual backend plus fallback diagnostics truthfully. UI, config, agent/CLI, smoke, and benchmark callers use this service; backend recorder/cache/readback details are a non-exported module partition. `Extrinsic.Runtime.Engine` does not import or name clustering. |
 | `Extrinsic.Runtime.WorldHandle` | Opaque runtime world identity shared by kernel seams. `DefaultWorldHandle` is reserved as the boot-world identity so frame-0 work and compatibility jobs are always scoped. |
 | `Extrinsic.Runtime.JobService` | The one domain-free snapshot-in/result-out runtime work service from ADR-0024 D8 and `RUNTIME-194`. CPU jobs submit immutable work to the shared `Core::Tasks` scheduler with dependencies, priority/kind/cost metadata, `WorldHandle` scope, cooperative cancellation, progress, optional readiness parking, and fail-closed `ValidateBeforeApply`. Only the Engine-owned pre-pump-B completion gate applies results, with an eight-result per-frame budget; `SnapshotAll()` supplies generic observation without feature identity leaking into the service. Unpublished terminal work reconciles exactly once through `FinalizeUnpublishedOnMainThread`. The Engine kernel owns the service object, while app-composed `AsyncWorkModule` publishes that exact borrowed object and owns survivor cancellation/withdrawal at module shutdown. The service also owns the `GpuQueue` participant registry used by render-thread GPU work: participants record commands inside the renderer's open frame command context, drain transfer/readback completions during Maintenance, and release resources only after the runtime GPU-queue bridge has performed any required device-idle wait. |
 | `Extrinsic.Runtime.JobServiceGpuQueueBridge` | Runtime-owned bridge from `JobService` GPU-queue participants to the renderer runtime-frame command hook (`RUNTIME-160`). Owns the renderer hook handle, installs a hook that delegates command recording to `JobService::RecordGpuQueueFrameCommands(...)`, detaches the hook before participant shutdown, and forwards the Engine-provided device-idle wait callback into `JobService::ShutdownGpuQueueParticipants(...)`. `Engine` keeps lifecycle ordering and device ownership, while raw hook-token ownership and GPU-participant teardown sequencing stay in implementation-only state rather than the `Runtime.Engine.cppm` surface. |
@@ -27,7 +27,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.Engine` | Domain-free composition root and frame-loop owner. Its interface owns no application callback object and no asset/import/residency/bake, scene-document/history, scene-interaction, camera, async, config-control, editor-UI, reference-scene, selection, lookup, readback, gizmo, or mesh primitive-view capability. Optional owners publish exact services and contribute typed hooks through the module schedule. Before module registration Engine publishes the exact live `RHI::IDevice`, `Platform::IWindow`, `Graphics::IRenderer`, `RenderExtractionCache`, and `RuntimeInputActionRegistry` built-ins; `AsyncWorkModule` separately publishes the kernel-owned `JobService`. Reinitialization republishes fresh borrowed instances. `BeginShutdown()` publishes and pumps the announcement after command discard, drains GPU participants, stops the loop, and waits for device idle while worlds/services remain live so concrete app state can detach. `Shutdown()` invokes that boundary when needed, then performs ordinary reverse module and subsystem teardown. Render-extraction cache/pool/frame-index ownership remains in the Engine-private `RenderExtractionService`; callers read extraction or visualization state from the published cache rather than Engine forwarders. `RUNTIME-187` puts every private field behind `Engine::Impl`. The exact final surface is `12/0/0/5`: twelve declaration-required plain imports, zero domain imports, zero re-exports, and only `GetDevice`, `GetEngineConfig`, `GetLastFramePacingDiagnostics`, `GetRenderer`, and `GetWindow`, each ratcheted with its return/owning type and owning import. |
 | `Extrinsic.Runtime.FramePacingDiagnostics` | Runtime-owned frame-pacing diagnostics module from `RUNTIME-158`. Exports `RuntimeFramePacingDiagnostics` plus the pure helper that copies renderer `RenderGraphFrameStats` compile/execute timings into the current frame sample. `EditorUiModule` privately copies ImGui adapter timings/counters into the borrowed sample, so this generic module no longer imports the adapter. `Engine::RunFrame()` writes phase-boundary timings and publishes the last sample through `Engine::GetLastFramePacingDiagnostics()`. |
 | `Extrinsic.Runtime.SceneDocumentModule` | Optional app-composed document owner from `RUNTIME-172`. The concrete `final IRuntimeModule` publishes itself and its exact owned `EditorCommandHistory`, binds document path/event/sequence/history to one validated active `{WorldHandle, Scene::Registry*, binding epoch}`, and resets that complete durable state instead of retaining a per-world map. It preserves synchronous save/load/new/close, and queues snapshot saves and temporary-registry loads on the kernel-owned `JobService` (`RUNTIME-194` Slice B3; the optional `StreamingExecutor` dependency is retired). Every completion captures weak operation state plus module generation, binding epoch, world, and registry identity. That captured binding is re-checked through `JobDesc::ValidateBeforeApply` immediately before the drain would commit, so a stale result is discarded rather than applied; a queued operation that terminates without publishing — cancelled, discarded as stale, or dropped — reconciles through `JobDesc::FinalizeUnpublishedOnMainThread`, which publishes the terminal failure event exactly once when the captured binding still holds. New/load/close snapshot strong-handle participants in deterministic name/registration order, run every `BeforeReplace` callback while the outgoing registry is live, replace, run every `AfterReplace` callback against the rebound registry, then reset history. Parse failure invokes no participant and mutates no document state. Shutdown invalidates generation/epoch and cancels owned tasks before reverse module teardown; omission leaves Engine and the active world operational while document/history services are unavailable. |
-| `Extrinsic.Runtime.SceneInteractionModule` | Optional app-composed one-world interaction owner from `RUNTIME-188`. Its PImpl owns `SelectionController`, `StableEntityLookup` plus its scene binding, `SelectionReadbackState`, and `GizmoFrameService`; it publishes only the exact module and exact controller. Every input, `BeforeExtraction`, and `Maintenance` hook validates `{WorldHandle, Registry*, interaction epoch}` directly. The typed viewport hook runs after camera/capture, `BeforeExtraction` drains one pick and submits a copied world-tagged selection/hover/gizmo snapshot after input actions and transform flush, and `Maintenance` drains completed readbacks. A strong scene-document participant clears the complete cohort while the outgoing registry is live and rebuilds lookup on New/Load/Close; active-world mismatch, retirement, announcement, and recycled-handle reinitialize use the same reset. Pick sequences remain monotonic while zero, unknown, wrong-world, and wrong-epoch results fail closed. Announcement unregisters the document participant and detaches borrows before ordinary exact withdrawal. Omission leaves document, camera, generic input, component-driven primitive views, rendering, and Engine operational with empty interaction snapshots. |
+| `Extrinsic.Runtime.SceneInteractionModule` | Optional app-composed one-world interaction owner from `RUNTIME-188`. Its PImpl owns `SelectionController`, `StableEntityLookup` plus its scene binding, `SelectionReadbackState`, and `GizmoFrameService`; it publishes only the exact module and exact controller. Every input, `BeforeExtraction`, and `Maintenance` hook validates `{WorldHandle, Registry*, interaction epoch}` directly. The typed viewport hook runs after camera/capture, borrows the exact document `EditorCommandHistory` when composed, and disables transform dragging when that history is unavailable. `BeforeExtraction` drains one pick and submits a copied world-tagged selection/hover/gizmo snapshot after input actions and transform flush, and `Maintenance` drains completed readbacks. A strong scene-document participant clears the complete cohort while the outgoing registry is live and rebuilds lookup on New/Load/Close; active-world mismatch, retirement, announcement, and recycled-handle reinitialize use the same reset. Pick sequences remain monotonic while zero, unknown, wrong-world, and wrong-epoch results fail closed. Announcement unregisters the document participant and detaches borrows before ordinary exact withdrawal. Omission leaves document, camera, generic input, component-driven primitive views, rendering, and Engine operational with empty interaction snapshots. |
 | `Extrinsic.Runtime.AssetWorkflowModule` | Optional app-composed global asset owner from `RUNTIME-183`. Its PImpl keeps one persistent dependency-empty `AssetImportPipeline` across Engine reinitialize, while each boot recreates `AssetService`, `GpuAssetCache`, the cache listener, and model texture/scene handoffs. It publishes exactly `AssetService`, `AssetImportPipeline`, `GpuAssetCache`, and `Core::IAssetFrameHooks`. When `TextureBakeModule` is composed, asset workflow borrows its canonical `TextureBakeService` for import handoffs and reconciles ready `PropertyTextureBakeOutputs` into `GeometryPresentationRuntimeState` plus one atomic material snapshot per entity, preserving unrelated channels. It owns no bake scheduler or GPU participant. Resolution requires the exact `SceneDocumentModule` and `EditorCommandHistory`, borrows the kernel `JobService` plus optional selection, and registers one strong document-replacement participant. Active-world and direct callback paths validate `{WorldHandle, Registry*, binding epoch}`. Shutdown announcement cancels imports and detaches provider borrows before application/provider teardown. Omission leaves generic Engine/render/world/transfer/async and render-extraction geometry retirement operational, with asset services absent and platform drops ignored. |
 | `Extrinsic.Runtime.AssetImportPipeline` | `AssetWorkflowModule`-owned asset import subsystem from `RUNTIME-147`. Exports runtime asset import/reimport requests, queued geometry/model/texture entry points and records, import result/event records, IO/backend decode-block test seams, and post-import processor/import-authoring/import-completed registry contracts. It owns the promoted ASSETIO geometry/model/texture decoder composition, ingest state-machine wiring, import event log, queue snapshot/cancel/clear facade, standalone geometry ECS materialization with local/world culling bounds, model/texture handoffs, dropped-file import routing, and the decode/materialize helpers previously in `Engine`. Queued imports freeze the active `{WorldHandle, Scene::Registry*}` target plus its binding epoch at submission and validate that exact active binding before materialization; direct imports perform the same check. Scene-changing successful imports mark the exact `EditorCommandHistory` service dirty. Default direct-mesh post-processing materializes the named normal property and UVs before calling the same canonical `TextureBakeService` used by editor and model-scene callers. A bounded, world-scoped `JobService::IsReadyToApply` continuation retries that caller request across promoted-Vulkan cold start while mesh publication and property-buffer fallback remain immediate; Null/non-operational composition still executes no CPU texture fallback. Runtime logs dropped-file receipt, per-path routing/queue decisions, and shared import completion so failed drops remain diagnosable outside the editor panel. |
 | `Extrinsic.Runtime.TextureBakeModule` | Optional app-composed GPU property-texture owner (`RUNTIME-190`, unified by `RUNTIME-191`). It exports one canonical `PropertyTextureBakeRequest`, result/status, representation, output-record vocabulary, and exact `TextureBakeService`; the request describes only world/entity identity, canonical source and texcoord `GeometryPropertyRef`s, expected generations, storage/encoding/range, extent/padding, and stable output identity. Material, visualization, presentation, normal-space, and consumer meaning are absent. Requests require existing finite, count-matched UV and typed mesh vertex, face, or edge properties; edge values use the nearest triangle-edge rule. Raw scalar/vector storage and explicit RGBA, label, scalar-colormap, and normal encodings all enter one `Graphics.PropertyTextureBake` recorder and one bounded JobService GPU participant with canonical byte identity, live-residency revalidation, cache generations, ready-frame publication, dilation, stale rejection, and frame-safe retirement. A record is identified by entity plus output name: rebaking reloads the same generated asset, renaming preserves the old output, and removal destroys the owned asset. Callers own source preparation and completed-output material/presentation processing. Document replacement and shutdown synchronously detach or destroy outgoing ownership. Missing and non-operational GPUs fail closed with no CPU fallback or specialized normal path. |
@@ -42,7 +42,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.AssetModelTextureHandoff` | Runtime-owned texture residency seam for `ASSETIO-001` Slice D.1. Exports `BuildGpuTextureDesc(...)`, `RequestTextureAssetUpload(...)`, diagnostics/options records, and `AssetModelTextureHandoff`, which subscribes to `AssetService::Ready` events, reads promoted `AssetTexture2DPayload` records, maps supported CPU texture formats to RHI texture descriptors, and submits `Graphics::GpuAssetCache::RequestUpload(GpuTextureRequest)` without importing graphics/RHI into `src/assets`. RGB8 and unknown CPU texture formats fail closed as `AssetUnsupportedFormat` and can mark the GPU cache entry failed. `DeviceNotOperational` and in-flight upload conflicts are recorded as retryable upload deferrals so CPU imports can succeed under the Null backend. `RequestTextureAssetUpload(...)` is idempotent for cache entries already `GpuUploading` or `Ready`, so embedded child textures requested by the model-scene handoff do not double-submit when their own texture `Ready` event is later observed. |
 | `Extrinsic.Runtime.AssetModelSceneHandoff` | Runtime-owned model-scene materialization seam for `ASSETIO-001` Slice D.2, extended by `RUNTIME-114`, `RUNTIME-129`, and unified by `RUNTIME-191`. It reads promoted CPU-only model payloads and materializes deterministic ECS node/primitive hierarchies with `GeometrySources`, `RenderSurface`, explicit or synthesized normals, authored-preserved or generated-atlas UVs, typed properties, material leases, and data-only texture-asset bindings. Embedded/authored textures use child `AssetTexture2DPayload` assets and `AssetModelTextureHandoff` and retain authored tangent-space metadata. Missing generated albedo/normal textures are represented as caller-owned presentation targets and submitted only through the canonical `TextureBakeService` after their named properties and UVs exist. Progressive mode keeps property-buffer/vertex-normal fallback while dependent UV/normal/property jobs complete; non-progressive mode schedules the same request directly. Neither path creates a CPU-generated texture or changes backend when the GPU is unavailable. Imported material-less primitives receive the handoff-scoped neutral lit `StandardPBR` material, generated entities stay on the `GeometrySources` residency lane, and pending authored texture bindings continue to re-resolve without rerunning import. The optional progressive enrichment chain submits to `Runtime.JobService` through `AssetModelSceneHandoffOptions::ProgressiveJobs`, declares ordering through `JobDesc::DependsOn`, and applies from the main-thread completion drain. |
 | `Extrinsic.Runtime.EcsSystemBundle` | Runtime-owned activation helper for the complete promoted fixed-step ECS bundle. Exports `PromotedEcsSystemBundleStats` and `RegisterPromotedEcsSystemBundle(FrameGraph&, ECS::Scene::Registry&)`, which adds `Extrinsic.ECS.System.TransformHierarchy`, `Extrinsic.ECS.System.BoundsPropagation`, and `Extrinsic.ECS.System.RenderSync` as FrameGraph passes. Each fixed substep registers this bundle, then runs `Compile` → `Execute` → `ResetForReplay`; exact descriptors retain topology while callbacks bind the current scene. Dirty world matrices and bounds are therefore refreshed every substep before render extraction observes them (`RUNTIME-091`, `CORE-008`). Also exports `PreRenderTransformFlushStats` and `FlushPreRenderTransformState(ECS::Scene::Registry&)` (BUG-024): a direct `TransformHierarchy` → `BoundsPropagation` → `RenderSync` pass that `Engine::RunFrame()` gates on pending `Transform::IsDirtyTag` / `WorldUpdatedTag` work after the variable tick, ImGui editor hook, and gizmo-interaction drive — and before transform-gizmo packet build and render extraction — so post-fixed-step UI/editor/gizmo transform edits reach the rendered model matrix in the same frame while idle frames skip the redundant sweep. |
-| `Extrinsic.Runtime.EditorCommandHistory` | Runtime/editor-owned undo/redo and document dirty-state seam (`RUNTIME-102`). Exports `EditorCommandHistory`, deterministic result/status/snapshot DTOs, typed adapters for transform edits, single-selection replacement, legacy mesh primitive-view compatibility settings, visualization configs, spatial-debug bindings, compound commands with rollback, and a hierarchy delete/orphan planning helper. Delete planning consumes the guarded ECS descendant-preorder query; hierarchy corruption returns `CommandFailed` with empty delete/orphan lists before any command or entity mutation can be published. The history stores labels, capacity-bounds undo/redo stacks, active scene path, revision/saved-revision dirty tracking, and fail-closed stale/missing dependency statuses. ECS remains data-authoritative; the service lives in runtime because editor command policy, sidecars, dirty-state UX, and recursive hierarchy policy are above ECS. Scene create/duplicate/delete materialization and asset-import undo stay deferred until runtime scene lifecycle/snapshot support can make them reversible without serializing renderer/RHI state. |
+| `Extrinsic.Runtime.EditorCommandHistory` | Runtime/editor-owned undo/redo and document dirty-state seam (`RUNTIME-102`, unified by retired `RUNTIME-201`). Exports `EditorCommandHistory`, deterministic result/status/snapshot DTOs, generic command records, the retained single-selection compatibility adapter, compound commands with rollback, and a hierarchy delete/orphan planning helper. Undoable entity edits keep typed state capture/apply policy with their transform, visualization/presentation, render-hint, geometry, method, or gizmo owner and enter history through the runtime-internal generation-validated mutation transaction; the retired public transform/visualization/primitive-view adapter DTOs no longer make this module import their component types. Delete planning consumes the guarded ECS descendant-preorder query; hierarchy corruption returns `CommandFailed` with empty delete/orphan lists before any command or entity mutation can be published. The history stores labels, capacity-bounds undo/redo stacks, active scene path, revision/saved-revision dirty tracking, and fail-closed stale/missing dependency statuses. ECS remains data-authoritative; the service lives in runtime because editor command policy, sidecars, dirty-state UX, and recursive hierarchy policy are above ECS. |
 | `Extrinsic.Runtime.EditorWindowRegistry` | Generic editor-window contribution contract from `UI-034`. Contributors register a stable id, display title, structured menu path, draw callback, initial open state, and optional open-state observer. Duplicate/invalid registrations fail closed; handles support unregister and visibility changes; callbacks may unregister themselves during dispatch. `DrawOpenWindows()` invokes only open windows and invokes none while global visibility is disabled. The data-only `EditorUiVisibilityCommand` (`Toggle`/`Show`/`Hide`) preserves each window's open state across global hide/show. |
 | `Extrinsic.Runtime.EditorPropertyWidgets` | Generic property-inspection model and draw wrapper from `UI-034`. `BuildEditorScalarPropertyPlotModel(...)` enumerates numeric scalar properties from a `Geometry::ConstPropertySet`, excludes vector properties, selects deterministically, copies finite values into a data-only plot model, and reports filtered non-finite samples plus the finite range. `DrawEditorScalarPropertyPlotWidget(...)` renders the selector, bin control, and histogram while keeping ImGui/ImPlot types private to the implementation unit. ImPlot 1.0 is manifest-managed and linked **PRIVATE** to runtime; its context is created, rebuilt, and destroyed with the existing ImGui adapter context. |
 | `Extrinsic.Runtime.EditorUiHost` | Engine-free editor capability published by `EditorUiModule`. It owns the existing `EditorWindowRegistry`, global visibility state, copied adapter diagnostics, and mutation-safe parameterless frame contributions; it stores no `Engine&`, adapter, overlay, or capture reference. Consumers register/unregister windows and contributions and may issue visibility commands. A move-only owner control is claimed exactly once before publication and is retained only by the module, so service consumers cannot invoke contributions out of bracket or forge operational/diagnostic state. |
@@ -62,8 +62,8 @@ startup/shutdown.
 | `Extrinsic.Runtime.VisualizationRecipes` | Runtime-owned, data-driven translation from canonical geometry properties to data-only `Extrinsic.Graphics.VisualizationPackets`. Exports a closed `VisualizationRecipe` variant for scalar, color, label, vector-field, isoline, Htex-preview, and fragment-bake metadata; `EncodeVisualizationRecipe(...)` resolves `GeometryPropertyRef` values and returns an owning `VisualizationEncodingBatch` plus deterministic `VisualizationEncodingDiagnostics`. Missing BDAs emit copied property-buffer upload descriptors for common graphics residency. Encoding is side-effect free; `ScheduleVisualizationHtexRecreate(...)` is a separate typed `JobService` operation. `RenderExtractionCache` stores copied per-entity recipes, projects `VisualizationConfig` and ready `GeometryPresentationRecipe` property slots into the same encoder, scopes upload keys by stable entity id, and exposes recipe-prefixed extraction counters. No adapter object, registry, opaque key, borrowed property view, or material-source overloading remains. |
 | `Extrinsic.Runtime.ImGuiAdapter` | Runtime-side Dear ImGui platform/renderer adapter (`RUNTIME-090`, `RUNTIME-159`, `UI-034`). It owns paired ImGui 1.92.8 and ImPlot 1.0 contexts, translates drained platform events, opens a frame through `BeginFrame()`, invokes the configured visible contribution through `BuildEditorFrame()`, and copies `ImDrawData` into `Graphics::ImGuiOverlaySystem` during `EndFrame()`. `EndFrame()` records the data-only `EditorInputCaptureSnapshot` defined by `Runtime.Module` from `WantCaptureKeyboard`, `WantCaptureMouse`, and active-widget state before rendering; `EditorUiModule` copies it into the frame-owned value after end. `SetEditorVisible(false)` clears stored capture immediately and suppresses contribution work while preserving adapter lifecycle. The adapter remains backend-agnostic and exposes diagnostics without exporting ImGui headers; `imgui_core_lib` and `implot::implot` are linked **PRIVATE** to runtime. ImGui dynamic texture requests remain disabled because the promoted renderer consumes the copied legacy CPU font atlas. |
 | `Extrinsic.Runtime.SandboxEditorFacades` | Presentation-free Sandbox editor runtime contract. Exports frame-local `SandboxEditorContext`, panel/domain models, selected-model cache/session wiring, and the file, scene, transform, camera, visualization, texture/UV, geometry-processing, method, render-recipe, and artifact facade functions consumed by `app/Sandbox`. The context borrows the canonical `ClusteringService` and last typed K-Means completion; it exports no backend-specific K-Means request, queue, submission, or result family. Geometry-composition summaries consume the guarded ECS immediate-child query; corrupt links emit a `CorruptHierarchy` diagnostic and leave the summary empty instead of presenting a partial child count. The file-import model keeps command-surface availability distinct from form readiness: it reports path/hint/import prerequisites, the concretely resolved payload, stable per-payload option availability, and deterministic disabled reasons. One private route/capability evaluator builds that model and revalidates immediately before dispatch, so empty, unsupported, unavailable-decoder, ambiguous, and incompatible requests fail closed without reaching an import callback. This is extension/capability preflight only; source and companion-file reads remain deferred to `ASSETIO-010`. Runtime owns ECS/asset/graphics/method execution, history, jobs, stale-result rejection, and result sinks; it owns no Sandbox windows, menu state, ImGui drawing, or clustering backend lifecycle. The former `Extrinsic.Runtime.SandboxEditorUi` module is retired. Generic host/registry/property widgets remain under `src/runtime/Editor`; app-owned `Extrinsic.Sandbox.Editor.Shell`, `MethodPanels`, `MeshProcessingPanels`, and `DomainPanels` own presentation. Progressive Poisson and render-recipe/artifact bodies compile in separate private implementation units. |
-| `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor transform-gizmo interaction (`RUNTIME-084`). It performs screen-space handle hit testing and axis-constrained translate/rotate/scale edits, stamps transform dirtiness, and records its distinct gizmo undo entries. In production it is owned by `SceneInteractionModule` through `GizmoFrameService`; graphics receives only frozen copied `TransformGizmoRenderPacket` values in the interaction render snapshot. |
-| `Extrinsic.Runtime.GizmoFrameService` | Runtime composition helper from `RUNTIME-162`, privately owned by `SceneInteractionModule`. It owns one interaction, gizmo undo stack, packet builder, and reusable selected-entity scratch; drives input only after completed editor capture; submits selection clicks only when no gizmo drag owns the pointer; and builds copied packets. `ClearSceneState(scene)` cancels an active drag while the registry is live, restores the authored transform, clears undo/scratch/packets, and preserves app-global gizmo config, mode, and orientation. Engine has no gizmo state or facade. |
+| `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor transform-gizmo interaction (`RUNTIME-084`, history convergence in `RUNTIME-201`). It performs screen-space handle hit testing and axis-constrained translate/rotate/scale preview edits, stamps transform dirtiness, and coalesces every moved entity from one drag into one generation-validated `EditorCommandHistory` transaction. Undo/redo revalidates the exact expected batch before restoring it atomically; the retired `GizmoUndoStack` has no replacement stack. In production the interaction is owned by `SceneInteractionModule` through `GizmoFrameService`; graphics receives only frozen copied `TransformGizmoRenderPacket` values in the interaction render snapshot. |
+| `Extrinsic.Runtime.GizmoFrameService` | Runtime composition helper from `RUNTIME-162`, privately owned by `SceneInteractionModule`. It owns one interaction, packet builder, and reusable selected-entity scratch; drives input only after completed editor capture and only when the exact document `EditorCommandHistory` is available; submits selection clicks only when no gizmo drag owns the pointer; and builds copied packets. `ClearSceneState(scene)` cancels an active drag while the registry is live, restores the authored transform, clears scratch/packets, and preserves app-global gizmo config, mode, and orientation. Engine has no gizmo state or facade. |
 
 ### Asset Import Apply Scheduling
 
@@ -119,6 +119,14 @@ own payload copy, and graph/point-cloud materialization still makes the mutable
 local copy required by `PopulateFromGraph` / `PopulateFromCloud`, but the
 worker-to-apply handoff and reload lambdas no longer copy the whole decoded
 payload.
+
+Successful scene-changing import completion uses
+`EditorCommandHistory::MarkDirty` as a document-lifecycle transition: it
+advances document revision/dirty state but deliberately creates no undo entry.
+Entity creation, automatic authoring, and post-import enrichment are one import
+lifecycle rather than editor-authored mutations. Generation-safe stale discard
+for the deferred direct-mesh enrichment is owned by `BUG-095`; the staged
+workflow replacement in `RUNTIME-200` must preserve that contract.
 
 Geometry materialization invokes an ordered post-import processor registry after
 each created entity is populated from its decoded payload. Processors receive
@@ -352,12 +360,18 @@ from `GEOM-026` (`Geometry.HalfedgeMesh.Vertices.Normals`,
 worker lane, and publish count-matched `glm::vec3` normals to canonical
 `v:normal` only from the stale-checked main-thread apply. Tests and non-engine
 callers without an injected job surface keep the immediate compatibility path.
-Successful publication stamps the precise `DirtyVertexNormals` tag and marks
-editor history dirty; it does not call renderer/RHI upload APIs or stamp broad
-`GpuDirty`. Mesh, graph, and point-cloud residency extraction consume that dirty
-tag and perform deferred normal-channel reupload on the next extraction
-opportunity. If a direct mesh import's deferred materialization applies after an
-edit, runtime preserves count-matched current `v:normal` values so
+Sync and queued completions enter one owner-local `RUNTIME-201` mutation
+transaction. It validates geometry metadata, the exact domain source-property
+snapshot excluding the owned output, and the exact optional current
+`v:normal`; topology/attribute/output edits therefore stale-discard queued
+work or reject undo/redo without moving history. Undo restores the prior
+normal values or removes a newly introduced property, redo restores the
+generated values, and every successful transition stamps only
+`DirtyVertexNormals`. It does not call renderer/RHI upload APIs or stamp broad
+`GpuDirty`. Mesh, graph, and point-cloud residency extraction consume that
+dirty tag and perform deferred normal-channel reupload on the next extraction
+opportunity. If a direct mesh import's deferred materialization applies after
+an edit, runtime preserves count-matched current `v:normal` values so
 editor-authored normals remain the CPU authority.
 
 ### Sandbox Editor Mesh Denoise
@@ -377,12 +391,15 @@ action. `SandboxEditorContext::MeshDenoiseKernelAvailable` provides the
 deterministic unavailable-kernel diagnostic lane used by headless/editor
 contract tests.
 
-Successful publication is undoable through `EditorCommandHistory::Execute`:
-undo restores the exact prior `v:position` array and redo reapplies the
-denoised positions. The commit stamps `DirtyVertexPositions` and
-`DirtyVertexAttributes` for deferred mesh extraction/reupload and does not call
-renderer/RHI upload APIs or stamp broad `GpuDirty`. Runtime owns the ECS
-composition and history seam; geometry owns the denoising algorithm.
+Successful publication is undoable through the shared editor mutation
+transaction: undo restores the exact prior `v:position` array and redo
+reapplies the denoised positions only while the entity, geometry metadata, and
+live position snapshot still match the expected state. An intervening property
+or position mutation fails closed without moving history. The owner stamp marks
+`DirtyVertexPositions` and `DirtyVertexAttributes` for deferred mesh
+extraction/reupload and does not call renderer/RHI upload APIs or stamp broad
+`GpuDirty`. Runtime owns the ECS composition and history seam; geometry owns
+the denoising algorithm.
 
 ### Sandbox Editor Point-Cloud Outlier Removal
 
@@ -400,9 +417,14 @@ for undo plus a live-only worker cloud, and queues the GEOM-016 removal through
 points first (so the operators — which iterate every slot — see only live points
 and report live-relative counts, never resurrecting dead slots). The
 main-thread apply revalidates the selected entity's point-source metadata and
-positions before publishing; tests and non-engine callers without an injected
-job surface keep the immediate compatibility path. The window exposes a method
-toggle plus the per-method parameters: statistical removal takes `KNeighbors`
+full point-property/deleted-slot snapshot before publishing; the same typed
+state and validation enter the shared editor mutation transaction for exact
+undo/redo. An intervening position or attribute edit discards queued output or
+rejects history without mutation. Full GPU/position/attribute/normal dirty tags
+are stamped only after replacement publication; tests and non-engine callers
+without an injected job surface keep the immediate compatibility path. The
+window exposes a method toggle plus the per-method parameters: statistical
+removal takes `KNeighbors`
 (1–512) and a
 `StdDevMultiplier` (0–100, higher keeps more points); radius removal takes a
 positive `SearchRadius` and a `MinNeighbors` (0–512) threshold. It surfaces the
@@ -520,9 +542,13 @@ requested and available, the command also writes `v:principal_dir1` and
 or unavailable, the command succeeds with scalars only and reports a
 deterministic diagnostic. The UI exposes an output selector, a principal
 directions toggle that is inert when directions are unavailable, and a single
-`Compute` action. Successful commits are undoable through
-`EditorCommandHistory::Execute`, stamp `DirtyVertexAttributes`, and do not call
-renderer/RHI upload APIs or stamp broad `GpuDirty`.
+`Compute` action. Successful commits are undoable through the shared editor
+mutation transaction, which validates geometry metadata, the exact source
+positions, and the four owned curvature-property snapshots before apply, undo,
+or redo. An intervening geometry or curvature-property edit fails closed
+without moving history. Successful publication stamps
+`DirtyVertexAttributes` and does not call renderer/RHI upload APIs or stamp
+broad `GpuDirty`.
 
 Published curvature properties use the ordinary closed
 `Extrinsic.Runtime.VisualizationRecipes` alternatives. Scalar curvature maps
@@ -555,12 +581,15 @@ Each backing kernel and option has an explicit `SandboxEditorContext` feature
 gate, so unavailable operators return deterministic diagnostics without
 mutating `GeometrySources`.
 
-Successful remesh and subdivide commits are undoable through
-`EditorCommandHistory::Execute`: undo restores the exact prior mesh snapshot and
-redo reapplies the generated mesh. Publication stamps `DirtyVertexPositions`,
-`DirtyVertexAttributes`, `DirtyEdgeTopology`, and `DirtyFaceTopology`, and does
-not call renderer/RHI upload APIs or stamp broad `GpuDirty`; mesh extraction
-repackages/reuploads on the next deferred extraction opportunity.
+Successful remesh and subdivide commits are undoable through the shared editor
+mutation transaction: undo restores the exact prior mesh snapshot and redo
+reapplies the generated mesh only while geometry metadata and the complete
+canonical position/connectivity state still match. In-place topology changes
+also stale-discard queued output before publication. Publication stamps
+`DirtyVertexPositions`, `DirtyVertexAttributes`, `DirtyEdgeTopology`, and
+`DirtyFaceTopology`, and does not call renderer/RHI upload APIs or stamp broad
+`GpuDirty`; mesh extraction repackages/reuploads on the next deferred
+extraction opportunity.
 
 ### Sandbox Editor Mesh Simplify
 
@@ -577,13 +606,28 @@ per-collapse max-error cap (`0` = unlimited), boundary preservation, and the
 FA-QEM feature weights (feature angle, normal/boundary/curvature weights, sharp-
 feature and UV-seam pinning), and reads out the `Result` diagnostics: input →
 output vertex/face counts, collapse count, max collapse error, topology/quality
-rejections, and pinned sharp-feature/UV-seam counts. Commits are undoable
-through `EditorCommandHistory::Execute` and stamp the same
+rejections, and pinned sharp-feature/UV-seam counts. Commits use the same
+generation-validated topology transaction as remesh/subdivide and stamp the same
 `DirtyVertexPositions`/`DirtyVertexAttributes`/`DirtyEdgeTopology`/
 `DirtyFaceTopology` tags as remesh/subdivide, without renderer/RHI upload calls
 or broad `GpuDirty`. `SandboxEditorContext::MeshSimplifyKernelAvailable` gates
 the executor so an unavailable kernel returns deterministic diagnostics without
 mutating `GeometrySources`.
+
+### Sandbox Editor Mesh Parameterization
+
+The selected-mesh parameterization command dispatches the configured LSCM,
+harmonic-cotangent, Tutte-uniform, or BFF CPU strategy, validates finite
+count-matched output, and publishes canonical `v:texcoord` values through the
+shared editor mutation transaction. Each initial apply, undo, and redo
+revalidates geometry metadata plus the exact semantic triangle topology,
+finite `v:position` values, and current optional UV property consumed by the
+solver. Undo restores the prior UV values or removes a newly introduced
+property; redo restores the generated values. An intervening position,
+topology, or UV edit returns `StaleEntity` without changing geometry or the
+history cursor. Successful transitions stamp `DirtyVertexTexcoords` and
+`DirtyVertexAttributes` only after publication, while the transaction retains
+no selected-model cache or other session-owned state.
 
 ### Sandbox Editor ICP Registration
 
@@ -598,13 +642,18 @@ resolve to `GeometrySources` `Domain::PointCloud`, runs the runtime-owned
 `Extrinsic::Runtime::AlignPointClouds` ICP controller (which forwards to
 `Geometry::Registration::AlignICP` and captures the per-iteration convergence
 trajectory), and drives the source entity's `Transform::Component` with
-`Extrinsic::Runtime::TrajectoryPose(outcome, step)` through an undoable
-`MakeTransformEditCommand`. The panel takes the source/target from the current
-multi-selection (with a swap toggle), exposes the `ICPVariant`, max iterations,
-max correspondence distance (`0` = unlimited), and inlier ratio, and provides a
-trajectory-step slider over `[0, IterationCount()]` that scrubs the previewed
-pose. The command owns no geometry, renderer, or asset state; it only reads
-point positions, calls the runtime controller, and edits the source `Transform`.
+`Extrinsic::Runtime::TrajectoryPose(outcome, step)` through the same internal
+generation-validated transaction used by direct transform edits. Each history
+transition revalidates the captured world/registry/entity identity and exact
+expected transform before atomically replacing the component and stamping
+`Transform::IsDirtyTag`; an intervening transform edit fails closed instead of
+being overwritten by undo/redo. The panel takes the source/target from the
+current multi-selection (with a swap toggle), exposes the `ICPVariant`, max
+iterations, max correspondence distance (`0` = unlimited), and inlier ratio,
+and provides a trajectory-step slider over `[0, IterationCount()]` that scrubs
+the previewed pose. The command owns no geometry, renderer, or asset state; it
+only reads point positions, calls the runtime controller, and edits the source
+`Transform`.
 
 ### Sandbox Editor Appearance / Properties Reorganization
 
@@ -648,10 +697,13 @@ through `ResolveColorChannelPackedUnorm8`. Resolver status, source/fallback
 counts, and non-finite repair counts remain visible in the data-only model.
 
 `ApplySandboxEditorVertexChannelBindingCommand(...)` mutates only the runtime
-ECS descriptor `VertexChannelBindingSet`, stamps `DirtyVertexAttributes`, and
-marks editor history dirty when present. It does not allocate renderer
-resources, call RHI upload APIs, or persist material/asset authoring state.
-Runtime render extraction reads the component and passes it to
+ECS descriptor `VertexChannelBindingSet`. Under `RUNTIME-201`, the complete
+optional descriptor enters the shared editor mutation transaction: undo/redo
+restore the exact binding set, each transition rejects an intervening binding
+or generation edit, and the selected normal/color dirty domain is stamped only
+after successful publication. It does not allocate renderer resources, call
+RHI upload APIs, or persist material/asset authoring state. Runtime render
+extraction reads the component and passes it to
 `PackMesh`/`PackGraph`/`PackCloud`; graphics receives only the resulting
 channel byte spans through public `GpuWorld` upload descriptors.
 
@@ -676,6 +728,13 @@ exclusive `GeometrySources::ActiveDomain()`, so a mesh or graph can give its
 rendered vertices/nodes a uniform point-lane color independently of edge or
 surface color.
 
+Under `RUNTIME-201`, default and lane-targeted visualization changes share one
+owner-local mutation transaction. Each history transition revalidates the exact
+stored optional config for the stable `{world, entity, lane}` identity before
+replacing it; an intervening edit leaves ECS state and the undo/redo cursor
+unchanged. `EditorCommandHistory` stores only the generic record and no longer
+exports a visualization-component adapter.
+
 `UI-021` makes `Extrinsic.Runtime.GeometryAvailability` the shared availability
 policy for those editor models and commands. Domain windows, visualization
 targets, property catalogs, primitive-view toggles, render hints, K-Means
@@ -692,10 +751,15 @@ uniform default colors; compatible-first property choices with incompatible
 entries disabled and explained; readiness and diagnostics; per-entity
 derived-job rows from an injected `DerivedJobQueueSnapshot`; and aggregate child
 summaries for composition entities. Slot default and source-property commands
-route through `EditorCommandHistory` when available and mutate only the
+route through the shared generation-validated editor transaction when history
+is available. Apply, undo, and redo require the expected
+`GeometryPresentationRuntimeState::RecipeGeneration` and stamp a fresh
+monotonic generation, so an intervening bake/output or authoring mutation
+cannot be overwritten through an ABA generation restore. They mutate only the
 authored `GeometryPresentationRecipe`; readiness, diagnostics, and generated
-outputs remain in `GeometryPresentationRuntimeState`. UI code does not run geometry algorithms,
-texture bakes, asset IO, worker jobs, or graphics uploads, and it does not
+outputs remain in `GeometryPresentationRuntimeState`. UI code does not run
+geometry algorithms, texture bakes, asset IO, worker jobs, or graphics uploads,
+and it does not
 implicitly copy transient selection/highlight overlays into authored
 properties.
 
@@ -725,11 +789,14 @@ promoted fast-staged backend, and mesh UV regeneration command availability. The
 UV regeneration command triangulates the selected mesh `GeometrySources`, then
 queues `Geometry.UvAtlas` through the runtime `JobService` when that job
 surface is available. The worker runs from copied mesh soup, property, authored
-UV, and topology snapshots; the main-thread apply phase revalidates the live
-mesh generation/source snapshot, copies remapped known vertex/face properties
-back to the regenerated halfedge mesh, repopulates `GeometrySources`, stamps
-geometry and GPU dirty tags, and records an undoable `EditorCommandHistory`
-entry. The panel reports the matching `uv_regeneration` job status from
+UV, and topology snapshots. The main-thread apply phase and every undo/redo
+transition enter the shared generation-validated editor mutation transaction
+and revalidate exact live positions, edge/halfedge/face connectivity, and known
+vertex/face property values. Publication copies remapped properties back to the
+regenerated halfedge mesh, repopulates `GeometrySources`, then stamps geometry
+and full-GPU dirty tags. Intervening topology or authored-property edits discard
+queued output or reject history without mutation. The panel reports the
+matching `uv_regeneration` job status from
 the runtime queue snapshot and stores the immediate `Pending` result until the
 main-thread apply sink publishes the completed result. Callers without a job
 surface still use the same worker/commit path synchronously for compatibility.
@@ -765,6 +832,15 @@ graph nodes, and point-cloud points. Older primitive-view editor/engine command
 surfaces are compatibility shims that translate to `RenderEdges` /
 `RenderPoints`; extraction no longer consumes `MeshPrimitiveViewSettings` as a
 toggle source.
+
+Under `RUNTIME-201`, both the generic render-hint command and the mesh
+primitive-view compatibility command use one owner-local mutation transaction.
+The transaction snapshots the complete optional `RenderSurface`,
+`RenderEdges`, and `RenderPoints` cohort and revalidates it before initial
+apply, undo, or redo. An intervening component edit returns `StaleEntity`
+without overwriting another lane or moving the history cursor. The former
+public primitive-view history adapter is deleted; only the feature owner
+translates primitive-view input into canonical render components.
 
 Edge view sidecars prefer authored mesh `Edges` rows, but BUG-028 also derives a
 unique wireframe line list from valid halfedge/face surface topology when a mesh
@@ -898,8 +974,10 @@ reinitialize cannot make a stale participant handle valid again:
   selected-id snapshots, pending picks, and in-flight pick correlation without
   resetting its monotonic issue sequence.
 - `GizmoFrameService::ClearSceneState(...)` cancels a drag while the outgoing
-  registry is live, restores the authored transform, and clears gizmo undo,
-  selected scratch, and packets while retaining app-global tuning/mode.
+  registry is live, restores the authored transform, and clears selected
+  scratch and packets while retaining app-global tuning/mode. Durable gizmo
+  undo belongs to the document `EditorCommandHistory`, which the document
+  resets after the complete replacement transition.
 - `SelectionReadbackState::ClearSceneState()` drops all world/epoch correlation
   contexts and advances the refined-result generation. The stable lookup
   binding disconnects and clears; `AfterReplace` rebuilds it against the same
@@ -1614,9 +1692,10 @@ Known gaps relative to legacy and planned camera work are tracked in
 `tasks/archive/RUNTIME-081A-camera-legacy-gap-analysis.md`: editor-specific camera
 shortcuts and any policy that renders multiple camera outputs in one frame remain
 outside this runtime-controller surface. Transform-gizmo hit testing,
-translate/rotate/scale drag application, undo emission, default input binding,
-selected-entity scratch, selection-click interlock, and extraction packet
-submission now live in `Extrinsic.Runtime.GizmoInteraction` plus
+translate/rotate/scale drag application, generation-validated
+`EditorCommandHistory` batch commit, default input binding, selected-entity
+scratch, selection-click interlock, and extraction packet submission now live
+in `Extrinsic.Runtime.GizmoInteraction` plus
 `Extrinsic.Runtime.GizmoFrameService`. Graphics consumes only copied
 `TransformGizmoRenderPacket` spans.
 

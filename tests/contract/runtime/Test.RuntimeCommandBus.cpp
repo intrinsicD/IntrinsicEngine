@@ -16,8 +16,6 @@ using Extrinsic::ECS::Scene::Registry;
 using Extrinsic::Runtime::CommandBus;
 using Extrinsic::Runtime::CommandContext;
 using Extrinsic::Runtime::CommandCorrelationId;
-using Extrinsic::Runtime::CommandEnvelope;
-using Extrinsic::Runtime::CommandHistoryRecord;
 using Extrinsic::Runtime::CommandOutcome;
 using Extrinsic::Runtime::CommandStatus;
 
@@ -40,11 +38,6 @@ namespace
     {
     };
 
-    struct SetValue
-    {
-        int Old{0};
-        int New{0};
-    };
 }
 
 TEST(RuntimeCommandBus, DrainExecutesInEnqueueOrderOnDrainingThread)
@@ -205,46 +198,6 @@ TEST(RuntimeCommandBus, HandlerEnqueuedFollowUpDefersToNextDrain)
     EXPECT_EQ(followUps, 1);
 }
 
-TEST(RuntimeCommandBus, HistoryHookReceivesReEnqueueableInverse)
-{
-    Registry   scene;
-    CommandBus bus;
-
-    int current = 0;
-    bus.RegisterHandler<SetValue>(
-        [&](CommandContext& ctx, const SetValue& cmd) -> CommandOutcome
-        {
-            current = cmd.New;
-            ctx.Commands.RecordInverse(
-                CommandEnvelope::Make(SetValue{cmd.New, cmd.Old}));
-            return CommandOutcome::Ok();
-        });
-
-    CommandEnvelope inverse;
-    int             hookCalls = 0;
-    bus.SetHistoryHook(
-        [&](const CommandHistoryRecord& record)
-        {
-            ++hookCalls;
-            inverse = record.Inverse;
-            EXPECT_TRUE(record.Correlation.IsValid());
-        });
-
-    bus.Enqueue(SetValue{0, 7});
-    bus.Drain(scene);
-
-    EXPECT_EQ(current, 7);
-    EXPECT_EQ(hookCalls, 1);
-    ASSERT_TRUE(inverse.IsValid());
-
-    // Undo = re-enqueue the recorded inverse envelope.
-    bus.Enqueue(inverse);
-    bus.Drain(scene);
-
-    EXPECT_EQ(current, 0);
-    EXPECT_EQ(hookCalls, 2);  // the undo records its own inverse (redo)
-}
-
 TEST(RuntimeCommandBus, DiscardPendingDropsQueuedCommandsWithoutExecuting)
 {
     Registry   scene;
@@ -270,26 +223,4 @@ TEST(RuntimeCommandBus, DiscardPendingDropsQueuedCommandsWithoutExecuting)
     EXPECT_EQ(executed, 0);
     EXPECT_EQ(bus.Stats().Executed, 0u);
     EXPECT_EQ(bus.DiscardPending(), 0u);
-}
-
-TEST(RuntimeCommandBus, FailedCommandDoesNotNotifyHistoryHook)
-{
-    Registry   scene;
-    CommandBus bus;
-
-    bus.RegisterHandler<FailingCommand>(
-        [](CommandContext& ctx, const FailingCommand&) -> CommandOutcome
-        {
-            ctx.Commands.RecordInverse(CommandEnvelope::Make(AppendValue{1}));
-            return CommandOutcome::Fail("intentional test failure");
-        });
-
-    int hookCalls = 0;
-    bus.SetHistoryHook([&](const CommandHistoryRecord&) { ++hookCalls; });
-
-    bus.Enqueue(FailingCommand{});
-    bus.Drain(scene);
-
-    EXPECT_EQ(hookCalls, 0);
-    EXPECT_EQ(bus.Stats().Failed, 1u);
 }

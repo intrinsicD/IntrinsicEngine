@@ -599,6 +599,80 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
     EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 }
+TEST(SandboxEditorUi,
+     VertexChannelBindingHistoryRestoresExactlyAndRejectsInterveningState)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "BindingHistory");
+    AddTriangleMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    SetVec3Property(
+        properties,
+        "v:custom_normal",
+        {
+            {1.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+        });
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+            context,
+            Runtime::SandboxEditorVertexChannelBindingCommand{
+                .StableEntityId = stableId,
+                .Channel = Runtime::VertexChannel::Normal,
+                .EnableBinding = true,
+                .PropertyName = "v:custom_normal",
+            }),
+        Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_EQ(history.UndoCount(), 1u);
+
+    const Runtime::VertexChannelBindingSet after =
+        registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh);
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(
+        registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    const auto& redone =
+        registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh);
+    EXPECT_EQ(redone.Normal.Enabled, after.Normal.Enabled);
+    EXPECT_EQ(redone.Normal.Property, after.Normal.Property);
+    EXPECT_EQ(redone.Color.Enabled, after.Color.Enabled);
+    EXPECT_EQ(redone.Color.Property, after.Color.Property);
+    EXPECT_EQ(redone.BindingGeneration, after.BindingGeneration);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    auto& intervening =
+        registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh);
+    ++intervening.BindingGeneration;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+
+    intervening = after;
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(
+        registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
+}
 TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
 {
     using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
@@ -845,6 +919,20 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
               G::RenderSurface::SourceDomain::Face);
 
+    raw.get<G::RenderSurface>(mesh).Domain =
+        G::RenderSurface::SourceDomain::Vertex;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
+              G::RenderSurface::SourceDomain::Vertex);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+    raw.get<G::RenderSurface>(mesh).Domain =
+        G::RenderSurface::SourceDomain::Face;
+
     EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
                   context,
                   Runtime::SandboxEditorRenderHintCommand{
@@ -1083,6 +1171,59 @@ TEST(SandboxEditorUi, TransformEditCommandMutatesLocalTransformAndMarksDirty)
                   }),
               Runtime::SandboxEditorCommandStatus::MissingSelectionController);
 }
+TEST(SandboxEditorUi,
+     TransformEditHistoryRejectsInterveningStateAndRestoresExactly)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle entity = MakeSelectable(registry, "Undoable");
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(entity);
+    const ECSC::Transform::Component before =
+        registry.Raw().get<ECSC::Transform::Component>(entity);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorTransformEdit(
+                  context,
+                  Runtime::SandboxEditorTransformEditCommand{
+                      .StableEntityId = stableId,
+                      .SetPosition = true,
+                      .Position = glm::vec3{4.0f, 5.0f, 6.0f},
+                      .SetScale = true,
+                      .Scale = glm::vec3{2.0f, 2.5f, 3.0f},
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_EQ(history.UndoCount(), 1u);
+    const ECSC::Transform::Component after =
+        registry.Raw().get<ECSC::Transform::Component>(entity);
+
+    auto& transform =
+        registry.Raw().get<ECSC::Transform::Component>(entity);
+    transform.Position = glm::vec3{99.0f};
+    const Runtime::EditorCommandHistoryResult rejected = history.Undo();
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(transform.Position, glm::vec3{99.0f});
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 1u);
+
+    transform = after;
+    const Runtime::EditorCommandHistoryResult undone = history.Undo();
+    ASSERT_EQ(undone.Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(transform.Position, before.Position);
+    EXPECT_EQ(transform.Rotation, before.Rotation);
+    EXPECT_EQ(transform.Scale, before.Scale);
+
+    const Runtime::EditorCommandHistoryResult redone = history.Redo();
+    ASSERT_EQ(redone.Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(transform.Position, after.Position);
+    EXPECT_EQ(transform.Rotation, after.Rotation);
+    EXPECT_EQ(transform.Scale, after.Scale);
+    EXPECT_TRUE(
+        registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(entity));
+}
 TEST(SandboxEditorUi, CameraControllerCommandReplacesMainController)
 {
     ECS::Scene::Registry registry;
@@ -1249,6 +1390,71 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
                   }),
               Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
 }
+
+TEST(SandboxEditorUi, PrimitiveViewHistoryRejectsInterveningRenderHints)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto& raw = registry.Raw();
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    raw.emplace<G::RenderSurface>(
+        mesh,
+        G::RenderSurface{
+            .Domain = G::RenderSurface::SourceDomain::Face,
+        });
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorPrimitiveViewCommand(
+            context,
+            Runtime::SandboxEditorPrimitiveViewCommand{
+                .StableEntityId = stableId,
+                .SetEdgeView = true,
+                .EnableEdgeView = true,
+                .SetVertexView = true,
+                .EnableVertexView = true,
+                .SetVertexRenderMode = true,
+                .VertexRenderMode =
+                    Runtime::MeshVertexViewRenderMode::ImpostorSphere,
+                .SetVertexPointRadius = true,
+                .VertexPointRadiusPx = 9.0f,
+            }),
+        Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
+
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_FALSE(raw.all_of<G::RenderEdges>(mesh));
+    EXPECT_FALSE(raw.all_of<G::RenderPoints>(mesh));
+    ASSERT_TRUE(raw.all_of<G::RenderSurface>(mesh));
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
+              G::RenderSurface::SourceDomain::Face);
+
+    ASSERT_TRUE(history.Redo().Succeeded());
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
+    raw.get<G::RenderSurface>(mesh).Domain =
+        G::RenderSurface::SourceDomain::Vertex;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
+              G::RenderSurface::SourceDomain::Vertex);
+    EXPECT_TRUE(raw.all_of<G::RenderEdges>(mesh));
+    EXPECT_TRUE(raw.all_of<G::RenderPoints>(mesh));
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+}
+
 TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
 {
     ECS::Scene::Registry registry;
@@ -1452,6 +1658,62 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
               Runtime::SandboxEditorCommandStatus::Applied);
     EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+}
+TEST(SandboxEditorUi,
+     VisualizationConfigHistoryRejectsInterveningStateAndRestoresExactly)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VisualMesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    context.VisualizationCommandsAvailable = true;
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationConfigCommand{
+                      .StableEntityId = stableId,
+                      .EnableConfig = true,
+                      .Source =
+                          G::VisualizationConfig::ColorSource::UniformColor,
+                      .Color = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f},
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    const G::VisualizationConfig applied =
+        registry.Raw().get<G::VisualizationConfig>(mesh);
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+
+    G::VisualizationConfig intervening = applied;
+    intervening.Color = glm::vec4{0.9f, 0.8f, 0.7f, 1.0f};
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(
+        mesh,
+        intervening);
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Color,
+              intervening.Color);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, applied);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Color,
+              applied.Color);
 }
 TEST(SandboxEditorUi, VisualizationRecipeCommandRoutesThroughRuntimeSurface)
 {
@@ -1675,7 +1937,7 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
         registry.Raw()
             .get<Runtime::GeometryPresentationRuntimeState>(mesh)
             .RecipeGeneration,
-        7u);
+        9u);
 
     EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
                   context,
@@ -1695,7 +1957,7 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
         registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
     const auto& propertyRuntimeState =
         registry.Raw().get<Runtime::GeometryPresentationRuntimeState>(mesh);
-    EXPECT_EQ(propertyRuntimeState.RecipeGeneration, 8u);
+    EXPECT_EQ(propertyRuntimeState.RecipeGeneration, 10u);
     presentation = Runtime::FindGeometryPresentationBinding(propertyBindings, "mesh.surface");
     ASSERT_NE(presentation, nullptr);
     albedo =
@@ -1728,4 +1990,90 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
                       .PropertyName = "v:temperature",
                   }),
               Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+
+    Runtime::SandboxEditorContext directContext = context;
+    directContext.CommandHistory = nullptr;
+    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
+                  directContext,
+                  Runtime::SandboxEditorGeometryPresentationSlotDefaultCommand{
+                      .StableEntityId = stableId,
+                      .PresentationKey = "mesh.surface",
+                      .Semantic =
+                          Runtime::GeometryPresentationSlotSemantic::Albedo,
+                      .Value = newColor,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(mesh)
+            .RecipeGeneration,
+        11u);
+}
+
+TEST(SandboxEditorUi,
+     GeometryPresentationHistoryRejectsInterveningGenerationWithoutMutation)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "GeometryPresentationStaleHistory");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
+        mesh,
+        MakeGeometryPresentationRecipe());
+    registry.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
+        mesh,
+        MakeGeometryPresentationRuntimeState());
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const Runtime::GeometryPresentationDefaultValue authored{
+        .Kind = Geometry::PropertyValueKind::Vec4,
+        .Vector = glm::vec4{0.9f, 0.1f, 0.2f, 1.0f},
+    };
+    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
+                  context,
+                  Runtime::SandboxEditorGeometryPresentationSlotDefaultCommand{
+                      .StableEntityId = stableId,
+                      .PresentationKey = "mesh.surface",
+                      .Semantic =
+                          Runtime::GeometryPresentationSlotSemantic::Albedo,
+                      .Value = authored,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(mesh)
+            .RecipeGeneration,
+        8u);
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+
+    auto& recipe =
+        registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
+    auto* presentation =
+        Runtime::FindGeometryPresentationBinding(recipe, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    auto* albedo =
+        Runtime::FindGeometryPresentationSlot(
+            *presentation,
+            Runtime::GeometryPresentationSlotSemantic::Albedo);
+    ASSERT_NE(albedo, nullptr);
+    const glm::vec4 intervening{0.3f, 0.4f, 0.5f, 1.0f};
+    albedo->UniformDefault.Vector = intervening;
+    auto& runtime =
+        registry.Raw().get<Runtime::GeometryPresentationRuntimeState>(mesh);
+    ++runtime.RecipeGeneration;
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(albedo->UniformDefault.Vector, intervening);
+    EXPECT_EQ(runtime.RecipeGeneration, 9u);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
 }

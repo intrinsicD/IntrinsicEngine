@@ -211,6 +211,67 @@ participants may still release their exact registration handles before reverse
 module teardown. Omitting the module leaves Engine and the active world
 operational but publishes no document or history capability.
 
+Undoable entity edits keep their typed capture, validation, atomic application,
+and dirty-stamp policy with the owning runtime feature. The runtime-internal
+`ExecuteUndoableEntityMutation(...)` template turns those callbacks plus stable
+world/entity identity, expected owner state/generations, and typed before/after
+values into one generic `EditorCommandHistory` record. Every initial apply,
+undo, and redo validates before publishing; rejection leaves both feature state
+and the history cursor unchanged. Direct/ICP transforms, coalesced gizmo
+transforms, and default or lane-targeted visualization config edits use this
+shape. Mesh, graph, and point-cloud vertex-normal publishers use it for both
+immediate and queued completion paths, validating exact non-output source
+properties plus the optional current normal property. Clustering likewise
+captures exact input points and the optional label/color/scalar output cohort;
+its CPU and Vulkan completions enter the transaction when document history is
+composed, while the module stays independently usable without it.
+Progressive Poisson point publication stages its four optional scalar
+properties and entity visualization before committing them together. Its
+mesh-surface lane captures the complete authoritative geometry-source and
+owned presentation cohort, so the destructive mesh-to-point-cloud conversion
+restores the original domain, properties, topology, and render hints on undo.
+Both immediate and queued lanes reject intervening source, output, or owned
+presentation changes before publication and before every history transition.
+Geometry-presentation slot edits additionally validate and monotonically
+advance the presentation recipe generation on apply, undo, and redo instead of
+restoring a captured generation and admitting an ABA stale-output match. The
+mesh-denoise publisher validates both geometry metadata and the exact live
+`v:position` snapshot before each transition. Mesh-curvature publication also
+validates that source plus the exact mean, Gaussian, and principal-direction
+property snapshots it owns. Remesh, subdivide, and simplify publication
+validate geometry metadata plus the complete canonical position/connectivity
+state, including before queued output may publish. UV regeneration uses the
+same transaction mechanics with its owner-specific semantic source snapshot:
+exact live positions, edge/halfedge/face connectivity, and known vertex/face
+property values are revalidated before queued publication and every history
+transition. Its apply stamp requests the required full GPU rebuild only after
+the regenerated topology is published; the other mesh owners stamp their
+normal deferred geometry dirty tags after publication. Point-cloud outlier
+replacement also uses the transaction with an exact full point-property/deleted
+slot snapshot; queued output and undo/redo reject any intervening point
+attribute or metadata mutation, and full replacement dirty tags are stamped
+only after publication. Parameterization UV publication validates geometry
+metadata plus the exact semantic triangle topology, finite positions, and
+current optional `v:texcoord` state consumed by the solver. Its initial apply
+and every undo/redo transition stamp texcoord/attribute dirtiness only after
+the UV property is replaced or removed. Generic render-hint and mesh
+primitive-view edits snapshot the complete optional `RenderSurface`,
+`RenderEdges`, and `RenderPoints` component cohort. Each transition validates
+that exact cohort before replacing it, so an intervening lane edit leaves ECS
+and history unchanged. The public history module therefore owns history
+mechanics rather than transform, visualization, or primitive-view component
+DTOs. Retired `RUNTIME-201`'s production census found no parallel undo stack,
+inverse-history hook, specialized mutation builder, or undoable entity edit
+outside the common transaction.
+
+Asset import is intentionally outside that undoable editor-mutation set.
+Successful scene-changing materialization calls
+`EditorCommandHistory::MarkDirty` to advance document dirty/revision state
+without adding an undo record; entity creation, authoring defaults, and
+post-import enrichment remain one automatic import lifecycle. `BUG-095` owns
+generation-safe stale discard for the deferred direct-mesh enrichment, and
+`RUNTIME-200` owns its migration into the staged import recipe.
+
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes
 the exact `CameraControllerRegistry`, subscribes to active-world change and
@@ -647,9 +708,12 @@ invented rollback protocol exists.
 `SceneInteractionModule` retains its own strong participant handle. Before
 replacement it cancels any drag while the registry is live and clears
 selection/hover tags, pending and in-flight picks, readback contexts/refined
-output, gizmo undo/scratch/packets, stable lookup binding, and its copied render
-snapshot. After replacement it rebuilds lookup against the rebound registry and
-publishes empty interaction data. The module owns one validated
+output, gizmo scratch/packets, stable lookup binding, and its copied render
+snapshot. Gizmo drag release coalesces the selected transform batch into the
+document-owned `EditorCommandHistory`; when that service is absent, transform
+dragging is disabled rather than recorded in a second stack. After replacement
+the module rebuilds lookup against the rebound registry and publishes empty
+interaction data. The module owns one validated
 `{WorldHandle, Registry*, interaction epoch}` binding; pick sequences remain
 monotonic while old-world/old-epoch results fail closed.
 

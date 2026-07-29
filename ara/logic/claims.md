@@ -399,3 +399,44 @@
 - **Tags**: runtime, graphics, property texture bake, Vulkan, parity,
   retirement
 - **From staging**: O70
+
+## C16: Runtime entity mutations have one undoable history transaction
+- **Statement**: Production undoable runtime entity and geometry edits use the
+  include-only `ExecuteUndoableEntityMutation` transaction and the single
+  `EditorCommandHistory`. Transform, gizmo, visualization/presentation,
+  render-hint, geometry property/topology/domain conversion, parameterization,
+  vertex-channel/normal, clustering, and Progressive Poisson owners retain
+  their exact typed state, generation validation, atomic apply, and dirty
+  policy. Import creation, authoring, and enrichment remain a deliberately
+  non-undoable dirty-only document lifecycle. The former gizmo stack,
+  CommandBus inverse-history hook, and mutation-specific history adapters are
+  absent.
+- **Status**: supported — focused and complete CPU/Null contracts; no
+  GPU/Vulkan or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: An undoable production entity/geometry edit
+  bypasses the internal transaction or commits more than one history record; a
+  queued result publishes after its captured entity/source/presentation state
+  becomes stale; undo/redo fails to restore the feature-owned exact state; a
+  second undo stack, CommandBus inverse hook, or mutation-specific history
+  builder returns; or import lifecycle starts creating partial undo records.
+- **Proof**: [tasks/done/RUNTIME-201-unified-editor-mutation-history-transaction.md,
+  src/runtime/Runtime.EditorMutation.Internal.hpp,
+  src/runtime/Runtime.EditorCommandHistory.cppm,
+  src/runtime/Runtime.EditorCommandHistory.cpp,
+  src/runtime/Runtime.SandboxEditorFacades.cpp,
+  src/runtime/Runtime.SandboxMethodFacade.cpp,
+  src/runtime/Runtime.SandboxParameterizationFacade.cpp,
+  src/runtime/Gizmos/Runtime.GizmoInteraction.cpp,
+  src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp,
+  tests/contract/runtime/Test.EditorCommandHistory.cpp,
+  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tests/contract/runtime/Test.SandboxEditorVisualization.cpp,
+  tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
+  tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp,
+  tests/contract/runtime/Test.AssetImportFormatCoverage.cpp,
+  docs/architecture/runtime.md]
+- **Dependencies**: [C06, C11, C12, C14]
+- **Tags**: runtime, editor, mutation, history, undo, redo, CPU, retirement
+- **From staging**: O76

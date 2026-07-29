@@ -3,7 +3,10 @@ module;
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <span>
+#include <string>
+#include <utility>
 #include <vector>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -15,6 +18,8 @@ module Extrinsic.Runtime.GizmoInteraction;
 
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.Runtime.StableEntityLookup;
+
+#include "../Runtime.EditorMutation.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -144,11 +149,99 @@ namespace Extrinsic::Runtime
                    glm::length(afterScale - beforeScale) > kEpsilon ||
                    rotationDelta < 1.0f - kEpsilon;
         }
-    }
 
-    void GizmoUndoStack::Push(const GizmoTransformEdit& edit)
-    {
-        m_Records.push_back(edit);
+        struct GizmoTransformMutationIdentity
+        {
+            GizmoInteraction::Registry* Scene{nullptr};
+            WorldHandle World{};
+        };
+
+        struct GizmoTransformState
+        {
+            GizmoInteraction::EntityHandle Entity{
+                Extrinsic::ECS::InvalidEntityHandle};
+            Extrinsic::ECS::Components::Transform::Component Transform{};
+        };
+
+        struct GizmoTransformBatch
+        {
+            std::vector<GizmoTransformState> Transforms{};
+        };
+
+        [[nodiscard]] bool SameTransform(
+            const Extrinsic::ECS::Components::Transform::Component& lhs,
+            const Extrinsic::ECS::Components::Transform::Component& rhs)
+            noexcept
+        {
+            return lhs.Position == rhs.Position &&
+                   lhs.Rotation == rhs.Rotation &&
+                   lhs.Scale == rhs.Scale;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ValidateGizmoTransformBatch(
+            const GizmoTransformMutationIdentity& identity,
+            const GizmoTransformBatch& expected)
+        {
+            if (identity.Scene == nullptr || !identity.World.IsValid())
+                return EditorCommandHistoryStatus::MissingScene;
+            if (expected.Transforms.empty())
+                return EditorCommandHistoryStatus::NoChange;
+
+            for (const GizmoTransformState& state : expected.Transforms)
+            {
+                if (!identity.Scene->IsValid(state.Entity))
+                    return EditorCommandHistoryStatus::StaleEntity;
+                const auto* transform =
+                    identity.Scene->Raw().try_get<
+                        Extrinsic::ECS::Components::Transform::Component>(
+                        state.Entity);
+                if (transform == nullptr)
+                    return EditorCommandHistoryStatus::MissingTransform;
+                if (!SameTransform(*transform, state.Transform))
+                    return EditorCommandHistoryStatus::StaleEntity;
+            }
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyGizmoTransformBatch(
+            const GizmoTransformMutationIdentity& identity,
+            const GizmoTransformBatch& target)
+        {
+            if (target.Transforms.empty())
+                return EditorCommandHistoryStatus::NoChange;
+
+            for (const GizmoTransformState& state : target.Transforms)
+            {
+                if (!identity.Scene->IsValid(state.Entity))
+                    return EditorCommandHistoryStatus::StaleEntity;
+                if (identity.Scene->Raw().try_get<
+                        Extrinsic::ECS::Components::Transform::Component>(
+                        state.Entity) == nullptr)
+                {
+                    return EditorCommandHistoryStatus::MissingTransform;
+                }
+            }
+            for (const GizmoTransformState& state : target.Transforms)
+            {
+                identity.Scene->Raw().get<
+                    Extrinsic::ECS::Components::Transform::Component>(
+                    state.Entity) = state.Transform;
+            }
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] GizmoTransformBatch StampGizmoTransformBatch(
+            const GizmoTransformMutationIdentity& identity,
+            const GizmoTransformBatch& target)
+        {
+            for (const GizmoTransformState& state : target.Transforms)
+            {
+                identity.Scene->Raw().emplace_or_replace<
+                    Extrinsic::ECS::Components::Transform::IsDirtyTag>(
+                    state.Entity);
+            }
+            return target;
+        }
     }
 
     GizmoInteraction::GizmoInteraction(const GizmoConfig& config) noexcept
@@ -410,45 +503,119 @@ namespace Extrinsic::Runtime
         return true;
     }
 
-    std::size_t GizmoInteraction::DragCommit(const Registry& registry, GizmoUndoStack& undo)
+    EditorCommandHistoryResult GizmoInteraction::DragCommit(
+        Registry& registry,
+        const WorldHandle world,
+        EditorCommandHistory& history)
     {
-        if (!m_Dragging)
-            return 0u;
+        const bool wasDragging = m_Dragging;
+        GizmoTransformBatch before{};
+        GizmoTransformBatch after{};
+        before.Transforms.reserve(m_DragEntries.size());
+        after.Transforms.reserve(m_DragEntries.size());
 
-        std::size_t emitted = 0u;
-        for (const DragEntry& entry : m_DragEntries)
+        if (wasDragging)
         {
-            glm::vec3 after{0.f};
-            glm::quat afterRotation{1.f, 0.f, 0.f, 0.f};
-            glm::vec3 afterScale{1.f};
-            if (!ReadTransform(registry, entry.Entity, after, afterRotation, afterScale))
-                continue;
-            if (!MeaningfullyDifferent(entry.BeforePosition,
-                                       entry.BeforeRotation,
-                                       entry.BeforeScale,
-                                       after,
-                                       afterRotation,
-                                       afterScale))
-                continue;
-            undo.Push(GizmoTransformEdit{
-                .Entity = entry.Entity,
-                .BeforePosition = entry.BeforePosition,
-                .AfterPosition = after,
-                .BeforeRotation = entry.BeforeRotation,
-                .AfterRotation = afterRotation,
-                .BeforeScale = entry.BeforeScale,
-                .AfterScale = afterScale,
-            });
-            ++emitted;
+            for (const DragEntry& entry : m_DragEntries)
+            {
+                glm::vec3 afterPosition{0.f};
+                glm::quat afterRotation{1.f, 0.f, 0.f, 0.f};
+                glm::vec3 afterScale{1.f};
+                if (!ReadTransform(
+                        registry,
+                        entry.Entity,
+                        afterPosition,
+                        afterRotation,
+                        afterScale))
+                {
+                    continue;
+                }
+                if (!MeaningfullyDifferent(
+                        entry.BeforePosition,
+                        entry.BeforeRotation,
+                        entry.BeforeScale,
+                        afterPosition,
+                        afterRotation,
+                        afterScale))
+                {
+                    continue;
+                }
+
+                before.Transforms.push_back(
+                    GizmoTransformState{
+                        .Entity = entry.Entity,
+                        .Transform =
+                            {
+                                .Position = entry.BeforePosition,
+                                .Rotation = entry.BeforeRotation,
+                                .Scale = entry.BeforeScale,
+                            },
+                    });
+                after.Transforms.push_back(
+                    GizmoTransformState{
+                        .Entity = entry.Entity,
+                        .Transform =
+                            {
+                                .Position = afterPosition,
+                                .Rotation = afterRotation,
+                                .Scale = afterScale,
+                            },
+                    });
+            }
         }
+
+        const std::size_t editCount = after.Transforms.size();
+        GizmoTransformBatch expected = after;
+        EditorCommandHistoryResult result =
+            Internal::ExecuteUndoableEntityMutation(
+                history,
+                "Manipulate Transform",
+                GizmoTransformMutationIdentity{
+                    .Scene = &registry,
+                    .World = world,
+                },
+                std::move(expected),
+                std::move(before),
+                std::move(after),
+                [](
+                    const GizmoTransformMutationIdentity& identity,
+                    const GizmoTransformBatch& expected,
+                    const GizmoTransformBatch&)
+                {
+                    return ValidateGizmoTransformBatch(
+                        identity, expected);
+                },
+                [](
+                    const GizmoTransformMutationIdentity& identity,
+                    const GizmoTransformBatch& target)
+                {
+                    return ApplyGizmoTransformBatch(
+                        identity, target);
+                },
+                [](
+                    const GizmoTransformMutationIdentity& identity,
+                    const GizmoTransformBatch&,
+                    const GizmoTransformBatch& target)
+                {
+                    return StampGizmoTransformBatch(
+                        identity, target);
+                },
+                true,
+                Internal::InitialMutationState::
+                    TargetAlreadyApplied);
 
         m_Dragging = false;
         m_DragMode = GizmoMode::Translate;
         m_DragAxis = GizmoAxis::None;
         m_DragEntries.clear();
-        ++m_Diagnostics.DragsCommitted;
-        m_Diagnostics.EditsEmitted += static_cast<std::uint32_t>(emitted);
-        return emitted;
+        if (wasDragging)
+            ++m_Diagnostics.DragsCommitted;
+        if (result.Succeeded())
+        {
+            m_Diagnostics.EditsEmitted +=
+                static_cast<std::uint32_t>(editCount);
+        }
+        return result;
     }
 
     void GizmoInteraction::DragCancel(Registry& registry)

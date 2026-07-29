@@ -12,6 +12,7 @@ export module Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Core.Error;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.EditorCommandHistory;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -187,6 +188,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::string_view Name() const noexcept override;
         [[nodiscard]] Core::Result OnRegister(EngineSetup& setup) override;
+        [[nodiscard]] Core::Result OnResolve(EngineSetup& setup) override;
         void OnShutdown(RuntimeModuleShutdownContext& context) override;
 
         [[nodiscard]] const ClusteringModuleStats& Stats() const noexcept
@@ -201,6 +203,7 @@ namespace Extrinsic::Runtime
         KernelEventBus* m_Events{};
         JobService* m_Jobs{};
         WorldRegistry* m_Worlds{};
+        EditorCommandHistory* m_History{};
         RHI::IDevice* m_Device{};
         std::unique_ptr<ClusteringGpuState> m_GpuState{};
         GpuQueueParticipantHandle m_GpuParticipant{};

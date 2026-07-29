@@ -1919,8 +1919,16 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelinePreservesImportDirtySt
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
-    EXPECT_TRUE(engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty());
-    EXPECT_TRUE(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Dirty);
+    Runtime::EditorCommandHistory* const history =
+        engine.Services().Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    EXPECT_TRUE(history->IsDirty());
+    const Runtime::EditorCommandHistorySnapshot snapshot =
+        history->Snapshot();
+    EXPECT_TRUE(snapshot.Dirty);
+    EXPECT_EQ(snapshot.Revision, 1u);
+    EXPECT_EQ(snapshot.UndoCount, 0u);
+    EXPECT_FALSE(snapshot.CanUndo);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& importedEvent =
         pipeline.GetLastAssetImportEvent();

@@ -113,6 +113,7 @@ import Geometry.Smoothing;
 import Geometry.Subdivision;
 import Geometry.UvAtlas;
 
+#include "Runtime.EditorMutation.Internal.hpp"
 #include "Runtime.SandboxEditorFacades.Internal.hpp"
 
 namespace Extrinsic::Runtime
@@ -169,6 +170,10 @@ namespace Extrinsic::Runtime
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
         using SandboxEditorModelBuildClock = std::chrono::steady_clock;
+
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
+            const entt::registry& raw,
+            std::uint32_t stableId);
 
         [[nodiscard]] std::uint64_t SandboxEditorElapsedNs(
             const SandboxEditorModelBuildClock::time_point start) noexcept
@@ -972,36 +977,6 @@ namespace Extrinsic::Runtime
             return EditorCommandHistoryStatus::Applied;
         }
 
-        [[nodiscard]] EditorCommandRecord MakeVisualizationConfigTargetCommand(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const SandboxEditorVisualizationTarget target,
-            std::optional<G::VisualizationConfig> before,
-            std::optional<G::VisualizationConfig> after,
-            std::string label)
-        {
-            return EditorCommandRecord{
-                .Label = std::move(label),
-                .Redo = [scene, stableEntityId, target, after]()
-                {
-                    return ApplyVisualizationConfigTarget(
-                        scene,
-                        stableEntityId,
-                        target,
-                        after);
-                },
-                .Undo = [scene, stableEntityId, target, before]()
-                {
-                    return ApplyVisualizationConfigTarget(
-                        scene,
-                        stableEntityId,
-                        target,
-                        before);
-                },
-                .Dirtying = true,
-            };
-        }
-
         [[nodiscard]] bool SameVisualizationConfig(
             const G::VisualizationConfig& lhs,
             const G::VisualizationConfig& rhs) noexcept
@@ -1029,6 +1004,93 @@ namespace Extrinsic::Runtime
                    lhs.Scalar.Isolines.Num == rhs.Scalar.Isolines.Num &&
                    lhs.Scalar.Isolines.Width == rhs.Scalar.Isolines.Width &&
                    lhs.Scalar.Isolines.Color == rhs.Scalar.Isolines.Color;
+        }
+
+        [[nodiscard]] bool SameOptionalVisualizationConfig(
+            const std::optional<G::VisualizationConfig>& lhs,
+            const std::optional<G::VisualizationConfig>& rhs) noexcept
+        {
+            if (lhs.has_value() != rhs.has_value())
+                return false;
+            return !lhs.has_value() || SameVisualizationConfig(*lhs, *rhs);
+        }
+
+        struct EditorVisualizationMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            SandboxEditorVisualizationTarget Target{
+                SandboxEditorVisualizationTarget::Entity};
+        };
+
+        [[nodiscard]] EditorCommandHistoryResult
+        ExecuteEditorVisualizationMutation(
+            EditorCommandHistory& history,
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVisualizationTarget target,
+            const std::optional<G::VisualizationConfig>& before,
+            const std::optional<G::VisualizationConfig>& after,
+            std::string label)
+        {
+            return Internal::ExecuteUndoableEntityMutation(
+                history,
+                std::move(label),
+                EditorVisualizationMutationIdentity{
+                    .Scene = scene,
+                    .World = world,
+                    .StableEntityId = stableEntityId,
+                    .Target = target,
+                },
+                before,
+                before,
+                after,
+                [](
+                    const EditorVisualizationMutationIdentity& identity,
+                    const std::optional<G::VisualizationConfig>& expected,
+                    const std::optional<G::VisualizationConfig>&)
+                {
+                    if (identity.Scene == nullptr || !identity.World.IsValid())
+                        return EditorCommandHistoryStatus::MissingScene;
+
+                    entt::registry& raw = identity.Scene->Raw();
+                    const ECS::EntityHandle entity =
+                        SelectionController::ToEntityHandle(
+                            identity.StableEntityId);
+                    if (entity == ECS::InvalidEntityHandle ||
+                        !raw.valid(entity))
+                    {
+                        return EditorCommandHistoryStatus::StaleEntity;
+                    }
+
+                    return SameOptionalVisualizationConfig(
+                               StoredVisualizationConfigForTarget(
+                                   raw,
+                                   entity,
+                                   identity.Target),
+                               expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                },
+                [](
+                    const EditorVisualizationMutationIdentity& identity,
+                    const std::optional<G::VisualizationConfig>& targetConfig)
+                {
+                    return ApplyVisualizationConfigTarget(
+                        identity.Scene,
+                        identity.StableEntityId,
+                        identity.Target,
+                        targetConfig);
+                },
+                [](
+                    const EditorVisualizationMutationIdentity&,
+                    const std::optional<G::VisualizationConfig>&,
+                    const std::optional<G::VisualizationConfig>& targetConfig)
+                {
+                    return targetConfig;
+                });
         }
 
         [[nodiscard]] bool IsInternalVisualizationProperty(
@@ -1957,6 +2019,25 @@ namespace Extrinsic::Runtime
                    lhs.Property == rhs.Property;
         }
 
+        [[nodiscard]] bool SameVertexChannelBindingSet(
+            const VertexChannelBindingSet& lhs,
+            const VertexChannelBindingSet& rhs) noexcept
+        {
+            return SameVertexChannelSourceBinding(lhs.Normal, rhs.Normal) &&
+                   SameVertexChannelSourceBinding(lhs.Color, rhs.Color) &&
+                   lhs.BindingGeneration == rhs.BindingGeneration;
+        }
+
+        [[nodiscard]] bool SameOptionalVertexChannelBindingSet(
+            const std::optional<VertexChannelBindingSet>& lhs,
+            const std::optional<VertexChannelBindingSet>& rhs) noexcept
+        {
+            if (lhs.has_value() != rhs.has_value())
+                return false;
+            return !lhs.has_value() ||
+                   SameVertexChannelBindingSet(*lhs, *rhs);
+        }
+
         void MarkVertexChannelDirty(entt::registry& raw,
                                     const entt::entity entity,
                                     const VertexChannel channel)
@@ -1980,6 +2061,129 @@ namespace Extrinsic::Runtime
                 Dirty::MarkVertexAttributesDirty(raw, entity);
                 break;
             }
+        }
+
+        [[nodiscard]] std::optional<VertexChannelBindingSet>
+        StoredVertexChannelBindingSet(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            if (const auto* bindings =
+                    raw.try_get<VertexChannelBindingSet>(entity))
+            {
+                return *bindings;
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus
+        ApplyVertexChannelBindingSet(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const std::optional<VertexChannelBindingSet>& bindings)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            if (bindings.has_value())
+                raw.emplace_or_replace<VertexChannelBindingSet>(
+                    *entity,
+                    *bindings);
+            else
+                raw.remove<VertexChannelBindingSet>(*entity);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        struct VertexChannelBindingMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            VertexChannel Channel{VertexChannel::Custom};
+        };
+
+        [[nodiscard]] EditorCommandHistoryResult
+        ExecuteVertexChannelBindingMutation(
+            EditorCommandHistory& history,
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            const std::uint32_t stableEntityId,
+            const VertexChannel channel,
+            const std::optional<VertexChannelBindingSet>& before,
+            const std::optional<VertexChannelBindingSet>& after)
+        {
+            return Internal::ExecuteUndoableEntityMutation(
+                history,
+                "Change vertex channel binding",
+                VertexChannelBindingMutationIdentity{
+                    .Scene = scene,
+                    .World = world,
+                    .StableEntityId = stableEntityId,
+                    .Channel = channel,
+                },
+                before,
+                before,
+                after,
+                [](
+                    const VertexChannelBindingMutationIdentity& identity,
+                    const std::optional<VertexChannelBindingSet>& expected,
+                    const std::optional<VertexChannelBindingSet>&)
+                {
+                    if (identity.Scene == nullptr ||
+                        !identity.World.IsValid())
+                    {
+                        return EditorCommandHistoryStatus::MissingScene;
+                    }
+
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(
+                            raw,
+                            identity.StableEntityId);
+                    if (!entity.has_value())
+                        return EditorCommandHistoryStatus::StaleEntity;
+
+                    return SameOptionalVertexChannelBindingSet(
+                               StoredVertexChannelBindingSet(raw, *entity),
+                               expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                },
+                [](
+                    const VertexChannelBindingMutationIdentity& identity,
+                    const std::optional<VertexChannelBindingSet>& target)
+                {
+                    return ApplyVertexChannelBindingSet(
+                        identity.Scene,
+                        identity.StableEntityId,
+                        target);
+                },
+                [](
+                    const VertexChannelBindingMutationIdentity& identity,
+                    const std::optional<VertexChannelBindingSet>&,
+                    const std::optional<VertexChannelBindingSet>&)
+                {
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(
+                            raw,
+                            identity.StableEntityId);
+                    if (entity.has_value())
+                    {
+                        MarkVertexChannelDirty(
+                            raw,
+                            *entity,
+                            identity.Channel);
+                        return StoredVertexChannelBindingSet(raw, *entity);
+                    }
+                    return std::optional<VertexChannelBindingSet>{};
+                });
         }
 
         [[nodiscard]] SandboxEditorVertexChannelBindingTargetModel
@@ -2266,12 +2470,28 @@ namespace Extrinsic::Runtime
             return lhs.Domain == rhs.Domain;
         }
 
+        [[nodiscard]] bool SameRenderScalarSource(
+            const std::variant<float, std::string>& lhs,
+            const std::variant<float, std::string>& rhs) noexcept
+        {
+            if (lhs.index() != rhs.index())
+                return false;
+            if (const auto* lhsUniform = std::get_if<float>(&lhs))
+            {
+                const auto* rhsUniform = std::get_if<float>(&rhs);
+                return rhsUniform != nullptr &&
+                       std::bit_cast<std::uint32_t>(*lhsUniform) ==
+                           std::bit_cast<std::uint32_t>(*rhsUniform);
+            }
+            return std::get<std::string>(lhs) == std::get<std::string>(rhs);
+        }
+
         [[nodiscard]] bool SameRenderEdges(
             const G::RenderEdges& lhs,
             const G::RenderEdges& rhs)
         {
             return lhs.Domain == rhs.Domain &&
-                   lhs.WidthSource == rhs.WidthSource;
+                   SameRenderScalarSource(lhs.WidthSource, rhs.WidthSource);
         }
 
         [[nodiscard]] bool SameRenderPoints(
@@ -2279,7 +2499,7 @@ namespace Extrinsic::Runtime
             const G::RenderPoints& rhs)
         {
             return lhs.Type == rhs.Type &&
-                   lhs.SizeSource == rhs.SizeSource;
+                   SameRenderScalarSource(lhs.SizeSource, rhs.SizeSource);
         }
 
         template <typename T, typename SameFn>
@@ -2467,6 +2687,73 @@ namespace Extrinsic::Runtime
                 raw.remove<G::RenderPoints>(entity);
 
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        struct EditorRenderHintMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        [[nodiscard]] EditorCommandHistoryResult ExecuteEditorRenderHintMutation(
+            EditorCommandHistory& history,
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorRenderHintState& before,
+            const SandboxEditorRenderHintState& after)
+        {
+            return Internal::ExecuteUndoableEntityMutation(
+                history,
+                "Change Render Hints",
+                EditorRenderHintMutationIdentity{
+                    .Scene = scene,
+                    .World = world,
+                    .StableEntityId = stableEntityId,
+                },
+                before,
+                before,
+                after,
+                [](
+                    const EditorRenderHintMutationIdentity& identity,
+                    const SandboxEditorRenderHintState& expected,
+                    const SandboxEditorRenderHintState&)
+                {
+                    if (identity.Scene == nullptr || !identity.World.IsValid())
+                        return EditorCommandHistoryStatus::MissingScene;
+
+                    const entt::registry& raw = identity.Scene->Raw();
+                    const ECS::EntityHandle entity =
+                        SelectionController::ToEntityHandle(
+                            identity.StableEntityId);
+                    if (entity == ECS::InvalidEntityHandle ||
+                        !raw.valid(entity))
+                    {
+                        return EditorCommandHistoryStatus::StaleEntity;
+                    }
+                    return SameRenderHintState(
+                               ReadRenderHintState(raw, entity),
+                               expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                },
+                [](
+                    const EditorRenderHintMutationIdentity& identity,
+                    const SandboxEditorRenderHintState& target)
+                {
+                    return ApplyRenderHintState(
+                        identity.Scene,
+                        identity.StableEntityId,
+                        target);
+                },
+                [](
+                    const EditorRenderHintMutationIdentity&,
+                    const SandboxEditorRenderHintState&,
+                    const SandboxEditorRenderHintState& target)
+                {
+                    return target;
+                });
         }
 
         [[nodiscard]] bool SameVec4(
@@ -2745,6 +3032,13 @@ namespace Extrinsic::Runtime
             GeometryPresentationRuntimeState Runtime{};
         };
 
+        struct GeometryPresentationMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
         [[nodiscard]] EditorCommandHistoryStatus ApplyGeometryPresentationState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
@@ -2759,13 +3053,31 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
                 return EditorCommandHistoryStatus::StaleEntity;
 
+            const auto* currentRuntime =
+                raw.try_get<GeometryPresentationRuntimeState>(entity);
+            GeometryPresentationRuntimeState runtime = state.Runtime;
+            runtime.RecipeGeneration = currentRuntime != nullptr
+                ? currentRuntime->RecipeGeneration
+                : GeometryPresentationRuntimeState{}.RecipeGeneration;
             raw.emplace_or_replace<GeometryPresentationRecipe>(
                 entity,
                 state.Recipe);
             raw.emplace_or_replace<GeometryPresentationRuntimeState>(
                 entity,
-                state.Runtime);
+                std::move(runtime));
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] std::uint64_t StampGeometryPresentationGeneration(
+            ECS::Scene::Registry& scene,
+            const std::uint32_t stableEntityId)
+        {
+            entt::registry& raw = scene.Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            auto& runtime =
+                raw.get<GeometryPresentationRuntimeState>(entity);
+            return ++runtime.RecipeGeneration;
         }
 
         struct GeometryPresentationSlotLookup
@@ -2846,37 +3158,90 @@ namespace Extrinsic::Runtime
         {
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                const std::uint64_t expectedGeneration =
+                    before.Runtime.RecipeGeneration;
                 const EditorCommandHistoryResult result =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = "Change Geometry Presentation",
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyGeometryPresentationState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyGeometryPresentationState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        "Change Geometry Presentation",
+                        GeometryPresentationMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        expectedGeneration,
+                        std::move(before),
+                        std::move(after),
+                        [](
+                            const GeometryPresentationMutationIdentity& identity,
+                            const std::uint64_t expectedGeneration,
+                            const GeometryPresentationEditorState&)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            if (entity == ECS::InvalidEntityHandle ||
+                                !raw.valid(entity))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            if (!raw.all_of<GeometryPresentationRecipe>(entity))
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+
+                            const auto* runtime =
+                                raw.try_get<GeometryPresentationRuntimeState>(
+                                    entity);
+                            const std::uint64_t currentGeneration =
+                                runtime != nullptr
+                                    ? runtime->RecipeGeneration
+                                    : GeometryPresentationRuntimeState{}
+                                          .RecipeGeneration;
+                            return currentGeneration == expectedGeneration
+                                ? EditorCommandHistoryStatus::Applied
+                                : EditorCommandHistoryStatus::StaleEntity;
+                        },
+                        [](
+                            const GeometryPresentationMutationIdentity& identity,
+                            const GeometryPresentationEditorState& target)
+                        {
+                            return ApplyGeometryPresentationState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                target);
+                        },
+                        [](
+                            const GeometryPresentationMutationIdentity& identity,
+                            const std::uint64_t,
+                            const GeometryPresentationEditorState&)
+                        {
+                            return StampGeometryPresentationGeneration(
+                                *identity.Scene,
+                                identity.StableEntityId);
                         });
                 return ToSandboxEditorCommandStatus(result.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus applied =
                 ApplyGeometryPresentationState(
                     context.Scene,
                     stableEntityId,
-                    after));
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            (void)StampGeometryPresentationGeneration(
+                *context.Scene,
+                stableEntityId);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         [[nodiscard]] bool PropertySourceKindAllowedForGeometryPresentationSlotCommand(
@@ -3884,6 +4249,8 @@ namespace Extrinsic::Runtime
                 return;
 
             auto targetProperty = target.GetOrAdd<T>(name, T{});
+            if (!targetProperty)
+                return;
             for (std::size_t outputIndex = 0u; outputIndex < xrefs.size(); ++outputIndex)
             {
                 const std::uint32_t sourceIndex = xrefs[outputIndex];
@@ -3902,12 +4269,135 @@ namespace Extrinsic::Runtime
                 CopyTypedPropertyByXref<float>(source, name, xrefs, target);
                 CopyTypedPropertyByXref<double>(source, name, xrefs, target);
                 CopyTypedPropertyByXref<std::uint32_t>(source, name, xrefs, target);
+                CopyTypedPropertyByXref<std::uint64_t>(source, name, xrefs, target);
                 CopyTypedPropertyByXref<std::int32_t>(source, name, xrefs, target);
                 CopyTypedPropertyByXref<bool>(source, name, xrefs, target);
                 CopyTypedPropertyByXref<glm::vec2>(source, name, xrefs, target);
                 CopyTypedPropertyByXref<glm::vec3>(source, name, xrefs, target);
                 CopyTypedPropertyByXref<glm::vec4>(source, name, xrefs, target);
             }
+        }
+
+        template <typename T>
+        [[nodiscard]] bool SameKnownPropertyValue(
+            const T& lhs,
+            const T& rhs) noexcept
+        {
+            return lhs == rhs;
+        }
+
+        template <>
+        [[nodiscard]] bool SameKnownPropertyValue<float>(
+            const float& lhs,
+            const float& rhs) noexcept
+        {
+            return std::bit_cast<std::uint32_t>(lhs) ==
+                   std::bit_cast<std::uint32_t>(rhs);
+        }
+
+        template <>
+        [[nodiscard]] bool SameKnownPropertyValue<double>(
+            const double& lhs,
+            const double& rhs) noexcept
+        {
+            return std::bit_cast<std::uint64_t>(lhs) ==
+                   std::bit_cast<std::uint64_t>(rhs);
+        }
+
+        template <>
+        [[nodiscard]] bool SameKnownPropertyValue<glm::vec2>(
+            const glm::vec2& lhs,
+            const glm::vec2& rhs) noexcept
+        {
+            return SameKnownPropertyValue(lhs.x, rhs.x) &&
+                   SameKnownPropertyValue(lhs.y, rhs.y);
+        }
+
+        template <>
+        [[nodiscard]] bool SameKnownPropertyValue<glm::vec3>(
+            const glm::vec3& lhs,
+            const glm::vec3& rhs) noexcept
+        {
+            return SameKnownPropertyValue(lhs.x, rhs.x) &&
+                   SameKnownPropertyValue(lhs.y, rhs.y) &&
+                   SameKnownPropertyValue(lhs.z, rhs.z);
+        }
+
+        template <>
+        [[nodiscard]] bool SameKnownPropertyValue<glm::vec4>(
+            const glm::vec4& lhs,
+            const glm::vec4& rhs) noexcept
+        {
+            return SameKnownPropertyValue(lhs.x, rhs.x) &&
+                   SameKnownPropertyValue(lhs.y, rhs.y) &&
+                   SameKnownPropertyValue(lhs.z, rhs.z) &&
+                   SameKnownPropertyValue(lhs.w, rhs.w);
+        }
+
+        template <typename T>
+        [[nodiscard]] std::optional<bool> SameTypedPropertyValues(
+            const Geometry::ConstPropertySet& current,
+            const Geometry::ConstPropertySet& expected,
+            const std::string_view name) noexcept
+        {
+            const auto expectedProperty = expected.Get<T>(name);
+            if (!expectedProperty)
+                return std::nullopt;
+
+            const auto currentProperty = current.Get<T>(name);
+            if (!currentProperty)
+                return std::nullopt;
+            if (currentProperty.Vector().size() !=
+                expectedProperty.Vector().size())
+            {
+                return false;
+            }
+            for (std::size_t i = 0u;
+                 i < expectedProperty.Vector().size();
+                 ++i)
+            {
+                const T currentValue = currentProperty[i];
+                const T expectedValue = expectedProperty[i];
+                if (!SameKnownPropertyValue(
+                        currentValue,
+                        expectedValue))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool SameKnownPropertyValues(
+            const Geometry::ConstPropertySet& current,
+            const Geometry::ConstPropertySet& expected) noexcept
+        {
+            for (const std::string& name : expected.Properties())
+            {
+                const auto matches =
+                    [&]<typename T>()
+                    {
+                        const std::optional<bool> same =
+                            SameTypedPropertyValues<T>(
+                                current,
+                                expected,
+                                name);
+                        return !same.has_value() || *same;
+                    };
+                if (!matches.template operator()<float>() ||
+                    !matches.template operator()<double>() ||
+                    !matches.template operator()<std::uint32_t>() ||
+                    !matches.template operator()<std::uint64_t>() ||
+                    !matches.template operator()<std::int32_t>() ||
+                    !matches.template operator()<bool>() ||
+                    !matches.template operator()<glm::vec2>() ||
+                    !matches.template operator()<glm::vec3>() ||
+                    !matches.template operator()<glm::vec4>())
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         void CopyUvOutputPropertiesToHalfedgeMesh(
@@ -3944,6 +4434,39 @@ namespace Extrinsic::Runtime
                 sourceFaceProperties,
                 sourceFaceForOutputFace,
                 mesh.FaceProperties());
+        }
+
+        void CopyUvSourcePropertiesToHalfedgeMesh(
+            const Geometry::ConstPropertySet& sourceVertexProperties,
+            const bool hasSourceVertexProperties,
+            const Geometry::ConstPropertySet& sourceFaceProperties,
+            const bool hasSourceFaceProperties,
+            const MeshSoupFromGeometrySourcesResult& soup,
+            Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            if (hasSourceVertexProperties)
+            {
+                std::vector<std::uint32_t> sourceVertexForMeshVertex;
+                sourceVertexForMeshVertex.reserve(mesh.VerticesSize());
+                for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+                {
+                    sourceVertexForMeshVertex.push_back(
+                        static_cast<std::uint32_t>(i));
+                }
+                CopyKnownPropertiesByXref(
+                    sourceVertexProperties,
+                    sourceVertexForMeshVertex,
+                    mesh.VertexProperties());
+            }
+
+            if (hasSourceFaceProperties &&
+                soup.SourceFaceForSoupFace.size() == mesh.FacesSize())
+            {
+                CopyKnownPropertiesByXref(
+                    sourceFaceProperties,
+                    soup.SourceFaceForSoupFace,
+                    mesh.FaceProperties());
+            }
         }
 
         [[nodiscard]] bool IsTextureBakeSourceDomain(
@@ -5124,33 +5647,6 @@ namespace Extrinsic::Runtime
                 source.FallbackNormalWasRepaired;
         }
 
-        [[nodiscard]] bool PublishMeshVertexNormals(
-            GS::MutableSourceView& view,
-            const GN::Result& result)
-        {
-            if (view.VertexSource == nullptr || !result.Normals.IsValid())
-                return false;
-
-            Geometry::PropertySet& properties = view.VertexSource->Properties;
-            if (properties.Exists(GS::PropertyNames::kNormal) &&
-                !properties.Get<glm::vec3>(GS::PropertyNames::kNormal))
-            {
-                return false;
-            }
-
-            auto normals = properties.GetOrAdd<glm::vec3>(
-                std::string{GS::PropertyNames::kNormal},
-                glm::vec3{0.0f, 1.0f, 0.0f});
-            if (!normals ||
-                normals.Vector().size() != result.Normals.Vector().size())
-            {
-                return false;
-            }
-
-            normals.Vector() = result.Normals.Vector();
-            return true;
-        }
-
         [[nodiscard]] bool PublishCanonicalVec3Normals(
             Geometry::PropertySet& properties,
             const std::vector<glm::vec3>& normals)
@@ -5608,6 +6104,22 @@ namespace Extrinsic::Runtime
             return positions;
         }
 
+        using MeshPositionState =
+            std::shared_ptr<const std::vector<glm::vec3>>;
+
+        struct MeshPropertyMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        struct MeshDenoiseMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            MeshPositionState Positions{};
+        };
+
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshDenoisePositionState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
@@ -5644,9 +6156,18 @@ namespace Extrinsic::Runtime
             }
 
             currentPositions.Vector() = positions;
-            Dirty::MarkVertexPositionsDirty(raw, *entity);
-            Dirty::MarkVertexAttributesDirty(raw, *entity);
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        void StampMeshDenoisePositionDirty(
+            ECS::Scene::Registry& scene,
+            const std::uint32_t stableEntityId)
+        {
+            entt::registry& raw = scene.Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            Dirty::MarkVertexPositionsDirty(raw, entity);
+            Dirty::MarkVertexAttributesDirty(raw, entity);
         }
 
         [[nodiscard]] SandboxEditorCommandStatus CommitMeshDenoisePositions(
@@ -5657,37 +6178,138 @@ namespace Extrinsic::Runtime
         {
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                if (context.Scene == nullptr)
+                    return SandboxEditorCommandStatus::MissingScene;
+                const ECS::EntityHandle entity =
+                    SelectionController::ToEntityHandle(stableEntityId);
+                if (entity == ECS::InvalidEntityHandle ||
+                    !context.Scene->Raw().valid(entity))
+                {
+                    return SandboxEditorCommandStatus::StaleEntity;
+                }
+
+                const MeshPositionState beforeState =
+                    std::make_shared<std::vector<glm::vec3>>(
+                        std::move(before));
+                const MeshPositionState afterState =
+                    std::make_shared<std::vector<glm::vec3>>(
+                        std::move(after));
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = "Denoise mesh vertices",
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyMeshDenoisePositionState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyMeshDenoisePositionState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        "Denoise mesh vertices",
+                        MeshPropertyMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        MeshDenoiseMutationGeneration{
+                            .GeometryMetadataSignature =
+                                GeometryMetadataSignatureForEntity(
+                                    context.Scene->Raw(),
+                                    entity),
+                            .Positions = beforeState,
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshDenoiseMutationGeneration& expected,
+                            const MeshPositionState&)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            if (entity == ECS::InvalidEntityHandle ||
+                                !raw.valid(entity))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const GS::ConstSourceView view =
+                                GS::BuildConstView(raw, entity);
+                            const GS::SourceAvailability availability =
+                                GS::BuildSourceAvailability(view);
+                            if (availability.ProvenanceDomain !=
+                                    GS::Domain::Mesh ||
+                                view.VertexSource == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (expected.Positions == nullptr ||
+                                GeometryMetadataSignatureForEntity(raw, entity) !=
+                                    expected.GeometryMetadataSignature)
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const auto positions =
+                                view.VertexSource->Properties.Get<glm::vec3>(
+                                    GS::PropertyNames::kPosition);
+                            if (!positions ||
+                                !SameGeometryPositions(
+                                    positions.Vector(),
+                                    *expected.Positions))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshPositionState& target)
+                        {
+                            if (target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    CommandFailed;
+                            }
+                            return ApplyMeshDenoisePositionState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                *target);
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshDenoiseMutationGeneration&,
+                            const MeshPositionState& target)
+                        {
+                            StampMeshDenoisePositionDirty(
+                                *identity.Scene,
+                                identity.StableEntityId);
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            return MeshDenoiseMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    GeometryMetadataSignatureForEntity(
+                                        identity.Scene->Raw(),
+                                        entity),
+                                .Positions = target,
+                            };
                         });
                 return ToSandboxEditorCommandStatus(history.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus applied =
                 ApplyMeshDenoisePositionState(
                     context.Scene,
                     stableEntityId,
-                    after));
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            StampMeshDenoisePositionDirty(
+                *context.Scene,
+                stableEntityId);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         void CopyMeshDenoiseCounters(
@@ -5730,6 +6352,7 @@ namespace Extrinsic::Runtime
         struct MeshCurvatureSourceResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
+            std::vector<glm::vec3> SourcePositions{};
             std::size_t VertexSlotCount{0u};
             SandboxEditorCommandStatus Status{
                 SandboxEditorCommandStatus::NoChange};
@@ -5753,6 +6376,8 @@ namespace Extrinsic::Runtime
             if (source.Succeeded())
             {
                 result.Mesh = std::move(source.Mesh);
+                result.SourcePositions =
+                    std::move(source.BeforePositions);
                 result.Diagnostic.clear();
             }
             else if (source.Status ==
@@ -5789,6 +6414,17 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec3> Dir2{};
         };
 
+        using MeshCurvaturePropertySnapshot =
+            std::shared_ptr<const MeshCurvaturePropertyState>;
+
+        struct MeshCurvatureMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            std::size_t VertexSlotCount{0u};
+            MeshPositionState Positions{};
+            MeshCurvaturePropertySnapshot Properties{};
+        };
+
         [[nodiscard]] bool SameVec3PropertyValues(
             const std::vector<glm::vec3>& lhs,
             const std::vector<glm::vec3>& rhs) noexcept
@@ -5819,6 +6455,24 @@ namespace Extrinsic::Runtime
                    lhs.Gaussian == rhs.Gaussian &&
                    SameVec3PropertyValues(lhs.Dir1, rhs.Dir1) &&
                    SameVec3PropertyValues(lhs.Dir2, rhs.Dir2);
+        }
+
+        [[nodiscard]] bool MeshCurvaturePropertyStateMatchesCount(
+            const MeshCurvaturePropertyState& state,
+            const std::size_t expectedCount) noexcept
+        {
+            return (state.HadMean
+                        ? state.Mean.size() == expectedCount
+                        : state.Mean.empty()) &&
+                   (state.HadGaussian
+                        ? state.Gaussian.size() == expectedCount
+                        : state.Gaussian.empty()) &&
+                   (state.HadDir1
+                        ? state.Dir1.size() == expectedCount
+                        : state.Dir1.empty()) &&
+                   (state.HadDir2
+                        ? state.Dir2.size() == expectedCount
+                        : state.Dir2.empty());
         }
 
         template <typename T>
@@ -6002,46 +6656,186 @@ namespace Extrinsic::Runtime
                 return EditorCommandHistoryStatus::CommandFailed;
             }
 
-            Dirty::MarkVertexAttributesDirty(raw, *entity);
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        void StampMeshCurvaturePropertyDirty(
+            ECS::Scene::Registry& scene,
+            const std::uint32_t stableEntityId)
+        {
+            entt::registry& raw = scene.Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            Dirty::MarkVertexAttributesDirty(raw, entity);
         }
 
         [[nodiscard]] SandboxEditorCommandStatus CommitMeshCurvatureProperties(
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
+            std::vector<glm::vec3> positions,
             MeshCurvaturePropertyState before,
             MeshCurvaturePropertyState after)
         {
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                if (context.Scene == nullptr)
+                    return SandboxEditorCommandStatus::MissingScene;
+                const ECS::EntityHandle entity =
+                    SelectionController::ToEntityHandle(stableEntityId);
+                if (entity == ECS::InvalidEntityHandle ||
+                    !context.Scene->Raw().valid(entity))
+                {
+                    return SandboxEditorCommandStatus::StaleEntity;
+                }
+
+                const MeshPositionState positionState =
+                    std::make_shared<std::vector<glm::vec3>>(
+                        std::move(positions));
+                const MeshCurvaturePropertySnapshot beforeState =
+                    std::make_shared<MeshCurvaturePropertyState>(
+                        std::move(before));
+                const MeshCurvaturePropertySnapshot afterState =
+                    std::make_shared<MeshCurvaturePropertyState>(
+                        std::move(after));
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = "Compute mesh curvature",
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyMeshCurvatureState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyMeshCurvatureState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        "Compute mesh curvature",
+                        MeshPropertyMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        MeshCurvatureMutationGeneration{
+                            .GeometryMetadataSignature =
+                                GeometryMetadataSignatureForEntity(
+                                    context.Scene->Raw(),
+                                    entity),
+                            .VertexSlotCount = positionState->size(),
+                            .Positions = positionState,
+                            .Properties = beforeState,
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshCurvatureMutationGeneration& expected,
+                            const MeshCurvaturePropertySnapshot& target)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            if (entity == ECS::InvalidEntityHandle ||
+                                !raw.valid(entity))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            GS::MutableSourceView view =
+                                GS::BuildMutableView(raw, entity);
+                            const GS::SourceAvailability availability =
+                                GS::BuildSourceAvailability(view);
+                            if (availability.ProvenanceDomain !=
+                                    GS::Domain::Mesh ||
+                                view.VertexSource == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (expected.Positions == nullptr ||
+                                expected.Properties == nullptr ||
+                                target == nullptr ||
+                                !MeshCurvaturePropertyStateMatchesCount(
+                                    *target,
+                                    expected.VertexSlotCount))
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+                            if (GeometryMetadataSignatureForEntity(raw, entity) !=
+                                expected.GeometryMetadataSignature)
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const auto currentPositions =
+                                view.VertexSource->Properties.Get<glm::vec3>(
+                                    GS::PropertyNames::kPosition);
+                            if (!currentPositions ||
+                                !SameGeometryPositions(
+                                    currentPositions.Vector(),
+                                    *expected.Positions))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            MeshCurvaturePropertyState currentProperties{};
+                            std::string diagnostic{};
+                            if (!CaptureMeshCurvaturePropertyState(
+                                    view.VertexSource->Properties,
+                                    expected.VertexSlotCount,
+                                    currentProperties,
+                                    diagnostic) ||
+                                !SameMeshCurvaturePropertyState(
+                                    currentProperties,
+                                    *expected.Properties))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshCurvaturePropertySnapshot& target)
+                        {
+                            if (target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    CommandFailed;
+                            }
+                            return ApplyMeshCurvatureState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                *target);
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshCurvatureMutationGeneration& expected,
+                            const MeshCurvaturePropertySnapshot& target)
+                        {
+                            StampMeshCurvaturePropertyDirty(
+                                *identity.Scene,
+                                identity.StableEntityId);
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            return MeshCurvatureMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    GeometryMetadataSignatureForEntity(
+                                        identity.Scene->Raw(),
+                                        entity),
+                                .VertexSlotCount = expected.VertexSlotCount,
+                                .Positions = expected.Positions,
+                                .Properties = target,
+                            };
                         });
                 return ToSandboxEditorCommandStatus(history.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
-                ApplyMeshCurvatureState(context.Scene, stableEntityId, after));
+            const EditorCommandHistoryStatus applied =
+                ApplyMeshCurvatureState(context.Scene, stableEntityId, after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            StampMeshCurvaturePropertyDirty(
+                *context.Scene,
+                stableEntityId);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         [[nodiscard]] std::string BuildMeshCurvatureSuccessMessage(
@@ -6171,6 +6965,148 @@ namespace Extrinsic::Runtime
             Dirty::MarkFaceTopologyDirty(raw, entity);
         }
 
+        using MeshTopologySnapshot =
+            std::shared_ptr<const Geometry::HalfedgeMesh::Mesh>;
+
+        struct MeshTopologyMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            MeshTopologySnapshot Mesh{};
+        };
+
+        [[nodiscard]] bool SameMeshTopologyState(
+            const GS::ConstSourceView& view,
+            const Geometry::HalfedgeMesh::Mesh& mesh) noexcept
+        {
+            if (view.VertexSource == nullptr ||
+                view.EdgeSource == nullptr ||
+                view.HalfedgeSource == nullptr ||
+                view.FaceSource == nullptr ||
+                view.VertexSource->Properties.Size() != mesh.VerticesSize() ||
+                view.EdgeSource->Properties.Size() != mesh.EdgesSize() ||
+                view.HalfedgeSource->Properties.Size() != mesh.HalfedgesSize() ||
+                view.FaceSource->Properties.Size() != mesh.FacesSize() ||
+                view.VertexSource->NumDeleted != mesh.DeletedVertexCount() ||
+                view.EdgeSource->NumDeleted != mesh.DeletedEdgeCount() ||
+                view.FaceSource->NumDeleted != mesh.DeletedFaceCount())
+            {
+                return false;
+            }
+
+            const auto positions =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    GS::PropertyNames::kPosition);
+            const auto edgeV0 =
+                view.EdgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kEdgeV0);
+            const auto edgeV1 =
+                view.EdgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kEdgeV1);
+            const auto halfedgeTo =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeToVertex);
+            const auto halfedgeNext =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeNext);
+            const auto halfedgeFace =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeFace);
+            const auto faceHalfedge =
+                view.FaceSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kFaceHalfedge);
+            if (!positions || !edgeV0 || !edgeV1 || !halfedgeTo ||
+                !halfedgeNext || !halfedgeFace || !faceHalfedge)
+            {
+                return false;
+            }
+            if (!SameKnownPropertyValues(
+                    Geometry::ConstPropertySet(
+                        view.VertexSource->Properties),
+                    mesh.VertexProperties()) ||
+                !SameKnownPropertyValues(
+                    Geometry::ConstPropertySet(
+                        view.EdgeSource->Properties),
+                    mesh.EdgeProperties()) ||
+                !SameKnownPropertyValues(
+                    Geometry::ConstPropertySet(
+                        view.HalfedgeSource->Properties),
+                    mesh.HalfedgeProperties()) ||
+                !SameKnownPropertyValues(
+                    Geometry::ConstPropertySet(
+                        view.FaceSource->Properties),
+                    mesh.FaceProperties()))
+            {
+                return false;
+            }
+
+            for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+            {
+                const glm::vec3& current = positions.Vector()[i];
+                const glm::vec3& expected =
+                    mesh.Position(Geometry::VertexHandle{
+                        static_cast<Geometry::PropertyIndex>(i)});
+                if (current.x != expected.x ||
+                    current.y != expected.y ||
+                    current.z != expected.z)
+                {
+                    return false;
+                }
+            }
+
+            for (std::size_t i = 0u; i < mesh.EdgesSize(); ++i)
+            {
+                const Geometry::HalfedgeHandle halfedge =
+                    mesh.Halfedge(
+                        Geometry::EdgeHandle{
+                            static_cast<Geometry::PropertyIndex>(i)},
+                        0u);
+                if (edgeV0.Vector()[i] !=
+                        static_cast<std::uint32_t>(
+                            mesh.FromVertex(halfedge).Index) ||
+                    edgeV1.Vector()[i] !=
+                        static_cast<std::uint32_t>(
+                            mesh.ToVertex(halfedge).Index))
+                {
+                    return false;
+                }
+            }
+
+            for (std::size_t i = 0u; i < mesh.HalfedgesSize(); ++i)
+            {
+                const Geometry::HalfedgeHandle halfedge{
+                    static_cast<Geometry::PropertyIndex>(i)};
+                const Geometry::FaceHandle face = mesh.Face(halfedge);
+                const std::uint32_t expectedFace =
+                    face.IsValid()
+                        ? static_cast<std::uint32_t>(face.Index)
+                        : std::numeric_limits<std::uint32_t>::max();
+                if (halfedgeTo.Vector()[i] !=
+                        static_cast<std::uint32_t>(
+                            mesh.ToVertex(halfedge).Index) ||
+                    halfedgeNext.Vector()[i] !=
+                        static_cast<std::uint32_t>(
+                            mesh.NextHalfedge(halfedge).Index) ||
+                    halfedgeFace.Vector()[i] != expectedFace)
+                {
+                    return false;
+                }
+            }
+
+            for (std::size_t i = 0u; i < mesh.FacesSize(); ++i)
+            {
+                const Geometry::HalfedgeHandle halfedge =
+                    mesh.Halfedge(Geometry::FaceHandle{
+                        static_cast<Geometry::PropertyIndex>(i)});
+                const std::uint32_t expectedHalfedge =
+                    halfedge.IsValid()
+                        ? static_cast<std::uint32_t>(halfedge.Index)
+                        : std::numeric_limits<std::uint32_t>::max();
+                if (faceHalfedge.Vector()[i] != expectedHalfedge)
+                    return false;
+            }
+            return true;
+        }
+
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshTopologyState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
@@ -6189,7 +7125,6 @@ namespace Extrinsic::Runtime
             if (published.HasGarbage())
                 published.GarbageCollection();
             GS::PopulateFromMesh(raw, *entity, published);
-            MarkMeshTopologyReplacementDirty(raw, *entity);
             return EditorCommandHistoryStatus::Applied;
         }
 
@@ -6197,107 +7132,136 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
             const char* label,
+            const std::uint64_t expectedGeometryMetadataSignature,
             Geometry::HalfedgeMesh::Mesh before,
             Geometry::HalfedgeMesh::Mesh after)
         {
+            if (before.HasGarbage())
+                before.GarbageCollection();
+            if (after.HasGarbage())
+                after.GarbageCollection();
+
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                const MeshTopologySnapshot beforeState =
+                    std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                        std::move(before));
+                const MeshTopologySnapshot afterState =
+                    std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                        std::move(after));
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = label,
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyMeshTopologyState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyMeshTopologyState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        label,
+                        MeshPropertyMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        MeshTopologyMutationGeneration{
+                            .GeometryMetadataSignature =
+                                expectedGeometryMetadataSignature,
+                            .Mesh = beforeState,
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshTopologyMutationGeneration& expected,
+                            const MeshTopologySnapshot& target)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (!entity.has_value())
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const GS::ConstSourceView view =
+                                GS::BuildConstView(raw, *entity);
+                            const GS::SourceAvailability availability =
+                                GS::BuildSourceAvailability(view);
+                            if (availability.ProvenanceDomain !=
+                                GS::Domain::Mesh)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (expected.Mesh == nullptr || target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+                            if (GeometryMetadataSignatureForEntity(
+                                    raw,
+                                    *entity) !=
+                                    expected.GeometryMetadataSignature ||
+                                !SameMeshTopologyState(view, *expected.Mesh))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshTopologySnapshot& target)
+                        {
+                            if (target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    CommandFailed;
+                            }
+                            return ApplyMeshTopologyState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                *target);
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshTopologyMutationGeneration&,
+                            const MeshTopologySnapshot& target)
+                        {
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (entity.has_value())
+                                MarkMeshTopologyReplacementDirty(raw, *entity);
+                            return MeshTopologyMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    entity.has_value()
+                                        ? GeometryMetadataSignatureForEntity(
+                                              raw,
+                                              *entity)
+                                        : 0u,
+                                .Mesh = target,
+                            };
                         });
                 return ToSandboxEditorCommandStatus(history.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus applied =
                 ApplyMeshTopologyState(
                     context.Scene,
                     stableEntityId,
-                    after));
-        }
-
-        [[nodiscard]] EditorCommandHistoryStatus ApplyUvMeshTopologyState(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const Geometry::HalfedgeMesh::Mesh& mesh)
-        {
-            if (scene == nullptr)
-                return EditorCommandHistoryStatus::MissingScene;
-
-            entt::registry& raw = scene->Raw();
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, stableEntityId);
-            if (!entity.has_value())
-                return EditorCommandHistoryStatus::StaleEntity;
-
-            Geometry::HalfedgeMesh::Mesh published = mesh;
-            if (published.HasGarbage())
-                published.GarbageCollection();
-            GS::PopulateFromMesh(raw, *entity, published);
-            MarkMeshTopologyReplacementDirty(raw, *entity);
-            Dirty::MarkGpuDirty(raw, *entity);
-            return EditorCommandHistoryStatus::Applied;
-        }
-
-        [[nodiscard]] SandboxEditorCommandStatus CommitUvMeshTopologyReplacement(
-            const SandboxEditorContext& context,
-            const std::uint32_t stableEntityId,
-            const char* label,
-            Geometry::HalfedgeMesh::Mesh before,
-            Geometry::HalfedgeMesh::Mesh after)
-        {
-            if (context.CommandHistory != nullptr)
-            {
-                ECS::Scene::Registry* scene = context.Scene;
-                const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = label,
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyUvMeshTopologyState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyUvMeshTopologyState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
-                        });
-                return ToSandboxEditorCommandStatus(history.Status);
-            }
-
-            return ToSandboxEditorCommandStatus(
-                ApplyUvMeshTopologyState(
-                    context.Scene,
-                    stableEntityId,
-                    after));
+            if (entity.has_value())
+                MarkMeshTopologyReplacementDirty(raw, *entity);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         // UI-027: outlier removal changes the point count, so the published
@@ -6333,8 +7297,56 @@ namespace Extrinsic::Runtime
             // mutated.
             Geometry::PointCloud::Cloud published = cloud;
             GS::PopulateFromCloud(raw, *entity, published);
-            MarkPointCloudReplacementDirty(raw, *entity);
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        struct PointCloudMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        struct PointCloudSourceState
+        {
+            Geometry::PropertySet Properties{};
+            std::size_t NumDeleted{0u};
+        };
+
+        using PointCloudSourceSnapshot =
+            std::shared_ptr<const PointCloudSourceState>;
+        using PointCloudState =
+            std::shared_ptr<const Geometry::PointCloud::Cloud>;
+
+        struct PointCloudMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            PointCloudSourceSnapshot Source{};
+        };
+
+        [[nodiscard]] PointCloudSourceSnapshot CapturePointCloudSourceState(
+            const GS::ConstSourceView& view)
+        {
+            if (view.VertexSource == nullptr)
+                return nullptr;
+            return std::make_shared<PointCloudSourceState>(
+                PointCloudSourceState{
+                    .Properties = view.VertexSource->Properties,
+                    .NumDeleted = view.VertexSource->NumDeleted,
+                });
+        }
+
+        [[nodiscard]] bool SamePointCloudSourceState(
+            const GS::ConstSourceView& view,
+            const PointCloudSourceState& expected) noexcept
+        {
+            return view.VertexSource != nullptr &&
+                   view.VertexSource->NumDeleted == expected.NumDeleted &&
+                   SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(
+                           view.VertexSource->Properties),
+                       Geometry::ConstPropertySet(
+                           expected.Properties));
         }
 
         [[nodiscard]] bool MirrorGeometrySourcePositionsToPointCloudStorage(
@@ -6361,42 +7373,137 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
             const char* label,
+            const std::uint64_t expectedGeometryMetadataSignature,
+            PointCloudSourceSnapshot expectedSource,
             Geometry::PointCloud::Cloud before,
             Geometry::PointCloud::Cloud after)
         {
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                const PointCloudState beforeState =
+                    std::make_shared<Geometry::PointCloud::Cloud>(
+                        std::move(before));
+                const PointCloudState afterState =
+                    std::make_shared<Geometry::PointCloud::Cloud>(
+                        std::move(after));
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = label,
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyPointCloudPointState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyPointCloudPointState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        label,
+                        PointCloudMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        PointCloudMutationGeneration{
+                            .GeometryMetadataSignature =
+                                expectedGeometryMetadataSignature,
+                            .Source = std::move(expectedSource),
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const PointCloudMutationIdentity& identity,
+                            const PointCloudMutationGeneration& expected,
+                            const PointCloudState& target)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (!entity.has_value())
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const GS::ConstSourceView view =
+                                GS::BuildConstView(raw, *entity);
+                            const GS::SourceAvailability availability =
+                                GS::BuildSourceAvailability(view);
+                            if (availability.ProvenanceDomain !=
+                                GS::Domain::PointCloud)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (expected.Source == nullptr || target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+                            if (GeometryMetadataSignatureForEntity(
+                                    raw,
+                                    *entity) !=
+                                    expected.GeometryMetadataSignature ||
+                                !SamePointCloudSourceState(
+                                    view,
+                                    *expected.Source))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const PointCloudMutationIdentity& identity,
+                            const PointCloudState& target)
+                        {
+                            if (target == nullptr)
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            return ApplyPointCloudPointState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                *target);
+                        },
+                        [](
+                            const PointCloudMutationIdentity& identity,
+                            const PointCloudMutationGeneration&,
+                            const PointCloudState&)
+                        {
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (entity.has_value())
+                                MarkPointCloudReplacementDirty(raw, *entity);
+                            return PointCloudMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    entity.has_value()
+                                        ? GeometryMetadataSignatureForEntity(
+                                              raw,
+                                              *entity)
+                                        : 0u,
+                                .Source =
+                                    entity.has_value()
+                                        ? CapturePointCloudSourceState(
+                                              GS::BuildConstView(
+                                                  raw,
+                                                  *entity))
+                                        : nullptr,
+                            };
                         });
                 return ToSandboxEditorCommandStatus(history.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus applied =
                 ApplyPointCloudPointState(
                     context.Scene,
                     stableEntityId,
-                    after));
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (entity.has_value())
+                MarkPointCloudReplacementDirty(raw, *entity);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         [[nodiscard]] const char* DebugNameForOutlierRemovalStatus(
@@ -6726,7 +7833,7 @@ namespace Extrinsic::Runtime
         {
             std::uint32_t StableEntityId{0u};
             std::uint64_t GeometryMetadataSignature{0u};
-            std::vector<glm::vec3> SnapshotPositions{};
+            PointCloudSourceSnapshot Snapshot{};
             Geometry::PointCloud::Cloud BeforeCloud{};
             Geometry::PointCloud::Cloud WorkCloud{};
             Geometry::PointCloud::Cloud AfterCloud{};
@@ -6763,10 +7870,8 @@ namespace Extrinsic::Runtime
                 return JobApplyValidation::StaleGeneration;
             }
 
-            std::optional<std::vector<glm::vec3>> current =
-                CollectFiniteGeometryPositions(view.VertexSource->Properties);
-            if (!current.has_value() ||
-                !SameGeometryPositions(*current, job.SnapshotPositions))
+            if (job.Snapshot == nullptr ||
+                !SamePointCloudSourceState(view, *job.Snapshot))
             {
                 return JobApplyValidation::StaleGeneration;
             }
@@ -6875,8 +7980,10 @@ namespace Extrinsic::Runtime
                     statistical
                         ? "Remove statistical point-cloud outliers"
                         : "Remove radius point-cloud outliers",
-                    job.BeforeCloud,
-                    job.AfterCloud);
+                    job.GeometryMetadataSignature,
+                    std::move(job.Snapshot),
+                    std::move(job.BeforeCloud),
+                    std::move(job.AfterCloud));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -6954,14 +8061,14 @@ namespace Extrinsic::Runtime
             const SandboxEditorPointCloudOutlierRemovalCommand& command,
             Geometry::PointCloud::Cloud beforeCloud,
             Geometry::PointCloud::Cloud workCloud,
-            std::vector<glm::vec3> snapshotPositions,
+            PointCloudSourceSnapshot snapshot,
             const std::uint64_t geometryMetadataSignature)
         {
             auto state = std::make_shared<
                 SandboxEditorPointCloudOutlierRemovalCpuJobState>();
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
-            state->SnapshotPositions = std::move(snapshotPositions);
+            state->Snapshot = std::move(snapshot);
             state->BeforeCloud = std::move(beforeCloud);
             state->WorkCloud = std::move(workCloud);
             state->Command = command;
@@ -7136,6 +8243,9 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        struct VertexNormalPropertyState;
+        struct VertexNormalsSourceState;
+
         struct SandboxEditorVertexNormalsCpuJobState
         {
             SandboxEditorVertexNormalsCpuJobKind Kind{
@@ -7144,6 +8254,8 @@ namespace Extrinsic::Runtime
             std::uint64_t GeometryMetadataSignature{0u};
             std::vector<glm::vec3> SnapshotPositions{};
             std::vector<glm::vec3> Normals{};
+            std::shared_ptr<const VertexNormalsSourceState> SourceState{};
+            std::shared_ptr<const VertexNormalPropertyState> BeforeNormal{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             Geometry::Vertices GraphNodes{};
             Geometry::PropertySet GraphEdges{};
@@ -7197,6 +8309,398 @@ namespace Extrinsic::Runtime
             return nullptr;
         }
 
+        struct VertexNormalPropertyState
+        {
+            bool HadNormal{false};
+            std::vector<glm::vec3> Normals{};
+        };
+
+        using VertexNormalPropertySnapshot =
+            std::shared_ptr<const VertexNormalPropertyState>;
+
+        struct VertexNormalsSourceState
+        {
+            Geometry::PropertySet Primary{};
+            std::optional<Geometry::PropertySet> Edges{};
+            std::optional<Geometry::PropertySet> Halfedges{};
+            std::optional<Geometry::PropertySet> Faces{};
+        };
+
+        using VertexNormalsSourceSnapshot =
+            std::shared_ptr<const VertexNormalsSourceState>;
+
+        struct VertexNormalsMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            SandboxEditorVertexNormalsCpuJobKind Kind{
+                SandboxEditorVertexNormalsCpuJobKind::Mesh};
+        };
+
+        struct VertexNormalsMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            VertexNormalsSourceSnapshot Source{};
+            VertexNormalPropertySnapshot Normal{};
+        };
+
+        [[nodiscard]] bool CaptureVertexNormalPropertyState(
+            const Geometry::PropertySet& properties,
+            VertexNormalPropertyState& out)
+        {
+            out = {};
+            if (!properties.Exists(GS::PropertyNames::kNormal))
+                return true;
+
+            const auto normals =
+                properties.Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (!normals ||
+                normals.Vector().size() != properties.Size())
+            {
+                return false;
+            }
+
+            out.HadNormal = true;
+            out.Normals = normals.Vector();
+            return true;
+        }
+
+        [[nodiscard]] bool SameVertexNormalPropertyState(
+            const VertexNormalPropertyState& lhs,
+            const VertexNormalPropertyState& rhs) noexcept
+        {
+            if (lhs.HadNormal != rhs.HadNormal ||
+                lhs.Normals.size() != rhs.Normals.size())
+            {
+                return false;
+            }
+            for (std::size_t i = 0u; i < lhs.Normals.size(); ++i)
+            {
+                if (!SameKnownPropertyValue(
+                        lhs.Normals[i],
+                        rhs.Normals[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] Geometry::PropertySet
+        CopyVertexNormalSourceProperties(
+            const Geometry::PropertySet& properties)
+        {
+            Geometry::PropertySet copy = properties;
+            auto normals =
+                copy.Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (normals)
+                copy.Remove(normals);
+            return copy;
+        }
+
+        [[nodiscard]] bool CaptureVertexNormalsSourceState(
+            const GS::ConstSourceView& view,
+            const SandboxEditorVertexNormalsCpuJobKind kind,
+            VertexNormalsSourceState& out)
+        {
+            out = {};
+            switch (kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+                if (view.VertexSource == nullptr ||
+                    view.HalfedgeSource == nullptr ||
+                    view.FaceSource == nullptr)
+                {
+                    return false;
+                }
+                out.Primary = CopyVertexNormalSourceProperties(
+                    view.VertexSource->Properties);
+                if (view.EdgeSource != nullptr)
+                    out.Edges = view.EdgeSource->Properties;
+                out.Halfedges = view.HalfedgeSource->Properties;
+                out.Faces = view.FaceSource->Properties;
+                return true;
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                if (view.NodeSource == nullptr ||
+                    view.EdgeSource == nullptr)
+                {
+                    return false;
+                }
+                out.Primary = CopyVertexNormalSourceProperties(
+                    view.NodeSource->Properties);
+                out.Edges = view.EdgeSource->Properties;
+                return true;
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                if (view.VertexSource == nullptr)
+                    return false;
+                out.Primary = CopyVertexNormalSourceProperties(
+                    view.VertexSource->Properties);
+                return true;
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool SameOptionalKnownPropertySet(
+            const std::optional<Geometry::PropertySet>& lhs,
+            const std::optional<Geometry::PropertySet>& rhs) noexcept
+        {
+            if (lhs.has_value() != rhs.has_value())
+                return false;
+            if (!lhs.has_value())
+                return true;
+            return SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(*lhs),
+                       Geometry::ConstPropertySet(*rhs)) &&
+                   SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(*rhs),
+                       Geometry::ConstPropertySet(*lhs));
+        }
+
+        [[nodiscard]] bool SameVertexNormalsSourceState(
+            const VertexNormalsSourceState& lhs,
+            const VertexNormalsSourceState& rhs) noexcept
+        {
+            return SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(lhs.Primary),
+                       Geometry::ConstPropertySet(rhs.Primary)) &&
+                   SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(rhs.Primary),
+                       Geometry::ConstPropertySet(lhs.Primary)) &&
+                   SameOptionalKnownPropertySet(lhs.Edges, rhs.Edges) &&
+                   SameOptionalKnownPropertySet(
+                       lhs.Halfedges,
+                       rhs.Halfedges) &&
+                   SameOptionalKnownPropertySet(lhs.Faces, rhs.Faces);
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyVertexNormalPropertyState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVertexNormalsCpuJobKind kind,
+            const VertexNormalPropertyState& state)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            if (GS::BuildSourceAvailability(view).ProvenanceDomain !=
+                VertexNormalsExpectedSourceDomain(kind))
+            {
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+            }
+
+            Geometry::PropertySet* properties =
+                VertexNormalsTargetProperties(view, kind);
+            if (properties == nullptr)
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+            if (state.HadNormal)
+            {
+                return PublishCanonicalVec3Normals(
+                           *properties,
+                           state.Normals)
+                    ? EditorCommandHistoryStatus::Applied
+                    : EditorCommandHistoryStatus::CommandFailed;
+            }
+
+            if (!state.Normals.empty())
+                return EditorCommandHistoryStatus::CommandFailed;
+            if (!properties->Exists(GS::PropertyNames::kNormal))
+                return EditorCommandHistoryStatus::Applied;
+            auto normals =
+                properties->Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (!normals)
+                return EditorCommandHistoryStatus::CommandFailed;
+            properties->Remove(normals);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus CommitVertexNormalProperty(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVertexNormalsCpuJobKind kind,
+            const char* label,
+            const std::uint64_t expectedGeometryMetadataSignature,
+            VertexNormalsSourceState source,
+            VertexNormalPropertyState before,
+            std::vector<glm::vec3> afterNormals)
+        {
+            VertexNormalPropertyState after{
+                .HadNormal = true,
+                .Normals = std::move(afterNormals),
+            };
+
+            if (context.CommandHistory != nullptr)
+            {
+                const VertexNormalsSourceSnapshot sourceState =
+                    std::make_shared<VertexNormalsSourceState>(
+                        std::move(source));
+                const VertexNormalPropertySnapshot beforeState =
+                    std::make_shared<VertexNormalPropertyState>(
+                        std::move(before));
+                const VertexNormalPropertySnapshot afterState =
+                    std::make_shared<VertexNormalPropertyState>(
+                        std::move(after));
+                const EditorCommandHistoryResult history =
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        label,
+                        VertexNormalsMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                            .Kind = kind,
+                        },
+                        VertexNormalsMutationGeneration{
+                            .GeometryMetadataSignature =
+                                expectedGeometryMetadataSignature,
+                            .Source = sourceState,
+                            .Normal = beforeState,
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const VertexNormalsMutationIdentity& identity,
+                            const VertexNormalsMutationGeneration& expected,
+                            const VertexNormalPropertySnapshot& target)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+                            if (expected.Source == nullptr ||
+                                expected.Normal == nullptr ||
+                                target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (!entity.has_value())
+                                return EditorCommandHistoryStatus::StaleEntity;
+
+                            const GS::ConstSourceView view =
+                                GS::BuildConstView(raw, *entity);
+                            if (GS::BuildSourceAvailability(view)
+                                    .ProvenanceDomain !=
+                                VertexNormalsExpectedSourceDomain(
+                                    identity.Kind))
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (GeometryMetadataSignatureForEntity(
+                                    raw,
+                                    *entity) !=
+                                expected.GeometryMetadataSignature)
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            VertexNormalsSourceState currentSource{};
+                            if (!CaptureVertexNormalsSourceState(
+                                    view,
+                                    identity.Kind,
+                                    currentSource) ||
+                                !SameVertexNormalsSourceState(
+                                    currentSource,
+                                    *expected.Source))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const Geometry::PropertySet* properties =
+                                VertexNormalsSourceProperties(
+                                    view,
+                                    identity.Kind);
+                            VertexNormalPropertyState currentNormal{};
+                            if (properties == nullptr ||
+                                !CaptureVertexNormalPropertyState(
+                                    *properties,
+                                    currentNormal) ||
+                                !SameVertexNormalPropertyState(
+                                    currentNormal,
+                                    *expected.Normal))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            if (target->HadNormal &&
+                                target->Normals.size() !=
+                                    properties->Size())
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const VertexNormalsMutationIdentity& identity,
+                            const VertexNormalPropertySnapshot& target)
+                        {
+                            if (target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    CommandFailed;
+                            }
+                            return ApplyVertexNormalPropertyState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                identity.Kind,
+                                *target);
+                        },
+                        [](
+                            const VertexNormalsMutationIdentity& identity,
+                            const VertexNormalsMutationGeneration& expected,
+                            const VertexNormalPropertySnapshot& target)
+                        {
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (entity.has_value())
+                                Dirty::MarkVertexNormalsDirty(raw, *entity);
+                            return VertexNormalsMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    entity.has_value()
+                                        ? GeometryMetadataSignatureForEntity(
+                                              raw,
+                                              *entity)
+                                        : 0u,
+                                .Source = expected.Source,
+                                .Normal = target,
+                            };
+                        });
+                return ToSandboxEditorCommandStatus(history.Status);
+            }
+
+            const EditorCommandHistoryStatus applied =
+                ApplyVertexNormalPropertyState(
+                    context.Scene,
+                    stableEntityId,
+                    kind,
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            Dirty::MarkVertexNormalsDirty(
+                context.Scene->Raw(),
+                entity);
+            return SandboxEditorCommandStatus::Applied;
+        }
+
         [[nodiscard]] JobApplyValidation ValidateVertexNormalsCpuJobApply(
             const SandboxEditorContext& context,
             const SandboxEditorVertexNormalsCpuJobState& job)
@@ -7234,6 +8738,35 @@ namespace Extrinsic::Runtime
                 CollectFiniteGeometryPositions(*properties);
             if (!current.has_value() ||
                 !SameGeometryPositions(*current, job.SnapshotPositions))
+            {
+                return JobApplyValidation::StaleGeneration;
+            }
+
+            if (job.SourceState == nullptr ||
+                job.BeforeNormal == nullptr)
+            {
+                return JobApplyValidation::StaleGeneration;
+            }
+
+            VertexNormalsSourceState currentSource{};
+            if (!CaptureVertexNormalsSourceState(
+                    view,
+                    job.Kind,
+                    currentSource) ||
+                !SameVertexNormalsSourceState(
+                    currentSource,
+                    *job.SourceState))
+            {
+                return JobApplyValidation::StaleGeneration;
+            }
+
+            VertexNormalPropertyState currentNormal{};
+            if (!CaptureVertexNormalPropertyState(
+                    *properties,
+                    currentNormal) ||
+                !SameVertexNormalPropertyState(
+                    currentNormal,
+                    *job.BeforeNormal))
             {
                 return JobApplyValidation::StaleGeneration;
             }
@@ -7503,51 +9036,38 @@ namespace Extrinsic::Runtime
                 PublishMeshVertexNormalsResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
-            if (context.Scene == nullptr)
-            {
-                result.Status = SandboxEditorCommandStatus::MissingScene;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Scene registry is unavailable for mesh vertex-normal publication.";
-                PublishMeshVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, job.StableEntityId);
-            if (!entity.has_value())
-            {
-                result.Status = SandboxEditorCommandStatus::StaleEntity;
-                result.Error = Core::ErrorCode::ResourceNotFound;
-                result.Message =
-                    "Mesh vertex-normal target entity is stale before publication.";
-                PublishMeshVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-            Geometry::PropertySet* properties =
-                VertexNormalsTargetProperties(
-                    view,
-                    SandboxEditorVertexNormalsCpuJobKind::Mesh);
-            if (properties == nullptr ||
-                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            if (job.SourceState == nullptr ||
+                job.BeforeNormal == nullptr)
             {
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
-                result.NormalStatus = GN::RecomputeStatus::PropertyTypeConflict;
-                result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message      = "Mesh vertex-normal publication failed because v:normal "
-                                      "has an incompatible type or size.";
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Mesh vertex-normal publication is missing its source snapshot.";
                 PublishMeshVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
 
-            Dirty::MarkVertexNormalsDirty(raw, *entity);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Recompute mesh vertex normals");
+            const SandboxEditorCommandStatus commitStatus =
+                CommitVertexNormalProperty(
+                    context,
+                    job.StableEntityId,
+                    SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                    "Recompute mesh vertex normals",
+                    job.GeometryMetadataSignature,
+                    *job.SourceState,
+                    *job.BeforeNormal,
+                    job.Normals);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message = "Mesh vertex-normal publication failed during "
+                                 "editor history commit.";
+                PublishMeshVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildMeshNormalsSuccessMessage(result);
@@ -7566,52 +9086,38 @@ namespace Extrinsic::Runtime
                 PublishGraphVertexNormalsResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
-            if (context.Scene == nullptr)
-            {
-                result.Status = SandboxEditorCommandStatus::MissingScene;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Scene registry is unavailable for graph vertex-normal publication.";
-                PublishGraphVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, job.StableEntityId);
-            if (!entity.has_value())
-            {
-                result.Status = SandboxEditorCommandStatus::StaleEntity;
-                result.Error = Core::ErrorCode::ResourceNotFound;
-                result.Message =
-                    "Graph vertex-normal target entity is stale before publication.";
-                PublishGraphVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-            Geometry::PropertySet* properties =
-                VertexNormalsTargetProperties(
-                    view,
-                    SandboxEditorVertexNormalsCpuJobKind::Graph);
-            if (properties == nullptr ||
-                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            if (job.SourceState == nullptr ||
+                job.BeforeNormal == nullptr)
             {
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
-                result.NormalStatus =
-                    GraphNormals::RecomputeStatus::PropertyTypeConflict;
-                result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message = "Graph vertex-normal publication failed because v:normal "
-                                 "has an incompatible type or size.";
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Graph vertex-normal publication is missing its source snapshot.";
                 PublishGraphVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
 
-            Dirty::MarkVertexNormalsDirty(raw, *entity);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Recompute graph vertex normals");
+            const SandboxEditorCommandStatus commitStatus =
+                CommitVertexNormalProperty(
+                    context,
+                    job.StableEntityId,
+                    SandboxEditorVertexNormalsCpuJobKind::Graph,
+                    "Recompute graph vertex normals",
+                    job.GeometryMetadataSignature,
+                    *job.SourceState,
+                    *job.BeforeNormal,
+                    job.Normals);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message = "Graph vertex-normal publication failed during "
+                                 "editor history commit.";
+                PublishGraphVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildGraphNormalsSuccessMessage(result);
@@ -7631,52 +9137,38 @@ namespace Extrinsic::Runtime
                 PublishPointCloudVertexNormalsResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
-            if (context.Scene == nullptr)
-            {
-                result.Status = SandboxEditorCommandStatus::MissingScene;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "Scene registry is unavailable for point-cloud "
-                                 "vertex-normal publication.";
-                PublishPointCloudVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, job.StableEntityId);
-            if (!entity.has_value())
-            {
-                result.Status = SandboxEditorCommandStatus::StaleEntity;
-                result.Error = Core::ErrorCode::ResourceNotFound;
-                result.Message =
-                    "Point-cloud vertex-normal target entity is stale before publication.";
-                PublishPointCloudVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-            Geometry::PropertySet* properties =
-                VertexNormalsTargetProperties(
-                    view,
-                    SandboxEditorVertexNormalsCpuJobKind::PointCloud);
-            if (properties == nullptr ||
-                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            if (job.SourceState == nullptr ||
+                job.BeforeNormal == nullptr)
             {
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
-                result.NormalStatus =
-                    PointNormals::RecomputeStatus::PropertyTypeConflict;
-                result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message = "Point-cloud vertex-normal publication failed because "
-                                 "v:normal has an incompatible type or size.";
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Point-cloud vertex-normal publication is missing its source snapshot.";
                 PublishPointCloudVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
 
-            Dirty::MarkVertexNormalsDirty(raw, *entity);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Recompute point-cloud vertex normals");
+            const SandboxEditorCommandStatus commitStatus =
+                CommitVertexNormalProperty(
+                    context,
+                    job.StableEntityId,
+                    SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                    "Recompute point-cloud vertex normals",
+                    job.GeometryMetadataSignature,
+                    *job.SourceState,
+                    *job.BeforeNormal,
+                    job.Normals);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message = "Point-cloud vertex-normal publication failed during "
+                                 "editor history commit.";
+                PublishPointCloudVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildPointCloudNormalsSuccessMessage(result);
@@ -7760,6 +9252,8 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const SandboxEditorMeshVertexNormalsCommand& command,
             Geometry::HalfedgeMesh::Mesh mesh,
+            VertexNormalsSourceState sourceState,
+            VertexNormalPropertyState beforeNormal,
             const std::uint64_t geometryMetadataSignature)
         {
             auto state =
@@ -7768,6 +9262,12 @@ namespace Extrinsic::Runtime
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(mesh);
+            state->SourceState =
+                std::make_shared<VertexNormalsSourceState>(
+                    std::move(sourceState));
+            state->BeforeNormal =
+                std::make_shared<VertexNormalPropertyState>(
+                    std::move(beforeNormal));
             state->Mesh = std::move(mesh);
             state->MeshCommand = command;
             state->MeshResult = MakeMeshNormalsResult(
@@ -7823,6 +9323,8 @@ namespace Extrinsic::Runtime
             Geometry::PropertySet edges,
             Geometry::Halfedges halfedges,
             const std::size_t edgeSlotCount,
+            VertexNormalsSourceState sourceState,
+            VertexNormalPropertyState beforeNormal,
             const std::uint64_t geometryMetadataSignature)
         {
             std::optional<std::vector<glm::vec3>> positions =
@@ -7843,6 +9345,12 @@ namespace Extrinsic::Runtime
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = std::move(*positions);
+            state->SourceState =
+                std::make_shared<VertexNormalsSourceState>(
+                    std::move(sourceState));
+            state->BeforeNormal =
+                std::make_shared<VertexNormalPropertyState>(
+                    std::move(beforeNormal));
             state->GraphNodes = std::move(nodes);
             state->GraphEdges = std::move(edges);
             state->GraphHalfedges = std::move(halfedges);
@@ -7901,6 +9409,8 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const SandboxEditorPointCloudVertexNormalsCommand& command,
             Geometry::Vertices points,
+            VertexNormalsSourceState sourceState,
+            VertexNormalPropertyState beforeNormal,
             const std::uint64_t geometryMetadataSignature)
         {
             std::optional<std::vector<glm::vec3>> positions =
@@ -7921,6 +9431,12 @@ namespace Extrinsic::Runtime
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = std::move(*positions);
+            state->SourceState =
+                std::make_shared<VertexNormalsSourceState>(
+                    std::move(sourceState));
+            state->BeforeNormal =
+                std::make_shared<VertexNormalPropertyState>(
+                    std::move(beforeNormal));
             state->PointCloudPoints = std::move(points);
             state->PointCloudCommand = command;
             state->PointCloudResult = MakePointCloudNormalsResult(
@@ -8114,6 +9630,14 @@ namespace Extrinsic::Runtime
                 CollectFiniteGeometryPositions(view.VertexSource->Properties);
             if (!current.has_value() ||
                 !SameGeometryPositions(*current, job.SnapshotPositions))
+            {
+                return JobApplyValidation::StaleGeneration;
+            }
+
+            if ((job.Kind == SandboxEditorMeshCpuJobKind::Remesh ||
+                 job.Kind == SandboxEditorMeshCpuJobKind::Subdivide ||
+                 job.Kind == SandboxEditorMeshCpuJobKind::Simplify) &&
+                !SameMeshTopologyState(view, job.BeforeMesh))
             {
                 return JobApplyValidation::StaleGeneration;
             }
@@ -8706,8 +10230,9 @@ namespace Extrinsic::Runtime
                 CommitMeshCurvatureProperties(
                     context,
                     job.StableEntityId,
-                    job.CurvatureBefore,
-                    job.CurvatureAfter);
+                    std::move(job.SnapshotPositions),
+                    std::move(job.CurvatureBefore),
+                    std::move(job.CurvatureAfter));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -8745,8 +10270,9 @@ namespace Extrinsic::Runtime
                     context,
                     job.StableEntityId,
                     "Remesh mesh",
-                    job.BeforeMesh,
-                    job.Mesh);
+                    job.GeometryMetadataSignature,
+                    std::move(job.BeforeMesh),
+                    std::move(job.Mesh));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -8781,8 +10307,9 @@ namespace Extrinsic::Runtime
                     context,
                     job.StableEntityId,
                     "Subdivide mesh",
-                    job.BeforeMesh,
-                    job.Mesh);
+                    job.GeometryMetadataSignature,
+                    std::move(job.BeforeMesh),
+                    std::move(job.Mesh));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -8817,8 +10344,9 @@ namespace Extrinsic::Runtime
                     context,
                     job.StableEntityId,
                     "Simplify mesh",
-                    job.BeforeMesh,
-                    job.Mesh);
+                    job.GeometryMetadataSignature,
+                    std::move(job.BeforeMesh),
+                    std::move(job.Mesh));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -8922,7 +10450,8 @@ namespace Extrinsic::Runtime
             state->Kind = SandboxEditorMeshCpuJobKind::Curvature;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
-            state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
+            state->SnapshotPositions =
+                std::move(source.SourcePositions);
             state->BeforeMesh = source.Mesh;
             state->Mesh = std::move(source.Mesh);
             state->CurvatureBefore = std::move(before);
@@ -9320,6 +10849,89 @@ namespace Extrinsic::Runtime
                    lhs.Scale.z == rhs.Scale.z;
         }
 
+        struct EditorTransformMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        [[nodiscard]] EditorCommandHistoryResult ExecuteEditorTransformMutation(
+            EditorCommandHistory& history,
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            const std::uint32_t stableEntityId,
+            const ECSC::Transform::Component& before,
+            const ECSC::Transform::Component& after,
+            std::string label)
+        {
+            return Internal::ExecuteUndoableEntityMutation(
+                history,
+                std::move(label),
+                EditorTransformMutationIdentity{
+                    .Scene = scene,
+                    .World = world,
+                    .StableEntityId = stableEntityId,
+                },
+                before,
+                before,
+                after,
+                [](
+                    const EditorTransformMutationIdentity& identity,
+                    const ECSC::Transform::Component& expected,
+                    const ECSC::Transform::Component&)
+                {
+                    if (identity.Scene == nullptr || !identity.World.IsValid())
+                        return EditorCommandHistoryStatus::MissingScene;
+
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(raw, identity.StableEntityId);
+                    if (!entity.has_value())
+                        return EditorCommandHistoryStatus::StaleEntity;
+
+                    const ECSC::Transform::Component* transform =
+                        raw.try_get<ECSC::Transform::Component>(*entity);
+                    if (transform == nullptr)
+                        return EditorCommandHistoryStatus::MissingTransform;
+                    return SameTransformComponent(*transform, expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                },
+                [](
+                    const EditorTransformMutationIdentity& identity,
+                    const ECSC::Transform::Component& target)
+                {
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(raw, identity.StableEntityId);
+                    if (!entity.has_value())
+                        return EditorCommandHistoryStatus::StaleEntity;
+
+                    ECSC::Transform::Component* transform =
+                        raw.try_get<ECSC::Transform::Component>(*entity);
+                    if (transform == nullptr)
+                        return EditorCommandHistoryStatus::MissingTransform;
+                    *transform = target;
+                    return EditorCommandHistoryStatus::Applied;
+                },
+                [](
+                    const EditorTransformMutationIdentity& identity,
+                    const ECSC::Transform::Component&,
+                    const ECSC::Transform::Component& target)
+                {
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(raw, identity.StableEntityId);
+                    if (entity.has_value())
+                    {
+                        raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(
+                            *entity);
+                    }
+                    return target;
+                });
+        }
+
         struct SandboxEditorRegistrationCpuJobState
         {
             std::uint32_t SourceStableEntityId{0u};
@@ -9559,15 +11171,14 @@ namespace Extrinsic::Runtime
             if (context.CommandHistory != nullptr)
             {
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        MakeTransformEditCommand(
-                            EditorTransformEditCommand{
-                                .Scene = context.Scene,
-                                .StableEntityId = job.SourceStableEntityId,
-                                .Before = job.SourceBeforeTransform,
-                                .After = job.SourceAfterTransform,
-                                .Label = "Align point clouds (ICP)",
-                            }));
+                    ExecuteEditorTransformMutation(
+                        *context.CommandHistory,
+                        context.Scene,
+                        context.World,
+                        job.SourceStableEntityId,
+                        job.SourceBeforeTransform,
+                        job.SourceAfterTransform,
+                        "Align point clouds (ICP)");
                 result.Status = ToSandboxEditorCommandStatus(history.Status);
             }
             else
@@ -11653,17 +13264,6 @@ namespace Extrinsic::Runtime
             return BuildActiveDerivedJobMessage(label, job);
         }
 
-        EditorCommandHistoryStatus ApplySandboxMethodPointCloudPointState(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const Geometry::PointCloud::Cloud& cloud)
-        {
-            return ApplyPointCloudPointState(
-                scene,
-                stableEntityId,
-                cloud);
-        }
-
         SandboxEditorCommandStatus ToSandboxMethodCommandStatus(
             const EditorCommandHistoryStatus status) noexcept
         {
@@ -13117,15 +14717,14 @@ namespace Extrinsic::Runtime
                 next.Scale = command.Scale;
 
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(
-                    MakeTransformEditCommand(
-                        EditorTransformEditCommand{
-                            .Scene = context.Scene,
-                            .StableEntityId = command.StableEntityId,
-                            .Before = *transform,
-                            .After = next,
-                            .Label = "Edit Transform",
-                        }));
+                ExecuteEditorTransformMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    *transform,
+                    next,
+                    "Edit Transform");
             return ToSandboxEditorCommandStatus(result.Status);
         }
 
@@ -13254,25 +14853,14 @@ namespace Extrinsic::Runtime
             return SandboxEditorCommandStatus::NoChange;
         if (context.CommandHistory != nullptr)
         {
-            const std::uint32_t stableEntityId = command.StableEntityId;
-            ECS::Scene::Registry* scene = context.Scene;
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(
-                    EditorCommandRecord{
-                        .Label = "Change Render Hints",
-                        .Redo =
-                            [scene, stableEntityId, after]()
-                            {
-                                return ApplyRenderHintState(
-                                    scene, stableEntityId, after);
-                            },
-                        .Undo =
-                            [scene, stableEntityId, before]()
-                            {
-                                return ApplyRenderHintState(
-                                    scene, stableEntityId, before);
-                            },
-                    });
+                ExecuteEditorRenderHintMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    before,
+                    after);
             return InvalidateSelectedModelCacheIfApplied(
                 context,
                 ToSandboxEditorCommandStatus(result.Status));
@@ -13319,26 +14907,14 @@ namespace Extrinsic::Runtime
 
         if (context.CommandHistory != nullptr)
         {
-            const std::uint32_t stableEntityId = command.StableEntityId;
-            ECS::Scene::Registry* scene = context.Scene;
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(
-                    EditorCommandRecord{
-                        .Label = "Change Render Hints",
-                        .Redo =
-                            [scene, stableEntityId, after]()
-                            {
-                                return ApplyRenderHintState(
-                                    scene, stableEntityId, after);
-                            },
-                        .Undo =
-                            [scene, stableEntityId, before]()
-                            {
-                                return ApplyRenderHintState(
-                                    scene, stableEntityId, before);
-                            },
-                        .Dirtying = true,
-                    });
+                ExecuteEditorRenderHintMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    before,
+                    after);
             return InvalidateSelectedModelCacheIfApplied(
                 context,
                 ToSandboxEditorCommandStatus(result.Status));
@@ -13392,25 +14968,16 @@ namespace Extrinsic::Runtime
 
         if (context.CommandHistory != nullptr)
         {
-            const EditorCommandRecord record =
-                command.Target == SandboxEditorVisualizationTarget::Entity
-                    ? MakeVisualizationConfigCommand(
-                          EditorVisualizationConfigCommand{
-                              .Scene = context.Scene,
-                              .StableEntityId = command.StableEntityId,
-                              .Before = before,
-                              .After = after,
-                              .Label = "Change Visualization",
-                          })
-                    : MakeVisualizationConfigTargetCommand(
-                          context.Scene,
-                          command.StableEntityId,
-                          command.Target,
-                          before,
-                          after,
-                          "Change Visualization");
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(record);
+                ExecuteEditorVisualizationMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    command.Target,
+                    before,
+                    after,
+                    "Change Visualization");
             return InvalidateSelectedModelCacheIfApplied(
                 context,
                 ToSandboxEditorCommandStatus(result.Status));
@@ -13604,9 +15171,10 @@ namespace Extrinsic::Runtime
         if (properties == nullptr)
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
-        const auto* current = raw.try_get<VertexChannelBindingSet>(*entity);
-        VertexChannelBindingSet after = current != nullptr
-            ? *current
+        const std::optional<VertexChannelBindingSet> before =
+            StoredVertexChannelBindingSet(raw, *entity);
+        VertexChannelBindingSet after = before.has_value()
+            ? *before
             : VertexChannelBindingSet{};
         VertexChannelSourceBinding* target =
             FindMutableVertexChannelBinding(after, command.Channel);
@@ -13615,68 +15183,88 @@ namespace Extrinsic::Runtime
 
         if (!command.EnableBinding)
         {
-            if (current == nullptr || !IsVertexChannelBindingEnabled(*target))
+            if (!before.has_value() ||
+                !IsVertexChannelBindingEnabled(*target))
+            {
                 return SandboxEditorCommandStatus::NoChange;
+            }
 
             *target = {};
             ++after.BindingGeneration;
-            if (AnyVertexChannelBindingEnabled(after))
-                raw.emplace_or_replace<VertexChannelBindingSet>(*entity, after);
-            else
-                raw.remove<VertexChannelBindingSet>(*entity);
-
-            MarkVertexChannelDirty(raw, *entity, command.Channel);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Change vertex channel binding");
-            InvalidateSelectedModelCache(context);
-            return SandboxEditorCommandStatus::Applied;
         }
-
-        if (command.PropertyName.empty())
-            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
-
-        const Geometry::PropertyValueKind valueKind =
-            DetectGeometryPropertyValueKind(*properties, command.PropertyName);
-        const std::optional<AttributeSourceType> sourceType =
-            ToAttributeSourceType(valueKind);
-        if (!sourceType.has_value())
-            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
-
-        const AttributeBindResult resolver =
-            EvaluateVertexChannelBinding(
-                *properties,
-                command.Channel,
-                command.PropertyName,
-                *sourceType,
-                properties->Size(),
-                context.ModelBuildStats);
-        if (!resolver.Ok())
-            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
-
-        const VertexChannelSourceBinding next{
-            .Enabled = true,
-            .Property = GeometryPropertyRef{
-                .Domain = ToGeometryElementDomain(*domain),
-                .Name = command.PropertyName,
-                .ValueKind = valueKind,
-            },
-        };
-        if (current != nullptr &&
-            SameVertexChannelSourceBinding(*target, next))
+        else
         {
-            return SandboxEditorCommandStatus::NoChange;
+            if (command.PropertyName.empty())
+                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+            const Geometry::PropertyValueKind valueKind =
+                DetectGeometryPropertyValueKind(
+                    *properties,
+                    command.PropertyName);
+            const std::optional<AttributeSourceType> sourceType =
+                ToAttributeSourceType(valueKind);
+            if (!sourceType.has_value())
+                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+            const AttributeBindResult resolver =
+                EvaluateVertexChannelBinding(
+                    *properties,
+                    command.Channel,
+                    command.PropertyName,
+                    *sourceType,
+                    properties->Size(),
+                    context.ModelBuildStats);
+            if (!resolver.Ok())
+                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+            const VertexChannelSourceBinding next{
+                .Enabled = true,
+                .Property = GeometryPropertyRef{
+                    .Domain = ToGeometryElementDomain(*domain),
+                    .Name = command.PropertyName,
+                    .ValueKind = valueKind,
+                },
+            };
+            if (before.has_value() &&
+                SameVertexChannelSourceBinding(*target, next))
+            {
+                return SandboxEditorCommandStatus::NoChange;
+            }
+
+            *target = next;
+            ++after.BindingGeneration;
         }
 
-        *target = next;
-        ++after.BindingGeneration;
-        raw.emplace_or_replace<VertexChannelBindingSet>(*entity, after);
-        MarkVertexChannelDirty(raw, *entity, command.Channel);
         if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty(
-                "Change vertex channel binding");
-        InvalidateSelectedModelCache(context);
-        return SandboxEditorCommandStatus::Applied;
+        {
+            const EditorCommandHistoryResult result =
+                ExecuteVertexChannelBindingMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    command.Channel,
+                    before,
+                    AnyVertexChannelBindingEnabled(after)
+                        ? std::optional<VertexChannelBindingSet>{after}
+                        : std::nullopt);
+            return InvalidateSelectedModelCacheIfApplied(
+                context,
+                ToSandboxEditorCommandStatus(result.Status));
+        }
+
+        const EditorCommandHistoryStatus applied =
+            ApplyVertexChannelBindingSet(
+                context.Scene,
+                command.StableEntityId,
+                AnyVertexChannelBindingEnabled(after)
+                    ? std::optional<VertexChannelBindingSet>{after}
+                    : std::nullopt);
+        if (applied == EditorCommandHistoryStatus::Applied)
+            MarkVertexChannelDirty(raw, *entity, command.Channel);
+        return InvalidateSelectedModelCacheIfApplied(
+            context,
+            ToSandboxEditorCommandStatus(applied));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
@@ -13736,7 +15324,6 @@ namespace Extrinsic::Runtime
             slot.Semantic,
             GeometryPresentationReadiness::DefaultValue,
             GeometryPresentationProvenance::UniformDefault);
-        ++after.Runtime.RecipeGeneration;
 
         return InvalidateSelectedModelCacheIfApplied(
             context,
@@ -13834,7 +15421,6 @@ namespace Extrinsic::Runtime
             slot.Semantic,
             nextReadiness,
             nextProvenance);
-        ++after.Runtime.RecipeGeneration;
 
         return InvalidateSelectedModelCacheIfApplied(
             context,
@@ -14688,6 +16274,8 @@ namespace Extrinsic::Runtime
     struct SandboxEditorUvRegenerationSourceSnapshot
     {
         std::vector<glm::vec3> Positions{};
+        std::vector<std::uint32_t> EdgeV0{};
+        std::vector<std::uint32_t> EdgeV1{};
         std::vector<std::uint32_t> HalfedgeToVertex{};
         std::vector<std::uint32_t> HalfedgeNext{};
         std::vector<std::uint32_t> HalfedgeFace{};
@@ -14709,6 +16297,7 @@ namespace Extrinsic::Runtime
         SandboxEditorUvRegenerationSourceSnapshot& out)
     {
         if (view.VertexSource == nullptr ||
+            view.EdgeSource == nullptr ||
             view.HalfedgeSource == nullptr ||
             view.FaceSource == nullptr)
         {
@@ -14717,6 +16306,12 @@ namespace Extrinsic::Runtime
 
         std::optional<std::vector<glm::vec3>> positions =
             CollectFiniteGeometryPositions(view.VertexSource->Properties);
+        std::optional<std::vector<std::uint32_t>> edgeV0 =
+            CopyU32Property(view.EdgeSource->Properties,
+                            GS::PropertyNames::kEdgeV0);
+        std::optional<std::vector<std::uint32_t>> edgeV1 =
+            CopyU32Property(view.EdgeSource->Properties,
+                            GS::PropertyNames::kEdgeV1);
         std::optional<std::vector<std::uint32_t>> halfedgeToVertex =
             CopyU32Property(view.HalfedgeSource->Properties,
                             GS::PropertyNames::kHalfedgeToVertex);
@@ -14730,6 +16325,8 @@ namespace Extrinsic::Runtime
             CopyU32Property(view.FaceSource->Properties,
                             GS::PropertyNames::kFaceHalfedge);
         if (!positions.has_value() ||
+            !edgeV0.has_value() ||
+            !edgeV1.has_value() ||
             !halfedgeToVertex.has_value() ||
             !halfedgeNext.has_value() ||
             !halfedgeFace.has_value() ||
@@ -14739,6 +16336,8 @@ namespace Extrinsic::Runtime
         }
 
         out.Positions = std::move(*positions);
+        out.EdgeV0 = std::move(*edgeV0);
+        out.EdgeV1 = std::move(*edgeV1);
         out.HalfedgeToVertex = std::move(*halfedgeToVertex);
         out.HalfedgeNext = std::move(*halfedgeNext);
         out.HalfedgeFace = std::move(*halfedgeFace);
@@ -14751,10 +16350,237 @@ namespace Extrinsic::Runtime
         const SandboxEditorUvRegenerationSourceSnapshot& rhs) noexcept
     {
         return SameGeometryPositions(lhs.Positions, rhs.Positions) &&
+               lhs.EdgeV0 == rhs.EdgeV0 &&
+               lhs.EdgeV1 == rhs.EdgeV1 &&
                lhs.HalfedgeToVertex == rhs.HalfedgeToVertex &&
                lhs.HalfedgeNext == rhs.HalfedgeNext &&
                lhs.HalfedgeFace == rhs.HalfedgeFace &&
                lhs.FaceHalfedge == rhs.FaceHalfedge;
+    }
+
+    struct UvMeshKnownPropertyState
+    {
+        Geometry::PropertySet VertexProperties{};
+        Geometry::PropertySet FaceProperties{};
+    };
+
+    using UvMeshKnownPropertySnapshot =
+        std::shared_ptr<const UvMeshKnownPropertyState>;
+
+    [[nodiscard]] UvMeshKnownPropertySnapshot CaptureUvMeshKnownPropertyState(
+        const GS::ConstSourceView& view)
+    {
+        if (view.VertexSource == nullptr || view.FaceSource == nullptr)
+            return nullptr;
+        return std::make_shared<UvMeshKnownPropertyState>(
+            UvMeshKnownPropertyState{
+                .VertexProperties = view.VertexSource->Properties,
+                .FaceProperties = view.FaceSource->Properties,
+            });
+    }
+
+    [[nodiscard]] bool SameUvMeshKnownPropertyState(
+        const GS::ConstSourceView& view,
+        const UvMeshKnownPropertyState& expected) noexcept
+    {
+        return view.VertexSource != nullptr &&
+               view.FaceSource != nullptr &&
+               SameKnownPropertyValues(
+                   Geometry::ConstPropertySet(
+                       view.VertexSource->Properties),
+                   Geometry::ConstPropertySet(
+                       expected.VertexProperties)) &&
+               SameKnownPropertyValues(
+                   Geometry::ConstPropertySet(
+                       view.FaceSource->Properties),
+                   Geometry::ConstPropertySet(
+                       expected.FaceProperties));
+    }
+
+    struct UvMeshTopologyMutationGeneration
+    {
+        std::uint64_t GeometryMetadataSignature{0u};
+        SandboxEditorUvRegenerationSourceSnapshot Snapshot{};
+        UvMeshKnownPropertySnapshot Properties{};
+    };
+
+    [[nodiscard]] SandboxEditorCommandStatus CommitUvMeshTopologyReplacement(
+        const SandboxEditorContext& context,
+        const std::uint32_t stableEntityId,
+        const char* label,
+        const std::uint64_t expectedGeometryMetadataSignature,
+        SandboxEditorUvRegenerationSourceSnapshot expectedSnapshot,
+        Geometry::HalfedgeMesh::Mesh before,
+        Geometry::HalfedgeMesh::Mesh after)
+    {
+        if (before.HasGarbage())
+            before.GarbageCollection();
+        if (after.HasGarbage())
+            after.GarbageCollection();
+
+        if (context.CommandHistory != nullptr)
+        {
+            if (context.Scene == nullptr)
+            {
+                return SandboxEditorCommandStatus::MissingScene;
+            }
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return SandboxEditorCommandStatus::StaleEntity;
+            const UvMeshKnownPropertySnapshot beforeProperties =
+                CaptureUvMeshKnownPropertyState(
+                    GS::BuildConstView(raw, *entity));
+            if (beforeProperties == nullptr)
+            {
+                return SandboxEditorCommandStatus::
+                    UnsupportedGeometryDomain;
+            }
+
+            const MeshTopologySnapshot beforeState =
+                std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                    std::move(before));
+            const MeshTopologySnapshot afterState =
+                std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                    std::move(after));
+            const EditorCommandHistoryResult history =
+                Internal::ExecuteUndoableEntityMutation(
+                    *context.CommandHistory,
+                    label,
+                    MeshPropertyMutationIdentity{
+                        .Scene = context.Scene,
+                        .World = context.World,
+                        .StableEntityId = stableEntityId,
+                    },
+                    UvMeshTopologyMutationGeneration{
+                        .GeometryMetadataSignature =
+                            expectedGeometryMetadataSignature,
+                        .Snapshot = std::move(expectedSnapshot),
+                        .Properties = beforeProperties,
+                    },
+                    beforeState,
+                    afterState,
+                    [](
+                        const MeshPropertyMutationIdentity& identity,
+                        const UvMeshTopologyMutationGeneration& expected,
+                        const MeshTopologySnapshot& target)
+                    {
+                        if (identity.Scene == nullptr ||
+                            !identity.World.IsValid())
+                        {
+                            return EditorCommandHistoryStatus::MissingScene;
+                        }
+
+                        entt::registry& raw = identity.Scene->Raw();
+                        const std::optional<ECS::EntityHandle> entity =
+                            ResolveStableEntity(
+                                raw,
+                                identity.StableEntityId);
+                        if (!entity.has_value())
+                            return EditorCommandHistoryStatus::StaleEntity;
+
+                        const GS::ConstSourceView view =
+                            GS::BuildConstView(raw, *entity);
+                        const GS::SourceAvailability availability =
+                            GS::BuildSourceAvailability(view);
+                        if (availability.ProvenanceDomain != GS::Domain::Mesh)
+                        {
+                            return EditorCommandHistoryStatus::
+                                UnsupportedOperation;
+                        }
+                        if (expected.Properties == nullptr || target == nullptr)
+                        {
+                            return EditorCommandHistoryStatus::CommandFailed;
+                        }
+                        if (GeometryMetadataSignatureForEntity(
+                                raw,
+                                *entity) !=
+                            expected.GeometryMetadataSignature)
+                        {
+                            return EditorCommandHistoryStatus::StaleEntity;
+                        }
+
+                        SandboxEditorUvRegenerationSourceSnapshot current{};
+                        if (!CaptureUvRegenerationSourceSnapshot(
+                                view,
+                                current) ||
+                            !SameUvRegenerationSourceSnapshot(
+                                current,
+                                expected.Snapshot) ||
+                            !SameUvMeshKnownPropertyState(
+                                view,
+                                *expected.Properties))
+                        {
+                            return EditorCommandHistoryStatus::StaleEntity;
+                        }
+                        return EditorCommandHistoryStatus::Applied;
+                    },
+                    [](
+                        const MeshPropertyMutationIdentity& identity,
+                        const MeshTopologySnapshot& target)
+                    {
+                        if (target == nullptr)
+                            return EditorCommandHistoryStatus::CommandFailed;
+                        return ApplyMeshTopologyState(
+                            identity.Scene,
+                            identity.StableEntityId,
+                            *target);
+                    },
+                    [](
+                        const MeshPropertyMutationIdentity& identity,
+                        const UvMeshTopologyMutationGeneration&,
+                        const MeshTopologySnapshot&)
+                    {
+                        entt::registry& raw = identity.Scene->Raw();
+                        const std::optional<ECS::EntityHandle> entity =
+                            ResolveStableEntity(
+                                raw,
+                                identity.StableEntityId);
+                        SandboxEditorUvRegenerationSourceSnapshot current{};
+                        if (entity.has_value())
+                        {
+                            MarkMeshTopologyReplacementDirty(raw, *entity);
+                            Dirty::MarkGpuDirty(raw, *entity);
+                            (void)CaptureUvRegenerationSourceSnapshot(
+                                GS::BuildConstView(raw, *entity),
+                                current);
+                        }
+                        const UvMeshKnownPropertySnapshot properties =
+                            entity.has_value()
+                                ? CaptureUvMeshKnownPropertyState(
+                                      GS::BuildConstView(raw, *entity))
+                                : nullptr;
+                        return UvMeshTopologyMutationGeneration{
+                            .GeometryMetadataSignature =
+                                entity.has_value()
+                                    ? GeometryMetadataSignatureForEntity(
+                                          raw,
+                                          *entity)
+                                    : 0u,
+                            .Snapshot = std::move(current),
+                            .Properties = properties,
+                        };
+                    });
+            return ToSandboxEditorCommandStatus(history.Status);
+        }
+
+        const EditorCommandHistoryStatus applied =
+            ApplyMeshTopologyState(
+                context.Scene,
+                stableEntityId,
+                after);
+        if (applied != EditorCommandHistoryStatus::Applied)
+            return ToSandboxEditorCommandStatus(applied);
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, stableEntityId);
+        if (entity.has_value())
+        {
+            MarkMeshTopologyReplacementDirty(raw, *entity);
+            Dirty::MarkGpuDirty(raw, *entity);
+        }
+        return SandboxEditorCommandStatus::Applied;
     }
 
     [[nodiscard]] SandboxEditorUvRegenerationCommandResult
@@ -14843,10 +16669,21 @@ namespace Extrinsic::Runtime
         }
 
         SandboxEditorUvRegenerationSourceSnapshot current{};
-        if (!CaptureUvRegenerationSourceSnapshot(view, current))
+        if (!CaptureUvRegenerationSourceSnapshot(view, current) ||
+            !SameUvRegenerationSourceSnapshot(current, job.Snapshot) ||
+            view.VertexSource == nullptr ||
+            view.FaceSource == nullptr ||
+            !SameKnownPropertyValues(
+                Geometry::ConstPropertySet(
+                    view.VertexSource->Properties),
+                job.BeforeMesh.VertexProperties()) ||
+            !SameKnownPropertyValues(
+                Geometry::ConstPropertySet(
+                    view.FaceSource->Properties),
+                job.BeforeMesh.FaceProperties()))
+        {
             return JobApplyValidation::StaleGeneration;
-        if (!SameUvRegenerationSourceSnapshot(current, job.Snapshot))
-            return JobApplyValidation::StaleGeneration;
+        }
 
         return JobApplyValidation::Current;
     }
@@ -14949,8 +16786,10 @@ namespace Extrinsic::Runtime
                 context,
                 job.StableEntityId,
                 "Regenerate UVs",
-                job.BeforeMesh,
-                job.AfterMesh);
+                job.GeometryMetadataSignature,
+                std::move(job.Snapshot),
+                std::move(job.BeforeMesh),
+                std::move(job.AfterMesh));
         if (commitStatus != SandboxEditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
@@ -15127,8 +16966,8 @@ namespace Extrinsic::Runtime
             return MakeUvRegenerationResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
                 Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
-                "UV regeneration requires count-matched mesh position and halfedge "
-                "topology properties.");
+                "UV regeneration requires count-matched mesh position, edge, "
+                "halfedge, and face topology properties.");
         }
 
         std::vector<glm::vec2> authoredTexcoords;
@@ -15160,6 +16999,13 @@ namespace Extrinsic::Runtime
             state->SourceFaceProperties = view.FaceSource->Properties;
             state->HasSourceFaceProperties = true;
         }
+        CopyUvSourcePropertiesToHalfedgeMesh(
+            Geometry::ConstPropertySet(state->SourceVertexProperties),
+            state->HasSourceVertexProperties,
+            Geometry::ConstPropertySet(state->SourceFaceProperties),
+            state->HasSourceFaceProperties,
+            state->Soup,
+            state->BeforeMesh);
 
         if (context.JobCommands.Available())
             return SubmitUvRegenerationCpuJob(context, state);
@@ -15534,6 +17380,7 @@ namespace Extrinsic::Runtime
             CommitMeshCurvatureProperties(
                 context,
                 command.StableEntityId,
+                std::move(source.SourcePositions),
                 std::move(before),
                 std::move(after));
         if (commitStatus != SandboxEditorCommandStatus::Applied)
@@ -15721,6 +17568,7 @@ namespace Extrinsic::Runtime
                 context,
                 command.StableEntityId,
                 "Remesh mesh",
+                GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(source.Mesh));
         if (commitStatus != SandboxEditorCommandStatus::Applied)
@@ -15930,6 +17778,7 @@ namespace Extrinsic::Runtime
                 context,
                 command.StableEntityId,
                 "Subdivide mesh",
+                GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(output));
         if (commitStatus != SandboxEditorCommandStatus::Applied)
@@ -16079,6 +17928,7 @@ namespace Extrinsic::Runtime
                 context,
                 command.StableEntityId,
                 "Simplify mesh",
+                GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(source.Mesh));
         if (commitStatus != SandboxEditorCommandStatus::Applied)
@@ -16148,13 +17998,43 @@ namespace Extrinsic::Runtime
                 source.Diagnostic);
         }
 
+        const std::uint64_t geometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *entity);
+        const Geometry::PropertySet* normalProperties =
+            VertexNormalsSourceProperties(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::Mesh);
+        VertexNormalsSourceState sourceState{};
+        VertexNormalPropertyState beforeNormal{};
+        if (normalProperties == nullptr ||
+            !CaptureVertexNormalsSourceState(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                sourceState) ||
+            !CaptureVertexNormalPropertyState(
+                *normalProperties,
+                beforeNormal))
+        {
+            return MakeMeshNormalsResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                GN::RecomputeStatus::PropertyTypeConflict,
+                command.Weighting,
+                Core::ErrorCode::TypeMismatch,
+                "Mesh vertex-normal publication requires an absent or "
+                "count-matched vec3 v:normal property.");
+        }
+
         if (context.JobCommands.Available())
         {
             return SubmitMeshVertexNormalsCpuJob(
                 context,
                 command,
                 source.Mesh,
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                std::move(sourceState),
+                std::move(beforeNormal),
+                geometryMetadataSignature);
         }
 
         Geometry::HalfedgeMesh::Mesh mesh = source.Mesh;
@@ -16186,19 +18066,25 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (!PublishMeshVertexNormals(view, normalResult))
+        const SandboxEditorCommandStatus commitStatus =
+            CommitVertexNormalProperty(
+                context,
+                command.StableEntityId,
+                SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                "Recompute mesh vertex normals",
+                geometryMetadataSignature,
+                std::move(sourceState),
+                std::move(beforeNormal),
+                normalResult.Normals.Vector());
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
-            result.NormalStatus = GN::RecomputeStatus::PropertyTypeConflict;
-            result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message      = "Mesh vertex-normal publication failed because v:normal "
-                                  "has an incompatible type or size.";
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message = "Mesh vertex-normal publication failed during "
+                             "editor history commit.";
             return result;
         }
 
-        Dirty::MarkVertexNormalsDirty(raw, *entity);
-        if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty("Recompute mesh vertex normals");
         result.Message = BuildMeshNormalsSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
@@ -16255,6 +18141,34 @@ namespace Extrinsic::Runtime
                 source.Diagnostic);
         }
 
+        const std::uint64_t geometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *entity);
+        const Geometry::PropertySet* normalProperties =
+            VertexNormalsSourceProperties(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::Graph);
+        VertexNormalsSourceState sourceState{};
+        VertexNormalPropertyState beforeNormal{};
+        if (normalProperties == nullptr ||
+            !CaptureVertexNormalsSourceState(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::Graph,
+                sourceState) ||
+            !CaptureVertexNormalPropertyState(
+                *normalProperties,
+                beforeNormal))
+        {
+            return MakeGraphNormalsResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                GraphNormals::RecomputeStatus::PropertyTypeConflict,
+                command.OrientTowardFallback,
+                Core::ErrorCode::TypeMismatch,
+                "Graph vertex-normal publication requires an absent or "
+                "count-matched vec3 v:normal property.");
+        }
+
         if (context.JobCommands.Available())
         {
             return SubmitGraphVertexNormalsCpuJob(
@@ -16264,7 +18178,9 @@ namespace Extrinsic::Runtime
                 view.EdgeSource->Properties,
                 source.Halfedges,
                 source.EdgeSlotCount,
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                std::move(sourceState),
+                std::move(beforeNormal),
+                geometryMetadataSignature);
         }
 
         Geometry::Vertices scratchNodes = view.NodeSource->Properties;
@@ -16313,24 +18229,36 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (!normalResult.Normals.IsValid() ||
-            !PublishCanonicalVec3Normals(
-                view.NodeSource->Properties,
-                normalResult.Normals.Vector()))
+        if (!normalResult.Normals.IsValid())
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus =
-                GraphNormals::RecomputeStatus::PropertyTypeConflict;
-            result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message = "Graph vertex-normal publication failed because v:normal "
-                             "has an incompatible type or size.";
+                GraphNormals::RecomputeStatus::InvalidOutputProperty;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Graph vertex-normal recompute produced no normal property.";
             return result;
         }
 
-        Dirty::MarkVertexNormalsDirty(raw, *entity);
-        if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty(
-                "Recompute graph vertex normals");
+        const SandboxEditorCommandStatus commitStatus =
+            CommitVertexNormalProperty(
+                context,
+                command.StableEntityId,
+                SandboxEditorVertexNormalsCpuJobKind::Graph,
+                "Recompute graph vertex normals",
+                geometryMetadataSignature,
+                std::move(sourceState),
+                std::move(beforeNormal),
+                normalResult.Normals.Vector());
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message = "Graph vertex-normal publication failed during "
+                             "editor history commit.";
+            return result;
+        }
+
         result.Message = BuildGraphNormalsSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
@@ -16391,13 +18319,43 @@ namespace Extrinsic::Runtime
                 "GeometrySources.");
         }
 
+        const std::uint64_t geometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *entity);
+        const Geometry::PropertySet* normalProperties =
+            VertexNormalsSourceProperties(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::PointCloud);
+        VertexNormalsSourceState sourceState{};
+        VertexNormalPropertyState beforeNormal{};
+        if (normalProperties == nullptr ||
+            !CaptureVertexNormalsSourceState(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                sourceState) ||
+            !CaptureVertexNormalPropertyState(
+                *normalProperties,
+                beforeNormal))
+        {
+            return MakePointCloudNormalsResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                PointNormals::RecomputeStatus::PropertyTypeConflict,
+                command,
+                Core::ErrorCode::TypeMismatch,
+                "Point-cloud vertex-normal publication requires an absent or "
+                "count-matched vec3 v:normal property.");
+        }
+
         if (context.JobCommands.Available())
         {
             return SubmitPointCloudVertexNormalsCpuJob(
                 context,
                 command,
                 view.VertexSource->Properties,
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                std::move(sourceState),
+                std::move(beforeNormal),
+                geometryMetadataSignature);
         }
 
         Geometry::Vertices scratchPoints = view.VertexSource->Properties;
@@ -16444,24 +18402,36 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (!normalResult.Normals.IsValid() ||
-            !PublishCanonicalVec3Normals(
-                view.VertexSource->Properties,
-                normalResult.Normals.Vector()))
+        if (!normalResult.Normals.IsValid())
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus =
-                PointNormals::RecomputeStatus::PropertyTypeConflict;
-            result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message = "Point-cloud vertex-normal publication failed because "
-                             "v:normal has an incompatible type or size.";
+                PointNormals::RecomputeStatus::InvalidOutputProperty;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud vertex-normal recompute produced no normal property.";
             return result;
         }
 
-        Dirty::MarkVertexNormalsDirty(raw, *entity);
-        if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty(
-                "Recompute point-cloud vertex normals");
+        const SandboxEditorCommandStatus commitStatus =
+            CommitVertexNormalProperty(
+                context,
+                command.StableEntityId,
+                SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                "Recompute point-cloud vertex normals",
+                geometryMetadataSignature,
+                std::move(sourceState),
+                std::move(beforeNormal),
+                normalResult.Normals.Vector());
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message = "Point-cloud vertex-normal publication failed during "
+                             "editor history commit.";
+            return result;
+        }
+
         result.Message = BuildPointCloudNormalsSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
@@ -16540,6 +18510,20 @@ namespace Extrinsic::Runtime
                              "point-cloud GeometrySources.";
             return result;
         }
+        const PointCloudSourceSnapshot sourceSnapshot =
+            CapturePointCloudSourceState(
+                GS::BuildConstView(raw, *entity));
+        if (sourceSnapshot == nullptr)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message = "Point-cloud outlier removal requires selected "
+                             "point-cloud GeometrySources.";
+            return result;
+        }
+        const std::uint64_t geometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
 
         // Snapshot the original point property set (including any deleted slots
         // and the live deletion counter) so undo restores the entity exactly.
@@ -16582,9 +18566,9 @@ namespace Extrinsic::Runtime
         if (workCloud.HasGarbage())
             workCloud.GarbageCollection();
 
-        std::optional<std::vector<glm::vec3>> snapshotPositions =
-            CollectFiniteGeometryPositions(view.VertexSource->Properties);
-        if (!snapshotPositions.has_value())
+        if (!CollectFiniteGeometryPositions(
+                 view.VertexSource->Properties)
+                 .has_value())
         {
             result.Status =
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
@@ -16603,8 +18587,8 @@ namespace Extrinsic::Runtime
                 command,
                 std::move(beforeCloud),
                 std::move(workCloud),
-                std::move(*snapshotPositions),
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                sourceSnapshot,
+                geometryMetadataSignature);
         }
 
         Geometry::PointCloud::OutlierRemovalResult removal{};
@@ -16664,8 +18648,10 @@ namespace Extrinsic::Runtime
                 statistical
                     ? "Remove statistical point-cloud outliers"
                     : "Remove radius point-cloud outliers",
-                beforeCloud,
-                afterCloud);
+                geometryMetadataSignature,
+                sourceSnapshot,
+                std::move(beforeCloud),
+                std::move(afterCloud));
         result.Status = status;
         if (status != SandboxEditorCommandStatus::Applied)
         {
@@ -16882,15 +18868,14 @@ namespace Extrinsic::Runtime
         if (context.CommandHistory != nullptr)
         {
             const EditorCommandHistoryResult history =
-                context.CommandHistory->Execute(
-                    MakeTransformEditCommand(
-                        EditorTransformEditCommand{
-                            .Scene = context.Scene,
-                            .StableEntityId = command.SourceStableEntityId,
-                            .Before = *transform,
-                            .After = next,
-                            .Label = "Align point clouds (ICP)",
-                        }));
+                ExecuteEditorTransformMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.SourceStableEntityId,
+                    *transform,
+                    next,
+                    "Align point clouds (ICP)");
             result.Status = ToSandboxEditorCommandStatus(history.Status);
         }
         else

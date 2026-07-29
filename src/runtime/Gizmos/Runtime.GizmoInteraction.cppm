@@ -15,6 +15,8 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
@@ -108,36 +110,6 @@ export namespace Extrinsic::Runtime
         float                      PixelDistance{0.f};
     };
 
-    // One undoable authoring-transform edit emitted on drag-commit. The editor
-    // owns redo/undo policy; runtime only records the before/after pair so the
-    // editor can replay it.
-    struct GizmoTransformEdit
-    {
-        Extrinsic::ECS::EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};
-        glm::vec3                    BeforePosition{0.f};
-        glm::vec3                    AfterPosition{0.f};
-        glm::quat                    BeforeRotation{1.f, 0.f, 0.f, 0.f};
-        glm::quat                    AfterRotation{1.f, 0.f, 0.f, 0.f};
-        glm::vec3                    BeforeScale{1.f};
-        glm::vec3                    AfterScale{1.f};
-    };
-
-    // Minimal runtime-owned undo stack for gizmo edits. The editor may instead
-    // supply its own sink; this keeps the module standalone-testable.
-    class GizmoUndoStack
-    {
-    public:
-        void Push(const GizmoTransformEdit& edit);
-        [[nodiscard]] std::size_t Size() const noexcept { return m_Records.size(); }
-        [[nodiscard]] bool        Empty() const noexcept { return m_Records.empty(); }
-        [[nodiscard]] const GizmoTransformEdit& Back() const { return m_Records.back(); }
-        [[nodiscard]] std::span<const GizmoTransformEdit> Records() const noexcept { return m_Records; }
-        void Clear() noexcept { m_Records.clear(); }
-
-    private:
-        std::vector<GizmoTransformEdit> m_Records{};
-    };
-
     // Diagnostics counters surfaced for editor overlays / tests.
     struct GizmoInteractionDiagnostics
     {
@@ -222,9 +194,13 @@ export namespace Extrinsic::Runtime
         // BeginDrag; snap rounds the active operation to its configured step.
         bool DragTick(Registry& registry, const PickRay& ray);
 
-        // Commit the drag: emit one `GizmoTransformEdit` per moved entity to
-        // `undo`, then clear drag state. Returns the number of edits emitted.
-        std::size_t DragCommit(const Registry& registry, GizmoUndoStack& undo);
+        // Commit every moved entity as one generation-validated history
+        // transaction, then clear drag state. The already-applied live preview
+        // is recorded without being published a second time.
+        [[nodiscard]] EditorCommandHistoryResult DragCommit(
+            Registry& registry,
+            WorldHandle world,
+            EditorCommandHistory& history);
 
         // Abort the drag, restoring each entity to its recorded before transform.
         void DragCancel(Registry& registry);

@@ -24,11 +24,13 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 
@@ -723,6 +725,86 @@ TEST(ClusteringModule, EngineRunCommitsLabelsAndPublishesChangeEvent)
         appPtr->Entity));
     EXPECT_EQ(appPtr->Stats.LabelsCommitted, 1u);
     EXPECT_EQ(appPtr->Stats.VisualizationRefreshReactions, 1u);
+
+    engine.Shutdown();
+}
+
+TEST(ClusteringModule, DocumentHistoryOwnsQueuedOutputUndoRedo)
+{
+    auto app = std::make_unique<KMeansSuccessApp>();
+    KMeansSuccessApp* appPtr = app.get();
+
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        NullWindowHeadlessConfig(),
+        std::move(app));
+    engine.EmplaceModule<Runtime::ClusteringModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    engine.Run();
+
+    ASSERT_TRUE(appPtr->Completion.has_value());
+    ASSERT_TRUE(appPtr->Completion->Succeeded())
+        << appPtr->Completion->Message;
+    Runtime::EditorCommandHistory* history =
+        engine.Services().Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    ASSERT_EQ(history->UndoCount(), 1u);
+
+    ECS::Scene::Registry* scene =
+        engine.Worlds().Get(engine.ActiveWorld());
+    ASSERT_NE(scene, nullptr);
+    auto& properties =
+        scene->Raw().get<GS::Vertices>(appPtr->Entity).Properties;
+    const auto labels =
+        properties.Get<std::uint32_t>("p:kmeans_label");
+    const auto colors =
+        properties.Get<glm::vec4>("p:kmeans_color");
+    ASSERT_TRUE(labels);
+    ASSERT_TRUE(colors);
+    const std::vector<std::uint32_t> publishedLabels =
+        labels.Vector();
+    const std::vector<glm::vec4> publishedColors =
+        colors.Vector();
+
+    scene->Raw().remove<Dirty::DirtyVertexAttributes>(
+        appPtr->Entity);
+    EXPECT_EQ(history->Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(properties.Exists("p:kmeans_label"));
+    EXPECT_FALSE(properties.Exists("p:kmeans_color"));
+    EXPECT_TRUE(scene->Raw().all_of<Dirty::DirtyVertexAttributes>(
+        appPtr->Entity));
+
+    scene->Raw().remove<Dirty::DirtyVertexAttributes>(
+        appPtr->Entity);
+    EXPECT_EQ(history->Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    auto redoneLabels =
+        properties.Get<std::uint32_t>("p:kmeans_label");
+    auto redoneColors =
+        properties.Get<glm::vec4>("p:kmeans_color");
+    ASSERT_TRUE(redoneLabels);
+    ASSERT_TRUE(redoneColors);
+    EXPECT_EQ(redoneLabels.Vector(), publishedLabels);
+    EXPECT_EQ(redoneColors.Vector(), publishedColors);
+    EXPECT_TRUE(scene->Raw().all_of<Dirty::DirtyVertexAttributes>(
+        appPtr->Entity));
+
+    redoneLabels.Vector()[0] += 1u;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history->Snapshot();
+    EXPECT_EQ(history->Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(history->UndoCount(), 1u);
+    EXPECT_EQ(history->RedoCount(), 0u);
+    EXPECT_EQ(history->Snapshot().Revision,
+              beforeRejectedUndo.Revision);
+
+    redoneLabels.Vector() = publishedLabels;
+    EXPECT_EQ(history->Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(properties.Exists("p:kmeans_label"));
+    EXPECT_FALSE(properties.Exists("p:kmeans_color"));
 
     engine.Shutdown();
 }

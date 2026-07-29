@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -28,12 +29,14 @@ import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.KMeans;
 import Geometry.Properties;
 
 #include "Runtime.ClusteringGpuState.Internal.hpp"
+#include "../../Runtime.EditorMutation.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -254,9 +257,12 @@ namespace Extrinsic::Runtime
                 return false;
             for (std::size_t i = 0u; i < lhs.size(); ++i)
             {
-                if (lhs[i].x != rhs[i].x ||
-                    lhs[i].y != rhs[i].y ||
-                    lhs[i].z != rhs[i].z)
+                if (std::bit_cast<std::uint32_t>(lhs[i].x) !=
+                        std::bit_cast<std::uint32_t>(rhs[i].x) ||
+                    std::bit_cast<std::uint32_t>(lhs[i].y) !=
+                        std::bit_cast<std::uint32_t>(rhs[i].y) ||
+                    std::bit_cast<std::uint32_t>(lhs[i].z) !=
+                        std::bit_cast<std::uint32_t>(rhs[i].z))
                 {
                     return false;
                 }
@@ -293,50 +299,212 @@ namespace Extrinsic::Runtime
             return glm::vec4(rgb + glm::vec3(m), 1.0f);
         }
 
-        [[nodiscard]] bool PublishProperties(
-            Geometry::PropertySet& properties,
+        template <typename T>
+        [[nodiscard]] bool CaptureOutputProperty(
+            const Geometry::PropertySet& properties,
+            const std::string_view name,
+            bool& hadProperty,
+            std::vector<T>& values)
+        {
+            hadProperty = false;
+            values.clear();
+            if (!properties.Exists(name))
+                return true;
+
+            const auto property = properties.Get<T>(name);
+            if (!property ||
+                property.Vector().size() != properties.Size())
+            {
+                return false;
+            }
+
+            hadProperty = true;
+            values = property.Vector();
+            return true;
+        }
+
+        [[nodiscard]] bool CaptureKMeansOutputPropertyState(
+            const Geometry::PropertySet& properties,
+            const KMeansPropertyRefs& refs,
+            KMeansOutputPropertyState& out)
+        {
+            out = {};
+            if (!CaptureOutputProperty<std::uint32_t>(
+                    properties,
+                    refs.OutputLabels.Name,
+                    out.HadLabels,
+                    out.Labels) ||
+                !CaptureOutputProperty<glm::vec4>(
+                    properties,
+                    refs.OutputColors.Name,
+                    out.HadColors,
+                    out.Colors))
+            {
+                return false;
+            }
+            if (!refs.OutputScalarLabels.has_value())
+                return true;
+            return CaptureOutputProperty<float>(
+                properties,
+                refs.OutputScalarLabels->Name,
+                out.HadScalarLabels,
+                out.ScalarLabels);
+        }
+
+        [[nodiscard]] bool SameFloatBits(
+            const float lhs,
+            const float rhs) noexcept
+        {
+            return std::bit_cast<std::uint32_t>(lhs) ==
+                   std::bit_cast<std::uint32_t>(rhs);
+        }
+
+        [[nodiscard]] bool SameKMeansOutputPropertyState(
+            const KMeansOutputPropertyState& lhs,
+            const KMeansOutputPropertyState& rhs) noexcept
+        {
+            if (lhs.HadLabels != rhs.HadLabels ||
+                lhs.HadColors != rhs.HadColors ||
+                lhs.HadScalarLabels != rhs.HadScalarLabels ||
+                lhs.Labels != rhs.Labels ||
+                lhs.Colors.size() != rhs.Colors.size() ||
+                lhs.ScalarLabels.size() != rhs.ScalarLabels.size())
+            {
+                return false;
+            }
+
+            for (std::size_t i = 0u; i < lhs.Colors.size(); ++i)
+            {
+                const glm::vec4& a = lhs.Colors[i];
+                const glm::vec4& b = rhs.Colors[i];
+                if (!SameFloatBits(a.x, b.x) ||
+                    !SameFloatBits(a.y, b.y) ||
+                    !SameFloatBits(a.z, b.z) ||
+                    !SameFloatBits(a.w, b.w))
+                {
+                    return false;
+                }
+            }
+            for (std::size_t i = 0u;
+                 i < lhs.ScalarLabels.size();
+                 ++i)
+            {
+                if (!SameFloatBits(
+                        lhs.ScalarLabels[i],
+                        rhs.ScalarLabels[i]))
+                    return false;
+            }
+            return true;
+        }
+
+        [[nodiscard]] std::optional<KMeansOutputPropertyState>
+        BuildKMeansOutputPropertyState(
+            const Geometry::PropertySet& properties,
             const KMeansPropertyRefs& refs,
             const GK::KMeansResult& result)
         {
             if (result.Labels.empty() ||
                 result.Labels.size() != properties.Size())
             {
-                return false;
+                return std::nullopt;
             }
 
-            auto labels = properties.GetOrAdd<std::uint32_t>(
-                refs.OutputLabels.Name, 0u);
-            auto colors =
-                properties.GetOrAdd<glm::vec4>(
-                    refs.OutputColors.Name, glm::vec4{1.0f});
-            if (!labels || !colors)
-                return false;
-            if (labels.Vector().size() != result.Labels.size() ||
-                colors.Vector().size() != result.Labels.size())
+            KMeansOutputPropertyState state{
+                .HadLabels = true,
+                .HadColors = true,
+                .HadScalarLabels =
+                    refs.OutputScalarLabels.has_value(),
+                .Labels = result.Labels,
+            };
+            state.Colors.reserve(result.Labels.size());
+            state.ScalarLabels.reserve(
+                refs.OutputScalarLabels.has_value()
+                    ? result.Labels.size()
+                    : 0u);
+            for (const std::uint32_t label : result.Labels)
             {
-                return false;
+                state.Colors.push_back(LabelColor(label));
+                if (refs.OutputScalarLabels.has_value())
+                {
+                    state.ScalarLabels.push_back(
+                        static_cast<float>(label));
+                }
+            }
+            return state;
+        }
+
+        template <typename T>
+        [[nodiscard]] bool ApplyOutputProperty(
+            Geometry::PropertySet& properties,
+            const std::string_view name,
+            const bool hasProperty,
+            const std::vector<T>& values,
+            const T& defaultValue)
+        {
+            if (!hasProperty)
+            {
+                if (!values.empty())
+                    return false;
+                if (!properties.Exists(name))
+                    return true;
+                auto property = properties.Get<T>(name);
+                if (!property)
+                    return false;
+                properties.Remove(property);
+                return true;
             }
 
-            for (std::size_t i = 0u; i < result.Labels.size(); ++i)
+            if (values.size() != properties.Size())
+                return false;
+            auto property =
+                properties.GetOrAdd<T>(std::string{name}, defaultValue);
+            if (!property || property.Vector().size() != values.size())
+                return false;
+            property.Vector() = values;
+            return true;
+        }
+
+        [[nodiscard]] bool ApplyKMeansOutputPropertyState(
+            Geometry::PropertySet& properties,
+            const KMeansPropertyRefs& refs,
+            const KMeansOutputPropertyState& state)
+        {
+            Geometry::PropertySet staged = properties;
+            if (!ApplyOutputProperty<std::uint32_t>(
+                    staged,
+                    refs.OutputLabels.Name,
+                    state.HadLabels,
+                    state.Labels,
+                    0u) ||
+                !ApplyOutputProperty<glm::vec4>(
+                    staged,
+                    refs.OutputColors.Name,
+                    state.HadColors,
+                    state.Colors,
+                    glm::vec4{1.0f}))
             {
-                labels.Vector()[i] = result.Labels[i];
-                colors.Vector()[i] = LabelColor(result.Labels[i]);
+                return false;
             }
 
             if (refs.OutputScalarLabels.has_value())
             {
-                auto labelFloats =
-                    properties.GetOrAdd<float>(
-                        refs.OutputScalarLabels->Name, 0.0f);
-                if (!labelFloats ||
-                    labelFloats.Vector().size() != result.Labels.size())
+                if (!ApplyOutputProperty<float>(
+                        staged,
+                        refs.OutputScalarLabels->Name,
+                        state.HadScalarLabels,
+                        state.ScalarLabels,
+                        0.0f))
                 {
                     return false;
                 }
-                for (std::size_t i = 0u; i < result.Labels.size(); ++i)
-                    labelFloats.Vector()[i] =
-                        static_cast<float>(result.Labels[i]);
             }
+            else if (state.HadScalarLabels ||
+                     !state.ScalarLabels.empty())
+            {
+                return false;
+            }
+
+            properties = std::move(staged);
             return true;
         }
 
@@ -475,6 +643,22 @@ namespace Extrinsic::Runtime
                 return std::nullopt;
             }
 
+            KMeansOutputPropertyState beforeOutputs{};
+            if (!CaptureKMeansOutputPropertyState(
+                    *properties,
+                    command.Properties,
+                    beforeOutputs))
+            {
+                failure = MakeCompletion(
+                    command,
+                    world,
+                    correlation,
+                    KMeansRunStatus::InvalidProcessingParameters,
+                    Core::ErrorCode::TypeMismatch,
+                    "K-Means output properties could not be captured as exact count-matched typed state.");
+                return std::nullopt;
+            }
+
             GK::KMeansParams params{};
             params.ClusterCount = command.Parameters.ClusterCount;
             params.MaxIterations = command.Parameters.MaxIterations;
@@ -490,6 +674,7 @@ namespace Extrinsic::Runtime
                 .World = world,
                 .Correlation = correlation,
                 .Points = std::move(*points),
+                .BeforeOutputs = std::move(beforeOutputs),
                 .Params = params,
             };
         }
@@ -600,10 +785,260 @@ namespace Extrinsic::Runtime
             return ECS::InvalidEntityHandle;
         }
 
+        using KMeansPointSnapshot =
+            std::shared_ptr<const std::vector<glm::vec3>>;
+        using KMeansOutputPropertySnapshot =
+            std::shared_ptr<const KMeansOutputPropertyState>;
+
+        struct KMeansMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            KMeansPropertyRefs Properties{};
+        };
+
+        struct KMeansMutationGeneration
+        {
+            KMeansPointSnapshot Points{};
+            KMeansOutputPropertySnapshot Outputs{};
+        };
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyKMeansOutputState(
+            const KMeansMutationIdentity& identity,
+            const KMeansOutputPropertyState& state)
+        {
+            if (identity.Scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = identity.Scene->Raw();
+            const ECS::EntityHandle entity =
+                ResolveEntity(raw, identity.StableEntityId);
+            if (entity == ECS::InvalidEntityHandle)
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, entity);
+            const GeometryElementDomain domain =
+                identity.Properties.InputPositions.Domain;
+            if (!view.Valid() ||
+                !SourceViewSupportsDomain(view, domain))
+            {
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+            }
+            Geometry::PropertySet* properties =
+                TargetProperties(view, domain);
+            if (properties == nullptr)
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+
+            return ApplyKMeansOutputPropertyState(
+                       *properties,
+                       identity.Properties,
+                       state)
+                ? EditorCommandHistoryStatus::Applied
+                : EditorCommandHistoryStatus::CommandFailed;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus CommitKMeansOutputs(
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            EditorCommandHistory* history,
+            const KMeansSnapshot& snapshot,
+            const GK::KMeansResult& clustered)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const ECS::EntityHandle entity =
+                ResolveEntity(
+                    raw,
+                    snapshot.Command.StableEntityId);
+            if (entity == ECS::InvalidEntityHandle)
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            GS::MutableSourceView view =
+                GS::BuildMutableView(raw, entity);
+            Geometry::PropertySet* properties =
+                TargetProperties(
+                    view,
+                    snapshot.Command.Properties.InputPositions.Domain);
+            if (properties == nullptr)
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+
+            std::optional<KMeansOutputPropertyState> after =
+                BuildKMeansOutputPropertyState(
+                    *properties,
+                    snapshot.Command.Properties,
+                    clustered);
+            if (!after.has_value())
+                return EditorCommandHistoryStatus::CommandFailed;
+
+            const KMeansMutationIdentity identity{
+                .Scene = scene,
+                .World = world,
+                .StableEntityId = snapshot.Command.StableEntityId,
+                .Properties = snapshot.Command.Properties,
+            };
+            if (history != nullptr)
+            {
+                const KMeansPointSnapshot points =
+                    std::make_shared<std::vector<glm::vec3>>(
+                        snapshot.Points);
+                const KMeansOutputPropertySnapshot beforeState =
+                    std::make_shared<KMeansOutputPropertyState>(
+                        snapshot.BeforeOutputs);
+                const KMeansOutputPropertySnapshot afterState =
+                    std::make_shared<KMeansOutputPropertyState>(
+                        std::move(*after));
+                return Internal::ExecuteUndoableEntityMutation(
+                           *history,
+                           "Run K-Means clustering",
+                           identity,
+                           KMeansMutationGeneration{
+                               .Points = points,
+                               .Outputs = beforeState,
+                           },
+                           beforeState,
+                           afterState,
+                           [](
+                               const KMeansMutationIdentity& mutation,
+                               const KMeansMutationGeneration& expected,
+                               const KMeansOutputPropertySnapshot& target)
+                           {
+                               if (mutation.Scene == nullptr ||
+                                   !mutation.World.IsValid())
+                               {
+                                   return EditorCommandHistoryStatus::
+                                       MissingScene;
+                               }
+                               if (expected.Points == nullptr ||
+                                   expected.Outputs == nullptr ||
+                                   target == nullptr)
+                               {
+                                   return EditorCommandHistoryStatus::
+                                       CommandFailed;
+                               }
+
+                               entt::registry& currentRaw =
+                                   mutation.Scene->Raw();
+                               const ECS::EntityHandle currentEntity =
+                                   ResolveEntity(
+                                       currentRaw,
+                                       mutation.StableEntityId);
+                               if (currentEntity ==
+                                   ECS::InvalidEntityHandle)
+                               {
+                                   return EditorCommandHistoryStatus::
+                                       StaleEntity;
+                               }
+
+                               GS::MutableSourceView currentView =
+                                   GS::BuildMutableView(
+                                       currentRaw,
+                                       currentEntity);
+                               const GeometryElementDomain domain =
+                                   mutation.Properties.InputPositions.Domain;
+                               if (!currentView.Valid() ||
+                                   !SourceViewSupportsDomain(
+                                       currentView,
+                                       domain))
+                               {
+                                   return EditorCommandHistoryStatus::
+                                       UnsupportedOperation;
+                               }
+                               Geometry::PropertySet* currentProperties =
+                                   TargetProperties(
+                                       currentView,
+                                       domain);
+                               if (currentProperties == nullptr)
+                               {
+                                   return EditorCommandHistoryStatus::
+                                       UnsupportedOperation;
+                               }
+
+                               const std::optional<
+                                   std::vector<glm::vec3>>
+                                   currentPoints =
+                                       CollectPositions(
+                                           *currentProperties,
+                                           mutation.Properties
+                                               .InputPositions.Name);
+                               KMeansOutputPropertyState currentOutputs{};
+                               if (!currentPoints.has_value() ||
+                                   !SamePositions(
+                                       *currentPoints,
+                                       *expected.Points) ||
+                                   !CaptureKMeansOutputPropertyState(
+                                       *currentProperties,
+                                       mutation.Properties,
+                                       currentOutputs) ||
+                                   !SameKMeansOutputPropertyState(
+                                       currentOutputs,
+                                       *expected.Outputs))
+                               {
+                                   return EditorCommandHistoryStatus::
+                                       StaleEntity;
+                               }
+                               if (target->HadLabels &&
+                                   target->Labels.size() !=
+                                       currentProperties->Size())
+                               {
+                                   return EditorCommandHistoryStatus::
+                                       CommandFailed;
+                               }
+                               return EditorCommandHistoryStatus::Applied;
+                           },
+                           [](
+                               const KMeansMutationIdentity& mutation,
+                               const KMeansOutputPropertySnapshot& target)
+                           {
+                               if (target == nullptr)
+                               {
+                                   return EditorCommandHistoryStatus::
+                                       CommandFailed;
+                               }
+                               return ApplyKMeansOutputState(
+                                   mutation,
+                                   *target);
+                           },
+                           [](
+                               const KMeansMutationIdentity& mutation,
+                               const KMeansMutationGeneration& expected,
+                               const KMeansOutputPropertySnapshot& target)
+                           {
+                               entt::registry& currentRaw =
+                                   mutation.Scene->Raw();
+                               const ECS::EntityHandle currentEntity =
+                                   ResolveEntity(
+                                       currentRaw,
+                                       mutation.StableEntityId);
+                               if (currentEntity !=
+                                   ECS::InvalidEntityHandle)
+                               {
+                                   Dirty::MarkVertexAttributesDirty(
+                                       currentRaw,
+                                       currentEntity);
+                               }
+                               return KMeansMutationGeneration{
+                                   .Points = expected.Points,
+                                   .Outputs = target,
+                               };
+                           })
+                    .Status;
+            }
+
+            const EditorCommandHistoryStatus applied =
+                ApplyKMeansOutputState(identity, *after);
+            if (applied == EditorCommandHistoryStatus::Applied)
+                Dirty::MarkVertexAttributesDirty(raw, entity);
+            return applied;
+        }
+
         void HandleJobCompletedEvent(
             const KMeansJobCompleted& event,
             WorldRegistry* worlds,
             KernelEventBus* events,
+            EditorCommandHistory* history,
             ClusteringModuleStats& stats)
         {
             stats.CompletionEvents += 1u;
@@ -708,17 +1143,40 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            if (!PublishProperties(
-                    *properties,
-                    job.Snapshot.Command.Properties,
-                    *job.Clustered))
+            const EditorCommandHistoryStatus commitStatus =
+                CommitKMeansOutputs(
+                    scene,
+                    job.Snapshot.World,
+                    history,
+                    job.Snapshot,
+                    *job.Clustered);
+            if (commitStatus != EditorCommandHistoryStatus::Applied)
             {
                 stats.CommitsDropped += 1u;
                 KMeansRunCompleted dropped = job.Completion;
-                dropped.Status = KMeansRunStatus::GeometryProcessingFailed;
-                dropped.Error = Core::ErrorCode::TypeMismatch;
-                dropped.Message =
-                    "K-Means result publication failed because output properties have incompatible types or sizes.";
+                switch (commitStatus)
+                {
+                case EditorCommandHistoryStatus::MissingScene:
+                    dropped.Status = KMeansRunStatus::MissingScene;
+                    dropped.Error = Core::ErrorCode::InvalidState;
+                    break;
+                case EditorCommandHistoryStatus::UnsupportedOperation:
+                    dropped.Status =
+                        KMeansRunStatus::UnsupportedGeometryDomain;
+                    dropped.Error = Core::ErrorCode::InvalidArgument;
+                    break;
+                case EditorCommandHistoryStatus::StaleEntity:
+                    dropped.Status = KMeansRunStatus::StaleSource;
+                    dropped.Error = Core::ErrorCode::InvalidState;
+                    break;
+                default:
+                    dropped.Status =
+                        KMeansRunStatus::GeometryProcessingFailed;
+                    dropped.Error = Core::ErrorCode::TypeMismatch;
+                    break;
+                }
+                dropped.Message = "K-Means result publication failed during "
+                                  "the editor mutation transaction.";
                 PublishCompletion(events, std::move(dropped));
                 return;
             }
@@ -829,6 +1287,7 @@ namespace Extrinsic::Runtime
             JobService* jobs,
             WorldRegistry* worlds,
             KernelEventBus* events,
+            EditorCommandHistory* history,
             ClusteringModuleStats& stats)
         {
             if (result.Succeeded())
@@ -842,6 +1301,7 @@ namespace Extrinsic::Runtime
                     KMeansJobCompleted{.Result = std::move(completed)},
                     worlds,
                     events,
+                    history,
                     stats);
                 return;
             }
@@ -1109,6 +1569,7 @@ namespace Extrinsic::Runtime
                                 m_Jobs,
                                 m_Worlds,
                                 m_Events,
+                                m_History,
                                 m_Stats);
                         }
                     },
@@ -1146,6 +1607,7 @@ namespace Extrinsic::Runtime
                         event,
                         m_Worlds,
                         m_Events,
+                        m_History,
                         m_Stats);
                 });
 
@@ -1159,6 +1621,13 @@ namespace Extrinsic::Runtime
                         m_Stats);
                 });
 
+        return Core::Ok();
+    }
+
+    Core::Result ClusteringModule::OnResolve(EngineSetup& setup)
+    {
+        m_History =
+            setup.Services().Find<EditorCommandHistory>();
         return Core::Ok();
     }
 
@@ -1183,6 +1652,7 @@ namespace Extrinsic::Runtime
         m_Events = nullptr;
         m_Jobs = nullptr;
         m_Worlds = nullptr;
+        m_History = nullptr;
         m_Device = nullptr;
     }
 }

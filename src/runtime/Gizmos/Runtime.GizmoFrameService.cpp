@@ -117,8 +117,9 @@ namespace Extrinsic::Runtime
 
         void DriveGizmoInteractionForFrame(
             GizmoInteraction& gizmo,
-            GizmoUndoStack& undo,
             ECS::Scene::Registry& scene,
+            const WorldHandle world,
+            EditorCommandHistory* const history,
             const Platform::Input::Context& input,
             const Graphics::CameraViewInput& cameraInput,
             const Core::Extent2D windowExtent,
@@ -126,6 +127,14 @@ namespace Extrinsic::Runtime
             const bool imguiCapturesInput,
             std::span<const ECS::EntityHandle> selected)
         {
+            if (!world.IsValid() || history == nullptr)
+            {
+                gizmo.SetModifierMask(0u);
+                if (gizmo.IsDragging())
+                    gizmo.DragCancel(scene);
+                return;
+            }
+
             if (imguiCapturesInput)
             {
                 gizmo.SetModifierMask(0u);
@@ -164,7 +173,8 @@ namespace Extrinsic::Runtime
                 if (!input.IsMouseButtonPressed(kGizmoMouseButton) &&
                     gizmo.IsDragging())
                 {
-                    (void)gizmo.DragCommit(scene, undo);
+                    (void)gizmo.DragCommit(
+                        scene, world, *history);
                 }
                 return;
             }
@@ -193,7 +203,8 @@ namespace Extrinsic::Runtime
             else if (!input.IsMouseButtonPressed(kGizmoMouseButton) &&
                      gizmo.IsDragging())
             {
-                (void)gizmo.DragCommit(scene, undo);
+                (void)gizmo.DragCommit(
+                    scene, world, *history);
             }
         }
     }
@@ -208,8 +219,9 @@ namespace Extrinsic::Runtime
 
         const Platform::Extent2D windowExtent = input.Window.GetWindowExtent();
         DriveGizmoInteractionForFrame(m_Interaction,
-                                      m_UndoStack,
                                       input.Scene,
+                                      input.World,
+                                      input.CommandHistory,
                                       input.Window.GetInput(),
                                       input.Camera,
                                       windowExtent,
@@ -248,7 +260,6 @@ namespace Extrinsic::Runtime
         m_Interaction = GizmoInteraction{config};
         m_Interaction.SetMode(mode);
         m_Interaction.SetOrientation(orientation);
-        m_UndoStack.Clear();
         m_SelectedEntities.clear();
         m_PacketBuilder = TransformGizmoRenderPacketBuilder{};
     }
@@ -263,13 +274,4 @@ namespace Extrinsic::Runtime
         return m_Interaction;
     }
 
-    GizmoUndoStack& GizmoFrameService::UndoStack() noexcept
-    {
-        return m_UndoStack;
-    }
-
-    const GizmoUndoStack& GizmoFrameService::UndoStack() const noexcept
-    {
-        return m_UndoStack;
-    }
 }

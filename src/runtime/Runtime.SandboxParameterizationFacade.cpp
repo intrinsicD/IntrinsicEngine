@@ -7,6 +7,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <numbers>
 #include <optional>
 #include <ranges>
@@ -35,6 +36,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.Parameterization;
 import Geometry.Properties;
 
+#include "Runtime.EditorMutation.Internal.hpp"
 #include "Runtime.SandboxEditorFacades.Internal.hpp"
 
 namespace Extrinsic::Runtime
@@ -552,6 +554,129 @@ namespace Extrinsic::Runtime
             };
         }
 
+        struct ParameterizationSourceState
+        {
+            std::vector<std::uint32_t> SurfaceIndices{};
+            std::vector<std::uint32_t> TriangleFaces{};
+            std::vector<glm::vec3> Positions{};
+            ParameterizationUvState Uv{};
+        };
+
+        using ParameterizationSourceSnapshot =
+            std::shared_ptr<const ParameterizationSourceState>;
+        using ParameterizationUvSnapshot =
+            std::shared_ptr<const ParameterizationUvState>;
+
+        struct ParameterizationMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        struct ParameterizationMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            ParameterizationSourceSnapshot Source{};
+        };
+
+        [[nodiscard]] bool SameUvState(
+            const ParameterizationUvState& lhs,
+            const ParameterizationUvState& rhs) noexcept
+        {
+            if (lhs.Present != rhs.Present ||
+                lhs.Values.size() != rhs.Values.size())
+            {
+                return false;
+            }
+            for (std::size_t i = 0u; i < lhs.Values.size(); ++i)
+            {
+                if (std::bit_cast<std::uint32_t>(lhs.Values[i].x) !=
+                        std::bit_cast<std::uint32_t>(rhs.Values[i].x) ||
+                    std::bit_cast<std::uint32_t>(lhs.Values[i].y) !=
+                        std::bit_cast<std::uint32_t>(rhs.Values[i].y))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool SamePositions(
+            const std::span<const glm::vec3> lhs,
+            const std::span<const glm::vec3> rhs) noexcept
+        {
+            if (lhs.size() != rhs.size())
+                return false;
+            for (std::size_t i = 0u; i < lhs.size(); ++i)
+            {
+                if (std::bit_cast<std::uint32_t>(lhs[i].x) !=
+                        std::bit_cast<std::uint32_t>(rhs[i].x) ||
+                    std::bit_cast<std::uint32_t>(lhs[i].y) !=
+                        std::bit_cast<std::uint32_t>(rhs[i].y) ||
+                    std::bit_cast<std::uint32_t>(lhs[i].z) !=
+                        std::bit_cast<std::uint32_t>(rhs[i].z))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] ParameterizationSourceSnapshot
+        CaptureParameterizationSourceState(
+            const GS::ConstSourceView& view)
+        {
+            if (GS::BuildSourceAvailability(view).ProvenanceDomain !=
+                    GS::Domain::Mesh ||
+                view.VertexSource == nullptr)
+            {
+                return nullptr;
+            }
+
+            std::vector<std::uint32_t> surfaceIndices{};
+            std::vector<std::uint32_t> triangleFaces{};
+            if (BuildMeshSurfaceTriangleTopology(
+                    view,
+                    surfaceIndices,
+                    triangleFaces) != MeshSurfaceTopologyStatus::Success)
+            {
+                return nullptr;
+            }
+
+            const auto positions =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    GS::PropertyNames::kPosition);
+            const std::optional<ParameterizationUvState> uv =
+                CaptureUvState(view);
+            if (!positions ||
+                positions.Vector().size() !=
+                    view.VertexSource->Properties.Size() ||
+                !AllFinitePositions(positions.Vector()) ||
+                !uv.has_value())
+            {
+                return nullptr;
+            }
+
+            return std::make_shared<ParameterizationSourceState>(
+                ParameterizationSourceState{
+                    .SurfaceIndices = std::move(surfaceIndices),
+                    .TriangleFaces = std::move(triangleFaces),
+                    .Positions = positions.Vector(),
+                    .Uv = *uv,
+                });
+        }
+
+        [[nodiscard]] bool SameParameterizationSourceState(
+            const ParameterizationSourceState& lhs,
+            const ParameterizationSourceState& rhs) noexcept
+        {
+            return lhs.SurfaceIndices == rhs.SurfaceIndices &&
+                   lhs.TriangleFaces == rhs.TriangleFaces &&
+                   SamePositions(lhs.Positions, rhs.Positions) &&
+                   SameUvState(lhs.Uv, rhs.Uv);
+        }
+
         [[nodiscard]] bool RestoreDeletedVertexSlots(
             Detail::SandboxEditorMeshSourceSnapshot& source,
             std::string& diagnostic)
@@ -631,45 +756,161 @@ namespace Extrinsic::Runtime
                 target.Vector() = state.Values;
             }
 
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        void StampUvStateDirty(
+            ECS::Scene::Registry& scene,
+            const std::uint32_t stableEntityId)
+        {
+            entt::registry& raw = scene.Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                Detail::ResolveSandboxMethodStableEntity(
+                    raw,
+                    stableEntityId);
+            if (!entity.has_value())
+                return;
             Dirty::MarkVertexTexcoordsDirty(raw, *entity);
             Dirty::MarkVertexAttributesDirty(raw, *entity);
-            return EditorCommandHistoryStatus::Applied;
         }
 
         [[nodiscard]] SandboxEditorCommandStatus CommitUvState(
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
+            const std::uint64_t expectedGeometryMetadataSignature,
+            ParameterizationSourceSnapshot expectedSource,
             ParameterizationUvState before,
             ParameterizationUvState after)
         {
-            ECS::Scene::Registry* scene = context.Scene;
             if (context.CommandHistory == nullptr)
             {
                 const SandboxEditorCommandStatus status =
                     Detail::ToSandboxMethodCommandStatus(
-                        ApplyUvState(scene, stableEntityId, after));
+                        ApplyUvState(
+                            context.Scene,
+                            stableEntityId,
+                            after));
                 if (status == SandboxEditorCommandStatus::Applied)
+                {
+                    StampUvStateDirty(
+                        *context.Scene,
+                        stableEntityId);
                     Detail::InvalidateSandboxMethodSelectedModelCache(context);
+                }
                 return status;
             }
 
+            const ParameterizationUvSnapshot beforeState =
+                std::make_shared<ParameterizationUvState>(
+                    std::move(before));
+            const ParameterizationUvSnapshot afterState =
+                std::make_shared<ParameterizationUvState>(
+                    std::move(after));
             const EditorCommandHistoryResult history =
-                context.CommandHistory->Execute(
-                    EditorCommandRecord{
-                        .Label = "Parameterize mesh UVs",
-                        .Redo =
-                            [scene, stableEntityId, after]()
-                            {
-                                return ApplyUvState(
-                                    scene, stableEntityId, after);
-                            },
-                        .Undo =
-                            [scene, stableEntityId, before]()
-                            {
-                                return ApplyUvState(
-                                    scene, stableEntityId, before);
-                            },
-                        .Dirtying = true,
+                Internal::ExecuteUndoableEntityMutation(
+                    *context.CommandHistory,
+                    "Parameterize mesh UVs",
+                    ParameterizationMutationIdentity{
+                        .Scene = context.Scene,
+                        .World = context.World,
+                        .StableEntityId = stableEntityId,
+                    },
+                    ParameterizationMutationGeneration{
+                        .GeometryMetadataSignature =
+                            expectedGeometryMetadataSignature,
+                        .Source = std::move(expectedSource),
+                    },
+                    beforeState,
+                    afterState,
+                    [](
+                        const ParameterizationMutationIdentity& identity,
+                        const ParameterizationMutationGeneration& expected,
+                        const ParameterizationUvSnapshot& target)
+                    {
+                        if (identity.Scene == nullptr ||
+                            !identity.World.IsValid())
+                        {
+                            return EditorCommandHistoryStatus::MissingScene;
+                        }
+
+                        entt::registry& raw = identity.Scene->Raw();
+                        const std::optional<ECS::EntityHandle> entity =
+                            Detail::ResolveSandboxMethodStableEntity(
+                                raw,
+                                identity.StableEntityId);
+                        if (!entity.has_value())
+                            return EditorCommandHistoryStatus::StaleEntity;
+
+                        const GS::ConstSourceView view =
+                            GS::BuildConstView(raw, *entity);
+                        if (GS::BuildSourceAvailability(view).ProvenanceDomain !=
+                            GS::Domain::Mesh)
+                        {
+                            return EditorCommandHistoryStatus::
+                                UnsupportedOperation;
+                        }
+                        if (expected.Source == nullptr || target == nullptr)
+                            return EditorCommandHistoryStatus::CommandFailed;
+                        if (Detail::
+                                SandboxEditorGeometryMetadataSignatureForEntity(
+                                    raw,
+                                    *entity) !=
+                                expected.GeometryMetadataSignature)
+                        {
+                            return EditorCommandHistoryStatus::StaleEntity;
+                        }
+
+                        const ParameterizationSourceSnapshot current =
+                            CaptureParameterizationSourceState(view);
+                        if (current == nullptr ||
+                            !SameParameterizationSourceState(
+                                *current,
+                                *expected.Source))
+                        {
+                            return EditorCommandHistoryStatus::StaleEntity;
+                        }
+                        return EditorCommandHistoryStatus::Applied;
+                    },
+                    [](
+                        const ParameterizationMutationIdentity& identity,
+                        const ParameterizationUvSnapshot& target)
+                    {
+                        if (target == nullptr)
+                            return EditorCommandHistoryStatus::CommandFailed;
+                        return ApplyUvState(
+                            identity.Scene,
+                            identity.StableEntityId,
+                            *target);
+                    },
+                    [](
+                        const ParameterizationMutationIdentity& identity,
+                        const ParameterizationMutationGeneration&,
+                        const ParameterizationUvSnapshot&)
+                    {
+                        StampUvStateDirty(
+                            *identity.Scene,
+                            identity.StableEntityId);
+                        entt::registry& raw = identity.Scene->Raw();
+                        const std::optional<ECS::EntityHandle> entity =
+                            Detail::ResolveSandboxMethodStableEntity(
+                                raw,
+                                identity.StableEntityId);
+                        return ParameterizationMutationGeneration{
+                            .GeometryMetadataSignature =
+                                entity.has_value()
+                                    ? Detail::
+                                          SandboxEditorGeometryMetadataSignatureForEntity(
+                                              raw,
+                                              *entity)
+                                    : 0u,
+                            .Source =
+                                entity.has_value()
+                                    ? CaptureParameterizationSourceState(
+                                          GS::BuildConstView(
+                                              raw,
+                                              *entity))
+                                    : nullptr,
+                        };
                     });
             const SandboxEditorCommandStatus status =
                 Detail::ToSandboxMethodCommandStatus(history.Status);
@@ -791,6 +1032,21 @@ namespace Extrinsic::Runtime
                 Parameterization::ParameterizationStatus::InvalidInput,
                 "Existing v:texcoord has the wrong type, count, or non-finite values."));
         }
+        const ParameterizationSourceSnapshot sourceGeneration =
+            CaptureParameterizationSourceState(view);
+        if (sourceGeneration == nullptr)
+        {
+            return finish(MakeResult(
+                command,
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                Parameterization::ParameterizationStatus::InvalidInput,
+                "Parameterization requires finite count-matched positions and "
+                "valid triangle topology."));
+        }
+        const std::uint64_t geometryMetadataSignature =
+            Detail::SandboxEditorGeometryMetadataSignatureForEntity(
+                raw,
+                *entity);
 
         Detail::SandboxEditorMeshSourceSnapshot source =
             Detail::BuildSandboxEditorMeshSourceSnapshot(view);
@@ -879,6 +1135,8 @@ namespace Extrinsic::Runtime
         const SandboxEditorCommandStatus commitStatus = CommitUvState(
             context,
             command.StableEntityId,
+            geometryMetadataSignature,
+            sourceGeneration,
             *before,
             ParameterizationUvState{
                 .Present = true,

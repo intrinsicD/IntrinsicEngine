@@ -125,9 +125,8 @@ namespace Extrinsic::Runtime
 
     // Opaque, copyable, re-enqueueable command payload. Produced by
     // `CommandEnvelope::Make<T>` (the same erasure `Enqueue<T>` uses)
-    // and consumed by `CommandBus::Enqueue(CommandEnvelope)` — the
-    // undo path re-enqueues the inverse envelope recorded by a
-    // handler. Payloads are immutable once wrapped.
+    // and consumed by `CommandBus::Enqueue(CommandEnvelope)`.
+    // Payloads are immutable once wrapped.
     export class CommandEnvelope
     {
     public:
@@ -158,19 +157,6 @@ namespace Extrinsic::Runtime
         std::shared_ptr<const void> m_Payload{};
         std::string_view            m_TypeName{};
     };
-
-    // Post-execution history record (ADR-0024 D5 undo seam). The bus
-    // notifies the installed hook after a *successful* execution that
-    // recorded an inverse payload; which commands are undoable is
-    // module policy, not kernel policy. Undo = re-enqueue `Inverse`.
-    export struct CommandHistoryRecord
-    {
-        std::string_view     CommandTypeName{};
-        CommandCorrelationId Correlation{};
-        CommandEnvelope      Inverse{};
-    };
-
-    export using CommandHistoryHook = std::function<void(const CommandHistoryRecord&)>;
 
     // Cumulative drain diagnostics; intended for tests and telemetry.
     export struct CommandBusStats
@@ -223,7 +209,7 @@ namespace Extrinsic::Runtime
             return Enqueue(CommandEnvelope::Make<TCommand>(std::move(payload)));
         }
 
-        // Re-enqueue path (undo, replay). Thread-safe.
+        // Re-enqueue path for replay and deferred forwarding. Thread-safe.
         CommandCorrelationId Enqueue(CommandEnvelope envelope);
 
         // Executes every command enqueued before this call, in enqueue
@@ -235,17 +221,6 @@ namespace Extrinsic::Runtime
         void Drain(ECS::Scene::Registry& activeWorld);
         void Drain(ECS::Scene::Registry& activeWorld,
                    CommandDrainServices services);
-
-        // During handler execution only: record the inverse payload
-        // that undoes the currently executing command. Forwarded to
-        // the history hook after successful execution.
-        void RecordInverse(CommandEnvelope inverse);
-
-        // Install the post-execution history hook (e.g. the editor
-        // command history). One hook; replaces any previous hook.
-        // Hooks must not throw (the codebase builds with
-        // -fno-exceptions; a throw is a process-terminating defect).
-        void SetHistoryHook(CommandHistoryHook hook);
 
         // Drop every command still queued without executing it and
         // return the number dropped. Called by `Engine::Shutdown()` so
@@ -286,10 +261,8 @@ namespace Extrinsic::Runtime
         std::uint64_t               m_NextCorrelation{1};
 
         std::unordered_map<CommandTypeKey, HandlerRecord> m_Handlers;
-        CommandHistoryHook                                m_HistoryHook{};
 
-        bool            m_Draining{false};
-        CommandEnvelope m_RecordedInverse{};
+        bool m_Draining{false};
         CommandBusStats m_Stats{};
     };
 }

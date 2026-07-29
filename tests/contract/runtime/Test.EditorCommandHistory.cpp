@@ -1,26 +1,24 @@
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
 
 import Extrinsic.ECS.Component.Hierarchy;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.SelectionController;
+
+#include "Runtime.EditorMutation.Internal.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
 namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
-namespace G = Extrinsic::Graphics::Components;
 
 namespace
 {
@@ -49,6 +47,90 @@ namespace
     [[nodiscard]] ECS::EntityHandle CreateEntity(ECS::Scene::Registry& registry)
     {
         return registry.Create();
+    }
+
+    struct TestMutationIdentity
+    {
+        std::uint64_t World{0u};
+        std::uint32_t Entity{0u};
+
+        bool operator==(const TestMutationIdentity&) const = default;
+    };
+
+    struct TestMutationGenerations
+    {
+        std::uint64_t Binding{0u};
+        std::uint64_t Source{0u};
+
+        bool operator==(const TestMutationGenerations&) const = default;
+    };
+
+    struct TestMutationState
+    {
+        int Value{0};
+    };
+
+    struct TestMutationStore
+    {
+        TestMutationIdentity Identity{.World = 7u, .Entity = 19u};
+        TestMutationGenerations Generations{.Binding = 3u, .Source = 11u};
+        int Value{4};
+        std::uint32_t ApplyCount{0u};
+        std::uint32_t DirtyStampCount{0u};
+        std::optional<Runtime::EditorCommandHistoryStatus> ValidationFailure{};
+        bool FailApply{false};
+    };
+
+    [[nodiscard]] Runtime::EditorCommandHistoryResult ExecuteTestMutation(
+        Runtime::EditorCommandHistory& history,
+        TestMutationStore& store,
+        const TestMutationIdentity identity,
+        const TestMutationGenerations expected,
+        const TestMutationState before,
+        const TestMutationState after,
+        const Runtime::Internal::InitialMutationState initialState =
+            Runtime::Internal::InitialMutationState::ApplyTarget)
+    {
+        return Runtime::Internal::ExecuteUndoableEntityMutation(
+            history,
+            "Mutate Test Entity",
+            identity,
+            expected,
+            before,
+            after,
+            [&store](
+                const TestMutationIdentity& candidateIdentity,
+                const TestMutationGenerations& candidateGenerations,
+                const TestMutationState&)
+            {
+                if (store.ValidationFailure.has_value())
+                    return *store.ValidationFailure;
+                return candidateIdentity == store.Identity &&
+                               candidateGenerations == store.Generations
+                           ? Runtime::EditorCommandHistoryStatus::Applied
+                           : Runtime::EditorCommandHistoryStatus::StaleEntity;
+            },
+            [&store](
+                const TestMutationIdentity&,
+                const TestMutationState& target)
+            {
+                if (store.FailApply)
+                    return Runtime::EditorCommandHistoryStatus::CommandFailed;
+                store.Value = target.Value;
+                ++store.ApplyCount;
+                return Runtime::EditorCommandHistoryStatus::Applied;
+            },
+            [&store](
+                const TestMutationIdentity&,
+                const TestMutationGenerations&,
+                const TestMutationState&)
+            {
+                ++store.Generations.Source;
+                ++store.DirtyStampCount;
+                return store.Generations;
+            },
+            true,
+            initialState);
     }
 }
 
@@ -95,43 +177,194 @@ TEST(EditorCommandHistory, ExecuteRecordUndoRedoCapacityAndDirtyState)
     EXPECT_EQ(history.Snapshot().ActivePath, "loaded.extrinsic.json");
 }
 
-TEST(EditorCommandHistory, TransformAdapterAppliesUndoRedoAndRejectsStaleEntity)
+TEST(EditorCommandHistory,
+     UndoableEntityMutationRevalidatesAndTracksGenerationsAcrossUndoRedo)
 {
-    ECS::Scene::Registry registry;
-    const ECS::EntityHandle entity = CreateEntity(registry);
-    ECSC::Transform::Component before{};
-    before.Position = glm::vec3{0.0f, 0.0f, 0.0f};
-    ECSC::Transform::Component after = before;
-    after.Position = glm::vec3{4.0f, 5.0f, 6.0f};
-    registry.Raw().emplace<ECSC::Transform::Component>(entity, before);
-
     Runtime::EditorCommandHistory history;
-    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(entity);
-    auto result = history.Execute(
-        Runtime::MakeTransformEditCommand(
-            Runtime::EditorTransformEditCommand{
-                .Scene = &registry,
-                .StableEntityId = stableId,
-                .Before = before,
-                .After = after,
-                .Label = "Move Entity",
-            }));
-    ASSERT_TRUE(result.Succeeded());
-    const auto* transform = registry.Raw().try_get<ECSC::Transform::Component>(entity);
-    ASSERT_NE(transform, nullptr);
-    EXPECT_EQ(transform->Position, after.Position);
-    EXPECT_TRUE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(entity));
+    TestMutationStore store;
 
-    ASSERT_TRUE(history.Undo().Succeeded());
-    EXPECT_EQ(registry.Raw().get<ECSC::Transform::Component>(entity).Position,
-              before.Position);
-    ASSERT_TRUE(history.Redo().Succeeded());
-    EXPECT_EQ(registry.Raw().get<ECSC::Transform::Component>(entity).Position,
-              after.Position);
+    const Runtime::EditorCommandHistoryResult applied =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
 
-    registry.Destroy(entity);
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    ASSERT_TRUE(applied.Succeeded());
+    EXPECT_EQ(applied.Status, Runtime::EditorCommandHistoryStatus::Applied);
+    EXPECT_EQ(store.Value, 9);
+    EXPECT_EQ(store.ApplyCount, 1u);
+    EXPECT_EQ(store.DirtyStampCount, 1u);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.Snapshot().UndoLabel, "Mutate Test Entity");
+
+    const Runtime::EditorCommandHistoryResult undone = history.Undo();
+    ASSERT_TRUE(undone.Succeeded());
+    EXPECT_EQ(undone.Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 2u);
+    EXPECT_EQ(store.DirtyStampCount, 2u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.RedoCount(), 1u);
+
+    const Runtime::EditorCommandHistoryResult redone = history.Redo();
+    ASSERT_TRUE(redone.Succeeded());
+    EXPECT_EQ(redone.Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(store.Value, 9);
+    EXPECT_EQ(store.ApplyCount, 3u);
+    EXPECT_EQ(store.DirtyStampCount, 3u);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationRecordsAlreadyAppliedTargetWithoutRepublishing)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    store.Value = 9;
+
+    const Runtime::EditorCommandHistoryResult recorded =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9},
+            Runtime::Internal::InitialMutationState::
+                TargetAlreadyApplied);
+
+    ASSERT_TRUE(recorded.Succeeded());
+    EXPECT_EQ(
+        recorded.Status,
+        Runtime::EditorCommandHistoryStatus::Applied);
+    EXPECT_EQ(store.Value, 9);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    ASSERT_EQ(history.UndoCount(), 1u);
+
+    ASSERT_EQ(
+        history.Undo().Status,
+        Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 1u);
+    EXPECT_EQ(store.DirtyStampCount, 1u);
+
+    ASSERT_EQ(
+        history.Redo().Status,
+        Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(store.Value, 9);
+    EXPECT_EQ(store.ApplyCount, 2u);
+    EXPECT_EQ(store.DirtyStampCount, 2u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationRejectsStaleIdentityWithoutMutationOrHistory)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    const TestMutationIdentity staleIdentity{
+        .World = store.Identity.World + 1u,
+        .Entity = store.Identity.Entity,
+    };
+
+    const Runtime::EditorCommandHistoryResult rejected =
+        ExecuteTestMutation(
+            history,
+            store,
+            staleIdentity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationRejectsStaleGenerationWithoutMutationOrHistory)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    TestMutationGenerations staleGenerations = store.Generations;
+    ++staleGenerations.Source;
+
+    const Runtime::EditorCommandHistoryResult rejected =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            staleGenerations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationValidationFailurePublishesNoMutationOrHistory)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    store.ValidationFailure =
+        Runtime::EditorCommandHistoryStatus::UnsupportedOperation;
+
+    const Runtime::EditorCommandHistoryResult rejected =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    EXPECT_EQ(
+        rejected.Status,
+        Runtime::EditorCommandHistoryStatus::UnsupportedOperation);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationApplyFailurePublishesNoPartialStateOrHistory)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    store.FailApply = true;
+
+    const Runtime::EditorCommandHistoryResult rejected =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandHistoryStatus::CommandFailed);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 0u);
 }
 
 TEST(EditorCommandHistory, SelectionAdapterRestoresSingleSelectionWithoutDirtyingDocument)
@@ -163,53 +396,6 @@ TEST(EditorCommandHistory, SelectionAdapterRestoresSingleSelectionWithoutDirtyin
     ASSERT_EQ(selection.SelectedStableIds().size(), 1u);
     EXPECT_EQ(selection.SelectedStableIds().front(),
               Runtime::SelectionController::ToStableEntityId(first));
-}
-
-TEST(EditorCommandHistory, VisualizationSpatialAndPrimitiveAdaptersAreReversible)
-{
-    ECS::Scene::Registry registry;
-    const ECS::EntityHandle entity = CreateEntity(registry);
-    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(entity);
-    Runtime::EditorCommandHistory history;
-
-    G::VisualizationConfig visualization{};
-    visualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
-    visualization.Color = glm::vec4{0.2f, 0.4f, 0.6f, 1.0f};
-    ASSERT_TRUE(history.Execute(
-        Runtime::MakeVisualizationConfigCommand(
-            Runtime::EditorVisualizationConfigCommand{
-                .Scene = &registry,
-                .StableEntityId = stableId,
-                .Before = std::nullopt,
-                .After = visualization,
-            })).Succeeded());
-    EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(entity));
-    ASSERT_TRUE(history.Undo().Succeeded());
-    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationConfig>(entity));
-
-    Runtime::MeshPrimitiveViewSettings stored{};
-    auto setSettings = [&stored](std::uint32_t, Runtime::MeshPrimitiveViewSettings next)
-    {
-        stored = next;
-    };
-    auto clearSettings = [&stored](std::uint32_t)
-    {
-        stored = Runtime::MeshPrimitiveViewSettings{};
-    };
-    Runtime::MeshPrimitiveViewSettings enabled{};
-    enabled.EnableEdgeView = true;
-    ASSERT_TRUE(history.Execute(
-        Runtime::MakePrimitiveViewSettingsCommand(
-            Runtime::EditorPrimitiveViewSettingsCommand{
-                .StableEntityId = stableId,
-                .Before = Runtime::MeshPrimitiveViewSettings{},
-                .After = enabled,
-                .SetSettings = setSettings,
-                .ClearSettings = clearSettings,
-            })).Succeeded());
-    EXPECT_TRUE(stored.EnableEdgeView);
-    ASSERT_TRUE(history.Undo().Succeeded());
-    EXPECT_FALSE(stored.AnyEnabled());
 }
 
 TEST(EditorCommandHistory, CompoundCommandRollsBackAppliedCommandsOnFailure)

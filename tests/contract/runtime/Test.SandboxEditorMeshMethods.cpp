@@ -1,6 +1,7 @@
 // ARCH-006 runtime Sandbox editor MeshMethods contract partition.
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -450,6 +451,38 @@ void ExpectPositionsExactlyEqual(
         }
     }
 
+void ExpectTexcoordsExactlyEqual(
+        const std::vector<glm::vec2>& lhs,
+        const std::vector<glm::vec2>& rhs)
+    {
+        ASSERT_EQ(lhs.size(), rhs.size());
+        for (std::size_t i = 0u; i < lhs.size(); ++i)
+        {
+            EXPECT_EQ(std::bit_cast<std::uint32_t>(lhs[i].x),
+                      std::bit_cast<std::uint32_t>(rhs[i].x));
+            EXPECT_EQ(std::bit_cast<std::uint32_t>(lhs[i].y),
+                      std::bit_cast<std::uint32_t>(rhs[i].y));
+        }
+    }
+
+void ExpectColorsExactlyEqual(
+        const std::vector<glm::vec4>& lhs,
+        const std::vector<glm::vec4>& rhs)
+    {
+        ASSERT_EQ(lhs.size(), rhs.size());
+        for (std::size_t i = 0u; i < lhs.size(); ++i)
+        {
+            EXPECT_EQ(std::bit_cast<std::uint32_t>(lhs[i].x),
+                      std::bit_cast<std::uint32_t>(rhs[i].x));
+            EXPECT_EQ(std::bit_cast<std::uint32_t>(lhs[i].y),
+                      std::bit_cast<std::uint32_t>(rhs[i].y));
+            EXPECT_EQ(std::bit_cast<std::uint32_t>(lhs[i].z),
+                      std::bit_cast<std::uint32_t>(rhs[i].z));
+            EXPECT_EQ(std::bit_cast<std::uint32_t>(lhs[i].w),
+                      std::bit_cast<std::uint32_t>(rhs[i].w));
+        }
+    }
+
 [[nodiscard]] bool AnyPositionDiffers(
         const std::vector<glm::vec3>& lhs,
         const std::vector<glm::vec3>& rhs)
@@ -777,6 +810,20 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
     EXPECT_EQ(history.Redo().Status,
               Runtime::EditorCommandHistoryStatus::Redone);
     ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), denoised);
+
+    std::vector<glm::vec3> intervening = denoised;
+    intervening.front().x += 1.0f;
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh), intervening);
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, mesh),
+        intervening);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
 
     context.LastMeshDenoiseResult = &result;
     const Runtime::SandboxEditorDomainWindowModel model =
@@ -1137,6 +1184,64 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalDerivedJobDiscardsStaleSource)
     EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
 }
+TEST(SandboxEditorUi, PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.PointCloudOutlierRemoval =
+        [&completedSinkCalled](
+            Runtime::SandboxEditorPointCloudOutlierRemovalResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "StaleOutlierPropertyCloud");
+    AddPointCloudSource(registry, cloud, positions.size());
+    auto& vertices = registry.Raw().get<GS::Vertices>(cloud);
+    SetPositions(vertices, positions);
+    auto confidence =
+        vertices.Properties.GetOrAdd<float>("v:confidence", 0.5f);
+    ASSERT_TRUE(confidence);
+
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult queued =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Statistical,
+                .KNeighbors = 8u,
+                .StdDevMultiplier = 1.0f,
+            });
+    ASSERT_EQ(queued.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    confidence[0] = 0.75f;
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    const Runtime::SandboxEditorJobQueueSnapshot done =
+        jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), positions.size());
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+    EXPECT_FLOAT_EQ(
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:confidence")[0],
+        0.75f);
+}
 TEST(SandboxEditorUi, PointCloudOutlierRemovalRadiusPublishesAndFailsClosed)
 {
     ECS::Scene::Registry registry;
@@ -1232,6 +1337,11 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalPreservesSurvivingPointProperties)
         for (std::size_t i = 0; i < originalCount; ++i)
             labels.Vector()[i] = (i + 3u >= originalCount) ? 99.0f : 7.0f;
     }
+    const std::vector<float> originalLabels =
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:label")
+            .Vector();
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
 
     const Runtime::SandboxEditorPointCloudOutlierRemovalResult result =
@@ -1257,6 +1367,50 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalPreservesSurvivingPointProperties)
     // All kept points are the inliers, so every surviving label is the sentinel.
     for (const float label : survived.Vector())
         EXPECT_FLOAT_EQ(label, 7.0f);
+    const std::vector<glm::vec3> keptPositions =
+        MeshVertexPositions(registry, cloud);
+    const std::vector<float> keptLabels = survived.Vector();
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, cloud),
+        positions);
+    const auto restoredLabels =
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:label");
+    ASSERT_TRUE(restoredLabels);
+    EXPECT_EQ(restoredLabels.Vector(), originalLabels);
+
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, cloud),
+        keptPositions);
+    auto redoneLabels =
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:label");
+    ASSERT_TRUE(redoneLabels);
+    EXPECT_EQ(redoneLabels.Vector(), keptLabels);
+
+    redoneLabels[0] = 42.0f;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FLOAT_EQ(
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:label")[0],
+        42.0f);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, cloud),
+        keptPositions);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
 }
 TEST(SandboxEditorUi, PointCloudOutlierRemovalRespectsDeletedSlots)
 {
@@ -1305,6 +1459,22 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalRespectsDeletedSlots)
     EXPECT_EQ(result.KeptCount + result.RejectedCount, liveCount);
     EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
     EXPECT_LE(result.KeptCount, liveCount);
+    EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).NumDeleted, 0u);
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    const auto& restored = registry.Raw().get<GS::Vertices>(cloud);
+    EXPECT_EQ(restored.Properties.Size(), slotCount);
+    EXPECT_EQ(restored.NumDeleted, 1u);
+    const auto restoredDeleted =
+        restored.Properties.Get<bool>("p:deleted");
+    ASSERT_TRUE(restoredDeleted);
+    ASSERT_EQ(restoredDeleted.Vector().size(), slotCount);
+    EXPECT_TRUE(restoredDeleted[slotCount - 1u]);
+
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
     EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).NumDeleted, 0u);
 }
 TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel)
@@ -1465,6 +1635,41 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
+
+    auto liveMean = properties.Get<double>(PN::kMeanCurvature);
+    ASSERT_TRUE(liveMean.IsValid());
+    ASSERT_FALSE(liveMean.Vector().empty());
+    const double publishedMean = liveMean.Vector().front();
+    liveMean.Vector().front() = publishedMean + 1.0;
+    const Runtime::EditorCommandHistorySnapshot beforePropertyRejection =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_DOUBLE_EQ(
+        properties.Get<double>(PN::kMeanCurvature).Vector().front(),
+        publishedMean + 1.0);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforePropertyRejection.Revision);
+
+    liveMean = properties.Get<double>(PN::kMeanCurvature);
+    ASSERT_TRUE(liveMean.IsValid());
+    liveMean.Vector().front() = publishedMean;
+    std::vector<glm::vec3> interveningPositions =
+        MeshVertexPositions(registry, mesh);
+    interveningPositions.front().x += 1.0f;
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh), interveningPositions);
+    const Runtime::EditorCommandHistorySnapshot beforePositionRejection =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, mesh),
+        interveningPositions);
+    EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforePositionRejection.Revision);
 
     context.LastMeshCurvatureResult = &result;
     const Runtime::SandboxEditorDomainWindowModel model =
@@ -1784,6 +1989,38 @@ TEST(SandboxEditorUi, MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo)
     EXPECT_EQ(history.Redo().Status,
               Runtime::EditorCommandHistoryStatus::Redone);
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), afterUniform);
+
+    auto nextHalfedge =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext);
+    ASSERT_TRUE(nextHalfedge.IsValid());
+    ASSERT_FALSE(nextHalfedge.Vector().empty());
+    const std::uint32_t publishedNext = nextHalfedge.Vector().front();
+    const std::uint32_t interveningNext =
+        publishedNext == 0u ? 1u : 0u;
+    nextHalfedge.Vector().front() = interveningNext;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext)
+            .Vector()
+            .front(),
+        interveningNext);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), afterUniform);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+    nextHalfedge =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext);
+    ASSERT_TRUE(nextHalfedge.IsValid());
+    nextHalfedge.Vector().front() = publishedNext;
 
     context.LastMeshRemeshResult = &uniform;
     const Runtime::SandboxEditorDomainWindowModel model =
@@ -2112,6 +2349,64 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
     ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh),
                                 stalePositions);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+}
+TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.MeshSubdivide =
+        [&completedSinkCalled](Runtime::SandboxEditorMeshSubdivideResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "StaleSubdivideTopology");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    const Runtime::SandboxEditorMeshSubdivideResult result =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            context,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Operator = Runtime::SandboxEditorMeshSubdivideOperator::Loop,
+                .Iterations = 1u,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    auto nextHalfedge =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext);
+    ASSERT_TRUE(nextHalfedge.IsValid());
+    ASSERT_FALSE(nextHalfedge.Vector().empty());
+    const std::uint32_t staleNext =
+        nextHalfedge.Vector().front() == 0u ? 1u : 0u;
+    nextHalfedge.Vector().front() = staleNext;
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+
+    const Runtime::SandboxEditorJobQueueSnapshot done =
+        jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(completedSinkCalled);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext)
+            .Vector()
+            .front(),
+        staleNext);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
 }
@@ -2652,6 +2947,36 @@ TEST(SandboxEditorUi, MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnAppl
         EXPECT_NEAR(normal.y, 0.0f, 1.0e-5f);
         EXPECT_NEAR(normal.z, 1.0f, 1.0e-5f);
     }
+
+    const std::vector<glm::vec3> publishedNormals = normals.Vector();
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(properties.Exists(PN::kNormal));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    auto redoneNormals = properties.Get<glm::vec3>(PN::kNormal);
+    ASSERT_TRUE(redoneNormals);
+    EXPECT_EQ(redoneNormals.Vector(), publishedNormals);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    redoneNormals.Vector()[0].x = 0.25f;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FLOAT_EQ(redoneNormals.Vector()[0].x, 0.25f);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+
+    redoneNormals.Vector() = publishedNormals;
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(properties.Exists(PN::kNormal));
 }
 TEST(SandboxEditorUi,
      GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply)
@@ -2784,6 +3109,26 @@ TEST(SandboxEditorUi,
         EXPECT_GT(normal.z, 0.5f);
     }
     EXPECT_TRUE(history.IsDirty());
+
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(graph);
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(cloud);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(cloudProperties.Exists(PN::kNormal));
+    EXPECT_TRUE(graphProperties.Exists(PN::kNormal));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(graphProperties.Exists(PN::kNormal));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
+
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(graphProperties.Exists(PN::kNormal));
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(cloudProperties.Exists(PN::kNormal));
 }
 TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
 {
@@ -2857,13 +3202,11 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
                 });
         ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
-        SetNodePositions(registry.Raw().get<GS::Nodes>(graph),
-                         {
-                             {10.0f, 0.0f, 0.0f},
-                             {11.0f, 0.0f, 0.0f},
-                             {12.0f, 0.0f, 0.0f},
-                             {13.0f, 0.0f, 0.0f},
-                         });
+        auto edgeV0 = registry.Raw()
+                          .get<GS::Edges>(graph)
+                          .Properties.Get<std::uint32_t>(PN::kEdgeV0);
+        ASSERT_TRUE(edgeV0);
+        edgeV0.Vector()[0] = 2u;
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
         Runtime::SandboxEditorJobQueueSnapshot done =
@@ -2899,6 +3242,17 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
                          {0.0f, 1.0f, 0.0f},
                          {1.0f, 1.0f, 0.0f},
                      });
+        auto& cloudProperties =
+            registry.Raw().get<GS::Vertices>(cloud).Properties;
+        auto existingNormals = cloudProperties.GetOrAdd<glm::vec3>(
+            std::string{PN::kNormal},
+            glm::vec3{0.0f, 0.0f, 1.0f});
+        existingNormals.Vector() = {
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+        };
         const Runtime::SandboxEditorPointCloudVertexNormalsResult result =
             Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
                 context,
@@ -2910,13 +3264,7 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
                 });
         ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
-        SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                     {
-                         {10.0f, 0.0f, 0.0f},
-                         {11.0f, 0.0f, 0.0f},
-                         {12.0f, 0.0f, 0.0f},
-                         {13.0f, 0.0f, 0.0f},
-                     });
+        existingNormals.Vector()[0] = glm::vec3{1.0f, 0.0f, 0.0f};
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
         Runtime::SandboxEditorJobQueueSnapshot done =
@@ -2925,8 +3273,11 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
         EXPECT_EQ(done.Entries[0].State,
                   Runtime::JobState::StaleDiscarded);
         EXPECT_FALSE(completedSinkCalled);
-        EXPECT_FALSE(registry.Raw().get<GS::Vertices>(cloud)
-                         .Properties.Exists(PN::kNormal));
+        const auto retainedNormals =
+            cloudProperties.Get<glm::vec3>(PN::kNormal);
+        ASSERT_TRUE(retainedNormals);
+        EXPECT_EQ(retainedNormals.Vector()[0],
+                  (glm::vec3{1.0f, 0.0f, 0.0f}));
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
     }
 }
@@ -3393,6 +3744,12 @@ TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
         };
     auto& faces = registry.Raw().get<GS::Faces>(mesh);
     faces.Properties.GetOrAdd<std::uint32_t>("f:material", 0u).Vector() = {7u};
+    const MeshCounts originalCounts = SourceMeshCounts(registry, mesh);
+    const std::vector<glm::vec2> originalTexcoords = texcoords.Vector();
+    const std::vector<glm::vec4> originalPaint =
+        vertices.Properties.Get<glm::vec4>("v:paint").Vector();
+    const std::vector<std::uint32_t> originalMaterial =
+        faces.Properties.Get<std::uint32_t>("f:material").Vector();
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
@@ -3453,11 +3810,82 @@ TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
     ASSERT_TRUE(repairedMaterial);
     ASSERT_FALSE(repairedMaterial.Vector().empty());
     EXPECT_EQ(repairedMaterial[0], 7u);
+    const MeshCounts repairedCounts = SourceMeshCounts(registry, mesh);
+    const std::vector<glm::vec2> generatedTexcoords =
+        repairedTexcoords.Vector();
+    const std::vector<glm::vec4> generatedPaint =
+        repairedPaint.Vector();
+    const std::vector<std::uint32_t> generatedMaterial =
+        repairedMaterial.Vector();
 
     const Runtime::SandboxEditorPanelFrame after =
         Runtime::BuildSandboxEditorPanelFrame(context);
     EXPECT_TRUE(after.Inspector.TextureBake.Uv.TexcoordsFinite);
     EXPECT_TRUE(after.Inspector.TextureBake.Uv.CheckerPreviewAvailable);
+
+    ASSERT_TRUE(history.CanUndo());
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), originalCounts);
+    const GS::ConstSourceView restored =
+        GS::BuildConstView(registry.Raw(), mesh);
+    ASSERT_NE(restored.VertexSource, nullptr);
+    ASSERT_NE(restored.FaceSource, nullptr);
+    const auto restoredTexcoords =
+        restored.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    const auto restoredPaint =
+        restored.VertexSource->Properties.Get<glm::vec4>("v:paint");
+    const auto restoredMaterial =
+        restored.FaceSource->Properties.Get<std::uint32_t>("f:material");
+    ASSERT_TRUE(restoredTexcoords);
+    ASSERT_TRUE(restoredPaint);
+    ASSERT_TRUE(restoredMaterial);
+    ExpectTexcoordsExactlyEqual(
+        restoredTexcoords.Vector(),
+        originalTexcoords);
+    ExpectColorsExactlyEqual(restoredPaint.Vector(), originalPaint);
+    EXPECT_EQ(restoredMaterial.Vector(), originalMaterial);
+
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), repairedCounts);
+    const GS::ConstSourceView regenerated =
+        GS::BuildConstView(registry.Raw(), mesh);
+    ASSERT_NE(regenerated.VertexSource, nullptr);
+    ASSERT_NE(regenerated.FaceSource, nullptr);
+    const auto regeneratedTexcoords =
+        regenerated.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    auto regeneratedPaint =
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec4>("v:paint");
+    const auto regeneratedMaterial =
+        regenerated.FaceSource->Properties.Get<std::uint32_t>("f:material");
+    ASSERT_TRUE(regeneratedTexcoords);
+    ASSERT_TRUE(regeneratedPaint);
+    ASSERT_TRUE(regeneratedMaterial);
+    ExpectTexcoordsExactlyEqual(
+        regeneratedTexcoords.Vector(),
+        generatedTexcoords);
+    ExpectColorsExactlyEqual(regeneratedPaint.Vector(), generatedPaint);
+    EXPECT_EQ(regeneratedMaterial.Vector(), generatedMaterial);
+
+    const float interveningPaint = regeneratedPaint[0].x + 0.25f;
+    regeneratedPaint[0].x = interveningPaint;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FLOAT_EQ(
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec4>("v:paint")[0]
+            .x,
+        interveningPaint);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), repairedCounts);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
 }
 TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
 {
@@ -3691,6 +4119,77 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
     ASSERT_TRUE(staleTexcoords);
     ASSERT_GT(staleTexcoords.Vector().size(), 1u);
     EXPECT_FALSE(std::isfinite(staleTexcoords[1].x));
+}
+TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleAuthoredProperty)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.UvRegeneration =
+        [&completedSinkCalled](
+            Runtime::SandboxEditorUvRegenerationCommandResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "StaleUvPropertyMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords);
+    texcoords[1] = glm::vec2{
+        std::numeric_limits<float>::quiet_NaN(),
+        0.0f,
+    };
+    auto paint =
+        vertices.Properties.GetOrAdd<glm::vec4>(
+            "v:paint",
+            glm::vec4{1.0f});
+    ASSERT_TRUE(paint);
+
+    const Runtime::SandboxEditorUvRegenerationCommandResult result =
+        Runtime::ApplySandboxEditorUvRegenerationCommand(
+            context,
+            Runtime::SandboxEditorUvRegenerationCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Resolution = 64u,
+                .Padding = 2u,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    paint[0] = glm::vec4{0.25f, 0.5f, 0.75f, 1.0f};
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    const Runtime::SandboxEditorJobQueueSnapshot done =
+        jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+
+    const GS::ConstSourceView stale = GS::BuildConstView(registry.Raw(), mesh);
+    ASSERT_NE(stale.VertexSource, nullptr);
+    const auto staleTexcoords =
+        stale.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    const auto stalePaint =
+        stale.VertexSource->Properties.Get<glm::vec4>("v:paint");
+    ASSERT_TRUE(staleTexcoords);
+    ASSERT_TRUE(stalePaint);
+    EXPECT_FALSE(std::isfinite(staleTexcoords[1].x));
+    EXPECT_FLOAT_EQ(stalePaint[0].x, 0.25f);
+    EXPECT_FLOAT_EQ(stalePaint[0].y, 0.5f);
+    EXPECT_FLOAT_EQ(stalePaint[0].z, 0.75f);
+    EXPECT_FLOAT_EQ(stalePaint[0].w, 1.0f);
 }
 TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
 {

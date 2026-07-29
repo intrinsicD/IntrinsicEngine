@@ -100,6 +100,7 @@ import Geometry.Subdivision;
 import Geometry.UvAtlas;
 
 
+#include "Runtime.EditorMutation.Internal.hpp"
 #include "Runtime.SandboxEditorFacades.Internal.hpp"
 
 namespace Extrinsic::Runtime
@@ -133,15 +134,6 @@ namespace Extrinsic::Runtime
             return Detail::ResolveSandboxMethodStableEntity(raw, stableId);
         }
 
-        [[nodiscard]] std::uint64_t GeometryMetadataSignatureForEntity(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity)
-        {
-            return Detail::SandboxEditorGeometryMetadataSignatureForEntity(
-                raw,
-                entity);
-        }
-
         void InvalidateSelectedModelCache(const SandboxEditorContext& context)
         {
             Detail::InvalidateSandboxMethodSelectedModelCache(context);
@@ -162,17 +154,6 @@ namespace Extrinsic::Runtime
             return Detail::BuildActiveSandboxMethodDerivedJobMessage(
                 label,
                 job);
-        }
-
-        [[nodiscard]] EditorCommandHistoryStatus ApplyPointCloudPointState(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const Geometry::PointCloud::Cloud& cloud)
-        {
-            return Detail::ApplySandboxMethodPointCloudPointState(
-                scene,
-                stableEntityId,
-                cloud);
         }
 
         [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
@@ -207,24 +188,6 @@ namespace Extrinsic::Runtime
                 points.push_back(position);
             }
             return points;
-        }
-
-        [[nodiscard]] bool SamePositionSnapshot(
-            const std::vector<glm::vec3>& lhs,
-            const std::vector<glm::vec3>& rhs) noexcept
-        {
-            if (lhs.size() != rhs.size())
-                return false;
-            for (std::size_t i = 0u; i < lhs.size(); ++i)
-            {
-                if (lhs[i].x != rhs[i].x ||
-                    lhs[i].y != rhs[i].y ||
-                    lhs[i].z != rhs[i].z)
-                {
-                    return false;
-                }
-            }
-            return true;
         }
 
         inline constexpr const char* kProgressivePoissonLevelProperty =
@@ -686,37 +649,637 @@ namespace Extrinsic::Runtime
             result.Message += ".";
         }
 
-        void ApplyProgressivePoissonVisualization(
+        struct ProgressivePoissonEntityState
+        {
+            std::optional<GS::Vertices> Vertices{};
+            std::optional<GS::Edges> Edges{};
+            std::optional<GS::Halfedges> Halfedges{};
+            std::optional<GS::Faces> Faces{};
+            std::optional<GS::Nodes> Nodes{};
+            bool HasMeshTopology{false};
+            bool HasGraphTopology{false};
+            std::optional<G::RenderSurface> RenderSurface{};
+            std::optional<G::RenderPoints> RenderPoints{};
+            std::optional<G::VisualizationConfig> Visualization{};
+        };
+
+        using ProgressivePoissonEntitySnapshot =
+            std::shared_ptr<const ProgressivePoissonEntityState>;
+
+        template <typename T>
+        [[nodiscard]] std::optional<T> CaptureOptionalComponent(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            if (const T* component = raw.try_get<T>(entity))
+                return *component;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] ProgressivePoissonEntityState
+        CaptureProgressivePoissonEntityState(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            return ProgressivePoissonEntityState{
+                .Vertices = CaptureOptionalComponent<GS::Vertices>(
+                    raw,
+                    entity),
+                .Edges = CaptureOptionalComponent<GS::Edges>(raw, entity),
+                .Halfedges = CaptureOptionalComponent<GS::Halfedges>(
+                    raw,
+                    entity),
+                .Faces = CaptureOptionalComponent<GS::Faces>(raw, entity),
+                .Nodes = CaptureOptionalComponent<GS::Nodes>(raw, entity),
+                .HasMeshTopology =
+                    raw.all_of<GS::HasMeshTopology>(entity),
+                .HasGraphTopology =
+                    raw.all_of<GS::HasGraphTopology>(entity),
+                .RenderSurface =
+                    CaptureOptionalComponent<G::RenderSurface>(raw, entity),
+                .RenderPoints =
+                    CaptureOptionalComponent<G::RenderPoints>(raw, entity),
+                .Visualization =
+                    CaptureOptionalComponent<G::VisualizationConfig>(
+                        raw,
+                        entity),
+            };
+        }
+
+        template <typename T>
+        [[nodiscard]] bool SameProgressivePoissonValue(
+            const T& lhs,
+            const T& rhs) noexcept
+        {
+            return lhs == rhs;
+        }
+
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<float>(
+            const float& lhs,
+            const float& rhs) noexcept
+        {
+            return std::bit_cast<std::uint32_t>(lhs) ==
+                   std::bit_cast<std::uint32_t>(rhs);
+        }
+
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<double>(
+            const double& lhs,
+            const double& rhs) noexcept
+        {
+            return std::bit_cast<std::uint64_t>(lhs) ==
+                   std::bit_cast<std::uint64_t>(rhs);
+        }
+
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<glm::vec2>(
+            const glm::vec2& lhs,
+            const glm::vec2& rhs) noexcept
+        {
+            return SameProgressivePoissonValue(lhs.x, rhs.x) &&
+                   SameProgressivePoissonValue(lhs.y, rhs.y);
+        }
+
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<glm::vec3>(
+            const glm::vec3& lhs,
+            const glm::vec3& rhs) noexcept
+        {
+            return SameProgressivePoissonValue(lhs.x, rhs.x) &&
+                   SameProgressivePoissonValue(lhs.y, rhs.y) &&
+                   SameProgressivePoissonValue(lhs.z, rhs.z);
+        }
+
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<glm::vec4>(
+            const glm::vec4& lhs,
+            const glm::vec4& rhs) noexcept
+        {
+            return SameProgressivePoissonValue(lhs.x, rhs.x) &&
+                   SameProgressivePoissonValue(lhs.y, rhs.y) &&
+                   SameProgressivePoissonValue(lhs.z, rhs.z) &&
+                   SameProgressivePoissonValue(lhs.w, rhs.w);
+        }
+
+        template <typename T>
+        [[nodiscard]] bool SameProgressivePoissonProperty(
+            const Geometry::ConstPropertySet& current,
+            const Geometry::ConstPropertySet& expected,
+            const std::string_view name) noexcept
+        {
+            const auto currentProperty = current.Get<T>(name);
+            const auto expectedProperty = expected.Get<T>(name);
+            if (!currentProperty || !expectedProperty ||
+                currentProperty.Vector().size() !=
+                    expectedProperty.Vector().size())
+            {
+                return false;
+            }
+            for (std::size_t i = 0u;
+                 i < expectedProperty.Vector().size();
+                 ++i)
+            {
+                if (!SameProgressivePoissonValue(
+                        currentProperty.Vector()[i],
+                        expectedProperty.Vector()[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool SameProgressivePoissonPropertySet(
+            const Geometry::PropertySet& current,
+            const Geometry::PropertySet& expected) noexcept
+        {
+            const std::vector<Geometry::PropertyDescriptor> currentDescriptors =
+                current.Descriptors();
+            const std::vector<Geometry::PropertyDescriptor> expectedDescriptors =
+                expected.Descriptors();
+            if (current.Size() != expected.Size() ||
+                currentDescriptors.size() != expectedDescriptors.size())
+            {
+                return false;
+            }
+
+            const Geometry::ConstPropertySet currentView{current};
+            const Geometry::ConstPropertySet expectedView{expected};
+            for (std::size_t i = 0u;
+                 i < expectedDescriptors.size();
+                 ++i)
+            {
+                const Geometry::PropertyDescriptor& lhs =
+                    currentDescriptors[i];
+                const Geometry::PropertyDescriptor& rhs =
+                    expectedDescriptors[i];
+                if (lhs.Name != rhs.Name ||
+                    lhs.Type != rhs.Type ||
+                    lhs.ValueKind != rhs.ValueKind ||
+                    lhs.ElementCount != rhs.ElementCount)
+                {
+                    return false;
+                }
+
+                bool same = true;
+                switch (rhs.ValueKind)
+                {
+                case Geometry::PropertyValueKind::Bool:
+                    same = SameProgressivePoissonProperty<bool>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::Int32:
+                    same = SameProgressivePoissonProperty<std::int32_t>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::UInt32:
+                    same = SameProgressivePoissonProperty<std::uint32_t>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::UInt64:
+                    same = SameProgressivePoissonProperty<std::uint64_t>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::Float:
+                    same = SameProgressivePoissonProperty<float>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::Double:
+                    same = SameProgressivePoissonProperty<double>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::Vec2:
+                    same = SameProgressivePoissonProperty<glm::vec2>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::Vec3:
+                    same = SameProgressivePoissonProperty<glm::vec3>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::Vec4:
+                    same = SameProgressivePoissonProperty<glm::vec4>(
+                        currentView,
+                        expectedView,
+                        rhs.Name);
+                    break;
+                case Geometry::PropertyValueKind::Unknown:
+                    // Geometry containers carry private connectivity
+                    // properties whose erased values are intentionally not
+                    // exposed. Their descriptor metadata is checked here;
+                    // promoted topology/value properties are checked above.
+                    break;
+                }
+                if (!same)
+                    return false;
+            }
+            return true;
+        }
+
+        template <typename T>
+        [[nodiscard]] bool SameOptionalGeometrySource(
+            const std::optional<T>& current,
+            const std::optional<T>& expected) noexcept
+        {
+            if (current.has_value() != expected.has_value())
+                return false;
+            if (!current.has_value())
+                return true;
+            return current->NumDeleted == expected->NumDeleted &&
+                   SameProgressivePoissonPropertySet(
+                       current->Properties,
+                       expected->Properties);
+        }
+
+        [[nodiscard]] bool SameOptionalHalfedgeSource(
+            const std::optional<GS::Halfedges>& current,
+            const std::optional<GS::Halfedges>& expected) noexcept
+        {
+            if (current.has_value() != expected.has_value())
+                return false;
+            return !current.has_value() ||
+                   SameProgressivePoissonPropertySet(
+                       current->Properties,
+                       expected->Properties);
+        }
+
+        [[nodiscard]] bool SameOptionalRenderSurface(
+            const std::optional<G::RenderSurface>& current,
+            const std::optional<G::RenderSurface>& expected) noexcept
+        {
+            return current.has_value() == expected.has_value() &&
+                   (!current.has_value() ||
+                    current->Domain == expected->Domain);
+        }
+
+        [[nodiscard]] bool SameRenderPoints(
+            const G::RenderPoints& current,
+            const G::RenderPoints& expected) noexcept
+        {
+            if (current.Type != expected.Type ||
+                current.SizeSource.index() != expected.SizeSource.index())
+            {
+                return false;
+            }
+            if (const float* currentSize =
+                    std::get_if<float>(&current.SizeSource))
+            {
+                const float* expectedSize =
+                    std::get_if<float>(&expected.SizeSource);
+                return expectedSize != nullptr &&
+                       SameProgressivePoissonValue(
+                           *currentSize,
+                           *expectedSize);
+            }
+            return std::get<std::string>(current.SizeSource) ==
+                   std::get<std::string>(expected.SizeSource);
+        }
+
+        [[nodiscard]] bool SameOptionalRenderPoints(
+            const std::optional<G::RenderPoints>& current,
+            const std::optional<G::RenderPoints>& expected) noexcept
+        {
+            return current.has_value() == expected.has_value() &&
+                   (!current.has_value() ||
+                    SameRenderPoints(*current, *expected));
+        }
+
+        [[nodiscard]] bool SameVisualizationConfig(
+            const G::VisualizationConfig& current,
+            const G::VisualizationConfig& expected) noexcept
+        {
+            if (current.Scalar.Isolines.ValueCount !=
+                expected.Scalar.Isolines.ValueCount)
+            {
+                return false;
+            }
+            for (std::uint32_t i = 0u;
+                 i < current.Scalar.Isolines.ValueCount;
+                 ++i)
+            {
+                if (!SameProgressivePoissonValue(
+                        current.Scalar.Isolines.Values[i],
+                        expected.Scalar.Isolines.Values[i]))
+                {
+                    return false;
+                }
+            }
+            return current.Source == expected.Source &&
+                   SameProgressivePoissonValue(
+                       current.Color,
+                       expected.Color) &&
+                   current.ScalarFieldName == expected.ScalarFieldName &&
+                   current.ScalarDomain == expected.ScalarDomain &&
+                   current.ColorBufferName == expected.ColorBufferName &&
+                   current.Scalar.Map == expected.Scalar.Map &&
+                   current.Scalar.AutoRange == expected.Scalar.AutoRange &&
+                   SameProgressivePoissonValue(
+                       current.Scalar.RangeMin,
+                       expected.Scalar.RangeMin) &&
+                   SameProgressivePoissonValue(
+                       current.Scalar.RangeMax,
+                       expected.Scalar.RangeMax) &&
+                   current.Scalar.BinCount == expected.Scalar.BinCount &&
+                   current.Scalar.Isolines.Num ==
+                       expected.Scalar.Isolines.Num &&
+                   SameProgressivePoissonValue(
+                       current.Scalar.Isolines.Width,
+                       expected.Scalar.Isolines.Width) &&
+                   SameProgressivePoissonValue(
+                       current.Scalar.Isolines.Color,
+                       expected.Scalar.Isolines.Color);
+        }
+
+        [[nodiscard]] bool SameOptionalVisualizationConfig(
+            const std::optional<G::VisualizationConfig>& current,
+            const std::optional<G::VisualizationConfig>& expected) noexcept
+        {
+            return current.has_value() == expected.has_value() &&
+                   (!current.has_value() ||
+                    SameVisualizationConfig(*current, *expected));
+        }
+
+        [[nodiscard]] bool SameProgressivePoissonEntityState(
+            const ProgressivePoissonEntityState& current,
+            const ProgressivePoissonEntityState& expected) noexcept
+        {
+            return SameOptionalGeometrySource(
+                       current.Vertices,
+                       expected.Vertices) &&
+                   SameOptionalGeometrySource(
+                       current.Edges,
+                       expected.Edges) &&
+                   SameOptionalHalfedgeSource(
+                       current.Halfedges,
+                       expected.Halfedges) &&
+                   SameOptionalGeometrySource(
+                       current.Faces,
+                       expected.Faces) &&
+                   SameOptionalGeometrySource(
+                       current.Nodes,
+                       expected.Nodes) &&
+                   current.HasMeshTopology ==
+                       expected.HasMeshTopology &&
+                   current.HasGraphTopology ==
+                       expected.HasGraphTopology &&
+                   SameOptionalRenderSurface(
+                       current.RenderSurface,
+                       expected.RenderSurface) &&
+                   SameOptionalRenderPoints(
+                       current.RenderPoints,
+                       expected.RenderPoints) &&
+                   SameOptionalVisualizationConfig(
+                       current.Visualization,
+                       expected.Visualization);
+        }
+
+        template <typename T>
+        void ApplyOptionalComponent(
             entt::registry& raw,
             const ECS::EntityHandle entity,
+            const std::optional<T>& component)
+        {
+            if (component.has_value())
+                raw.emplace_or_replace<T>(entity, *component);
+            else
+                raw.remove<T>(entity);
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus
+        ApplyProgressivePoissonEntityState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const ProgressivePoissonEntityState& state)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            ApplyOptionalComponent(raw, *entity, state.Vertices);
+            ApplyOptionalComponent(raw, *entity, state.Edges);
+            ApplyOptionalComponent(raw, *entity, state.Halfedges);
+            ApplyOptionalComponent(raw, *entity, state.Faces);
+            ApplyOptionalComponent(raw, *entity, state.Nodes);
+            if (state.HasMeshTopology)
+                raw.emplace_or_replace<GS::HasMeshTopology>(*entity);
+            else
+                raw.remove<GS::HasMeshTopology>(*entity);
+            if (state.HasGraphTopology)
+                raw.emplace_or_replace<GS::HasGraphTopology>(*entity);
+            else
+                raw.remove<GS::HasGraphTopology>(*entity);
+            ApplyOptionalComponent(raw, *entity, state.RenderSurface);
+            ApplyOptionalComponent(raw, *entity, state.RenderPoints);
+            ApplyOptionalComponent(raw, *entity, state.Visualization);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        void ApplyProgressivePoissonVisualization(
+            ProgressivePoissonEntityState& state,
             const SandboxEditorProgressivePoissonChannel channel)
         {
-            G::RenderPoints points = raw.all_of<G::RenderPoints>(entity)
-                ? raw.get<G::RenderPoints>(entity)
-                : G::RenderPoints{};
+            G::RenderPoints points =
+                state.RenderPoints.value_or(G::RenderPoints{});
             if (!std::holds_alternative<float>(points.SizeSource) &&
                 !std::holds_alternative<std::string>(points.SizeSource))
             {
                 points.SizeSource = 4.0f;
             }
-            raw.emplace_or_replace<G::RenderPoints>(entity, points);
+            state.RenderPoints = std::move(points);
 
-            G::VisualizationConfig config = raw.all_of<G::VisualizationConfig>(entity)
-                ? raw.get<G::VisualizationConfig>(entity)
-                : G::VisualizationConfig{};
+            G::VisualizationConfig config =
+                state.Visualization.value_or(G::VisualizationConfig{});
             config.Source = G::VisualizationConfig::ColorSource::ScalarField;
             config.ScalarDomain = G::VisualizationConfig::Domain::Vertex;
             config.ScalarFieldName = ProgressivePoissonChannelPropertyName(channel);
             config.Scalar.AutoRange = true;
             config.Scalar.BinCount = 0u;
             config.Scalar.Isolines.Num = 0u;
-            raw.emplace_or_replace<G::VisualizationConfig>(entity, config);
+            state.Visualization = std::move(config);
         }
 
-        [[nodiscard]] EditorCommandHistoryStatus ApplyPointCloudPointState(
-            ECS::Scene::Registry* scene,
-            std::uint32_t stableEntityId,
-            const Geometry::PointCloud::Cloud& cloud);
+        [[nodiscard]] ProgressivePoissonEntityState
+        MakeProgressivePoissonPointCloudState(
+            const ProgressivePoissonEntityState& before,
+            const Geometry::PointCloud::Cloud& cloud,
+            const SandboxEditorProgressivePoissonChannel channel)
+        {
+            ProgressivePoissonEntityState after = before;
+            entt::registry staged{};
+            const entt::entity entity = staged.create();
+            Geometry::PointCloud::Cloud published = cloud;
+            GS::PopulateFromCloud(staged, entity, published);
+            after.Vertices =
+                CaptureOptionalComponent<GS::Vertices>(staged, entity);
+            after.Edges.reset();
+            after.Halfedges.reset();
+            after.Faces.reset();
+            after.Nodes.reset();
+            after.HasMeshTopology = false;
+            after.HasGraphTopology = false;
+            after.RenderSurface.reset();
+            ApplyProgressivePoissonVisualization(after, channel);
+            return after;
+        }
+
+        enum class ProgressivePoissonMutationScope : std::uint8_t
+        {
+            PointAttributes,
+            MeshToPointCloud,
+        };
+
+        struct ProgressivePoissonMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            ProgressivePoissonMutationScope Scope{
+                ProgressivePoissonMutationScope::PointAttributes};
+        };
+
+        void StampProgressivePoissonMutation(
+            const ProgressivePoissonMutationIdentity& identity)
+        {
+            entt::registry& raw = identity.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, identity.StableEntityId);
+            if (!entity.has_value())
+                return;
+
+            if (identity.Scope ==
+                ProgressivePoissonMutationScope::MeshToPointCloud)
+            {
+                Dirty::MarkGpuDirty(raw, *entity);
+                Dirty::MarkVertexPositionsDirty(raw, *entity);
+                Dirty::MarkVertexNormalsDirty(raw, *entity);
+            }
+            Dirty::MarkVertexAttributesDirty(raw, *entity);
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus
+        CommitProgressivePoissonMutation(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            const ProgressivePoissonMutationScope scope,
+            ProgressivePoissonEntityState before,
+            ProgressivePoissonEntityState after)
+        {
+            const ProgressivePoissonEntitySnapshot beforeState =
+                std::make_shared<ProgressivePoissonEntityState>(
+                    std::move(before));
+            const ProgressivePoissonEntitySnapshot afterState =
+                std::make_shared<ProgressivePoissonEntityState>(
+                    std::move(after));
+            const ProgressivePoissonMutationIdentity identity{
+                .Scene = context.Scene,
+                .World = context.World,
+                .StableEntityId = stableEntityId,
+                .Scope = scope,
+            };
+
+            const auto validate =
+                [](
+                    const ProgressivePoissonMutationIdentity& candidate,
+                    const ProgressivePoissonEntitySnapshot& expected,
+                    const ProgressivePoissonEntitySnapshot&)
+                {
+                    if (candidate.Scene == nullptr ||
+                        !candidate.World.IsValid())
+                    {
+                        return EditorCommandHistoryStatus::MissingScene;
+                    }
+                    if (expected == nullptr)
+                        return EditorCommandHistoryStatus::CommandFailed;
+
+                    entt::registry& raw = candidate.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(
+                            raw,
+                            candidate.StableEntityId);
+                    if (!entity.has_value())
+                        return EditorCommandHistoryStatus::StaleEntity;
+                    return SameProgressivePoissonEntityState(
+                               CaptureProgressivePoissonEntityState(
+                                   raw,
+                                   *entity),
+                               *expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                };
+            const auto apply =
+                [](
+                    const ProgressivePoissonMutationIdentity& candidate,
+                    const ProgressivePoissonEntitySnapshot& target)
+                {
+                    if (target == nullptr)
+                        return EditorCommandHistoryStatus::CommandFailed;
+                    return ApplyProgressivePoissonEntityState(
+                        candidate.Scene,
+                        candidate.StableEntityId,
+                        *target);
+                };
+            const auto stamp =
+                [](
+                    const ProgressivePoissonMutationIdentity& candidate,
+                    const ProgressivePoissonEntitySnapshot&,
+                    const ProgressivePoissonEntitySnapshot& target)
+                {
+                    StampProgressivePoissonMutation(candidate);
+                    return target;
+                };
+
+            if (context.CommandHistory != nullptr)
+            {
+                const EditorCommandHistoryResult history =
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        scope ==
+                                ProgressivePoissonMutationScope::
+                                    MeshToPointCloud
+                            ? "Run progressive Poisson mesh sampling"
+                            : "Run progressive Poisson sampling",
+                        identity,
+                        beforeState,
+                        beforeState,
+                        afterState,
+                        validate,
+                        apply,
+                        stamp);
+                return ToSandboxEditorCommandStatus(history.Status);
+            }
+
+            const EditorCommandHistoryStatus validation =
+                validate(identity, beforeState, afterState);
+            if (validation != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(validation);
+            const EditorCommandHistoryStatus applied =
+                apply(identity, afterState);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            (void)stamp(identity, beforeState, afterState);
+            return SandboxEditorCommandStatus::Applied;
+        }
 
         enum class SandboxEditorProgressivePoissonCpuJobSource : std::uint8_t
         {
@@ -870,7 +1433,7 @@ namespace Extrinsic::Runtime
                 SandboxEditorProgressivePoissonCpuJobSource::PointCloud};
             ProgressivePoissonBackendResolution Backend{};
             std::vector<glm::vec3> SnapshotPositions{};
-            std::uint64_t GeometryMetadataSignature{0u};
+            ProgressivePoissonEntitySnapshot BeforeState{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             std::optional<PPR::Result> Method{};
             std::optional<SurfaceSampling::Result> Sampled{};
@@ -878,47 +1441,14 @@ namespace Extrinsic::Runtime
         };
 
         [[nodiscard]] JobApplyValidation
-        ValidateProgressivePoissonPointCloudApply(
-            const SandboxEditorContext& context,
-            const SandboxEditorProgressivePoissonCommand& command,
-            const std::vector<glm::vec3>& positions)
-        {
-            if (context.Scene == nullptr)
-                return JobApplyValidation::MissingTarget;
-
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, command.StableEntityId);
-            if (!entity.has_value())
-                return JobApplyValidation::MissingTarget;
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-            const GS::SourceAvailability availability =
-                GS::BuildSourceAvailability(view);
-            if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
-                view.VertexSource == nullptr)
-            {
-                return JobApplyValidation::StaleGeneration;
-            }
-
-            std::optional<std::vector<glm::vec3>> current =
-                CollectFiniteVertexPositions(view.VertexSource->Properties);
-            if (!current.has_value() ||
-                !SamePositionSnapshot(*current, positions))
-            {
-                return JobApplyValidation::StaleGeneration;
-            }
-
-            return JobApplyValidation::Current;
-        }
-
-        [[nodiscard]] JobApplyValidation
-        ValidateProgressivePoissonMeshSurfaceApply(
+        ValidateProgressivePoissonApply(
             const SandboxEditorContext& context,
             const SandboxEditorProgressivePoissonCpuJobState& job)
         {
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
+            if (job.BeforeState == nullptr)
+                return JobApplyValidation::StaleGeneration;
 
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
@@ -926,25 +1456,24 @@ namespace Extrinsic::Runtime
             if (!entity.has_value())
                 return JobApplyValidation::MissingTarget;
 
-            const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+            const GS::ConstSourceView view =
+                GS::BuildConstView(raw, *entity);
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
-            if (availability.ProvenanceDomain != GS::Domain::Mesh)
-                return JobApplyValidation::StaleGeneration;
-
-            if (GeometryMetadataSignatureForEntity(raw, *entity) !=
-                job.GeometryMetadataSignature)
+            const GS::Domain expectedDomain =
+                job.Source ==
+                        SandboxEditorProgressivePoissonCpuJobSource::
+                            MeshSurface
+                    ? GS::Domain::Mesh
+                    : GS::Domain::PointCloud;
+            if (availability.ProvenanceDomain != expectedDomain)
             {
                 return JobApplyValidation::StaleGeneration;
             }
 
-            if (view.VertexSource == nullptr)
-                return JobApplyValidation::StaleGeneration;
-
-            std::optional<std::vector<glm::vec3>> current =
-                CollectFiniteVertexPositions(view.VertexSource->Properties);
-            if (!current.has_value() ||
-                !SamePositionSnapshot(*current, job.SnapshotPositions))
+            if (!SameProgressivePoissonEntityState(
+                    CaptureProgressivePoissonEntityState(raw, *entity),
+                    *job.BeforeState))
             {
                 return JobApplyValidation::StaleGeneration;
             }
@@ -960,6 +1489,11 @@ namespace Extrinsic::Runtime
                 return Core::Err(Core::ErrorCode::Unknown);
             if (context.Scene == nullptr)
                 return Core::Err(Core::ErrorCode::InvalidState);
+            if (job.BeforeState == nullptr ||
+                !job.BeforeState->Vertices.has_value())
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
 
             if (!job.Result.Succeeded())
             {
@@ -967,35 +1501,37 @@ namespace Extrinsic::Runtime
                 return Core::Err(ProgressivePoissonResultError(job.Result));
             }
 
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, job.Command.StableEntityId);
-            if (!entity.has_value())
-                return Core::Err(Core::ErrorCode::ResourceNotFound);
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-            if (view.VertexSource == nullptr)
-                return Core::Err(Core::ErrorCode::InvalidArgument);
-
+            ProgressivePoissonEntityState after = *job.BeforeState;
             SandboxEditorProgressivePoissonResult result =
                 PublishProgressivePoissonComputedResult(
-                    view.VertexSource->Properties,
+                    after.Vertices->Properties,
                     job.Command.Config,
                     *job.Method,
                     job.Result);
             if (result.Succeeded())
             {
                 ApplyProgressivePoissonVisualization(
-                    raw,
-                    *entity,
+                    after,
                     job.Command.Config.Channel);
-                Dirty::MarkVertexAttributesDirty(raw, *entity);
-                if (context.CommandHistory != nullptr)
-                    (void)context.CommandHistory->MarkDirty(
-                        "Run progressive Poisson sampling");
-
-                AppendProgressivePoissonSuccessMessage(result);
-                InvalidateSelectedModelCache(context);
+                const SandboxEditorCommandStatus committed =
+                    CommitProgressivePoissonMutation(
+                        context,
+                        job.Command.StableEntityId,
+                        ProgressivePoissonMutationScope::PointAttributes,
+                        *job.BeforeState,
+                        std::move(after));
+                if (committed != SandboxEditorCommandStatus::Applied)
+                {
+                    result.Status = committed;
+                    result.Error = Core::ErrorCode::InvalidState;
+                    result.Message =
+                        "Progressive Poisson point publication became stale.";
+                }
+                else
+                {
+                    AppendProgressivePoissonSuccessMessage(result);
+                    InvalidateSelectedModelCache(context);
+                }
             }
 
             PublishProgressivePoissonResultSink(context, result);
@@ -1017,38 +1553,31 @@ namespace Extrinsic::Runtime
                 return Core::Err(Core::ErrorCode::Unknown);
             if (context.Scene == nullptr)
                 return Core::Err(Core::ErrorCode::InvalidState);
+            if (job.BeforeState == nullptr)
+                return Core::Err(Core::ErrorCode::InvalidState);
 
-            const EditorCommandHistoryStatus publishStatus =
-                ApplyPointCloudPointState(
-                    context.Scene,
-                    job.Command.StableEntityId,
-                    job.Sampled->Cloud);
             SandboxEditorProgressivePoissonResult result = job.Result;
-            if (publishStatus != EditorCommandHistoryStatus::Applied)
+            ProgressivePoissonEntityState after =
+                MakeProgressivePoissonPointCloudState(
+                    *job.BeforeState,
+                    job.Sampled->Cloud,
+                    job.Command.Config.Channel);
+            const SandboxEditorCommandStatus publishStatus =
+                CommitProgressivePoissonMutation(
+                    context,
+                    job.Command.StableEntityId,
+                    ProgressivePoissonMutationScope::MeshToPointCloud,
+                    *job.BeforeState,
+                    std::move(after));
+            if (publishStatus != SandboxEditorCommandStatus::Applied)
             {
-                result.Status = ToSandboxEditorCommandStatus(publishStatus);
+                result.Status = publishStatus;
                 result.Error = Core::ErrorCode::Unknown;
                 result.Message =
                     "Progressive Poisson mesh sample publication failed.";
                 PublishProgressivePoissonResultSink(context, result);
                 return Core::Err(Core::ErrorCode::Unknown);
             }
-
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, job.Command.StableEntityId);
-            if (entity.has_value())
-            {
-                if (raw.all_of<G::RenderSurface>(*entity))
-                    raw.remove<G::RenderSurface>(*entity);
-                ApplyProgressivePoissonVisualization(
-                    raw,
-                    *entity,
-                    job.Command.Config.Channel);
-            }
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Run progressive Poisson mesh sampling");
 
             AppendProgressivePoissonSuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -1131,7 +1660,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorProgressivePoissonCpuJobSource source,
             std::vector<glm::vec3> snapshotPositions,
             Geometry::HalfedgeMesh::Mesh mesh,
-            const std::uint64_t geometryMetadataSignature,
+            ProgressivePoissonEntityState beforeState,
             const std::uint32_t inputCount,
             ProgressivePoissonBackendResolution backend)
         {
@@ -1141,13 +1670,11 @@ namespace Extrinsic::Runtime
             state->Source = source;
             state->Backend = std::move(backend);
             state->SnapshotPositions = std::move(snapshotPositions);
-            state->GeometryMetadataSignature = geometryMetadataSignature;
+            state->BeforeState =
+                std::make_shared<ProgressivePoissonEntityState>(
+                    std::move(beforeState));
             state->Mesh = std::move(mesh);
 
-            // The retired key carried `SourcePropertyGeneration`; the dedup
-            // guard never compared it, and the staleness it stood for is
-            // re-checked by `ValidateBeforeApply` below.
-            (void)geometryMetadataSignature;
             const SandboxEditorJobIdentity identity{
                 .EntityId = command.StableEntityId,
                 .Scope = ToProgressivePoissonJobScope(source),
@@ -1175,15 +1702,9 @@ namespace Extrinsic::Runtime
                 .ValidateBeforeApply =
                     [context, state]()
                     {
-                        return state->Source ==
-                                   SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
-                            ? ValidateProgressivePoissonMeshSurfaceApply(
-                                  context,
-                                  *state)
-                            : ValidateProgressivePoissonPointCloudApply(
-                                  context,
-                                  state->Command,
-                                  state->SnapshotPositions);
+                        return ValidateProgressivePoissonApply(
+                            context,
+                            *state);
                     },
                 .PublishCompletion =
                     [context, state](KernelEventBus&,
@@ -1469,6 +1990,8 @@ namespace Extrinsic::Runtime
                 "Progressive Poisson sampling requires selected point-cloud or mesh "
                 "GeometrySources.");
         }
+        const ProgressivePoissonEntityState beforeState =
+            CaptureProgressivePoissonEntityState(raw, *entity);
 
         if (availability.ProvenanceDomain == GS::Domain::PointCloud)
         {
@@ -1508,30 +2031,49 @@ namespace Extrinsic::Runtime
                     SandboxEditorProgressivePoissonCpuJobSource::PointCloud,
                     std::move(*positions),
                     Geometry::HalfedgeMesh::Mesh{},
-                    GeometryMetadataSignatureForEntity(raw, *entity),
+                    beforeState,
                     pointCount,
                     backend);
             }
 
+            ProgressivePoissonEntityState afterState = beforeState;
+            if (!afterState.Vertices.has_value())
+            {
+                return MakeProgressivePoissonResult(
+                    SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                    command.Config.Channel,
+                    Core::ErrorCode::InvalidState,
+                    "Progressive Poisson point source state is unavailable.");
+            }
             SandboxEditorProgressivePoissonResult result =
                 RunProgressivePoissonAndPublish(
                     std::span<const glm::vec3>{
                         positions->data(),
                         positions->size()},
-                    view.VertexSource->Properties,
+                    afterState.Vertices->Properties,
                     command.Config,
                     context.Device);
             if (!result.Succeeded())
                 return result;
 
             ApplyProgressivePoissonVisualization(
-                raw,
-                *entity,
+                afterState,
                 command.Config.Channel);
-            Dirty::MarkVertexAttributesDirty(raw, *entity);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Run progressive Poisson sampling");
+            const SandboxEditorCommandStatus committed =
+                CommitProgressivePoissonMutation(
+                    context,
+                    command.StableEntityId,
+                    ProgressivePoissonMutationScope::PointAttributes,
+                    beforeState,
+                    std::move(afterState));
+            if (committed != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = committed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Progressive Poisson point publication became stale.";
+                return result;
+            }
 
             AppendProgressivePoissonSuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -1574,7 +2116,7 @@ namespace Extrinsic::Runtime
                 SandboxEditorProgressivePoissonCpuJobSource::MeshSurface,
                 std::move(source.BeforePositions),
                 std::move(source.Mesh),
-                GeometryMetadataSignatureForEntity(raw, *entity),
+                beforeState,
                 command.Config.MeshSurfaceSampleCount,
                 backend);
         }
@@ -1636,29 +2178,26 @@ namespace Extrinsic::Runtime
         if (!result.Succeeded())
             return result;
 
-        const EditorCommandHistoryStatus publishStatus =
-            ApplyPointCloudPointState(
-                context.Scene,
+        ProgressivePoissonEntityState afterState =
+            MakeProgressivePoissonPointCloudState(
+                beforeState,
+                sampled.Cloud,
+                command.Config.Channel);
+        const SandboxEditorCommandStatus publishStatus =
+            CommitProgressivePoissonMutation(
+                context,
                 command.StableEntityId,
-                sampled.Cloud);
-        if (publishStatus != EditorCommandHistoryStatus::Applied)
+                ProgressivePoissonMutationScope::MeshToPointCloud,
+                beforeState,
+                std::move(afterState));
+        if (publishStatus != SandboxEditorCommandStatus::Applied)
         {
-            result.Status = ToSandboxEditorCommandStatus(publishStatus);
+            result.Status = publishStatus;
             result.Error = Core::ErrorCode::Unknown;
             result.Message =
                 "Progressive Poisson mesh sample publication failed.";
             return result;
         }
-
-        if (raw.all_of<G::RenderSurface>(*entity))
-            raw.remove<G::RenderSurface>(*entity);
-        ApplyProgressivePoissonVisualization(
-            raw,
-            *entity,
-            command.Config.Channel);
-        if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty(
-                "Run progressive Poisson mesh sampling");
 
         AppendProgressivePoissonSuccessMessage(result);
         InvalidateSelectedModelCache(context);

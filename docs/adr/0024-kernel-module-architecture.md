@@ -119,9 +119,10 @@ deterministic, replayable. Discrete UI actions accept one frame of latency.
 Continuous edits (gizmo drags, slider scrubs) bypass the bus: direct component
 mutation during the variable-tick/UI phase, one undo-granularity command
 emitted on release (feeds `EditorCommandHistory`). A command with no
-registered handler fails loudly (fail-closed). Undoability is module policy:
-commands may declare an inverse payload; the bus notifies a history hook after
-successful execution.
+registered handler fails loudly (fail-closed). Undoability remains editor
+mutation-owner policy: `RUNTIME-201` retired the unused CommandBus inverse
+payload/history-hook seam after production edits converged on the
+generation-validated `EditorCommandHistory` transaction.
 
 ### D6 — Standing reactions are events; call-site scripts are CommandSequences
 

@@ -5,12 +5,23 @@
 
 namespace Extrinsic::Runtime
 {
+    struct KMeansOutputPropertyState
+    {
+        bool HadLabels{false};
+        bool HadColors{false};
+        bool HadScalarLabels{false};
+        std::vector<std::uint32_t> Labels{};
+        std::vector<glm::vec4> Colors{};
+        std::vector<float> ScalarLabels{};
+    };
+
     struct KMeansSnapshot
     {
         RunKMeans Command{};
         WorldHandle World{};
         CommandCorrelationId Correlation{};
         std::vector<glm::vec3> Points{};
+        KMeansOutputPropertyState BeforeOutputs{};
         Geometry::KMeans::KMeansParams Params{};
         std::string BackendDiagnostic{};
     };
