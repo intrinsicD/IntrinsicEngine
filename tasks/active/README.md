@@ -14,7 +14,8 @@ Each active task should include:
 - [`RUNTIME-201` — Unified editor mutation and history transaction](RUNTIME-201-unified-editor-mutation-history-transaction.md)
   is in progress on `codex/runtime-201-unified-editor-mutation`; Slice A's
   internal transaction helper and atomicity/staleness contracts are complete,
-  and owner-scoped feature adoption is next.
+  direct/ICP transform publication now uses it, and gizmo/history convergence
+  is the next owner-scoped adoption.
 
 ## History
 

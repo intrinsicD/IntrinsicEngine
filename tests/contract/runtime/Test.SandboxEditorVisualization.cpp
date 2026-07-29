@@ -1083,6 +1083,59 @@ TEST(SandboxEditorUi, TransformEditCommandMutatesLocalTransformAndMarksDirty)
                   }),
               Runtime::SandboxEditorCommandStatus::MissingSelectionController);
 }
+TEST(SandboxEditorUi,
+     TransformEditHistoryRejectsInterveningStateAndRestoresExactly)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle entity = MakeSelectable(registry, "Undoable");
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(entity);
+    const ECSC::Transform::Component before =
+        registry.Raw().get<ECSC::Transform::Component>(entity);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorTransformEdit(
+                  context,
+                  Runtime::SandboxEditorTransformEditCommand{
+                      .StableEntityId = stableId,
+                      .SetPosition = true,
+                      .Position = glm::vec3{4.0f, 5.0f, 6.0f},
+                      .SetScale = true,
+                      .Scale = glm::vec3{2.0f, 2.5f, 3.0f},
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_EQ(history.UndoCount(), 1u);
+    const ECSC::Transform::Component after =
+        registry.Raw().get<ECSC::Transform::Component>(entity);
+
+    auto& transform =
+        registry.Raw().get<ECSC::Transform::Component>(entity);
+    transform.Position = glm::vec3{99.0f};
+    const Runtime::EditorCommandHistoryResult rejected = history.Undo();
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(transform.Position, glm::vec3{99.0f});
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 1u);
+
+    transform = after;
+    const Runtime::EditorCommandHistoryResult undone = history.Undo();
+    ASSERT_EQ(undone.Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(transform.Position, before.Position);
+    EXPECT_EQ(transform.Rotation, before.Rotation);
+    EXPECT_EQ(transform.Scale, before.Scale);
+
+    const Runtime::EditorCommandHistoryResult redone = history.Redo();
+    ASSERT_EQ(redone.Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(transform.Position, after.Position);
+    EXPECT_EQ(transform.Rotation, after.Rotation);
+    EXPECT_EQ(transform.Scale, after.Scale);
+    EXPECT_TRUE(
+        registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(entity));
+}
 TEST(SandboxEditorUi, CameraControllerCommandReplacesMainController)
 {
     ECS::Scene::Registry registry;

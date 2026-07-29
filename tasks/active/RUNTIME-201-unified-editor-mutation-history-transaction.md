@@ -24,10 +24,11 @@ maturity_target: Retired
 ## Context
 
 - Status: in progress; owner `Codex`; branch
-  `codex/runtime-201-unified-editor-mutation`; Slice A is complete and Slice B
-  feature adoption is next. The next verification step is the first
-  owner-scoped adoption contract plus the focused
-  `EditorCommandHistory|Mutation` run.
+  `codex/runtime-201-unified-editor-mutation`; Slice A is complete. Slice B has
+  migrated direct transform edits and synchronous/asynchronous ICP transform
+  publication; gizmo/history convergence is next. The next verification step
+  is the gizmo drag-coalescing/history contract plus the focused
+  `EditorCommandHistory|Gizmo|Mutation` run.
 - `EditorCommandHistory` is already the durable editor undo/redo owner but also
   contains feature-specific builders. Geometry/method facades duplicate
   snapshot/validate/apply/dirty/history rules, gizmo drag commits use a
@@ -60,9 +61,11 @@ maturity_target: Retired
   implementation/internal
   `ExecuteUndoableEntityMutation<TState>` shape and focused atomicity/staleness
   contracts without a new public service.
-- **Slice B — feature adoption.** Migrate transform/gizmo, geometry,
-  visualization/presentation, registration, clustering, parameterization,
-  import postprocess, and destructive conversion commits.
+- **Slice B — feature adoption (in progress).** Direct transform edits and
+  synchronous/asynchronous ICP transform publication use the internal
+  transaction as of 2026-07-29. Migrate gizmo, geometry,
+  visualization/presentation, clustering, parameterization, import
+  postprocess, and destructive conversion commits.
 - **Slice C — cleanup.** Move specialized builders to feature owners and
   delete `GizmoUndoStack`, CommandBus inverse-history API, duplicate apply
   paths, and compatibility tests after all real workflows use history.
@@ -132,6 +135,19 @@ Slice A verification completed on 2026-07-29:
 - `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
 - `ctest --test-dir build/ci --output-on-failure -R '^EditorCommandHistory\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
 - `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/check_task_state_links.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+
+Transform/registration adoption verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `cmake --build --preset ci --target IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.(Registration|TransformEdit)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120`
+- `ctest --test-dir build/ci --output-on-failure -R 'TransformEdit|InspectorTransform|UiTransform' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120`
+- `ctest --test-dir build/ci --output-on-failure -R 'EditorCommandHistory|Gizmo|Undo|Redo|Mutation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/docs/check_doc_links.py --root .`
 - `python3 tools/agents/check_task_policy.py --root . --strict`
 - `python3 tools/agents/check_task_state_links.py --root . --strict`
 - `python3 tools/agents/generate_session_brief.py --check`

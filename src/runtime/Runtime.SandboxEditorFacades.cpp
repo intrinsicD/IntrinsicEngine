@@ -113,6 +113,7 @@ import Geometry.Smoothing;
 import Geometry.Subdivision;
 import Geometry.UvAtlas;
 
+#include "Runtime.EditorMutation.Internal.hpp"
 #include "Runtime.SandboxEditorFacades.Internal.hpp"
 
 namespace Extrinsic::Runtime
@@ -9320,6 +9321,89 @@ namespace Extrinsic::Runtime
                    lhs.Scale.z == rhs.Scale.z;
         }
 
+        struct EditorTransformMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        [[nodiscard]] EditorCommandHistoryResult ExecuteEditorTransformMutation(
+            EditorCommandHistory& history,
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            const std::uint32_t stableEntityId,
+            const ECSC::Transform::Component& before,
+            const ECSC::Transform::Component& after,
+            std::string label)
+        {
+            return Internal::ExecuteUndoableEntityMutation(
+                history,
+                std::move(label),
+                EditorTransformMutationIdentity{
+                    .Scene = scene,
+                    .World = world,
+                    .StableEntityId = stableEntityId,
+                },
+                before,
+                before,
+                after,
+                [](
+                    const EditorTransformMutationIdentity& identity,
+                    const ECSC::Transform::Component& expected,
+                    const ECSC::Transform::Component&)
+                {
+                    if (identity.Scene == nullptr || !identity.World.IsValid())
+                        return EditorCommandHistoryStatus::MissingScene;
+
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(raw, identity.StableEntityId);
+                    if (!entity.has_value())
+                        return EditorCommandHistoryStatus::StaleEntity;
+
+                    const ECSC::Transform::Component* transform =
+                        raw.try_get<ECSC::Transform::Component>(*entity);
+                    if (transform == nullptr)
+                        return EditorCommandHistoryStatus::MissingTransform;
+                    return SameTransformComponent(*transform, expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                },
+                [](
+                    const EditorTransformMutationIdentity& identity,
+                    const ECSC::Transform::Component& target)
+                {
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(raw, identity.StableEntityId);
+                    if (!entity.has_value())
+                        return EditorCommandHistoryStatus::StaleEntity;
+
+                    ECSC::Transform::Component* transform =
+                        raw.try_get<ECSC::Transform::Component>(*entity);
+                    if (transform == nullptr)
+                        return EditorCommandHistoryStatus::MissingTransform;
+                    *transform = target;
+                    return EditorCommandHistoryStatus::Applied;
+                },
+                [](
+                    const EditorTransformMutationIdentity& identity,
+                    const ECSC::Transform::Component&,
+                    const ECSC::Transform::Component& target)
+                {
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(raw, identity.StableEntityId);
+                    if (entity.has_value())
+                    {
+                        raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(
+                            *entity);
+                    }
+                    return target;
+                });
+        }
+
         struct SandboxEditorRegistrationCpuJobState
         {
             std::uint32_t SourceStableEntityId{0u};
@@ -9559,15 +9643,14 @@ namespace Extrinsic::Runtime
             if (context.CommandHistory != nullptr)
             {
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        MakeTransformEditCommand(
-                            EditorTransformEditCommand{
-                                .Scene = context.Scene,
-                                .StableEntityId = job.SourceStableEntityId,
-                                .Before = job.SourceBeforeTransform,
-                                .After = job.SourceAfterTransform,
-                                .Label = "Align point clouds (ICP)",
-                            }));
+                    ExecuteEditorTransformMutation(
+                        *context.CommandHistory,
+                        context.Scene,
+                        context.World,
+                        job.SourceStableEntityId,
+                        job.SourceBeforeTransform,
+                        job.SourceAfterTransform,
+                        "Align point clouds (ICP)");
                 result.Status = ToSandboxEditorCommandStatus(history.Status);
             }
             else
@@ -13117,15 +13200,14 @@ namespace Extrinsic::Runtime
                 next.Scale = command.Scale;
 
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(
-                    MakeTransformEditCommand(
-                        EditorTransformEditCommand{
-                            .Scene = context.Scene,
-                            .StableEntityId = command.StableEntityId,
-                            .Before = *transform,
-                            .After = next,
-                            .Label = "Edit Transform",
-                        }));
+                ExecuteEditorTransformMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    *transform,
+                    next,
+                    "Edit Transform");
             return ToSandboxEditorCommandStatus(result.Status);
         }
 
@@ -16882,15 +16964,14 @@ namespace Extrinsic::Runtime
         if (context.CommandHistory != nullptr)
         {
             const EditorCommandHistoryResult history =
-                context.CommandHistory->Execute(
-                    MakeTransformEditCommand(
-                        EditorTransformEditCommand{
-                            .Scene = context.Scene,
-                            .StableEntityId = command.SourceStableEntityId,
-                            .Before = *transform,
-                            .After = next,
-                            .Label = "Align point clouds (ICP)",
-                        }));
+                ExecuteEditorTransformMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.SourceStableEntityId,
+                    *transform,
+                    next,
+                    "Align point clouds (ICP)");
             result.Status = ToSandboxEditorCommandStatus(history.Status);
         }
         else

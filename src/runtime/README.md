@@ -598,13 +598,18 @@ resolve to `GeometrySources` `Domain::PointCloud`, runs the runtime-owned
 `Extrinsic::Runtime::AlignPointClouds` ICP controller (which forwards to
 `Geometry::Registration::AlignICP` and captures the per-iteration convergence
 trajectory), and drives the source entity's `Transform::Component` with
-`Extrinsic::Runtime::TrajectoryPose(outcome, step)` through an undoable
-`MakeTransformEditCommand`. The panel takes the source/target from the current
-multi-selection (with a swap toggle), exposes the `ICPVariant`, max iterations,
-max correspondence distance (`0` = unlimited), and inlier ratio, and provides a
-trajectory-step slider over `[0, IterationCount()]` that scrubs the previewed
-pose. The command owns no geometry, renderer, or asset state; it only reads
-point positions, calls the runtime controller, and edits the source `Transform`.
+`Extrinsic::Runtime::TrajectoryPose(outcome, step)` through the same internal
+generation-validated transaction used by direct transform edits. Each history
+transition revalidates the captured world/registry/entity identity and exact
+expected transform before atomically replacing the component and stamping
+`Transform::IsDirtyTag`; an intervening transform edit fails closed instead of
+being overwritten by undo/redo. The panel takes the source/target from the
+current multi-selection (with a swap toggle), exposes the `ICPVariant`, max
+iterations, max correspondence distance (`0` = unlimited), and inlier ratio,
+and provides a trajectory-step slider over `[0, IterationCount()]` that scrubs
+the previewed pose. The command owns no geometry, renderer, or asset state; it
+only reads point positions, calls the runtime controller, and edits the source
+`Transform`.
 
 ### Sandbox Editor Appearance / Properties Reorganization
 
