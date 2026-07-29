@@ -3,12 +3,12 @@ task_id: PROC-028
 workflow_profile: high-risk
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-29T22:31:16Z'
+generated_at: '2026-07-29T22:34:25Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 5f7843c99be6f978b2939b463f48abfb39348c66
-  head_revision: f4adcea4948f6b9b7c81967c9b8e0709479beb2d
+  head_revision: f154ec2a55eba3e1049089464ed70342801f968d
   branch: codex/proc-028-enforced-agent-workflow
   worktree: /home/alex/Documents/IntrinsicEngine-proc-028
   dirty: false
@@ -30,13 +30,15 @@ source:
   - path: ara/staging/observations.yaml
     sha256: 4fa0e1a4a947be2d252fd08ab7af9571d803b179f8c4cd39be807a6199b4247b
   - path: ara/trace/exploration_tree.yaml
-    sha256: 9703ef1f54dc6099a689d3120752f92774573e8fd815a312b784a86b077226bb
+    sha256: 4656cadbcd26b4645ee58affe1cbb91552806de2b7f3312302feca13b3beb2fb
   - path: ara/trace/pm_reasoning_log.yaml
-    sha256: 38eb7227ccb770253dfd479afeae461bd72d90e857264d8489fd9f8a088f7483
+    sha256: d0832b193bf74050ea2693554379300aa4596d33a07aaf4ef0d73dd675a694e3
   - path: ara/trace/sessions/2026-07-29_001.yaml
     sha256: 17ff3a3794b5f1fd4eccadc9f94d21335154c72ca8e194d60e8d521057c561cd
+  - path: ara/trace/sessions/2026-07-30_001.yaml
+    sha256: 009433acada4d1ca534afca96a4e030e24d07eb6c7349a38a83365b4556d9272
   - path: ara/trace/sessions/session_index.yaml
-    sha256: cf1253498900fbf098f97af650d06dc1493636dbd988a6d42e402b4295d04df0
+    sha256: 76dcd8ab06971d520036db8ac1e8563136d0452c218be71f255ebcefbfdc3853
   - path: benchmarks/CMakeLists.txt
     sha256: d615f2357fc5b8b7bffa5743ae3756d1af589e927eaff3a438b89235e82aeec3
   - path: benchmarks/README.md
@@ -201,7 +203,7 @@ source:
     sha256: 8054296b5c93cf28c762193840f2b2a04d04ce83f54e22500304af6f116c60cb
   - path: tools/ci/validate_gate_timing_baseline.py
     sha256: 681d484edc4a6ca02447eed1841e5dfba3e47152396ef020e08708920d320f75
-  content_digest: 6dd87131fd4ac92128bba4180687e63b148eefb99686ff2e9e59e16ce29c8a65
+  content_digest: 5573a54476e0e82c24dd1de50f2559ea12c00e9d73003830d8b985d6fef9556d
 touched:
   paths:
   - .github/pull_request_template.md
@@ -215,6 +217,7 @@ touched:
   - ara/trace/exploration_tree.yaml
   - ara/trace/pm_reasoning_log.yaml
   - ara/trace/sessions/2026-07-29_001.yaml
+  - ara/trace/sessions/2026-07-30_001.yaml
   - ara/trace/sessions/session_index.yaml
   - benchmarks/CMakeLists.txt
   - benchmarks/README.md
@@ -433,6 +436,9 @@ artifacts:
   kind: file
 - path: ara/trace/sessions/2026-07-29_001.yaml
   sha256: 17ff3a3794b5f1fd4eccadc9f94d21335154c72ca8e194d60e8d521057c561cd
+  kind: file
+- path: ara/trace/sessions/2026-07-30_001.yaml
+  sha256: 009433acada4d1ca534afca96a4e030e24d07eb6c7349a38a83365b4556d9272
   kind: file
 self_review:
   completed: true
