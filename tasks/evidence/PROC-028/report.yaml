@@ -3,12 +3,12 @@ task_id: PROC-028
 workflow_profile: high-risk
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-29T22:34:25Z'
+generated_at: '2026-07-29T22:55:04Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 5f7843c99be6f978b2939b463f48abfb39348c66
-  head_revision: f154ec2a55eba3e1049089464ed70342801f968d
+  head_revision: e800ede9e7590e4eb225ceac9c0ce807b2ff10d9
   branch: codex/proc-028-enforced-agent-workflow
   worktree: /home/alex/Documents/IntrinsicEngine-proc-028
   dirty: false
@@ -80,7 +80,7 @@ source:
   - path: docs/agent/task-format.md
     sha256: 435e47d8b427bbd79da5b8209e91bf640617889234bb2c66246b2d791f6754c1
   - path: docs/agent/workflow-evidence.md
-    sha256: 7bd3f72c2edf479716111263532ab60cd75ea4f295ca54251e9ceaaff385be1b
+    sha256: fd138b17cb8d9b8eaf31cea4b97e485ee91ec4dc3840c9a2b59ebbf3f993ac58
   - path: docs/benchmarking/benchmark-manifest-schema.md
     sha256: 1b9bcf8334197c3903967626dc9690fbbcb523b7eebdb0117bfaf7247c8eff8b
   - path: docs/benchmarking/ci-policy.md
@@ -134,7 +134,7 @@ source:
   - path: tests/regression/tooling/Test.ValidateTasks.py
     sha256: 196036bfdc56bf6b2693792bdf40b50a4620df54158e18c9f7680edce2d41021
   - path: tests/regression/tooling/Test.WorkflowEvidence.py
-    sha256: 6514d0b665e088eec84cb230cfcd5dd0e9bd97d896e7417387e874694428d58f
+    sha256: 32362df1ae182e1c3e43ebda14df32d8c4d144cbc70022b424fe688ca1414502
   - path: tests/regression/tooling/Test_BenchmarkResultValidator.py
     sha256: 3bf1c459e18886e6fec2f7ed1d61f6431704c23ef4b71d4623bfa85acd95af36
   - path: tools/agents/README.md
@@ -174,7 +174,7 @@ source:
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
     sha256: 303e7fbd0775ee9e345cda46fbb9360307b241913344685fb4a1886ce5334a2f
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-    sha256: 7bd3f72c2edf479716111263532ab60cd75ea4f295ca54251e9ceaaff385be1b
+    sha256: fd138b17cb8d9b8eaf31cea4b97e485ee91ec4dc3840c9a2b59ebbf3f993ac58
   - path: tools/agents/sync_skills.py
     sha256: 14aa6c1c921e87dae40a3b11c334798eb86add0662d22f132f4497347e7465d3
   - path: tools/agents/task_claim.py
@@ -182,7 +182,7 @@ source:
   - path: tools/agents/validate_tasks.py
     sha256: b244007bea41fca1f5699b83ad4809b3f8dc9dc0cc3b58c6665586c7c9a1752b
   - path: tools/agents/workflow_evidence.py
-    sha256: 839a8e9f1091061aa3c138acf6fa5a70ff44bc1770b13786491ba871010a79bc
+    sha256: aca8222cf416f6ffd5bcc000bbfdb9a468d7e9485f2c33f296f7e51a1ff174cf
   - path: tools/agents/workflow_legacy_tasks.json
     sha256: 89513832b30474b677cd6ada49c4b12edc53b794c367bacdc85a85aa2d58d525
   - path: tools/benchmark/README.md
@@ -203,7 +203,7 @@ source:
     sha256: 8054296b5c93cf28c762193840f2b2a04d04ce83f54e22500304af6f116c60cb
   - path: tools/ci/validate_gate_timing_baseline.py
     sha256: 681d484edc4a6ca02447eed1841e5dfba3e47152396ef020e08708920d320f75
-  content_digest: 5573a54476e0e82c24dd1de50f2559ea12c00e9d73003830d8b985d6fef9556d
+  content_digest: ad1d044a680964d892e6fb882e50c869b5f04d04ff120779f1d6acc3818fa24b
 touched:
   paths:
   - .github/pull_request_template.md
@@ -390,8 +390,9 @@ changed_public_contracts:
   append-only run/attempt identities.
 - Git-common-dir task/path claim CLI with bounded leases and retained release/recovery history.
 diagnostics_and_previews:
-- Focused workflow/benchmark regression suites passed 85/85.
-- Explicit uncommitted-file docs-sync validation covered 94 changed paths and triggered three rules with
+- Focused workflow/benchmark regression suites passed 88/88, including clean fixed-revision and dirty-worktree
+  report behavior.
+- Explicit uncommitted-file docs-sync validation covered the task surface and triggered three rules with
   no findings.
 - ci configured with Clang 23; IntrinsicTests and IntrinsicBenchmarks built successfully.
 - Complete default CPU-supported selector passed 4042/4042 with one expected GLFW/LSan capability self-skip.
@@ -418,8 +419,8 @@ residual_risks:
   reconciled.
 - Git-common-dir claims coordinate sibling worktrees on one local clone; they do not provide a cross-host
   distributed lock.
-- Any changed source-surface byte invalidates this report digest and requires regenerated handoff/review
-  bindings.
+- A fixed clean draft remains auditable after unrelated commits; a new PROC-028 source revision requires
+  regenerated report, handoff, and review bindings before completion.
 skipped_checks:
 - check: Test.WorkflowConcurrency.py
   reason: Pre-existing BUG-120 reproduces against byte-identical origin/main workflow/test sources; PROC-028
