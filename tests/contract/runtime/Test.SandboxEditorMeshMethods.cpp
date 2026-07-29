@@ -1480,6 +1480,41 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
 
+    auto liveMean = properties.Get<double>(PN::kMeanCurvature);
+    ASSERT_TRUE(liveMean.IsValid());
+    ASSERT_FALSE(liveMean.Vector().empty());
+    const double publishedMean = liveMean.Vector().front();
+    liveMean.Vector().front() = publishedMean + 1.0;
+    const Runtime::EditorCommandHistorySnapshot beforePropertyRejection =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_DOUBLE_EQ(
+        properties.Get<double>(PN::kMeanCurvature).Vector().front(),
+        publishedMean + 1.0);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforePropertyRejection.Revision);
+
+    liveMean = properties.Get<double>(PN::kMeanCurvature);
+    ASSERT_TRUE(liveMean.IsValid());
+    liveMean.Vector().front() = publishedMean;
+    std::vector<glm::vec3> interveningPositions =
+        MeshVertexPositions(registry, mesh);
+    interveningPositions.front().x += 1.0f;
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh), interveningPositions);
+    const Runtime::EditorCommandHistorySnapshot beforePositionRejection =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, mesh),
+        interveningPositions);
+    EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforePositionRejection.Revision);
+
     context.LastMeshCurvatureResult = &result;
     const Runtime::SandboxEditorDomainWindowModel model =
         Runtime::BuildSandboxEditorDomainWindowModel(

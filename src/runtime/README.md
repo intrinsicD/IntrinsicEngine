@@ -523,9 +523,13 @@ requested and available, the command also writes `v:principal_dir1` and
 or unavailable, the command succeeds with scalars only and reports a
 deterministic diagnostic. The UI exposes an output selector, a principal
 directions toggle that is inert when directions are unavailable, and a single
-`Compute` action. Successful commits are undoable through
-`EditorCommandHistory::Execute`, stamp `DirtyVertexAttributes`, and do not call
-renderer/RHI upload APIs or stamp broad `GpuDirty`.
+`Compute` action. Successful commits are undoable through the shared editor
+mutation transaction, which validates geometry metadata, the exact source
+positions, and the four owned curvature-property snapshots before apply, undo,
+or redo. An intervening geometry or curvature-property edit fails closed
+without moving history. Successful publication stamps
+`DirtyVertexAttributes` and does not call renderer/RHI upload APIs or stamp
+broad `GpuDirty`.
 
 Published curvature properties use the ordinary closed
 `Extrinsic.Runtime.VisualizationRecipes` alternatives. Scalar curvature maps

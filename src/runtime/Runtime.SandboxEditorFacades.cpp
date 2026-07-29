@@ -5744,10 +5744,10 @@ namespace Extrinsic::Runtime
             return positions;
         }
 
-        using MeshDenoisePositionState =
+        using MeshPositionState =
             std::shared_ptr<const std::vector<glm::vec3>>;
 
-        struct MeshDenoiseMutationIdentity
+        struct MeshPropertyMutationIdentity
         {
             ECS::Scene::Registry* Scene{nullptr};
             WorldHandle World{};
@@ -5757,7 +5757,7 @@ namespace Extrinsic::Runtime
         struct MeshDenoiseMutationGeneration
         {
             std::uint64_t GeometryMetadataSignature{0u};
-            MeshDenoisePositionState Positions{};
+            MeshPositionState Positions{};
         };
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshDenoisePositionState(
@@ -5828,17 +5828,17 @@ namespace Extrinsic::Runtime
                     return SandboxEditorCommandStatus::StaleEntity;
                 }
 
-                const MeshDenoisePositionState beforeState =
+                const MeshPositionState beforeState =
                     std::make_shared<std::vector<glm::vec3>>(
                         std::move(before));
-                const MeshDenoisePositionState afterState =
+                const MeshPositionState afterState =
                     std::make_shared<std::vector<glm::vec3>>(
                         std::move(after));
                 const EditorCommandHistoryResult history =
                     Internal::ExecuteUndoableEntityMutation(
                         *context.CommandHistory,
                         "Denoise mesh vertices",
-                        MeshDenoiseMutationIdentity{
+                        MeshPropertyMutationIdentity{
                             .Scene = context.Scene,
                             .World = context.World,
                             .StableEntityId = stableEntityId,
@@ -5853,9 +5853,9 @@ namespace Extrinsic::Runtime
                         beforeState,
                         afterState,
                         [](
-                            const MeshDenoiseMutationIdentity& identity,
+                            const MeshPropertyMutationIdentity& identity,
                             const MeshDenoiseMutationGeneration& expected,
-                            const MeshDenoisePositionState&)
+                            const MeshPositionState&)
                         {
                             if (identity.Scene == nullptr ||
                                 !identity.World.IsValid())
@@ -5904,8 +5904,8 @@ namespace Extrinsic::Runtime
                             return EditorCommandHistoryStatus::Applied;
                         },
                         [](
-                            const MeshDenoiseMutationIdentity& identity,
-                            const MeshDenoisePositionState& target)
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshPositionState& target)
                         {
                             if (target == nullptr)
                             {
@@ -5918,9 +5918,9 @@ namespace Extrinsic::Runtime
                                 *target);
                         },
                         [](
-                            const MeshDenoiseMutationIdentity& identity,
+                            const MeshPropertyMutationIdentity& identity,
                             const MeshDenoiseMutationGeneration&,
-                            const MeshDenoisePositionState& target)
+                            const MeshPositionState& target)
                         {
                             StampMeshDenoisePositionDirty(
                                 *identity.Scene,
@@ -5992,6 +5992,7 @@ namespace Extrinsic::Runtime
         struct MeshCurvatureSourceResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
+            std::vector<glm::vec3> SourcePositions{};
             std::size_t VertexSlotCount{0u};
             SandboxEditorCommandStatus Status{
                 SandboxEditorCommandStatus::NoChange};
@@ -6015,6 +6016,8 @@ namespace Extrinsic::Runtime
             if (source.Succeeded())
             {
                 result.Mesh = std::move(source.Mesh);
+                result.SourcePositions =
+                    std::move(source.BeforePositions);
                 result.Diagnostic.clear();
             }
             else if (source.Status ==
@@ -6051,6 +6054,17 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec3> Dir2{};
         };
 
+        using MeshCurvaturePropertySnapshot =
+            std::shared_ptr<const MeshCurvaturePropertyState>;
+
+        struct MeshCurvatureMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            std::size_t VertexSlotCount{0u};
+            MeshPositionState Positions{};
+            MeshCurvaturePropertySnapshot Properties{};
+        };
+
         [[nodiscard]] bool SameVec3PropertyValues(
             const std::vector<glm::vec3>& lhs,
             const std::vector<glm::vec3>& rhs) noexcept
@@ -6081,6 +6095,24 @@ namespace Extrinsic::Runtime
                    lhs.Gaussian == rhs.Gaussian &&
                    SameVec3PropertyValues(lhs.Dir1, rhs.Dir1) &&
                    SameVec3PropertyValues(lhs.Dir2, rhs.Dir2);
+        }
+
+        [[nodiscard]] bool MeshCurvaturePropertyStateMatchesCount(
+            const MeshCurvaturePropertyState& state,
+            const std::size_t expectedCount) noexcept
+        {
+            return (state.HadMean
+                        ? state.Mean.size() == expectedCount
+                        : state.Mean.empty()) &&
+                   (state.HadGaussian
+                        ? state.Gaussian.size() == expectedCount
+                        : state.Gaussian.empty()) &&
+                   (state.HadDir1
+                        ? state.Dir1.size() == expectedCount
+                        : state.Dir1.empty()) &&
+                   (state.HadDir2
+                        ? state.Dir2.size() == expectedCount
+                        : state.Dir2.empty());
         }
 
         template <typename T>
@@ -6264,46 +6296,186 @@ namespace Extrinsic::Runtime
                 return EditorCommandHistoryStatus::CommandFailed;
             }
 
-            Dirty::MarkVertexAttributesDirty(raw, *entity);
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        void StampMeshCurvaturePropertyDirty(
+            ECS::Scene::Registry& scene,
+            const std::uint32_t stableEntityId)
+        {
+            entt::registry& raw = scene.Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            Dirty::MarkVertexAttributesDirty(raw, entity);
         }
 
         [[nodiscard]] SandboxEditorCommandStatus CommitMeshCurvatureProperties(
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
+            std::vector<glm::vec3> positions,
             MeshCurvaturePropertyState before,
             MeshCurvaturePropertyState after)
         {
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                if (context.Scene == nullptr)
+                    return SandboxEditorCommandStatus::MissingScene;
+                const ECS::EntityHandle entity =
+                    SelectionController::ToEntityHandle(stableEntityId);
+                if (entity == ECS::InvalidEntityHandle ||
+                    !context.Scene->Raw().valid(entity))
+                {
+                    return SandboxEditorCommandStatus::StaleEntity;
+                }
+
+                const MeshPositionState positionState =
+                    std::make_shared<std::vector<glm::vec3>>(
+                        std::move(positions));
+                const MeshCurvaturePropertySnapshot beforeState =
+                    std::make_shared<MeshCurvaturePropertyState>(
+                        std::move(before));
+                const MeshCurvaturePropertySnapshot afterState =
+                    std::make_shared<MeshCurvaturePropertyState>(
+                        std::move(after));
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = "Compute mesh curvature",
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyMeshCurvatureState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyMeshCurvatureState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        "Compute mesh curvature",
+                        MeshPropertyMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        MeshCurvatureMutationGeneration{
+                            .GeometryMetadataSignature =
+                                GeometryMetadataSignatureForEntity(
+                                    context.Scene->Raw(),
+                                    entity),
+                            .VertexSlotCount = positionState->size(),
+                            .Positions = positionState,
+                            .Properties = beforeState,
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshCurvatureMutationGeneration& expected,
+                            const MeshCurvaturePropertySnapshot& target)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            if (entity == ECS::InvalidEntityHandle ||
+                                !raw.valid(entity))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            GS::MutableSourceView view =
+                                GS::BuildMutableView(raw, entity);
+                            const GS::SourceAvailability availability =
+                                GS::BuildSourceAvailability(view);
+                            if (availability.ProvenanceDomain !=
+                                    GS::Domain::Mesh ||
+                                view.VertexSource == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (expected.Positions == nullptr ||
+                                expected.Properties == nullptr ||
+                                target == nullptr ||
+                                !MeshCurvaturePropertyStateMatchesCount(
+                                    *target,
+                                    expected.VertexSlotCount))
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+                            if (GeometryMetadataSignatureForEntity(raw, entity) !=
+                                expected.GeometryMetadataSignature)
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const auto currentPositions =
+                                view.VertexSource->Properties.Get<glm::vec3>(
+                                    GS::PropertyNames::kPosition);
+                            if (!currentPositions ||
+                                !SameGeometryPositions(
+                                    currentPositions.Vector(),
+                                    *expected.Positions))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            MeshCurvaturePropertyState currentProperties{};
+                            std::string diagnostic{};
+                            if (!CaptureMeshCurvaturePropertyState(
+                                    view.VertexSource->Properties,
+                                    expected.VertexSlotCount,
+                                    currentProperties,
+                                    diagnostic) ||
+                                !SameMeshCurvaturePropertyState(
+                                    currentProperties,
+                                    *expected.Properties))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshCurvaturePropertySnapshot& target)
+                        {
+                            if (target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    CommandFailed;
+                            }
+                            return ApplyMeshCurvatureState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                *target);
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshCurvatureMutationGeneration& expected,
+                            const MeshCurvaturePropertySnapshot& target)
+                        {
+                            StampMeshCurvaturePropertyDirty(
+                                *identity.Scene,
+                                identity.StableEntityId);
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            return MeshCurvatureMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    GeometryMetadataSignatureForEntity(
+                                        identity.Scene->Raw(),
+                                        entity),
+                                .VertexSlotCount = expected.VertexSlotCount,
+                                .Positions = expected.Positions,
+                                .Properties = target,
+                            };
                         });
                 return ToSandboxEditorCommandStatus(history.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
-                ApplyMeshCurvatureState(context.Scene, stableEntityId, after));
+            const EditorCommandHistoryStatus applied =
+                ApplyMeshCurvatureState(context.Scene, stableEntityId, after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            StampMeshCurvaturePropertyDirty(
+                *context.Scene,
+                stableEntityId);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         [[nodiscard]] std::string BuildMeshCurvatureSuccessMessage(
@@ -8968,8 +9140,9 @@ namespace Extrinsic::Runtime
                 CommitMeshCurvatureProperties(
                     context,
                     job.StableEntityId,
-                    job.CurvatureBefore,
-                    job.CurvatureAfter);
+                    std::move(job.SnapshotPositions),
+                    std::move(job.CurvatureBefore),
+                    std::move(job.CurvatureAfter));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -9184,7 +9357,8 @@ namespace Extrinsic::Runtime
             state->Kind = SandboxEditorMeshCpuJobKind::Curvature;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
-            state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
+            state->SnapshotPositions =
+                std::move(source.SourcePositions);
             state->BeforeMesh = source.Mesh;
             state->Mesh = std::move(source.Mesh);
             state->CurvatureBefore = std::move(before);
@@ -15866,6 +16040,7 @@ namespace Extrinsic::Runtime
             CommitMeshCurvatureProperties(
                 context,
                 command.StableEntityId,
+                std::move(source.SourcePositions),
                 std::move(before),
                 std::move(after));
         if (commitStatus != SandboxEditorCommandStatus::Applied)
