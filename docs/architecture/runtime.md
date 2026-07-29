@@ -211,6 +211,18 @@ participants may still release their exact registration handles before reverse
 module teardown. Omitting the module leaves Engine and the active world
 operational but publishes no document or history capability.
 
+Undoable entity edits keep their typed capture, validation, atomic application,
+and dirty-stamp policy with the owning runtime feature. The runtime-internal
+`ExecuteUndoableEntityMutation(...)` template turns those callbacks plus stable
+world/entity identity, expected owner state/generations, and typed before/after
+values into one generic `EditorCommandHistory` record. Every initial apply,
+undo, and redo validates before publishing; rejection leaves both feature state
+and the history cursor unchanged. Direct/ICP transforms, coalesced gizmo
+transforms, and default or lane-targeted visualization config edits use this
+shape. The public history module therefore owns history mechanics rather than
+transform or visualization component DTOs; remaining feature migrations are
+tracked by `RUNTIME-201`.
+
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes
 the exact `CameraControllerRegistry`, subscribes to active-world change and

@@ -1506,6 +1506,62 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
     EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
 }
+TEST(SandboxEditorUi,
+     VisualizationConfigHistoryRejectsInterveningStateAndRestoresExactly)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VisualMesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    context.VisualizationCommandsAvailable = true;
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationConfigCommand{
+                      .StableEntityId = stableId,
+                      .EnableConfig = true,
+                      .Source =
+                          G::VisualizationConfig::ColorSource::UniformColor,
+                      .Color = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f},
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    const G::VisualizationConfig applied =
+        registry.Raw().get<G::VisualizationConfig>(mesh);
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+
+    G::VisualizationConfig intervening = applied;
+    intervening.Color = glm::vec4{0.9f, 0.8f, 0.7f, 1.0f};
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(
+        mesh,
+        intervening);
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Color,
+              intervening.Color);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, applied);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Color,
+              applied.Color);
+}
 TEST(SandboxEditorUi, VisualizationRecipeCommandRoutesThroughRuntimeSurface)
 {
     ECS::Scene::Registry registry;

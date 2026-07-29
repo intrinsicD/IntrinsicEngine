@@ -10,10 +10,8 @@ module;
 
 export module Extrinsic.Runtime.EditorCommandHistory;
 
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.SelectionController;
 
@@ -120,15 +118,6 @@ export namespace Extrinsic::Runtime
         std::string m_ActivePath{};
     };
 
-    struct EditorTransformEditCommand
-    {
-        ECS::Scene::Registry* Scene{nullptr};
-        std::uint32_t StableEntityId{0u};
-        ECS::Components::Transform::Component Before{};
-        ECS::Components::Transform::Component After{};
-        std::string Label{"Edit Transform"};
-    };
-
     struct EditorSelectionReplaceCommand
     {
         ECS::Scene::Registry* Scene{nullptr};
@@ -149,15 +138,6 @@ export namespace Extrinsic::Runtime
         std::string Label{"Change Primitive View"};
     };
 
-    struct EditorVisualizationConfigCommand
-    {
-        ECS::Scene::Registry* Scene{nullptr};
-        std::uint32_t StableEntityId{0u};
-        std::optional<Graphics::Components::VisualizationConfig> Before{};
-        std::optional<Graphics::Components::VisualizationConfig> After{};
-        std::string Label{"Change Visualization"};
-    };
-
     enum class EditorHierarchyDeletePolicy : std::uint8_t
     {
         DeleteDescendants,
@@ -173,14 +153,10 @@ export namespace Extrinsic::Runtime
         EditorCommandHistoryStatus Status{EditorCommandHistoryStatus::NoChange};
     };
 
-    [[nodiscard]] EditorCommandRecord MakeTransformEditCommand(
-        EditorTransformEditCommand command);
     [[nodiscard]] EditorCommandRecord MakeSelectionReplaceCommand(
         EditorSelectionReplaceCommand command);
     [[nodiscard]] EditorCommandRecord MakePrimitiveViewSettingsCommand(
         EditorPrimitiveViewSettingsCommand command);
-    [[nodiscard]] EditorCommandRecord MakeVisualizationConfigCommand(
-        EditorVisualizationConfigCommand command);
     [[nodiscard]] EditorCommandRecord MakeCompoundEditorCommand(
         std::string label,
         std::vector<EditorCommandRecord> commands);

@@ -24,3 +24,30 @@
 ## Findings → follow-ups
 
 - No findings.
+
+## Visualization adapter cleanup addendum
+
+### Change under review
+
+- Change: route entity-default and lane-targeted visualization config edits
+  through the runtime-internal validated transaction, then remove the unused
+  transform/visualization DTOs and builders from the public history module.
+- Trigger: shrinks the exported runtime module dependency surface and removes
+  two feature-component imports.
+
+### Scorecard
+
+| # | Check | Outcome | Notes |
+| --- | --- | --- | --- |
+| 1 | Promoted layer imports match `/AGENTS.md` §2 | pass | The strict layer check scanned 720 files, 6,321 import/include references, and 85 CMake links with no violation or allowlist entry. The public history module now imports two fewer same-layer/lower-layer component modules. |
+| 2 | CMake target links match layer policy | pass | No target or CMake link changed. |
+| 3 | No new public API exposes a higher-layer type to a lower layer | pass | The public surface only shrank: transform and graphics visualization component types were removed from `Extrinsic.Runtime.EditorCommandHistory`. The internal owner transaction remains in runtime implementation code. |
+| 4 | Renderer member/subsystem growth justified by an owning seam | n/a | No renderer state or graphics ownership changed. |
+| 5 | New passes use typed IDs, not string routing | n/a | No pass or command route was added. |
+| 6 | New frame-recipe dependencies resource-driven or explicitly justified | n/a | No recipe or ordering edge changed. |
+| 7 | Scaffold/parity tasks have a follow-up maturity gate | n/a | `RUNTIME-201` remains active at its `Retired` target. |
+| 8 | Legacy/temporary exceptions have a task ID and expiry | pass | No exception, allowlist row, shim, or warning-mode gate was added. |
+
+### Findings → follow-ups
+
+- No findings.

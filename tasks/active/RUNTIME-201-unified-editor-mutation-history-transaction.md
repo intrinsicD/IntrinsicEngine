@@ -26,10 +26,11 @@ maturity_target: Retired
 - Status: in progress; owner `Codex`; branch
   `codex/runtime-201-unified-editor-mutation`; Slice A is complete. Slice B has
   migrated direct transform edits and synchronous/asynchronous ICP transform
-  publication plus gizmo drag commit. `GizmoUndoStack` is deleted; the next
-  owner-scoped adoption is geometry/property and presentation mutation. The
-  next verification step is that feature's stale-generation/undo contract plus
-  the focused `EditorCommandHistory|Mutation` run.
+  publication, gizmo drag commit, and default/lane visualization-config edits.
+  `GizmoUndoStack` and the now-unused public transform/visualization history
+  adapters are deleted; the next owner-scoped adoption is geometry/property
+  mutation. The next verification step is that feature's stale-generation/undo
+  contract plus the focused `EditorCommandHistory|Mutation` run.
 - At task intake, `EditorCommandHistory` was already the durable editor
   undo/redo owner but also contained feature-specific builders. Geometry/method
   facades still duplicate snapshot/validate/apply/dirty/history rules; gizmo
@@ -65,13 +66,16 @@ maturity_target: Retired
   contracts without a new public service.
 - **Slice B — feature adoption (in progress).** Direct transform edits,
   synchronous/asynchronous ICP transform publication, and coalesced gizmo drag
-  commit use the internal transaction as of 2026-07-29. Migrate geometry,
-  visualization/presentation, clustering, parameterization, import postprocess,
-  and destructive conversion commits.
+  commit use the internal transaction as of 2026-07-29. Entity-default and
+  lane-targeted visualization-config edits now use the same transaction.
+  Migrate geometry, remaining presentation, clustering, parameterization,
+  import postprocess, and destructive conversion commits.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
-  adoption. Move specialized builders to feature owners and delete the
-  CommandBus inverse-history API, duplicate apply paths, and compatibility
-  tests after all remaining real workflows use history.
+  adoption. The unused public transform and visualization adapter DTOs/builders
+  were deleted after their owners adopted the transaction. Move remaining
+  specialized builders to feature owners and delete the CommandBus
+  inverse-history API, duplicate apply paths, and compatibility tests after all
+  remaining real workflows use history.
 
 ## Required changes
 
@@ -82,7 +86,8 @@ maturity_target: Retired
       presentation generation, validation failure, cancelled work, or failed
       apply.
 - [ ] Keep feature-specific state capture and restoration code with the owning
-      feature; `EditorCommandHistory` stores generic records only.
+      feature; transform and visualization satisfy this now, while remaining
+      typed compatibility adapters still need migration or retirement.
 - [x] Route gizmo drag commit and property transform edits through the same
       history owner and preserve drag coalescing semantics. The production
       census found no separate keyboard-only transform mutation path.
@@ -91,7 +96,8 @@ maturity_target: Retired
       domain-conversion mutations.
 - [ ] Delete `GizmoUndoStack`, feature-specific builders from
       `EditorCommandHistory`, and `CommandBus::SetHistoryHook` /
-      `RecordInverse` after production adoption and parity.
+      `RecordInverse` after production adoption and parity. Gizmo plus the
+      transform/visualization builders are complete.
 
 ## Tests
 
@@ -168,6 +174,24 @@ Gizmo/history convergence verification completed on 2026-07-29:
 - `python3 tools/repo/check_layering.py --root src --strict`
 - `python3 tools/repo/check_test_layout.py --root . --strict`
 - `python3 tools/docs/check_doc_links.py --root .`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/check_task_state_links.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+
+Visualization-history convergence verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `cmake --build --preset ci --target IntrinsicTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.VisualizationConfig|^EditorCommandHistory\.(PrimitiveViewAdapterIsReversible|UndoableEntityMutation)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120`
+- `ctest --test-dir build/ci --output-on-failure -R 'EditorCommandHistory|Gizmo|Undo|Redo|Mutation|VisualizationConfig' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+- `rg -n '\b(EditorTransformEditCommand|MakeTransformEditCommand|EditorVisualizationConfigCommand|MakeVisualizationConfigCommand|MakeVisualizationConfigTargetCommand)\b' . --glob '!build/**' --glob '!tasks/archive/**' --glob '!tasks/done/**'`
+- `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
+- `tools/ci/run_clean_workshop_review.sh . --strict`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/repo/check_test_layout.py --root . --strict`
+- `python3 tools/docs/check_doc_links.py --root .`
+- `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --head-ref HEAD --strict`
+- `python3 tools/repo/check_root_hygiene.py --root .`
 - `python3 tools/agents/check_task_policy.py --root . --strict`
 - `python3 tools/agents/check_task_state_links.py --root . --strict`
 - `python3 tools/agents/generate_session_brief.py --check`

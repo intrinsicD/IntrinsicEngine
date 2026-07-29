@@ -6,15 +6,11 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
 
 import Extrinsic.ECS.Component.Hierarchy;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.SelectionController;
@@ -24,7 +20,6 @@ import Extrinsic.Runtime.SelectionController;
 namespace Runtime = Extrinsic::Runtime;
 namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
-namespace G = Extrinsic::Graphics::Components;
 
 namespace
 {
@@ -373,45 +368,6 @@ TEST(EditorCommandHistory,
     EXPECT_EQ(history.Snapshot().Revision, 0u);
 }
 
-TEST(EditorCommandHistory, TransformAdapterAppliesUndoRedoAndRejectsStaleEntity)
-{
-    ECS::Scene::Registry registry;
-    const ECS::EntityHandle entity = CreateEntity(registry);
-    ECSC::Transform::Component before{};
-    before.Position = glm::vec3{0.0f, 0.0f, 0.0f};
-    ECSC::Transform::Component after = before;
-    after.Position = glm::vec3{4.0f, 5.0f, 6.0f};
-    registry.Raw().emplace<ECSC::Transform::Component>(entity, before);
-
-    Runtime::EditorCommandHistory history;
-    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(entity);
-    auto result = history.Execute(
-        Runtime::MakeTransformEditCommand(
-            Runtime::EditorTransformEditCommand{
-                .Scene = &registry,
-                .StableEntityId = stableId,
-                .Before = before,
-                .After = after,
-                .Label = "Move Entity",
-            }));
-    ASSERT_TRUE(result.Succeeded());
-    const auto* transform = registry.Raw().try_get<ECSC::Transform::Component>(entity);
-    ASSERT_NE(transform, nullptr);
-    EXPECT_EQ(transform->Position, after.Position);
-    EXPECT_TRUE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(entity));
-
-    ASSERT_TRUE(history.Undo().Succeeded());
-    EXPECT_EQ(registry.Raw().get<ECSC::Transform::Component>(entity).Position,
-              before.Position);
-    ASSERT_TRUE(history.Redo().Succeeded());
-    EXPECT_EQ(registry.Raw().get<ECSC::Transform::Component>(entity).Position,
-              after.Position);
-
-    registry.Destroy(entity);
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::StaleEntity);
-}
-
 TEST(EditorCommandHistory, SelectionAdapterRestoresSingleSelectionWithoutDirtyingDocument)
 {
     ECS::Scene::Registry registry;
@@ -443,28 +399,9 @@ TEST(EditorCommandHistory, SelectionAdapterRestoresSingleSelectionWithoutDirtyin
               Runtime::SelectionController::ToStableEntityId(first));
 }
 
-TEST(EditorCommandHistory, VisualizationSpatialAndPrimitiveAdaptersAreReversible)
+TEST(EditorCommandHistory, PrimitiveViewAdapterIsReversible)
 {
-    ECS::Scene::Registry registry;
-    const ECS::EntityHandle entity = CreateEntity(registry);
-    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(entity);
     Runtime::EditorCommandHistory history;
-
-    G::VisualizationConfig visualization{};
-    visualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
-    visualization.Color = glm::vec4{0.2f, 0.4f, 0.6f, 1.0f};
-    ASSERT_TRUE(history.Execute(
-        Runtime::MakeVisualizationConfigCommand(
-            Runtime::EditorVisualizationConfigCommand{
-                .Scene = &registry,
-                .StableEntityId = stableId,
-                .Before = std::nullopt,
-                .After = visualization,
-            })).Succeeded());
-    EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(entity));
-    ASSERT_TRUE(history.Undo().Succeeded());
-    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationConfig>(entity));
-
     Runtime::MeshPrimitiveViewSettings stored{};
     auto setSettings = [&stored](std::uint32_t, Runtime::MeshPrimitiveViewSettings next)
     {
@@ -479,7 +416,7 @@ TEST(EditorCommandHistory, VisualizationSpatialAndPrimitiveAdaptersAreReversible
     ASSERT_TRUE(history.Execute(
         Runtime::MakePrimitiveViewSettingsCommand(
             Runtime::EditorPrimitiveViewSettingsCommand{
-                .StableEntityId = stableId,
+                .StableEntityId = 17u,
                 .Before = Runtime::MeshPrimitiveViewSettings{},
                 .After = enabled,
                 .SetSettings = setSettings,

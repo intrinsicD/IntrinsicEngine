@@ -973,36 +973,6 @@ namespace Extrinsic::Runtime
             return EditorCommandHistoryStatus::Applied;
         }
 
-        [[nodiscard]] EditorCommandRecord MakeVisualizationConfigTargetCommand(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const SandboxEditorVisualizationTarget target,
-            std::optional<G::VisualizationConfig> before,
-            std::optional<G::VisualizationConfig> after,
-            std::string label)
-        {
-            return EditorCommandRecord{
-                .Label = std::move(label),
-                .Redo = [scene, stableEntityId, target, after]()
-                {
-                    return ApplyVisualizationConfigTarget(
-                        scene,
-                        stableEntityId,
-                        target,
-                        after);
-                },
-                .Undo = [scene, stableEntityId, target, before]()
-                {
-                    return ApplyVisualizationConfigTarget(
-                        scene,
-                        stableEntityId,
-                        target,
-                        before);
-                },
-                .Dirtying = true,
-            };
-        }
-
         [[nodiscard]] bool SameVisualizationConfig(
             const G::VisualizationConfig& lhs,
             const G::VisualizationConfig& rhs) noexcept
@@ -1030,6 +1000,93 @@ namespace Extrinsic::Runtime
                    lhs.Scalar.Isolines.Num == rhs.Scalar.Isolines.Num &&
                    lhs.Scalar.Isolines.Width == rhs.Scalar.Isolines.Width &&
                    lhs.Scalar.Isolines.Color == rhs.Scalar.Isolines.Color;
+        }
+
+        [[nodiscard]] bool SameOptionalVisualizationConfig(
+            const std::optional<G::VisualizationConfig>& lhs,
+            const std::optional<G::VisualizationConfig>& rhs) noexcept
+        {
+            if (lhs.has_value() != rhs.has_value())
+                return false;
+            return !lhs.has_value() || SameVisualizationConfig(*lhs, *rhs);
+        }
+
+        struct EditorVisualizationMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            SandboxEditorVisualizationTarget Target{
+                SandboxEditorVisualizationTarget::Entity};
+        };
+
+        [[nodiscard]] EditorCommandHistoryResult
+        ExecuteEditorVisualizationMutation(
+            EditorCommandHistory& history,
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVisualizationTarget target,
+            const std::optional<G::VisualizationConfig>& before,
+            const std::optional<G::VisualizationConfig>& after,
+            std::string label)
+        {
+            return Internal::ExecuteUndoableEntityMutation(
+                history,
+                std::move(label),
+                EditorVisualizationMutationIdentity{
+                    .Scene = scene,
+                    .World = world,
+                    .StableEntityId = stableEntityId,
+                    .Target = target,
+                },
+                before,
+                before,
+                after,
+                [](
+                    const EditorVisualizationMutationIdentity& identity,
+                    const std::optional<G::VisualizationConfig>& expected,
+                    const std::optional<G::VisualizationConfig>&)
+                {
+                    if (identity.Scene == nullptr || !identity.World.IsValid())
+                        return EditorCommandHistoryStatus::MissingScene;
+
+                    entt::registry& raw = identity.Scene->Raw();
+                    const ECS::EntityHandle entity =
+                        SelectionController::ToEntityHandle(
+                            identity.StableEntityId);
+                    if (entity == ECS::InvalidEntityHandle ||
+                        !raw.valid(entity))
+                    {
+                        return EditorCommandHistoryStatus::StaleEntity;
+                    }
+
+                    return SameOptionalVisualizationConfig(
+                               StoredVisualizationConfigForTarget(
+                                   raw,
+                                   entity,
+                                   identity.Target),
+                               expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                },
+                [](
+                    const EditorVisualizationMutationIdentity& identity,
+                    const std::optional<G::VisualizationConfig>& targetConfig)
+                {
+                    return ApplyVisualizationConfigTarget(
+                        identity.Scene,
+                        identity.StableEntityId,
+                        identity.Target,
+                        targetConfig);
+                },
+                [](
+                    const EditorVisualizationMutationIdentity&,
+                    const std::optional<G::VisualizationConfig>&,
+                    const std::optional<G::VisualizationConfig>& targetConfig)
+                {
+                    return targetConfig;
+                });
         }
 
         [[nodiscard]] bool IsInternalVisualizationProperty(
@@ -13474,25 +13531,16 @@ namespace Extrinsic::Runtime
 
         if (context.CommandHistory != nullptr)
         {
-            const EditorCommandRecord record =
-                command.Target == SandboxEditorVisualizationTarget::Entity
-                    ? MakeVisualizationConfigCommand(
-                          EditorVisualizationConfigCommand{
-                              .Scene = context.Scene,
-                              .StableEntityId = command.StableEntityId,
-                              .Before = before,
-                              .After = after,
-                              .Label = "Change Visualization",
-                          })
-                    : MakeVisualizationConfigTargetCommand(
-                          context.Scene,
-                          command.StableEntityId,
-                          command.Target,
-                          before,
-                          after,
-                          "Change Visualization");
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(record);
+                ExecuteEditorVisualizationMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    command.Target,
+                    before,
+                    after,
+                    "Change Visualization");
             return InvalidateSelectedModelCacheIfApplied(
                 context,
                 ToSandboxEditorCommandStatus(result.Status));
