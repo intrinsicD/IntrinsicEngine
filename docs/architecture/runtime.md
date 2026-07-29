@@ -263,6 +263,14 @@ mechanics rather than transform, visualization, or primitive-view component
 DTOs; import lifecycle classification and the final production census are
 tracked by `RUNTIME-201`.
 
+Asset import is intentionally outside that undoable editor-mutation set.
+Successful scene-changing materialization calls
+`EditorCommandHistory::MarkDirty` to advance document dirty/revision state
+without adding an undo record; entity creation, authoring defaults, and
+post-import enrichment remain one automatic import lifecycle. `BUG-095` owns
+generation-safe stale discard for the deferred direct-mesh enrichment, and
+`RUNTIME-200` owns its migration into the staged import recipe.
+
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes
 the exact `CameraControllerRegistry`, subscribes to active-world change and

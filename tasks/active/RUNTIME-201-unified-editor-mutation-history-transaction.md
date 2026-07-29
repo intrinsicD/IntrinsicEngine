@@ -95,7 +95,11 @@ maturity_target: Retired
   history only when that optional module is composed. Progressive Poisson
   captures its four optional point outputs plus visualization state, or the
   complete mesh/point-cloud geometry-source and presentation cohort for its
-  destructive conversion. Audit the remaining import postprocess commits.
+  destructive conversion. The import audit classifies all five remaining
+  `MarkDirty` calls as non-undoable document-lifecycle transitions: import
+  entity creation, authoring, and enrichment are one automatic lifecycle,
+  while `BUG-095` owns its stale completion guard and `RUNTIME-200` its staged
+  replacement.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction; render-hint adoption
@@ -123,9 +127,12 @@ maturity_target: Retired
 - [x] Route gizmo drag commit and property transform edits through the same
       history owner and preserve drag coalescing semantics. The production
       census found no separate keyboard-only transform mutation path.
-- [ ] Migrate geometry/property, presentation/visualization, registration,
-      clustering/method, parameterization, import postprocess, and destructive
-      domain-conversion mutations.
+- [x] Migrate geometry/property, presentation/visualization, registration,
+      clustering/method, parameterization, and destructive domain-conversion
+      mutations. The import census proved postprocess is part of automatic
+      import lifecycle, not an independently undoable editor mutation; its
+      successful scene change remains a dirty-only document transition with no
+      undo record.
 - [ ] Delete `GizmoUndoStack`, feature-specific builders from
       `EditorCommandHistory`, and `CommandBus::SetHistoryHook` /
       `RecordInverse` after production adoption and parity. Gizmo plus the
@@ -137,8 +144,8 @@ maturity_target: Retired
 - [x] Generic contracts cover success, failed validation, stale generation,
       apply failure, exact one-entry commit, deterministic undo/redo, and no
       partial mutation.
-- [ ] Feature matrix covers transform/gizmo, topology/property,
-      presentation/material, async method completion, import enrichment, and
+- [x] Feature matrix covers transform/gizmo, topology/property,
+      presentation/material, async method completion, import lifecycle, and
       domain conversion through the same helper. Transform/gizmo,
       presentation, and sync/async denoise/curvature property plus mesh
       topology/UV-regeneration, point-cloud replacement, and parameterization
@@ -147,7 +154,9 @@ maturity_target: Retired
       coverage; GPU completion rejoins that same commit function. Progressive
       Poisson covers exact point-output restoration and full
       mesh-to-point-cloud domain/presentation undo/redo with stale-state
-      rejection.
+      rejection. Import coverage proves successful materialization dirties the
+      document without creating an undo entry, matching the task's lifecycle
+      non-goal.
 - [x] Gizmo drag coalescing and exact transform restoration remain covered
       through `EditorCommandHistory`.
 - [ ] Structural tests prove no second undo stack, CommandBus history hook, or
@@ -383,6 +392,12 @@ Progressive Poisson history convergence verification completed on 2026-07-29:
 
 - `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
 - `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.ProgressivePoisson' --timeout 60`
+
+Import lifecycle classification verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^RuntimeAssetImportFormatCoverage\.AssetImportPipelinePreservesImportDirtyState$' --timeout 60`
+- `rg -n 'MarkDirty\\(' src/runtime --glob '*.{cpp,cppm,hpp}'`
 
 ## Forbidden changes
 

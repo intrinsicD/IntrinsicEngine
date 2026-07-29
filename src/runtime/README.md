@@ -120,6 +120,14 @@ local copy required by `PopulateFromGraph` / `PopulateFromCloud`, but the
 worker-to-apply handoff and reload lambdas no longer copy the whole decoded
 payload.
 
+Successful scene-changing import completion uses
+`EditorCommandHistory::MarkDirty` as a document-lifecycle transition: it
+advances document revision/dirty state but deliberately creates no undo entry.
+Entity creation, automatic authoring, and post-import enrichment are one import
+lifecycle rather than editor-authored mutations. Generation-safe stale discard
+for the deferred direct-mesh enrichment is owned by `BUG-095`; the staged
+workflow replacement in `RUNTIME-200` must preserve that contract.
+
 Geometry materialization invokes an ordered post-import processor registry after
 each created entity is populated from its decoded payload. Processors receive
 the source path, payload kind, entity handle, optional mesh payload view, and
