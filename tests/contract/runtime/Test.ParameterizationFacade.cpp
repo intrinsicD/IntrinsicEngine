@@ -262,12 +262,26 @@ TEST(ParameterizationFacade, UndoRedoRestoresAbsentUvProperty)
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     const std::vector<glm::vec2> generated = *harness.Uvs();
 
+    harness.Scene.Raw()
+        .remove<Dirty::DirtyVertexTexcoords,
+                Dirty::DirtyVertexAttributes>(harness.Entity);
     ASSERT_TRUE(harness.History.Undo().Succeeded());
     EXPECT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
+    EXPECT_TRUE(harness.Scene.Raw().all_of<Dirty::DirtyVertexTexcoords>(
+        harness.Entity));
+    EXPECT_TRUE(harness.Scene.Raw().all_of<Dirty::DirtyVertexAttributes>(
+        harness.Entity));
 
+    harness.Scene.Raw()
+        .remove<Dirty::DirtyVertexTexcoords,
+                Dirty::DirtyVertexAttributes>(harness.Entity);
     ASSERT_TRUE(harness.History.Redo().Succeeded());
     ASSERT_TRUE(harness.Uvs().has_value());
     EXPECT_EQ(*harness.Uvs(), generated);
+    EXPECT_TRUE(harness.Scene.Raw().all_of<Dirty::DirtyVertexTexcoords>(
+        harness.Entity));
+    EXPECT_TRUE(harness.Scene.Raw().all_of<Dirty::DirtyVertexAttributes>(
+        harness.Entity));
 }
 
 TEST(ParameterizationFacade, UndoRedoRestoresPresentUvValues)
@@ -292,6 +306,93 @@ TEST(ParameterizationFacade, UndoRedoRestoresPresentUvValues)
 
     ASSERT_TRUE(harness.History.Redo().Succeeded());
     EXPECT_EQ(*harness.Uvs(), generated);
+
+    std::vector<glm::vec2> intervening = generated;
+    intervening.front().x += 0.125f;
+    harness.Vertices()
+        .Properties.Get<glm::vec2>("v:texcoord")
+        .Vector() = intervening;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        harness.History.Snapshot();
+    EXPECT_EQ(harness.History.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    ASSERT_TRUE(harness.Uvs().has_value());
+    EXPECT_EQ(*harness.Uvs(), intervening);
+    EXPECT_EQ(harness.History.UndoCount(), 1u);
+    EXPECT_EQ(harness.History.RedoCount(), 0u);
+    EXPECT_EQ(harness.History.Snapshot().Revision,
+              beforeRejectedUndo.Revision);
+}
+
+TEST(ParameterizationFacade, HistoryRejectsInterveningGeometryState)
+{
+    ParameterizationHarness harness{};
+    const Runtime::SandboxEditorParameterizationResult result = Apply(
+        harness, Runtime::ParameterizationStrategyKind::TutteUniform);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    const std::vector<glm::vec2> generated = *harness.Uvs();
+
+    auto positions =
+        harness.Vertices().Properties.Get<glm::vec3>(
+            GS::PropertyNames::kPosition);
+    ASSERT_TRUE(positions);
+    const float originalX = positions[0].x;
+    positions[0].x += 0.5f;
+    const float interveningX = positions[0].x;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedPositionUndo =
+        harness.History.Snapshot();
+    EXPECT_EQ(harness.History.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FLOAT_EQ(
+        harness.Vertices()
+            .Properties.Get<glm::vec3>(
+                GS::PropertyNames::kPosition)[0]
+            .x,
+        interveningX);
+    ASSERT_TRUE(harness.Uvs().has_value());
+    EXPECT_EQ(*harness.Uvs(), generated);
+    EXPECT_EQ(harness.History.Snapshot().Revision,
+              beforeRejectedPositionUndo.Revision);
+
+    positions =
+        harness.Vertices().Properties.Get<glm::vec3>(
+            GS::PropertyNames::kPosition);
+    ASSERT_TRUE(positions);
+    positions[0].x = originalX;
+    auto next =
+        harness.Scene.Raw()
+            .get<GS::Halfedges>(harness.Entity)
+            .Properties.Get<std::uint32_t>(
+                GS::PropertyNames::kHalfedgeNext);
+    ASSERT_TRUE(next);
+    ASSERT_GT(next.Vector().size(), 1u);
+    const std::uint32_t originalNext = next[0];
+    const std::uint32_t interveningNext = next[1];
+    ASSERT_NE(interveningNext, originalNext);
+    next[0] = interveningNext;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedTopologyUndo =
+        harness.History.Snapshot();
+    EXPECT_EQ(harness.History.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(
+        harness.Scene.Raw()
+            .get<GS::Halfedges>(harness.Entity)
+            .Properties.Get<std::uint32_t>(
+                GS::PropertyNames::kHalfedgeNext)[0],
+        interveningNext);
+    ASSERT_TRUE(harness.Uvs().has_value());
+    EXPECT_EQ(*harness.Uvs(), generated);
+    EXPECT_EQ(harness.History.UndoCount(), 1u);
+    EXPECT_EQ(harness.History.RedoCount(), 0u);
+    EXPECT_EQ(harness.History.Snapshot().Revision,
+              beforeRejectedTopologyUndo.Revision);
+    next =
+        harness.Scene.Raw()
+            .get<GS::Halfedges>(harness.Entity)
+            .Properties.Get<std::uint32_t>(
+                GS::PropertyNames::kHalfedgeNext);
+    ASSERT_TRUE(next);
+    next[0] = originalNext;
 }
 
 TEST(ParameterizationFacade, HistoryDoesNotRetainSessionOwnedModelCache)

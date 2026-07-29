@@ -30,12 +30,12 @@ maturity_target: Retired
   geometry-presentation slot authoring plus synchronous/asynchronous mesh
   denoise position, mesh-curvature property, and remesh/subdivide/simplify
   topology publication, UV-regeneration topology/property publication, and
-  point-cloud outlier replacement.
+  point-cloud outlier replacement plus parameterization UV publication.
   `GizmoUndoStack` and the now-unused public transform/visualization history
-  adapters are deleted; the next owner-scoped adoption is parameterization UV
-  publication. The next verification step is that feature's
-  stale-generation/undo contract plus the focused
-  `EditorCommandHistory|Mutation` run.
+  adapters are deleted; the next owner-scoped adoption is the two remaining
+  render-hint component edit routes. The next verification step is their exact
+  stale-state/undo contract plus the focused
+  `RenderHint|EditorCommandHistory|Mutation` run.
 - At task intake, `EditorCommandHistory` was already the durable editor
   undo/redo owner but also contained feature-specific builders. Geometry/method
   facades still duplicate snapshot/validate/apply/dirty/history rules; gizmo
@@ -78,9 +78,10 @@ maturity_target: Retired
   migrated mesh-topology owner, while UV regeneration supplies its semantic
   source snapshot and full-GPU dirty policy to the same mechanics. Point-cloud
   outlier removal supplies its full point-property/deleted-slot snapshot and
-  replacement dirty policy. Migrate the remaining geometry/property,
-  clustering, parameterization, import postprocess, and destructive conversion
-  commits.
+  replacement dirty policy. Parameterization UV publication supplies its exact
+  semantic triangle topology, positions, and current-UV snapshot. Migrate the
+  remaining render-hint, geometry/property, clustering, import postprocess, and
+  destructive conversion commits.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction. Move remaining
@@ -98,9 +99,9 @@ maturity_target: Retired
       apply.
 - [ ] Keep feature-specific state capture and restoration code with the owning
       feature; transform, visualization/presentation, mesh denoise, and mesh
-      curvature plus mesh topology replacement satisfy this now, while
-      remaining typed compatibility adapters still need migration or
-      retirement.
+      curvature plus mesh topology replacement, point-cloud replacement, and
+      parameterization satisfy this now, while remaining typed compatibility
+      adapters still need migration or retirement.
 - [x] Route gizmo drag commit and property transform edits through the same
       history owner and preserve drag coalescing semantics. The production
       census found no separate keyboard-only transform mutation path.
@@ -121,8 +122,8 @@ maturity_target: Retired
       presentation/material, async method completion, import enrichment, and
       domain conversion through the same helper. Transform/gizmo,
       presentation, and sync/async denoise/curvature property plus mesh
-      topology/UV-regeneration and point-cloud replacement coverage is
-      complete.
+      topology/UV-regeneration, point-cloud replacement, and parameterization
+      coverage is complete.
 - [x] Gizmo drag coalescing and exact transform restoration remain covered
       through `EditorCommandHistory`.
 - [ ] Structural tests prove no second undo stack, CommandBus history hook, or
@@ -292,6 +293,20 @@ Point-cloud replacement history convergence verification completed on
 - `cmake --build --preset ci --target IntrinsicTests`
 - `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.PointCloudOutlierRemoval' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
 - `ctest --test-dir build/ci --output-on-failure -R 'PointCloudOutlierRemoval|EditorCommandHistory|Mutation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/repo/check_test_layout.py --root . --strict`
+- `python3 tools/docs/check_doc_links.py --root .`
+- `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --head-ref HEAD --strict`
+- `python3 tools/repo/check_root_hygiene.py --root .`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/check_task_state_links.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+
+Parameterization UV history convergence verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^ParameterizationFacade\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- `ctest --test-dir build/ci --output-on-failure -R 'ParameterizationFacade|EditorCommandHistory|Mutation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
 - `python3 tools/repo/check_layering.py --root src --strict`
 - `python3 tools/repo/check_test_layout.py --root . --strict`
 - `python3 tools/docs/check_doc_links.py --root .`

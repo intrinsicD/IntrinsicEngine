@@ -237,9 +237,13 @@ normal deferred geometry dirty tags after publication. Point-cloud outlier
 replacement also uses the transaction with an exact full point-property/deleted
 slot snapshot; queued output and undo/redo reject any intervening point
 attribute or metadata mutation, and full replacement dirty tags are stamped
-only after publication. The public history module therefore owns history
-mechanics rather than transform or visualization component DTOs; remaining
-feature migrations are tracked by `RUNTIME-201`.
+only after publication. Parameterization UV publication validates geometry
+metadata plus the exact semantic triangle topology, finite positions, and
+current optional `v:texcoord` state consumed by the solver. Its initial apply
+and every undo/redo transition stamp texcoord/attribute dirtiness only after
+the UV property is replaced or removed. The public history module therefore
+owns history mechanics rather than transform or visualization component DTOs;
+remaining feature migrations are tracked by `RUNTIME-201`.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

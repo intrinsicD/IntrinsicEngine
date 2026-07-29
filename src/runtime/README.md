@@ -600,6 +600,21 @@ or broad `GpuDirty`. `SandboxEditorContext::MeshSimplifyKernelAvailable` gates
 the executor so an unavailable kernel returns deterministic diagnostics without
 mutating `GeometrySources`.
 
+### Sandbox Editor Mesh Parameterization
+
+The selected-mesh parameterization command dispatches the configured LSCM,
+harmonic-cotangent, Tutte-uniform, or BFF CPU strategy, validates finite
+count-matched output, and publishes canonical `v:texcoord` values through the
+shared editor mutation transaction. Each initial apply, undo, and redo
+revalidates geometry metadata plus the exact semantic triangle topology,
+finite `v:position` values, and current optional UV property consumed by the
+solver. Undo restores the prior UV values or removes a newly introduced
+property; redo restores the generated values. An intervening position,
+topology, or UV edit returns `StaleEntity` without changing geometry or the
+history cursor. Successful transitions stamp `DirtyVertexTexcoords` and
+`DirtyVertexAttributes` only after publication, while the transaction retains
+no selected-model cache or other session-owned state.
+
 ### Sandbox Editor ICP Registration
 
 `UI-029` adds an `ICP Registration` panel reachable from the `View` menu.

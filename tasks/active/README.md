@@ -17,7 +17,8 @@ Each active task should include:
   direct/ICP transform publication and coalesced gizmo drag commit now use it,
   `GizmoUndoStack` is deleted, migrated mesh property/topology owners include
   UV regeneration, point-cloud replacement now validates the full point source,
-  and parameterization is the next owner-scoped adoption.
+  parameterization validates its exact semantic solver source, and the two
+  render-hint component edit routes are the next owner-scoped adoption.
 
 ## History
 
