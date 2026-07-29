@@ -45,12 +45,6 @@ namespace Extrinsic::Runtime::Detail
         std::string_view label,
         const SandboxEditorJobRecord& job);
 
-    [[nodiscard]] EditorCommandHistoryStatus
-    ApplySandboxMethodPointCloudPointState(
-        ECS::Scene::Registry* scene,
-        std::uint32_t stableEntityId,
-        const Geometry::PointCloud::Cloud& cloud);
-
     [[nodiscard]] SandboxEditorCommandStatus
     ToSandboxMethodCommandStatus(EditorCommandHistoryStatus status) noexcept;
 

@@ -225,6 +225,13 @@ properties plus the optional current normal property. Clustering likewise
 captures exact input points and the optional label/color/scalar output cohort;
 its CPU and Vulkan completions enter the transaction when document history is
 composed, while the module stays independently usable without it.
+Progressive Poisson point publication stages its four optional scalar
+properties and entity visualization before committing them together. Its
+mesh-surface lane captures the complete authoritative geometry-source and
+owned presentation cohort, so the destructive mesh-to-point-cloud conversion
+restores the original domain, properties, topology, and render hints on undo.
+Both immediate and queued lanes reject intervening source, output, or owned
+presentation changes before publication and before every history transition.
 Geometry-presentation slot edits additionally validate and monotonically
 advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The
@@ -253,7 +260,8 @@ primitive-view edits snapshot the complete optional `RenderSurface`,
 that exact cohort before replacing it, so an intervening lane edit leaves ECS
 and history unchanged. The public history module therefore owns history
 mechanics rather than transform, visualization, or primitive-view component
-DTOs; remaining feature migrations are tracked by `RUNTIME-201`.
+DTOs; import lifecycle classification and the final production census are
+tracked by `RUNTIME-201`.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

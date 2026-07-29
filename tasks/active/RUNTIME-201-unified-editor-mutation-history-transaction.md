@@ -34,7 +34,10 @@ maturity_target: Retired
   generic render-hint and primitive-view component edits and vertex-channel
   binding descriptors plus synchronous/asynchronous mesh, graph, and
   point-cloud vertex-normal publication plus CPU/Vulkan K-Means output
-  publication.
+  publication. Progressive Poisson point-property publication and its
+  destructive mesh-to-point-cloud conversion now capture their complete
+  geometry/presentation cohorts, including queued validation and exact domain
+  restoration.
   `GizmoUndoStack` and the now-unused public transform/visualization history
   adapters are deleted together with the primitive-view compatibility builder
   and the unused CommandBus inverse-history hook. The next cleanup is the final
@@ -89,8 +92,10 @@ maturity_target: Retired
   supply exact non-output source-property and optional current-normal snapshots
   for both immediate and queued publication. Clustering captures input points
   plus its exact optional label/color/scalar output cohort and borrows document
-  history only when that optional module is composed. Audit the remaining
-  import postprocess and destructive conversion commits.
+  history only when that optional module is composed. Progressive Poisson
+  captures its four optional point outputs plus visualization state, or the
+  complete mesh/point-cloud geometry-source and presentation cohort for its
+  destructive conversion. Audit the remaining import postprocess commits.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction; render-hint adoption
@@ -112,8 +117,9 @@ maturity_target: Retired
       curvature plus mesh topology replacement, point-cloud replacement, and
       parameterization, render hints, and vertex-channel bindings satisfy this
       now; mesh/graph/point-cloud normal properties share another owner-local
-      typed state, and clustering owns its typed output cohort. Remaining typed
-      compatibility adapters still need migration or retirement.
+      typed state, clustering owns its typed output cohort, and Progressive
+      Poisson owns its point-output/domain-conversion cohort. Remaining import
+      paths still need classification or migration.
 - [x] Route gizmo drag commit and property transform edits through the same
       history owner and preserve drag coalescing semantics. The production
       census found no separate keyboard-only transform mutation path.
@@ -138,7 +144,10 @@ maturity_target: Retired
       topology/UV-regeneration, point-cloud replacement, and parameterization
       plus render-hint, vertex-channel, and sync/async vertex-normal coverage is
       complete. CPU clustering completion has exact history and stale-output
-      coverage; GPU completion rejoins that same commit function.
+      coverage; GPU completion rejoins that same commit function. Progressive
+      Poisson covers exact point-output restoration and full
+      mesh-to-point-cloud domain/presentation undo/redo with stale-state
+      rejection.
 - [x] Gizmo drag coalescing and exact transform restoration remain covered
       through `EditorCommandHistory`.
 - [ ] Structural tests prove no second undo stack, CommandBus history hook, or
@@ -369,6 +378,11 @@ Clustering output history convergence verification completed on 2026-07-29:
 
 - `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
 - `ctest --test-dir build/ci --output-on-failure -R '^ClusteringModule\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120`
+
+Progressive Poisson history convergence verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.ProgressivePoisson' --timeout 60`
 
 ## Forbidden changes
 

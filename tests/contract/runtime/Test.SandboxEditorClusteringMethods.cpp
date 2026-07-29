@@ -419,6 +419,130 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
     EXPECT_EQ(model.Processing.LastProgressivePoissonResult->AcceptedCount,
               result.AcceptedCount);
 }
+TEST(SandboxEditorUi,
+     ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonHistory");
+    AddPointCloudSource(registry, cloud, 6u);
+    SetPositions(
+        registry.Raw().get<GS::Vertices>(cloud),
+        {
+            {0.0f, 0.0f, 0.0f},
+            {0.25f, 0.0f, 0.0f},
+            {0.5f, 0.5f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {1.0f, 1.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        });
+    const std::vector<float> priorLevels(
+        registry.Raw().get<GS::Vertices>(cloud).Properties.Size(),
+        42.0f);
+    registry.Raw()
+        .get<GS::Vertices>(cloud)
+        .Properties.GetOrAdd<float>("p:poisson_level", 0.0f)
+        .Vector() = priorLevels;
+    G::RenderPoints priorPoints{};
+    priorPoints.Type = G::RenderPoints::RenderType::Flat;
+    priorPoints.SizeSource = std::string{"p:prior_size"};
+    registry.Raw().emplace_or_replace<G::RenderPoints>(
+        cloud,
+        priorPoints);
+    G::VisualizationConfig priorVisualization{};
+    priorVisualization.Source =
+        G::VisualizationConfig::ColorSource::UniformColor;
+    priorVisualization.Color = {0.1f, 0.2f, 0.3f, 0.4f};
+    registry.Raw().emplace<G::VisualizationConfig>(
+        cloud,
+        priorVisualization);
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Config = Runtime::SandboxEditorProgressivePoissonConfig{
+                    .Dimension = 2u,
+                    .GridWidth = 3u,
+                    .MaxLevels = 5u,
+                    .HashLoadFactor = 0.75f,
+                    .RadiusAlpha = 0.4f,
+                    .RandomizeGridOrigin = false,
+                    .ShuffleWithinLevels = false,
+                    .PrefixCount = 3u,
+                    .Channel =
+                        Runtime::SandboxEditorProgressivePoissonChannel::
+                            Phase,
+                },
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    ASSERT_TRUE(history.CanUndo());
+
+    const Geometry::PropertySet& appliedProperties =
+        registry.Raw().get<GS::Vertices>(cloud).Properties;
+    const std::vector<float> appliedLevels =
+        appliedProperties.Get<float>("p:poisson_level").Vector();
+    const std::vector<float> appliedPhases =
+        appliedProperties.Get<float>("p:poisson_phase").Vector();
+    ASSERT_EQ(
+        registry.Raw().get<G::VisualizationConfig>(cloud).ScalarFieldName,
+        "p:poisson_phase");
+
+    EXPECT_EQ(
+        history.Undo().Status,
+        Runtime::EditorCommandHistoryStatus::Undone);
+    const Geometry::PropertySet& undoneProperties =
+        registry.Raw().get<GS::Vertices>(cloud).Properties;
+    ASSERT_TRUE(undoneProperties.Get<float>("p:poisson_level"));
+    EXPECT_EQ(
+        undoneProperties.Get<float>("p:poisson_level").Vector(),
+        priorLevels);
+    EXPECT_FALSE(undoneProperties.Get<float>("p:poisson_phase"));
+    EXPECT_FALSE(undoneProperties.Get<float>("p:poisson_splat_radius"));
+    EXPECT_FALSE(undoneProperties.Get<float>("p:poisson_prefix_visible"));
+    const G::RenderPoints& undonePoints =
+        registry.Raw().get<G::RenderPoints>(cloud);
+    EXPECT_EQ(undonePoints.Type, priorPoints.Type);
+    ASSERT_TRUE(
+        std::holds_alternative<std::string>(undonePoints.SizeSource));
+    EXPECT_EQ(
+        std::get<std::string>(undonePoints.SizeSource),
+        "p:prior_size");
+    const G::VisualizationConfig& undoneVisualization =
+        registry.Raw().get<G::VisualizationConfig>(cloud);
+    EXPECT_EQ(undoneVisualization.Source, priorVisualization.Source);
+    EXPECT_EQ(undoneVisualization.Color, priorVisualization.Color);
+
+    EXPECT_EQ(
+        history.Redo().Status,
+        Runtime::EditorCommandHistoryStatus::Redone);
+    Geometry::PropertySet& redoneProperties =
+        registry.Raw().get<GS::Vertices>(cloud).Properties;
+    ASSERT_TRUE(redoneProperties.Get<float>("p:poisson_level"));
+    ASSERT_TRUE(redoneProperties.Get<float>("p:poisson_phase"));
+    EXPECT_EQ(
+        redoneProperties.Get<float>("p:poisson_level").Vector(),
+        appliedLevels);
+    EXPECT_EQ(
+        redoneProperties.Get<float>("p:poisson_phase").Vector(),
+        appliedPhases);
+
+    redoneProperties.Get<float>("p:poisson_level")[0] += 1.0f;
+    const float intervening =
+        redoneProperties.Get<float>("p:poisson_level")[0];
+    EXPECT_EQ(
+        history.Undo().Status,
+        Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(
+        redoneProperties.Get<float>("p:poisson_level")[0],
+        intervening);
+}
 TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
 {
     ECS::Scene::Registry registry;
@@ -1241,6 +1365,120 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
     EXPECT_EQ(vis.Source, G::VisualizationConfig::ColorSource::ScalarField);
     EXPECT_EQ(vis.ScalarDomain, G::VisualizationConfig::Domain::Vertex);
     EXPECT_EQ(vis.ScalarFieldName, "p:poisson_level");
+}
+TEST(SandboxEditorUi,
+     ProgressivePoissonMeshConversionHistoryRestoresDomainAndPresentation)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMeshHistory");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderSurface>(
+        mesh,
+        G::RenderSurface{
+            .Domain = G::RenderSurface::SourceDomain::Face,
+        });
+    G::VisualizationConfig priorVisualization{};
+    priorVisualization.Source =
+        G::VisualizationConfig::ColorSource::UniformColor;
+    priorVisualization.Color = {0.7f, 0.6f, 0.5f, 0.4f};
+    registry.Raw().emplace<G::VisualizationConfig>(
+        mesh,
+        priorVisualization);
+    const std::vector<glm::vec3> priorPositions =
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec3>(PN::kPosition)
+            .Vector();
+    const std::vector<glm::vec2> priorTexcoords =
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec2>("v:texcoord")
+            .Vector();
+
+    const Runtime::SandboxEditorProgressivePoissonResult result =
+        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+            context,
+            Runtime::SandboxEditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Config = Runtime::SandboxEditorProgressivePoissonConfig{
+                    .Dimension = 2u,
+                    .GridWidth = 3u,
+                    .MaxLevels = 5u,
+                    .HashLoadFactor = 0.75f,
+                    .RadiusAlpha = 0.4f,
+                    .RandomizeGridOrigin = false,
+                    .ShuffleWithinLevels = true,
+                    .ShuffleSeed = 37u,
+                    .PrefixCount = 7u,
+                    .Channel =
+                        Runtime::SandboxEditorProgressivePoissonChannel::
+                            Level,
+                    .MeshSurfaceSampleCount = 16u,
+                    .MeshSurfaceSampleSeed = 41u,
+                    .MeshSurfaceMinTriangleArea = 1.0e-14,
+                    .MeshSurfaceInterpolateNormals = true,
+                },
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(
+        GS::BuildSourceAvailability(
+            GS::BuildConstView(registry.Raw(), mesh)).ProvenanceDomain,
+        GS::Domain::PointCloud);
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
+
+    EXPECT_EQ(
+        history.Undo().Status,
+        Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(
+        GS::BuildSourceAvailability(
+            GS::BuildConstView(registry.Raw(), mesh)).ProvenanceDomain,
+        GS::Domain::Mesh);
+    ASSERT_TRUE((
+        registry.Raw().all_of<GS::Edges, GS::Halfedges, GS::Faces>(mesh)));
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec3>(PN::kPosition)
+            .Vector(),
+        priorPositions);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec2>("v:texcoord")
+            .Vector(),
+        priorTexcoords);
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderPoints>(mesh));
+    ASSERT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_EQ(
+        registry.Raw().get<G::RenderSurface>(mesh).Domain,
+        G::RenderSurface::SourceDomain::Face);
+    EXPECT_EQ(
+        registry.Raw().get<G::VisualizationConfig>(mesh).Color,
+        priorVisualization.Color);
+
+    EXPECT_EQ(
+        history.Redo().Status,
+        Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(
+        GS::BuildSourceAvailability(
+            GS::BuildConstView(registry.Raw(), mesh)).ProvenanceDomain,
+        GS::Domain::PointCloud);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    EXPECT_EQ(
+        history.Undo().Status,
+        Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(
+        GS::BuildSourceAvailability(
+            GS::BuildConstView(registry.Raw(), mesh)).ProvenanceDomain,
+        GS::Domain::PointCloud);
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
 }
 TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo)
 {

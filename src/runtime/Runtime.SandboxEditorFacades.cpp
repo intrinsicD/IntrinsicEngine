@@ -13264,17 +13264,6 @@ namespace Extrinsic::Runtime
             return BuildActiveDerivedJobMessage(label, job);
         }
 
-        EditorCommandHistoryStatus ApplySandboxMethodPointCloudPointState(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const Geometry::PointCloud::Cloud& cloud)
-        {
-            return ApplyPointCloudPointState(
-                scene,
-                stableEntityId,
-                cloud);
-        }
-
         SandboxEditorCommandStatus ToSandboxMethodCommandStatus(
             const EditorCommandHistoryStatus status) noexcept
         {
