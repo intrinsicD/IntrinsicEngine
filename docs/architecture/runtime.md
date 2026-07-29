@@ -221,8 +221,11 @@ and the history cursor unchanged. Direct/ICP transforms, coalesced gizmo
 transforms, and default or lane-targeted visualization config edits use this
 shape. Mesh, graph, and point-cloud vertex-normal publishers use it for both
 immediate and queued completion paths, validating exact non-output source
-properties plus the optional current normal property. Geometry-presentation
-slot edits additionally validate and monotonically
+properties plus the optional current normal property. Clustering likewise
+captures exact input points and the optional label/color/scalar output cohort;
+its CPU and Vulkan completions enter the transaction when document history is
+composed, while the module stays independently usable without it.
+Geometry-presentation slot edits additionally validate and monotonically
 advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The
 mesh-denoise publisher validates both geometry metadata and the exact live

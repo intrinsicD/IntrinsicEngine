@@ -33,7 +33,8 @@ maturity_target: Retired
   point-cloud outlier replacement, parameterization UV publication, plus
   generic render-hint and primitive-view component edits and vertex-channel
   binding descriptors plus synchronous/asynchronous mesh, graph, and
-  point-cloud vertex-normal publication.
+  point-cloud vertex-normal publication plus CPU/Vulkan K-Means output
+  publication.
   `GizmoUndoStack` and the now-unused public transform/visualization history
   adapters are deleted together with the primitive-view compatibility builder
   and the unused CommandBus inverse-history hook. The next cleanup is the final
@@ -86,8 +87,10 @@ maturity_target: Retired
   cohort. Vertex-channel binding edits supply the complete optional binding
   descriptor and selected-channel dirty policy. The three vertex-normal owners
   supply exact non-output source-property and optional current-normal snapshots
-  for both immediate and queued publication. Audit the remaining clustering,
-  import postprocess, and destructive conversion commits.
+  for both immediate and queued publication. Clustering captures input points
+  plus its exact optional label/color/scalar output cohort and borrows document
+  history only when that optional module is composed. Audit the remaining
+  import postprocess and destructive conversion commits.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction; render-hint adoption
@@ -109,8 +112,8 @@ maturity_target: Retired
       curvature plus mesh topology replacement, point-cloud replacement, and
       parameterization, render hints, and vertex-channel bindings satisfy this
       now; mesh/graph/point-cloud normal properties share another owner-local
-      typed state. Remaining typed compatibility adapters still need migration
-      or retirement.
+      typed state, and clustering owns its typed output cohort. Remaining typed
+      compatibility adapters still need migration or retirement.
 - [x] Route gizmo drag commit and property transform edits through the same
       history owner and preserve drag coalescing semantics. The production
       census found no separate keyboard-only transform mutation path.
@@ -134,7 +137,8 @@ maturity_target: Retired
       presentation, and sync/async denoise/curvature property plus mesh
       topology/UV-regeneration, point-cloud replacement, and parameterization
       plus render-hint, vertex-channel, and sync/async vertex-normal coverage is
-      complete.
+      complete. CPU clustering completion has exact history and stale-output
+      coverage; GPU completion rejoins that same commit function.
 - [x] Gizmo drag coalescing and exact transform restoration remain covered
       through `EditorCommandHistory`.
 - [ ] Structural tests prove no second undo stack, CommandBus history hook, or
@@ -360,6 +364,11 @@ Vertex-normal property history convergence verification completed on
 
 - `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
 - `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\..*VertexNormals' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120`
+
+Clustering output history convergence verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^ClusteringModule\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120`
 
 ## Forbidden changes
 
