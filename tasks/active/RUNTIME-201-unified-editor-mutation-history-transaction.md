@@ -23,6 +23,10 @@ maturity_target: Retired
 
 ## Context
 
+- Status: in progress; owner `Codex`; branch
+  `codex/runtime-201-unified-editor-mutation`; Slice A is the current slice and
+  its next verification step is the focused `EditorCommandHistory|Mutation`
+  contract run.
 - `EditorCommandHistory` is already the durable editor undo/redo owner but also
   contains feature-specific builders. Geometry/method facades duplicate
   snapshot/validate/apply/dirty/history rules, gizmo drag commits use a
@@ -33,6 +37,21 @@ maturity_target: Retired
   stamp dirty generations, and record one deterministic undo/redo entry.
 - Asynchronous work remains on `JobService`; only current completions may enter
   the mutation transaction.
+
+## Right-sizing
+
+- **Element:** the common mutation transaction shape triggers the
+  interface/service and plumbing-ratio heuristics if modeled as another public
+  runtime service or module.
+- **Simpler alternative:** keep one include-only internal function template
+  beside `EditorCommandHistory`; feature owners supply typed identity,
+  generation, state, validation, atomic-apply, and dirty-stamp callbacks.
+- **Blast radius:** Slice A touches only the internal helper and focused runtime
+  contracts. Later feature adoption is owner-by-owner; import/include census
+  and `check_layering.py` guard every slice.
+- **Reintroduction trigger:** add a public abstraction only when a present
+  second history backend, cross-layer caller, or independently replaceable
+  transaction implementation requires one.
 
 ## Slice plan
 

@@ -11,9 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-- None. `RUNTIME-187` and its `ARCH-014` umbrella retired on 2026-07-23 after
-  the exact `12/0/0/5` Engine boundary and full CPU/sanitizer/Vulkan matrix
-  passed.
+- [`RUNTIME-201` — Unified editor mutation and history transaction](RUNTIME-201-unified-editor-mutation-history-transaction.md)
+  is in progress on `codex/runtime-201-unified-editor-mutation`; Slice A owns
+  the internal transaction helper and focused atomicity/staleness contracts.
 
 ## History
 

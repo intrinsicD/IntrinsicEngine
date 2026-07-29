@@ -20,7 +20,7 @@ cleanup slice:
   unifies route/decode/materialize/author/postprocess/residency/completion and
   deletes the role callback/IO bridge/monolithic handoff paths after workflow
   visibility parity.
-- [`RUNTIME-201` — Unified editor mutation and history transaction](RUNTIME-201-unified-editor-mutation-history-transaction.md)
+- [`RUNTIME-201` — Unified editor mutation and history transaction](../../active/RUNTIME-201-unified-editor-mutation-history-transaction.md)
   routes undoable edits through `EditorCommandHistory` and retires
   `GizmoUndoStack`, specialized builders, and unused CommandBus history hooks.
 - [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](RUNTIME-202-retire-sandbox-runtime-facade.md)
