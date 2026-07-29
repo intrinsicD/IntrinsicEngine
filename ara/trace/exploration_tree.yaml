@@ -7113,8 +7113,10 @@ tree:
       - "tools/agents/workflow_evidence.py"
       - "tests/regression/tooling/Test.WorkflowEvidence.py"
       - "docs/agent/workflow-evidence.md"
+      - "tasks/evidence/.gitattributes"
       - "source-surface fixed-revision repair commit e800ede9"
       - "artifact fixed-revision repair commit b1c2d7b3"
+      - "raw evidence-log preservation commit 9d66faf2"
       - "clean evidence-binding commit 37895297"
       - "PROC-first runtime merge commit 26d50449"
       - "workflow and benchmark regression bundle: 90/90"
@@ -7129,6 +7131,8 @@ tree:
       remain bound to the current worktree; five regressions cover source
       surfaces and referenced artifacts across both contracts. After rebinding
       the evidence, RUNTIME-201 merged after PROC and the combined tree passed
-      all recorded gates. PROC-028 remains active only for distinct
-      independent review and BUG-120; no push was performed.
+      all recorded gates. Hash-bound command logs are classified as raw binary
+      evidence so Git preserves their bytes and whole-range diff hygiene does
+      not reinterpret captured tool whitespace. PROC-028 remains active only
+      for distinct independent review and BUG-120; no push was performed.
     status: resolved

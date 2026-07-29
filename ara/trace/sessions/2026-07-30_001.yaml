@@ -42,13 +42,14 @@ ai_actions:
       - "tasks/evidence/PROC-028/handoff.jsonl"
       - "tasks/evidence/PROC-028/reviews.jsonl"
   - turn: 2
-    action: "Saved the dirty runtime checkout recoverably; corrected clean fixed-revision evidence semantics with regressions and synchronized docs; merged RUNTIME-201 after PROC; released the PROC claim; removed the extra worktrees; and ran the complete post-merge CPU and structural gates."
+    action: "Saved the dirty runtime checkout recoverably; corrected clean fixed-revision evidence semantics with regressions and synchronized docs; preserved hash-bound command logs as raw binary evidence; merged RUNTIME-201 after PROC; released the PROC claim; removed the extra worktrees; and ran the complete post-merge CPU and structural gates."
     provenance: ai-executed
     files_changed:
       - "tools/agents/workflow_evidence.py"
       - "tests/regression/tooling/Test.WorkflowEvidence.py"
       - "docs/agent/workflow-evidence.md"
       - "tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md"
+      - "tasks/evidence/.gitattributes"
       - "tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md"
       - "ara/trace/exploration_tree.yaml"
       - "ara/trace/sessions/2026-07-29_002.yaml"
