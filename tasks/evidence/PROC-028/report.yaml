@@ -3,15 +3,15 @@ task_id: PROC-028
 workflow_profile: high-risk
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-29T22:28:27Z'
+generated_at: '2026-07-29T22:31:16Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 5f7843c99be6f978b2939b463f48abfb39348c66
-  head_revision: 5f7843c99be6f978b2939b463f48abfb39348c66
+  head_revision: f4adcea4948f6b9b7c81967c9b8e0709479beb2d
   branch: codex/proc-028-enforced-agent-workflow
   worktree: /home/alex/Documents/IntrinsicEngine-proc-028
-  dirty: true
+  dirty: false
   surface:
   - path: .github/pull_request_template.md
     sha256: 8dd92d663b9133b010dd428eeecd3d8286c03f49cfc8e57c7d21874591b6a599
