@@ -2324,12 +2324,28 @@ namespace Extrinsic::Runtime
             return lhs.Domain == rhs.Domain;
         }
 
+        [[nodiscard]] bool SameRenderScalarSource(
+            const std::variant<float, std::string>& lhs,
+            const std::variant<float, std::string>& rhs) noexcept
+        {
+            if (lhs.index() != rhs.index())
+                return false;
+            if (const auto* lhsUniform = std::get_if<float>(&lhs))
+            {
+                const auto* rhsUniform = std::get_if<float>(&rhs);
+                return rhsUniform != nullptr &&
+                       std::bit_cast<std::uint32_t>(*lhsUniform) ==
+                           std::bit_cast<std::uint32_t>(*rhsUniform);
+            }
+            return std::get<std::string>(lhs) == std::get<std::string>(rhs);
+        }
+
         [[nodiscard]] bool SameRenderEdges(
             const G::RenderEdges& lhs,
             const G::RenderEdges& rhs)
         {
             return lhs.Domain == rhs.Domain &&
-                   lhs.WidthSource == rhs.WidthSource;
+                   SameRenderScalarSource(lhs.WidthSource, rhs.WidthSource);
         }
 
         [[nodiscard]] bool SameRenderPoints(
@@ -2337,7 +2353,7 @@ namespace Extrinsic::Runtime
             const G::RenderPoints& rhs)
         {
             return lhs.Type == rhs.Type &&
-                   lhs.SizeSource == rhs.SizeSource;
+                   SameRenderScalarSource(lhs.SizeSource, rhs.SizeSource);
         }
 
         template <typename T, typename SameFn>
@@ -2525,6 +2541,73 @@ namespace Extrinsic::Runtime
                 raw.remove<G::RenderPoints>(entity);
 
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        struct EditorRenderHintMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        [[nodiscard]] EditorCommandHistoryResult ExecuteEditorRenderHintMutation(
+            EditorCommandHistory& history,
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorRenderHintState& before,
+            const SandboxEditorRenderHintState& after)
+        {
+            return Internal::ExecuteUndoableEntityMutation(
+                history,
+                "Change Render Hints",
+                EditorRenderHintMutationIdentity{
+                    .Scene = scene,
+                    .World = world,
+                    .StableEntityId = stableEntityId,
+                },
+                before,
+                before,
+                after,
+                [](
+                    const EditorRenderHintMutationIdentity& identity,
+                    const SandboxEditorRenderHintState& expected,
+                    const SandboxEditorRenderHintState&)
+                {
+                    if (identity.Scene == nullptr || !identity.World.IsValid())
+                        return EditorCommandHistoryStatus::MissingScene;
+
+                    const entt::registry& raw = identity.Scene->Raw();
+                    const ECS::EntityHandle entity =
+                        SelectionController::ToEntityHandle(
+                            identity.StableEntityId);
+                    if (entity == ECS::InvalidEntityHandle ||
+                        !raw.valid(entity))
+                    {
+                        return EditorCommandHistoryStatus::StaleEntity;
+                    }
+                    return SameRenderHintState(
+                               ReadRenderHintState(raw, entity),
+                               expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                },
+                [](
+                    const EditorRenderHintMutationIdentity& identity,
+                    const SandboxEditorRenderHintState& target)
+                {
+                    return ApplyRenderHintState(
+                        identity.Scene,
+                        identity.StableEntityId,
+                        target);
+                },
+                [](
+                    const EditorRenderHintMutationIdentity&,
+                    const SandboxEditorRenderHintState&,
+                    const SandboxEditorRenderHintState& target)
+                {
+                    return target;
+                });
         }
 
         [[nodiscard]] bool SameVec4(
@@ -14253,25 +14336,14 @@ namespace Extrinsic::Runtime
             return SandboxEditorCommandStatus::NoChange;
         if (context.CommandHistory != nullptr)
         {
-            const std::uint32_t stableEntityId = command.StableEntityId;
-            ECS::Scene::Registry* scene = context.Scene;
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(
-                    EditorCommandRecord{
-                        .Label = "Change Render Hints",
-                        .Redo =
-                            [scene, stableEntityId, after]()
-                            {
-                                return ApplyRenderHintState(
-                                    scene, stableEntityId, after);
-                            },
-                        .Undo =
-                            [scene, stableEntityId, before]()
-                            {
-                                return ApplyRenderHintState(
-                                    scene, stableEntityId, before);
-                            },
-                    });
+                ExecuteEditorRenderHintMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    before,
+                    after);
             return InvalidateSelectedModelCacheIfApplied(
                 context,
                 ToSandboxEditorCommandStatus(result.Status));
@@ -14318,26 +14390,14 @@ namespace Extrinsic::Runtime
 
         if (context.CommandHistory != nullptr)
         {
-            const std::uint32_t stableEntityId = command.StableEntityId;
-            ECS::Scene::Registry* scene = context.Scene;
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(
-                    EditorCommandRecord{
-                        .Label = "Change Render Hints",
-                        .Redo =
-                            [scene, stableEntityId, after]()
-                            {
-                                return ApplyRenderHintState(
-                                    scene, stableEntityId, after);
-                            },
-                        .Undo =
-                            [scene, stableEntityId, before]()
-                            {
-                                return ApplyRenderHintState(
-                                    scene, stableEntityId, before);
-                            },
-                        .Dirtying = true,
-                    });
+                ExecuteEditorRenderHintMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    before,
+                    after);
             return InvalidateSelectedModelCacheIfApplied(
                 context,
                 ToSandboxEditorCommandStatus(result.Status));

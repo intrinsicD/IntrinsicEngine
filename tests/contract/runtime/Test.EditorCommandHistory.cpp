@@ -12,7 +12,6 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.SelectionController;
 
 #include "Runtime.EditorMutation.Internal.hpp"
@@ -397,34 +396,6 @@ TEST(EditorCommandHistory, SelectionAdapterRestoresSingleSelectionWithoutDirtyin
     ASSERT_EQ(selection.SelectedStableIds().size(), 1u);
     EXPECT_EQ(selection.SelectedStableIds().front(),
               Runtime::SelectionController::ToStableEntityId(first));
-}
-
-TEST(EditorCommandHistory, PrimitiveViewAdapterIsReversible)
-{
-    Runtime::EditorCommandHistory history;
-    Runtime::MeshPrimitiveViewSettings stored{};
-    auto setSettings = [&stored](std::uint32_t, Runtime::MeshPrimitiveViewSettings next)
-    {
-        stored = next;
-    };
-    auto clearSettings = [&stored](std::uint32_t)
-    {
-        stored = Runtime::MeshPrimitiveViewSettings{};
-    };
-    Runtime::MeshPrimitiveViewSettings enabled{};
-    enabled.EnableEdgeView = true;
-    ASSERT_TRUE(history.Execute(
-        Runtime::MakePrimitiveViewSettingsCommand(
-            Runtime::EditorPrimitiveViewSettingsCommand{
-                .StableEntityId = 17u,
-                .Before = Runtime::MeshPrimitiveViewSettings{},
-                .After = enabled,
-                .SetSettings = setSettings,
-                .ClearSettings = clearSettings,
-            })).Succeeded());
-    EXPECT_TRUE(stored.EnableEdgeView);
-    ASSERT_TRUE(history.Undo().Succeeded());
-    EXPECT_FALSE(stored.AnyEnabled());
 }
 
 TEST(EditorCommandHistory, CompoundCommandRollsBackAppliedCommandsOnFailure)

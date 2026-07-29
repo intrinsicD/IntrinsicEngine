@@ -241,9 +241,13 @@ only after publication. Parameterization UV publication validates geometry
 metadata plus the exact semantic triangle topology, finite positions, and
 current optional `v:texcoord` state consumed by the solver. Its initial apply
 and every undo/redo transition stamp texcoord/attribute dirtiness only after
-the UV property is replaced or removed. The public history module therefore
-owns history mechanics rather than transform or visualization component DTOs;
-remaining feature migrations are tracked by `RUNTIME-201`.
+the UV property is replaced or removed. Generic render-hint and mesh
+primitive-view edits snapshot the complete optional `RenderSurface`,
+`RenderEdges`, and `RenderPoints` component cohort. Each transition validates
+that exact cohort before replacing it, so an intervening lane edit leaves ECS
+and history unchanged. The public history module therefore owns history
+mechanics rather than transform, visualization, or primitive-view component
+DTOs; remaining feature migrations are tracked by `RUNTIME-201`.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

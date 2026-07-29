@@ -845,6 +845,20 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
               G::RenderSurface::SourceDomain::Face);
 
+    raw.get<G::RenderSurface>(mesh).Domain =
+        G::RenderSurface::SourceDomain::Vertex;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
+              G::RenderSurface::SourceDomain::Vertex);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+    raw.get<G::RenderSurface>(mesh).Domain =
+        G::RenderSurface::SourceDomain::Face;
+
     EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
                   context,
                   Runtime::SandboxEditorRenderHintCommand{
@@ -1302,6 +1316,71 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
                   }),
               Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
 }
+
+TEST(SandboxEditorUi, PrimitiveViewHistoryRejectsInterveningRenderHints)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto& raw = registry.Raw();
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    raw.emplace<G::RenderSurface>(
+        mesh,
+        G::RenderSurface{
+            .Domain = G::RenderSurface::SourceDomain::Face,
+        });
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorPrimitiveViewCommand(
+            context,
+            Runtime::SandboxEditorPrimitiveViewCommand{
+                .StableEntityId = stableId,
+                .SetEdgeView = true,
+                .EnableEdgeView = true,
+                .SetVertexView = true,
+                .EnableVertexView = true,
+                .SetVertexRenderMode = true,
+                .VertexRenderMode =
+                    Runtime::MeshVertexViewRenderMode::ImpostorSphere,
+                .SetVertexPointRadius = true,
+                .VertexPointRadiusPx = 9.0f,
+            }),
+        Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
+
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_FALSE(raw.all_of<G::RenderEdges>(mesh));
+    EXPECT_FALSE(raw.all_of<G::RenderPoints>(mesh));
+    ASSERT_TRUE(raw.all_of<G::RenderSurface>(mesh));
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
+              G::RenderSurface::SourceDomain::Face);
+
+    ASSERT_TRUE(history.Redo().Succeeded());
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
+    raw.get<G::RenderSurface>(mesh).Domain =
+        G::RenderSurface::SourceDomain::Vertex;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
+              G::RenderSurface::SourceDomain::Vertex);
+    EXPECT_TRUE(raw.all_of<G::RenderEdges>(mesh));
+    EXPECT_TRUE(raw.all_of<G::RenderPoints>(mesh));
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+}
+
 TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
 {
     ECS::Scene::Registry registry;

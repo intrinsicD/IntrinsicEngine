@@ -12,7 +12,6 @@ export module Extrinsic.Runtime.EditorCommandHistory;
 
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.SelectionController;
 
 export namespace Extrinsic::Runtime
@@ -127,17 +126,6 @@ export namespace Extrinsic::Runtime
         std::string Label{"Change Selection"};
     };
 
-    struct EditorPrimitiveViewSettingsCommand
-    {
-        std::uint32_t StableEntityId{0u};
-        MeshPrimitiveViewSettings Before{};
-        MeshPrimitiveViewSettings After{};
-        std::function<void(std::uint32_t, MeshPrimitiveViewSettings)> SetSettings{};
-        std::function<void(std::uint32_t)> ClearSettings{};
-        bool Dirtying{false};
-        std::string Label{"Change Primitive View"};
-    };
-
     enum class EditorHierarchyDeletePolicy : std::uint8_t
     {
         DeleteDescendants,
@@ -155,8 +143,6 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] EditorCommandRecord MakeSelectionReplaceCommand(
         EditorSelectionReplaceCommand command);
-    [[nodiscard]] EditorCommandRecord MakePrimitiveViewSettingsCommand(
-        EditorPrimitiveViewSettingsCommand command);
     [[nodiscard]] EditorCommandRecord MakeCompoundEditorCommand(
         std::string label,
         std::vector<EditorCommandRecord> commands);

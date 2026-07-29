@@ -74,20 +74,6 @@ namespace Extrinsic::Runtime
             return EditorCommandHistoryStatus::Applied;
         }
 
-        [[nodiscard]] EditorCommandHistoryStatus ApplyPrimitiveViewSettings(
-            const EditorPrimitiveViewSettingsCommand& command,
-            const MeshPrimitiveViewSettings settings)
-        {
-            if (!command.SetSettings || !command.ClearSettings)
-                return EditorCommandHistoryStatus::UnsupportedOperation;
-
-            if (settings.AnyEnabled())
-                command.SetSettings(command.StableEntityId, settings);
-            else
-                command.ClearSettings(command.StableEntityId);
-            return EditorCommandHistoryStatus::Applied;
-        }
-
     }
 
     const char* DebugNameForEditorCommandHistoryStatus(
@@ -327,24 +313,6 @@ namespace Extrinsic::Runtime
                                       command.BeforeStableEntityId);
             },
             .Dirtying = false,
-        };
-    }
-
-    EditorCommandRecord MakePrimitiveViewSettingsCommand(
-        EditorPrimitiveViewSettingsCommand command)
-    {
-        const bool dirtying = command.Dirtying;
-        return EditorCommandRecord{
-            .Label = NonEmptyLabel(command.Label),
-            .Redo = [command]()
-            {
-                return ApplyPrimitiveViewSettings(command, command.After);
-            },
-            .Undo = [command]()
-            {
-                return ApplyPrimitiveViewSettings(command, command.Before);
-            },
-            .Dirtying = dirtying,
         };
     }
 
