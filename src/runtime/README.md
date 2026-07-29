@@ -352,12 +352,18 @@ from `GEOM-026` (`Geometry.HalfedgeMesh.Vertices.Normals`,
 worker lane, and publish count-matched `glm::vec3` normals to canonical
 `v:normal` only from the stale-checked main-thread apply. Tests and non-engine
 callers without an injected job surface keep the immediate compatibility path.
-Successful publication stamps the precise `DirtyVertexNormals` tag and marks
-editor history dirty; it does not call renderer/RHI upload APIs or stamp broad
-`GpuDirty`. Mesh, graph, and point-cloud residency extraction consume that dirty
-tag and perform deferred normal-channel reupload on the next extraction
-opportunity. If a direct mesh import's deferred materialization applies after an
-edit, runtime preserves count-matched current `v:normal` values so
+Sync and queued completions enter one owner-local `RUNTIME-201` mutation
+transaction. It validates geometry metadata, the exact domain source-property
+snapshot excluding the owned output, and the exact optional current
+`v:normal`; topology/attribute/output edits therefore stale-discard queued
+work or reject undo/redo without moving history. Undo restores the prior
+normal values or removes a newly introduced property, redo restores the
+generated values, and every successful transition stamps only
+`DirtyVertexNormals`. It does not call renderer/RHI upload APIs or stamp broad
+`GpuDirty`. Mesh, graph, and point-cloud residency extraction consume that
+dirty tag and perform deferred normal-channel reupload on the next extraction
+opportunity. If a direct mesh import's deferred materialization applies after
+an edit, runtime preserves count-matched current `v:normal` values so
 editor-authored normals remain the CPU authority.
 
 ### Sandbox Editor Mesh Denoise

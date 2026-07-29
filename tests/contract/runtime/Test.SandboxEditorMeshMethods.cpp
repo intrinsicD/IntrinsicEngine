@@ -2947,6 +2947,36 @@ TEST(SandboxEditorUi, MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnAppl
         EXPECT_NEAR(normal.y, 0.0f, 1.0e-5f);
         EXPECT_NEAR(normal.z, 1.0f, 1.0e-5f);
     }
+
+    const std::vector<glm::vec3> publishedNormals = normals.Vector();
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(properties.Exists(PN::kNormal));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    auto redoneNormals = properties.Get<glm::vec3>(PN::kNormal);
+    ASSERT_TRUE(redoneNormals);
+    EXPECT_EQ(redoneNormals.Vector(), publishedNormals);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    redoneNormals.Vector()[0].x = 0.25f;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FLOAT_EQ(redoneNormals.Vector()[0].x, 0.25f);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+
+    redoneNormals.Vector() = publishedNormals;
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(properties.Exists(PN::kNormal));
 }
 TEST(SandboxEditorUi,
      GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply)
@@ -3079,6 +3109,26 @@ TEST(SandboxEditorUi,
         EXPECT_GT(normal.z, 0.5f);
     }
     EXPECT_TRUE(history.IsDirty());
+
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(graph);
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(cloud);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(cloudProperties.Exists(PN::kNormal));
+    EXPECT_TRUE(graphProperties.Exists(PN::kNormal));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(graphProperties.Exists(PN::kNormal));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
+
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(graphProperties.Exists(PN::kNormal));
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(cloudProperties.Exists(PN::kNormal));
 }
 TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
 {
@@ -3152,13 +3202,11 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
                 });
         ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
-        SetNodePositions(registry.Raw().get<GS::Nodes>(graph),
-                         {
-                             {10.0f, 0.0f, 0.0f},
-                             {11.0f, 0.0f, 0.0f},
-                             {12.0f, 0.0f, 0.0f},
-                             {13.0f, 0.0f, 0.0f},
-                         });
+        auto edgeV0 = registry.Raw()
+                          .get<GS::Edges>(graph)
+                          .Properties.Get<std::uint32_t>(PN::kEdgeV0);
+        ASSERT_TRUE(edgeV0);
+        edgeV0.Vector()[0] = 2u;
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
         Runtime::SandboxEditorJobQueueSnapshot done =
@@ -3194,6 +3242,17 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
                          {0.0f, 1.0f, 0.0f},
                          {1.0f, 1.0f, 0.0f},
                      });
+        auto& cloudProperties =
+            registry.Raw().get<GS::Vertices>(cloud).Properties;
+        auto existingNormals = cloudProperties.GetOrAdd<glm::vec3>(
+            std::string{PN::kNormal},
+            glm::vec3{0.0f, 0.0f, 1.0f});
+        existingNormals.Vector() = {
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+        };
         const Runtime::SandboxEditorPointCloudVertexNormalsResult result =
             Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
                 context,
@@ -3205,13 +3264,7 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
                 });
         ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
-        SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                     {
-                         {10.0f, 0.0f, 0.0f},
-                         {11.0f, 0.0f, 0.0f},
-                         {12.0f, 0.0f, 0.0f},
-                         {13.0f, 0.0f, 0.0f},
-                     });
+        existingNormals.Vector()[0] = glm::vec3{1.0f, 0.0f, 0.0f};
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
         Runtime::SandboxEditorJobQueueSnapshot done =
@@ -3220,8 +3273,11 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
         EXPECT_EQ(done.Entries[0].State,
                   Runtime::JobState::StaleDiscarded);
         EXPECT_FALSE(completedSinkCalled);
-        EXPECT_FALSE(registry.Raw().get<GS::Vertices>(cloud)
-                         .Properties.Exists(PN::kNormal));
+        const auto retainedNormals =
+            cloudProperties.Get<glm::vec3>(PN::kNormal);
+        ASSERT_TRUE(retainedNormals);
+        EXPECT_EQ(retainedNormals.Vector()[0],
+                  (glm::vec3{1.0f, 0.0f, 0.0f}));
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
     }
 }

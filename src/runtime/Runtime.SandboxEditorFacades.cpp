@@ -5647,33 +5647,6 @@ namespace Extrinsic::Runtime
                 source.FallbackNormalWasRepaired;
         }
 
-        [[nodiscard]] bool PublishMeshVertexNormals(
-            GS::MutableSourceView& view,
-            const GN::Result& result)
-        {
-            if (view.VertexSource == nullptr || !result.Normals.IsValid())
-                return false;
-
-            Geometry::PropertySet& properties = view.VertexSource->Properties;
-            if (properties.Exists(GS::PropertyNames::kNormal) &&
-                !properties.Get<glm::vec3>(GS::PropertyNames::kNormal))
-            {
-                return false;
-            }
-
-            auto normals = properties.GetOrAdd<glm::vec3>(
-                std::string{GS::PropertyNames::kNormal},
-                glm::vec3{0.0f, 1.0f, 0.0f});
-            if (!normals ||
-                normals.Vector().size() != result.Normals.Vector().size())
-            {
-                return false;
-            }
-
-            normals.Vector() = result.Normals.Vector();
-            return true;
-        }
-
         [[nodiscard]] bool PublishCanonicalVec3Normals(
             Geometry::PropertySet& properties,
             const std::vector<glm::vec3>& normals)
@@ -8270,6 +8243,9 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        struct VertexNormalPropertyState;
+        struct VertexNormalsSourceState;
+
         struct SandboxEditorVertexNormalsCpuJobState
         {
             SandboxEditorVertexNormalsCpuJobKind Kind{
@@ -8278,6 +8254,8 @@ namespace Extrinsic::Runtime
             std::uint64_t GeometryMetadataSignature{0u};
             std::vector<glm::vec3> SnapshotPositions{};
             std::vector<glm::vec3> Normals{};
+            std::shared_ptr<const VertexNormalsSourceState> SourceState{};
+            std::shared_ptr<const VertexNormalPropertyState> BeforeNormal{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             Geometry::Vertices GraphNodes{};
             Geometry::PropertySet GraphEdges{};
@@ -8331,6 +8309,398 @@ namespace Extrinsic::Runtime
             return nullptr;
         }
 
+        struct VertexNormalPropertyState
+        {
+            bool HadNormal{false};
+            std::vector<glm::vec3> Normals{};
+        };
+
+        using VertexNormalPropertySnapshot =
+            std::shared_ptr<const VertexNormalPropertyState>;
+
+        struct VertexNormalsSourceState
+        {
+            Geometry::PropertySet Primary{};
+            std::optional<Geometry::PropertySet> Edges{};
+            std::optional<Geometry::PropertySet> Halfedges{};
+            std::optional<Geometry::PropertySet> Faces{};
+        };
+
+        using VertexNormalsSourceSnapshot =
+            std::shared_ptr<const VertexNormalsSourceState>;
+
+        struct VertexNormalsMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            SandboxEditorVertexNormalsCpuJobKind Kind{
+                SandboxEditorVertexNormalsCpuJobKind::Mesh};
+        };
+
+        struct VertexNormalsMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            VertexNormalsSourceSnapshot Source{};
+            VertexNormalPropertySnapshot Normal{};
+        };
+
+        [[nodiscard]] bool CaptureVertexNormalPropertyState(
+            const Geometry::PropertySet& properties,
+            VertexNormalPropertyState& out)
+        {
+            out = {};
+            if (!properties.Exists(GS::PropertyNames::kNormal))
+                return true;
+
+            const auto normals =
+                properties.Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (!normals ||
+                normals.Vector().size() != properties.Size())
+            {
+                return false;
+            }
+
+            out.HadNormal = true;
+            out.Normals = normals.Vector();
+            return true;
+        }
+
+        [[nodiscard]] bool SameVertexNormalPropertyState(
+            const VertexNormalPropertyState& lhs,
+            const VertexNormalPropertyState& rhs) noexcept
+        {
+            if (lhs.HadNormal != rhs.HadNormal ||
+                lhs.Normals.size() != rhs.Normals.size())
+            {
+                return false;
+            }
+            for (std::size_t i = 0u; i < lhs.Normals.size(); ++i)
+            {
+                if (!SameKnownPropertyValue(
+                        lhs.Normals[i],
+                        rhs.Normals[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] Geometry::PropertySet
+        CopyVertexNormalSourceProperties(
+            const Geometry::PropertySet& properties)
+        {
+            Geometry::PropertySet copy = properties;
+            auto normals =
+                copy.Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (normals)
+                copy.Remove(normals);
+            return copy;
+        }
+
+        [[nodiscard]] bool CaptureVertexNormalsSourceState(
+            const GS::ConstSourceView& view,
+            const SandboxEditorVertexNormalsCpuJobKind kind,
+            VertexNormalsSourceState& out)
+        {
+            out = {};
+            switch (kind)
+            {
+            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+                if (view.VertexSource == nullptr ||
+                    view.HalfedgeSource == nullptr ||
+                    view.FaceSource == nullptr)
+                {
+                    return false;
+                }
+                out.Primary = CopyVertexNormalSourceProperties(
+                    view.VertexSource->Properties);
+                if (view.EdgeSource != nullptr)
+                    out.Edges = view.EdgeSource->Properties;
+                out.Halfedges = view.HalfedgeSource->Properties;
+                out.Faces = view.FaceSource->Properties;
+                return true;
+            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+                if (view.NodeSource == nullptr ||
+                    view.EdgeSource == nullptr)
+                {
+                    return false;
+                }
+                out.Primary = CopyVertexNormalSourceProperties(
+                    view.NodeSource->Properties);
+                out.Edges = view.EdgeSource->Properties;
+                return true;
+            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+                if (view.VertexSource == nullptr)
+                    return false;
+                out.Primary = CopyVertexNormalSourceProperties(
+                    view.VertexSource->Properties);
+                return true;
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool SameOptionalKnownPropertySet(
+            const std::optional<Geometry::PropertySet>& lhs,
+            const std::optional<Geometry::PropertySet>& rhs) noexcept
+        {
+            if (lhs.has_value() != rhs.has_value())
+                return false;
+            if (!lhs.has_value())
+                return true;
+            return SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(*lhs),
+                       Geometry::ConstPropertySet(*rhs)) &&
+                   SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(*rhs),
+                       Geometry::ConstPropertySet(*lhs));
+        }
+
+        [[nodiscard]] bool SameVertexNormalsSourceState(
+            const VertexNormalsSourceState& lhs,
+            const VertexNormalsSourceState& rhs) noexcept
+        {
+            return SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(lhs.Primary),
+                       Geometry::ConstPropertySet(rhs.Primary)) &&
+                   SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(rhs.Primary),
+                       Geometry::ConstPropertySet(lhs.Primary)) &&
+                   SameOptionalKnownPropertySet(lhs.Edges, rhs.Edges) &&
+                   SameOptionalKnownPropertySet(
+                       lhs.Halfedges,
+                       rhs.Halfedges) &&
+                   SameOptionalKnownPropertySet(lhs.Faces, rhs.Faces);
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyVertexNormalPropertyState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVertexNormalsCpuJobKind kind,
+            const VertexNormalPropertyState& state)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            if (GS::BuildSourceAvailability(view).ProvenanceDomain !=
+                VertexNormalsExpectedSourceDomain(kind))
+            {
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+            }
+
+            Geometry::PropertySet* properties =
+                VertexNormalsTargetProperties(view, kind);
+            if (properties == nullptr)
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+            if (state.HadNormal)
+            {
+                return PublishCanonicalVec3Normals(
+                           *properties,
+                           state.Normals)
+                    ? EditorCommandHistoryStatus::Applied
+                    : EditorCommandHistoryStatus::CommandFailed;
+            }
+
+            if (!state.Normals.empty())
+                return EditorCommandHistoryStatus::CommandFailed;
+            if (!properties->Exists(GS::PropertyNames::kNormal))
+                return EditorCommandHistoryStatus::Applied;
+            auto normals =
+                properties->Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (!normals)
+                return EditorCommandHistoryStatus::CommandFailed;
+            properties->Remove(normals);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus CommitVertexNormalProperty(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVertexNormalsCpuJobKind kind,
+            const char* label,
+            const std::uint64_t expectedGeometryMetadataSignature,
+            VertexNormalsSourceState source,
+            VertexNormalPropertyState before,
+            std::vector<glm::vec3> afterNormals)
+        {
+            VertexNormalPropertyState after{
+                .HadNormal = true,
+                .Normals = std::move(afterNormals),
+            };
+
+            if (context.CommandHistory != nullptr)
+            {
+                const VertexNormalsSourceSnapshot sourceState =
+                    std::make_shared<VertexNormalsSourceState>(
+                        std::move(source));
+                const VertexNormalPropertySnapshot beforeState =
+                    std::make_shared<VertexNormalPropertyState>(
+                        std::move(before));
+                const VertexNormalPropertySnapshot afterState =
+                    std::make_shared<VertexNormalPropertyState>(
+                        std::move(after));
+                const EditorCommandHistoryResult history =
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        label,
+                        VertexNormalsMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                            .Kind = kind,
+                        },
+                        VertexNormalsMutationGeneration{
+                            .GeometryMetadataSignature =
+                                expectedGeometryMetadataSignature,
+                            .Source = sourceState,
+                            .Normal = beforeState,
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const VertexNormalsMutationIdentity& identity,
+                            const VertexNormalsMutationGeneration& expected,
+                            const VertexNormalPropertySnapshot& target)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+                            if (expected.Source == nullptr ||
+                                expected.Normal == nullptr ||
+                                target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (!entity.has_value())
+                                return EditorCommandHistoryStatus::StaleEntity;
+
+                            const GS::ConstSourceView view =
+                                GS::BuildConstView(raw, *entity);
+                            if (GS::BuildSourceAvailability(view)
+                                    .ProvenanceDomain !=
+                                VertexNormalsExpectedSourceDomain(
+                                    identity.Kind))
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (GeometryMetadataSignatureForEntity(
+                                    raw,
+                                    *entity) !=
+                                expected.GeometryMetadataSignature)
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            VertexNormalsSourceState currentSource{};
+                            if (!CaptureVertexNormalsSourceState(
+                                    view,
+                                    identity.Kind,
+                                    currentSource) ||
+                                !SameVertexNormalsSourceState(
+                                    currentSource,
+                                    *expected.Source))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const Geometry::PropertySet* properties =
+                                VertexNormalsSourceProperties(
+                                    view,
+                                    identity.Kind);
+                            VertexNormalPropertyState currentNormal{};
+                            if (properties == nullptr ||
+                                !CaptureVertexNormalPropertyState(
+                                    *properties,
+                                    currentNormal) ||
+                                !SameVertexNormalPropertyState(
+                                    currentNormal,
+                                    *expected.Normal))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            if (target->HadNormal &&
+                                target->Normals.size() !=
+                                    properties->Size())
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const VertexNormalsMutationIdentity& identity,
+                            const VertexNormalPropertySnapshot& target)
+                        {
+                            if (target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    CommandFailed;
+                            }
+                            return ApplyVertexNormalPropertyState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                identity.Kind,
+                                *target);
+                        },
+                        [](
+                            const VertexNormalsMutationIdentity& identity,
+                            const VertexNormalsMutationGeneration& expected,
+                            const VertexNormalPropertySnapshot& target)
+                        {
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (entity.has_value())
+                                Dirty::MarkVertexNormalsDirty(raw, *entity);
+                            return VertexNormalsMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    entity.has_value()
+                                        ? GeometryMetadataSignatureForEntity(
+                                              raw,
+                                              *entity)
+                                        : 0u,
+                                .Source = expected.Source,
+                                .Normal = target,
+                            };
+                        });
+                return ToSandboxEditorCommandStatus(history.Status);
+            }
+
+            const EditorCommandHistoryStatus applied =
+                ApplyVertexNormalPropertyState(
+                    context.Scene,
+                    stableEntityId,
+                    kind,
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            Dirty::MarkVertexNormalsDirty(
+                context.Scene->Raw(),
+                entity);
+            return SandboxEditorCommandStatus::Applied;
+        }
+
         [[nodiscard]] JobApplyValidation ValidateVertexNormalsCpuJobApply(
             const SandboxEditorContext& context,
             const SandboxEditorVertexNormalsCpuJobState& job)
@@ -8368,6 +8738,35 @@ namespace Extrinsic::Runtime
                 CollectFiniteGeometryPositions(*properties);
             if (!current.has_value() ||
                 !SameGeometryPositions(*current, job.SnapshotPositions))
+            {
+                return JobApplyValidation::StaleGeneration;
+            }
+
+            if (job.SourceState == nullptr ||
+                job.BeforeNormal == nullptr)
+            {
+                return JobApplyValidation::StaleGeneration;
+            }
+
+            VertexNormalsSourceState currentSource{};
+            if (!CaptureVertexNormalsSourceState(
+                    view,
+                    job.Kind,
+                    currentSource) ||
+                !SameVertexNormalsSourceState(
+                    currentSource,
+                    *job.SourceState))
+            {
+                return JobApplyValidation::StaleGeneration;
+            }
+
+            VertexNormalPropertyState currentNormal{};
+            if (!CaptureVertexNormalPropertyState(
+                    *properties,
+                    currentNormal) ||
+                !SameVertexNormalPropertyState(
+                    currentNormal,
+                    *job.BeforeNormal))
             {
                 return JobApplyValidation::StaleGeneration;
             }
@@ -8637,51 +9036,38 @@ namespace Extrinsic::Runtime
                 PublishMeshVertexNormalsResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
-            if (context.Scene == nullptr)
-            {
-                result.Status = SandboxEditorCommandStatus::MissingScene;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Scene registry is unavailable for mesh vertex-normal publication.";
-                PublishMeshVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, job.StableEntityId);
-            if (!entity.has_value())
-            {
-                result.Status = SandboxEditorCommandStatus::StaleEntity;
-                result.Error = Core::ErrorCode::ResourceNotFound;
-                result.Message =
-                    "Mesh vertex-normal target entity is stale before publication.";
-                PublishMeshVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-            Geometry::PropertySet* properties =
-                VertexNormalsTargetProperties(
-                    view,
-                    SandboxEditorVertexNormalsCpuJobKind::Mesh);
-            if (properties == nullptr ||
-                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            if (job.SourceState == nullptr ||
+                job.BeforeNormal == nullptr)
             {
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
-                result.NormalStatus = GN::RecomputeStatus::PropertyTypeConflict;
-                result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message      = "Mesh vertex-normal publication failed because v:normal "
-                                      "has an incompatible type or size.";
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Mesh vertex-normal publication is missing its source snapshot.";
                 PublishMeshVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
 
-            Dirty::MarkVertexNormalsDirty(raw, *entity);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Recompute mesh vertex normals");
+            const SandboxEditorCommandStatus commitStatus =
+                CommitVertexNormalProperty(
+                    context,
+                    job.StableEntityId,
+                    SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                    "Recompute mesh vertex normals",
+                    job.GeometryMetadataSignature,
+                    *job.SourceState,
+                    *job.BeforeNormal,
+                    job.Normals);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message = "Mesh vertex-normal publication failed during "
+                                 "editor history commit.";
+                PublishMeshVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildMeshNormalsSuccessMessage(result);
@@ -8700,52 +9086,38 @@ namespace Extrinsic::Runtime
                 PublishGraphVertexNormalsResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
-            if (context.Scene == nullptr)
-            {
-                result.Status = SandboxEditorCommandStatus::MissingScene;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Scene registry is unavailable for graph vertex-normal publication.";
-                PublishGraphVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, job.StableEntityId);
-            if (!entity.has_value())
-            {
-                result.Status = SandboxEditorCommandStatus::StaleEntity;
-                result.Error = Core::ErrorCode::ResourceNotFound;
-                result.Message =
-                    "Graph vertex-normal target entity is stale before publication.";
-                PublishGraphVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-            Geometry::PropertySet* properties =
-                VertexNormalsTargetProperties(
-                    view,
-                    SandboxEditorVertexNormalsCpuJobKind::Graph);
-            if (properties == nullptr ||
-                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            if (job.SourceState == nullptr ||
+                job.BeforeNormal == nullptr)
             {
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
-                result.NormalStatus =
-                    GraphNormals::RecomputeStatus::PropertyTypeConflict;
-                result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message = "Graph vertex-normal publication failed because v:normal "
-                                 "has an incompatible type or size.";
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Graph vertex-normal publication is missing its source snapshot.";
                 PublishGraphVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
 
-            Dirty::MarkVertexNormalsDirty(raw, *entity);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Recompute graph vertex normals");
+            const SandboxEditorCommandStatus commitStatus =
+                CommitVertexNormalProperty(
+                    context,
+                    job.StableEntityId,
+                    SandboxEditorVertexNormalsCpuJobKind::Graph,
+                    "Recompute graph vertex normals",
+                    job.GeometryMetadataSignature,
+                    *job.SourceState,
+                    *job.BeforeNormal,
+                    job.Normals);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message = "Graph vertex-normal publication failed during "
+                                 "editor history commit.";
+                PublishGraphVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildGraphNormalsSuccessMessage(result);
@@ -8765,52 +9137,38 @@ namespace Extrinsic::Runtime
                 PublishPointCloudVertexNormalsResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
-            if (context.Scene == nullptr)
-            {
-                result.Status = SandboxEditorCommandStatus::MissingScene;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "Scene registry is unavailable for point-cloud "
-                                 "vertex-normal publication.";
-                PublishPointCloudVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, job.StableEntityId);
-            if (!entity.has_value())
-            {
-                result.Status = SandboxEditorCommandStatus::StaleEntity;
-                result.Error = Core::ErrorCode::ResourceNotFound;
-                result.Message =
-                    "Point-cloud vertex-normal target entity is stale before publication.";
-                PublishPointCloudVertexNormalsResultSink(context, result);
-                return Core::Err(result.Error);
-            }
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-            Geometry::PropertySet* properties =
-                VertexNormalsTargetProperties(
-                    view,
-                    SandboxEditorVertexNormalsCpuJobKind::PointCloud);
-            if (properties == nullptr ||
-                !PublishCanonicalVec3Normals(*properties, job.Normals))
+            if (job.SourceState == nullptr ||
+                job.BeforeNormal == nullptr)
             {
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
-                result.NormalStatus =
-                    PointNormals::RecomputeStatus::PropertyTypeConflict;
-                result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message = "Point-cloud vertex-normal publication failed because "
-                                 "v:normal has an incompatible type or size.";
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Point-cloud vertex-normal publication is missing its source snapshot.";
                 PublishPointCloudVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
 
-            Dirty::MarkVertexNormalsDirty(raw, *entity);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Recompute point-cloud vertex normals");
+            const SandboxEditorCommandStatus commitStatus =
+                CommitVertexNormalProperty(
+                    context,
+                    job.StableEntityId,
+                    SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                    "Recompute point-cloud vertex normals",
+                    job.GeometryMetadataSignature,
+                    *job.SourceState,
+                    *job.BeforeNormal,
+                    job.Normals);
+            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message = "Point-cloud vertex-normal publication failed during "
+                                 "editor history commit.";
+                PublishPointCloudVertexNormalsResultSink(context, result);
+                return Core::Err(result.Error);
+            }
+
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildPointCloudNormalsSuccessMessage(result);
@@ -8894,6 +9252,8 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const SandboxEditorMeshVertexNormalsCommand& command,
             Geometry::HalfedgeMesh::Mesh mesh,
+            VertexNormalsSourceState sourceState,
+            VertexNormalPropertyState beforeNormal,
             const std::uint64_t geometryMetadataSignature)
         {
             auto state =
@@ -8902,6 +9262,12 @@ namespace Extrinsic::Runtime
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(mesh);
+            state->SourceState =
+                std::make_shared<VertexNormalsSourceState>(
+                    std::move(sourceState));
+            state->BeforeNormal =
+                std::make_shared<VertexNormalPropertyState>(
+                    std::move(beforeNormal));
             state->Mesh = std::move(mesh);
             state->MeshCommand = command;
             state->MeshResult = MakeMeshNormalsResult(
@@ -8957,6 +9323,8 @@ namespace Extrinsic::Runtime
             Geometry::PropertySet edges,
             Geometry::Halfedges halfedges,
             const std::size_t edgeSlotCount,
+            VertexNormalsSourceState sourceState,
+            VertexNormalPropertyState beforeNormal,
             const std::uint64_t geometryMetadataSignature)
         {
             std::optional<std::vector<glm::vec3>> positions =
@@ -8977,6 +9345,12 @@ namespace Extrinsic::Runtime
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = std::move(*positions);
+            state->SourceState =
+                std::make_shared<VertexNormalsSourceState>(
+                    std::move(sourceState));
+            state->BeforeNormal =
+                std::make_shared<VertexNormalPropertyState>(
+                    std::move(beforeNormal));
             state->GraphNodes = std::move(nodes);
             state->GraphEdges = std::move(edges);
             state->GraphHalfedges = std::move(halfedges);
@@ -9035,6 +9409,8 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const SandboxEditorPointCloudVertexNormalsCommand& command,
             Geometry::Vertices points,
+            VertexNormalsSourceState sourceState,
+            VertexNormalPropertyState beforeNormal,
             const std::uint64_t geometryMetadataSignature)
         {
             std::optional<std::vector<glm::vec3>> positions =
@@ -9055,6 +9431,12 @@ namespace Extrinsic::Runtime
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = std::move(*positions);
+            state->SourceState =
+                std::make_shared<VertexNormalsSourceState>(
+                    std::move(sourceState));
+            state->BeforeNormal =
+                std::make_shared<VertexNormalPropertyState>(
+                    std::move(beforeNormal));
             state->PointCloudPoints = std::move(points);
             state->PointCloudCommand = command;
             state->PointCloudResult = MakePointCloudNormalsResult(
@@ -17627,13 +18009,43 @@ namespace Extrinsic::Runtime
                 source.Diagnostic);
         }
 
+        const std::uint64_t geometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *entity);
+        const Geometry::PropertySet* normalProperties =
+            VertexNormalsSourceProperties(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::Mesh);
+        VertexNormalsSourceState sourceState{};
+        VertexNormalPropertyState beforeNormal{};
+        if (normalProperties == nullptr ||
+            !CaptureVertexNormalsSourceState(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                sourceState) ||
+            !CaptureVertexNormalPropertyState(
+                *normalProperties,
+                beforeNormal))
+        {
+            return MakeMeshNormalsResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                GN::RecomputeStatus::PropertyTypeConflict,
+                command.Weighting,
+                Core::ErrorCode::TypeMismatch,
+                "Mesh vertex-normal publication requires an absent or "
+                "count-matched vec3 v:normal property.");
+        }
+
         if (context.JobCommands.Available())
         {
             return SubmitMeshVertexNormalsCpuJob(
                 context,
                 command,
                 source.Mesh,
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                std::move(sourceState),
+                std::move(beforeNormal),
+                geometryMetadataSignature);
         }
 
         Geometry::HalfedgeMesh::Mesh mesh = source.Mesh;
@@ -17665,19 +18077,25 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (!PublishMeshVertexNormals(view, normalResult))
+        const SandboxEditorCommandStatus commitStatus =
+            CommitVertexNormalProperty(
+                context,
+                command.StableEntityId,
+                SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                "Recompute mesh vertex normals",
+                geometryMetadataSignature,
+                std::move(sourceState),
+                std::move(beforeNormal),
+                normalResult.Normals.Vector());
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
-            result.NormalStatus = GN::RecomputeStatus::PropertyTypeConflict;
-            result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message      = "Mesh vertex-normal publication failed because v:normal "
-                                  "has an incompatible type or size.";
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message = "Mesh vertex-normal publication failed during "
+                             "editor history commit.";
             return result;
         }
 
-        Dirty::MarkVertexNormalsDirty(raw, *entity);
-        if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty("Recompute mesh vertex normals");
         result.Message = BuildMeshNormalsSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
@@ -17734,6 +18152,34 @@ namespace Extrinsic::Runtime
                 source.Diagnostic);
         }
 
+        const std::uint64_t geometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *entity);
+        const Geometry::PropertySet* normalProperties =
+            VertexNormalsSourceProperties(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::Graph);
+        VertexNormalsSourceState sourceState{};
+        VertexNormalPropertyState beforeNormal{};
+        if (normalProperties == nullptr ||
+            !CaptureVertexNormalsSourceState(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::Graph,
+                sourceState) ||
+            !CaptureVertexNormalPropertyState(
+                *normalProperties,
+                beforeNormal))
+        {
+            return MakeGraphNormalsResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                GraphNormals::RecomputeStatus::PropertyTypeConflict,
+                command.OrientTowardFallback,
+                Core::ErrorCode::TypeMismatch,
+                "Graph vertex-normal publication requires an absent or "
+                "count-matched vec3 v:normal property.");
+        }
+
         if (context.JobCommands.Available())
         {
             return SubmitGraphVertexNormalsCpuJob(
@@ -17743,7 +18189,9 @@ namespace Extrinsic::Runtime
                 view.EdgeSource->Properties,
                 source.Halfedges,
                 source.EdgeSlotCount,
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                std::move(sourceState),
+                std::move(beforeNormal),
+                geometryMetadataSignature);
         }
 
         Geometry::Vertices scratchNodes = view.NodeSource->Properties;
@@ -17792,24 +18240,36 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (!normalResult.Normals.IsValid() ||
-            !PublishCanonicalVec3Normals(
-                view.NodeSource->Properties,
-                normalResult.Normals.Vector()))
+        if (!normalResult.Normals.IsValid())
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus =
-                GraphNormals::RecomputeStatus::PropertyTypeConflict;
-            result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message = "Graph vertex-normal publication failed because v:normal "
-                             "has an incompatible type or size.";
+                GraphNormals::RecomputeStatus::InvalidOutputProperty;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Graph vertex-normal recompute produced no normal property.";
             return result;
         }
 
-        Dirty::MarkVertexNormalsDirty(raw, *entity);
-        if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty(
-                "Recompute graph vertex normals");
+        const SandboxEditorCommandStatus commitStatus =
+            CommitVertexNormalProperty(
+                context,
+                command.StableEntityId,
+                SandboxEditorVertexNormalsCpuJobKind::Graph,
+                "Recompute graph vertex normals",
+                geometryMetadataSignature,
+                std::move(sourceState),
+                std::move(beforeNormal),
+                normalResult.Normals.Vector());
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message = "Graph vertex-normal publication failed during "
+                             "editor history commit.";
+            return result;
+        }
+
         result.Message = BuildGraphNormalsSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
@@ -17870,13 +18330,43 @@ namespace Extrinsic::Runtime
                 "GeometrySources.");
         }
 
+        const std::uint64_t geometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *entity);
+        const Geometry::PropertySet* normalProperties =
+            VertexNormalsSourceProperties(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::PointCloud);
+        VertexNormalsSourceState sourceState{};
+        VertexNormalPropertyState beforeNormal{};
+        if (normalProperties == nullptr ||
+            !CaptureVertexNormalsSourceState(
+                sourceView,
+                SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                sourceState) ||
+            !CaptureVertexNormalPropertyState(
+                *normalProperties,
+                beforeNormal))
+        {
+            return MakePointCloudNormalsResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                PointNormals::RecomputeStatus::PropertyTypeConflict,
+                command,
+                Core::ErrorCode::TypeMismatch,
+                "Point-cloud vertex-normal publication requires an absent or "
+                "count-matched vec3 v:normal property.");
+        }
+
         if (context.JobCommands.Available())
         {
             return SubmitPointCloudVertexNormalsCpuJob(
                 context,
                 command,
                 view.VertexSource->Properties,
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                std::move(sourceState),
+                std::move(beforeNormal),
+                geometryMetadataSignature);
         }
 
         Geometry::Vertices scratchPoints = view.VertexSource->Properties;
@@ -17923,24 +18413,36 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (!normalResult.Normals.IsValid() ||
-            !PublishCanonicalVec3Normals(
-                view.VertexSource->Properties,
-                normalResult.Normals.Vector()))
+        if (!normalResult.Normals.IsValid())
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus =
-                PointNormals::RecomputeStatus::PropertyTypeConflict;
-            result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message = "Point-cloud vertex-normal publication failed because "
-                             "v:normal has an incompatible type or size.";
+                PointNormals::RecomputeStatus::InvalidOutputProperty;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Point-cloud vertex-normal recompute produced no normal property.";
             return result;
         }
 
-        Dirty::MarkVertexNormalsDirty(raw, *entity);
-        if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty(
-                "Recompute point-cloud vertex normals");
+        const SandboxEditorCommandStatus commitStatus =
+            CommitVertexNormalProperty(
+                context,
+                command.StableEntityId,
+                SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                "Recompute point-cloud vertex normals",
+                geometryMetadataSignature,
+                std::move(sourceState),
+                std::move(beforeNormal),
+                normalResult.Normals.Vector());
+        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message = "Point-cloud vertex-normal publication failed during "
+                             "editor history commit.";
+            return result;
+        }
+
         result.Message = BuildPointCloudNormalsSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
