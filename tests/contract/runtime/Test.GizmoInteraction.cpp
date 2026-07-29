@@ -21,11 +21,14 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.WorldHandle;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
@@ -40,7 +43,6 @@ using Extrinsic::Runtime::GizmoInteraction;
 using Extrinsic::Runtime::GizmoMode;
 using Extrinsic::Runtime::GizmoModifier;
 using Extrinsic::Runtime::GizmoOrientation;
-using Extrinsic::Runtime::GizmoUndoStack;
 using Extrinsic::Runtime::PickRay;
 using Extrinsic::Runtime::TransformGizmoRenderPacketBuilder;
 
@@ -63,7 +65,7 @@ namespace
     // A centred orthographic camera looking down -Z. World (0,0,0) projects to
     // the viewport centre; +X projects to the right, +Y up. Orthographic so the
     // pixel mapping is linear and exact for the hit-test assertions.
-    CameraViewSnapshot OrthoCamera(const Extrinsic::Core::Extent2D viewport)
+    CameraViewInput OrthoCameraInput()
     {
         CameraViewInput input{};
         input.View = glm::lookAt(glm::vec3{0.f, 0.f, 5.f}, glm::vec3{0.f}, glm::vec3{0.f, 1.f, 0.f});
@@ -75,7 +77,13 @@ namespace
         input.NearPlane = 0.1f;
         input.FarPlane = 100.f;
         input.Valid = true;
-        return BuildCameraViewSnapshot(input, viewport);
+        return input;
+    }
+
+    CameraViewSnapshot OrthoCamera(const Extrinsic::Core::Extent2D viewport)
+    {
+        return BuildCameraViewSnapshot(
+            OrthoCameraInput(), viewport);
     }
 }
 
@@ -120,7 +128,7 @@ TEST(GizmoInteraction, HitTestEmptySelectionIsNoHit)
 
 // --- Drag application + undo emission --------------------------------------
 
-TEST(GizmoInteraction, DragTickTranslatesAlongAxisAndCommitEmitsUndoRecord)
+TEST(GizmoInteraction, DragTickTranslatesAlongAxisAndCommitsHistory)
 {
     Registry registry{};
     const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
@@ -147,15 +155,109 @@ TEST(GizmoInteraction, DragTickTranslatesAlongAxisAndCommitEmitsUndoRecord)
     EXPECT_NEAR(transform.Position.z, 0.f, 1.0e-4f);
     EXPECT_TRUE((registry.Raw().all_of<Tf::IsDirtyTag>(entity)));
 
-    GizmoUndoStack undo{};
-    EXPECT_EQ(gizmo.DragCommit(registry, undo), 1u);
+    Extrinsic::Runtime::EditorCommandHistory history;
+    const Extrinsic::Runtime::EditorCommandHistoryResult committed =
+        gizmo.DragCommit(
+            registry,
+            Extrinsic::Runtime::DefaultWorldHandle,
+            history);
+    EXPECT_EQ(
+        committed.Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Applied);
     EXPECT_FALSE(gizmo.IsDragging());
-    ASSERT_EQ(undo.Size(), 1u);
-    EXPECT_EQ(undo.Back().Entity, entity);
-    EXPECT_NEAR(undo.Back().BeforePosition.x, 0.f, 1.0e-4f);
-    EXPECT_NEAR(undo.Back().AfterPosition.x, 3.f, 1.0e-4f);
-    EXPECT_NEAR(undo.Back().BeforeScale.x, 1.f, 1.0e-4f);
-    EXPECT_NEAR(undo.Back().AfterScale.x, 1.f, 1.0e-4f);
+    ASSERT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.Snapshot().UndoLabel, "Manipulate Transform");
+
+    ASSERT_EQ(
+        history.Undo().Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(
+        registry.Raw().get<Tf::Component>(entity).Position,
+        glm::vec3(0.f));
+    ASSERT_EQ(
+        history.Redo().Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_NEAR(
+        registry.Raw().get<Tf::Component>(entity).Position.x,
+        3.f,
+        1.0e-4f);
+}
+
+TEST(GizmoInteraction,
+     DragCommitCoalescesMultiSelectionAndRejectsInterveningState)
+{
+    Registry registry{};
+    const EntityHandle first =
+        MakeEntity(registry, glm::vec3{0.f});
+    const EntityHandle second =
+        MakeEntity(registry, glm::vec3{10.f, 2.f, 0.f});
+    const EntityHandle selected[] = {first, second};
+
+    GizmoInteraction gizmo{};
+    const GizmoHitResult hit{
+        .Hit = true,
+        .Axis = GizmoAxis::X,
+        .Entity = first,
+    };
+    const PickRay startRay{
+        .Origin = {5.f, 0.f, 5.f},
+        .Direction = {0.f, 0.f, -1.f},
+    };
+    const PickRay currentRay{
+        .Origin = {8.f, 0.f, 5.f},
+        .Direction = {0.f, 0.f, -1.f},
+    };
+    ASSERT_TRUE(
+        gizmo.BeginDrag(
+            registry, hit, startRay, selected));
+    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
+
+    Extrinsic::Runtime::EditorCommandHistory history;
+    ASSERT_EQ(
+        gizmo.DragCommit(
+                 registry,
+                 Extrinsic::Runtime::DefaultWorldHandle,
+                 history)
+            .Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Applied);
+    ASSERT_EQ(history.UndoCount(), 1u);
+    EXPECT_NEAR(
+        registry.Raw().get<Tf::Component>(first).Position.x,
+        3.f,
+        1.0e-4f);
+    EXPECT_NEAR(
+        registry.Raw().get<Tf::Component>(second).Position.x,
+        13.f,
+        1.0e-4f);
+
+    ASSERT_EQ(
+        history.Undo().Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(
+        registry.Raw().get<Tf::Component>(first).Position,
+        glm::vec3(0.f));
+    EXPECT_EQ(
+        registry.Raw().get<Tf::Component>(second).Position,
+        glm::vec3(10.f, 2.f, 0.f));
+
+    ASSERT_EQ(
+        history.Redo().Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Redone);
+    auto& firstTransform =
+        registry.Raw().get<Tf::Component>(first);
+    const Tf::Component secondBeforeRejectedUndo =
+        registry.Raw().get<Tf::Component>(second);
+    firstTransform.Position.x = 99.f;
+
+    EXPECT_EQ(
+        history.Undo().Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FLOAT_EQ(firstTransform.Position.x, 99.f);
+    EXPECT_EQ(
+        registry.Raw().get<Tf::Component>(second).Position,
+        secondBeforeRejectedUndo.Position);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
 }
 
 TEST(GizmoInteraction, DragCancelRestoresBeforeTransform)
@@ -185,7 +287,7 @@ TEST(GizmoInteraction, DragCancelRestoresBeforeTransform)
 }
 
 TEST(GizmoFrameService,
-     SceneClearCancelsDragAndClearsUndoPacketsAndScratch)
+     SceneClearCancelsDragAndClearsPacketsAndScratch)
 {
     Registry registry{};
     const EntityHandle entity =
@@ -225,10 +327,6 @@ TEST(GizmoFrameService,
         service.BuildRenderPackets(registry).size(),
         1u);
 
-    service.UndoStack().Push(
-        Extrinsic::Runtime::GizmoTransformEdit{
-            .Entity = entity,
-        });
     GizmoHitResult hit{
         .Hit = true,
         .Axis = GizmoAxis::X,
@@ -263,7 +361,6 @@ TEST(GizmoFrameService,
             .get<Tf::Component>(entity)
             .Scale.x,
         1.f);
-    EXPECT_TRUE(service.UndoStack().Empty());
     EXPECT_TRUE(
         service.BuildRenderPackets(registry).empty());
     EXPECT_EQ(service.Interaction().Mode(),
@@ -275,7 +372,87 @@ TEST(GizmoFrameService,
         2.5f);
 }
 
-TEST(GizmoInteraction, DragTickRotatesAroundAxisAndCommitEmitsUndoRecord)
+TEST(GizmoFrameService,
+     FrameInputRequiresHistoryAndCommitsOneUndoableDrag)
+{
+    Registry registry{};
+    const EntityHandle entity =
+        MakeEntity(registry, glm::vec3{0.f});
+    registry.Raw().emplace<
+        Extrinsic::ECS::Components::Selection::
+            SelectableTag>(entity);
+    Extrinsic::Runtime::SelectionController selection;
+    ASSERT_TRUE(
+        selection.SetSelectedEntity(registry, entity));
+
+    Extrinsic::Core::Config::WindowConfig windowConfig{};
+    windowConfig.Backend =
+        Extrinsic::Core::Config::WindowBackend::Null;
+    windowConfig.Width = 800;
+    windowConfig.Height = 600;
+    Extrinsic::Platform::Backends::Null::NullWindow window{
+        windowConfig};
+    const Extrinsic::Platform::Extent2D viewport{
+        .Width = 800,
+        .Height = 600,
+    };
+    const CameraViewInput camera = OrthoCameraInput();
+    Extrinsic::Runtime::GizmoFrameService service;
+
+    const auto drive =
+        [&](Extrinsic::Runtime::EditorCommandHistory* history)
+        {
+            service.DriveInputForFrame(
+                Extrinsic::Runtime::GizmoFrameServiceInput{
+                    .Scene = registry,
+                    .World =
+                        Extrinsic::Runtime::DefaultWorldHandle,
+                    .Selection = selection,
+                    .CommandHistory = history,
+                    .Window = window,
+                    .Viewport = viewport,
+                    .Camera = camera,
+                });
+        };
+
+    window.QueueCursor(450.0, 300.0);
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    drive(nullptr);
+    EXPECT_FALSE(service.Interaction().IsDragging());
+
+    window.QueueMouseButton(0, false);
+    window.PollEvents();
+    drive(nullptr);
+
+    Extrinsic::Runtime::EditorCommandHistory history;
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    drive(&history);
+    ASSERT_TRUE(service.Interaction().IsDragging());
+
+    window.QueueCursor(550.0, 300.0);
+    window.PollEvents();
+    drive(&history);
+    EXPECT_TRUE(service.Interaction().IsDragging());
+    EXPECT_GT(
+        registry.Raw().get<Tf::Component>(entity).Position.x,
+        0.f);
+
+    window.QueueMouseButton(0, false);
+    window.PollEvents();
+    drive(&history);
+    EXPECT_FALSE(service.Interaction().IsDragging());
+    ASSERT_EQ(history.UndoCount(), 1u);
+    ASSERT_EQ(
+        history.Undo().Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(
+        registry.Raw().get<Tf::Component>(entity).Position,
+        glm::vec3(0.f));
+}
+
+TEST(GizmoInteraction, DragTickRotatesAroundAxisAndCommitsHistory)
 {
     Registry registry{};
     const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
@@ -298,14 +475,25 @@ TEST(GizmoInteraction, DragTickRotatesAroundAxisAndCommitEmitsUndoRecord)
     EXPECT_NEAR(transform.Rotation.w, std::cos(1.5f), 1.0e-4f);
     EXPECT_NEAR(transform.Rotation.x, std::sin(1.5f), 1.0e-4f);
 
-    GizmoUndoStack undo{};
-    EXPECT_EQ(gizmo.DragCommit(registry, undo), 1u);
-    ASSERT_EQ(undo.Size(), 1u);
-    EXPECT_NEAR(undo.Back().BeforeRotation.w, 1.f, 1.0e-4f);
-    EXPECT_NEAR(undo.Back().AfterRotation.w, std::cos(1.5f), 1.0e-4f);
+    Extrinsic::Runtime::EditorCommandHistory history;
+    EXPECT_EQ(
+        gizmo.DragCommit(
+                 registry,
+                 Extrinsic::Runtime::DefaultWorldHandle,
+                 history)
+            .Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Applied);
+    ASSERT_EQ(history.UndoCount(), 1u);
+    ASSERT_EQ(
+        history.Undo().Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_NEAR(
+        registry.Raw().get<Tf::Component>(entity).Rotation.w,
+        1.f,
+        1.0e-4f);
 }
 
-TEST(GizmoInteraction, DragTickScalesAlongAxisAndCommitEmitsUndoRecord)
+TEST(GizmoInteraction, DragTickScalesAlongAxisAndCommitsHistory)
 {
     Registry registry{};
     const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
@@ -328,11 +516,22 @@ TEST(GizmoInteraction, DragTickScalesAlongAxisAndCommitEmitsUndoRecord)
     EXPECT_NEAR(transform.Scale.y, 1.f, 1.0e-4f);
     EXPECT_NEAR(transform.Scale.z, 1.f, 1.0e-4f);
 
-    GizmoUndoStack undo{};
-    EXPECT_EQ(gizmo.DragCommit(registry, undo), 1u);
-    ASSERT_EQ(undo.Size(), 1u);
-    EXPECT_NEAR(undo.Back().BeforeScale.x, 1.f, 1.0e-4f);
-    EXPECT_NEAR(undo.Back().AfterScale.x, 2.f, 1.0e-4f);
+    Extrinsic::Runtime::EditorCommandHistory history;
+    EXPECT_EQ(
+        gizmo.DragCommit(
+                 registry,
+                 Extrinsic::Runtime::DefaultWorldHandle,
+                 history)
+            .Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Applied);
+    ASSERT_EQ(history.UndoCount(), 1u);
+    ASSERT_EQ(
+        history.Undo().Status,
+        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_NEAR(
+        registry.Raw().get<Tf::Component>(entity).Scale.x,
+        1.f,
+        1.0e-4f);
 }
 
 TEST(GizmoInteraction, DragModeIsLatchedWhenToolbarModeChangesMidDrag)

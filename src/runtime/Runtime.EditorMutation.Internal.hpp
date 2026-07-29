@@ -6,6 +6,15 @@
 
 namespace Extrinsic::Runtime::Internal
 {
+    enum class InitialMutationState
+    {
+        ApplyTarget,
+        // Live-preview owners validate and record the current target without
+        // publishing or dirty-stamping it a second time. Undo/redo transitions
+        // still use the normal validate/apply/stamp sequence.
+        TargetAlreadyApplied,
+    };
+
     // Runtime-internal, typed transaction shape shared by feature owners.
     //
     // `validate` must be side-effect free and return `Applied` only when the
@@ -31,7 +40,9 @@ namespace Extrinsic::Runtime::Internal
         TValidate validate,
         TApply applyAtomically,
         TStamp stamp,
-        const bool dirtying = true)
+        const bool dirtying = true,
+        const InitialMutationState initialState =
+            InitialMutationState::ApplyTarget)
     {
         struct MutationContext final
         {
@@ -42,6 +53,8 @@ namespace Extrinsic::Runtime::Internal
             TValidate Validate;
             TApply ApplyAtomically;
             TStamp Stamp;
+            InitialMutationState InitialState{
+                InitialMutationState::ApplyTarget};
 
             [[nodiscard]] EditorCommandHistoryStatus ApplyTarget(
                 const TState& target)
@@ -50,6 +63,13 @@ namespace Extrinsic::Runtime::Internal
                     Validate(Identity, ExpectedGenerations, target);
                 if (validation != EditorCommandHistoryStatus::Applied)
                     return validation;
+
+                if (InitialState ==
+                    InitialMutationState::TargetAlreadyApplied)
+                {
+                    InitialState = InitialMutationState::ApplyTarget;
+                    return EditorCommandHistoryStatus::Applied;
+                }
 
                 const EditorCommandHistoryStatus applied =
                     ApplyAtomically(Identity, target);
@@ -71,6 +91,7 @@ namespace Extrinsic::Runtime::Internal
                 .Validate = std::move(validate),
                 .ApplyAtomically = std::move(applyAtomically),
                 .Stamp = std::move(stamp),
+                .InitialState = initialState,
             });
 
         return history.Execute(

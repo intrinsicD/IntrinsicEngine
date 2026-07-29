@@ -42,8 +42,6 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] GizmoInteraction& Interaction() noexcept;
         [[nodiscard]] const GizmoInteraction& Interaction() const noexcept;
-        [[nodiscard]] GizmoUndoStack& UndoStack() noexcept;
-        [[nodiscard]] const GizmoUndoStack& UndoStack() const noexcept;
 
         [[nodiscard]] const std::optional<PrimitiveSelectionResult>&
             LastRefinedPrimitive() const noexcept;

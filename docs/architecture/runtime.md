@@ -647,9 +647,12 @@ invented rollback protocol exists.
 `SceneInteractionModule` retains its own strong participant handle. Before
 replacement it cancels any drag while the registry is live and clears
 selection/hover tags, pending and in-flight picks, readback contexts/refined
-output, gizmo undo/scratch/packets, stable lookup binding, and its copied render
-snapshot. After replacement it rebuilds lookup against the rebound registry and
-publishes empty interaction data. The module owns one validated
+output, gizmo scratch/packets, stable lookup binding, and its copied render
+snapshot. Gizmo drag release coalesces the selected transform batch into the
+document-owned `EditorCommandHistory`; when that service is absent, transform
+dragging is disabled rather than recorded in a second stack. After replacement
+the module rebuilds lookup against the rebound registry and publishes empty
+interaction data. The module owns one validated
 `{WorldHandle, Registry*, interaction epoch}` binding; pick sequences remain
 monotonic while old-world/old-epoch results fail closed.
 

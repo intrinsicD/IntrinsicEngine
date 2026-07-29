@@ -442,6 +442,10 @@ TEST(RuntimeEngineLayering,
         ReadFile(
             root /
             "src/runtime/Scene/Runtime.SceneInteractionModule.cpp");
+    const auto gizmoInterface =
+        ReadFile(
+            root /
+            "src/runtime/Gizmos/Runtime.GizmoInteraction.cppm");
     const auto serviceInterface =
         ReadFile(
             root /
@@ -505,6 +509,12 @@ TEST(RuntimeEngineLayering,
         interactionImpl.find(
             "Gizmo.ClearSceneState(BoundRegistry)"),
         std::string::npos);
+    EXPECT_EQ(
+        interactionInterface.find("UndoStack"),
+        std::string::npos);
+    EXPECT_EQ(
+        gizmoInterface.find("GizmoUndoStack"),
+        std::string::npos);
 
     const auto unifiedClear =
         SliceBetween(
@@ -548,7 +558,11 @@ TEST(RuntimeEngineLayering,
               std::string::npos);
     EXPECT_NE(serviceInterface.find("GizmoInteraction m_Interaction"),
               std::string::npos);
-    EXPECT_NE(serviceInterface.find("GizmoUndoStack m_UndoStack"),
+    EXPECT_EQ(serviceInterface.find("GizmoUndoStack"),
+              std::string::npos);
+    EXPECT_EQ(serviceInterface.find("m_UndoStack"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("EditorCommandHistory* CommandHistory"),
               std::string::npos);
     EXPECT_NE(serviceInterface.find("TransformGizmoRenderPacketBuilder m_PacketBuilder"),
               std::string::npos);

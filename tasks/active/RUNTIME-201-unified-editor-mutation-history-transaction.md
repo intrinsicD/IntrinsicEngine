@@ -26,13 +26,15 @@ maturity_target: Retired
 - Status: in progress; owner `Codex`; branch
   `codex/runtime-201-unified-editor-mutation`; Slice A is complete. Slice B has
   migrated direct transform edits and synchronous/asynchronous ICP transform
-  publication; gizmo/history convergence is next. The next verification step
-  is the gizmo drag-coalescing/history contract plus the focused
-  `EditorCommandHistory|Gizmo|Mutation` run.
-- `EditorCommandHistory` is already the durable editor undo/redo owner but also
-  contains feature-specific builders. Geometry/method facades duplicate
-  snapshot/validate/apply/dirty/history rules, gizmo drag commits use a
-  separate `GizmoUndoStack`, and `CommandBus::SetHistoryHook` /
+  publication plus gizmo drag commit. `GizmoUndoStack` is deleted; the next
+  owner-scoped adoption is geometry/property and presentation mutation. The
+  next verification step is that feature's stale-generation/undo contract plus
+  the focused `EditorCommandHistory|Mutation` run.
+- At task intake, `EditorCommandHistory` was already the durable editor
+  undo/redo owner but also contained feature-specific builders. Geometry/method
+  facades still duplicate snapshot/validate/apply/dirty/history rules; gizmo
+  drag commits used the now-retired `GizmoUndoStack`, and
+  `CommandBus::SetHistoryHook` /
   `RecordInverse` have tests but no production history consumer.
 - The common behavior is small: capture typed before state, compute/receive
   typed after state, revalidate entity/source generation, apply atomically,
@@ -61,14 +63,15 @@ maturity_target: Retired
   implementation/internal
   `ExecuteUndoableEntityMutation<TState>` shape and focused atomicity/staleness
   contracts without a new public service.
-- **Slice B — feature adoption (in progress).** Direct transform edits and
-  synchronous/asynchronous ICP transform publication use the internal
-  transaction as of 2026-07-29. Migrate gizmo, geometry,
-  visualization/presentation, clustering, parameterization, import
-  postprocess, and destructive conversion commits.
-- **Slice C — cleanup.** Move specialized builders to feature owners and
-  delete `GizmoUndoStack`, CommandBus inverse-history API, duplicate apply
-  paths, and compatibility tests after all real workflows use history.
+- **Slice B — feature adoption (in progress).** Direct transform edits,
+  synchronous/asynchronous ICP transform publication, and coalesced gizmo drag
+  commit use the internal transaction as of 2026-07-29. Migrate geometry,
+  visualization/presentation, clustering, parameterization, import postprocess,
+  and destructive conversion commits.
+- **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
+  adoption. Move specialized builders to feature owners and delete the
+  CommandBus inverse-history API, duplicate apply paths, and compatibility
+  tests after all remaining real workflows use history.
 
 ## Required changes
 
@@ -80,8 +83,9 @@ maturity_target: Retired
       apply.
 - [ ] Keep feature-specific state capture and restoration code with the owning
       feature; `EditorCommandHistory` stores generic records only.
-- [ ] Route gizmo drag commit and keyboard/property transform edits through the
-      same history owner and preserve drag coalescing semantics.
+- [x] Route gizmo drag commit and property transform edits through the same
+      history owner and preserve drag coalescing semantics. The production
+      census found no separate keyboard-only transform mutation path.
 - [ ] Migrate geometry/property, presentation/visualization, registration,
       clustering/method, parameterization, import postprocess, and destructive
       domain-conversion mutations.
@@ -97,7 +101,7 @@ maturity_target: Retired
 - [ ] Feature matrix covers transform/gizmo, topology/property,
       presentation/material, async method completion, import enrichment, and
       domain conversion through the same helper.
-- [ ] Gizmo drag coalescing and exact transform restoration remain covered
+- [x] Gizmo drag coalescing and exact transform restoration remain covered
       through `EditorCommandHistory`.
 - [ ] Structural tests prove no second undo stack, CommandBus history hook, or
       feature-owned parallel history path remains.
@@ -152,6 +156,22 @@ Transform/registration adoption verification completed on 2026-07-29:
 - `python3 tools/agents/check_task_state_links.py --root . --strict`
 - `python3 tools/agents/generate_session_brief.py --check`
 
+Gizmo/history convergence verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `cmake --build --preset ci --target IntrinsicTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^EditorCommandHistory\.|^GizmoInteraction\.|^GizmoFrameService\.|RuntimeEngineLayering\.SceneInteractionModuleOwnsGizmoFrameServiceOutOfEngine' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120`
+- `ctest --test-dir build/ci --output-on-failure -R 'EditorCommandHistory|Gizmo|Undo|Redo|Mutation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+- `rg -n 'GizmoUndoStack|GizmoTransformEdit|UndoStack\(' src/runtime --glob '*.{cpp,cppm,hpp}'`
+- `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
+- `tools/ci/run_clean_workshop_review.sh . --strict`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/repo/check_test_layout.py --root . --strict`
+- `python3 tools/docs/check_doc_links.py --root .`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/check_task_state_links.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+
 ## Forbidden changes
 
 - A second history service/stack, app-owned snapshot, or generic serialized
@@ -164,5 +184,7 @@ Transform/registration adoption verification completed on 2026-07-29:
 
 - Target: `Retired`; common atomicity contracts and all real workflow
   migrations must pass before the parallel history mechanisms are removed.
-- Slice A establishes only the internal transaction contract; production
-  feature adoption and all parallel-history removals remain open.
+- Slice A establishes the internal transaction contract. Direct transform/ICP
+  and gizmo production adoption is complete, including removal of the parallel
+  gizmo stack; the remaining feature migrations and history-path removals stay
+  open.

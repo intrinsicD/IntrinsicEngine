@@ -17,6 +17,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
@@ -52,6 +53,7 @@ namespace Extrinsic::Runtime
             Graphics::IRenderer* Renderer{nullptr};
             RenderExtractionCache* Extraction{nullptr};
             SceneDocumentModule* Documents{nullptr};
+            EditorCommandHistory* History{nullptr};
 
             SelectionController Selection{};
             StableEntityLookup Lookup{};
@@ -183,7 +185,9 @@ namespace Extrinsic::Runtime
                 Gizmo.DriveInputForFrame(
                     GizmoFrameServiceInput{
                         .Scene = *BoundRegistry,
+                        .World = BoundWorld,
                         .Selection = Selection,
+                        .CommandHistory = History,
                         .Window = *Window,
                         .Viewport = context.Viewport,
                         .ImGuiCapturesInput =
@@ -320,6 +324,7 @@ namespace Extrinsic::Runtime
                 // borrows now so reverse name-sorted module shutdown cannot
                 // observe a destroyed provider.
                 Documents = nullptr;
+                History = nullptr;
                 Window = nullptr;
                 Renderer = nullptr;
                 Extraction = nullptr;
@@ -516,6 +521,8 @@ namespace Extrinsic::Runtime
 
         state.Documents =
             setup.Services().Find<SceneDocumentModule>();
+        state.History =
+            setup.Services().Find<EditorCommandHistory>();
         if (state.Documents != nullptr)
         {
             const std::weak_ptr<Impl::State> weakState =
@@ -650,18 +657,6 @@ namespace Extrinsic::Runtime
     SceneInteractionModule::Interaction() const noexcept
     {
         return m_Impl->Shared->Gizmo.Interaction();
-    }
-
-    GizmoUndoStack&
-    SceneInteractionModule::UndoStack() noexcept
-    {
-        return m_Impl->Shared->Gizmo.UndoStack();
-    }
-
-    const GizmoUndoStack&
-    SceneInteractionModule::UndoStack() const noexcept
-    {
-        return m_Impl->Shared->Gizmo.UndoStack();
     }
 
     const std::optional<PrimitiveSelectionResult>&

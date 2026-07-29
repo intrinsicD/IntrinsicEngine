@@ -10,15 +10,19 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.EditorCommandHistory;
 export import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
     struct GizmoFrameServiceInput
     {
         ECS::Scene::Registry& Scene;
+        WorldHandle World{};
         SelectionController& Selection;
+        EditorCommandHistory* CommandHistory{nullptr};
         const Platform::IWindow& Window;
         Platform::Extent2D Viewport{};
         bool ImGuiCapturesInput{false};
@@ -45,12 +49,9 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] GizmoInteraction& Interaction() noexcept;
         [[nodiscard]] const GizmoInteraction& Interaction() const noexcept;
-        [[nodiscard]] GizmoUndoStack& UndoStack() noexcept;
-        [[nodiscard]] const GizmoUndoStack& UndoStack() const noexcept;
 
     private:
         GizmoInteraction m_Interaction{};
-        GizmoUndoStack m_UndoStack{};
         TransformGizmoRenderPacketBuilder m_PacketBuilder{};
         std::vector<ECS::EntityHandle> m_SelectedEntities{};
     };

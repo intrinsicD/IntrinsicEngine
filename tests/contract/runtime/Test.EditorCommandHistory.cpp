@@ -93,7 +93,9 @@ namespace
         const TestMutationIdentity identity,
         const TestMutationGenerations expected,
         const TestMutationState before,
-        const TestMutationState after)
+        const TestMutationState after,
+        const Runtime::Internal::InitialMutationState initialState =
+            Runtime::Internal::InitialMutationState::ApplyTarget)
     {
         return Runtime::Internal::ExecuteUndoableEntityMutation(
             history,
@@ -132,7 +134,9 @@ namespace
                 ++store.Generations.Source;
                 ++store.DirtyStampCount;
                 return store.Generations;
-            });
+            },
+            true,
+            initialState);
     }
 }
 
@@ -219,6 +223,48 @@ TEST(EditorCommandHistory,
     EXPECT_EQ(store.DirtyStampCount, 3u);
     EXPECT_EQ(history.UndoCount(), 1u);
     EXPECT_EQ(history.RedoCount(), 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationRecordsAlreadyAppliedTargetWithoutRepublishing)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    store.Value = 9;
+
+    const Runtime::EditorCommandHistoryResult recorded =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9},
+            Runtime::Internal::InitialMutationState::
+                TargetAlreadyApplied);
+
+    ASSERT_TRUE(recorded.Succeeded());
+    EXPECT_EQ(
+        recorded.Status,
+        Runtime::EditorCommandHistoryStatus::Applied);
+    EXPECT_EQ(store.Value, 9);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    ASSERT_EQ(history.UndoCount(), 1u);
+
+    ASSERT_EQ(
+        history.Undo().Status,
+        Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 1u);
+    EXPECT_EQ(store.DirtyStampCount, 1u);
+
+    ASSERT_EQ(
+        history.Redo().Status,
+        Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(store.Value, 9);
+    EXPECT_EQ(store.ApplyCount, 2u);
+    EXPECT_EQ(store.DirtyStampCount, 2u);
 }
 
 TEST(EditorCommandHistory,
