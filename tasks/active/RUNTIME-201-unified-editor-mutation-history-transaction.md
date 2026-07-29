@@ -31,7 +31,8 @@ maturity_target: Retired
   denoise position, mesh-curvature property, and remesh/subdivide/simplify
   topology publication, UV-regeneration topology/property publication, and
   point-cloud outlier replacement, parameterization UV publication, plus
-  generic render-hint and primitive-view component edits.
+  generic render-hint and primitive-view component edits and vertex-channel
+  binding descriptors.
   `GizmoUndoStack` and the now-unused public transform/visualization history
   adapters are deleted together with the primitive-view compatibility builder
   and the unused CommandBus inverse-history hook. The next cleanup is the final
@@ -81,8 +82,10 @@ maturity_target: Retired
   replacement dirty policy. Parameterization UV publication supplies its exact
   semantic triangle topology, positions, and current-UV snapshot. Render-hint
   and primitive-view edits supply the complete optional render-component
-  cohort. Audit the remaining geometry/property, clustering, import
-  postprocess, and destructive conversion commits.
+  cohort. Vertex-channel binding edits supply the complete optional binding
+  descriptor and selected-channel dirty policy. Audit the remaining
+  geometry/property, clustering, import postprocess, and destructive conversion
+  commits.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction; render-hint adoption
@@ -102,8 +105,9 @@ maturity_target: Retired
 - [ ] Keep feature-specific state capture and restoration code with the owning
       feature; transform, visualization/presentation, mesh denoise, and mesh
       curvature plus mesh topology replacement, point-cloud replacement, and
-      parameterization plus render hints satisfy this now, while remaining
-      typed compatibility adapters still need migration or retirement.
+      parameterization, render hints, and vertex-channel bindings satisfy this
+      now, while remaining typed compatibility adapters still need migration
+      or retirement.
 - [x] Route gizmo drag commit and property transform edits through the same
       history owner and preserve drag coalescing semantics. The production
       census found no separate keyboard-only transform mutation path.
@@ -340,6 +344,12 @@ CommandBus inverse-history cleanup verification completed on 2026-07-29:
 - `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
 - `ctest --test-dir build/ci --output-on-failure -R '^RuntimeCommandBus\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
 - `rg -n 'RecordInverse|SetHistoryHook|CommandHistoryRecord|CommandHistoryHook' . --glob '!build/**' --glob '!tasks/archive/**' --glob '!tasks/done/**' --glob '!ara/**'`
+
+Vertex-channel binding history convergence verification completed on
+2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.VertexChannelBinding' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
 
 ## Forbidden changes
 

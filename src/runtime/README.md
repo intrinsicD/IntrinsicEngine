@@ -683,10 +683,13 @@ through `ResolveColorChannelPackedUnorm8`. Resolver status, source/fallback
 counts, and non-finite repair counts remain visible in the data-only model.
 
 `ApplySandboxEditorVertexChannelBindingCommand(...)` mutates only the runtime
-ECS descriptor `VertexChannelBindingSet`, stamps `DirtyVertexAttributes`, and
-marks editor history dirty when present. It does not allocate renderer
-resources, call RHI upload APIs, or persist material/asset authoring state.
-Runtime render extraction reads the component and passes it to
+ECS descriptor `VertexChannelBindingSet`. Under `RUNTIME-201`, the complete
+optional descriptor enters the shared editor mutation transaction: undo/redo
+restore the exact binding set, each transition rejects an intervening binding
+or generation edit, and the selected normal/color dirty domain is stamped only
+after successful publication. It does not allocate renderer resources, call
+RHI upload APIs, or persist material/asset authoring state. Runtime render
+extraction reads the component and passes it to
 `PackMesh`/`PackGraph`/`PackCloud`; graphics receives only the resulting
 channel byte spans through public `GpuWorld` upload descriptors.
 

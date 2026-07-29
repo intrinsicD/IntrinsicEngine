@@ -171,6 +171,10 @@ namespace Extrinsic::Runtime
 
         using SandboxEditorModelBuildClock = std::chrono::steady_clock;
 
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
+            const entt::registry& raw,
+            std::uint32_t stableId);
+
         [[nodiscard]] std::uint64_t SandboxEditorElapsedNs(
             const SandboxEditorModelBuildClock::time_point start) noexcept
         {
@@ -2015,6 +2019,25 @@ namespace Extrinsic::Runtime
                    lhs.Property == rhs.Property;
         }
 
+        [[nodiscard]] bool SameVertexChannelBindingSet(
+            const VertexChannelBindingSet& lhs,
+            const VertexChannelBindingSet& rhs) noexcept
+        {
+            return SameVertexChannelSourceBinding(lhs.Normal, rhs.Normal) &&
+                   SameVertexChannelSourceBinding(lhs.Color, rhs.Color) &&
+                   lhs.BindingGeneration == rhs.BindingGeneration;
+        }
+
+        [[nodiscard]] bool SameOptionalVertexChannelBindingSet(
+            const std::optional<VertexChannelBindingSet>& lhs,
+            const std::optional<VertexChannelBindingSet>& rhs) noexcept
+        {
+            if (lhs.has_value() != rhs.has_value())
+                return false;
+            return !lhs.has_value() ||
+                   SameVertexChannelBindingSet(*lhs, *rhs);
+        }
+
         void MarkVertexChannelDirty(entt::registry& raw,
                                     const entt::entity entity,
                                     const VertexChannel channel)
@@ -2038,6 +2061,129 @@ namespace Extrinsic::Runtime
                 Dirty::MarkVertexAttributesDirty(raw, entity);
                 break;
             }
+        }
+
+        [[nodiscard]] std::optional<VertexChannelBindingSet>
+        StoredVertexChannelBindingSet(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            if (const auto* bindings =
+                    raw.try_get<VertexChannelBindingSet>(entity))
+            {
+                return *bindings;
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus
+        ApplyVertexChannelBindingSet(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const std::optional<VertexChannelBindingSet>& bindings)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            if (bindings.has_value())
+                raw.emplace_or_replace<VertexChannelBindingSet>(
+                    *entity,
+                    *bindings);
+            else
+                raw.remove<VertexChannelBindingSet>(*entity);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        struct VertexChannelBindingMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            VertexChannel Channel{VertexChannel::Custom};
+        };
+
+        [[nodiscard]] EditorCommandHistoryResult
+        ExecuteVertexChannelBindingMutation(
+            EditorCommandHistory& history,
+            ECS::Scene::Registry* scene,
+            const WorldHandle world,
+            const std::uint32_t stableEntityId,
+            const VertexChannel channel,
+            const std::optional<VertexChannelBindingSet>& before,
+            const std::optional<VertexChannelBindingSet>& after)
+        {
+            return Internal::ExecuteUndoableEntityMutation(
+                history,
+                "Change vertex channel binding",
+                VertexChannelBindingMutationIdentity{
+                    .Scene = scene,
+                    .World = world,
+                    .StableEntityId = stableEntityId,
+                    .Channel = channel,
+                },
+                before,
+                before,
+                after,
+                [](
+                    const VertexChannelBindingMutationIdentity& identity,
+                    const std::optional<VertexChannelBindingSet>& expected,
+                    const std::optional<VertexChannelBindingSet>&)
+                {
+                    if (identity.Scene == nullptr ||
+                        !identity.World.IsValid())
+                    {
+                        return EditorCommandHistoryStatus::MissingScene;
+                    }
+
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(
+                            raw,
+                            identity.StableEntityId);
+                    if (!entity.has_value())
+                        return EditorCommandHistoryStatus::StaleEntity;
+
+                    return SameOptionalVertexChannelBindingSet(
+                               StoredVertexChannelBindingSet(raw, *entity),
+                               expected)
+                        ? EditorCommandHistoryStatus::Applied
+                        : EditorCommandHistoryStatus::StaleEntity;
+                },
+                [](
+                    const VertexChannelBindingMutationIdentity& identity,
+                    const std::optional<VertexChannelBindingSet>& target)
+                {
+                    return ApplyVertexChannelBindingSet(
+                        identity.Scene,
+                        identity.StableEntityId,
+                        target);
+                },
+                [](
+                    const VertexChannelBindingMutationIdentity& identity,
+                    const std::optional<VertexChannelBindingSet>&,
+                    const std::optional<VertexChannelBindingSet>&)
+                {
+                    entt::registry& raw = identity.Scene->Raw();
+                    const std::optional<ECS::EntityHandle> entity =
+                        ResolveStableEntity(
+                            raw,
+                            identity.StableEntityId);
+                    if (entity.has_value())
+                    {
+                        MarkVertexChannelDirty(
+                            raw,
+                            *entity,
+                            identity.Channel);
+                        return StoredVertexChannelBindingSet(raw, *entity);
+                    }
+                    return std::optional<VertexChannelBindingSet>{};
+                });
         }
 
         [[nodiscard]] SandboxEditorVertexChannelBindingTargetModel
@@ -14654,9 +14800,10 @@ namespace Extrinsic::Runtime
         if (properties == nullptr)
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
-        const auto* current = raw.try_get<VertexChannelBindingSet>(*entity);
-        VertexChannelBindingSet after = current != nullptr
-            ? *current
+        const std::optional<VertexChannelBindingSet> before =
+            StoredVertexChannelBindingSet(raw, *entity);
+        VertexChannelBindingSet after = before.has_value()
+            ? *before
             : VertexChannelBindingSet{};
         VertexChannelSourceBinding* target =
             FindMutableVertexChannelBinding(after, command.Channel);
@@ -14665,68 +14812,88 @@ namespace Extrinsic::Runtime
 
         if (!command.EnableBinding)
         {
-            if (current == nullptr || !IsVertexChannelBindingEnabled(*target))
+            if (!before.has_value() ||
+                !IsVertexChannelBindingEnabled(*target))
+            {
                 return SandboxEditorCommandStatus::NoChange;
+            }
 
             *target = {};
             ++after.BindingGeneration;
-            if (AnyVertexChannelBindingEnabled(after))
-                raw.emplace_or_replace<VertexChannelBindingSet>(*entity, after);
-            else
-                raw.remove<VertexChannelBindingSet>(*entity);
-
-            MarkVertexChannelDirty(raw, *entity, command.Channel);
-            if (context.CommandHistory != nullptr)
-                (void)context.CommandHistory->MarkDirty(
-                    "Change vertex channel binding");
-            InvalidateSelectedModelCache(context);
-            return SandboxEditorCommandStatus::Applied;
         }
-
-        if (command.PropertyName.empty())
-            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
-
-        const Geometry::PropertyValueKind valueKind =
-            DetectGeometryPropertyValueKind(*properties, command.PropertyName);
-        const std::optional<AttributeSourceType> sourceType =
-            ToAttributeSourceType(valueKind);
-        if (!sourceType.has_value())
-            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
-
-        const AttributeBindResult resolver =
-            EvaluateVertexChannelBinding(
-                *properties,
-                command.Channel,
-                command.PropertyName,
-                *sourceType,
-                properties->Size(),
-                context.ModelBuildStats);
-        if (!resolver.Ok())
-            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
-
-        const VertexChannelSourceBinding next{
-            .Enabled = true,
-            .Property = GeometryPropertyRef{
-                .Domain = ToGeometryElementDomain(*domain),
-                .Name = command.PropertyName,
-                .ValueKind = valueKind,
-            },
-        };
-        if (current != nullptr &&
-            SameVertexChannelSourceBinding(*target, next))
+        else
         {
-            return SandboxEditorCommandStatus::NoChange;
+            if (command.PropertyName.empty())
+                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+            const Geometry::PropertyValueKind valueKind =
+                DetectGeometryPropertyValueKind(
+                    *properties,
+                    command.PropertyName);
+            const std::optional<AttributeSourceType> sourceType =
+                ToAttributeSourceType(valueKind);
+            if (!sourceType.has_value())
+                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+            const AttributeBindResult resolver =
+                EvaluateVertexChannelBinding(
+                    *properties,
+                    command.Channel,
+                    command.PropertyName,
+                    *sourceType,
+                    properties->Size(),
+                    context.ModelBuildStats);
+            if (!resolver.Ok())
+                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+            const VertexChannelSourceBinding next{
+                .Enabled = true,
+                .Property = GeometryPropertyRef{
+                    .Domain = ToGeometryElementDomain(*domain),
+                    .Name = command.PropertyName,
+                    .ValueKind = valueKind,
+                },
+            };
+            if (before.has_value() &&
+                SameVertexChannelSourceBinding(*target, next))
+            {
+                return SandboxEditorCommandStatus::NoChange;
+            }
+
+            *target = next;
+            ++after.BindingGeneration;
         }
 
-        *target = next;
-        ++after.BindingGeneration;
-        raw.emplace_or_replace<VertexChannelBindingSet>(*entity, after);
-        MarkVertexChannelDirty(raw, *entity, command.Channel);
         if (context.CommandHistory != nullptr)
-            (void)context.CommandHistory->MarkDirty(
-                "Change vertex channel binding");
-        InvalidateSelectedModelCache(context);
-        return SandboxEditorCommandStatus::Applied;
+        {
+            const EditorCommandHistoryResult result =
+                ExecuteVertexChannelBindingMutation(
+                    *context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    command.StableEntityId,
+                    command.Channel,
+                    before,
+                    AnyVertexChannelBindingEnabled(after)
+                        ? std::optional<VertexChannelBindingSet>{after}
+                        : std::nullopt);
+            return InvalidateSelectedModelCacheIfApplied(
+                context,
+                ToSandboxEditorCommandStatus(result.Status));
+        }
+
+        const EditorCommandHistoryStatus applied =
+            ApplyVertexChannelBindingSet(
+                context.Scene,
+                command.StableEntityId,
+                AnyVertexChannelBindingEnabled(after)
+                    ? std::optional<VertexChannelBindingSet>{after}
+                    : std::nullopt);
+        if (applied == EditorCommandHistoryStatus::Applied)
+            MarkVertexChannelDirty(raw, *entity, command.Channel);
+        return InvalidateSelectedModelCacheIfApplied(
+            context,
+            ToSandboxEditorCommandStatus(applied));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorGeometryPresentationSlotDefaultCommand(

@@ -599,6 +599,80 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
     EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 }
+TEST(SandboxEditorUi,
+     VertexChannelBindingHistoryRestoresExactlyAndRejectsInterveningState)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "BindingHistory");
+    AddTriangleMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    SetVec3Property(
+        properties,
+        "v:custom_normal",
+        {
+            {1.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+        });
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+            context,
+            Runtime::SandboxEditorVertexChannelBindingCommand{
+                .StableEntityId = stableId,
+                .Channel = Runtime::VertexChannel::Normal,
+                .EnableBinding = true,
+                .PropertyName = "v:custom_normal",
+            }),
+        Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_EQ(history.UndoCount(), 1u);
+
+    const Runtime::VertexChannelBindingSet after =
+        registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh);
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(
+        registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    const auto& redone =
+        registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh);
+    EXPECT_EQ(redone.Normal.Enabled, after.Normal.Enabled);
+    EXPECT_EQ(redone.Normal.Property, after.Normal.Property);
+    EXPECT_EQ(redone.Color.Enabled, after.Color.Enabled);
+    EXPECT_EQ(redone.Color.Property, after.Color.Property);
+    EXPECT_EQ(redone.BindingGeneration, after.BindingGeneration);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+
+    auto& intervening =
+        registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh);
+    ++intervening.BindingGeneration;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+
+    intervening = after;
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(
+        registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
+}
 TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
 {
     using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
