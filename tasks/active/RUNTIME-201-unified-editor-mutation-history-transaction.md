@@ -27,7 +27,8 @@ maturity_target: Retired
   `codex/runtime-201-unified-editor-mutation`; Slice A is complete. Slice B has
   migrated direct transform edits and synchronous/asynchronous ICP transform
   publication, gizmo drag commit, default/lane visualization-config edits, and
-  geometry-presentation slot authoring.
+  geometry-presentation slot authoring plus synchronous/asynchronous mesh
+  denoise position publication.
   `GizmoUndoStack` and the now-unused public transform/visualization history
   adapters are deleted; the next owner-scoped adoption is geometry/property
   mutation. The next verification step is that feature's stale-generation/undo
@@ -69,7 +70,8 @@ maturity_target: Retired
   synchronous/asynchronous ICP transform publication, and coalesced gizmo drag
   commit use the internal transaction as of 2026-07-29. Entity-default and
   lane-targeted visualization-config plus geometry-presentation slot edits now
-  use the same transaction. Migrate geometry/property, clustering,
+  use the same transaction. Mesh denoise is the first geometry-property owner
+  migrated. Migrate the remaining geometry/property, clustering,
   parameterization, import postprocess, and destructive conversion commits.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
@@ -87,8 +89,9 @@ maturity_target: Retired
       presentation generation, validation failure, cancelled work, or failed
       apply.
 - [ ] Keep feature-specific state capture and restoration code with the owning
-      feature; transform and visualization satisfy this now, while remaining
-      typed compatibility adapters still need migration or retirement.
+      feature; transform, visualization/presentation, and mesh denoise satisfy
+      this now, while remaining typed compatibility adapters still need
+      migration or retirement.
 - [x] Route gizmo drag commit and property transform edits through the same
       history owner and preserve drag coalescing semantics. The production
       census found no separate keyboard-only transform mutation path.
@@ -107,7 +110,8 @@ maturity_target: Retired
       partial mutation.
 - [ ] Feature matrix covers transform/gizmo, topology/property,
       presentation/material, async method completion, import enrichment, and
-      domain conversion through the same helper.
+      domain conversion through the same helper. Transform/gizmo,
+      presentation, and sync/async denoise-property coverage is complete.
 - [x] Gizmo drag coalescing and exact transform restoration remain covered
       through `EditorCommandHistory`.
 - [ ] Structural tests prove no second undo stack, CommandBus history hook, or
@@ -207,6 +211,19 @@ Geometry-presentation history convergence verification completed on 2026-07-29:
 - `python3 tools/repo/check_test_layout.py --root . --strict`
 - `python3 tools/docs/check_doc_links.py --root .`
 - `python3 tools/repo/check_root_hygiene.py --root .`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/check_task_state_links.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+
+Mesh-denoise property-history convergence verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `cmake --build --preset ci --target IntrinsicTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.MeshDenoise' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+- `ctest --test-dir build/ci --output-on-failure -R 'MeshDenoise|EditorCommandHistory|Mutation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/repo/check_test_layout.py --root . --strict`
+- `python3 tools/docs/check_doc_links.py --root .`
 - `python3 tools/agents/check_task_policy.py --root . --strict`
 - `python3 tools/agents/check_task_state_links.py --root . --strict`
 - `python3 tools/agents/generate_session_brief.py --check`

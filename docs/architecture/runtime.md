@@ -222,9 +222,11 @@ transforms, and default or lane-targeted visualization config edits use this
 shape. Geometry-presentation slot edits additionally validate and monotonically
 advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The
-public history module therefore owns history mechanics rather than transform
-or visualization component DTOs; remaining feature migrations are tracked by
-`RUNTIME-201`.
+mesh-denoise publisher validates both geometry metadata and the exact live
+`v:position` snapshot before each transition, then stamps its normal deferred
+geometry dirty tags after publication. The public history module therefore
+owns history mechanics rather than transform or visualization component DTOs;
+remaining feature migrations are tracked by `RUNTIME-201`.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

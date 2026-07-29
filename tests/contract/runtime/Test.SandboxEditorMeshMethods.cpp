@@ -778,6 +778,20 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
               Runtime::EditorCommandHistoryStatus::Redone);
     ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), denoised);
 
+    std::vector<glm::vec3> intervening = denoised;
+    intervening.front().x += 1.0f;
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh), intervening);
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, mesh),
+        intervening);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+
     context.LastMeshDenoiseResult = &result;
     const Runtime::SandboxEditorDomainWindowModel model =
         Runtime::BuildSandboxEditorDomainWindowModel(

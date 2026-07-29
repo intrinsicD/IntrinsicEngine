@@ -5744,6 +5744,22 @@ namespace Extrinsic::Runtime
             return positions;
         }
 
+        using MeshDenoisePositionState =
+            std::shared_ptr<const std::vector<glm::vec3>>;
+
+        struct MeshDenoiseMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        struct MeshDenoiseMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            MeshDenoisePositionState Positions{};
+        };
+
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshDenoisePositionState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
@@ -5780,9 +5796,18 @@ namespace Extrinsic::Runtime
             }
 
             currentPositions.Vector() = positions;
-            Dirty::MarkVertexPositionsDirty(raw, *entity);
-            Dirty::MarkVertexAttributesDirty(raw, *entity);
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        void StampMeshDenoisePositionDirty(
+            ECS::Scene::Registry& scene,
+            const std::uint32_t stableEntityId)
+        {
+            entt::registry& raw = scene.Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            Dirty::MarkVertexPositionsDirty(raw, entity);
+            Dirty::MarkVertexAttributesDirty(raw, entity);
         }
 
         [[nodiscard]] SandboxEditorCommandStatus CommitMeshDenoisePositions(
@@ -5793,37 +5818,138 @@ namespace Extrinsic::Runtime
         {
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                if (context.Scene == nullptr)
+                    return SandboxEditorCommandStatus::MissingScene;
+                const ECS::EntityHandle entity =
+                    SelectionController::ToEntityHandle(stableEntityId);
+                if (entity == ECS::InvalidEntityHandle ||
+                    !context.Scene->Raw().valid(entity))
+                {
+                    return SandboxEditorCommandStatus::StaleEntity;
+                }
+
+                const MeshDenoisePositionState beforeState =
+                    std::make_shared<std::vector<glm::vec3>>(
+                        std::move(before));
+                const MeshDenoisePositionState afterState =
+                    std::make_shared<std::vector<glm::vec3>>(
+                        std::move(after));
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = "Denoise mesh vertices",
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyMeshDenoisePositionState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyMeshDenoisePositionState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        "Denoise mesh vertices",
+                        MeshDenoiseMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        MeshDenoiseMutationGeneration{
+                            .GeometryMetadataSignature =
+                                GeometryMetadataSignatureForEntity(
+                                    context.Scene->Raw(),
+                                    entity),
+                            .Positions = beforeState,
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const MeshDenoiseMutationIdentity& identity,
+                            const MeshDenoiseMutationGeneration& expected,
+                            const MeshDenoisePositionState&)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            if (entity == ECS::InvalidEntityHandle ||
+                                !raw.valid(entity))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const GS::ConstSourceView view =
+                                GS::BuildConstView(raw, entity);
+                            const GS::SourceAvailability availability =
+                                GS::BuildSourceAvailability(view);
+                            if (availability.ProvenanceDomain !=
+                                    GS::Domain::Mesh ||
+                                view.VertexSource == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (expected.Positions == nullptr ||
+                                GeometryMetadataSignatureForEntity(raw, entity) !=
+                                    expected.GeometryMetadataSignature)
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const auto positions =
+                                view.VertexSource->Properties.Get<glm::vec3>(
+                                    GS::PropertyNames::kPosition);
+                            if (!positions ||
+                                !SameGeometryPositions(
+                                    positions.Vector(),
+                                    *expected.Positions))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const MeshDenoiseMutationIdentity& identity,
+                            const MeshDenoisePositionState& target)
+                        {
+                            if (target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    CommandFailed;
+                            }
+                            return ApplyMeshDenoisePositionState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                *target);
+                        },
+                        [](
+                            const MeshDenoiseMutationIdentity& identity,
+                            const MeshDenoiseMutationGeneration&,
+                            const MeshDenoisePositionState& target)
+                        {
+                            StampMeshDenoisePositionDirty(
+                                *identity.Scene,
+                                identity.StableEntityId);
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            return MeshDenoiseMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    GeometryMetadataSignatureForEntity(
+                                        identity.Scene->Raw(),
+                                        entity),
+                                .Positions = target,
+                            };
                         });
                 return ToSandboxEditorCommandStatus(history.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus applied =
                 ApplyMeshDenoisePositionState(
                     context.Scene,
                     stableEntityId,
-                    after));
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            StampMeshDenoisePositionDirty(
+                *context.Scene,
+                stableEntityId);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         void CopyMeshDenoiseCounters(

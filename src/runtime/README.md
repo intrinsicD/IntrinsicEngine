@@ -377,12 +377,15 @@ action. `SandboxEditorContext::MeshDenoiseKernelAvailable` provides the
 deterministic unavailable-kernel diagnostic lane used by headless/editor
 contract tests.
 
-Successful publication is undoable through `EditorCommandHistory::Execute`:
-undo restores the exact prior `v:position` array and redo reapplies the
-denoised positions. The commit stamps `DirtyVertexPositions` and
-`DirtyVertexAttributes` for deferred mesh extraction/reupload and does not call
-renderer/RHI upload APIs or stamp broad `GpuDirty`. Runtime owns the ECS
-composition and history seam; geometry owns the denoising algorithm.
+Successful publication is undoable through the shared editor mutation
+transaction: undo restores the exact prior `v:position` array and redo
+reapplies the denoised positions only while the entity, geometry metadata, and
+live position snapshot still match the expected state. An intervening property
+or position mutation fails closed without moving history. The owner stamp marks
+`DirtyVertexPositions` and `DirtyVertexAttributes` for deferred mesh
+extraction/reupload and does not call renderer/RHI upload APIs or stamp broad
+`GpuDirty`. Runtime owns the ECS composition and history seam; geometry owns
+the denoising algorithm.
 
 ### Sandbox Editor Point-Cloud Outlier Removal
 
