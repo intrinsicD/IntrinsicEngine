@@ -129,7 +129,13 @@ class Fixture:
             executable,
         ).returncode
 
-    def generate(self, *, complete: bool = True, skip: str | None = None) -> None:
+    def generate(
+        self,
+        *,
+        complete: bool = True,
+        replace: bool = False,
+        skip: str | None = None,
+    ) -> None:
         command = [
             "generate-report",
             "--root",
@@ -148,6 +154,8 @@ class Fixture:
         ]
         if complete:
             command.append("--complete")
+        if replace:
+            command.append("--replace")
         if skip:
             command.extend(["--skip", skip])
         run(self.repo, *command, expected=0)
@@ -235,6 +243,68 @@ class WorkflowEvidenceTests(unittest.TestCase):
             fixture.generate()
             result = fixture.validate()
         self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_clean_fixed_revision_survives_later_unrelated_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp)
+            fixture.receipt()
+            fixture.generate()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "implementation and initial evidence")
+
+            fixture.generate(replace=True)
+            report = yaml.safe_load(fixture.report.read_text(encoding="utf-8"))
+            fixed_revision = report["source"]["head_revision"]
+            self.assertFalse(report["source"]["dirty"])
+            git(fixture.repo, "add", str(fixture.report))
+            git(fixture.repo, "commit", "-qm", "bind fixed revision evidence")
+
+            unrelated = fixture.repo / "unrelated.txt"
+            unrelated.write_text("later task\n", encoding="utf-8")
+            git(fixture.repo, "add", str(unrelated))
+            git(fixture.repo, "commit", "-qm", "land unrelated task")
+            current_revision = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=fixture.repo,
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip()
+            result = fixture.validate()
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertNotEqual(current_revision, fixed_revision)
+
+    def test_clean_fixed_revision_rejects_recorded_blob_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp)
+            fixture.receipt()
+            fixture.generate()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "implementation and initial evidence")
+            fixture.generate(replace=True)
+
+            report = yaml.safe_load(fixture.report.read_text(encoding="utf-8"))
+            report["source"]["surface"][0]["sha256"] = "0" * 64
+            fixture.report.write_text(
+                yaml.safe_dump(report, sort_keys=False), encoding="utf-8"
+            )
+            result = fixture.validate()
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("content hash mismatch", result.stdout)
+
+    def test_dirty_report_remains_bound_to_current_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp)
+            fixture.receipt()
+            fixture.generate()
+            unrelated = fixture.repo / "unrelated.txt"
+            unrelated.write_text("later worktree change\n", encoding="utf-8")
+            result = fixture.validate()
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("current worktree diff", result.stdout)
 
     def test_duplicate_yaml_key_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -311,6 +311,52 @@ def changed_paths(
     return sorted(paths)
 
 
+def changed_paths_between(
+    repo_root: Path,
+    base_revision: str,
+    head_revision: str,
+    evidence_task_id: str | None = None,
+) -> list[str]:
+    paths = {
+        line
+        for line in git(
+            repo_root,
+            "diff",
+            "--name-only",
+            "--diff-filter=ACDMRTUXB",
+            base_revision,
+            head_revision,
+            "--",
+        ).splitlines()
+        if line
+    }
+    if evidence_task_id:
+        prefix = f"tasks/evidence/{evidence_task_id}/"
+        paths = {path for path in paths if not path.startswith(prefix)}
+    return sorted(paths)
+
+
+def require_commit(repo_root: Path, revision: object, location: str) -> str:
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError(f"{location} must be an exact 40-hex commit")
+    git(repo_root, "cat-file", "-e", f"{revision}^{{commit}}")
+    return revision
+
+
+def sha256_at_revision(repo_root: Path, revision: str, value: object) -> str | None:
+    path = resolve_repo_path(repo_root, value)
+    relative = relative_path(repo_root, path)
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "cat-file", "blob", f"{revision}:{relative}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    return sha256_bytes(result.stdout)
+
+
 def surface_entries(repo_root: Path, paths: Iterable[str]) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for value in sorted(set(paths)):
@@ -830,13 +876,31 @@ def validate_report(
 
     source = _require_mapping(report.get("source"), "source", findings)
     entries = _require_list(source.get("surface"), "source.surface", findings)
+    dirty = source.get("dirty")
+    if type(dirty) is not bool:
+        findings.append(Finding("error", "source.dirty", "must be a boolean"))
+    clean_head: str | None = None
+    if dirty is False:
+        try:
+            clean_head = require_commit(
+                repo_root, source.get("head_revision"), "source.head_revision"
+            )
+        except ValueError as exc:
+            findings.append(Finding("error", "source.head_revision", str(exc)))
     checked_entries: list[dict[str, Any]] = []
     for index, entry_value in enumerate(entries):
         entry = _require_mapping(entry_value, f"source.surface[{index}]", findings)
         try:
             path = resolve_repo_path(repo_root, entry.get("path"))
             expected_hash = entry.get("sha256")
-            actual_hash = sha256_file(path) if path.is_file() else None
+            if clean_head is not None:
+                actual_hash = sha256_at_revision(
+                    repo_root, clean_head, entry.get("path")
+                )
+            elif dirty is True:
+                actual_hash = sha256_file(path) if path.is_file() else None
+            else:
+                actual_hash = expected_hash
             if actual_hash != expected_hash:
                 findings.append(
                     Finding(
@@ -857,7 +921,22 @@ def validate_report(
     base_revision = source.get("base_revision")
     if isinstance(base_revision, str) and base_revision:
         try:
-            observed = changed_paths(repo_root, base_revision, task_id)
+            require_commit(repo_root, base_revision, "source.base_revision")
+            if clean_head is not None:
+                observed = changed_paths_between(
+                    repo_root, base_revision, clean_head, task_id
+                )
+                mismatch_detail = (
+                    "recorded changed-path surface does not match fixed revision diff"
+                )
+            elif dirty is True:
+                observed = changed_paths(repo_root, base_revision, task_id)
+                mismatch_detail = (
+                    "recorded changed-path surface does not match current worktree diff"
+                )
+            else:
+                observed = []
+                mismatch_detail = "source revision state is invalid"
             recorded = sorted(
                 entry.get("path")
                 for entry in checked_entries
@@ -868,7 +947,7 @@ def validate_report(
                     Finding(
                         "error",
                         "source.surface",
-                        "recorded changed-path surface does not match current diff",
+                        mismatch_detail,
                     )
                 )
         except ValueError as exc:

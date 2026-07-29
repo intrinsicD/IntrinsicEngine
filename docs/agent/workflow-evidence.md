@@ -113,6 +113,13 @@ surface, stale artifact hashes, missing reasons, and absent profile-specific
 records are blocking errors. A justified skipped check is an explicit warning
 and remains visible in the report.
 
+For a report with `source.dirty: false`, validation reads the recorded surface
+from the exact `source.head_revision` commit and compares
+`source.base_revision..source.head_revision`. This keeps a fixed-revision draft
+auditable after unrelated work lands on the current branch. A report with
+`source.dirty: true` remains bound to the current worktree and is invalidated
+by any subsequent worktree change.
+
 ## High-risk handoff and review
 
 `high-risk` and higher reports point to append-only, hash-chained JSONL:
