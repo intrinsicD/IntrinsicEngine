@@ -1184,6 +1184,64 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalDerivedJobDiscardsStaleSource)
     EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
 }
+TEST(SandboxEditorUi, PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.PointCloudOutlierRemoval =
+        [&completedSinkCalled](
+            Runtime::SandboxEditorPointCloudOutlierRemovalResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
+    const ECS::EntityHandle cloud =
+        MakeSelectable(registry, "StaleOutlierPropertyCloud");
+    AddPointCloudSource(registry, cloud, positions.size());
+    auto& vertices = registry.Raw().get<GS::Vertices>(cloud);
+    SetPositions(vertices, positions);
+    auto confidence =
+        vertices.Properties.GetOrAdd<float>("v:confidence", 0.5f);
+    ASSERT_TRUE(confidence);
+
+    const Runtime::SandboxEditorPointCloudOutlierRemovalResult queued =
+        Runtime::ApplySandboxEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::SandboxEditorPointCloudOutlierRemovalCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Method =
+                    Runtime::SandboxEditorPointCloudOutlierMethod::Statistical,
+                .KNeighbors = 8u,
+                .StdDevMultiplier = 1.0f,
+            });
+    ASSERT_EQ(queued.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    confidence[0] = 0.75f;
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    const Runtime::SandboxEditorJobQueueSnapshot done =
+        jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), positions.size());
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+    EXPECT_FLOAT_EQ(
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:confidence")[0],
+        0.75f);
+}
 TEST(SandboxEditorUi, PointCloudOutlierRemovalRadiusPublishesAndFailsClosed)
 {
     ECS::Scene::Registry registry;
@@ -1279,6 +1337,11 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalPreservesSurvivingPointProperties)
         for (std::size_t i = 0; i < originalCount; ++i)
             labels.Vector()[i] = (i + 3u >= originalCount) ? 99.0f : 7.0f;
     }
+    const std::vector<float> originalLabels =
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:label")
+            .Vector();
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
 
     const Runtime::SandboxEditorPointCloudOutlierRemovalResult result =
@@ -1304,6 +1367,50 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalPreservesSurvivingPointProperties)
     // All kept points are the inliers, so every surviving label is the sentinel.
     for (const float label : survived.Vector())
         EXPECT_FLOAT_EQ(label, 7.0f);
+    const std::vector<glm::vec3> keptPositions =
+        MeshVertexPositions(registry, cloud);
+    const std::vector<float> keptLabels = survived.Vector();
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, cloud),
+        positions);
+    const auto restoredLabels =
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:label");
+    ASSERT_TRUE(restoredLabels);
+    EXPECT_EQ(restoredLabels.Vector(), originalLabels);
+
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, cloud),
+        keptPositions);
+    auto redoneLabels =
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:label");
+    ASSERT_TRUE(redoneLabels);
+    EXPECT_EQ(redoneLabels.Vector(), keptLabels);
+
+    redoneLabels[0] = 42.0f;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FLOAT_EQ(
+        registry.Raw()
+            .get<GS::Vertices>(cloud)
+            .Properties.Get<float>("v:label")[0],
+        42.0f);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(registry, cloud),
+        keptPositions);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
 }
 TEST(SandboxEditorUi, PointCloudOutlierRemovalRespectsDeletedSlots)
 {
@@ -1352,6 +1459,22 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalRespectsDeletedSlots)
     EXPECT_EQ(result.KeptCount + result.RejectedCount, liveCount);
     EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
     EXPECT_LE(result.KeptCount, liveCount);
+    EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).NumDeleted, 0u);
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    const auto& restored = registry.Raw().get<GS::Vertices>(cloud);
+    EXPECT_EQ(restored.Properties.Size(), slotCount);
+    EXPECT_EQ(restored.NumDeleted, 1u);
+    const auto restoredDeleted =
+        restored.Properties.Get<bool>("p:deleted");
+    ASSERT_TRUE(restoredDeleted);
+    ASSERT_EQ(restoredDeleted.Vector().size(), slotCount);
+    EXPECT_TRUE(restoredDeleted[slotCount - 1u]);
+
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
     EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).NumDeleted, 0u);
 }
 TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel)

@@ -233,9 +233,13 @@ exact live positions, edge/halfedge/face connectivity, and known vertex/face
 property values are revalidated before queued publication and every history
 transition. Its apply stamp requests the required full GPU rebuild only after
 the regenerated topology is published; the other mesh owners stamp their
-normal deferred geometry dirty tags after publication. The public history
-module therefore owns history mechanics rather than transform or visualization
-component DTOs; remaining feature migrations are tracked by `RUNTIME-201`.
+normal deferred geometry dirty tags after publication. Point-cloud outlier
+replacement also uses the transaction with an exact full point-property/deleted
+slot snapshot; queued output and undo/redo reject any intervening point
+attribute or metadata mutation, and full replacement dirty tags are stamped
+only after publication. The public history module therefore owns history
+mechanics rather than transform or visualization component DTOs; remaining
+feature migrations are tracked by `RUNTIME-201`.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

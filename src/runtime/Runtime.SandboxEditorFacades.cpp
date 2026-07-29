@@ -7095,8 +7095,56 @@ namespace Extrinsic::Runtime
             // mutated.
             Geometry::PointCloud::Cloud published = cloud;
             GS::PopulateFromCloud(raw, *entity, published);
-            MarkPointCloudReplacementDirty(raw, *entity);
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        struct PointCloudMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
+        struct PointCloudSourceState
+        {
+            Geometry::PropertySet Properties{};
+            std::size_t NumDeleted{0u};
+        };
+
+        using PointCloudSourceSnapshot =
+            std::shared_ptr<const PointCloudSourceState>;
+        using PointCloudState =
+            std::shared_ptr<const Geometry::PointCloud::Cloud>;
+
+        struct PointCloudMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            PointCloudSourceSnapshot Source{};
+        };
+
+        [[nodiscard]] PointCloudSourceSnapshot CapturePointCloudSourceState(
+            const GS::ConstSourceView& view)
+        {
+            if (view.VertexSource == nullptr)
+                return nullptr;
+            return std::make_shared<PointCloudSourceState>(
+                PointCloudSourceState{
+                    .Properties = view.VertexSource->Properties,
+                    .NumDeleted = view.VertexSource->NumDeleted,
+                });
+        }
+
+        [[nodiscard]] bool SamePointCloudSourceState(
+            const GS::ConstSourceView& view,
+            const PointCloudSourceState& expected) noexcept
+        {
+            return view.VertexSource != nullptr &&
+                   view.VertexSource->NumDeleted == expected.NumDeleted &&
+                   SameKnownPropertyValues(
+                       Geometry::ConstPropertySet(
+                           view.VertexSource->Properties),
+                       Geometry::ConstPropertySet(
+                           expected.Properties));
         }
 
         [[nodiscard]] bool MirrorGeometrySourcePositionsToPointCloudStorage(
@@ -7123,42 +7171,137 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
             const char* label,
+            const std::uint64_t expectedGeometryMetadataSignature,
+            PointCloudSourceSnapshot expectedSource,
             Geometry::PointCloud::Cloud before,
             Geometry::PointCloud::Cloud after)
         {
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                const PointCloudState beforeState =
+                    std::make_shared<Geometry::PointCloud::Cloud>(
+                        std::move(before));
+                const PointCloudState afterState =
+                    std::make_shared<Geometry::PointCloud::Cloud>(
+                        std::move(after));
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = label,
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyPointCloudPointState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyPointCloudPointState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        label,
+                        PointCloudMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        PointCloudMutationGeneration{
+                            .GeometryMetadataSignature =
+                                expectedGeometryMetadataSignature,
+                            .Source = std::move(expectedSource),
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const PointCloudMutationIdentity& identity,
+                            const PointCloudMutationGeneration& expected,
+                            const PointCloudState& target)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (!entity.has_value())
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const GS::ConstSourceView view =
+                                GS::BuildConstView(raw, *entity);
+                            const GS::SourceAvailability availability =
+                                GS::BuildSourceAvailability(view);
+                            if (availability.ProvenanceDomain !=
+                                GS::Domain::PointCloud)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (expected.Source == nullptr || target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+                            if (GeometryMetadataSignatureForEntity(
+                                    raw,
+                                    *entity) !=
+                                    expected.GeometryMetadataSignature ||
+                                !SamePointCloudSourceState(
+                                    view,
+                                    *expected.Source))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const PointCloudMutationIdentity& identity,
+                            const PointCloudState& target)
+                        {
+                            if (target == nullptr)
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            return ApplyPointCloudPointState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                *target);
+                        },
+                        [](
+                            const PointCloudMutationIdentity& identity,
+                            const PointCloudMutationGeneration&,
+                            const PointCloudState&)
+                        {
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (entity.has_value())
+                                MarkPointCloudReplacementDirty(raw, *entity);
+                            return PointCloudMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    entity.has_value()
+                                        ? GeometryMetadataSignatureForEntity(
+                                              raw,
+                                              *entity)
+                                        : 0u,
+                                .Source =
+                                    entity.has_value()
+                                        ? CapturePointCloudSourceState(
+                                              GS::BuildConstView(
+                                                  raw,
+                                                  *entity))
+                                        : nullptr,
+                            };
                         });
                 return ToSandboxEditorCommandStatus(history.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus applied =
                 ApplyPointCloudPointState(
                     context.Scene,
                     stableEntityId,
-                    after));
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (entity.has_value())
+                MarkPointCloudReplacementDirty(raw, *entity);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         [[nodiscard]] const char* DebugNameForOutlierRemovalStatus(
@@ -7488,7 +7631,7 @@ namespace Extrinsic::Runtime
         {
             std::uint32_t StableEntityId{0u};
             std::uint64_t GeometryMetadataSignature{0u};
-            std::vector<glm::vec3> SnapshotPositions{};
+            PointCloudSourceSnapshot Snapshot{};
             Geometry::PointCloud::Cloud BeforeCloud{};
             Geometry::PointCloud::Cloud WorkCloud{};
             Geometry::PointCloud::Cloud AfterCloud{};
@@ -7525,10 +7668,8 @@ namespace Extrinsic::Runtime
                 return JobApplyValidation::StaleGeneration;
             }
 
-            std::optional<std::vector<glm::vec3>> current =
-                CollectFiniteGeometryPositions(view.VertexSource->Properties);
-            if (!current.has_value() ||
-                !SameGeometryPositions(*current, job.SnapshotPositions))
+            if (job.Snapshot == nullptr ||
+                !SamePointCloudSourceState(view, *job.Snapshot))
             {
                 return JobApplyValidation::StaleGeneration;
             }
@@ -7637,8 +7778,10 @@ namespace Extrinsic::Runtime
                     statistical
                         ? "Remove statistical point-cloud outliers"
                         : "Remove radius point-cloud outliers",
-                    job.BeforeCloud,
-                    job.AfterCloud);
+                    job.GeometryMetadataSignature,
+                    std::move(job.Snapshot),
+                    std::move(job.BeforeCloud),
+                    std::move(job.AfterCloud));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -7716,14 +7859,14 @@ namespace Extrinsic::Runtime
             const SandboxEditorPointCloudOutlierRemovalCommand& command,
             Geometry::PointCloud::Cloud beforeCloud,
             Geometry::PointCloud::Cloud workCloud,
-            std::vector<glm::vec3> snapshotPositions,
+            PointCloudSourceSnapshot snapshot,
             const std::uint64_t geometryMetadataSignature)
         {
             auto state = std::make_shared<
                 SandboxEditorPointCloudOutlierRemovalCpuJobState>();
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
-            state->SnapshotPositions = std::move(snapshotPositions);
+            state->Snapshot = std::move(snapshot);
             state->BeforeCloud = std::move(beforeCloud);
             state->WorkCloud = std::move(workCloud);
             state->Command = command;
@@ -17649,6 +17792,20 @@ namespace Extrinsic::Runtime
                              "point-cloud GeometrySources.";
             return result;
         }
+        const PointCloudSourceSnapshot sourceSnapshot =
+            CapturePointCloudSourceState(
+                GS::BuildConstView(raw, *entity));
+        if (sourceSnapshot == nullptr)
+        {
+            result.Status =
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message = "Point-cloud outlier removal requires selected "
+                             "point-cloud GeometrySources.";
+            return result;
+        }
+        const std::uint64_t geometryMetadataSignature =
+            GeometryMetadataSignatureForEntity(raw, *entity);
 
         // Snapshot the original point property set (including any deleted slots
         // and the live deletion counter) so undo restores the entity exactly.
@@ -17691,9 +17848,9 @@ namespace Extrinsic::Runtime
         if (workCloud.HasGarbage())
             workCloud.GarbageCollection();
 
-        std::optional<std::vector<glm::vec3>> snapshotPositions =
-            CollectFiniteGeometryPositions(view.VertexSource->Properties);
-        if (!snapshotPositions.has_value())
+        if (!CollectFiniteGeometryPositions(
+                 view.VertexSource->Properties)
+                 .has_value())
         {
             result.Status =
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
@@ -17712,8 +17869,8 @@ namespace Extrinsic::Runtime
                 command,
                 std::move(beforeCloud),
                 std::move(workCloud),
-                std::move(*snapshotPositions),
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                sourceSnapshot,
+                geometryMetadataSignature);
         }
 
         Geometry::PointCloud::OutlierRemovalResult removal{};
@@ -17773,8 +17930,10 @@ namespace Extrinsic::Runtime
                 statistical
                     ? "Remove statistical point-cloud outliers"
                     : "Remove radius point-cloud outliers",
-                beforeCloud,
-                afterCloud);
+                geometryMetadataSignature,
+                sourceSnapshot,
+                std::move(beforeCloud),
+                std::move(afterCloud));
         result.Status = status;
         if (status != SandboxEditorCommandStatus::Applied)
         {

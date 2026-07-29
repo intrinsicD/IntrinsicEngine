@@ -403,9 +403,14 @@ for undo plus a live-only worker cloud, and queues the GEOM-016 removal through
 points first (so the operators — which iterate every slot — see only live points
 and report live-relative counts, never resurrecting dead slots). The
 main-thread apply revalidates the selected entity's point-source metadata and
-positions before publishing; tests and non-engine callers without an injected
-job surface keep the immediate compatibility path. The window exposes a method
-toggle plus the per-method parameters: statistical removal takes `KNeighbors`
+full point-property/deleted-slot snapshot before publishing; the same typed
+state and validation enter the shared editor mutation transaction for exact
+undo/redo. An intervening position or attribute edit discards queued output or
+rejects history without mutation. Full GPU/position/attribute/normal dirty tags
+are stamped only after replacement publication; tests and non-engine callers
+without an injected job surface keep the immediate compatibility path. The
+window exposes a method toggle plus the per-method parameters: statistical
+removal takes `KNeighbors`
 (1–512) and a
 `StdDevMultiplier` (0–100, higher keeps more points); radius removal takes a
 positive `SearchRadius` and a `MinNeighbors` (0–512) threshold. It surfaces the

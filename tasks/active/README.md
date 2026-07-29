@@ -16,8 +16,8 @@ Each active task should include:
   internal transaction helper and atomicity/staleness contracts are complete,
   direct/ICP transform publication and coalesced gizmo drag commit now use it,
   `GizmoUndoStack` is deleted, migrated mesh property/topology owners include
-  UV regeneration, and point-cloud replacement is the next owner-scoped
-  adoption.
+  UV regeneration, point-cloud replacement now validates the full point source,
+  and parameterization is the next owner-scoped adoption.
 
 ## History
 
