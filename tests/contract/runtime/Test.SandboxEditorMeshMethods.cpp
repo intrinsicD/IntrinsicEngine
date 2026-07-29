@@ -1834,6 +1834,38 @@ TEST(SandboxEditorUi, MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo)
               Runtime::EditorCommandHistoryStatus::Redone);
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), afterUniform);
 
+    auto nextHalfedge =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext);
+    ASSERT_TRUE(nextHalfedge.IsValid());
+    ASSERT_FALSE(nextHalfedge.Vector().empty());
+    const std::uint32_t publishedNext = nextHalfedge.Vector().front();
+    const std::uint32_t interveningNext =
+        publishedNext == 0u ? 1u : 0u;
+    nextHalfedge.Vector().front() = interveningNext;
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext)
+            .Vector()
+            .front(),
+        interveningNext);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), afterUniform);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+    nextHalfedge =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext);
+    ASSERT_TRUE(nextHalfedge.IsValid());
+    nextHalfedge.Vector().front() = publishedNext;
+
     context.LastMeshRemeshResult = &uniform;
     const Runtime::SandboxEditorDomainWindowModel model =
         Runtime::BuildSandboxEditorDomainWindowModel(
@@ -2161,6 +2193,64 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
     ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh),
                                 stalePositions);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+}
+TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.MeshSubdivide =
+        [&completedSinkCalled](Runtime::SandboxEditorMeshSubdivideResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "StaleSubdivideTopology");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    const Runtime::SandboxEditorMeshSubdivideResult result =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
+            context,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Operator = Runtime::SandboxEditorMeshSubdivideOperator::Loop,
+                .Iterations = 1u,
+            });
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+
+    auto nextHalfedge =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext);
+    ASSERT_TRUE(nextHalfedge.IsValid());
+    ASSERT_FALSE(nextHalfedge.Vector().empty());
+    const std::uint32_t staleNext =
+        nextHalfedge.Vector().front() == 0u ? 1u : 0u;
+    nextHalfedge.Vector().front() = staleNext;
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+
+    const Runtime::SandboxEditorJobQueueSnapshot done =
+        jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(completedSinkCalled);
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext)
+            .Vector()
+            .front(),
+        staleNext);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
 }

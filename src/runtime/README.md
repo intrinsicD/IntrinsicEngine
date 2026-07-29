@@ -562,12 +562,15 @@ Each backing kernel and option has an explicit `SandboxEditorContext` feature
 gate, so unavailable operators return deterministic diagnostics without
 mutating `GeometrySources`.
 
-Successful remesh and subdivide commits are undoable through
-`EditorCommandHistory::Execute`: undo restores the exact prior mesh snapshot and
-redo reapplies the generated mesh. Publication stamps `DirtyVertexPositions`,
-`DirtyVertexAttributes`, `DirtyEdgeTopology`, and `DirtyFaceTopology`, and does
-not call renderer/RHI upload APIs or stamp broad `GpuDirty`; mesh extraction
-repackages/reuploads on the next deferred extraction opportunity.
+Successful remesh and subdivide commits are undoable through the shared editor
+mutation transaction: undo restores the exact prior mesh snapshot and redo
+reapplies the generated mesh only while geometry metadata and the complete
+canonical position/connectivity state still match. In-place topology changes
+also stale-discard queued output before publication. Publication stamps
+`DirtyVertexPositions`, `DirtyVertexAttributes`, `DirtyEdgeTopology`, and
+`DirtyFaceTopology`, and does not call renderer/RHI upload APIs or stamp broad
+`GpuDirty`; mesh extraction repackages/reuploads on the next deferred
+extraction opportunity.
 
 ### Sandbox Editor Mesh Simplify
 
@@ -584,8 +587,8 @@ per-collapse max-error cap (`0` = unlimited), boundary preservation, and the
 FA-QEM feature weights (feature angle, normal/boundary/curvature weights, sharp-
 feature and UV-seam pinning), and reads out the `Result` diagnostics: input →
 output vertex/face counts, collapse count, max collapse error, topology/quality
-rejections, and pinned sharp-feature/UV-seam counts. Commits are undoable
-through `EditorCommandHistory::Execute` and stamp the same
+rejections, and pinned sharp-feature/UV-seam counts. Commits use the same
+generation-validated topology transaction as remesh/subdivide and stamp the same
 `DirtyVertexPositions`/`DirtyVertexAttributes`/`DirtyEdgeTopology`/
 `DirtyFaceTopology` tags as remesh/subdivide, without renderer/RHI upload calls
 or broad `GpuDirty`. `SandboxEditorContext::MeshSimplifyKernelAvailable` gates

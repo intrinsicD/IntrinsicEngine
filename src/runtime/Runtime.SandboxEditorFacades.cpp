@@ -6605,6 +6605,129 @@ namespace Extrinsic::Runtime
             Dirty::MarkFaceTopologyDirty(raw, entity);
         }
 
+        using MeshTopologySnapshot =
+            std::shared_ptr<const Geometry::HalfedgeMesh::Mesh>;
+
+        struct MeshTopologyMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            MeshTopologySnapshot Mesh{};
+        };
+
+        [[nodiscard]] bool SameMeshTopologyState(
+            const GS::ConstSourceView& view,
+            const Geometry::HalfedgeMesh::Mesh& mesh) noexcept
+        {
+            if (view.VertexSource == nullptr ||
+                view.EdgeSource == nullptr ||
+                view.HalfedgeSource == nullptr ||
+                view.FaceSource == nullptr ||
+                view.VertexSource->Properties.Size() != mesh.VerticesSize() ||
+                view.EdgeSource->Properties.Size() != mesh.EdgesSize() ||
+                view.HalfedgeSource->Properties.Size() != mesh.HalfedgesSize() ||
+                view.FaceSource->Properties.Size() != mesh.FacesSize() ||
+                view.VertexSource->NumDeleted != mesh.DeletedVertexCount() ||
+                view.EdgeSource->NumDeleted != mesh.DeletedEdgeCount() ||
+                view.FaceSource->NumDeleted != mesh.DeletedFaceCount())
+            {
+                return false;
+            }
+
+            const auto positions =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    GS::PropertyNames::kPosition);
+            const auto edgeV0 =
+                view.EdgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kEdgeV0);
+            const auto edgeV1 =
+                view.EdgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kEdgeV1);
+            const auto halfedgeTo =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeToVertex);
+            const auto halfedgeNext =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeNext);
+            const auto halfedgeFace =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeFace);
+            const auto faceHalfedge =
+                view.FaceSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kFaceHalfedge);
+            if (!positions || !edgeV0 || !edgeV1 || !halfedgeTo ||
+                !halfedgeNext || !halfedgeFace || !faceHalfedge)
+            {
+                return false;
+            }
+
+            for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+            {
+                const glm::vec3& current = positions.Vector()[i];
+                const glm::vec3& expected =
+                    mesh.Position(Geometry::VertexHandle{
+                        static_cast<Geometry::PropertyIndex>(i)});
+                if (current.x != expected.x ||
+                    current.y != expected.y ||
+                    current.z != expected.z)
+                {
+                    return false;
+                }
+            }
+
+            for (std::size_t i = 0u; i < mesh.EdgesSize(); ++i)
+            {
+                const Geometry::HalfedgeHandle halfedge =
+                    mesh.Halfedge(
+                        Geometry::EdgeHandle{
+                            static_cast<Geometry::PropertyIndex>(i)},
+                        0u);
+                if (edgeV0.Vector()[i] !=
+                        static_cast<std::uint32_t>(
+                            mesh.FromVertex(halfedge).Index) ||
+                    edgeV1.Vector()[i] !=
+                        static_cast<std::uint32_t>(
+                            mesh.ToVertex(halfedge).Index))
+                {
+                    return false;
+                }
+            }
+
+            for (std::size_t i = 0u; i < mesh.HalfedgesSize(); ++i)
+            {
+                const Geometry::HalfedgeHandle halfedge{
+                    static_cast<Geometry::PropertyIndex>(i)};
+                const Geometry::FaceHandle face = mesh.Face(halfedge);
+                const std::uint32_t expectedFace =
+                    face.IsValid()
+                        ? static_cast<std::uint32_t>(face.Index)
+                        : std::numeric_limits<std::uint32_t>::max();
+                if (halfedgeTo.Vector()[i] !=
+                        static_cast<std::uint32_t>(
+                            mesh.ToVertex(halfedge).Index) ||
+                    halfedgeNext.Vector()[i] !=
+                        static_cast<std::uint32_t>(
+                            mesh.NextHalfedge(halfedge).Index) ||
+                    halfedgeFace.Vector()[i] != expectedFace)
+                {
+                    return false;
+                }
+            }
+
+            for (std::size_t i = 0u; i < mesh.FacesSize(); ++i)
+            {
+                const Geometry::HalfedgeHandle halfedge =
+                    mesh.Halfedge(Geometry::FaceHandle{
+                        static_cast<Geometry::PropertyIndex>(i)});
+                const std::uint32_t expectedHalfedge =
+                    halfedge.IsValid()
+                        ? static_cast<std::uint32_t>(halfedge.Index)
+                        : std::numeric_limits<std::uint32_t>::max();
+                if (faceHalfedge.Vector()[i] != expectedHalfedge)
+                    return false;
+            }
+            return true;
+        }
+
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshTopologyState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
@@ -6623,7 +6746,6 @@ namespace Extrinsic::Runtime
             if (published.HasGarbage())
                 published.GarbageCollection();
             GS::PopulateFromMesh(raw, *entity, published);
-            MarkMeshTopologyReplacementDirty(raw, *entity);
             return EditorCommandHistoryStatus::Applied;
         }
 
@@ -6631,42 +6753,136 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
             const char* label,
+            const std::uint64_t expectedGeometryMetadataSignature,
             Geometry::HalfedgeMesh::Mesh before,
             Geometry::HalfedgeMesh::Mesh after)
         {
+            if (before.HasGarbage())
+                before.GarbageCollection();
+            if (after.HasGarbage())
+                after.GarbageCollection();
+
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                const MeshTopologySnapshot beforeState =
+                    std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                        std::move(before));
+                const MeshTopologySnapshot afterState =
+                    std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                        std::move(after));
                 const EditorCommandHistoryResult history =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = label,
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyMeshTopologyState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyMeshTopologyState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        label,
+                        MeshPropertyMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        MeshTopologyMutationGeneration{
+                            .GeometryMetadataSignature =
+                                expectedGeometryMetadataSignature,
+                            .Mesh = beforeState,
+                        },
+                        beforeState,
+                        afterState,
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshTopologyMutationGeneration& expected,
+                            const MeshTopologySnapshot& target)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (!entity.has_value())
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+
+                            const GS::ConstSourceView view =
+                                GS::BuildConstView(raw, *entity);
+                            const GS::SourceAvailability availability =
+                                GS::BuildSourceAvailability(view);
+                            if (availability.ProvenanceDomain !=
+                                GS::Domain::Mesh)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+                            if (expected.Mesh == nullptr || target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::CommandFailed;
+                            }
+                            if (GeometryMetadataSignatureForEntity(
+                                    raw,
+                                    *entity) !=
+                                    expected.GeometryMetadataSignature ||
+                                !SameMeshTopologyState(view, *expected.Mesh))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            return EditorCommandHistoryStatus::Applied;
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshTopologySnapshot& target)
+                        {
+                            if (target == nullptr)
+                            {
+                                return EditorCommandHistoryStatus::
+                                    CommandFailed;
+                            }
+                            return ApplyMeshTopologyState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                *target);
+                        },
+                        [](
+                            const MeshPropertyMutationIdentity& identity,
+                            const MeshTopologyMutationGeneration&,
+                            const MeshTopologySnapshot& target)
+                        {
+                            entt::registry& raw = identity.Scene->Raw();
+                            const std::optional<ECS::EntityHandle> entity =
+                                ResolveStableEntity(
+                                    raw,
+                                    identity.StableEntityId);
+                            if (entity.has_value())
+                                MarkMeshTopologyReplacementDirty(raw, *entity);
+                            return MeshTopologyMutationGeneration{
+                                .GeometryMetadataSignature =
+                                    entity.has_value()
+                                        ? GeometryMetadataSignatureForEntity(
+                                              raw,
+                                              *entity)
+                                        : 0u,
+                                .Mesh = target,
+                            };
                         });
                 return ToSandboxEditorCommandStatus(history.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus applied =
                 ApplyMeshTopologyState(
                     context.Scene,
                     stableEntityId,
-                    after));
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (entity.has_value())
+                MarkMeshTopologyReplacementDirty(raw, *entity);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyUvMeshTopologyState(
@@ -8552,6 +8768,14 @@ namespace Extrinsic::Runtime
                 return JobApplyValidation::StaleGeneration;
             }
 
+            if ((job.Kind == SandboxEditorMeshCpuJobKind::Remesh ||
+                 job.Kind == SandboxEditorMeshCpuJobKind::Subdivide ||
+                 job.Kind == SandboxEditorMeshCpuJobKind::Simplify) &&
+                !SameMeshTopologyState(view, job.BeforeMesh))
+            {
+                return JobApplyValidation::StaleGeneration;
+            }
+
             if (job.Kind == SandboxEditorMeshCpuJobKind::Curvature)
             {
                 GS::MutableSourceView mutableView =
@@ -9180,8 +9404,9 @@ namespace Extrinsic::Runtime
                     context,
                     job.StableEntityId,
                     "Remesh mesh",
-                    job.BeforeMesh,
-                    job.Mesh);
+                    job.GeometryMetadataSignature,
+                    std::move(job.BeforeMesh),
+                    std::move(job.Mesh));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -9216,8 +9441,9 @@ namespace Extrinsic::Runtime
                     context,
                     job.StableEntityId,
                     "Subdivide mesh",
-                    job.BeforeMesh,
-                    job.Mesh);
+                    job.GeometryMetadataSignature,
+                    std::move(job.BeforeMesh),
+                    std::move(job.Mesh));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -9252,8 +9478,9 @@ namespace Extrinsic::Runtime
                     context,
                     job.StableEntityId,
                     "Simplify mesh",
-                    job.BeforeMesh,
-                    job.Mesh);
+                    job.GeometryMetadataSignature,
+                    std::move(job.BeforeMesh),
+                    std::move(job.Mesh));
             if (commitStatus != SandboxEditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -16228,6 +16455,7 @@ namespace Extrinsic::Runtime
                 context,
                 command.StableEntityId,
                 "Remesh mesh",
+                GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(source.Mesh));
         if (commitStatus != SandboxEditorCommandStatus::Applied)
@@ -16437,6 +16665,7 @@ namespace Extrinsic::Runtime
                 context,
                 command.StableEntityId,
                 "Subdivide mesh",
+                GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(output));
         if (commitStatus != SandboxEditorCommandStatus::Applied)
@@ -16586,6 +16815,7 @@ namespace Extrinsic::Runtime
                 context,
                 command.StableEntityId,
                 "Simplify mesh",
+                GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(source.Mesh));
         if (commitStatus != SandboxEditorCommandStatus::Applied)

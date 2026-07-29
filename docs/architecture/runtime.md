@@ -225,10 +225,12 @@ restoring a captured generation and admitting an ABA stale-output match. The
 mesh-denoise publisher validates both geometry metadata and the exact live
 `v:position` snapshot before each transition. Mesh-curvature publication also
 validates that source plus the exact mean, Gaussian, and principal-direction
-property snapshots it owns. Both stamp their normal deferred geometry dirty
-tags only after publication. The public history module therefore owns history
-mechanics rather than transform or visualization component DTOs; remaining
-feature migrations are tracked by `RUNTIME-201`.
+property snapshots it owns. Remesh, subdivide, and simplify publication
+validate geometry metadata plus the complete canonical position/connectivity
+state, including before queued output may publish. These owners stamp their
+normal deferred geometry dirty tags only after publication. The public history
+module therefore owns history mechanics rather than transform or visualization
+component DTOs; remaining feature migrations are tracked by `RUNTIME-201`.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes
