@@ -1018,3 +1018,24 @@ observations:
     promoted_to: "logic/claims.md:C15"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O76
+    timestamp: "2026-07-29T14:02+02:00"
+    provenance: ai-executed
+    content: >
+      Production undoable runtime entity and geometry edits can share one
+      include-only generation-validated mutation transaction and one
+      EditorCommandHistory while each feature retains its exact typed state,
+      validation, atomic apply, and dirty-stamp policy.
+    context: >
+      RUNTIME-201 closure combines 89 focused CPU history/mutation cases, the
+      complete CPU-supported selector with 4,059 passes and one expected
+      GLFW/LeakSanitizer self-skip, a structural single-owner/retired-symbol
+      ratchet, and a production mutation census. Import creation, authoring,
+      and enrichment remain a documented dirty-only lifecycle. This is a CPU
+      lifecycle/capability claim, not a GPU/Vulkan or performance claim.
+    potential_type: claim
+    bound_to: [N104, N106, N107]
+    promoted: true
+    promoted_to: "logic/claims.md:C16"
+    crystallized_via: artifact-commitment
+    stale: false

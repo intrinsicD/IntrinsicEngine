@@ -6,6 +6,20 @@ maturity_target: Retired
 ---
 # RUNTIME-201 — Unified editor mutation and history transaction
 
+## Status
+
+- Retired on 2026-07-29 at `Retired` after every undoable production
+  entity/geometry edit converged on the internal generation-validated
+  transaction and the parallel history paths were deleted.
+- Retirement commit reference: this commit plus activation `ecd484d7`,
+  transaction contract `41c4f73b`, feature-adoption checkpoints
+  `cf4fe419` through `0f2fc696`, and structural ratchet `bc503c78`.
+- Final Clang 23 verification passed the 89-case focused history/mutation
+  selector and all 4,059 selected CPU-supported tests with one expected
+  GLFW/LeakSanitizer self-skip. Strict repository validators and the final
+  retired-symbol/mutation census passed; ARA C16 binds the CPU capability
+  claim without making a GPU/Vulkan or performance claim.
+
 ## Goal
 
 - Route every undoable runtime entity/geometry edit through one internal
@@ -23,8 +37,9 @@ maturity_target: Retired
 
 ## Context
 
-- Status: in progress; owner `Codex`; branch
-  `codex/runtime-201-unified-editor-mutation`; Slice A is complete. Slice B has
+- Status: retired; owner `Codex`; branch
+  `codex/runtime-201-unified-editor-mutation`. Slice A established the common
+  transaction and Slice B
   migrated direct transform edits and synchronous/asynchronous ICP transform
   publication, gizmo drag commit, default/lane visualization-config edits, and
   geometry-presentation slot authoring plus synchronous/asynchronous mesh
@@ -40,8 +55,9 @@ maturity_target: Retired
   restoration.
   `GizmoUndoStack` and the now-unused public transform/visualization history
   adapters are deleted together with the primitive-view compatibility builder
-  and the unused CommandBus inverse-history hook. The next cleanup is the final
-  production mutation census.
+  and the unused CommandBus inverse-history hook. The final production census
+  found only the documented non-dirty selection compatibility adapter and five
+  import-lifecycle `MarkDirty` transitions outside the entity-mutation helper.
 - At task intake, `EditorCommandHistory` was already the durable editor
   undo/redo owner but also contained feature-specific builders. Geometry/method
   facades still duplicate snapshot/validate/apply/dirty/history rules; gizmo
@@ -75,7 +91,7 @@ maturity_target: Retired
   implementation/internal
   `ExecuteUndoableEntityMutation<TState>` shape and focused atomicity/staleness
   contracts without a new public service.
-- **Slice B — feature adoption (in progress).** Direct transform edits,
+- **Slice B — feature adoption (complete 2026-07-29).** Direct transform edits,
   synchronous/asynchronous ICP transform publication, and coalesced gizmo drag
   commit use the internal transaction as of 2026-07-29. Entity-default and
   lane-targeted visualization-config plus geometry-presentation slot edits now
@@ -100,30 +116,31 @@ maturity_target: Retired
   entity creation, authoring, and enrichment are one automatic lifecycle,
   while `BUG-095` owns its stale completion guard and `RUNTIME-200` its staged
   replacement.
-- **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
+- **Slice C — cleanup (complete 2026-07-29).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction; render-hint adoption
   also deleted the primitive-view history builder. The CommandBus
-  inverse-history API and its compatibility tests are deleted. Delete any
-  remaining duplicate apply paths found by the final production mutation
-  census.
+  inverse-history API and its compatibility tests are deleted. The final
+  production census found no remaining duplicate entity-mutation apply or
+  history path.
 
 ## Required changes
 
 - [x] Define one internal mutation helper taking stable entity/world identity,
       expected generations, typed before/after state, pure validation, atomic
       apply, dirty stamping, and deterministic undo/redo callbacks.
-- [ ] Fail closed without mutation/history on stale entity, source/property/
+- [x] Fail closed without mutation/history on stale entity, source/property/
       presentation generation, validation failure, cancelled work, or failed
       apply.
-- [ ] Keep feature-specific state capture and restoration code with the owning
+- [x] Keep feature-specific state capture and restoration code with the owning
       feature; transform, visualization/presentation, mesh denoise, and mesh
       curvature plus mesh topology replacement, point-cloud replacement, and
       parameterization, render hints, and vertex-channel bindings satisfy this
       now; mesh/graph/point-cloud normal properties share another owner-local
       typed state, clustering owns its typed output cohort, and Progressive
-      Poisson owns its point-output/domain-conversion cohort. Remaining import
-      paths still need classification or migration.
+      Poisson owns its point-output/domain-conversion cohort. Import paths are
+      classified as automatic document lifecycle and remain deliberately
+      outside undo history.
 - [x] Route gizmo drag commit and property transform edits through the same
       history owner and preserve drag coalescing semantics. The production
       census found no separate keyboard-only transform mutation path.
@@ -133,7 +150,7 @@ maturity_target: Retired
       import lifecycle, not an independently undoable editor mutation; its
       successful scene change remains a dirty-only document transition with no
       undo record.
-- [ ] Delete `GizmoUndoStack`, feature-specific builders from
+- [x] Delete `GizmoUndoStack`, feature-specific builders from
       `EditorCommandHistory`, and `CommandBus::SetHistoryHook` /
       `RecordInverse` after production adoption and parity. Gizmo plus the
       transform/visualization/primitive-view builders and CommandBus hook are
@@ -159,24 +176,24 @@ maturity_target: Retired
       non-goal.
 - [x] Gizmo drag coalescing and exact transform restoration remain covered
       through `EditorCommandHistory`.
-- [ ] Structural tests prove no second undo stack, CommandBus history hook, or
+- [x] Structural tests prove no second undo stack, CommandBus history hook, or
       feature-owned parallel history path remains.
 
 ## Docs
 
-- [ ] Update editor/runtime command-history docs with transaction ownership,
+- [x] Update editor/runtime command-history docs with transaction ownership,
       stale completion, and feature-specific state responsibilities.
-- [ ] Regenerate module inventory if public surfaces are removed.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Regenerate module inventory after public surface removals.
+- [x] Refresh task indexes, session brief, and retirement records.
 
 ## Acceptance criteria
 
-- [ ] Every undoable production edit commits exactly once through
+- [x] Every undoable production edit commits exactly once through
       `EditorCommandHistory` using the same generation-validated transaction
       shape.
-- [ ] UI and agent callers submit the same typed operation; neither owns
+- [x] UI and agent callers submit the same typed operation; neither owns
       snapshots or bypasses runtime validation.
-- [ ] `GizmoUndoStack`, CommandBus inverse history, and specialized history
+- [x] `GizmoUndoStack`, CommandBus inverse history, and specialized history
       builders are deleted after behavior parity.
 
 ## Verification
@@ -399,6 +416,24 @@ Import lifecycle classification verification completed on 2026-07-29:
 - `ctest --test-dir build/ci --output-on-failure -R '^RuntimeAssetImportFormatCoverage\.AssetImportPipelinePreservesImportDirtyState$' --timeout 60`
 - `rg -n 'MarkDirty\\(' src/runtime --glob '*.{cpp,cppm,hpp}'`
 
+Final retirement verification completed on 2026-07-29:
+
+- `cmake --preset ci`
+- `cmake --build --preset ci --target IntrinsicTests`
+- `ctest --test-dir build/ci --output-on-failure -R 'EditorCommandHistory|Gizmo|Undo|Redo|Mutation|ProgressivePoisson|AssetImportPipelinePreservesImportDirtyState' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+  — 89/89 passed.
+- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+  — 4,059/4,059 passed with one expected GLFW/LeakSanitizer self-skip.
+- `RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface`
+  passed and pins the single history owner plus retired symbols.
+- Strict layering, test-layout, docs-link/docs-sync, root-hygiene, task,
+  task-state, session-brief, ARA, module-inventory, whitespace, and clean-
+  workshop checks passed.
+- Clean-workshop manual scorecard: layer/CMake policy, public API ownership,
+  and temporary-exception rows pass; renderer growth, frame-pass routing,
+  recipe edges, and scaffold follow-up rows are not applicable. No finding or
+  follow-up task was produced.
+
 ## Forbidden changes
 
 - A second history service/stack, app-owned snapshot, or generic serialized
@@ -409,9 +444,7 @@ Import lifecycle classification verification completed on 2026-07-29:
 
 ## Maturity
 
-- Target: `Retired`; common atomicity contracts and all real workflow
-  migrations must pass before the parallel history mechanisms are removed.
-- Slice A establishes the internal transaction contract. Direct transform/ICP
-  and gizmo production adoption is complete, including removal of the parallel
-  gizmo stack; the remaining feature migrations and history-path removals stay
-  open.
+- Retired on 2026-07-29 after common atomicity contracts, every production
+  owner migration, the import-lifecycle classification, parallel-path
+  deletion, structural absence ratchet, and complete CPU-supported gate
+  passed. No GPU/Vulkan or performance claim is made.

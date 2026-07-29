@@ -260,8 +260,9 @@ primitive-view edits snapshot the complete optional `RenderSurface`,
 that exact cohort before replacing it, so an intervening lane edit leaves ECS
 and history unchanged. The public history module therefore owns history
 mechanics rather than transform, visualization, or primitive-view component
-DTOs; import lifecycle classification and the final production census are
-tracked by `RUNTIME-201`.
+DTOs. Retired `RUNTIME-201`'s production census found no parallel undo stack,
+inverse-history hook, specialized mutation builder, or undoable entity edit
+outside the common transaction.
 
 Asset import is intentionally outside that undoable editor-mutation set.
 Successful scene-changing materialization calls

@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-201`](RUNTIME-201-unified-editor-mutation-history-transaction.md) —
+unified editor mutation/history convergence retired on 2026-07-29 at
+`Retired`. Every undoable production entity/geometry edit now keeps its typed
+before/after and validation policy with the owning feature, then commits once
+through the include-only generation-validated transaction and
+`EditorCommandHistory`. This covers direct and queued transform, gizmo,
+visualization/presentation, render-hint, geometry property/topology/domain,
+parameterization, vertex-channel/normal, clustering, and Progressive Poisson
+publication. Import creation/authoring/enrichment is explicitly a dirty-only
+document lifecycle with no undo entry; `BUG-095` and `RUNTIME-200` retain its
+stale-completion and staged-recipe work. `GizmoUndoStack`, the unused
+CommandBus inverse-history hook, and mutation-specific history adapters are
+deleted; a structural source contract prevents their return or feature-owned
+command-record construction. The focused CPU selector passed 89/89 and the
+complete CPU-supported gate passed 4,059/4,059 with one expected GLFW/LSan
+self-skip. Strict repository validators and the module-inventory check passed;
+ARA C16 records the CPU lifecycle/capability scope without a GPU/Vulkan or
+performance claim.
+
 [`RUNTIME-191`](RUNTIME-191-unified-property-texture-bake-pipeline.md) — unified
 property-to-texture baking retired on 2026-07-28 at `Retired`.
 `Runtime.TextureBakeModule`, `TextureBakeService`, and

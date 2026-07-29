@@ -20,11 +20,6 @@ cleanup slice:
   unifies route/decode/materialize/author/postprocess/residency/completion and
   deletes the role callback/IO bridge/monolithic handoff paths after workflow
   visibility parity.
-- [`RUNTIME-201` — Unified editor mutation and history transaction](../../active/RUNTIME-201-unified-editor-mutation-history-transaction.md)
-  routes undoable edits through `EditorCommandHistory`; its gizmo adoption has
-  retired `GizmoUndoStack` and its cleanup slice has removed the unused
-  CommandBus inverse-history hook; the remaining work is the final production
-  mutation census and owner migrations.
 - [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](RUNTIME-202-retire-sandbox-runtime-facade.md)
   is the final feature-workflow migration/removal task: app owns Sandbox view
   aggregation while runtime exposes narrow feature operations/snapshots.
@@ -34,6 +29,12 @@ cleanup slice:
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-201` — Unified editor mutation and history transaction](../../done/RUNTIME-201-unified-editor-mutation-history-transaction.md)
+  converged every undoable production entity/geometry edit on one internal
+  generation-validated transaction and `EditorCommandHistory`, retained
+  feature-owned typed state, classified import as dirty-only lifecycle, and
+  deleted the gizmo stack, CommandBus inverse hook, and specialized mutation
+  builders.
 - [`RUNTIME-198` — Data-driven visualization recipes](../../done/RUNTIME-198-data-driven-visualization-recipes.md)
   replaced the zero-production-registration adapter interface/registry with a
   closed recipe variant and pure packet encoders.
