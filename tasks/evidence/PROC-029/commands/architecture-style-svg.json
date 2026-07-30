@@ -1,0 +1,25 @@
+{
+  "command": [
+    "env",
+    "PUPPETEER_EXECUTABLE_PATH=/opt/google/chrome/chrome",
+    "mmdc",
+    "-i",
+    "/tmp/intrinsic-runtime-presentation.mmd",
+    "-o",
+    "/tmp/intrinsic-runtime-presentation.svg"
+  ],
+  "command_display": "env PUPPETEER_EXECUTABLE_PATH=/opt/google/chrome/chrome mmdc -i /tmp/intrinsic-runtime-presentation.mmd -o /tmp/intrinsic-runtime-presentation.svg",
+  "cwd": ".",
+  "duration_ms": 689,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T20:27:50Z",
+  "label": "architecture-style-svg",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T20:27:49Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-style-svg.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-style-svg.stdout.log",
+  "stdout_sha256": "561a11b7a6c00acc18c8f2f729f2f7d45d0db369c0d66c9cc61a6a8bfcc0ac6d",
+  "task_id": "PROC-029"
+}

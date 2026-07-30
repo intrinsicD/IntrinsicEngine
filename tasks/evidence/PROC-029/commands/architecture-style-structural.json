@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "\nmapfile -t changed_files < <(\n  {\n    git diff --name-only\n    git ls-files --others --exclude-standard\n  } | grep -v \"^tasks/evidence/PROC-029/\" | sort -u\n)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict\npython3 tools/docs/check_doc_links.py --root . --strict\npython3 tools/agents/validate_tasks.py --root tasks --strict\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/agents/check_task_state_links.py --root . --strict\npython3 tools/agents/generate_session_brief.py --check\npython3 tools/repo/check_root_hygiene.py --root . --strict\npython3 tools/agents/check_ara_claims.py --root . --strict\ngit diff --check\n"
+  ],
+  "command_display": "/bin/bash -o pipefail -c '\nmapfile -t changed_files < <(\n  {\n    git diff --name-only\n    git ls-files --others --exclude-standard\n  } | grep -v \"^tasks/evidence/PROC-029/\" | sort -u\n)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict\npython3 tools/docs/check_doc_links.py --root . --strict\npython3 tools/agents/validate_tasks.py --root tasks --strict\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/agents/check_task_state_links.py --root . --strict\npython3 tools/agents/generate_session_brief.py --check\npython3 tools/repo/check_root_hygiene.py --root . --strict\npython3 tools/agents/check_ara_claims.py --root . --strict\ngit diff --check\n'",
+  "cwd": ".",
+  "duration_ms": 1893,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T20:31:33Z",
+  "label": "architecture-style-structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T20:31:31Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-style-structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-style-structural.stdout.log",
+  "stdout_sha256": "dc5999913a2ffecd2c408febbe1031e735274e6faab6caf38c1799a72bcbeaba",
+  "task_id": "PROC-029"
+}

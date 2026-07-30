@@ -7159,3 +7159,104 @@ tree:
       BUG-120 skip owned by active PROC-028. No production change, promoted-
       Vulkan result, or performance claim was introduced.
     status: resolved
+  - id: N299
+    type: question
+    title: "Define a multi-scale code architecture diagram skill"
+    provenance: user
+    timestamp: "2026-07-30T21:13+02:00"
+    description: >
+      Determine how a reusable Codex skill should visualize relationships
+      among code elements across whole-system, layer, module, symbol, and
+      runtime-behavior scales for IntrinsicEngine and other codebases; clarify
+      whether UML, C4, knowledge graphs, or another notation should organize
+      the views and whether an equivalent skill already exists.
+    status: resolved
+  - id: N300
+    type: decision
+    title: "Implement the architecture skill for IntrinsicEngine first"
+    provenance: user
+    timestamp: "2026-07-30T21:41+02:00"
+    also_depends_on: [N299]
+    choice: >
+      Implement the multi-scale architecture-diagram skill inside
+      IntrinsicEngine now and defer any language-generic or cross-repository
+      adapter framework.
+    alternatives:
+      - "Build a generic cross-repository architecture-cartography framework first."
+      - "Install a global or plugin-owned diagram skill outside IntrinsicEngine."
+      - "Leave the design as guidance without implementing it."
+    evidence:
+      - "User direction: implement this skill in IntrinsicEngine only for now."
+      - "tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md"
+    status: resolved
+  - id: N301
+    type: experiment
+    title: "Generate bounded architecture views from the live engine graph"
+    provenance: ai-executed
+    timestamp: "2026-07-30T21:41+02:00"
+    also_depends_on: [N299, N300]
+    evidence:
+      - "tools/agents/skills/intrinsicengine-draw-architecture/SKILL.md"
+      - "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py"
+      - "tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md"
+      - "tests/regression/tooling/Test.ArchitectureDiagramSkill.py"
+      - "14/14 focused tooling regressions"
+      - "Ruff and skill-creator validation passed"
+      - "live graph: 372 modules and 1,903 module-import edges"
+      - "live layer view: 10 layers and 20 cross-layer pairs"
+      - "live FrameRecipe view: 9 modules and 23 import edges"
+    result: >
+      PROC-029 retired at Operational with one dependency-free repository
+      skill and deterministic Mermaid renderer. The renderer aggregates the
+      existing module graph or walks a bounded dependency/dependent
+      neighbourhood, fails instead of truncating above its declared budget,
+      and embeds evidence scope and blind spots. Source-audited sequence and
+      data-flow guidance covers behavior that imports cannot establish, while
+      Graphify remains the complete-graph exploration surface. Strict
+      task/docs/skill/ARA checks passed. No engine source, module edge,
+      external dependency, or layering authority changed; the optional SVG
+      path was not run because mmdc was absent.
+    status: resolved
+  - id: N302
+    type: decision
+    title: "Separate architecture audit and presentation output"
+    provenance: user
+    timestamp: "2026-07-30T22:29+02:00"
+    also_depends_on: [N299, N300, N301]
+    choice: >
+      Extend PROC-029 with an evidence-complete audit profile, a polished
+      presentation profile, and focused layer views while keeping audit as
+      the compatibility default.
+    alternatives:
+      - "Keep one exhaustive diagram style for both review and explanation."
+      - "Replace Mermaid with a new rendering dependency."
+      - "Remove edge counts globally to improve appearance."
+    evidence:
+      - "User affirmation: yes please."
+      - "tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md"
+      - "tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md"
+    status: resolved
+  - id: N303
+    type: experiment
+    title: "Exercise audit-compatible and focused presentation diagrams"
+    provenance: ai-executed
+    timestamp: "2026-07-30T22:29+02:00"
+    also_depends_on: [N301, N302]
+    evidence:
+      - "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py"
+      - "tests/regression/tooling/Test.ArchitectureDiagramSkill.py"
+      - "tasks/evidence/PROC-029/commands/architecture-style-regression.json"
+      - "tasks/evidence/PROC-029/commands/architecture-style-live-focus.json"
+      - "tasks/evidence/PROC-029/commands/architecture-style-svg.json"
+      - "21/21 focused tooling regressions"
+      - "live graph: 372 modules, 1,903 module-import edges, and 20 cross-layer pairs"
+      - "runtime presentation: 10 layer nodes and 9 visible focus-incident pairs"
+    result: >
+      Default and explicit audit output matched, while presentation output
+      embedded ELK/neo layout metadata, removed routine visible edge-count
+      labels, preserved every aggregate count and visibility decision in
+      Mermaid comments, and retained every violation. Focusing runtime kept
+      all ten layer nodes while projecting nine of twenty cross-layer pairs.
+      The installed Mermaid CLI rendered the focused source through packaged
+      Chrome to SVG. No renderer dependency or engine/module edge was added.
+    status: resolved

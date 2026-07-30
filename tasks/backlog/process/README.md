@@ -28,10 +28,10 @@ retirement log.
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
-- Active `PROC-028` is the only open process member. It implements the already
-  accepted `N123..N125` evidence-report decisions and the bounded
-  `N290`/`O71..O75` cross-repository workflow findings without replacing the
-  existing task, ARA, benchmark, or CI authorities.
+- Active `PROC-028` implements the already accepted `N123..N125`
+  evidence-report decisions and the bounded `N290`/`O71..O75`
+  cross-repository workflow findings without replacing the existing task,
+  ARA, benchmark, or CI authorities.
 - CI latency order: retired `CI-003` establishes telemetry/cancellation and
   retired `CI-004` establishes label-derived test build aggregates; retired
   `CI-007` establishes the bounded module-safe `pr-fast` ccache policy;
@@ -90,6 +90,10 @@ this batch is the evidence-backed `check_pr_contract.py` retirement audited by
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [PROC-029 — IntrinsicEngine architecture diagram skill](../../done/PROC-029-intrinsicengine-architecture-diagram-skill.md)
+  (done 2026-07-30): added one repository-owned Mermaid workflow for bounded
+  layer/module audit views, ELK-styled presentation views, and focused layer
+  context while retaining source-audited dynamic-view guidance.
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](../../done/PROC-025-port-research-ideation-skill-to-other-repos.md)
   (done 2026-07-18): verified both existing repo-native installations,
   refreshed StructSplat's post-`BENCH-007` frontier in `c1288a67` and

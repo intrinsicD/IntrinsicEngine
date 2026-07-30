@@ -1,0 +1,4 @@
+interface:
+  display_name: "Draw IntrinsicEngine Architecture"
+  short_description: "Draw bounded, evidence-backed engine diagrams"
+  default_prompt: "Use $intrinsicengine-draw-architecture to map this IntrinsicEngine area at the smallest useful scale."

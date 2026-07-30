@@ -1,0 +1,164 @@
+schema_version: 1
+task_id: PROC-029
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-07-30T21:06:30Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: e217c3a6f622cb3ed38a6182fef407f2e07d980a
+  head_revision: e217c3a6f622cb3ed38a6182fef407f2e07d980a
+  branch: agent/proc-029-architecture-diagram-skill
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/logic/solution/architecture.md
+    sha256: d6cd34288d839b826d6fcc886f342ccd91651fe3b9fc32ba5872c3d7a208cb18
+  - path: ara/logic/solution/heuristics.md
+    sha256: 3254e84b4b7ce9528bc48afd5001dba36deb665a2d4dbedd9056ea4c4004901c
+  - path: ara/staging/observations.yaml
+    sha256: 279a17c6329c8b6e499150c02366a796cd73da27ce677bcc30ee8138f5b36364
+  - path: ara/trace/exploration_tree.yaml
+    sha256: f66e4443e96d77696fdcc4066626a5067bcafde1cd846250a8c4618d41858d56
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: 8720bd69d3a3676479a71357843bb413babb4fffbc00649b00e25a967bc4a50e
+  - path: ara/trace/sessions/2026-07-30_001.yaml
+    sha256: 63bffdd4a01a12f360bd0302c05f52c1ac8fd46fd97dfed1c869150620efe77a
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: 7e0701e53a91e771f0ec351ae3e5953a90db704ecb4efc0010e7c81cb06e6ac4
+  - path: tasks/backlog/process/README.md
+    sha256: cc3ed401a78a9aaa9235eba4720dc945d4241e7d48a8fde37201063eac811f62
+  - path: tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md
+    sha256: f61d19bc0aa990235ef0703cb8f3ec8137d66d50e5b36798aded32f5a66f60dd
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: eb1be0a1b2d8668873db437a504f57412b59020cd2d24080fb19ebca4e715f12
+  - path: tests/regression/tooling/Test.ArchitectureDiagramSkill.py
+    sha256: a40c57507502c8dc493876933c99ae5c8b4010dbb8b23013721bcd7371a4465b
+  - path: tools/agents/skills/README.md
+    sha256: 58f44fcb11adc67a96216c3f33c563bce2ea4247d50a9f309196ad1a1f5d3590
+  - path: tools/agents/skills/intrinsicengine-core/SKILL.md
+    sha256: acda84dc8908f5bbdfd82d06c24779421627a1ffa493e2219b455fb29654179a
+  - path: tools/agents/skills/intrinsicengine-draw-architecture/SKILL.md
+    sha256: 8621977e4a21b8b5125e337460cfe6d647bff010c87c91cad00f88bc49498794
+  - path: tools/agents/skills/intrinsicengine-draw-architecture/agents/openai.yaml
+    sha256: bea1f5f64efc1de76f7e382827c5f752cfc0c5a0480519511a521af5799eb457
+  - path: tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md
+    sha256: 38a7045a33103808b4af5fead8e0ab9a549bf3e035901dd6350f83d00bcea68d
+  - path: tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py
+    sha256: c9d60b2da952bd80e84d54636483931bb98467bb1bc4a31547287e96e8aee98a
+  content_digest: a2c075d644a7578b5ec140b49d85ecf0ae8d8a3be8d129ad52439c121f3eadbc
+touched:
+  paths:
+  - ara/logic/solution/architecture.md
+  - ara/logic/solution/heuristics.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-07-30_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - tasks/backlog/process/README.md
+  - tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/regression/tooling/Test.ArchitectureDiagramSkill.py
+  - tools/agents/skills/README.md
+  - tools/agents/skills/intrinsicengine-core/SKILL.md
+  - tools/agents/skills/intrinsicengine-draw-architecture/SKILL.md
+  - tools/agents/skills/intrinsicengine-draw-architecture/agents/openai.yaml
+  - tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md
+  - tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py
+  layers:
+  - tools/agents
+  modules:
+  - intrinsicengine-draw-architecture
+extension_seam: The existing knowledge-graph JSON remains the sole generated structural input; bounded
+  view profiles may evolve without a renderer interface or parallel graph model.
+future_change_plan: Introduce a language-generic repository adapter only when a second concrete codebase
+  is commissioned and proves the shared extraction contract.
+acceptance:
+- criterion: '`$intrinsicengine-draw-architecture` gives another agent a complete,'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Layer and focused module diagrams are reproducible from the same graph
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The implementation introduces no external dependency or parallel
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Focused tooling tests and strict task/docs/skill/ARA checks pass.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A complete standard-profile evidence report records the final source
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Default audit output remains evidence-complete and backward compatible;
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Focused presentation output is materially less cluttered while retaining
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/PROC-029/commands/architecture-live-frame-recipe.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-live-graph.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-live-layers.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-skill-mirrors.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-skill-regression.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-skill-ruff.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-skill-validation.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-structural-bundle.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-format.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-live-focus.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-live-graph.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-live-layers.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-live-modules.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-mirrors.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-regression.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-ruff.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-structural.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-svg.json
+- receipt: tasks/evidence/PROC-029/commands/architecture-style-validation.json
+changed_public_contracts:
+- $intrinsicengine-draw-architecture workflow and render_architecture.py layers/modules CLI, including
+  --style audit|presentation and layer --focus.
+diagnostics_and_previews:
+- The live graph contained 372 modules, 1,903 module-import edges, and 20 cross-layer pairs; the runtime
+  presentation retained 10 layer nodes and displayed 9 focus-incident pairs.
+- Twenty-one focused regressions passed, default output matched explicit audit mode, and packaged Chrome
+  rendered the self-contained focused presentation to SVG through the installed Mermaid CLI.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- Static generated views intentionally omit includes, CMake links, runtime calls, ownership, and data
+  flow; the skill requires the strict layering checker or concrete source inspection for those questions.
+- Presentation frontmatter requires Mermaid support for ELK and the neo look; audit Mermaid remains the
+  compatibility path and durable source output.
+skipped_checks:
+- check: C++ build and CTest
+  reason: No engine source, CMake input, module surface, dependency edge, or compiled test changed; focused
+    Python tooling, live graph generation, real Mermaid rendering, and strict structural gates are the
+    strongest relevant subset.
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

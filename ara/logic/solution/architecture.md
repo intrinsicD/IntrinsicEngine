@@ -222,3 +222,21 @@
   tools/agents/experiment_custody.py, tools/agents/task_claim.py,
   .github/workflows/ci-docs.yml]
 - **From staging**: O75
+
+## A18: Architecture Views Reuse the Repository Evidence Graph
+- **Decision**: IntrinsicEngine owns one diagramming skill over the existing
+  deterministic knowledge graph rather than a parallel architecture model.
+  It generates aggregated layer and bounded module-import views, requires
+  concrete source inspection for composition, sequence, and data-flow views,
+  and routes complete-graph exploration to Graphify. Mermaid source is the
+  durable editable output; an installed renderer may add a convenience image
+  without becoming authoritative.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N299, N300, N301,
+  tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md,
+  tools/agents/skills/intrinsicengine-draw-architecture/SKILL.md,
+  tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py,
+  tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md,
+  tests/regression/tooling/Test.ArchitectureDiagramSkill.py]
+- **From staging**: O79

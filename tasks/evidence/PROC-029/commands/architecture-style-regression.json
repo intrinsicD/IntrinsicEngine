@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.ArchitectureDiagramSkill.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.ArchitectureDiagramSkill.py",
+  "cwd": ".",
+  "duration_ms": 1052,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T20:27:47Z",
+  "label": "architecture-style-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T20:27:46Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-style-regression.stderr.log",
+  "stderr_sha256": "643c3f0762d3d8cd05112de74244a4d672fd4c6046c59ebc4c083484c3e6d5c6",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-style-regression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-029"
+}
