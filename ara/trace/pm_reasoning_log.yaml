@@ -1162,3 +1162,10 @@ entries:
       - "Did not stage or crystallize a generalized observation: this turn published the already-recorded A18/H15 artifact and introduced no new architecture rule."
       - "Kept O77 staged because the published skill remains IntrinsicEngine-only and explicitly defers the generic repository-adapter framework."
       - "Kept the existing open threads unchanged; no PR or direct-main integration was requested."
+  - turn: "2026-07-30_001#8"
+    notes:
+      - "Routed the user's explicit direct-main integration choice as decision N306 and the verified fast-forward/push as experiment N307."
+      - "Recorded the e217c3a6..08dbea0c ancestry, complete relevant pre-merge gate, conflict-free fast-forward, successful origin/main push, and zero initial post-push divergence."
+      - "Did not stage or crystallize a generalized observation: main integration commits the already-recorded A18/H15 artifact but adds no architecture rule or capability result."
+      - "Kept O77 staged because moving the IntrinsicEngine-only skill to main still does not implement or select a generic repository adapter."
+      - "Kept the existing open threads unchanged; no pull request, merge commit, C++ gate, performance claim, or Vulkan claim was introduced."

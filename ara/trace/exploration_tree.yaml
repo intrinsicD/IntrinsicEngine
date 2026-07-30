@@ -7305,3 +7305,44 @@ tree:
       direct-main mutation, new architecture claim, or generic adapter
       commitment was made.
     status: resolved
+  - id: N306
+    type: decision
+    title: "Integrate PROC-029 directly into remote main"
+    provenance: user
+    timestamp: "2026-07-30T23:12+02:00"
+    also_depends_on: [N304, N305]
+    choice: >
+      Fast-forward the verified PROC-029 branch into local main and push the
+      identical history directly to origin/main.
+    alternatives:
+      - "Leave PROC-029 published only on its dedicated remote branch."
+      - "Open and merge a pull request."
+      - "Create a non-fast-forward merge commit."
+    evidence:
+      - "User direction: merge to main and push to remote."
+      - "origin/main at e217c3a6 before integration"
+      - "agent/proc-029-architecture-diagram-skill at 08dbea0c"
+    status: resolved
+  - id: N307
+    type: experiment
+    title: "Fast-forward and publish PROC-029 on main"
+    provenance: ai-executed
+    timestamp: "2026-07-30T23:12+02:00"
+    also_depends_on: [N305, N306]
+    evidence:
+      - "fast-forward range e217c3a6..08dbea0c"
+      - "21/21 focused tooling regressions"
+      - "Ruff lint and format checks"
+      - "skill and mirror validation"
+      - "strict docs, task, workflow-evidence, layering, test-layout, root-hygiene, and ARA validators"
+      - "git push origin main"
+      - "post-push main and origin/main divergence: 0/0 at 08dbea0c"
+    result: >
+      Fresh fetch and ancestry checks showed origin/main unchanged and the
+      PROC-029 branch three commits ahead with main as its direct ancestor.
+      The complete tooling and structural gate passed, local main
+      fast-forwarded without conflict or a merge commit, and origin/main
+      accepted the identical history through 08dbea0c. The integration
+      introduces no additional source change, capability claim, pull request,
+      or commitment to the deferred generic adapter.
+    status: resolved
