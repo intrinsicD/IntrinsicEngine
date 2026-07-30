@@ -7136,3 +7136,26 @@ tree:
       not reinterpret captured tool whitespace. PROC-028 remains active only
       for distinct independent review and BUG-120; no push was performed.
     status: resolved
+  - id: N298
+    type: experiment
+    title: "Revalidate integrated RUNTIME-201 on current main"
+    provenance: ai-executed
+    timestamp: "2026-07-30T10:55+02:00"
+    also_depends_on: [N295, N296, N297]
+    evidence:
+      - "current main commit 1c6a170bab5f1131352857bedc1f0e289d452a9d"
+      - "RUNTIME-201 retirement commit 061e037c is an ancestor of main"
+      - "RUNTIME-201 merge commit 26d50449 is an ancestor of main"
+      - "post-fetch main and origin/main divergence: 0/0"
+      - "strict task, workflow-evidence, experiment-custody, task-link, docs, ARA, layering, test-layout, and root-hygiene gates: zero errors"
+      - "fresh Clang 23 ci configure and complete IntrinsicTests build"
+      - "complete CPU-supported selector: 4059/4059 plus one expected GLFW/LeakSanitizer self-skip"
+    result: >
+      Reloading the repository workflow found RUNTIME-201 already retired,
+      merged, and published within the current main history. A fresh canonical
+      configure, complete test build, complete CPU-supported suite, and strict
+      structural bundle all passed on that current mainline state. Workflow
+      evidence retains one explicit warning for the separately tracked
+      BUG-120 skip owned by active PROC-028. No production change, promoted-
+      Vulkan result, or performance claim was introduced.
+    status: resolved

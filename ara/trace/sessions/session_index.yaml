@@ -190,8 +190,8 @@ sessions:
     open_threads: 3
   - id: "2026-07-30_001"
     date: "2026-07-30"
-    summary: "Integrated PROC-028 and its fixed-revision validator repair before RUNTIME-201, verified the combined main tree, and reduced the repository to one canonical worktree."
-    turn_count: 2
-    events_count: 4
+    summary: "Integrated PROC-028 and its fixed-revision validator repair before RUNTIME-201, then revalidated the published current main with the complete CPU-supported gate."
+    turn_count: 3
+    events_count: 5
     claims_touched: []
-    open_threads: 4
+    open_threads: 3

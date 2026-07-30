@@ -1127,3 +1127,10 @@ entries:
       - "Recorded the exact PROC source-surface repair, artifact repair, raw evidence-log preservation, evidence-binding, and subsequent runtime-merge commits; 90/90 workflow regressions; 89/89 focused runtime cases; 4,059/4,059 complete CPU-supported cases; and zero-error strict structural gates without making a performance or Vulkan claim."
       - "Did not stage or crystallize a new generalized observation: N297 is bounded implementation evidence for the already-selected workflow architecture, and PROC-028 remains active for genuinely independent review plus BUG-120."
       - "Kept O09, O13, O38, O57, and O58 unpromoted and non-stale; the next explicitly selected engineering thread is RUNTIME-200 after the user restarts the agent."
+  - turn: "2026-07-30_001#3"
+    notes:
+      - "Routed the fresh current-main configure, build, structural bundle, and complete CPU result as experiment N298 because they produced bounded integration evidence after the workflow reload."
+      - "Did not duplicate RUNTIME-201's implementation claim C16 or stage a generalized observation: this turn revalidated already-committed CPU behavior and introduced no new production capability."
+      - "Kept the BUG-120 workflow-evidence skip explicit and separate; zero validator errors do not retire active PROC-028 or imply an independent fixed-revision review."
+      - "Kept O09, O13, O38, O57, and O58 unpromoted and non-stale because turn 2 referenced their open topics and this verification supplies no closure or contradiction."
+      - "Removed the obsolete local-main-ahead open thread after fetch proved main and origin/main were identical before this epilogue."
