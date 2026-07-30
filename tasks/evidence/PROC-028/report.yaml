@@ -3,15 +3,15 @@ task_id: PROC-028
 workflow_profile: high-risk
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-30T22:19:49Z'
+generated_at: '2026-07-30T22:22:09Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 572d7d2ef1d7d563a11eba2e1a3b15467247f8f0
-  head_revision: e08d3967988e8d2bfef3ab0c5b457960dc6fb002
+  head_revision: c5e3970358f74f82761368aae80dbcf15eaa9a75
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: ara/trace/exploration_tree.yaml
     sha256: 46208429335b0c86559c2afe148ed3a1523a6b19d3e51283be6ca2a10bec395d
