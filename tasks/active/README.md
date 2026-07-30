@@ -11,13 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-120` — Test.WorkflowConcurrency drifted from the CPU test sources it mirrors](BUG-120-workflow-concurrency-ctest-processors-drift.md)
-  is reproducing four deterministic snapshot/parity failures on current
-  `main`; the task is reconciling the test and case-scoped CTest reservations
-  with the authoritative CPU test sources.
 - [`PROC-028` — Enforce agent evidence, review, and experiment custody](PROC-028-enforced-agent-evidence-review-experiment-workflow.md)
   is implemented and integrated on local `main`. Retirement remains blocked
-  on a distinct fixed-revision review and pre-existing `BUG-120`.
+  on a distinct fixed-revision review.
 
 ## History
 

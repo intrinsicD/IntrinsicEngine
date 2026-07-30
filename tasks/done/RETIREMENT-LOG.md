@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-120`](BUG-120-workflow-concurrency-ctest-processors-drift.md) — workflow
+concurrency snapshot drift retired on 2026-07-30 at `CPUContracted`. The
+one-worker config-root inventory now follows the current runtime test helpers,
+the clustering default/explicit worker-call guards reflect the current source,
+and the manual CTest `PROCESSORS` list exactly mirrors all 73 source-derived
+multi-worker cases with distribution `{3: 49, 4: 22, 8: 2}`. No scheduler
+worker count changed and no reservation exceeds what its test already spawns.
+`Test.WorkflowConcurrency.py` passed 19/19, the deliberate in-memory
+reservation mutation was rejected by the symmetric parity check,
+`Test.TestCohortParity.py` passed 7/7, and the canonical Clang-23 `ci`
+configure plus `IntrinsicTests` build succeeded. The implementation revision
+is `62e232ce1a0757914b5311633afec58725f83cd0`; no `Operational` backend
+follow-up is owed for this CPU/tooling contract.
+
 [`RUNTIME-201`](RUNTIME-201-unified-editor-mutation-history-transaction.md) —
 unified editor mutation/history convergence retired on 2026-07-29 at
 `Retired`. Every undoable production entity/geometry edit now keeps its typed

@@ -66,6 +66,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-07-30: [`BUG-120` — Test.WorkflowConcurrency drifted from the CPU test sources it mirrors](../../done/BUG-120-workflow-concurrency-ctest-processors-drift.md).
+  The exact source-derived reservation parity is restored at 73 cases
+  (`PROCESSORS` distribution `{3: 49, 4: 22, 8: 2}`), stale one-worker config
+  roots and clustering call-count guards are synchronized, and the focused
+  workflow/cohort regressions plus canonical `IntrinsicTests` build pass.
 - Closed 2026-07-19: [`BUG-117` — Dropped-import tests exhausted frame-count wait budgets](../../done/BUG-117-dropped-geometry-reimport-frame-budget-flake.md).
   Both test-local asynchronous completion helpers now use ten-second
   steady-clock deadlines and yield one millisecond between unsuccessful

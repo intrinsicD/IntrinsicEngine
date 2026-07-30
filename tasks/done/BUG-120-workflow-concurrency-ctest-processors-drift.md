@@ -13,11 +13,13 @@ claimed_at: "2026-07-30T11:50:38Z"
 # BUG-120 — Test.WorkflowConcurrency drifted from the CPU test sources it mirrors
 
 ## Status
-- Implementation and focused verification pass on `main`; owner: Codex.
+- Completed: 2026-07-30.
+- Commit: `62e232ce1a0757914b5311633afec58725f83cd0`.
+- Maturity: `CPUContracted`; this is a CPU/tooling parity contract and no
+  `Operational` backend follow-up is owed.
 - The clean-tree reproduction at `e217c3a6` fails 4 of 19 cases.
 - The corrected regression passes 19/19, the cohort-parity suite passes 7/7,
   and the canonical `ci` configure plus `IntrinsicTests` build succeeds.
-- Next gate: record final receipts and retire the task.
 
 ## Goal
 - Restore `tests/regression/tooling/Test.WorkflowConcurrency.py` to green by reconciling its

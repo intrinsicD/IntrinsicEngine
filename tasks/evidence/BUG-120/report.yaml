@@ -1,0 +1,92 @@
+schema_version: 1
+task_id: BUG-120
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-07-30T12:05:51Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: e217c3a6f622cb3ed38a6182fef407f2e07d980a
+  head_revision: 62e232ce1a0757914b5311633afec58725f83cd0
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: tasks/SESSION-BRIEF.md
+    sha256: ea2ca4b4cf7981c2674204166f10c1e1313ebbcf5b3405de44f491802a51f467
+  - path: tasks/active/README.md
+    sha256: 7d2250fd78ec70ae7d374e5eee619c051ce383e23c82e9aad454e6372ed29a6b
+  - path: tasks/backlog/bugs/BUG-120-workflow-concurrency-ctest-processors-drift.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 026477d595f556280f58bbf7575b87b31ca166fd394863dc612a994fcf678640
+  - path: tasks/done/BUG-120-workflow-concurrency-ctest-processors-drift.md
+    sha256: db6857f0f48c0d14944b8375421385e3a7d98399415f52298c288dfbd07f8191
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 5d866843c37301dfcc8f38f90cd1317de28e1027b53435036303b1cdcb747b56
+  - path: tests/CMakeLists.txt
+    sha256: f34bbee2b1c16dd21cbd85170e862d526eeed898b6d691ec795ce809f5bf90e5
+  - path: tests/README.md
+    sha256: 4d582c4b28f91277fa209baa72a6c03c357a8be2edd41ec23cfe9dc51c1cead1
+  - path: tests/regression/tooling/Test.WorkflowConcurrency.py
+    sha256: d9b30e9248a76c6186fb93a58db83b18144b11d7a0bbf53b730aab05aaabe6b1
+  content_digest: 79daaa0c589330c95a4224504f41f29067e4874371e80c1654460f34ae354295
+touched:
+  paths:
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/bugs/BUG-120-workflow-concurrency-ctest-processors-drift.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-120-workflow-concurrency-ctest-processors-drift.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/CMakeLists.txt
+  - tests/README.md
+  - tests/regression/tooling/Test.WorkflowConcurrency.py
+  layers:
+  - tests
+  modules: []
+extension_seam: Exact source-derived CTest reservation parity guard
+future_change_plan: Keep CPU scheduler sources authoritative and update the case-scoped CTest list plus
+  aggregate guards in the same change.
+acceptance:
+- criterion: All 19 tests green, with the parity check still symmetric (not subset-relaxed).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No scheduler worker count or CTest budget changed merely to satisfy the test.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-120/commands/build-intrinsic-tests.json
+- receipt: tasks/evidence/BUG-120/commands/configure-ci.json
+- receipt: tasks/evidence/BUG-120/commands/final-doc-links.json
+- receipt: tasks/evidence/BUG-120/commands/final-session-brief.json
+- receipt: tasks/evidence/BUG-120/commands/final-state-links.json
+- receipt: tasks/evidence/BUG-120/commands/final-task-policy.json
+- receipt: tasks/evidence/BUG-120/commands/final-test-layout.json
+- receipt: tasks/evidence/BUG-120/commands/final-validate-tasks.json
+- receipt: tasks/evidence/BUG-120/commands/test-cohort-parity.json
+- receipt: tasks/evidence/BUG-120/commands/workflow-concurrency.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- Clean-tree repro failed 4 of 19 before the fix; corrected WorkflowConcurrency passes 19 of 19.
+- An in-memory PROCESSORS mutation is rejected by the exact symmetric parity assertion.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-120-workflow-concurrency-ctest-processors-drift.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks: []
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

@@ -8,7 +8,6 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-120` — Test.WorkflowConcurrency drifted from the CPU test sources it mirrors (tasks/active/BUG-120-workflow-concurrency-ctest-processors-drift.md)
 - `PROC-028` — Enforce agent evidence, review, and experiment custody (tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md)
 
 ## Theme B — Rendering modernization
