@@ -7260,3 +7260,48 @@ tree:
       The installed Mermaid CLI rendered the focused source through packaged
       Chrome to SVG. No renderer dependency or engine/module edge was added.
     status: resolved
+  - id: N304
+    type: decision
+    title: "Publish PROC-029 on a dedicated remote branch"
+    provenance: user
+    timestamp: "2026-07-30T23:08+02:00"
+    also_depends_on: [N300, N302, N303]
+    choice: >
+      Commit the complete PROC-029 architecture-diagram skill and its
+      fixed-revision completion evidence, then push the result to the remote
+      repository without opening a pull request.
+    alternatives:
+      - "Leave the verified work uncommitted in the local main worktree."
+      - "Push the changes directly to main."
+      - "Open a pull request in the same operation."
+    evidence:
+      - "User direction: commit and push to remote."
+      - "branch agent/proc-029-architecture-diagram-skill"
+      - "implementation commit c992a16c"
+      - "evidence-binding commit 3d5981c2"
+    status: resolved
+  - id: N305
+    type: experiment
+    title: "Verify and publish the fixed PROC-029 revision"
+    provenance: ai-executed
+    timestamp: "2026-07-30T23:08+02:00"
+    also_depends_on: [N303, N304]
+    evidence:
+      - "implementation commit c992a16c"
+      - "evidence-binding commit 3d5981c2"
+      - "tasks/evidence/PROC-029/report.yaml"
+      - "21/21 focused tooling regressions"
+      - "Ruff lint and format checks"
+      - "skill, mirror, task, docs, root-hygiene, ARA, and workflow-evidence validators"
+      - "live 372-module graph generation and Mermaid/Chrome SVG render"
+      - "origin/agent/proc-029-architecture-diagram-skill"
+    result: >
+      The coherent PROC-029 surface was committed on a dedicated branch, its
+      standard-profile report was rebound to the exact clean implementation
+      revision, and both commits were pushed with local and upstream tips
+      equal at 3d5981c2. Workflow-evidence validation reported zero errors;
+      its two warnings remain the explicit BUG-120 concurrency skip and the
+      justified C++/CTest skip for this tooling-only change. No pull request,
+      direct-main mutation, new architecture claim, or generic adapter
+      commitment was made.
+    status: resolved

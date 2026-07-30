@@ -2,9 +2,9 @@ session:
   id: "2026-07-30_001"
   date: "2026-07-30"
   started: "2026-07-30T00:33+02:00"
-  last_turn: "2026-07-30T22:29+02:00"
-  turn_count: 6
-  summary: "Integrated PROC-028 before RUNTIME-201, revalidated current main, and implemented then presentation-refined an Operational IntrinsicEngine architecture-diagram skill over the existing code graph."
+  last_turn: "2026-07-30T23:08+02:00"
+  turn_count: 7
+  summary: "Integrated PROC-028 before RUNTIME-201, revalidated current main, and implemented, presentation-refined, then remotely published an Operational IntrinsicEngine architecture-diagram skill."
 
 events_logged:
   - turn: 1
@@ -97,6 +97,18 @@ events_logged:
     routing: crystallized
     provenance: user-revised
     summary: "Crystallized the evidence-complete audit versus metadata-preserving presentation split as H15 through verbal affirmation."
+  - turn: 7
+    type: decision
+    id: "N304"
+    routing: direct
+    provenance: user
+    summary: "Directed the complete PROC-029 change and fixed-revision evidence to be committed and pushed without opening a PR."
+  - turn: 7
+    type: experiment
+    id: "N305"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed the focused and structural gates, created two scoped commits, and published the matching branch tip to origin."
 
 ai_actions:
   - turn: 1
@@ -154,6 +166,12 @@ ai_actions:
       - "tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md"
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/backlog/process/README.md"
+  - turn: 7
+    action: "Created a dedicated PROC-029 branch; reran 21 focused regressions, Ruff, skill/mirror, live graph/SVG, and strict structural gates; committed the implementation and clean-revision evidence binding; and pushed both commits with upstream tracking."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md"
+      - "tasks/evidence/PROC-029/report.yaml"
 
 claims_touched: []
 
@@ -180,6 +198,10 @@ key_context:
     excerpt: "The user explicitly accepted the proposed audit/presentation split and layer focus."
   - turn: 6
     excerpt: "Presentation output may reduce visible density only while deterministic comments retain omitted counts/edges and violations remain visible."
+  - turn: 7
+    excerpt: "The user explicitly requested that the completed architecture-diagram skill be committed and pushed to the remote."
+  - turn: 7
+    excerpt: "The implementation and evidence-binding commits were published on agent/proc-029-architecture-diagram-skill; no PR or direct-main change was requested."
 
 open_threads:
   - "PROC-028 still requires a genuinely distinct fixed-revision accepted review before retirement."
