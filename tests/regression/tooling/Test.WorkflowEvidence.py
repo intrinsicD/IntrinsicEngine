@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -171,12 +172,24 @@ class Fixture:
         )
 
     def digest(self) -> str:
-        return yaml.safe_load(self.report.read_text(encoding="utf-8"))["source"][
-            "content_digest"
-        ]
+        return self.report_data()["source"]["content_digest"]
 
-    def handoff(self, digest: str | None = None) -> None:
-        run(
+    def report_data(self) -> dict:
+        return yaml.safe_load(self.report.read_text(encoding="utf-8"))
+
+    def revision(self) -> str:
+        source = self.report_data()["source"]
+        if source["dirty"]:
+            return f"worktree:{source['content_digest']}"
+        return source["head_revision"]
+
+    def handoff(
+        self,
+        digest: str | None = None,
+        revision: str | None = None,
+        expected: int | None = 0,
+    ) -> subprocess.CompletedProcess[str]:
+        return run(
             self.repo,
             "append-handoff",
             "--root",
@@ -186,7 +199,7 @@ class Fixture:
             "--driver",
             "driver",
             "--revision",
-            self.base,
+            revision or self.revision(),
             "--content-digest",
             digest or self.digest(),
             "--summary",
@@ -197,7 +210,7 @@ class Fixture:
             "artifact.txt",
             "--next-action",
             "Review",
-            expected=0,
+            expected=expected,
         )
 
     def review(
@@ -207,6 +220,7 @@ class Fixture:
         verdict: str = "accepted",
         reviewer: str = "reviewer",
         self_review: bool = False,
+        revision: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         command = [
             "append-review",
@@ -219,7 +233,7 @@ class Fixture:
             "--reviewer",
             reviewer,
             "--revision",
-            self.base,
+            revision or self.revision(),
             "--content-digest",
             digest or self.digest(),
             "--verdict",
@@ -436,10 +450,57 @@ class WorkflowEvidenceTests(unittest.TestCase):
             fixture.receipt()
             fixture.generate()
             fixture.handoff()
-            fixture.review(digest="0" * 64)
+            result = fixture.review(digest="0" * 64)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("record content digest does not match", result.stdout)
+
+    def test_append_rejects_revision_that_differs_from_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp, profile="high-risk")
+            fixture.receipt()
+            fixture.generate()
+            handoff = fixture.handoff(revision="0" * 40, expected=None)
+            fixture.handoff()
+            review = fixture.review(revision="0" * 40)
+        self.assertEqual(handoff.returncode, 2, handoff.stdout)
+        self.assertEqual(review.returncode, 2, review.stdout)
+        self.assertIn("does not match report source revision", handoff.stdout)
+        self.assertIn("does not match report source revision", review.stdout)
+
+    def test_validation_rejects_tampered_latest_record_revisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp, profile="high-risk")
+            fixture.receipt()
+            fixture.generate()
+            fixture.handoff()
+            fixture.review()
+            handoff_path = fixture.report.parent / "handoff.jsonl"
+            handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+            handoff["revision"] = "0" * 40
+            handoff_path.write_text(json.dumps(handoff) + "\n", encoding="utf-8")
+            review_path = fixture.report.parent / "reviews.jsonl"
+            review = json.loads(review_path.read_text(encoding="utf-8"))
+            review["revision"] = "0" * 40
+            review_path.write_text(json.dumps(review) + "\n", encoding="utf-8")
             result = fixture.validate()
         self.assertEqual(result.returncode, 1, result.stdout)
-        self.assertIn("accepted review binds stale content digest", result.stdout)
+        self.assertIn("handoff revision differs from report source", result.stdout)
+        self.assertIn("review revision differs from report source", result.stdout)
+
+    def test_claim_grade_and_protected_completion_require_custody(self) -> None:
+        for profile in ("claim-grade", "protected"):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as tmp:
+                fixture = self.fixture(tmp, profile=profile)
+                fixture.receipt()
+                fixture.generate()
+                fixture.handoff()
+                fixture.review()
+                result = fixture.validate()
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn(
+                "claim-grade completion requires experiment custody records",
+                result.stdout,
+            )
 
     def test_self_review_cannot_be_presented_as_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

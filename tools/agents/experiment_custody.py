@@ -79,6 +79,7 @@ RUN_REQUIRED = {
     "attempt_id",
     "status",
     "initialized_at",
+    "claim_eligible",
     "protocol_path",
     "protocol_digest",
     "task_path",
@@ -88,7 +89,10 @@ RUN_REQUIRED = {
     "environment",
     "datasets",
     "implementation_digest",
+    "command",
     "cell_journal",
+    "bundle",
+    "audit",
 }
 CELL_STATES = {"started", "completed", "failed", "missing"}
 RUN_STATES = {"initialized", "completed", "failed", "abandoned"}
@@ -506,8 +510,25 @@ def _validate_run_bindings(
             errors.append("run binds a stale/changed protocol digest")
         if implementation_digest(protocol) != run.get("implementation_digest"):
             errors.append("run binds a stale implementation digest")
+        if run.get("task_id") != protocol.get("task_id"):
+            errors.append("run task identity differs from frozen protocol")
+        if run.get("claim_eligible") != protocol.get("claim_eligible"):
+            errors.append("run claim eligibility differs from frozen protocol")
         if run.get("source") != protocol.get("source"):
             errors.append("run source identity differs from frozen protocol")
+        if run.get("config") != protocol.get("config"):
+            errors.append("run config differs from frozen protocol")
+        if run.get("environment") != protocol.get("environment"):
+            errors.append("run environment differs from frozen protocol")
+        protocol_datasets = protocol.get("datasets")
+        if isinstance(protocol_datasets, list) and all(
+            isinstance(entry, dict) for entry in protocol_datasets
+        ):
+            expected_datasets = [_sealed_copy(entry) for entry in protocol_datasets]
+            if run.get("datasets") != expected_datasets:
+                errors.append("run datasets differ from frozen protocol")
+        if run.get("command") != protocol.get("command"):
+            errors.append("run command differs from frozen protocol")
     except (ValueError, CustodyError) as exc:
         errors.append(str(exc))
         protocol = {}
@@ -1232,6 +1253,224 @@ def consume_attempt(args: argparse.Namespace) -> int:
     return 0
 
 
+def _validate_audit_record(
+    repo_root: Path,
+    run_root: Path,
+    run: dict[str, Any],
+    audit: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    if audit.get("schema_version") != SCHEMA_VERSION:
+        errors.append("audit schema_version must equal 1")
+    for key in ("task_id", "run_id", "attempt_id"):
+        if audit.get(key) != run.get(key):
+            errors.append(f"audit {key} does not match run")
+    if audit.get("auditor_label") == audit.get("driver_label"):
+        errors.append("audit is not independent")
+    if audit.get("identity_assurance") != "cooperative-label-only":
+        errors.append("audit identity assurance is invalid")
+    source = run.get("source")
+    source_revision = source.get("revision") if isinstance(source, dict) else None
+    if audit.get("audited_revision") != source_revision:
+        errors.append("audit revision differs from frozen run source")
+    bundle_path = run_root / "bundle.yaml"
+    if audit.get("bundle_path") != relative_path(repo_root, bundle_path):
+        errors.append("audit bundle path does not match canonical run bundle")
+    if bundle_path.is_file() and audit.get("bundle_sha256") != sha256_file(bundle_path):
+        errors.append("audit binds stale bundle")
+    if audit.get("disposition") != "accepted":
+        errors.append("independent audit is not accepted")
+    if audit.get("errors") != []:
+        errors.append("independent audit retains errors")
+    if audit.get("claim_authorized") is not False:
+        errors.append("audit must not silently authorize claim")
+    return errors
+
+
+def _validate_attempt_record(
+    run: dict[str, Any],
+    attempt_path: Path,
+    attempt: dict[str, Any],
+    *,
+    require_terminal: bool,
+) -> list[str]:
+    errors: list[str] = []
+    for key in ("task_id", "run_id", "attempt_id"):
+        if attempt.get(key) != run.get(key):
+            errors.append(f"attempt {key} does not match run")
+    if attempt_path.stem != run.get("attempt_id"):
+        errors.append("attempt filename does not match run attempt_id")
+    if attempt.get("protocol_digest") != run.get("protocol_digest"):
+        errors.append("attempt protocol digest differs from run")
+    if attempt.get("implementation_digest") != run.get("implementation_digest"):
+        errors.append("attempt implementation digest differs from run")
+    history = attempt.get("history")
+    state = attempt.get("state")
+    if (
+        not isinstance(history, list)
+        or not history
+        or not isinstance(history[0], dict)
+        or history[0].get("state") != "started"
+        or len(history) > 2
+    ):
+        errors.append("invalid one-shot history")
+        return errors
+    last = history[-1]
+    if (
+        not isinstance(last, dict)
+        or state != last.get("state")
+        or state not in ATTEMPT_STATES
+        or (len(history) == 2 and last.get("state") not in {"failed", "completed"})
+    ):
+        errors.append("inconsistent one-shot state")
+    if require_terminal and state not in {"failed", "completed"}:
+        errors.append("protected completion requires a terminal attempt")
+    return errors
+
+
+def validate_completion_records(
+    repo_root: Path,
+    experiment_root: Path,
+    task_id: str,
+    profile: str,
+) -> list[str]:
+    errors: list[str] = []
+    if profile not in {"claim-grade", "protected"}:
+        return ["completion profile must be claim-grade or protected"]
+    canonical = (repo_root / "tasks" / "evidence" / task_id / "experiment").resolve()
+    if experiment_root.resolve() != canonical:
+        return ["experiment root is not canonical for task"]
+    try:
+        task_path = find_task(repo_root, task_id)
+        _, metadata = load_task_metadata(task_path)
+        if metadata.get("workflow_profile") != profile:
+            errors.append("completion profile does not match task workflow profile")
+    except ValueError as exc:
+        errors.append(str(exc))
+
+    protocol_paths = sorted(experiment_root.rglob("protocol.yaml"))
+    run_paths = sorted(experiment_root.rglob("run.yaml"))
+    if not protocol_paths:
+        errors.append("completion requires at least one frozen protocol")
+    if not run_paths:
+        errors.append("completion requires at least one initialized run")
+
+    for protocol_path in protocol_paths:
+        try:
+            protocol = strict_yaml_load(protocol_path)
+            protocol_errors = validate_protocol_data(
+                repo_root, protocol, require_frozen=True
+            )
+            errors.extend(f"{protocol_path}: {error}" for error in protocol_errors)
+            if protocol.get("task_id") != task_id:
+                errors.append(f"{protocol_path}: protocol task_id mismatch")
+            if protocol.get("profile") != profile:
+                errors.append(f"{protocol_path}: protocol profile mismatch")
+            if profile == "protected":
+                errors.extend(
+                    f"{protocol_path}: {error}"
+                    for error in _validate_protected_authority(
+                        repo_root, protocol_path, protocol
+                    )
+                )
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    completed_runs = 0
+    for run_path in run_paths:
+        run_root = run_path.parent
+        try:
+            run = strict_yaml_load(run_path)
+            run_errors = _validate_run_bindings(repo_root, run_root, run)
+            errors.extend(f"{run_path}: {error}" for error in run_errors)
+            if run.get("task_id") != task_id:
+                errors.append(f"{run_path}: run task_id mismatch")
+            protocol_path = resolve_repo_path(repo_root, run.get("protocol_path"))
+            try:
+                protocol_path.resolve().relative_to(experiment_root.resolve())
+            except ValueError:
+                errors.append(f"{run_path}: run protocol is outside experiment root")
+            protocol = strict_yaml_load(protocol_path)
+            if protocol.get("profile") != profile:
+                errors.append(f"{run_path}: run protocol profile mismatch")
+
+            bundle_path = run_root / "bundle.yaml"
+            audit_path = run_root / "audit.json"
+            if not bundle_path.exists() and not audit_path.exists():
+                continue
+            candidate_errors: list[str] = []
+            if not bundle_path.is_file():
+                candidate_errors.append("portable bundle is missing")
+            else:
+                bundle = strict_yaml_load(bundle_path)
+                bundle_errors, _, _ = _validate_bundle(repo_root, run_root, run, bundle)
+                candidate_errors.extend(bundle_errors)
+            if not audit_path.is_file():
+                candidate_errors.append("independent audit is missing")
+            else:
+                audit = strict_json_load(audit_path)
+                candidate_errors.extend(
+                    _validate_audit_record(repo_root, run_root, run, audit)
+                )
+
+            journal_path = resolve_repo_path(repo_root, run.get("cell_journal"))
+            if not journal_path.is_file():
+                candidate_errors.append("completion cell journal is missing")
+            else:
+                cells = load_jsonl(journal_path)
+                if not cells:
+                    candidate_errors.append("completion cell journal is empty")
+                _validate_cells(cells, candidate_errors)
+                latest_states: dict[str, str] = {}
+                for cell in cells:
+                    if isinstance(cell.get("cell_key"), str):
+                        latest_states[cell["cell_key"]] = cell.get("state")
+                if any(state == "started" for state in latest_states.values()):
+                    candidate_errors.append("completion cell journal has started cells")
+
+            if profile == "protected":
+                attempt_path = run_root / "attempts" / f"{run.get('attempt_id')}.json"
+                if not attempt_path.is_file():
+                    candidate_errors.append("protected attempt consumption is missing")
+                else:
+                    attempt = strict_json_load(attempt_path)
+                    candidate_errors.extend(
+                        _validate_attempt_record(
+                            run, attempt_path, attempt, require_terminal=True
+                        )
+                    )
+            if candidate_errors:
+                errors.extend(f"{run_path}: {error}" for error in candidate_errors)
+            elif not run_errors:
+                completed_runs += 1
+        except (ValueError, CustodyError) as exc:
+            errors.append(str(exc))
+    if run_paths and completed_runs == 0:
+        errors.append(
+            "completion requires a valid run with terminal cells, portable bundle, "
+            "and accepted independent audit"
+        )
+    return errors
+
+
+def validate_completion(args: argparse.Namespace) -> int:
+    repo_root = repo_root_from(args.root)
+    experiment_root = resolve_repo_path(repo_root, args.experiment_root)
+    errors = validate_completion_records(
+        repo_root,
+        experiment_root,
+        args.task_id,
+        args.profile,
+    )
+    if errors:
+        print("Experiment completion validation FAILED:")
+        for error in errors:
+            print(f" - {error}")
+        return 1
+    print(f"Experiment completion validation passed for {args.task_id}.")
+    return 0
+
+
 def validate_tree(args: argparse.Namespace) -> int:
     repo_root = repo_root_from(args.root)
     roots = sorted((repo_root / "tasks" / "evidence").glob("*/experiment"))
@@ -1286,31 +1525,20 @@ def validate_tree(args: argparse.Namespace) -> int:
                         )
                     else:
                         audit = strict_json_load(audit_path)
-                        if audit.get("bundle_sha256") != sha256_file(bundle_path):
-                            errors.append(f"{audit_path}: audit binds stale bundle")
-                        if audit.get("claim_authorized") is not False:
-                            errors.append(
-                                f"{audit_path}: audit must not silently authorize claim"
+                        errors.extend(
+                            f"{audit_path}: {error}"
+                            for error in _validate_audit_record(
+                                repo_root, run_root, run, audit
                             )
+                        )
                 for attempt_path in sorted((run_root / "attempts").glob("*.json")):
                     attempt = strict_json_load(attempt_path)
-                    history = attempt.get("history")
-                    if (
-                        not isinstance(history, list)
-                        or not history
-                        or history[0].get("state") != "started"
-                        or len(history) > 2
-                    ):
-                        errors.append(f"{attempt_path}: invalid one-shot history")
-                    elif (
-                        attempt.get("state") != history[-1].get("state")
-                        or attempt.get("state") not in ATTEMPT_STATES
-                        or (
-                            len(history) == 2
-                            and history[-1].get("state") not in {"failed", "completed"}
+                    errors.extend(
+                        f"{attempt_path}: {error}"
+                        for error in _validate_attempt_record(
+                            run, attempt_path, attempt, require_terminal=False
                         )
-                    ):
-                        errors.append(f"{attempt_path}: inconsistent one-shot state")
+                    )
             except ValueError as exc:
                 errors.append(str(exc))
     if errors:
@@ -1332,6 +1560,15 @@ def build_parser() -> argparse.ArgumentParser:
     validate = subs.add_parser("validate")
     validate.add_argument("--root", type=Path, default=Path("."))
     validate.set_defaults(handler=validate_tree)
+
+    completion = subs.add_parser("validate-completion")
+    completion.add_argument("--root", type=Path, default=Path("."))
+    completion.add_argument("--task-id", required=True)
+    completion.add_argument(
+        "--profile", choices=("claim-grade", "protected"), required=True
+    )
+    completion.add_argument("--experiment-root", required=True)
+    completion.set_defaults(handler=validate_completion)
 
     freeze = subs.add_parser("freeze-protocol")
     freeze.add_argument("--root", type=Path, default=Path("."))

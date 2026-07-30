@@ -140,10 +140,15 @@ by any subsequent worktree or referenced-artifact change.
 Append them with `append-handoff` and `append-review` subcommands. Self-review
 is explicitly provisional and cannot emit `accepted`. A complete high-risk
 report requires the latest review to be `accepted`, independent, label-distinct
-from the driver, and bound to the report's current content digest. More than
-three revision rounds requires an escalation record. Other terminal
-dispositions are `rejected`, `inconclusive`, and `superseded`;
-`revision-requested` is non-terminal.
+from the driver, and bound to the report's current content digest and exact
+source revision. The exact revision is derived rather than caller-selected: a
+clean report binds `source.head_revision`, while a dirty report binds
+`worktree:<source.content_digest>`. Both append commands reject a mismatched
+revision or digest, and validation independently rechecks the latest handoff
+and review against the report. Historical rounds remain append-only and may
+bind older surfaces. More than three revision rounds requires an escalation
+record. Other terminal dispositions are `rejected`, `inconclusive`, and
+`superseded`; `revision-requested` is non-terminal.
 
 ## Claim-grade experiment custody
 
@@ -167,6 +172,11 @@ protocol, task hash, source, config, environment, datasets, and implementation.
 Claim-eligible initialization requires a clean worktree and an exact commit.
 Scratch-phase protocols can never be claim eligible.
 
+Run validation compares the recorded task identity, claim eligibility, source,
+config, environment, dataset seals, implementation digest, and exact command
+with the frozen protocol; merely pointing each field at an existing hash-valid
+file is insufficient. Substituting one valid seal for another therefore fails.
+
 `append-cell` maintains a hash-chained journal with stable cell keys.
 Transitions are `started` to `completed`, `failed`, or `missing`; terminal
 keys cannot be reused. Failures retain errors, missing cells retain reasons,
@@ -179,6 +189,16 @@ smoke receipts. Large artifacts remain external but must have path/hash
 bindings. `audit-bundle` independently recomputes summaries and gates from raw
 rows, validates links and smoke receipts, and writes a separate terminal audit
 receipt. An audit never authorizes a claim.
+
+Workflow completion for `claim-grade` and `protected` profiles invokes the
+experiment-custody completion gate. At least one canonical run must bind a
+frozen matching protocol, have a non-empty cell journal with no still-started
+cells, carry a valid portable bundle, and carry an accepted independent audit
+bound to the frozen source revision and current bundle. Failed, abandoned, or
+incomplete runs remain visible but do not satisfy completion. A `protected`
+completion additionally requires current result-free prospective review,
+separate authorization, and the initialized attempt recorded terminally as
+`failed` or `completed`.
 
 For an existing canonical benchmark result, pass `--benchmark-result` instead
 of `--raw-rows` and point `--benchmark-manifests-root` at its manifest tree.
@@ -219,6 +239,9 @@ review/authorization/consumption policy without touching real protected data.
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/workflow_evidence.py validate --root .
 python3 tools/agents/experiment_custody.py validate --root .
+python3 tools/agents/experiment_custody.py validate-completion \
+  --root . --task-id METHOD-999 --profile claim-grade \
+  --experiment-root tasks/evidence/METHOD-999/experiment
 python3 tests/regression/tooling/Test.WorkflowEvidence.py
 python3 tests/regression/tooling/Test.ExperimentCustody.py
 python3 tests/regression/tooling/Test.TaskClaim.py

@@ -380,6 +380,47 @@ def surface_digest(entries: list[dict[str, Any]]) -> str:
     return sha256_bytes(canonical)
 
 
+def report_exact_revision(report: dict[str, Any]) -> str:
+    source = report.get("source")
+    if not isinstance(source, dict):
+        raise ValueError("report source must be a mapping")
+    digest = source.get("content_digest")
+    if not isinstance(digest, str) or not SHA256_RE.fullmatch(digest):
+        raise ValueError("report source content_digest must be lowercase sha256")
+    dirty = source.get("dirty")
+    if dirty is False:
+        revision = source.get("head_revision")
+        if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+            raise ValueError("clean report source must bind an exact 40-hex commit")
+        return revision
+    if dirty is True:
+        return f"worktree:{digest}"
+    raise ValueError("report source dirty state must be a boolean")
+
+
+def require_current_report_binding(
+    repo_root: Path,
+    task_id: str,
+    revision: str,
+    content_digest: str,
+) -> None:
+    report_path = evidence_root(repo_root, task_id) / "report.yaml"
+    if not report_path.is_file():
+        raise ValueError("generate report.yaml before appending handoff or review")
+    report = strict_yaml_load(report_path)
+    if report.get("task_id") != task_id:
+        raise ValueError("report task_id does not match appended record")
+    expected_revision = report_exact_revision(report)
+    expected_digest = report.get("source", {}).get("content_digest")
+    if revision != expected_revision:
+        raise ValueError(
+            "record revision does not match report source revision "
+            f"(expected {expected_revision})"
+        )
+    if content_digest != expected_digest:
+        raise ValueError("record content digest does not match report source digest")
+
+
 def evidence_root(repo_root: Path, task_id: str) -> Path:
     if not TASK_ID_RE.fullmatch(task_id):
         raise ValueError(f"invalid task ID: {task_id}")
@@ -668,6 +709,12 @@ def append_handoff(args: argparse.Namespace) -> int:
         raise ValueError("revision must be a 40-hex commit or worktree:<sha256>")
     if not SHA256_RE.fullmatch(args.content_digest):
         raise ValueError("content digest must be lowercase sha256")
+    require_current_report_binding(
+        repo_root,
+        args.task_id,
+        args.revision,
+        args.content_digest,
+    )
     record = {
         "schema_version": SCHEMA_VERSION,
         "task_id": args.task_id,
@@ -705,6 +752,12 @@ def append_review(args: argparse.Namespace) -> int:
         raise ValueError("revision must be a 40-hex commit or worktree:<sha256>")
     if not SHA256_RE.fullmatch(args.content_digest):
         raise ValueError("content digest must be lowercase sha256")
+    require_current_report_binding(
+        repo_root,
+        args.task_id,
+        args.revision,
+        args.content_digest,
+    )
     review_kind = "self" if args.self_review else "independent"
     if review_kind == "self" and args.verdict == "accepted":
         raise ValueError("self-review is provisional and cannot accept a change")
@@ -1140,13 +1193,24 @@ def validate_report(
                 )
             )
 
+    completion_required = require_complete or status == "complete"
     if profile in PROFILE_ORDER and PROFILE_ORDER[profile] >= 2:
         findings.extend(
             validate_high_risk_records(
                 repo_root,
                 task_id,
                 report,
-                require_complete=status == "complete",
+                require_complete=completion_required,
+            )
+        )
+    if profile in PROFILE_ORDER and PROFILE_ORDER[profile] >= 3:
+        findings.extend(
+            validate_claim_grade_records(
+                repo_root,
+                task_id,
+                profile,
+                report,
+                require_complete=completion_required,
             )
         )
     return findings
@@ -1160,6 +1224,11 @@ def validate_high_risk_records(
 ) -> list[Finding]:
     findings: list[Finding] = []
     digest = report.get("source", {}).get("content_digest")
+    try:
+        expected_revision = report_exact_revision(report)
+    except ValueError as exc:
+        findings.append(Finding("error", "source", str(exc)))
+        expected_revision = None
     for key in ("handoff", "review"):
         if not isinstance(report.get(key), str):
             findings.append(
@@ -1225,6 +1294,17 @@ def validate_high_risk_records(
             findings.append(
                 Finding("error", "handoff", "handoff binds stale content digest")
             )
+        if (
+            expected_revision is not None
+            and latest.get("revision") != expected_revision
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    "handoff",
+                    "latest handoff revision differs from report source revision",
+                )
+            )
 
     try:
         review_path = resolve_repo_path(repo_root, report["review"])
@@ -1285,6 +1365,21 @@ def validate_high_risk_records(
                     )
                 )
         latest = reviews[-1]
+        if (
+            expected_revision is not None
+            and latest.get("revision") != expected_revision
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    "review",
+                    "latest review revision differs from report source revision",
+                )
+            )
+        if latest.get("content_digest") != digest:
+            findings.append(
+                Finding("error", "review", "latest review binds stale content digest")
+            )
         if require_complete:
             if latest.get("verdict") != "accepted":
                 findings.append(
@@ -1300,13 +1395,69 @@ def validate_high_risk_records(
                         "accepted terminal review must be independent",
                     )
                 )
-            if latest.get("content_digest") != digest:
-                findings.append(
-                    Finding(
-                        "error", "review", "accepted review binds stale content digest"
-                    )
-                )
     return findings
+
+
+def validate_claim_grade_records(
+    repo_root: Path,
+    task_id: str,
+    profile: str,
+    report: dict[str, Any],
+    require_complete: bool,
+) -> list[Finding]:
+    value = report.get("experiment_root")
+    canonical = f"tasks/evidence/{task_id}/experiment"
+    if value != canonical:
+        return [
+            Finding(
+                "error",
+                "experiment_root",
+                f"claim-grade report must use canonical experiment root {canonical}",
+            )
+        ]
+    if not require_complete:
+        return []
+    try:
+        root = resolve_repo_path(repo_root, value)
+    except ValueError as exc:
+        return [Finding("error", "experiment_root", str(exc))]
+    if not root.is_dir():
+        return [
+            Finding(
+                "error",
+                "experiment_root",
+                "claim-grade completion requires experiment custody records",
+            )
+        ]
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).with_name("experiment_custody.py")),
+            "validate-completion",
+            "--root",
+            str(repo_root),
+            "--task-id",
+            task_id,
+            "--profile",
+            profile,
+            "--experiment-root",
+            value,
+        ],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode == 0:
+        return []
+    detail = (result.stdout.strip() or result.stderr.strip()).replace("\n", "; ")
+    return [
+        Finding(
+            "error",
+            "experiment_root",
+            f"claim-grade completion custody is invalid: {detail}",
+        )
+    ]
 
 
 def validate_repository(args: argparse.Namespace) -> int:

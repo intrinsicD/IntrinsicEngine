@@ -20,14 +20,18 @@ Use this checklist before commit and PR creation.
 - [ ] Skipped checks have bounded reasons; failed required commands and
       residual blocking findings are not presented as completion.
 - [ ] `high-risk` and higher work has a final handoff plus accepted independent
-      review bound to the exact final commit/content digest. Self-review
-      remains provisional and labels are not treated as authentication.
+      review bound to the exact final commit/content digest (or the derived
+      `worktree:<content-digest>` identity for an explicitly dirty draft).
+      Append-time and validation-time checks both enforce the binding.
+      Self-review remains provisional and labels are not treated as
+      authentication.
 - [ ] `claim-grade` work has a frozen protocol, sealed non-overwriting run,
       visible cell failures/missing results, portable bundle, and independent
-      recomputation audit.
+      recomputation audit; the completion validator proves the run bindings
+      equal the protocol rather than merely naming hash-valid files.
 - [ ] `protected` work has result-free prospective review, separate launch
       authorization, current protocol/implementation digests, and one-shot
-      attempt consumption.
+      attempt consumption with a terminal `failed` or `completed` record.
 
 ## Maturity and closure
 
