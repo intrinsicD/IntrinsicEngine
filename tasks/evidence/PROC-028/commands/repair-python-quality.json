@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\npython3 -m ruff check tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py\npython3 -m ruff format --check tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py\npython3 -m py_compile tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\npython3 -m ruff check tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py\npython3 -m ruff format --check tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py\npython3 -m py_compile tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py'",
+  "cwd": ".",
+  "duration_ms": 87,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T22:13:08Z",
+  "label": "repair-python-quality",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T22:13:08Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/repair-python-quality.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-028/commands/repair-python-quality.stdout.log",
+  "stdout_sha256": "4bd8248f4985e327cd636d5b563aa46d1d34db2021498c8d8b37613b35f181d1",
+  "task_id": "PROC-028"
+}

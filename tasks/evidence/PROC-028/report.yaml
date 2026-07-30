@@ -3,310 +3,62 @@ task_id: PROC-028
 workflow_profile: high-risk
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-29T22:55:04Z'
+generated_at: '2026-07-30T22:19:49Z'
 claim_eligible: false
 source:
   base_ref: origin/main
-  base_revision: 5f7843c99be6f978b2939b463f48abfb39348c66
-  head_revision: e800ede9e7590e4eb225ceac9c0ce807b2ff10d9
-  branch: codex/proc-028-enforced-agent-workflow
-  worktree: /home/alex/Documents/IntrinsicEngine-proc-028
-  dirty: false
+  base_revision: 572d7d2ef1d7d563a11eba2e1a3b15467247f8f0
+  head_revision: e08d3967988e8d2bfef3ab0c5b457960dc6fb002
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
   surface:
-  - path: .github/pull_request_template.md
-    sha256: 8dd92d663b9133b010dd428eeecd3d8286c03f49cfc8e57c7d21874591b6a599
-  - path: .github/workflows/ci-docs.yml
-    sha256: 36f449e60ac1857e540af2e0e7e4645977984c6320f7865f58a044afc383a8db
-  - path: .github/workflows/nightly-deep.yml
-    sha256: e480408abb100196eae910c8df7ca56d9742d57776ff019c5e0a6265c71c4746
-  - path: AGENTS.md
-    sha256: 400be4c53fcddb03876564bb3e52845c484d57bd032f991797dece246fbf9060
-  - path: ara/logic/solution/architecture.md
-    sha256: 8d1da6ed965cfa73aefe4d3925531f702cd60f54f8e5c9dbf58bec64679c5976
-  - path: ara/logic/solution/constraints.md
-    sha256: 52336edfadc79e90ff64536c0d41f8fbe488e697b01740a4d2e4b2ab834aed2e
-  - path: ara/logic/solution/heuristics.md
-    sha256: 9427104937dd453a907234ede18aa7248fe8e479d92d0ed01f419fa8ad512216
-  - path: ara/staging/observations.yaml
-    sha256: 4fa0e1a4a947be2d252fd08ab7af9571d803b179f8c4cd39be807a6199b4247b
   - path: ara/trace/exploration_tree.yaml
-    sha256: 4656cadbcd26b4645ee58affe1cbb91552806de2b7f3312302feca13b3beb2fb
+    sha256: 46208429335b0c86559c2afe148ed3a1523a6b19d3e51283be6ca2a10bec395d
   - path: ara/trace/pm_reasoning_log.yaml
-    sha256: d0832b193bf74050ea2693554379300aa4596d33a07aaf4ef0d73dd675a694e3
-  - path: ara/trace/sessions/2026-07-29_001.yaml
-    sha256: 17ff3a3794b5f1fd4eccadc9f94d21335154c72ca8e194d60e8d521057c561cd
+    sha256: f8f5ecffd31a4491f4a8ca36c976cc44640771111a6267ca1cd597bc34f761f7
   - path: ara/trace/sessions/2026-07-30_001.yaml
-    sha256: 009433acada4d1ca534afca96a4e030e24d07eb6c7349a38a83365b4556d9272
+    sha256: 7cb406c214aa87208bc625ffb2c4f24132055e6192d78d248599e6fa67f29318
+  - path: ara/trace/sessions/2026-07-31_001.yaml
+    sha256: 5bec36c5af131fa27bbeb24fa0f3c687e4ef110f7769a94442a1641ed16ee540
   - path: ara/trace/sessions/session_index.yaml
-    sha256: 76dcd8ab06971d520036db8ac1e8563136d0452c218be71f255ebcefbfdc3853
-  - path: benchmarks/CMakeLists.txt
-    sha256: d615f2357fc5b8b7bffa5743ae3756d1af589e927eaff3a438b89235e82aeec3
-  - path: benchmarks/README.md
-    sha256: 9404ac3ba0ebdae07d0cc9a158d477e152b077e44fb2c13dfbd609d046853417
-  - path: benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json
-    sha256: 7302b29b4f19061d0b6dc28292cf5c744063de56f0a321a4d9909fccc3caab28
-  - path: benchmarks/baselines/core_scheduler_hardening_smoke_59fbb84a.json
-    sha256: b6f372debdcb6a4cd02438d4c8ef8bf8f61ecbf66e58a14d56bb20a3ada43507
-  - path: benchmarks/baselines/core_taskgraph_plan_reuse_ecs3_smoke_e8df606f.json
-    sha256: e51a072cce7cf62a8e52b63134c743df12aec9c9453ebfb545787a4e7ad7ff77
-  - path: benchmarks/baselines/core_taskgraph_plan_reuse_renderprep9_smoke_e8df606f.json
-    sha256: 7840f6d6da92b90e04f58b87a319fadb199753ef5939144912ede25285049d75
-  - path: benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json
-    sha256: a65f089e23ec50d1547cbc7c88a11f5e30316b9db189486083a2c14fb1a8bc9f
-  - path: benchmarks/baselines/smoke_baseline.json
-    sha256: 0f30b89fd51e650c06affc2e0af49a9a116793148b3e1d8fdd3bba95fc8a5c74
-  - path: benchmarks/datasets/manifests/geometry_example_small.yaml
-    sha256: 3b3facd2b2d355f92e2959c779834896c051e3ffbc4372a6c6bb77e9981eaff2
-  - path: benchmarks/geometry/README.md
-    sha256: be038a12919756e8640d6fcd6317d4b4d88cfdb6bbb382e55076ca778039b3bb
-  - path: benchmarks/reports/README.md
-    sha256: dd52294e63143047219cafae063e14f4b441b8941c5310a5669a7615ac5a6ec4
-  - path: benchmarks/reports/examples/example_smoke_result.json
-    sha256: 0a89ccd116a4289574927a7e6c544d3b246595ff2ee1c7364c01d270bbae6fe9
-  - path: docs/agent/ara-evidence-policy.md
-    sha256: 4bce83ec377e5216bb335eecc84f85378b2ef099ac30e8406b531c5bec842b66
-  - path: docs/agent/benchmark-review-checklist.md
-    sha256: ab73f55fc35bf107ae38dc0340202caf0596ed3829e4742614fffecfad1274a8
-  - path: docs/agent/benchmark-workflow.md
-    sha256: 06068ab220d5d673093e5dbff148d87c14441fd64f957f36d7ac4be80a6f69aa
-  - path: docs/agent/docs-sync-policy.md
-    sha256: c2a2b6b88ea08b598e1be506e656d9de73d313e02bdf8a28f832f5d5f9dcafc9
-  - path: docs/agent/how-this-repo-is-built.md
-    sha256: bda1d080eb9400a2be4bc0bc57877f83288ea744c4744ff6ff2d013df94bf076
-  - path: docs/agent/prompt/prompt.md
-    sha256: ec27628e3fb31def72d2fa757f3ffd766defc8646029bc861999a5ba4013a1d4
+    sha256: 4988032d9a924cf05ca40e40b59a97f5d2a36f2efa89bec6c197e8c293858384
   - path: docs/agent/review-checklist.md
-    sha256: 8b48036138efc225ae52587552addbc6208b967f231507e996fded1810a406ad
-  - path: docs/agent/task-format.md
-    sha256: 435e47d8b427bbd79da5b8209e91bf640617889234bb2c66246b2d791f6754c1
+    sha256: c4ce07448998ed364e36a387ca7c82ec8e9192f45a19af9faf3d80884010ec26
   - path: docs/agent/workflow-evidence.md
-    sha256: fd138b17cb8d9b8eaf31cea4b97e485ee91ec4dc3840c9a2b59ebbf3f993ac58
-  - path: docs/benchmarking/benchmark-manifest-schema.md
-    sha256: 1b9bcf8334197c3903967626dc9690fbbcb523b7eebdb0117bfaf7247c8eff8b
-  - path: docs/benchmarking/ci-policy.md
-    sha256: 4c02737724859a3957164b6078dff5d0cac5f5bcee2cb2aa1c7b72c4a3570a5a
-  - path: docs/benchmarking/dataset-policy.md
-    sha256: d75f2fc7564f990d1d18466ed707f360d11ab13e3b2ca33cf2183e14e80f8a22
-  - path: docs/benchmarking/index.md
-    sha256: 41bdae1698e202cbb445970535e69917e66f9e7644aafc312cb673b88a3310f2
-  - path: docs/benchmarking/overview.md
-    sha256: 3dc3efa2a1ff01130a3380620be11f694b5fb2306d5e8138a2223d9c6a847a99
-  - path: docs/benchmarking/report-template.md
-    sha256: 600fba13a212bb44f50531196e67b81b82c7cd84332b85af8aa92d281f0ccc1b
-  - path: docs/benchmarking/result-json-schema.md
-    sha256: a2c583dafb7a680ca25f3e38d82889bb9cdc1d9868db09adc6376dc2cc842a17
-  - path: docs/index.md
-    sha256: ffe8ee7ecbeda08da307f712e24d0f14eb1bc35cb4d2ece97498ead57c20f220
-  - path: docs/roadmap.md
-    sha256: 2523c172908fde4900f082a9827e9e140c2ebf8bacf5c81b83669e29fb29ee32
-  - path: tasks/README.md
-    sha256: 0a9737f91f77bd99c74688cdc3a3285cf9ef9cda48581ac946b6c54b245cf173
-  - path: tasks/SESSION-BRIEF.md
-    sha256: 2324ac5bca83175b9613668c5ef6274daea64019ffa68654ee5a5c859b2b5d98
+    sha256: 27eef7e3bfa602807d920cb209ca8b905d3f5bc649b022c1c9b5f456651bee37
   - path: tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
-    sha256: b050003a7b31a71faeca860c8b5f95bb10b45dedaf9f799cad0bfc7967ccfd2c
-  - path: tasks/active/README.md
-    sha256: 2bb16b8aba1cd1784723d9cff315dc7cc08146f621a5c04cd846d6f6491a6e09
-  - path: tasks/backlog/README.md
-    sha256: ec0b8714ff6746e3ab32e555795f8c3de985414f99bb4ef058ce8c79906cb259
-  - path: tasks/backlog/process/README.md
-    sha256: 2559ca680695dcc24cdd7bdf3a4fb5939a3fb0785ea45cfefa952e12bba87333
-  - path: tasks/evidence/README.md
-    sha256: 61c311e387e3436546521de05528a91ae1a41a4a8d92de07e01549e7f6f8ae37
-  - path: tasks/templates/bug-task.md
-    sha256: 1ed3d426c45117e3adac0d05356f19d6c359e4f38f4453d8f444e935bb64b005
-  - path: tasks/templates/method-task.md
-    sha256: 9532a66720610189622d966c6ddcd1dbdc4d77097184e8108f7d8e8212bce134
-  - path: tasks/templates/review-task.md
-    sha256: 69c3f1eb0b924960d93ada361249660708b8e677b1cfe8b7627d12053e81a001
-  - path: tasks/templates/task-micro.md
-    sha256: 14c8d51f4670fb5a1c8628ba473436e674ba305f1a7c015cf376f146310b8aca
-  - path: tasks/templates/task.md
-    sha256: 303e7fbd0775ee9e345cda46fbb9360307b241913344685fb4a1886ce5334a2f
-  - path: tests/regression/tooling/Test.BenchmarkComparison.py
-    sha256: 4c6945cf5393fc95215dbae3852cab931a06786d7a6e47afdfbd22f37e0446a5
-  - path: tests/regression/tooling/Test.CiTiming.py
-    sha256: 20dff8042f4dc4297d75fdef2ac79430cc8de08cb67c53615325daab07356134
+    sha256: 914cfa8511c7645eddf3de48a8d714b7c1e73d3d89410708fded957eefdd06a3
   - path: tests/regression/tooling/Test.ExperimentCustody.py
-    sha256: c2888a26daf491396783b8b9124eadc027e395be9de9323afdf2cb182dd85515
-  - path: tests/regression/tooling/Test.TaskClaim.py
-    sha256: e8419b845fb949c9e4aa9f5b8a6d935c466866cc8ab2e0863d5157447eb29969
-  - path: tests/regression/tooling/Test.ValidateTasks.py
-    sha256: 196036bfdc56bf6b2693792bdf40b50a4620df54158e18c9f7680edce2d41021
+    sha256: 8de2691bd9f01b32011004bd839f2d3c66ad76be86a6c346784b782190577718
   - path: tests/regression/tooling/Test.WorkflowEvidence.py
-    sha256: 32362df1ae182e1c3e43ebda14df32d8c4d144cbc70022b424fe688ca1414502
-  - path: tests/regression/tooling/Test_BenchmarkResultValidator.py
-    sha256: 3bf1c459e18886e6fec2f7ed1d61f6431704c23ef4b71d4623bfa85acd95af36
-  - path: tools/agents/README.md
-    sha256: c49b99c0ba46f410bda99478ecc787aff13b9b84a5a087a79a200414ed460bc2
+    sha256: 020c8ce4eb839a0b02e1691dbd51f3933de3866b75bb2d846c7b8a92b6fd6f26
   - path: tools/agents/experiment_custody.py
-    sha256: 97aeb66b547c2274dde0534a50d7712ee2a90add4cf7f23db0bf8fc4ae68690c
-  - path: tools/agents/fixtures/protected-synthetic/README.md
-    sha256: 9f9cfe6fbbb07854683d2b3033b08c52bd5b39c9cc867251135bbbe478505418
-  - path: tools/agents/fixtures/protected-synthetic/confirm.json
-    sha256: 64a36103d9a92dae1a10199a3f7bbafcb37661633eeb04637584d93349785c8f
-  - path: tools/agents/fixtures/protected-synthetic/environment.json
-    sha256: db5d95c2f599276e85950dfb2e3264f25b4b4082c8e63f4742fa792182fcf2b8
-  - path: tools/agents/fixtures/protected-synthetic/implementation.py
-    sha256: b47fc2606eab16e54c2a798cf3bc2070373c3097dd1dc330e6d5f449de031751
-  - path: tools/agents/fixtures/protected-synthetic/protocol.template.yaml
-    sha256: 2b0f847d1e327f10e5bcd89e9c70729146f24f0f0497ac5fb70acd6091cb69a3
-  - path: tools/agents/fixtures/protected-synthetic/run.yaml
-    sha256: d63c8b026456f3ec5c9fb98131f0d2f5b2f15db7e96d6a11fbb7a9feb05f43a2
-  - path: tools/agents/fixtures/protected-synthetic/screen.json
-    sha256: 632ab227abe6c319bde4d4193aa9d9ad6e472370d2d5810a7a6b54853bd7a979
-  - path: tools/agents/skills/intrinsicengine-benchmark/references/benchmark-review-checklist.md
-    sha256: ab73f55fc35bf107ae38dc0340202caf0596ed3829e4742614fffecfad1274a8
-  - path: tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
-    sha256: f102ecb4e93571a04e1bb42d808dcc7efa14459554b5cb97856e338bf294fe6f
-  - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
-    sha256: ec27628e3fb31def72d2fa757f3ffd766defc8646029bc861999a5ba4013a1d4
-  - path: tools/agents/skills/intrinsicengine-docs-sync/references/docs-sync-policy.md
-    sha256: c2a2b6b88ea08b598e1be506e656d9de73d313e02bdf8a28f832f5d5f9dcafc9
-  - path: tools/agents/skills/intrinsicengine-results-audit/references/ara-evidence-policy.md
-    sha256: 4bce83ec377e5216bb335eecc84f85378b2ef099ac30e8406b531c5bec842b66
+    sha256: 80db7f82fb84e18783750a8e5108ba3cf24bce8f205288e38f2339c5f4e976e0
   - path: tools/agents/skills/intrinsicengine-review/references/review-checklist.md
-    sha256: 459bcca1a4e5c7335609c92de587d454fe08ecb9940e0c80e58fdc66a60c4b44
-  - path: tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
-    sha256: d33c4876d1cf4e9787136921631447eb9f0126b5334bbe93f9d75725d09795cc
-  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
-    sha256: d6408a7ef9a67e11b7b263d58c7cb0be7af70a1dee36b0b5e948a97896de474e
-  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
-    sha256: 303e7fbd0775ee9e345cda46fbb9360307b241913344685fb4a1886ce5334a2f
+    sha256: a163a84e08d8c224a1767428a3ed6d8d63473ba8a9c10e58516852736ca4835f
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-    sha256: fd138b17cb8d9b8eaf31cea4b97e485ee91ec4dc3840c9a2b59ebbf3f993ac58
-  - path: tools/agents/sync_skills.py
-    sha256: 14aa6c1c921e87dae40a3b11c334798eb86add0662d22f132f4497347e7465d3
-  - path: tools/agents/task_claim.py
-    sha256: 3b6956b36c48542459394a0075b25a2f9fd9a02f811bf999a809e6fb9842b9cd
-  - path: tools/agents/validate_tasks.py
-    sha256: b244007bea41fca1f5699b83ad4809b3f8dc9dc0cc3b58c6665586c7c9a1752b
+    sha256: 27eef7e3bfa602807d920cb209ca8b905d3f5bc649b022c1c9b5f456651bee37
   - path: tools/agents/workflow_evidence.py
-    sha256: aca8222cf416f6ffd5bcc000bbfdb9a468d7e9485f2c33f296f7e51a1ff174cf
-  - path: tools/agents/workflow_legacy_tasks.json
-    sha256: 89513832b30474b677cd6ada49c4b12edc53b794c367bacdc85a85aa2d58d525
-  - path: tools/benchmark/README.md
-    sha256: da0b2ebe7af56a7881475adfe6793dc5849ca13785f89f7a9d20e926304f0eaf
-  - path: tools/benchmark/check_perf_regression.py
-    sha256: 3874bc9c66fdffc0c553c65541b1be7bc76bdeda6eb036cc303c5193a25650a9
-  - path: tools/benchmark/check_perf_regression.sh
-    sha256: d717f06bb0ba49181cf4af10b54b652268c9bee3a1d531e72a908b16c4f3c4d4
-  - path: tools/benchmark/run_and_seal.py
-    sha256: a02ed62827744fc967dd227c6ce2d3a15e5b56647da830129709c90c364a01e1
-  - path: tools/benchmark/seal_benchmark_results.py
-    sha256: ff20f2d2c3c8466d3217224bd16a4d2045579f7c84b3a2fd5e3043d567d4e092
-  - path: tools/benchmark/validate_benchmark_manifests.py
-    sha256: dd08ff7fb720f1acac65487ce7930d5115646e89dfe1516ae52569f667255228
-  - path: tools/benchmark/validate_benchmark_results.py
-    sha256: ef39f1de1e752cfb8b3feca5bf807e01f2a925265f729dfa64408f21d3433185
-  - path: tools/ci/aggregate_gate_timing.py
-    sha256: 8054296b5c93cf28c762193840f2b2a04d04ce83f54e22500304af6f116c60cb
-  - path: tools/ci/validate_gate_timing_baseline.py
-    sha256: 681d484edc4a6ca02447eed1841e5dfba3e47152396ef020e08708920d320f75
-  content_digest: ad1d044a680964d892e6fb882e50c869b5f04d04ff120779f1d6acc3818fa24b
+    sha256: 71e21c6103fe15c6ad51a7766f5acf6abbfbaf2fe99f04adfc8d91ecaa22750a
+  content_digest: c66519538b5877f3433cd804943cf7d62f3a8cd11c98628908ae842aed1552ea
 touched:
   paths:
-  - .github/pull_request_template.md
-  - .github/workflows/ci-docs.yml
-  - .github/workflows/nightly-deep.yml
-  - AGENTS.md
-  - ara/logic/solution/architecture.md
-  - ara/logic/solution/constraints.md
-  - ara/logic/solution/heuristics.md
-  - ara/staging/observations.yaml
   - ara/trace/exploration_tree.yaml
   - ara/trace/pm_reasoning_log.yaml
-  - ara/trace/sessions/2026-07-29_001.yaml
   - ara/trace/sessions/2026-07-30_001.yaml
+  - ara/trace/sessions/2026-07-31_001.yaml
   - ara/trace/sessions/session_index.yaml
-  - benchmarks/CMakeLists.txt
-  - benchmarks/README.md
-  - benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json
-  - benchmarks/baselines/core_scheduler_hardening_smoke_59fbb84a.json
-  - benchmarks/baselines/core_taskgraph_plan_reuse_ecs3_smoke_e8df606f.json
-  - benchmarks/baselines/core_taskgraph_plan_reuse_renderprep9_smoke_e8df606f.json
-  - benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json
-  - benchmarks/baselines/smoke_baseline.json
-  - benchmarks/datasets/manifests/geometry_example_small.yaml
-  - benchmarks/geometry/README.md
-  - benchmarks/reports/README.md
-  - benchmarks/reports/examples/example_smoke_result.json
-  - docs/agent/ara-evidence-policy.md
-  - docs/agent/benchmark-review-checklist.md
-  - docs/agent/benchmark-workflow.md
-  - docs/agent/docs-sync-policy.md
-  - docs/agent/how-this-repo-is-built.md
-  - docs/agent/prompt/prompt.md
   - docs/agent/review-checklist.md
-  - docs/agent/task-format.md
   - docs/agent/workflow-evidence.md
-  - docs/benchmarking/benchmark-manifest-schema.md
-  - docs/benchmarking/ci-policy.md
-  - docs/benchmarking/dataset-policy.md
-  - docs/benchmarking/index.md
-  - docs/benchmarking/overview.md
-  - docs/benchmarking/report-template.md
-  - docs/benchmarking/result-json-schema.md
-  - docs/index.md
-  - docs/roadmap.md
-  - tasks/README.md
-  - tasks/SESSION-BRIEF.md
   - tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
-  - tasks/active/README.md
-  - tasks/backlog/README.md
-  - tasks/backlog/process/README.md
-  - tasks/evidence/README.md
-  - tasks/templates/bug-task.md
-  - tasks/templates/method-task.md
-  - tasks/templates/review-task.md
-  - tasks/templates/task-micro.md
-  - tasks/templates/task.md
-  - tests/regression/tooling/Test.BenchmarkComparison.py
-  - tests/regression/tooling/Test.CiTiming.py
   - tests/regression/tooling/Test.ExperimentCustody.py
-  - tests/regression/tooling/Test.TaskClaim.py
-  - tests/regression/tooling/Test.ValidateTasks.py
   - tests/regression/tooling/Test.WorkflowEvidence.py
-  - tests/regression/tooling/Test_BenchmarkResultValidator.py
-  - tools/agents/README.md
   - tools/agents/experiment_custody.py
-  - tools/agents/fixtures/protected-synthetic/README.md
-  - tools/agents/fixtures/protected-synthetic/confirm.json
-  - tools/agents/fixtures/protected-synthetic/environment.json
-  - tools/agents/fixtures/protected-synthetic/implementation.py
-  - tools/agents/fixtures/protected-synthetic/protocol.template.yaml
-  - tools/agents/fixtures/protected-synthetic/run.yaml
-  - tools/agents/fixtures/protected-synthetic/screen.json
-  - tools/agents/skills/intrinsicengine-benchmark/references/benchmark-review-checklist.md
-  - tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
-  - tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
-  - tools/agents/skills/intrinsicengine-docs-sync/references/docs-sync-policy.md
-  - tools/agents/skills/intrinsicengine-results-audit/references/ara-evidence-policy.md
   - tools/agents/skills/intrinsicengine-review/references/review-checklist.md
-  - tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
-  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
-  - tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
   - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-  - tools/agents/sync_skills.py
-  - tools/agents/task_claim.py
-  - tools/agents/validate_tasks.py
   - tools/agents/workflow_evidence.py
-  - tools/agents/workflow_legacy_tasks.json
-  - tools/benchmark/README.md
-  - tools/benchmark/check_perf_regression.py
-  - tools/benchmark/check_perf_regression.sh
-  - tools/benchmark/run_and_seal.py
-  - tools/benchmark/seal_benchmark_results.py
-  - tools/benchmark/validate_benchmark_manifests.py
-  - tools/benchmark/validate_benchmark_results.py
-  - tools/ci/aggregate_gate_timing.py
-  - tools/ci/validate_gate_timing_baseline.py
   layers:
-  - ara
-  - benchmarks
-  - ci
-  - docs
-  - tasks
   - tools
   modules:
   - benchmark-result-schema-v2
@@ -379,32 +131,34 @@ commands:
 - receipt: tasks/evidence/PROC-028/commands/configure-ci.json
 - receipt: tasks/evidence/PROC-028/commands/default-cpu-ctest.json
 - receipt: tasks/evidence/PROC-028/commands/python-quality.json
+- receipt: tasks/evidence/PROC-028/commands/repair-python-quality.json
+- receipt: tasks/evidence/PROC-028/commands/repair-structural-gates.json
+- receipt: tasks/evidence/PROC-028/commands/repair-workflow-regressions.json
 - receipt: tasks/evidence/PROC-028/commands/structural-gates.json
 - receipt: tasks/evidence/PROC-028/commands/workflow-regressions.json
 changed_public_contracts:
 - Task front-matter workflow_schema/profile/evidence/ownership fields and deterministic prospective grandfathering.
 - Generated task-evidence report, command-receipt, handoff, and fixed-revision review schema version 1.
-- Claim-grade/protected protocol, run, cell, bundle, audit, prospective-review, authorization, and attempt-custody
-  records.
+- High-risk handoff and review records derive their exact clean-commit or dirty-worktree revision from
+  report source identity.
+- Claim-grade/protected completion requires validated protocol, run, terminal cells, bundle, audit, and
+  protected authority/attempt custody.
 - Benchmark result schema version 2 with exact manifest/source/config binding and stable benchmark plus
   append-only run/attempt identities.
 - Git-common-dir task/path claim CLI with bounded leases and retained release/recovery history.
 diagnostics_and_previews:
-- Focused workflow/benchmark regression suites passed 88/88, including clean fixed-revision and dirty-worktree
-  report behavior.
-- Explicit uncommitted-file docs-sync validation covered the task surface and triggered three rules with
-  no findings.
-- ci configured with Clang 23; IntrinsicTests and IntrinsicBenchmarks built successfully.
-- Complete default CPU-supported selector passed 4042/4042 with one expected GLFW/LSan capability self-skip.
-- Test.WorkflowConcurrency reproduces four pre-existing failures against byte-identical origin/main sources;
-  BUG-120 owns the repair.
+- Repaired workflow-evidence regressions pass 21/21 and experiment-custody regressions pass 21/21.
+- Complete focused workflow and benchmark bundle passes 96/96; Ruff lint/format and Python syntax checks
+  pass.
+- Strict task, docs, skill, workflow, experiment, ARA, method, benchmark, layering, test-layout, root-hygiene,
+  and session-brief gates pass.
+- Prior ci/IntrinsicTests/default CPU receipts remain hash-valid; this Python/process-only repair changes
+  no engine source, CMake input, module surface, dependency edge, or compiled test.
+- Test.WorkflowConcurrency remains a pre-existing BUG-120 failure against byte-identical origin/main sources.
 benchmark_or_parity_evidence:
-- All seven checked-in result payloads validate under schema v2 without renaming their stable benchmark
-  IDs.
-- IntrinsicBenchmarks generated and sealed 25 native smoke results; strict validation accepted all 25
-  manifest/source/run/attempt bindings.
+- All seven checked-in result payloads validate under schema v2 without renaming stable benchmark IDs.
 - The non-claim-eligible geometry.example.small fixture traverses strict result validation, bundle derivation,
-  replay/view receipt checks, and independent cooperative audit in Test.ExperimentCustody.py.
+  replay/view receipt checks, and independent cooperative audit.
 docs_sync:
   task_file: tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
   session_brief_present: true
@@ -413,14 +167,10 @@ docs_sync:
 residual_risks:
 - Owner, driver, reviewer, auditor, and authorizer labels are cooperative metadata and do not authenticate
   people or agents.
-- PROC-028 remains active until a genuinely distinct reviewer accepts the exact fixed revision; this self-review
-  is provisional.
-- Pre-existing BUG-120 keeps the already-wired WorkflowConcurrency CI check red until its snapshot is
-  reconciled.
-- Git-common-dir claims coordinate sibling worktrees on one local clone; they do not provide a cross-host
-  distributed lock.
-- A fixed clean draft remains auditable after unrelated commits; a new PROC-028 source revision requires
-  regenerated report, handoff, and review bindings before completion.
+- PROC-028 remains active until a genuinely distinct reviewer accepts the exact clean fixed revision;
+  self-review is provisional.
+- Pre-existing BUG-120 remains a separate retirement dependency.
+- Git-common-dir claims coordinate sibling worktrees on one local clone, not cross-host distributed ownership.
 skipped_checks:
 - check: Test.WorkflowConcurrency.py
   reason: Pre-existing BUG-120 reproduces against byte-identical origin/main workflow/test sources; PROC-028
@@ -435,11 +185,11 @@ artifacts:
 - path: tools/agents/fixtures/protected-synthetic/README.md
   sha256: 9f9cfe6fbbb07854683d2b3033b08c52bd5b39c9cc867251135bbbe478505418
   kind: file
-- path: ara/trace/sessions/2026-07-29_001.yaml
-  sha256: 17ff3a3794b5f1fd4eccadc9f94d21335154c72ca8e194d60e8d521057c561cd
-  kind: file
 - path: ara/trace/sessions/2026-07-30_001.yaml
-  sha256: 009433acada4d1ca534afca96a4e030e24d07eb6c7349a38a83365b4556d9272
+  sha256: 7cb406c214aa87208bc625ffb2c4f24132055e6192d78d248599e6fa67f29318
+  kind: file
+- path: ara/trace/sessions/2026-07-31_001.yaml
+  sha256: 5bec36c5af131fa27bbeb24fa0f3c687e4ef110f7769a94442a1641ed16ee540
   kind: file
 self_review:
   completed: true
