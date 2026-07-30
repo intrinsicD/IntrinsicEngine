@@ -2,9 +2,9 @@ session:
   id: "2026-07-30_001"
   date: "2026-07-30"
   started: "2026-07-30T00:33+02:00"
-  last_turn: "2026-07-30T23:12+02:00"
-  turn_count: 8
-  summary: "Integrated PROC-028 before RUNTIME-201, revalidated main, and implemented, presentation-refined, published, then fast-forwarded an Operational IntrinsicEngine architecture-diagram skill into remote main."
+  last_turn: "2026-07-30T23:27+02:00"
+  turn_count: 9
+  summary: "Integrated PROC-028 before RUNTIME-201, revalidated main, shipped the Operational architecture-diagram skill, and independently rejected PROC-028's recorded fixed revision on four enforcement defects."
 
 events_logged:
   - turn: 1
@@ -121,6 +121,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Passed the pre-merge gate and published the conflict-free three-commit fast-forward through 08dbea0c on main."
+  - turn: 9
+    type: experiment
+    id: "N308"
+    routing: direct
+    provenance: ai-executed
+    summary: "Independently rejected the recorded PROC-028 fixed revision after four adversarial enforcement defects survived passing focused and structural gates."
+  - turn: 9
+    type: decision
+    id: "N309"
+    routing: direct
+    provenance: ai-suggested
+    summary: "Left repair, clean fixed-revision rebinding, and a new independent accepted review unresolved before PROC-028 retirement."
 
 ai_actions:
   - turn: 1
@@ -188,6 +200,15 @@ ai_actions:
     action: "Fetched both refs, confirmed a clean three-commit descendant, reran the focused and strict structural gate, fast-forwarded local main without a merge commit, pushed origin/main, and confirmed zero post-push divergence."
     provenance: ai-executed
     files_changed: []
+  - turn: 9
+    action: "Audited the frozen PROC-028 revision and current main, passed 88 and 90 focused regressions plus strict structural validators, reproduced three adversarial enforcement counterexamples, and appended terminal rejected review sequence 6 with four blocking findings."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/evidence/PROC-028/reviews.jsonl"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-30_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
 claims_touched: []
 
@@ -222,9 +243,13 @@ key_context:
     excerpt: "The user explicitly requested that the verified architecture-diagram branch be merged into main and pushed to the remote."
   - turn: 8
     excerpt: "Main and origin/main accepted the conflict-free fast-forward through 08dbea0c after the complete relevant pre-merge gate passed."
+  - turn: 9
+    excerpt: "The user requested the final fixed-revision independent review of the active task."
+  - turn: 9
+    excerpt: "Passing ordinary validators did not establish the advertised enforcement: adversarial fixtures demonstrated unbound review revisions, absent claim-grade custody, and protocol/run binding drift."
 
 open_threads:
-  - "PROC-028 still requires a genuinely distinct fixed-revision accepted review before retirement."
+  - "PROC-028 must repair all four rejected findings, bind one clean contiguous final revision, and obtain a new genuinely independent accepted review before retirement."
   - "BUG-120 still owns the pre-existing Test.WorkflowConcurrency drift."
   - "RUNTIME-200 is the next runtime cleanup for the restarted agent."
   - "A generic cross-repository architecture adapter remains deferred; O77 is staged rather than promoted."

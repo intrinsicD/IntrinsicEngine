@@ -1169,3 +1169,10 @@ entries:
       - "Did not stage or crystallize a generalized observation: main integration commits the already-recorded A18/H15 artifact but adds no architecture rule or capability result."
       - "Kept O77 staged because moving the IntrinsicEngine-only skill to main still does not implement or select a generic repository adapter."
       - "Kept the existing open threads unchanged; no pull request, merge commit, C++ gate, performance claim, or Vulkan claim was introduced."
+  - turn: "2026-07-30_001#9"
+    notes:
+      - "Routed the fixed-revision independent review as experiment N308 and the required repair/rebind/re-review disposition as unresolved decision N309."
+      - "Flagged the conflict between N292's recorded revision-bound review and frozen-custody implementation result and N308's adversarial counterexamples; both records remain visible."
+      - "Did not create a new claim or revise K24/A17: those records state the intended cumulative workflow architecture, while this review shows the implementation does not yet satisfy it."
+      - "Recorded terminal rejected review sequence 6 with cooperative-label-only identity assurance; 88/88 frozen-revision and 90/90 current-main focused regressions passed, while the full C++ selector was not rerun."
+      - "Kept O77 and older observations unchanged; PROC-028's four repairs, a clean contiguous final revision, a new independent accepted review, and BUG-120 remain open."

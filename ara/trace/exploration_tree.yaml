@@ -6967,6 +6967,7 @@ tree:
       - "N290"
     status: resolved
   - id: N292
+    # CONFLICT: see N308
     type: experiment
     title: "Implement and exercise the enforced agent workflow"
     provenance: ai-executed
@@ -7346,3 +7347,50 @@ tree:
       introduces no additional source change, capability claim, pull request,
       or commitment to the deferred generic adapter.
     status: resolved
+  - id: N308
+    # CONFLICT: see N292
+    type: experiment
+    title: "Reject the recorded PROC-028 fixed revision"
+    provenance: ai-executed
+    timestamp: "2026-07-30T23:27+02:00"
+    also_depends_on: [N292, N297]
+    evidence:
+      - "tasks/evidence/PROC-028/reviews.jsonl sequence 6"
+      - "presented revision e800ede9e7590e4eb225ceac9c0ce807b2ff10d9"
+      - "presented content digest ad1d044a680964d892e6fb882e50c869b5f04d04ff120779f1d6acc3818fa24b"
+      - "later task-scoped commits b1c2d7b3, 6b5a224e, and 9d66faf2"
+      - "fixed-revision focused regressions: 88/88"
+      - "current-main focused regressions: 90/90"
+      - "fixed-revision strict structural validators passed"
+      - "adversarial review-revision mismatch probe accepted an unrelated revision"
+      - "claim-grade completion probe passed without experiment custody"
+      - "run-binding probe passed after replacing the protocol config binding"
+    result: >
+      The final independent review issued a terminal rejected verdict. The
+      presented revision is not the final PROC-028 surface; high-risk handoff
+      and review revisions are not bound to the report source revision;
+      claim-grade and protected completion do not require experiment custody;
+      and run bindings are not compared with the frozen protocol. The passing
+      regression and structural bundles therefore do not satisfy the task's
+      adversarial enforcement contract. BUG-120 and remote CI remain separate
+      recorded limitations rather than causes of this rejection.
+    status: resolved
+  - id: N309
+    type: decision
+    title: "Resolve the PROC-028 enforcement contradiction before retirement"
+    provenance: ai-suggested
+    timestamp: "2026-07-30T23:27+02:00"
+    also_depends_on: [N292, N297, N308]
+    choice: >
+      Unresolved: repair all four rejected enforcement paths, bind a new
+      completion report and handoff to one clean contiguous final revision,
+      and obtain a new genuinely independent fixed-revision accepted review
+      before retiring PROC-028.
+    alternatives:
+      - "Narrow PROC-028's acceptance criteria and the implementation result recorded in N292."
+      - "Treat the ordinary passing regression suite as sufficient despite the adversarial counterexamples."
+      - "Retire the recorded fixed revision as superseded without completing its high-risk acceptance contract."
+    evidence:
+      - "N308"
+      - "tasks/evidence/PROC-028/reviews.jsonl sequence 6"
+    status: unresolved
