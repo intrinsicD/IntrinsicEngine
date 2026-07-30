@@ -21,7 +21,6 @@ depends_on:
   - RUNTIME-174
   - RUNTIME-177
   - RUNTIME-188
-  - RUNTIME-138
   - RUNTIME-191
   - RUNTIME-192
   - RUNTIME-193
@@ -38,17 +37,28 @@ depends_on:
   - RUNTIME-204
   - PHYSICS-004
   - PROC-027
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 ---
 # REVIEW-003 — Architecture stability and right-sizing readiness audit
 
 ## Status
 
+- Dependency re-gate on 2026-07-30: `RUNTIME-138` is no longer a static
+  prerequisite. Its remaining broad selected-analysis scope is not required
+  to retire the Sandbox facade or to execute this audit. If the audit finds a
+  concrete selected-editor blocker, the existing finding rule opens one
+  scoped remediation task and re-runs the audit on a fresh `main` commit.
 - Re-gated on 2026-07-24: a source-complete runtime surface audit found
   parallel property/presentation/work/readback/clustering/residency/
   visualization/spatial-debug/import/history paths, a monolithic Sandbox
   facade, exported one-consumer helpers, and additional dormant/test-only
-  production surfaces. `RUNTIME-191..204`, `RUNTIME-138`, and `PHYSICS-004`
-  now own the
+  production surfaces. `RUNTIME-191..204` and `PHYSICS-004` now own the
   bounded remediation/migration/deletion work. The prior Ready status is
   superseded; this audit must not start until those dependencies retire.
 - Ready on 2026-07-23: `ARCH-014` retired with the all-green kernel scorecard

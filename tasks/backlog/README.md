@@ -168,6 +168,12 @@ still open. `UI-031` is retired and consumes the visibility-gated model-build
 slice for the domain-window information-architecture cleanup; the broader async
 cache/job pipeline remains owned by `RUNTIME-138`.
 
+Right-sizing re-gate (2026-07-30): `RUNTIME-138` remains a standalone open
+investigation but no longer blocks `RUNTIME-202`, `REVIEW-003`, or `UI-037`.
+Those tasks consume the cache, metadata, diagnostics, and shared `JobService`
+contracts already present; a downstream feature owns a narrow generation-
+keyed derivation only if one of its concrete workflows still requires it.
+
 The 2026-07-24 source-complete runtime surface audit opened the dependency-
 ordered `RUNTIME-192..204` remediation set and `PHYSICS-004`, re-gating
 `REVIEW-003`. It consolidates canonical property/presentation/work/readback/
@@ -182,9 +188,9 @@ The 2026-07-16 Sandbox model-workflow audit opened four Theme F leaves:
 route-level prerequisite contract delivered by `BUG-093`; `ASSETIO-011` owns
 the app-linked semantic File / Import matrix after its preview/timing/PLY/
 queued-geometry dependencies retire; `UI-037` owns runtime-authoritative
-linear action readiness and disabled-reason tooltips after `BUG-096` and
-`RUNTIME-138`; and `UI-038` owns explicit, undoable safety for destructive
-Progressive Poisson mesh conversion. The four reproducible Theme G defects
+linear action readiness and disabled-reason tooltips after `BUG-093`,
+`BUG-096`, and `RUNTIME-202`; and `UI-038` owns explicit, undoable safety for
+destructive Progressive Poisson mesh conversion. The four reproducible Theme G defects
 (`BUG-098..101`) are retired: completed-frame timing, binary PLY non-vertex
 list consumption, queued manual geometry import, and near-linear UV edge
 grouping now satisfy their recorded maturity targets.
@@ -359,11 +365,13 @@ Open members (kernel-seam priority set first):
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
   (remaining slices use `RUNTIME-192` property snapshots and the
-  post-`RUNTIME-194` `JobService`).
+  post-`RUNTIME-194` `JobService`; no longer a static dependency of
+  `RUNTIME-202`, `REVIEW-003`, or `UI-037`).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).
 - [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md)
-  (blocked by `BUG-096`, `RUNTIME-138`, and facade retirement).
+  (blocked by `BUG-096` and facade retirement; expensive readiness derivations
+  are feature-owned only when concretely required).
 - [`ui/UI-038-progressive-poisson-destructive-conversion-safety.md`](ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
   (blocked by the common mutation transaction and facade retirement).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).

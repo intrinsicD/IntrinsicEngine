@@ -19,7 +19,9 @@ map.
   mesh, UV, bake, point-cloud, registration, and parameterization actions;
   app owns aggregation after `RUNTIME-202`; gated on truthful point-to-plane
   semantics from `BUG-096`, the shared tooltip convention from `BUG-093`, and
-  generation-keyed nonblocking selected analysis from `RUNTIME-138`).
+  facade retirement from `RUNTIME-202`. It consumes existing canonical
+  metadata/cache results first and adds only concrete feature-owned derived
+  readiness work when required).
 - [UI-035 — Sandbox point-cloud consolidation editor panel](UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
   (LOP/WLOP/CLOP/EAR CPU-reference strategy and parameter controls driving the
   post-facade `RUNTIME-175` typed operation/config path; METHOD-019/020 may add only backends

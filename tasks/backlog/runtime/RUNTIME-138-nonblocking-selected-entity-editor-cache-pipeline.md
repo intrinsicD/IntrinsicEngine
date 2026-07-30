@@ -6,9 +6,28 @@ depends_on:
   - ARCH-009
   - RUNTIME-192
   - RUNTIME-194
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 maturity_target: Operational
 ---
 # RUNTIME-138 — Nonblocking selected-entity editor cache pipeline
+
+## Status
+
+- Re-gated on 2026-07-30: this task remains open pending a separate retirement
+  decision, but it is no longer a static prerequisite of `RUNTIME-202`,
+  `REVIEW-003`, or `UI-037`. Its previously completed checkboxes remain the
+  downstream baseline; those tasks must not assume that this umbrella will add
+  a broad selected-analysis module.
+- If a downstream workflow or a future measurement identifies a concrete
+  full-buffer selected-analysis problem, its owner should add the smallest
+  feature-local cached or `JobService` derivation needed for that case, with
+  generation/staleness tests, rather than blocking on this umbrella.
 
 ## Goal
 - Make the Sandbox selected-entity editor path nonblocking: the main loop reads cached editor/render state, applies cheap commands, submits generation-keyed async jobs for heavy derivations, and never scans large geometry/property buffers synchronously from the ImGui editor callback.

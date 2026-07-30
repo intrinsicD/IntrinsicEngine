@@ -2,7 +2,6 @@
 id: RUNTIME-202
 theme: F
 depends_on:
-  - RUNTIME-138
   - RUNTIME-191
   - RUNTIME-193
   - RUNTIME-196
@@ -10,9 +9,25 @@ depends_on:
   - RUNTIME-199
   - RUNTIME-200
   - RUNTIME-201
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 maturity_target: Retired
 ---
 # RUNTIME-202 — Retire the Sandbox runtime facade and localize feature models
+
+## Status
+
+- Re-gated on 2026-07-30: `RUNTIME-138` is no longer a prerequisite. Facade
+  retirement must preserve the current selected-model cache and diagnostic
+  behavior, migrate existing selection/property behavior to its feature
+  owner, and avoid waiting for or introducing a replacement selected-analysis
+  service. Any concrete expensive derivation discovered during migration
+  becomes a scoped feature-owner follow-up.
 
 ## Goal
 
@@ -75,10 +90,11 @@ maturity_target: Retired
 - [ ] Move Sandbox default-policy descriptor aggregation/installation into
       `src/app/Sandbox`; keep only reusable typed policy records/operations
       with their runtime feature owner.
-- [ ] Migrate selection/property analysis, texture baking, clustering,
-      progressive Poisson, registration, parameterization, asset import,
-      visualization/spatial debug, presentation/material edits, and scene
-      commands without app-to-lower-layer imports.
+- [ ] Migrate existing selection/property analysis, texture baking,
+      clustering, progressive Poisson, registration, parameterization, asset
+      import, visualization/spatial debug, presentation/material edits, and
+      scene commands without app-to-lower-layer imports or a replacement
+      selected-analysis service.
 - [ ] Remove Sandbox-specific backend/domain/value/result duplicates in favor
       of each feature's typed request/result and the canonical property record.
 - [ ] Inline or privatize thin `RegistrationAlignment` pass-through logic in

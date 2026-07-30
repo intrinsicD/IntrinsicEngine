@@ -22,7 +22,9 @@ cleanup slice:
   visibility parity.
 - [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](RUNTIME-202-retire-sandbox-runtime-facade.md)
   is the final feature-workflow migration/removal task: app owns Sandbox view
-  aggregation while runtime exposes narrow feature operations/snapshots.
+  aggregation while runtime exposes narrow feature operations/snapshots. It
+  preserves existing selected-model cache behavior but no longer waits on
+  `RUNTIME-138` or introduces a replacement selected-analysis service.
 - [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
   removes public BMIs for Engine/SceneInteraction/config/device helpers after
   their owner-level behavior tests are in place.
@@ -623,6 +625,10 @@ ImGui callback into generation-keyed canonical `JobService` work over
 `RUNTIME-192` property snapshots. The first landed slice is visibility-gated
 model construction plus per-frame domain-window model reuse; canonical
 property adoption, async analysis, and bounded-apply slices remain open.
+The task is now standalone: it no longer gates `RUNTIME-202`, `REVIEW-003`, or
+`UI-037`. A downstream task uses existing metadata/cache results first and
+owns a narrow feature-local derivation only when a concrete workflow requires
+one.
 
 
 ## Cross-linked rendering tasks (runtime-owned)

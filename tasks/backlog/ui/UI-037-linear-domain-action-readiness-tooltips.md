@@ -1,7 +1,14 @@
 ---
 id: UI-037
 theme: F
-depends_on: [BUG-093, BUG-096, RUNTIME-138, RUNTIME-202]
+depends_on: [BUG-093, BUG-096, RUNTIME-202]
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 maturity_target: Operational
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
@@ -18,6 +25,9 @@ maturity_target: Operational
 - No app-side inspection of geometry properties, selection cardinality, device state, or method configuration to rediscover whether an action is valid.
 - No replacement of command-time validation. Readiness is a side-effect-free preview for presentation and automation; every runtime command still revalidates immediately before apply.
 - No redesign of Sandbox navigation, input capture, window registration, or panel layout beyond keeping the existing linear controls present and understandable.
+- No broad selected-entity analysis service. Add a feature-owned
+  `JobService` derivation only when a concrete readiness predicate cannot be
+  answered from existing copied metadata or cached results.
 
 ## Context
 - Owner/layers: runtime feature owners own selection/domain/config/capability
@@ -39,15 +49,22 @@ maturity_target: Operational
   have a config lane keep config-file/UI/agent parity through their typed
   preview/apply path; this task does not invent config state for commands that
   are not currently config-backed.
-- `RUNTIME-138` is a prerequisite because finite/count/property readiness must
-  consume generation-keyed cached or asynchronous selected-analysis results;
-  it may not reintroduce full-buffer scans in the per-frame ImGui model build.
+- Readiness uses the smallest existing source of truth in order: copied
+  selection/config/capability snapshots, the `RUNTIME-192` canonical property
+  catalog and compatibility queries, then an already available generation-
+  keyed result. A feature owner may add one generation-keyed `JobService`
+  derivation only for a named finite/full-buffer predicate that cannot be
+  answered by those sources. Pending expensive results disable the affected
+  action; no path may reintroduce a full-buffer scan in the per-frame ImGui
+  model build.
 
 ## Slice plan
 - **Slice A — Runtime readiness contract.** Add the shared plain readiness
   record to feature-operation snapshots,
   stable reason priority, validator reuse, generation keys, and table-driven
-  model tests while consuming `RUNTIME-138` cached/async analysis results.
+  model tests while reusing canonical metadata/current caches and adding only
+  concrete feature-owned derived results that the readiness matrix proves it
+  needs.
 - **Slice B — App presentation.** Add the private disabled-reason item helper,
   reusing the exact app-internal free-function/hover-flag convention from
   `BUG-093`; keep controls visible in linear order, remove duplicated app
@@ -78,10 +95,13 @@ maturity_target: Operational
       config, or device validation.
 - [ ] Remove affected panel early returns and duplicated app-side prerequisite checks that hide actions or manufacture independent reasons. Retain app-only layout decisions and local editable config drafts.
 - [ ] Keep runtime apply paths fail-closed against stale selection/config/capability state after a readiness model was built, including asynchronous/derived-job submission and completion.
-- [ ] Consume generation-keyed cached/async finite-data and property-analysis
-      results from `RUNTIME-138`; pending analysis disables the affected action
-      with a reason, and steady per-frame model construction performs no
-      full-buffer geometry/property scan.
+- [ ] Resolve each readiness input through copied metadata and canonical
+      compatibility queries first, then reuse an existing generation-keyed
+      cached result where available. Only when a named readiness rule still
+      requires a full-buffer finite/property derivation may its feature owner
+      add a generation-keyed `JobService` result; pending work disables that
+      action with a reason, and steady per-frame model construction performs
+      no full-buffer geometry/property scan.
 
 ## Tests
 - [ ] Add a pure runtime/model test named
@@ -98,10 +118,12 @@ maturity_target: Operational
       exercise `AllowWhenDisabled` and the exact runtime-provided reason rather
       than a duplicated app literal.
 - [ ] Assert enabled controls emit their existing typed command and show no disabled-reason tooltip; disabled controls emit no command on click. Command-level stale-state tests continue to prove apply-time revalidation.
-- [ ] Add a steady-selection regression proving readiness cache hits perform
-      zero full-buffer finite/property scans, while a changed generation
-      invalidates the old result and reports pending until fresh analysis
-      applies.
+- [ ] Add a steady-selection regression proving metadata/cached readiness
+      performs zero full-buffer finite/property scans. For every concrete
+      derived readiness result introduced by this task, prove a changed
+      generation invalidates the old result and reports pending until the
+      fresh result applies; metadata-only rules owe no artificial pending
+      state.
 
 ## Docs
 - [ ] Update `src/runtime/README.md` with the readiness record, authoritative-validation reuse, deterministic reason policy, and the distinction between preview readiness and apply-time validation.
@@ -149,8 +171,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
   readiness facade; use the shared plain record in feature snapshots and the
   app-owned domain-window model.
 - No synchronous full-buffer finite/property scan from the per-frame readiness
-  or ImGui path; pending cached/async analysis remains an explicit disabled
-  state.
+  or ImGui path. When a concrete readiness rule needs an expensive derived
+  result, pending work remains an explicit disabled state; do not introduce a
+  global selected-analysis module for it.
 - No unrelated algorithm, renderer, input-lifecycle, import, scene-management, or navigation changes.
 
 ## Maturity
