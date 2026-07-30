@@ -3,15 +3,15 @@ task_id: BUG-120
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-30T12:05:51Z'
+generated_at: '2026-07-30T12:06:50Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: e217c3a6f622cb3ed38a6182fef407f2e07d980a
-  head_revision: 62e232ce1a0757914b5311633afec58725f83cd0
+  head_revision: c236ee87deff2323666d1dc259a68ec0dae9beb3
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: tasks/SESSION-BRIEF.md
     sha256: ea2ca4b4cf7981c2674204166f10c1e1313ebbcf5b3405de44f491802a51f467
