@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.TestCohortParity.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.TestCohortParity.py",
+  "cwd": ".",
+  "duration_ms": 640,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T11:54:35Z",
+  "label": "test-cohort-parity",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T11:54:34Z",
+  "stderr_path": "tasks/evidence/BUG-120/commands/test-cohort-parity.stderr.log",
+  "stderr_sha256": "2750d1c0f39e1bfbfee3b6b6f7164f99d134cfdbcf9fb9c9529a0c8c53f0c17c",
+  "stdout_path": "tasks/evidence/BUG-120/commands/test-cohort-parity.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-120"
+}

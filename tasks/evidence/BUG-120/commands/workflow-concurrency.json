@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.WorkflowConcurrency.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.WorkflowConcurrency.py",
+  "cwd": ".",
+  "duration_ms": 259,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T11:54:34Z",
+  "label": "workflow-concurrency",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T11:54:34Z",
+  "stderr_path": "tasks/evidence/BUG-120/commands/workflow-concurrency.stderr.log",
+  "stderr_sha256": "b9b4824f2735033f386102493dffbb5242f0f1828b9ad9d929a93a37050dbd90",
+  "stdout_path": "tasks/evidence/BUG-120/commands/workflow-concurrency.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-120"
+}

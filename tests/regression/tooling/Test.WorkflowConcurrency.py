@@ -61,7 +61,6 @@ CPU_ENGINE_CONFIG_ROOTS = (
     ("tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.RenderExtractionContract.cpp", "HeadlessConfig"),
-    ("tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp", "PoolConfig"),
     ("tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.RuntimeInputActions.cpp", "InputActionConfig"),
     ("tests/contract/runtime/Test.RuntimeJobService.cpp", "NullWindowHeadlessConfig"),
@@ -69,7 +68,7 @@ CPU_ENGINE_CONFIG_ROOTS = (
     ("tests/contract/runtime/Test.RuntimeModule.cpp", "NullWindowHeadlessConfig"),
     (
         "tests/contract/runtime/Test.RuntimeReferenceScene.cpp",
-        "SingleWorkerEngineConfig",
+        "HeadlessConfig",
     ),
     ("tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp", "HeadlessConfig"),
@@ -245,10 +244,10 @@ def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
 
 class WorkflowConcurrencyTests(unittest.TestCase):
     def test_cpu_engine_config_roots_use_one_worker(self) -> None:
-        self.assertEqual(len(CPU_ENGINE_CONFIG_ROOTS), 33)
+        self.assertEqual(len(CPU_ENGINE_CONFIG_ROOTS), 32)
         self.assertEqual(
             len({path for path, _ in CPU_ENGINE_CONFIG_ROOTS}),
-            32,
+            31,
         )
         worker_budget = "config.Simulation.WorkerThreadCount = 1u;"
 
@@ -270,8 +269,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             body.count("config.Simulation.WorkerThreadCount = workers;"),
             1,
         )
-        self.assertEqual(source.count("NullWindowHeadlessConfig(),"), 2)
-        self.assertEqual(source.count("NullWindowHeadlessConfig(1u),"), 1)
+        self.assertEqual(source.count("NullWindowHeadlessConfig(),"), 6)
+        self.assertEqual(source.count("NullWindowHeadlessConfig(1u),"), 3)
 
     def test_exact_multiworker_ctest_budgets_match_cpu_sources(self) -> None:
         cmake = (REPO_ROOT / "tests/CMakeLists.txt").read_text(encoding="utf-8")
@@ -292,7 +291,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         source_budgets = _source_multiworker_budgets()
 
         self.assertEqual(declared, source_budgets)
-        self.assertEqual(len(declared), 43)
+        self.assertEqual(len(declared), 73)
         self.assertEqual(
             {
                 budget: sum(
@@ -300,7 +299,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 )
                 for budget in (3, 4, 8)
             },
-            {3: 22, 4: 19, 8: 2},
+            {3: 49, 4: 22, 8: 2},
         )
         self.assertIn(
             "Declared multi-worker test "

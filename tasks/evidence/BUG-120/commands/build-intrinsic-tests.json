@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 14006,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T12:01:11Z",
+  "label": "build-intrinsic-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T12:00:57Z",
+  "stderr_path": "tasks/evidence/BUG-120/commands/build-intrinsic-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-120/commands/build-intrinsic-tests.stdout.log",
+  "stdout_sha256": "6088a68738142418115c60352aa1f4c385374af6b2ec111e65d11a10ffb8f71f",
+  "task_id": "BUG-120"
+}
