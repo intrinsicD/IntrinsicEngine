@@ -1,0 +1,53 @@
+session:
+  id: "2026-07-31_001"
+  date: "2026-07-31"
+  started: "2026-07-31T00:15+02:00"
+  last_turn: "2026-07-31T00:15+02:00"
+  turn_count: 1
+  summary: "Repaired all four rejected PROC-028 enforcement paths, passed 96 focused regressions and strict structural gates, and preserved independent re-review as the remaining acceptance gate."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N310"
+    routing: direct
+    provenance: user
+    summary: "Directed all four rejected PROC-028 enforcement findings to be fixed without narrowing the contract."
+  - turn: 1
+    type: experiment
+    id: "N311"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented exact review-revision, cumulative custody, protected-attempt, and protocol/run binding gates; 96 focused regressions and strict structural validators passed."
+
+ai_actions:
+  - turn: 1
+    action: "Acquired PROC-028, added exact clean/dirty review bindings and cumulative experiment-completion validation, hardened run/protocol equality and audit/attempt checks, added adversarial regressions, synchronized canonical docs and skill mirrors, recorded repair receipts, and created isolated review and repair commits."
+    provenance: ai-executed
+    files_changed:
+      - "tools/agents/workflow_evidence.py"
+      - "tools/agents/experiment_custody.py"
+      - "tests/regression/tooling/Test.WorkflowEvidence.py"
+      - "tests/regression/tooling/Test.ExperimentCustody.py"
+      - "docs/agent/workflow-evidence.md"
+      - "docs/agent/review-checklist.md"
+      - "tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md"
+      - "tools/agents/skills/intrinsicengine-review/references/review-checklist.md"
+      - "tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The user explicitly requested that all four findings from the rejected independent review be fixed."
+  - turn: 1
+    excerpt: "Passing ordinary validators was insufficient; the repair is bound to the exact adversarial counterexamples and keeps independent acceptance separate."
+
+open_threads:
+  - "PROC-028 needs a new clean fixed-revision report/handoff and genuinely independent accepted review before retirement."
+  - "BUG-120 still owns the pre-existing Test.WorkflowConcurrency drift."
+  - "RUNTIME-200 remains the next runtime cleanup for the restarted agent."
+  - "A generic cross-repository architecture adapter remains deferred; O77 is staged rather than promoted."
+
+ai_suggestions_pending:
+  - "Use one generic architecture-cartography skill with repository-specific evidence adapters and bounded views over a normalized graph model."

@@ -195,3 +195,10 @@ sessions:
     events_count: 21
     claims_touched: []
     open_threads: 4
+  - id: "2026-07-31_001"
+    date: "2026-07-31"
+    summary: "Repaired all four rejected PROC-028 enforcement paths, passed 96 focused regressions and strict structural gates, and preserved independent re-review as the remaining acceptance gate."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 4

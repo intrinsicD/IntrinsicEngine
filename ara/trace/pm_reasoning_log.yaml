@@ -1176,3 +1176,10 @@ entries:
       - "Did not create a new claim or revise K24/A17: those records state the intended cumulative workflow architecture, while this review shows the implementation does not yet satisfy it."
       - "Recorded terminal rejected review sequence 6 with cooperative-label-only identity assurance; 88/88 frozen-revision and 90/90 current-main focused regressions passed, while the full C++ selector was not rerun."
       - "Kept O77 and older observations unchanged; PROC-028's four repairs, a clean contiguous final revision, a new independent accepted review, and BUG-120 remain open."
+  - turn: "2026-07-31_001#1"
+    notes:
+      - "Routed the user's unqualified repair direction as decision N310 and the implemented 96-case repair as experiment N311."
+      - "Resolved contradiction decision N309 through the user-selected repair alternative; retained the N292/N308 conflict markers with explicit N310/N311 resolution links."
+      - "Did not create or revise a generalized claim: N311 is bounded workflow implementation evidence and does not constitute independent acceptance, claim eligibility, performance, sanitizer, or Vulkan evidence."
+      - "Recorded exact clean/dirty review binding, cumulative claim-grade/protected completion, terminal protected attempts, and exact protocol/run equality with commits 2a2f52ae and 8be851e4 plus 96/96 focused and strict structural passes."
+      - "Kept O77 and older observations unchanged; new fixed-revision evidence, distinct independent acceptance, and BUG-120 remain open."

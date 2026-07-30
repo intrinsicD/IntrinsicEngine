@@ -6968,6 +6968,7 @@ tree:
     status: resolved
   - id: N292
     # CONFLICT: see N308
+    # RESOLVED: see N310 and N311
     type: experiment
     title: "Implement and exercise the enforced agent workflow"
     provenance: ai-executed
@@ -7349,6 +7350,7 @@ tree:
     status: resolved
   - id: N308
     # CONFLICT: see N292
+    # RESOLVED: see N310 and N311
     type: experiment
     title: "Reject the recorded PROC-028 fixed revision"
     provenance: ai-executed
@@ -7382,7 +7384,7 @@ tree:
     timestamp: "2026-07-30T23:27+02:00"
     also_depends_on: [N292, N297, N308]
     choice: >
-      Unresolved: repair all four rejected enforcement paths, bind a new
+      Resolved by N310: repair all four rejected enforcement paths, bind a new
       completion report and handoff to one clean contiguous final revision,
       and obtain a new genuinely independent fixed-revision accepted review
       before retiring PROC-028.
@@ -7392,5 +7394,55 @@ tree:
       - "Retire the recorded fixed revision as superseded without completing its high-risk acceptance contract."
     evidence:
       - "N308"
+      - "N310"
+      - "N311"
       - "tasks/evidence/PROC-028/reviews.jsonl sequence 6"
-    status: unresolved
+    status: resolved
+  - id: N310
+    type: decision
+    title: "Repair all rejected PROC-028 enforcement findings"
+    provenance: user
+    timestamp: "2026-07-31T00:15+02:00"
+    also_depends_on: [N308, N309]
+    choice: >
+      Fix the four blocking findings from the final fixed-revision independent
+      review without narrowing PROC-028's cumulative workflow contract.
+    alternatives:
+      - "Leave the rejected implementation unchanged."
+      - "Narrow the task contract to match the existing validator behavior."
+      - "Repair only the stale evidence binding and defer the custody defects."
+    evidence:
+      - "User direction: please fix these."
+      - "tasks/evidence/PROC-028/reviews.jsonl sequence 6"
+    status: resolved
+  - id: N311
+    type: experiment
+    title: "Enforce final revision and cumulative experiment custody"
+    provenance: ai-executed
+    timestamp: "2026-07-31T00:15+02:00"
+    also_depends_on: [N308, N309, N310]
+    evidence:
+      - "review-record commit 2a2f52ae"
+      - "repair implementation commit 8be851e4"
+      - "tools/agents/workflow_evidence.py"
+      - "tools/agents/experiment_custody.py"
+      - "tests/regression/tooling/Test.WorkflowEvidence.py: 21/21"
+      - "tests/regression/tooling/Test.ExperimentCustody.py: 21/21"
+      - "complete focused workflow/benchmark bundle: 96/96"
+      - "Ruff lint/format and Python syntax checks passed"
+      - "strict task, docs, skill, ARA, method, benchmark, layering, test-layout, root-hygiene, and session-brief gates passed"
+      - "tasks/evidence/PROC-028/commands/repair-workflow-regressions.json"
+      - "tasks/evidence/PROC-028/commands/repair-python-quality.json"
+    result: >
+      High-risk appends and validation now derive the exact reviewed identity
+      from the report: clean reports bind source.head_revision and dirty
+      reports bind worktree:content_digest. Claim-grade/protected completion
+      invokes a task-scoped custody gate requiring a frozen matching protocol,
+      exact run bindings, terminal cell journal, portable bundle, and accepted
+      independent audit; protected completion additionally requires current
+      prospective authority and a terminal consumed attempt. Run task, claim,
+      source, config, environment, dataset, implementation, and command
+      bindings are compared exactly with the frozen protocol. The three
+      adversarial reproductions now fail closed. Independent acceptance and
+      BUG-120 remain separate open gates.
+    status: resolved
