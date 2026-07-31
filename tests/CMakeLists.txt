@@ -250,6 +250,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GpuResultReadbackJob.cpp
         Test.AssetGeometryIO.cpp
         Test.AssetIngestStateMachine.cpp
+        Test.AssetImportRecipe.cpp
         Test.AssetImportFormatCoverage.cpp
         Test.AssetWorkflowModule.cpp
         Test.AssetMeshNormals.cpp

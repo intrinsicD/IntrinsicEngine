@@ -17,11 +17,14 @@ maturity_target: Retired
 
 - In progress on 2026-07-31; owner `Codex-RuntimeCleanup`, branch
   `codex/runtime-200-staged-import-recipe`.
-- Current slice: audit the existing route/bridge/handoff surface, then land
-  Slice A's plain recipe and fail-closed stage contract before migrating any
-  production route.
-- Next verification: strict task/workflow validation after activation, then
-  focused asset-workflow contracts after Slice A.
+- Slice A contract completed on 2026-07-31: the plain recipe names payload,
+  authoring, postprocess, completion, request/world generation, and the seven
+  ordered stages; copied stage results fail closed on malformed order, stale
+  identity, invalid diagnostics, and post-terminal publication.
+- Current slice: wire the recipe/trace through queued geometry, model-scene,
+  and texture production routes before moving or deleting any legacy surface.
+- Next verification: focused queued route/visibility contracts after recipe
+  adoption.
 
 ## Goal
 
@@ -88,7 +91,7 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Define one plain `AssetImportRecipe` with explicit payload route,
+- [x] Define one plain `AssetImportRecipe` with explicit payload route,
       required stages, `ImportAuthoringRecipe`, postprocess policy, and stable
       request/world generations.
 - [ ] Define typed copied results between decode, CPU materialization, ECS

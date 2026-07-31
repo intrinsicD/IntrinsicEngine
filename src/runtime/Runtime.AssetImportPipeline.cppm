@@ -37,6 +37,86 @@ import Geometry.HalfedgeMesh.IO;
 
 namespace Extrinsic::Runtime
 {
+    export enum class AssetImportStage : std::uint8_t
+    {
+        Route,
+        Decode,
+        CpuMaterialize,
+        EcsAuthor,
+        Postprocess,
+        GpuResidency,
+        Complete,
+    };
+
+    export struct ImportAuthoringRecipe
+    {
+        bool AuthorRenderableComponents{true};
+        bool AuthorSelectableIdentity{true};
+    };
+
+    export enum class AssetImportPostprocessPolicy : std::uint8_t
+    {
+        None,
+        PrepareRenderableGeometry,
+    };
+
+    export struct AssetImportCompletionRecipe
+    {
+        bool SelectFirstCreatedEntity{true};
+        bool FocusCameraOnCreatedGeometry{true};
+    };
+
+    export struct AssetImportRecipe
+    {
+        std::string Path{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        RuntimeAssetIngestSource Source{RuntimeAssetIngestSource::ManualImport};
+        Assets::AssetId ExistingAsset{};
+        ImportAuthoringRecipe Authoring{};
+        AssetImportPostprocessPolicy Postprocess{
+            AssetImportPostprocessPolicy::PrepareRenderableGeometry};
+        AssetImportCompletionRecipe Completion{};
+    };
+
+    export struct AssetImportExecutionIdentity
+    {
+        RuntimeAssetIngestHandle Request{};
+        WorldHandle World{};
+        std::uint64_t BindingGeneration{0u};
+        std::uint32_t CancellationGeneration{0u};
+
+        [[nodiscard]] friend bool operator==(
+            const AssetImportExecutionIdentity&,
+            const AssetImportExecutionIdentity&) noexcept = default;
+    };
+
+    export struct AssetImportStageResult
+    {
+        AssetImportExecutionIdentity Identity{};
+        AssetImportStage Stage{AssetImportStage::Route};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        RuntimeAssetIngestDiagnostic Diagnostic{RuntimeAssetIngestDiagnostic::None};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Error == Core::ErrorCode::Success;
+        }
+    };
+
+    export struct AssetImportStageTrace
+    {
+        AssetImportExecutionIdentity Identity{};
+        std::vector<AssetImportStageResult> Results{};
+        bool Terminal{false};
+    };
+
+    export [[nodiscard]] Core::Result ValidateAssetImportRecipe(
+        const AssetImportRecipe& recipe) noexcept;
+
+    export [[nodiscard]] Core::Result AppendAssetImportStageResult(
+        AssetImportStageTrace& trace,
+        AssetImportStageResult result);
+
     export struct RuntimeAssetImportRequest
     {
         std::string Path{};

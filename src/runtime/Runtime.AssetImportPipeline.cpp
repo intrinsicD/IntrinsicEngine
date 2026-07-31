@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1439,6 +1440,73 @@ namespace Extrinsic::Runtime
                 .PayloadKind = decoded.PayloadKind,
             };
         }
+    }
+
+    Core::Result ValidateAssetImportRecipe(
+        const AssetImportRecipe& recipe) noexcept
+    {
+        if (recipe.Path.empty() ||
+            recipe.PayloadKind == Assets::AssetPayloadKind::Unknown)
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        const bool isReimport =
+            recipe.Source == RuntimeAssetIngestSource::Reimport;
+        if (isReimport != recipe.ExistingAsset.IsValid())
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        if (recipe.PayloadKind != Assets::AssetPayloadKind::Texture2D &&
+            (!recipe.Authoring.AuthorRenderableComponents ||
+             !recipe.Authoring.AuthorSelectableIdentity))
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+        return Core::Ok();
+    }
+
+    Core::Result AppendAssetImportStageResult(
+        AssetImportStageTrace& trace,
+        AssetImportStageResult result)
+    {
+        constexpr std::array<AssetImportStage, 7> orderedStages{
+            AssetImportStage::Route,
+            AssetImportStage::Decode,
+            AssetImportStage::CpuMaterialize,
+            AssetImportStage::EcsAuthor,
+            AssetImportStage::Postprocess,
+            AssetImportStage::GpuResidency,
+            AssetImportStage::Complete,
+        };
+
+        if (trace.Terminal ||
+            trace.Results.size() >= orderedStages.size() ||
+            result.Identity != trace.Identity ||
+            result.Stage != orderedStages[trace.Results.size()])
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        if (result.Succeeded())
+        {
+            if (result.Diagnostic != RuntimeAssetIngestDiagnostic::None)
+            {
+                return Core::Err(Core::ErrorCode::InvalidArgument);
+            }
+        }
+        else if (result.Stage == AssetImportStage::Complete ||
+                 result.Diagnostic == RuntimeAssetIngestDiagnostic::None)
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        const bool terminal =
+            !result.Succeeded() || result.Stage == AssetImportStage::Complete;
+        trace.Results.push_back(std::move(result));
+        trace.Terminal = terminal;
+        return Core::Ok();
     }
 
     AssetImportPipeline::AssetImportPipeline(
