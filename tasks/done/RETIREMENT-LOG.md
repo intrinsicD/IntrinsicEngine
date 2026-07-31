@@ -29,8 +29,9 @@ scene-save and stale presentation-smoke observations; no gate was weakened.
 The first independent high-risk review requested evidence-custody, queued
 reimport, and GPU-contention repairs; revision 2 accepted exact commit
 `c974242b` and digest `c699c50b` with no blocking finding. The clean-workshop
-scorecard found no architectural drift, and ARA C17 records the capability
-scope without a performance claim.
+scorecard found no architectural drift. O81 retains the consolidation result
+as an unpromoted architecture observation; this high-risk task makes no formal
+claim-grade capability or performance claim.
 
 [`BUG-095`](BUG-095-direct-mesh-postprocess-stale-overwrite.md) — deferred
 direct-mesh enrichment retired on 2026-07-31 at `Operational`. The world-scoped

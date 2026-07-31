@@ -1229,9 +1229,9 @@ observations:
       bridges, handoffs, and wrapper-only tests are absent. Open BUG-123 and
       BUG-124 retain unrelated observations; this is a capability/lifecycle
       claim, not a performance claim.
-    potential_type: claim
+    potential_type: architecture
     bound_to: [N268, N269, N288]
-    promoted: true
-    promoted_to: "logic/claims.md:C17"
-    crystallized_via: artifact-commitment
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
     stale: false
