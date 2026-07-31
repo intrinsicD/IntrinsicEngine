@@ -2,9 +2,26 @@
 id: RUNTIME-200
 theme: F
 depends_on: [BUG-095, RUNTIME-191, RUNTIME-194, RUNTIME-197]
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner: "Codex-RuntimeCleanup"
+branch: "codex/runtime-200-staged-import-recipe"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-07-31T14:57:45Z"
 maturity_target: Retired
 ---
 # RUNTIME-200 — Staged asset-import and materialization recipe
+
+## Status
+
+- In progress on 2026-07-31; owner `Codex-RuntimeCleanup`, branch
+  `codex/runtime-200-staged-import-recipe`.
+- Current slice: audit the existing route/bridge/handoff surface, then land
+  Slice A's plain recipe and fail-closed stage contract before migrating any
+  production route.
+- Next verification: strict task/workflow validation after activation, then
+  focused asset-workflow contracts after Slice A.
 
 ## Goal
 
@@ -38,6 +55,23 @@ maturity_target: Retired
 - `RUNTIME-194` supplies the work lane, `RUNTIME-197` the upload lifecycle,
   `RUNTIME-191` the single property-to-texture producer, and `BUG-095` the
   generation-safe postprocess contract.
+
+## Right-sizing
+
+- **Element:** the current import path is fragmented across public
+  `*Pipeline`, `*Bridge`, IO, normals, and handoff surfaces, triggering the
+  feature-fragmentation and pure-forwarding heuristics.
+- **Simpler alternative:** keep one plain recipe/stage record family and a
+  private executor inside the existing `AssetWorkflowModule`; lower layers
+  retain ordinary decode/export functions and no replacement registry or
+  service is introduced.
+- **Blast radius:** audit all module importers and direct callers before each
+  deletion; migrate production routes and their visibility/queue contracts
+  first, then remove surfaces mechanically and confirm the module inventory
+  plus strict layering gate.
+- **Reintroduction trigger:** expose a new public import orchestration seam only
+  when a present second runtime composition owner or independently replaceable
+  executor exists; a new file format alone is not such a trigger.
 
 ## Slice plan
 

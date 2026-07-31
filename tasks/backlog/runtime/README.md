@@ -16,7 +16,7 @@ cleanup slice:
 
 #### Open tasks
 
-- [`RUNTIME-200` — Staged asset-import and materialization recipe](RUNTIME-200-staged-asset-import-materialization-recipe.md)
+- [`RUNTIME-200` — Staged asset-import and materialization recipe](../../active/RUNTIME-200-staged-asset-import-materialization-recipe.md)
   unifies route/decode/materialize/author/postprocess/residency/completion and
   deletes the role callback/IO bridge/monolithic handoff paths after workflow
   visibility parity.

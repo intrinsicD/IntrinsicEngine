@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-200` — Staged asset-import and materialization recipe (tasks/active/RUNTIME-200-staged-asset-import-materialization-recipe.md)
 
 ## Theme B — Rendering modernization
 
@@ -35,7 +35,6 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-200`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- unblocked: `RUNTIME-200` — Staged asset-import and materialization recipe (tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md)
 - blocked by `RUNTIME-200`: `RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models (tasks/backlog/runtime/RUNTIME-202-retire-sandbox-runtime-facade.md)
 - blocked by `RUNTIME-200`: `RUNTIME-203` — Internalize one-consumer runtime composition helpers (tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
