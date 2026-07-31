@@ -3,22 +3,20 @@ task_id: RUNTIME-200
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-31T19:56:45Z'
+generated_at: '2026-07-31T20:04:40Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 46937f8e2487849fdad3079f132309d5cb0dd100
-  head_revision: c4751d036fb49a3826a3d62809e0f452a0d07f23
+  head_revision: 3732513ff719feb1b02a2df740505a881260fb24
   branch: codex/runtime-200-staged-import-recipe
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
   surface:
-  - path: ara/logic/claims.md
-    sha256: 9196ff549d761646e0d3a1da6b6b07561d47676177c1c3b7ccea05abd1149bb4
   - path: ara/logic/solution/architecture.md
     sha256: 77f56af0f2019d02b4e5c5fe793850d67eb5205efff6499e2b8016920b923659
   - path: ara/staging/observations.yaml
-    sha256: 5f0c937488eac60414479f91b94eabb289f5749265598bdce5834ce6a3e62f2d
+    sha256: 93fa83abd452180d890958d8cb6a6fe159f74e9b01a963286942860197098335
   - path: docs/adr/0027-right-sized-runtime-composition.md
     sha256: 1bdc3599b7ac0135faa39517e0db6197860550cddad0cb6ac76617edb2986e22
   - path: docs/api/generated/module_inventory.md
@@ -124,7 +122,7 @@ source:
   - path: tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md
     sha256: null
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: 8034cceaec97c5d59f8e7da6232316c5f7a978d775865d2fdba9ede1dbfa9701
+    sha256: 75ee639ba0e06475882e0cd73b03a1336014c8d1375c86625f57436ed04541f4
   - path: tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md
     sha256: 96a2967ad412d08031fccd18a0970a90782f4a8609d84523178d88ab668c2f33
   - path: tests/CMakeLists.txt
@@ -179,10 +177,9 @@ source:
     sha256: null
   - path: tests/unit/assets/Test.Asset.ModelTexturePayload.cpp
     sha256: 0ce4a5684c52377d5788eccc16e20d975e01256bf03fceb48902403144ec8431
-  content_digest: 490ed5aef8565904ab4df683488304caf7d7458e1393530bb4680a8d1f88bd55
+  content_digest: a45a6e47e0cec08185b1316fca12ded76518e44035140edb32f73ed77bfb7992
 touched:
   paths:
-  - ara/logic/claims.md
   - ara/logic/solution/architecture.md
   - ara/staging/observations.yaml
   - docs/adr/0027-right-sized-runtime-composition.md
@@ -323,6 +320,10 @@ commands:
 - receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-task-policy.json
 - receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-task-state-links.json
 - receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-task-validation.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-v4-diff-check.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-v4-strict-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-v4-strict-doc-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-v4-strict-task-policy.json
 - receipt: tasks/evidence/RUNTIME-200/commands/review-v2-asan-build.json
 - receipt: tasks/evidence/RUNTIME-200/commands/review-v2-asan-full-cpu-retry.json
 - receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ci-build.json
@@ -373,8 +374,8 @@ diagnostics_and_previews:
 - The required four import/model-scene Vulkan cases and 20 repeated generated-texture contention cases
   pass; the extra 48-case sweep exposed unrelated BUG-124.
 benchmark_or_parity_evidence:
-- No performance claim is made; evidence covers CPU correctness, sanitizer lifetime safety, and promoted-Vulkan
-  import visibility.
+- No formal claim-grade or performance claim is made; high-risk evidence covers implementation correctness
+  and review only.
 docs_sync:
   task_file: tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md
   session_brief_present: true
