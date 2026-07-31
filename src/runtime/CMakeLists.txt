@@ -10,12 +10,7 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.AsyncWorkModule.cppm
         Runtime.AssetWorkflowModule.cppm
-        Runtime.AssetImportPolicies.cppm
         Runtime.AssetIngestStateMachine.cppm
-        Runtime.AssetMeshNormals.cppm
-        Runtime.AssetModelSceneHandoff.cppm
-        Runtime.AssetModelTextureHandoff.cppm
-        Runtime.AssetModelTextureIO.cppm
         Runtime.CommandBus.cppm
         Runtime.DeviceBootstrap.cppm
         Runtime.JobService.cppm
@@ -74,6 +69,11 @@ target_sources(${target_name}
         PRIVATE
         FILE_SET asset_workflow_impl TYPE CXX_MODULES FILES
         Runtime.AssetWorkflowImportExecutor.cppm
+        Runtime.AssetWorkflowGeometryMaterialization.cppm
+        Runtime.AssetWorkflowModelMaterialization.cppm
+        Runtime.AssetWorkflowModelTextureDecode.cppm
+        Runtime.AssetWorkflowRecipePolicies.cppm
+        Runtime.AssetWorkflowTextureResidency.cppm
         PRIVATE
         FILE_SET render_extraction_impl TYPE CXX_MODULES FILES
         Runtime.GeometryPlanBuilders.cppm
@@ -82,12 +82,12 @@ target_sources(${target_name}
         Runtime.AsyncWorkModule.cpp
         Runtime.AssetWorkflowModule.cpp
         Runtime.AssetWorkflowImportExecutor.cpp
-        Runtime.AssetImportPolicies.cpp
         Runtime.AssetIngestStateMachine.cpp
-        Runtime.AssetMeshNormals.cpp
-        Runtime.AssetModelSceneHandoff.cpp
-        Runtime.AssetModelTextureHandoff.cpp
-        Runtime.AssetModelTextureIO.cpp
+        Runtime.AssetWorkflowGeometryMaterialization.cpp
+        Runtime.AssetWorkflowModelMaterialization.cpp
+        Runtime.AssetWorkflowModelTextureDecode.cpp
+        Runtime.AssetWorkflowRecipePolicies.cpp
+        Runtime.AssetWorkflowTextureResidency.cpp
         Runtime.CommandBus.cpp
         Runtime.DeviceBootstrap.cpp
         Runtime.JobService.cpp

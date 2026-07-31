@@ -5,7 +5,7 @@ module;
 #include <span>
 #include <string>
 
-export module Extrinsic.Runtime.AssetImportPolicies;
+export module Extrinsic.Runtime.AssetWorkflowRecipePolicies;
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.ImportRouter;

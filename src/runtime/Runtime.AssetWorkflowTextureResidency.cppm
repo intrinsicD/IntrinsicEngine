@@ -3,7 +3,7 @@ module;
 #include <cstdint>
 #include <memory>
 
-export module Extrinsic.Runtime.AssetModelTextureHandoff;
+export module Extrinsic.Runtime.AssetWorkflowTextureResidency;
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
@@ -14,13 +14,13 @@ import Extrinsic.RHI.Descriptors;
 
 export namespace Extrinsic::Runtime
 {
-    struct AssetModelTextureHandoffOptions
+    struct AssetWorkflowTextureResidencyOptions
     {
         RHI::SamplerDesc TextureSamplerDesc{};
         bool NotifyCacheFailedOnUploadError{true};
     };
 
-    struct AssetModelTextureHandoffDiagnostics
+    struct AssetWorkflowTextureResidencyDiagnostics
     {
         std::uint64_t ReadyEventsObserved{0};
         std::uint64_t TextureReadyEvents{0};
@@ -46,24 +46,24 @@ export namespace Extrinsic::Runtime
         Assets::AssetService& service,
         Graphics::GpuAssetCache& cache,
         Assets::AssetId id,
-        const AssetModelTextureHandoffOptions& options = {});
+        const AssetWorkflowTextureResidencyOptions& options = {});
 
-    class AssetModelTextureHandoff
+    class AssetWorkflowTextureResidency
     {
     public:
-        AssetModelTextureHandoff(
+        AssetWorkflowTextureResidency(
             Assets::AssetService& service,
             Graphics::GpuAssetCache& cache,
-            AssetModelTextureHandoffOptions options = {});
-        ~AssetModelTextureHandoff();
+            AssetWorkflowTextureResidencyOptions options = {});
+        ~AssetWorkflowTextureResidency();
 
-        AssetModelTextureHandoff(const AssetModelTextureHandoff&) = delete;
-        AssetModelTextureHandoff& operator=(const AssetModelTextureHandoff&) = delete;
-        AssetModelTextureHandoff(AssetModelTextureHandoff&&) = delete;
-        AssetModelTextureHandoff& operator=(AssetModelTextureHandoff&&) = delete;
+        AssetWorkflowTextureResidency(const AssetWorkflowTextureResidency&) = delete;
+        AssetWorkflowTextureResidency& operator=(const AssetWorkflowTextureResidency&) = delete;
+        AssetWorkflowTextureResidency(AssetWorkflowTextureResidency&&) = delete;
+        AssetWorkflowTextureResidency& operator=(AssetWorkflowTextureResidency&&) = delete;
 
         [[nodiscard]] bool IsSubscribed() const noexcept;
-        [[nodiscard]] AssetModelTextureHandoffDiagnostics GetDiagnostics() const noexcept;
+        [[nodiscard]] AssetWorkflowTextureResidencyDiagnostics GetDiagnostics() const noexcept;
 
         [[nodiscard]] Core::Result UploadReadyTexture(Assets::AssetId id);
 

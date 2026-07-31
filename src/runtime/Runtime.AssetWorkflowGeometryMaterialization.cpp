@@ -14,7 +14,7 @@ module;
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.AssetMeshNormals;
+module Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 
 import Extrinsic.Core.Error;
 import Geometry.Mesh.Conversion;

@@ -1041,12 +1041,12 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
             RepoRoot() /
             "src/runtime/Scene/Runtime.SceneDocumentModule.cpp");
     const auto importPolicies =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetImportPolicies.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp");
     const auto visualization =
         ReadFile(RepoRoot() /
                  "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp");
     const auto modelHandoff =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetModelSceneHandoff.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp");
     const auto methodFacade =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxMethodFacade.cpp");
     const auto clusteringModule = ReadFile(
@@ -1789,7 +1789,7 @@ TEST(RuntimeEngineLayering,
     const auto stopCallbacks =
         workflowAnnouncement.find("AcceptingCallbacks = false;");
     const auto detachScene =
-        workflowAnnouncement.find("SceneHandoff.reset();");
+        workflowAnnouncement.find("ModelMaterializer.reset();");
     const auto releaseDocument =
         workflowAnnouncement.find("ReleaseDocumentParticipant();");
     const auto clearSelection =

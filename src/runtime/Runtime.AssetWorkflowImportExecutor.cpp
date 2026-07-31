@@ -38,11 +38,11 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Runtime.AssetMeshNormals;
-import Extrinsic.Runtime.AssetImportPolicies;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
-import Extrinsic.Runtime.AssetModelTextureIO;
+import Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
+import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
+import Extrinsic.Runtime.AssetWorkflowModelMaterialization;
+import Extrinsic.Runtime.AssetWorkflowTextureResidency;
+import Extrinsic.Runtime.AssetWorkflowModelTextureDecode;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.JobService;
@@ -270,7 +270,8 @@ namespace Extrinsic::Runtime
             const AssetImportStage stage,
             const Core::ErrorCode error = Core::ErrorCode::Success,
             RuntimeAssetIngestDiagnostic diagnostic =
-                RuntimeAssetIngestDiagnostic::None)
+                RuntimeAssetIngestDiagnostic::None,
+            AssetImportStagePayload payload = {})
         {
             if (trace.Terminal)
                 return;
@@ -286,6 +287,7 @@ namespace Extrinsic::Runtime
                     .Stage = stage,
                     .Error = error,
                     .Diagnostic = diagnostic,
+                    .Payload = std::move(payload),
                 });
             if (!appended.has_value())
             {
@@ -296,13 +298,101 @@ namespace Extrinsic::Runtime
             }
         }
 
-        void AppendSuccessfulApplyStages(AssetImportStageTrace& trace)
+        [[nodiscard]] AssetImportRouteResult RouteStageResult(
+            const RuntimeAssetImportRequest& request)
         {
-            AppendImportStage(trace, AssetImportStage::CpuMaterialize);
-            AppendImportStage(trace, AssetImportStage::EcsAuthor);
-            AppendImportStage(trace, AssetImportStage::Postprocess);
-            AppendImportStage(trace, AssetImportStage::GpuResidency);
-            AppendImportStage(trace, AssetImportStage::Complete);
+            return AssetImportRouteResult{
+                .Path = request.Path,
+                .PayloadKind = request.PayloadKind,
+            };
+        }
+
+        [[nodiscard]] AssetImportDecodeResult DecodeStageResult(
+            const RuntimeAssetImportRequest& request)
+        {
+            return AssetImportDecodeResult{
+                .PayloadKind = request.PayloadKind,
+                .OwnedValueCount = 1u,
+            };
+        }
+
+        void AppendSuccessfulMaterializationStages(
+            AssetImportStageTrace& trace,
+            const AssetImportRecipe& recipe,
+            const RuntimeAssetImportResult& result)
+        {
+            AppendImportStage(
+                trace,
+                AssetImportStage::CpuMaterialize,
+                Core::ErrorCode::Success,
+                RuntimeAssetIngestDiagnostic::None,
+                AssetImportCpuMaterializationResult{
+                    .Asset = result.Asset,
+                    .PayloadKind = result.PayloadKind,
+                    .PrimitiveCount = result.PrimitiveEntitiesCreated,
+                    .EmbeddedTextureCount =
+                        result.EmbeddedTextureAssetsCreated,
+                });
+            AppendImportStage(
+                trace,
+                AssetImportStage::EcsAuthor,
+                Core::ErrorCode::Success,
+                RuntimeAssetIngestDiagnostic::None,
+                AssetImportEcsAuthorResult{
+                    .CreatedEntityCount = result.PrimitiveEntitiesCreated,
+                });
+            AppendImportStage(
+                trace,
+                AssetImportStage::Postprocess,
+                Core::ErrorCode::Success,
+                RuntimeAssetIngestDiagnostic::None,
+                AssetImportPostprocessResult{
+                    .Policy = recipe.Postprocess,
+                    .Requested =
+                        recipe.Postprocess != AssetImportPostprocessPolicy::None,
+                });
+        }
+
+        void AppendSuccessfulResidencyStage(
+            AssetImportStageTrace& trace,
+            const RuntimeAssetImportResult& result)
+        {
+            AppendImportStage(
+                trace,
+                AssetImportStage::GpuResidency,
+                Core::ErrorCode::Success,
+                RuntimeAssetIngestDiagnostic::None,
+                AssetImportGpuResidencyResult{
+                    .RequestCount = result.TextureUploadRequests,
+                    .Requested = result.RequestedTextureUpload,
+                });
+        }
+
+        void AppendSuccessfulCompletionStage(
+            AssetImportStageTrace& trace,
+            const AssetImportRecipe& recipe)
+        {
+            AppendImportStage(
+                trace,
+                AssetImportStage::Complete,
+                Core::ErrorCode::Success,
+                RuntimeAssetIngestDiagnostic::None,
+                AssetImportCompletionResult{
+                    .SelectFirstCreatedEntity =
+                        recipe.Completion.SelectFirstCreatedEntity,
+                    .FocusCameraOnCreatedGeometry =
+                        recipe.Completion.FocusCameraOnCreatedGeometry,
+                });
+        }
+
+        void AppendSuccessfulApplyStages(
+            AssetImportStageTrace& trace,
+            const AssetImportRecipe& recipe,
+            const RuntimeAssetImportResult& result)
+        {
+            AppendSuccessfulMaterializationStages(trace, recipe, result);
+            AppendSuccessfulResidencyStage(trace, result);
+            AppendSuccessfulCompletionStage(trace, recipe);
         }
 
         void AppendNextFailedStage(
@@ -421,7 +511,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
         FinalizeModelSceneImport(
-            AssetModelSceneHandoff& handoff,
+            AssetWorkflowModelMaterializer& handoff,
             ECS::Scene::Registry& scene,
             const ImportAuthoringRecipe& authoring,
             const AssetImportCompletionRecipe& completion,
@@ -430,7 +520,7 @@ namespace Extrinsic::Runtime
             const Core::Config::EngineConfig* config,
             RuntimeAssetImportResult result)
         {
-            const AssetModelSceneHandoffRecord* record =
+            const AssetWorkflowModelMaterializationRecord* record =
                 handoff.FindRecord(result.Asset);
             if (record == nullptr || record->Primitives.empty())
             {
@@ -440,7 +530,7 @@ namespace Extrinsic::Runtime
 
             std::vector<ECS::EntityHandle> primitiveEntities{};
             primitiveEntities.reserve(record->Primitives.size());
-            for (const AssetModelScenePrimitiveRecord& primitive :
+            for (const AssetWorkflowModelPrimitiveRecord& primitive :
                  record->Primitives)
             {
                 primitiveEntities.push_back(primitive.Entity);
@@ -487,7 +577,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
         MaterializeDecodedModelSceneImport(
             Assets::AssetService& assetService,
-            AssetModelSceneHandoff& handoff,
+            AssetWorkflowModelMaterializer& handoff,
             ECS::Scene::Registry& scene,
             const AssetImportRecipe& recipe,
             SelectionController* selection,
@@ -500,7 +590,7 @@ namespace Extrinsic::Runtime
             auto payload =
                 std::make_shared<Assets::AssetModelScenePayload>(
                     std::move(decoded));
-            const AssetModelSceneHandoffDiagnostics before =
+            const AssetWorkflowModelMaterializationDiagnostics before =
                 handoff.GetDiagnostics();
             if (existingAsset.IsValid())
             {
@@ -526,7 +616,7 @@ namespace Extrinsic::Runtime
                     return Core::Err<RuntimeAssetImportResult>(
                         drained.error());
                 }
-                const AssetModelSceneHandoffDiagnostics after =
+                const AssetWorkflowModelMaterializationDiagnostics after =
                     handoff.GetDiagnostics();
                 if (after.ModelSceneMaterializeFailures >
                         before.ModelSceneMaterializeFailures &&
@@ -593,7 +683,7 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            const AssetModelSceneHandoffDiagnostics after =
+            const AssetWorkflowModelMaterializationDiagnostics after =
                 handoff.GetDiagnostics();
             if (after.ModelSceneMaterializeFailures >
                     before.ModelSceneMaterializeFailures &&
@@ -634,7 +724,7 @@ namespace Extrinsic::Runtime
         MaterializeDecodedTextureImport(
             Assets::AssetService& assetService,
             Graphics::GpuAssetCache& gpuAssetCache,
-            AssetModelTextureHandoff& handoff,
+            AssetWorkflowTextureResidency& handoff,
             const RuntimeAssetImportRequest& request,
             const Assets::AssetId existingAsset,
             Assets::AssetTexture2DPayload decoded)
@@ -642,7 +732,7 @@ namespace Extrinsic::Runtime
             auto payload =
                 std::make_shared<Assets::AssetTexture2DPayload>(
                     std::move(decoded));
-            const AssetModelTextureHandoffDiagnostics before =
+            const AssetWorkflowTextureResidencyDiagnostics before =
                 handoff.GetDiagnostics();
             if (existingAsset.IsValid())
             {
@@ -668,7 +758,7 @@ namespace Extrinsic::Runtime
                     return Core::Err<RuntimeAssetImportResult>(
                         drained.error());
                 }
-                const AssetModelTextureHandoffDiagnostics after =
+                const AssetWorkflowTextureResidencyDiagnostics after =
                     handoff.GetDiagnostics();
                 if (after.TextureUploadFailures > before.TextureUploadFailures &&
                     after.LastFailedAsset == existingAsset)
@@ -707,7 +797,7 @@ namespace Extrinsic::Runtime
             {
                 return Core::Err<RuntimeAssetImportResult>(drained.error());
             }
-            AssetModelTextureHandoffDiagnostics after =
+            AssetWorkflowTextureResidencyDiagnostics after =
                 handoff.GetDiagnostics();
             const bool uploadWasAlreadyHandled =
                 after.TextureUploadRequests > before.TextureUploadRequests ||
@@ -1445,10 +1535,10 @@ namespace Extrinsic::Runtime
         m_BindingValid = std::move(dependencies.BindingValid);
         m_AssetService = BorrowedSubsystem<Assets::AssetService>{dependencies.AssetService};
         m_GpuAssetCache = BorrowedSubsystem<Graphics::GpuAssetCache>{dependencies.GpuAssetCache};
-        m_AssetModelTextureHandoff =
-            BorrowedSubsystem<AssetModelTextureHandoff>{dependencies.ModelTextureHandoff};
-        m_AssetModelSceneHandoff =
-            BorrowedSubsystem<AssetModelSceneHandoff>{dependencies.ModelSceneHandoff};
+        m_TextureResidency =
+            BorrowedSubsystem<AssetWorkflowTextureResidency>{dependencies.TextureResidency};
+        m_ModelMaterializer =
+            BorrowedSubsystem<AssetWorkflowModelMaterializer>{dependencies.ModelMaterializer};
         m_RenderExtraction =
             BorrowedSubsystem<RenderExtractionCache>{dependencies.RenderExtraction};
         m_Scene = BorrowedSubsystem<ECS::Scene::Registry>{dependencies.Scene};
@@ -1999,7 +2089,12 @@ namespace Extrinsic::Runtime
             return Core::Err<RuntimeQueuedAssetImport>(
                 ErrorFromIngestTransition(routeResolved));
         }
-        AppendImportStage(*stageTrace, AssetImportStage::Route);
+        AppendImportStage(
+            *stageTrace,
+            AssetImportStage::Route,
+            Core::ErrorCode::Success,
+            RuntimeAssetIngestDiagnostic::None,
+            RouteStageResult(request));
 
         RuntimeAssetIngestTransition decodeQueued =
             m_AssetIngestStateMachine.QueueDecode(submit.Handle);
@@ -2135,7 +2230,10 @@ namespace Extrinsic::Runtime
 
                     AppendImportStage(
                         *state->StageTrace,
-                        AssetImportStage::Decode);
+                        AssetImportStage::Decode,
+                        Core::ErrorCode::Success,
+                        RuntimeAssetIngestDiagnostic::None,
+                        DecodeStageResult(state->Request));
 
                     RuntimeAssetIngestTransition decodeComplete =
                         m_AssetIngestStateMachine.CompleteDecode(
@@ -2267,7 +2365,10 @@ namespace Extrinsic::Runtime
                         }
                         if (result.has_value())
                         {
-                            AppendSuccessfulApplyStages(*state->StageTrace);
+                            AppendSuccessfulApplyStages(
+                                *state->StageTrace,
+                                state->Recipe,
+                                *result);
                         }
                         else
                         {
@@ -2444,8 +2545,8 @@ namespace Extrinsic::Runtime
             !m_Jobs ||
             !m_AssetService ||
             !m_GpuAssetCache ||
-            !m_AssetModelTextureHandoff ||
-            !m_AssetModelSceneHandoff ||
+            !m_TextureResidency ||
+            !m_ModelMaterializer ||
             !IsCurrentSubmissionTarget(
                 submissionWorld,
                 submissionScene,
@@ -2496,7 +2597,12 @@ namespace Extrinsic::Runtime
             return Core::Err<RuntimeQueuedAssetImport>(
                 ErrorFromIngestTransition(routeResolved));
         }
-        AppendImportStage(*stageTrace, AssetImportStage::Route);
+        AppendImportStage(
+            *stageTrace,
+            AssetImportStage::Route,
+            Core::ErrorCode::Success,
+            RuntimeAssetIngestDiagnostic::None,
+            RouteStageResult(request));
 
         RuntimeAssetIngestTransition decodeQueued =
             m_AssetIngestStateMachine.QueueDecode(submit.Handle);
@@ -2668,7 +2774,10 @@ namespace Extrinsic::Runtime
 
                     AppendImportStage(
                         *state->StageTrace,
-                        AssetImportStage::Decode);
+                        AssetImportStage::Decode,
+                        Core::ErrorCode::Success,
+                        RuntimeAssetIngestDiagnostic::None,
+                        DecodeStageResult(state->Request));
 
                     RuntimeAssetIngestTransition decodeComplete =
                         m_AssetIngestStateMachine.CompleteDecode(
@@ -2737,7 +2846,7 @@ namespace Extrinsic::Runtime
                     {
                         result = MaterializeDecodedModelSceneImport(
                             *m_AssetService,
-                            *m_AssetModelSceneHandoff,
+                            *m_ModelMaterializer,
                             *submissionScene,
                             state->Recipe,
                             m_SelectionController.get(),
@@ -2753,7 +2862,7 @@ namespace Extrinsic::Runtime
                         result = MaterializeDecodedTextureImport(
                             *m_AssetService,
                             *m_GpuAssetCache,
-                            *m_AssetModelTextureHandoff,
+                            *m_TextureResidency,
                             state->Request,
                             existingAsset,
                             std::move(std::get<Assets::AssetTexture2DPayload>(
@@ -2797,7 +2906,10 @@ namespace Extrinsic::Runtime
                         }
                         if (result.has_value())
                         {
-                            AppendSuccessfulApplyStages(*state->StageTrace);
+                            AppendSuccessfulApplyStages(
+                                *state->StageTrace,
+                                state->Recipe,
+                                *result);
                         }
                         else
                         {
@@ -2920,6 +3032,23 @@ namespace Extrinsic::Runtime
             return result;
         }
 
+        const AssetImportRecipe recipe{
+            .Path = request.Path,
+            .PayloadKind = request.PayloadKind,
+            .Source = source,
+            .ExistingAsset = existingAsset,
+        };
+        AssetImportStageTrace stageTrace{
+            .Identity = AssetImportExecutionIdentity{
+                .Request = submit.Handle,
+                .World = m_World,
+                .BindingGeneration = m_TargetBindingEpoch,
+                .CancellationGeneration = m_Jobs
+                    ? m_Jobs->WorldGeneration(m_World)
+                    : 0u,
+            },
+        };
+
         if (source == RuntimeAssetIngestSource::Reimport)
         {
             Core::ErrorCode targetError = Core::ErrorCode::Success;
@@ -2948,7 +3077,16 @@ namespace Extrinsic::Runtime
                         targetError);
                 Core::Expected<RuntimeAssetImportResult> result =
                     Core::Err<RuntimeAssetImportResult>(targetError);
-                RecordAssetImportEvent(request, result, failed.Diagnostic);
+                AppendImportStage(
+                    stageTrace,
+                    AssetImportStage::Route,
+                    targetError,
+                    failed.Diagnostic);
+                RecordAssetImportEvent(
+                    request,
+                    result,
+                    failed.Diagnostic,
+                    &stageTrace);
                 return result;
             }
         }
@@ -2967,12 +3105,24 @@ namespace Extrinsic::Runtime
             Core::Expected<RuntimeAssetImportResult> result =
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(routeResolved));
+            AppendImportStage(
+                stageTrace,
+                AssetImportStage::Route,
+                result.error(),
+                routeResolved.Diagnostic);
             RecordAssetImportEvent(
                 request,
                 result,
-                routeResolved.Diagnostic);
+                routeResolved.Diagnostic,
+                &stageTrace);
             return result;
         }
+        AppendImportStage(
+            stageTrace,
+            AssetImportStage::Route,
+            Core::ErrorCode::Success,
+            RuntimeAssetIngestDiagnostic::None,
+            RouteStageResult(request));
 
         RuntimeAssetIngestTransition decodeQueued =
             m_AssetIngestStateMachine.QueueDecode(submit.Handle);
@@ -2981,10 +3131,16 @@ namespace Extrinsic::Runtime
             Core::Expected<RuntimeAssetImportResult> result =
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(decodeQueued));
+            AppendImportStage(
+                stageTrace,
+                AssetImportStage::Decode,
+                result.error(),
+                decodeQueued.Diagnostic);
             RecordAssetImportEvent(
                 request,
                 result,
-                decodeQueued.Diagnostic);
+                decodeQueued.Diagnostic,
+                &stageTrace);
             return result;
         }
 
@@ -2995,7 +3151,16 @@ namespace Extrinsic::Runtime
             Core::Expected<RuntimeAssetImportResult> result =
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(decoding));
-            RecordAssetImportEvent(request, result, decoding.Diagnostic);
+            AppendImportStage(
+                stageTrace,
+                AssetImportStage::Decode,
+                result.error(),
+                decoding.Diagnostic);
+            RecordAssetImportEvent(
+                request,
+                result,
+                decoding.Diagnostic,
+                &stageTrace);
             return result;
         }
 
@@ -3055,9 +3220,43 @@ namespace Extrinsic::Runtime
                 break;
             }
             eventDiagnostic = failed.Diagnostic;
-            RecordAssetImportEvent(request, result, eventDiagnostic);
+            if (eventDiagnostic ==
+                RuntimeAssetIngestDiagnostic::MaterializationFailed)
+            {
+                AppendImportStage(
+                    stageTrace,
+                    AssetImportStage::Decode,
+                    Core::ErrorCode::Success,
+                    RuntimeAssetIngestDiagnostic::None,
+                    DecodeStageResult(request));
+                AppendImportStage(
+                    stageTrace,
+                    AssetImportStage::CpuMaterialize,
+                    result.error(),
+                    eventDiagnostic);
+            }
+            else
+            {
+                AppendImportStage(
+                    stageTrace,
+                    AssetImportStage::Decode,
+                    result.error(),
+                    eventDiagnostic);
+            }
+            RecordAssetImportEvent(
+                request,
+                result,
+                eventDiagnostic,
+                &stageTrace);
             return result;
         }
+
+        AppendImportStage(
+            stageTrace,
+            AssetImportStage::Decode,
+            Core::ErrorCode::Success,
+            RuntimeAssetIngestDiagnostic::None,
+            DecodeStageResult(request));
 
         RuntimeAssetIngestTransition decodeComplete =
             m_AssetIngestStateMachine.CompleteDecode(
@@ -3067,10 +3266,15 @@ namespace Extrinsic::Runtime
         {
             result = Core::Err<RuntimeAssetImportResult>(
                 ErrorFromIngestTransition(decodeComplete));
+            AppendNextFailedStage(
+                stageTrace,
+                result.error(),
+                decodeComplete.Diagnostic);
             RecordAssetImportEvent(
                 request,
                 result,
-                decodeComplete.Diagnostic);
+                decodeComplete.Diagnostic,
+                &stageTrace);
             return result;
         }
 
@@ -3080,9 +3284,22 @@ namespace Extrinsic::Runtime
         {
             result = Core::Err<RuntimeAssetImportResult>(
                 ErrorFromIngestTransition(applying));
-            RecordAssetImportEvent(request, result, applying.Diagnostic);
+            AppendNextFailedStage(
+                stageTrace,
+                result.error(),
+                applying.Diagnostic);
+            RecordAssetImportEvent(
+                request,
+                result,
+                applying.Diagnostic,
+                &stageTrace);
             return result;
         }
+
+        AppendSuccessfulMaterializationStages(
+            stageTrace,
+            recipe,
+            *result);
 
         RuntimeAssetIngestTransition complete =
             RequestsGpuUpload(*result)
@@ -3092,9 +3309,19 @@ namespace Extrinsic::Runtime
         {
             result = Core::Err<RuntimeAssetImportResult>(
                 ErrorFromIngestTransition(complete));
-            RecordAssetImportEvent(request, result, complete.Diagnostic);
+            AppendImportStage(
+                stageTrace,
+                AssetImportStage::GpuResidency,
+                result.error(),
+                complete.Diagnostic);
+            RecordAssetImportEvent(
+                request,
+                result,
+                complete.Diagnostic,
+                &stageTrace);
             return result;
         }
+        AppendSuccessfulResidencyStage(stageTrace, *result);
         complete = m_AssetIngestStateMachine.CompleteApply(
             submit.Handle,
             submit.Handle.Generation,
@@ -3104,8 +3331,21 @@ namespace Extrinsic::Runtime
         {
             result = Core::Err<RuntimeAssetImportResult>(
                 ErrorFromIngestTransition(complete));
+            AppendImportStage(
+                stageTrace,
+                AssetImportStage::Complete,
+                result.error(),
+                complete.Diagnostic);
         }
-        RecordAssetImportEvent(request, result, eventDiagnostic);
+        else
+        {
+            AppendSuccessfulCompletionStage(stageTrace, recipe);
+        }
+        RecordAssetImportEvent(
+            request,
+            result,
+            eventDiagnostic,
+            &stageTrace);
         return result;
     }
 
@@ -3163,8 +3403,8 @@ namespace Extrinsic::Runtime
         if (!m_Initialized ||
             !m_AssetService ||
             !m_GpuAssetCache ||
-            !m_AssetModelTextureHandoff ||
-            !m_AssetModelSceneHandoff ||
+            !m_TextureResidency ||
+            !m_ModelMaterializer ||
             !m_Scene ||
             !IsCurrentSubmissionTarget(
                 m_World,
@@ -3265,7 +3505,7 @@ namespace Extrinsic::Runtime
 
             return MaterializeDecodedModelSceneImport(
                 *m_AssetService,
-                *m_AssetModelSceneHandoff,
+                *m_ModelMaterializer,
                 *m_Scene,
                 recipe,
                 m_SelectionController.get(),
@@ -3285,7 +3525,7 @@ namespace Extrinsic::Runtime
         return MaterializeDecodedTextureImport(
             *m_AssetService,
             *m_GpuAssetCache,
-            *m_AssetModelTextureHandoff,
+            *m_TextureResidency,
             request,
             existingAsset,
             std::move(*decoded));

@@ -3,7 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 
-export module Extrinsic.Runtime.AssetMeshNormals;
+export module Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 
 import Extrinsic.Core.Error;
 export import Geometry.HalfedgeMesh;

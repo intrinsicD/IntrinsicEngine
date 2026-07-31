@@ -23,7 +23,7 @@ module;
 
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.AssetModelTextureIO;
+module Extrinsic.Runtime.AssetWorkflowModelTextureDecode;
 
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;

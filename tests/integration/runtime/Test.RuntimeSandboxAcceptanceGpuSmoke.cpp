@@ -87,7 +87,6 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
@@ -96,7 +95,6 @@ import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
-import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
@@ -419,12 +417,35 @@ public:
             engine.GetDevice().IsOperational())
         {
             UploadRequested = true;
-            RT::AssetModelTextureHandoffOptions uploadOptions{};
-            uploadOptions.TextureSamplerDesc = GeneratedUvSmokeSamplerDesc();
-            auto upload = RT::RequestTextureAssetUpload(RequiredEngineService<Extrinsic::Assets::AssetService>(engine),
-                                                        RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine),
-                                                        m_GeneratedTexture,
-                                                        uploadOptions);
+            auto& assets = RequiredEngineService<Assets::AssetService>(engine);
+            auto payload = assets.Read<Assets::AssetTexture2DPayload>(
+                m_GeneratedTexture);
+            if (!payload.has_value() || payload->size() != 1u)
+            {
+                UploadError = payload.has_value()
+                    ? Extrinsic::Core::ErrorCode::AssetInvalidData
+                    : payload.error();
+                engine.RequestExit();
+                return;
+            }
+            const auto& texture = (*payload)[0];
+            auto upload = RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine)
+                .RequestUpload(Extrinsic::Graphics::GpuTextureRequest{
+                    .Id = m_GeneratedTexture,
+                    .Bytes = std::span<const std::byte>(
+                        texture.PixelBytes.data(),
+                        texture.PixelBytes.size()),
+                    .Desc = Extrinsic::RHI::TextureDesc{
+                        .Width = texture.Metadata.Width,
+                        .Height = texture.Metadata.Height,
+                        .MipLevels = 1u,
+                        .Fmt = Extrinsic::RHI::Format::RGBA8_SRGB,
+                        .Usage = Extrinsic::RHI::TextureUsage::Sampled |
+                                 Extrinsic::RHI::TextureUsage::TransferDst,
+                        .DebugName = "Graphics089.GeneratedAlbedoTexture",
+                    },
+                    .SamplerDesc = GeneratedUvSmokeSamplerDesc(),
+                });
             if (!upload.has_value())
             {
                 UploadError = upload.error();

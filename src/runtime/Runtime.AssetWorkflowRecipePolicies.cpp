@@ -15,7 +15,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.AssetImportPolicies;
+module Extrinsic.Runtime.AssetWorkflowRecipePolicies;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Core.Config.Engine;
@@ -30,7 +30,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.Runtime.AssetMeshNormals;
+import Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.JobService;

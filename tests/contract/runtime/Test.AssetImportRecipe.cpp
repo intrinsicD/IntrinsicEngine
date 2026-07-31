@@ -1,6 +1,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <variant>
 
 #include <gtest/gtest.h>
 
@@ -26,6 +27,48 @@ namespace
             .BindingGeneration = 9u,
             .CancellationGeneration = generation,
         };
+    }
+
+    [[nodiscard]] Runtime::AssetImportStagePayload SuccessfulPayload(
+        const Runtime::AssetImportStage stage)
+    {
+        switch (stage)
+        {
+        case Runtime::AssetImportStage::Route:
+            return Runtime::AssetImportRouteResult{
+                .Path = "mesh.obj",
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            };
+        case Runtime::AssetImportStage::Decode:
+            return Runtime::AssetImportDecodeResult{
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .OwnedValueCount = 1u,
+            };
+        case Runtime::AssetImportStage::CpuMaterialize:
+            return Runtime::AssetImportCpuMaterializationResult{
+                .Asset = Assets::AssetId{4u, 2u},
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .PrimitiveCount = 1u,
+            };
+        case Runtime::AssetImportStage::EcsAuthor:
+            return Runtime::AssetImportEcsAuthorResult{
+                .CreatedEntityCount = 1u,
+            };
+        case Runtime::AssetImportStage::Postprocess:
+            return Runtime::AssetImportPostprocessResult{
+                .Policy = Runtime::AssetImportPostprocessPolicy::
+                    PrepareRenderableGeometry,
+                .Requested = true,
+            };
+        case Runtime::AssetImportStage::GpuResidency:
+            return Runtime::AssetImportGpuResidencyResult{};
+        case Runtime::AssetImportStage::Complete:
+            return Runtime::AssetImportCompletionResult{
+                .SelectFirstCreatedEntity = true,
+                .FocusCameraOnCreatedGeometry = true,
+            };
+        }
+        return std::monostate{};
     }
 }
 
@@ -89,6 +132,7 @@ TEST(RuntimeAssetImportRecipe, StageTraceAcceptsOnlyTheNamedOrder)
                         Runtime::AssetImportStageResult{
                             .Identity = trace.Identity,
                             .Stage = stage,
+                            .Payload = SuccessfulPayload(stage),
                         })
                         .has_value());
     }
@@ -135,6 +179,8 @@ TEST(RuntimeAssetImportRecipe, StageTraceFailsClosedForMalformedOrStaleResults)
                     Runtime::AssetImportStageResult{
                         .Identity = trace.Identity,
                         .Stage = Runtime::AssetImportStage::Route,
+                        .Payload = SuccessfulPayload(
+                            Runtime::AssetImportStage::Route),
                     })
                     .has_value());
     ASSERT_TRUE(Runtime::AppendAssetImportStageResult(
@@ -169,6 +215,7 @@ TEST(RuntimeAssetImportRecipe, CompleteStageCanReportAWorkflowFailure)
                         Runtime::AssetImportStageResult{
                             .Identity = trace.Identity,
                             .Stage = stage,
+                            .Payload = SuccessfulPayload(stage),
                         })
                         .has_value());
     }

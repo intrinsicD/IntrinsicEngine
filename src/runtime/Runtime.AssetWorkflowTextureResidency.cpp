@@ -4,7 +4,7 @@ module;
 #include <memory>
 #include <span>
 
-module Extrinsic.Runtime.AssetModelTextureHandoff;
+module Extrinsic.Runtime.AssetWorkflowTextureResidency;
 
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -57,7 +57,7 @@ namespace Extrinsic::Runtime
         }
 
         void RecordFailure(
-            AssetModelTextureHandoffDiagnostics& diagnostics,
+            AssetWorkflowTextureResidencyDiagnostics& diagnostics,
             const Assets::AssetId id,
             const Core::ErrorCode error)
         {
@@ -75,7 +75,7 @@ namespace Extrinsic::Runtime
         }
 
         void RecordDeferral(
-            AssetModelTextureHandoffDiagnostics& diagnostics,
+            AssetWorkflowTextureResidencyDiagnostics& diagnostics,
             const Assets::AssetId id,
             const Core::ErrorCode error)
         {
@@ -117,7 +117,7 @@ namespace Extrinsic::Runtime
         Assets::AssetService& service,
         Graphics::GpuAssetCache& cache,
         const Assets::AssetId id,
-        const AssetModelTextureHandoffOptions& options)
+        const AssetWorkflowTextureResidencyOptions& options)
     {
         const Graphics::GpuAssetState currentState = cache.GetState(id);
         if (currentState == Graphics::GpuAssetState::GpuUploading
@@ -169,18 +169,18 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
-    struct AssetModelTextureHandoff::Impl
+    struct AssetWorkflowTextureResidency::Impl
     {
         Assets::AssetService& Service;
         Graphics::GpuAssetCache& Cache;
-        AssetModelTextureHandoffOptions Options{};
-        AssetModelTextureHandoffDiagnostics Diagnostics{};
+        AssetWorkflowTextureResidencyOptions Options{};
+        AssetWorkflowTextureResidencyDiagnostics Diagnostics{};
         Assets::AssetEventBus::ListenerToken Token{Assets::AssetEventBus::InvalidToken};
 
         Impl(
             Assets::AssetService& service,
             Graphics::GpuAssetCache& cache,
-            AssetModelTextureHandoffOptions options)
+            AssetWorkflowTextureResidencyOptions options)
             : Service(service)
             , Cache(cache)
             , Options(options)
@@ -272,31 +272,31 @@ namespace Extrinsic::Runtime
         }
     };
 
-    AssetModelTextureHandoff::AssetModelTextureHandoff(
+    AssetWorkflowTextureResidency::AssetWorkflowTextureResidency(
         Assets::AssetService& service,
         Graphics::GpuAssetCache& cache,
-        AssetModelTextureHandoffOptions options)
+        AssetWorkflowTextureResidencyOptions options)
         : m_Impl(std::make_unique<Impl>(service, cache, options))
     {
     }
 
-    AssetModelTextureHandoff::~AssetModelTextureHandoff() = default;
+    AssetWorkflowTextureResidency::~AssetWorkflowTextureResidency() = default;
 
-    bool AssetModelTextureHandoff::IsSubscribed() const noexcept
+    bool AssetWorkflowTextureResidency::IsSubscribed() const noexcept
     {
         return m_Impl != nullptr
             && m_Impl->Token != Assets::AssetEventBus::InvalidToken;
     }
 
-    AssetModelTextureHandoffDiagnostics
-    AssetModelTextureHandoff::GetDiagnostics() const noexcept
+    AssetWorkflowTextureResidencyDiagnostics
+    AssetWorkflowTextureResidency::GetDiagnostics() const noexcept
     {
         return m_Impl != nullptr
             ? m_Impl->Diagnostics
-            : AssetModelTextureHandoffDiagnostics{};
+            : AssetWorkflowTextureResidencyDiagnostics{};
     }
 
-    Core::Result AssetModelTextureHandoff::UploadReadyTexture(const Assets::AssetId id)
+    Core::Result AssetWorkflowTextureResidency::UploadReadyTexture(const Assets::AssetId id)
     {
         if (m_Impl == nullptr)
         {

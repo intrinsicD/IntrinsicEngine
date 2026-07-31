@@ -20,6 +20,7 @@
 #include <system_error>
 #include <thread>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <entt/entity/entity.hpp>
@@ -53,13 +54,11 @@ import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
-import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.RenderExtraction;
@@ -1538,6 +1537,32 @@ TEST(RuntimeAssetImportFormatCoverage, DirectImportCompletesIngestStateMachineRe
     EXPECT_TRUE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->IngestDiagnostic,
               Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(lastEvent->StageTrace.has_value());
+    const Runtime::AssetImportStageTrace& trace = *lastEvent->StageTrace;
+    ASSERT_TRUE(trace.Terminal);
+    ASSERT_EQ(trace.Results.size(), 7u);
+    EXPECT_EQ(trace.Results.front().Stage, Runtime::AssetImportStage::Route);
+    EXPECT_EQ(trace.Results.back().Stage, Runtime::AssetImportStage::Complete);
+    const auto* route = std::get_if<Runtime::AssetImportRouteResult>(
+        &trace.Results[0].Payload);
+    const auto* decoded = std::get_if<Runtime::AssetImportDecodeResult>(
+        &trace.Results[1].Payload);
+    const auto* materialized =
+        std::get_if<Runtime::AssetImportCpuMaterializationResult>(
+            &trace.Results[2].Payload);
+    const auto* authored = std::get_if<Runtime::AssetImportEcsAuthorResult>(
+        &trace.Results[3].Payload);
+    ASSERT_NE(route, nullptr);
+    ASSERT_NE(decoded, nullptr);
+    ASSERT_NE(materialized, nullptr);
+    ASSERT_NE(authored, nullptr);
+    EXPECT_EQ(route->Path, meshFile.Path.string());
+    EXPECT_EQ(route->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(decoded->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(decoded->OwnedValueCount, 1u);
+    EXPECT_EQ(materialized->Asset, imported->Asset);
+    EXPECT_EQ(materialized->PrimitiveCount, 1u);
+    EXPECT_EQ(authored->CreatedEntityCount, 1u);
 
     engine.Shutdown();
 }

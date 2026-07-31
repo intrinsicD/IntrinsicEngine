@@ -2,7 +2,7 @@ module;
 
 #include <string_view>
 
-export module Extrinsic.Runtime.AssetModelTextureIO;
+export module Extrinsic.Runtime.AssetWorkflowModelTextureDecode;
 
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Core.Error;

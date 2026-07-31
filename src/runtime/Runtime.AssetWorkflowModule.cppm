@@ -10,6 +10,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 export module Extrinsic.Runtime.AssetWorkflowModule;
@@ -79,6 +80,63 @@ namespace Extrinsic::Runtime
             const AssetImportExecutionIdentity&) noexcept = default;
     };
 
+    export struct AssetImportRouteResult
+    {
+        std::string Path{};
+        Assets::AssetPayloadKind PayloadKind{
+            Assets::AssetPayloadKind::Unknown};
+    };
+
+    export struct AssetImportDecodeResult
+    {
+        Assets::AssetPayloadKind PayloadKind{
+            Assets::AssetPayloadKind::Unknown};
+        std::size_t OwnedValueCount{0u};
+    };
+
+    export struct AssetImportCpuMaterializationResult
+    {
+        Assets::AssetId Asset{};
+        Assets::AssetPayloadKind PayloadKind{
+            Assets::AssetPayloadKind::Unknown};
+        std::uint64_t PrimitiveCount{0u};
+        std::uint64_t EmbeddedTextureCount{0u};
+    };
+
+    export struct AssetImportEcsAuthorResult
+    {
+        std::uint64_t CreatedEntityCount{0u};
+    };
+
+    export struct AssetImportPostprocessResult
+    {
+        AssetImportPostprocessPolicy Policy{
+            AssetImportPostprocessPolicy::None};
+        bool Requested{false};
+    };
+
+    export struct AssetImportGpuResidencyResult
+    {
+        std::uint64_t RequestCount{0u};
+        bool Requested{false};
+    };
+
+    export struct AssetImportCompletionResult
+    {
+        bool SelectFirstCreatedEntity{false};
+        bool FocusCameraOnCreatedGeometry{false};
+    };
+
+    export using AssetImportStagePayload = std::variant<
+        std::monostate,
+        AssetImportRouteResult,
+        AssetImportDecodeResult,
+        AssetImportCpuMaterializationResult,
+        AssetImportEcsAuthorResult,
+        AssetImportPostprocessResult,
+        AssetImportGpuResidencyResult,
+        AssetImportCompletionResult>;
+
     export struct AssetImportStageResult
     {
         AssetImportExecutionIdentity Identity{};
@@ -86,6 +144,7 @@ namespace Extrinsic::Runtime
         Core::ErrorCode Error{Core::ErrorCode::Success};
         RuntimeAssetIngestDiagnostic Diagnostic{
             RuntimeAssetIngestDiagnostic::None};
+        AssetImportStagePayload Payload{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -99,6 +158,31 @@ namespace Extrinsic::Runtime
         std::vector<AssetImportStageResult> Results{};
         bool Terminal{false};
     };
+
+    export [[nodiscard]] inline bool AssetImportStagePayloadMatches(
+        const AssetImportStage stage,
+        const AssetImportStagePayload& payload) noexcept
+    {
+        switch (stage)
+        {
+        case AssetImportStage::Route:
+            return std::holds_alternative<AssetImportRouteResult>(payload);
+        case AssetImportStage::Decode:
+            return std::holds_alternative<AssetImportDecodeResult>(payload);
+        case AssetImportStage::CpuMaterialize:
+            return std::holds_alternative<
+                AssetImportCpuMaterializationResult>(payload);
+        case AssetImportStage::EcsAuthor:
+            return std::holds_alternative<AssetImportEcsAuthorResult>(payload);
+        case AssetImportStage::Postprocess:
+            return std::holds_alternative<AssetImportPostprocessResult>(payload);
+        case AssetImportStage::GpuResidency:
+            return std::holds_alternative<AssetImportGpuResidencyResult>(payload);
+        case AssetImportStage::Complete:
+            return std::holds_alternative<AssetImportCompletionResult>(payload);
+        }
+        return false;
+    }
 
     export [[nodiscard]] inline Core::Result ValidateAssetImportRecipe(
         const AssetImportRecipe& recipe) noexcept
@@ -147,7 +231,10 @@ namespace Extrinsic::Runtime
 
         if (result.Succeeded())
         {
-            if (result.Diagnostic != RuntimeAssetIngestDiagnostic::None)
+            if (result.Diagnostic != RuntimeAssetIngestDiagnostic::None ||
+                !AssetImportStagePayloadMatches(
+                    result.Stage,
+                    result.Payload))
                 return Core::Err(Core::ErrorCode::InvalidArgument);
         }
         else if (result.Diagnostic == RuntimeAssetIngestDiagnostic::None)

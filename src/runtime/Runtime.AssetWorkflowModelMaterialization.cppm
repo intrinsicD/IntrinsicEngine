@@ -7,7 +7,7 @@ module;
 #include <string_view>
 #include <vector>
 
-export module Extrinsic.Runtime.AssetModelSceneHandoff;
+export module Extrinsic.Runtime.AssetWorkflowModelMaterialization;
 
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
@@ -19,16 +19,16 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.AssetWorkflowTextureResidency;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
-    struct AssetModelSceneHandoffOptions
+    struct AssetWorkflowModelMaterializationOptions
     {
-        AssetModelTextureHandoffOptions TextureOptions{};
+        AssetWorkflowTextureResidencyOptions TextureOptions{};
         bool RequestEmbeddedTextureUploads{true};
         bool ResolveMaterialTextureBindings{true};
         bool GenerateMissingNormalTextures{true};
@@ -50,7 +50,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t GeneratedTexturePaddingTexels{4u};
     };
 
-    struct AssetModelSceneHandoffDiagnostics
+    struct AssetWorkflowModelMaterializationDiagnostics
     {
         std::uint64_t ReadyEventsObserved{0};
         std::uint64_t ModelSceneReadyEvents{0};
@@ -94,7 +94,7 @@ export namespace Extrinsic::Runtime
         Core::ErrorCode LastError{Core::ErrorCode::Success};
     };
 
-    struct AssetModelSceneMaterialRecord
+    struct AssetWorkflowModelMaterialRecord
     {
         std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
         Graphics::MaterialTextureAssetBindings TextureBindings{};
@@ -103,7 +103,7 @@ export namespace Extrinsic::Runtime
         bool TextureBindingsResolved{false};
     };
 
-    struct AssetModelScenePrimitiveRecord
+    struct AssetWorkflowModelPrimitiveRecord
     {
         ECS::EntityHandle Entity{};
         std::uint32_t NodeIndex{Assets::kInvalidAssetModelIndex};
@@ -114,24 +114,24 @@ export namespace Extrinsic::Runtime
         bool HasMaterialSlot{false};
     };
 
-    struct AssetModelSceneNodeRecord
+    struct AssetWorkflowModelNodeRecord
     {
         ECS::EntityHandle Entity{};
         std::uint32_t NodeIndex{Assets::kInvalidAssetModelIndex};
     };
 
-    struct AssetModelSceneHandoffRecord
+    struct AssetWorkflowModelMaterializationRecord
     {
         Assets::AssetId ModelAsset{};
         std::vector<Assets::AssetId> EmbeddedTextureAssets{};
-        std::vector<AssetModelSceneMaterialRecord> Materials{};
-        std::vector<AssetModelSceneNodeRecord> Nodes{};
-        std::vector<AssetModelScenePrimitiveRecord> Primitives{};
+        std::vector<AssetWorkflowModelMaterialRecord> Materials{};
+        std::vector<AssetWorkflowModelNodeRecord> Nodes{};
+        std::vector<AssetWorkflowModelPrimitiveRecord> Primitives{};
     };
 
-    struct AssetModelSceneHandoffState
+    struct AssetWorkflowModelMaterializationState
     {
-        AssetModelSceneHandoffRecord Record{};
+        AssetWorkflowModelMaterializationRecord Record{};
         std::vector<Graphics::MaterialSystem::MaterialLease> MaterialLeases{};
 
         // Lazily-created neutral lit StandardPBR material bound to imported
@@ -154,34 +154,34 @@ export namespace Extrinsic::Runtime
         std::uint32_t imageIndex,
         const Assets::AssetTexture2DPayload& image);
 
-    [[nodiscard]] Core::Expected<AssetModelSceneHandoffState> MaterializeModelSceneAsset(
+    [[nodiscard]] Core::Expected<AssetWorkflowModelMaterializationState> MaterializeModelSceneAsset(
         Assets::AssetService& service,
         Graphics::GpuAssetCache& cache,
         ECS::Scene::Registry& scene,
         Graphics::MaterialSystem& materials,
         Assets::AssetId modelAsset,
-        const AssetModelSceneHandoffOptions& options = {},
-        AssetModelSceneHandoffDiagnostics* diagnostics = nullptr);
+        const AssetWorkflowModelMaterializationOptions& options = {},
+        AssetWorkflowModelMaterializationDiagnostics* diagnostics = nullptr);
 
-    class AssetModelSceneHandoff
+    class AssetWorkflowModelMaterializer
     {
     public:
-        AssetModelSceneHandoff(
+        AssetWorkflowModelMaterializer(
             Assets::AssetService& service,
             Graphics::GpuAssetCache& cache,
             ECS::Scene::Registry& scene,
             Graphics::IRenderer& renderer,
-            AssetModelSceneHandoffOptions options = {});
-        ~AssetModelSceneHandoff();
+            AssetWorkflowModelMaterializationOptions options = {});
+        ~AssetWorkflowModelMaterializer();
 
-        AssetModelSceneHandoff(const AssetModelSceneHandoff&) = delete;
-        AssetModelSceneHandoff& operator=(const AssetModelSceneHandoff&) = delete;
-        AssetModelSceneHandoff(AssetModelSceneHandoff&&) = delete;
-        AssetModelSceneHandoff& operator=(AssetModelSceneHandoff&&) = delete;
+        AssetWorkflowModelMaterializer(const AssetWorkflowModelMaterializer&) = delete;
+        AssetWorkflowModelMaterializer& operator=(const AssetWorkflowModelMaterializer&) = delete;
+        AssetWorkflowModelMaterializer(AssetWorkflowModelMaterializer&&) = delete;
+        AssetWorkflowModelMaterializer& operator=(AssetWorkflowModelMaterializer&&) = delete;
 
         [[nodiscard]] bool IsSubscribed() const noexcept;
-        [[nodiscard]] AssetModelSceneHandoffDiagnostics GetDiagnostics() const noexcept;
-        [[nodiscard]] const AssetModelSceneHandoffRecord* FindRecord(
+        [[nodiscard]] AssetWorkflowModelMaterializationDiagnostics GetDiagnostics() const noexcept;
+        [[nodiscard]] const AssetWorkflowModelMaterializationRecord* FindRecord(
             Assets::AssetId modelAsset) const noexcept;
 
         [[nodiscard]] Core::Result MaterializeReadyModelScene(Assets::AssetId modelAsset);

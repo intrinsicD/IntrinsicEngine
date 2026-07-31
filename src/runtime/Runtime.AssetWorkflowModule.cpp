@@ -31,8 +31,8 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetWorkflowImportExecutor;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.AssetWorkflowModelMaterialization;
+import Extrinsic.Runtime.AssetWorkflowTextureResidency;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -74,8 +74,8 @@ namespace Extrinsic::Runtime
             std::unique_ptr<Graphics::GpuAssetCache> Cache{};
             Assets::AssetEventBus::ListenerToken CacheListener{
                 Assets::AssetEventBus::InvalidToken};
-            std::unique_ptr<AssetModelTextureHandoff> TextureHandoff{};
-            std::unique_ptr<AssetModelSceneHandoff> SceneHandoff{};
+            std::unique_ptr<AssetWorkflowTextureResidency> TextureResidency{};
+            std::unique_ptr<AssetWorkflowModelMaterializer> ModelMaterializer{};
 
             WorldHandle BoundWorld{};
             ECS::Scene::Registry* BoundRegistry{nullptr};
@@ -452,7 +452,7 @@ namespace Extrinsic::Runtime
 
                 // The handoff destructor destroys its records through the
                 // outgoing registry. Reset it before that registry may retire.
-                SceneHandoff.reset();
+                ModelMaterializer.reset();
                 BoundWorld = {};
                 BoundRegistry = nullptr;
                 AdvanceBindingEpoch();
@@ -471,7 +471,7 @@ namespace Extrinsic::Runtime
                     BoundRegistry == nullptr ||
                     Assets == nullptr ||
                     Cache == nullptr ||
-                    TextureHandoff == nullptr ||
+                    TextureResidency == nullptr ||
                     Renderer == nullptr ||
                     Device == nullptr ||
                     ImportExecutor == nullptr)
@@ -492,13 +492,13 @@ namespace Extrinsic::Runtime
                         }
                         return false;
                     };
-                SceneHandoff =
-                    std::make_unique<AssetModelSceneHandoff>(
+                ModelMaterializer =
+                    std::make_unique<AssetWorkflowModelMaterializer>(
                         *Assets,
                         *Cache,
                         *BoundRegistry,
                         *Renderer,
-                        AssetModelSceneHandoffOptions{
+                        AssetWorkflowModelMaterializationOptions{
                             .World = BoundWorld,
                             .BindingEpoch = expectedEpoch,
                             .BindingValid = bindingValid,
@@ -515,10 +515,10 @@ namespace Extrinsic::Runtime
                         .BindingValid = bindingValid,
                         .AssetService = Assets.get(),
                         .GpuAssetCache = Cache.get(),
-                        .ModelTextureHandoff =
-                            TextureHandoff.get(),
-                        .ModelSceneHandoff =
-                            SceneHandoff.get(),
+                        .TextureResidency =
+                            TextureResidency.get(),
+                        .ModelMaterializer =
+                            ModelMaterializer.get(),
                         .RenderExtraction = Extraction,
                         .Scene = BoundRegistry,
                         .Selection = Selection,
@@ -604,7 +604,7 @@ namespace Extrinsic::Runtime
                 AcceptingCallbacks = false;
                 // TextureBakeModule owns and quiesces its GPU queue before
                 // this module destroys the shared asset/cache state.
-                SceneHandoff.reset();
+                ModelMaterializer.reset();
                 BoundWorld = {};
                 BoundRegistry = nullptr;
                 AdvanceBindingEpoch();
@@ -705,8 +705,8 @@ namespace Extrinsic::Runtime
                 return;
 
             auto& state = *Shared;
-            state.SceneHandoff.reset();
-            state.TextureHandoff.reset();
+            state.ModelMaterializer.reset();
+            state.TextureResidency.reset();
             if (state.Assets != nullptr &&
                 state.CacheListener !=
                     Assets::AssetEventBus::InvalidToken)
@@ -945,8 +945,8 @@ namespace Extrinsic::Runtime
                         break;
                     }
                 });
-        state.TextureHandoff =
-            std::make_unique<AssetModelTextureHandoff>(
+        state.TextureResidency =
+            std::make_unique<AssetWorkflowTextureResidency>(
                 *state.Assets, *state.Cache);
 
         if (Core::Result provided =
@@ -1225,11 +1225,11 @@ namespace Extrinsic::Runtime
                 state.Device->GetFramesInFlight());
         }
         state.ReconcileTextureBakeOutputs();
-        if (state.SceneHandoff != nullptr &&
+        if (state.ModelMaterializer != nullptr &&
             state.IsBindingCurrent(state.BindingEpoch))
         {
             static_cast<void>(
-                state.SceneHandoff->
+                state.ModelMaterializer->
                     ResolvePendingMaterialTextureBindings());
         }
     }

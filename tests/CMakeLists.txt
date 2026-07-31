@@ -252,10 +252,6 @@ if(TARGET ExtrinsicRuntime)
         Test.AssetImportRecipe.cpp
         Test.AssetImportFormatCoverage.cpp
         Test.AssetWorkflowModule.cpp
-        Test.AssetMeshNormals.cpp
-        Test.AssetModelSceneHandoff.cpp
-        Test.AssetModelTextureHandoff.cpp
-        Test.AssetModelTextureIO.cpp
         Test.AsyncWorkModule.cpp
         Test.EditorCommandHistory.cpp
         Test.EditorPropertyWidgets.cpp
