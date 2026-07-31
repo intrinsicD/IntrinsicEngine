@@ -15,10 +15,16 @@ maturity_target: Retired
 
 ## Status
 
-- Implementation is complete. The first fixed-surface high-risk review on
-  2026-07-31 requested three revisions; all three are implemented, and the
-  revised verification surface plus a second independent review remain before
-  retirement and merge.
+- Completed and retired on 2026-07-31 at `Retired` after every production
+  import route converged on one staged recipe behind the sole published
+  `AssetWorkflowModule` service and the superseded public seams were deleted.
+- Commit: implementation and accepted review surface through `c974242b`; this
+  retirement-state commit plus the generated report provide the final exact
+  task-state binding.
+- The first fixed-surface high-risk review requested three revisions. The
+  second independent review accepted the repaired exact revision and digest
+  with no blocking findings; both dispositions remain in the append-only
+  evidence record.
 - Slice A contract completed on 2026-07-31: the plain recipe names payload,
   authoring, postprocess, completion, request/world generation, and the seven
   ordered stages; copied stage results fail closed on malformed order, stale
@@ -187,7 +193,7 @@ maturity_target: Retired
 - [x] Update asset/runtime import architecture and Sandbox workflow docs with
       the stage ownership and recipe.
 - [x] Regenerate module inventory and update import visibility documentation.
-- [ ] Refresh task indexes, session brief, and retirement records after the
+- [x] Refresh task indexes, session brief, and retirement records after the
       accepted fixed-surface review.
 
 ## Acceptance criteria

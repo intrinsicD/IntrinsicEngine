@@ -3,7 +3,7 @@
 ## Change under review
 
 - Change: retire
-  [`RUNTIME-200`](../../tasks/active/RUNTIME-200-staged-asset-import-materialization-recipe.md)
+  [`RUNTIME-200`](../../tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md)
   after consolidating runtime asset import behind one staged recipe and the
   existing app-composed `AssetWorkflowModule`, then deleting the public
   pipeline, role callback registries, IO bridges, and handoff facades.

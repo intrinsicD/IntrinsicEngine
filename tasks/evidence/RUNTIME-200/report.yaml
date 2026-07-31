@@ -3,12 +3,12 @@ task_id: RUNTIME-200
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-31T18:46:08Z'
+generated_at: '2026-07-31T19:36:32Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 46937f8e2487849fdad3079f132309d5cb0dd100
-  head_revision: 7557a69c55b326eb182efe18f51b1115d2f9eb27
+  head_revision: c974242bb119739216c7aab92996c871e6b716fc
   branch: codex/runtime-200-staged-import-recipe
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
@@ -27,6 +27,8 @@ source:
     sha256: fa417e6188e363eb7774ab461f9a2b5e5aaf4f1b6e15a9dad2c52dacb35b2f83
   - path: docs/migration/nonlegacy-parity-matrix.md
     sha256: 09918824683139f4230064cd763f21b27cf1b76118e2c6a010816ed01d513ebd
+  - path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+    sha256: aace62cb20a2d950c4ad8e86314e7ab42b1b8aefc7b9872a8f1fc72e3b0db8ce
   - path: src/app/Sandbox/README.md
     sha256: 496cb54265aabdd07270617a138a27a2315d9d83187b7db653555dd5e9a86ca3
   - path: src/app/Sandbox/Sandbox.cpp
@@ -58,7 +60,7 @@ source:
   - path: src/runtime/CMakeLists.txt
     sha256: 372b31550c166e407955383724f10aa8b450d719b952e9f8fa9a6e616fff5d02
   - path: src/runtime/README.md
-    sha256: c7ce12843f4b388802721c6c4b46df66da33da56804ce9c6b6fc281eae869852
+    sha256: 6f8477f329f6897ba0a8a5a4685e85db605aedfa0788e40c66407d8f7cc398df
   - path: src/runtime/Runtime.AssetGeometryIO.cpp
     sha256: null
   - path: src/runtime/Runtime.AssetGeometryIO.cppm
@@ -72,7 +74,7 @@ source:
   - path: src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cppm
     sha256: 44104d7db3f3ad8c08b846b16032bb3da4381325d8c47680a2d6619421f572da
   - path: src/runtime/Runtime.AssetWorkflowImportExecutor.cpp
-    sha256: 79ec5dd2319c377eec5513d8114973fca8f75e5b223f0eb2542242f678158d1e
+    sha256: 388b247640fb73d5bfac371a4011113f4e570f3e23b53482a45880723d2f7eee
   - path: src/runtime/Runtime.AssetWorkflowImportExecutor.cppm
     sha256: bcbb615d491d2f4627b5086a8ab3829aee998b9cda54fd40379051963669491d
   - path: src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp
@@ -110,15 +112,17 @@ source:
   - path: tasks/SESSION-BRIEF.md
     sha256: 7005895e22c382a61e3b65a16663edd2da89aec951384af5614c828c0a27fb65
   - path: tasks/active/README.md
-    sha256: 9ae4d6c7d6f8bb8cf52b92357b22ce39066af3e1229d304500ba1880ed27ffff
+    sha256: 2b7d59e64dc7f32cf9cec7f95b6c922b2d6b88367d2aed62f57313b7e38dc326
   - path: tasks/active/RUNTIME-200-staged-asset-import-materialization-recipe.md
-    sha256: 488cd7803f76f8d14abfe1e79bfc1fd7e7a723965b03d7ee9e071404ae1173bb
+    sha256: da70cae712b3e82824921a1dbecfc26b41301da56926ec8ac1596875830499bf
   - path: tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
     sha256: 0c67d456def018c4a9ac5de59eae234e16082e9773d0ddd872449c757ffaa742
   - path: tasks/backlog/bugs/index.md
     sha256: 57e1c88cbd5f596f7e5e85d8e164f943f6fc2ac853f33cd211abfb029d27791c
   - path: tasks/backlog/runtime/README.md
     sha256: 49976af3c9830997d89256fef0596c2a4727166e6d06e17348739a32f83914bf
+  - path: tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md
+    sha256: null
   - path: tests/CMakeLists.txt
     sha256: 1bbb53559cf58d95e26eb38fe6854b7dc044f5544106b0a596ab59375c31c682
   - path: tests/README.md
@@ -126,7 +130,7 @@ source:
   - path: tests/contract/runtime/Test.AssetGeometryIO.cpp
     sha256: null
   - path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
-    sha256: f3c4cd9271abf46b64e44fb7149bdf1fc5359cb0eed65aba8fe896e2af7b0f00
+    sha256: 94bf243f9e3056316e4fec1b43ae703bf9ce6b1aa9aea4b06fa1ffe01d8a8a2a
   - path: tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp
     sha256: 8fc2b949ef51c119b8d703e89d34b740bb2f3ff1d94960d3f97f98667773e83f
   - path: tests/contract/runtime/Test.AssetImportRecipe.cpp
@@ -160,7 +164,7 @@ source:
   - path: tests/contract/runtime/Test.SandboxEditorVisualization.cpp
     sha256: 48160cc874027ac32a89b0f5d68784f8494c9d62bee36198e2f1cf2dba3001ce
   - path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
-    sha256: 3b2da16823a71ed0bc4cdaebec7fcdcde5aec86f882da081bc3ea1390c31bd7e
+    sha256: 9f8cee96a92fc697b69cc70ee197b61c149074d732992a7a30b399d0b52a8910
   - path: tests/integration/runtime/Test.SandboxAppComposition.cpp
     sha256: 8ffde2c2a5f07be733c2f0452e30543c01225a7a1aae030a31a208c82ddc284b
   - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
@@ -171,7 +175,7 @@ source:
     sha256: null
   - path: tests/unit/assets/Test.Asset.ModelTexturePayload.cpp
     sha256: 0ce4a5684c52377d5788eccc16e20d975e01256bf03fceb48902403144ec8431
-  content_digest: 8cf14aee414c764ee794de8e6476db929771c6f7f8ef6e0d36a23937ca763b06
+  content_digest: c699c50bcd276349fa04af39019f73fe39326fe5626841ff31dd885a26b7e8f9
 touched:
   paths:
   - ara/logic/solution/architecture.md
@@ -181,6 +185,7 @@ touched:
   - docs/architecture/runtime.md
   - docs/benchmarking/ci-policy.md
   - docs/migration/nonlegacy-parity-matrix.md
+  - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
   - src/app/Sandbox/README.md
   - src/app/Sandbox/Sandbox.cpp
   - src/assets/Asset.GeometryIOBridge.cpp
@@ -227,6 +232,7 @@ touched:
   - tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
   - tasks/backlog/bugs/index.md
   - tasks/backlog/runtime/README.md
+  - tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md
   - tests/CMakeLists.txt
   - tests/README.md
   - tests/contract/runtime/Test.AssetGeometryIO.cpp
@@ -303,6 +309,32 @@ commands:
 - receipt: tasks/evidence/RUNTIME-200/commands/debug-tag-scan.json
 - receipt: tasks/evidence/RUNTIME-200/commands/diff-check.json
 - receipt: tasks/evidence/RUNTIME-200/commands/module-inventory-refresh.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-asan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-asan-full-cpu-retry.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ci-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ci-focused.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ci-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-debug-tag-scan.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-diff-check.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-final-diff-check.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-final-doc-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-module-inventory-refresh.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-queued-reimport-repeat20.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-session-brief-refresh.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-doc-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-layering.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-task-policy.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-task-validation.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-test-layout.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ubsan-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-import-model.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-texture-repeat20.json
 - receipt: tasks/evidence/RUNTIME-200/commands/session-brief-refresh.json
 - receipt: tasks/evidence/RUNTIME-200/commands/strict-ara-claims.json
 - receipt: tasks/evidence/RUNTIME-200/commands/strict-doc-links.json
@@ -320,10 +352,12 @@ changed_public_contracts:
 diagnostics_and_previews:
 - Copied stage traces distinguish route, decode, CPU materialization, ECS authoring, postprocess, GPU
   residency, and exactly-once completion outcomes.
-- The initial ASan failures are retained as diagnosis receipts; ccache-disabled clean binaries and the
-  final ASan gate prove both lifetime fixes.
-- The required four import/model-scene Vulkan cases pass; the extra 48-case sweep exposed unrelated origin/main
-  assertion drift tracked as BUG-124.
+- Queued geometry reimport preserves ExistingAsset through ingest, reloads the same asset generation,
+  and authors no duplicate ECS entity.
+- Failed ASan and Vulkan diagnostic attempts are retained byte-for-byte as observation artifacts; every
+  JSON receipt remaining in commands is generator-included and passing.
+- The required four import/model-scene Vulkan cases and 20 repeated generated-texture contention cases
+  pass; the extra 48-case sweep exposed unrelated BUG-124.
 benchmark_or_parity_evidence:
 - No performance claim is made; evidence covers CPU correctness, sanitizer lifetime safety, and promoted-Vulkan
   import visibility.
@@ -333,21 +367,47 @@ docs_sync:
   canonical_docs_changed: true
   skill_mirrors_checked: false
 residual_risks:
+- BUG-123 remains an unrelated intermittent retired-scene-save terminal-event race; the unchanged complete
+  ASan selector passed after the preserved reproductions.
 - BUG-124 leaves the unrelated full geometry-presentation Vulkan sweep at 47/48 while all RUNTIME-200-specific
   Vulkan cases pass.
 skipped_checks: []
 artifacts:
 - path: tasks/active/RUNTIME-200-staged-asset-import-materialization-recipe.md
-  sha256: 488cd7803f76f8d14abfe1e79bfc1fd7e7a723965b03d7ee9e071404ae1173bb
+  sha256: da70cae712b3e82824921a1dbecfc26b41301da56926ec8ac1596875830499bf
   kind: file
 - path: docs/architecture/runtime.md
   sha256: d599c6a06635884df69208671c102e930a373d5273a28c83c9a6f99e19a0fe51
   kind: file
+- path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+  sha256: aace62cb20a2d950c4ad8e86314e7ab42b1b8aefc7b9872a8f1fc72e3b0db8ce
+  kind: file
 - path: tests/contract/runtime/Test.AssetImportRecipe.cpp
   sha256: 8af748c30bcaf696efd46dbf3338049f6a9cdaa4edcea26d559b9041c229b966
   kind: file
+- path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+  sha256: 94bf243f9e3056316e4fec1b43ae703bf9ce6b1aa9aea4b06fa1ffe01d8a8a2a
+  kind: file
 - path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
-  sha256: 3b2da16823a71ed0bc4cdaebec7fcdcde5aec86f882da081bc3ea1390c31bd7e
+  sha256: 9f8cee96a92fc697b69cc70ee197b61c149074d732992a7a30b399d0b52a8910
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/README.md
+  sha256: ec1c5d1272dc29143769e0e8e58098ab3f53d123a9cfd830c5c8f09a67a5c233
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/ci-asan-full-cpu.json
+  sha256: 227280401ae3f6692f544e7a1f560bc7c5654064652d85b4e91023658bc1693c
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/ci-vulkan-import-model-smoke.json
+  sha256: e88b331125625d155feb69eb7879a9dd7259e5ae798813b40146afdd18467857
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/ci-vulkan-full-gate.json
+  sha256: b0b7feb6568fee8e3f2216f3c25bf03452156e904c1c8ad6cd65aad58291c41c
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/review-v2-asan-full-cpu.json
+  sha256: f1888d735fd4aa5f69608f4774ac533f3f0c58b62e2d1f7cbf5936792d918a3f
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/review-v2-asan-bug123-repeat20.json
+  sha256: c646ef94620222d72779a29a8d4ebd4276eefe79204616291b3a48f9dc382c9a
   kind: file
 self_review:
   completed: true

@@ -8,6 +8,30 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-200`](RUNTIME-200-staged-asset-import-materialization-recipe.md) —
+staged asset-import convergence retired on 2026-07-31 at `Retired`. Every
+direct, queued, dropped-file, reimport, geometry, model-scene, texture, editor,
+agent, and default-policy route now executes one typed seven-stage
+`AssetImportRecipe` through the sole published `AssetWorkflowModule`. Runtime
+privately owns decode/materialization, ECS authoring, postprocess,
+property-texture bake/residency, selection/focus, and completion policy while
+assets and geometry retain ordinary CPU payload/codec ownership. The public
+`AssetImportPipeline`, lower callback registries, runtime IO bridges, normals
+role surface, texture/model handoffs, policy registries, compatibility
+accessors, and wrapper-only tests are deleted. Queued reimport preserves the
+same asset identity and authors no duplicate entity; queued asset callbacks
+invalidate safely during pipeline teardown. Focused CPU passed 101/101, the
+complete CPU selector 4,013/4,013 with one expected GLFW/LSan self-skip, ASan
+and UBSan 2,667/2,667 each, queued reimport and generated-texture Vulkan smokes
+20 consecutive repetitions each, and the targeted promoted-Vulkan import/model
+selector 4/4. Open `BUG-123` and `BUG-124` retain the unrelated intermittent
+scene-save and stale presentation-smoke observations; no gate was weakened.
+The first independent high-risk review requested evidence-custody, queued
+reimport, and GPU-contention repairs; revision 2 accepted exact commit
+`c974242b` and digest `c699c50b` with no blocking finding. The clean-workshop
+scorecard found no architectural drift, and ARA C17 records the capability
+scope without a performance claim.
+
 [`BUG-095`](BUG-095-direct-mesh-postprocess-stale-overwrite.md) — deferred
 direct-mesh enrichment retired on 2026-07-31 at `Operational`. The world-scoped
 job now captures and revalidates the complete active mesh-source content,
