@@ -10,8 +10,7 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `Extrinsic.Asset.Registry`
 - `Extrinsic.Asset.PayloadStore`
 - `Extrinsic.Asset.ImportRouter`
-- `Extrinsic.Asset.GeometryIOBridge`
-- `Extrinsic.Asset.ModelTextureIOBridge`
+- `Extrinsic.Asset.GeometryPayload`
 - `Extrinsic.Asset.ModelTexturePayload`
 - `Extrinsic.Asset.OperationStatus`
 - `Extrinsic.Asset.LoadPipeline`
@@ -29,16 +28,10 @@ store, load pipeline, event bus, and path index behind a single façade.
   hints to CPU-only import/export routes for mesh, point-cloud, graph, model
   scene, and texture payloads. It does not import geometry, runtime, graphics,
   or decoder code.
-- `Asset.GeometryIOBridge` stores asset-owned geometry import/export callback
-  registrations keyed by resolved route format and payload kind. Runtime
-  registers the promoted geometry codecs; `src/assets` dispatches callbacks and
-  verifies typed payloads without importing geometry, runtime, graphics, or RHI.
-- `Asset.ModelTextureIOBridge` stores asset-owned model-scene and texture
-  decoder callback registrations keyed by resolved route format. Assets own
-  primary file byte transport through `Extrinsic.Core.IOBackend`, relative
-  external-resource reads, callback dispatch, decode-error propagation, and
-  payload validation without importing decoder, geometry, runtime, graphics, or
-  RHI code.
+- `Asset.GeometryPayload` is the CPU-only, type-tagged geometry payload record
+  used by model-scene payloads. It owns no codec registry or IO dispatch;
+  runtime calls the promoted geometry loaders selected by `Asset.ImportRouter`
+  directly, while geometry modules retain their ordinary exporters.
 - `Asset.ModelTexturePayload` defines CPU-only model-scene and texture payload
   records, validation helpers, material texture references, and external
   resource diagnostics for GLTF/GLB and image ingest. Model primitives point at
@@ -49,7 +42,7 @@ store, load pipeline, event bus, and path index behind a single façade.
   and indices into shared primitive prototypes; multiple nodes can therefore
   instance one decoded geometry/material prototype without duplicating CPU
   geometry. It stores bytes, indices, transforms, and metadata only; runtime
-  registers the concrete tinygltf/stb decoder callbacks and separately owns
+  calls the concrete tinygltf/stb decoders and separately owns
   texture Ready-event upload requests into `GpuAssetCache` and model-scene
   ECS/material handoff. Embedded images remain CPU payload records in the model
   scene until runtime mints deterministic child texture assets for GPU
@@ -82,10 +75,9 @@ store, load pipeline, event bus, and path index behind a single façade.
 
 ```text
 Asset.EventBus.cppm
-Asset.GeometryIOBridge.cppm
+Asset.GeometryPayload.cppm
 Asset.ImportRouter.cppm
 Asset.LoadPipeline.cppm
-Asset.ModelTextureIOBridge.cppm
 Asset.ModelTexturePayload.cppm
 Asset.OperationStatus.cppm
 Asset.PathIndex.cppm
@@ -99,10 +91,8 @@ Asset.TypePool.cppm
 
 ```text
 Asset.EventBus.cpp
-Asset.GeometryIOBridge.cpp
 Asset.ImportRouter.cpp
 Asset.LoadPipeline.cpp
-Asset.ModelTextureIOBridge.cpp
 Asset.ModelTexturePayload.cpp
 Asset.PathIndex.cpp
 Asset.PayloadStore.cpp
@@ -125,7 +115,7 @@ Asset.Service.cpp
 ## Operation Status And Reload/Destroy Contract
 
 Promoted asset errors reuse `Core::ErrorCode`; `Asset.OperationStatus` provides
-the replacement for legacy `Asset.Errors` grouping. Import bridges and
+the replacement for legacy `Asset.Errors` grouping. Import decoders and
 `AssetService` preserve the original `Core::ErrorCode` while callers that need
 coarser UI/status decisions can classify it with
 `ClassifyAssetOperationStatus(...)` or `DiagnoseAssetOperation(...)`.

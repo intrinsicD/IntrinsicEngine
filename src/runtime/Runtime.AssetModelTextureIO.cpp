@@ -10,8 +10,11 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <expected>
 #include <filesystem>
+#include <functional>
 #include <limits>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -22,11 +25,11 @@ module;
 
 module Extrinsic.Runtime.AssetModelTextureIO;
 
-import Extrinsic.Asset.GeometryIOBridge;
+import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.ModelTextureIOBridge;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.IOBackend;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
 
@@ -35,6 +38,100 @@ namespace Extrinsic::Runtime
     namespace
     {
         namespace Assets = Extrinsic::Assets;
+
+        struct ExternalResourceRead
+        {
+            std::string Uri{};
+            std::string ResolvedPath{};
+            std::vector<std::byte> Bytes{};
+        };
+
+        using ExternalResourceReader = std::function<
+            Core::Expected<ExternalResourceRead>(std::string_view)>;
+
+        struct ModelTextureDecodeRequest
+        {
+            Assets::AssetImportRoute Route{};
+            std::string Path{};
+            std::string BasePath{};
+            std::span<const std::byte> SourceBytes{};
+            ExternalResourceReader ReadExternalResource{};
+        };
+
+        [[nodiscard]] std::string ParentPathOf(const std::string_view path)
+        {
+            return std::filesystem::path(std::string(path))
+                .parent_path()
+                .string();
+        }
+
+        [[nodiscard]] std::string ResolveExternalPath(
+            const std::string_view basePath,
+            const std::string_view uri)
+        {
+            const std::filesystem::path uriPath{std::string(uri)};
+            if (uriPath.is_absolute() || basePath.empty())
+                return uriPath.string();
+            return (std::filesystem::path(std::string(basePath)) / uriPath)
+                .lexically_normal()
+                .string();
+        }
+
+        [[nodiscard]] Core::Expected<std::vector<std::byte>> ReadBytes(
+            Core::IO::IIOBackend& backend,
+            const std::string_view path)
+        {
+            auto read = backend.Read(Core::IO::IORequest{.Path = std::string(path)});
+            if (!read.has_value())
+                return std::unexpected(read.error());
+            return std::move(read->Data);
+        }
+
+        [[nodiscard]] Core::Expected<ExternalResourceRead>
+        ReadExternalResource(
+            Core::IO::IIOBackend& backend,
+            const std::string_view basePath,
+            const std::string_view uri)
+        {
+            if (uri.empty())
+            {
+                return Core::Err<ExternalResourceRead>(
+                    Core::ErrorCode::InvalidPath);
+            }
+            const std::string resolvedPath =
+                ResolveExternalPath(basePath, uri);
+            auto bytes = ReadBytes(backend, resolvedPath);
+            if (!bytes.has_value())
+                return std::unexpected(bytes.error());
+            return ExternalResourceRead{
+                .Uri = std::string(uri),
+                .ResolvedPath = resolvedPath,
+                .Bytes = std::move(*bytes),
+            };
+        }
+
+        [[nodiscard]] ModelTextureDecodeRequest MakeDecodeRequest(
+            const Assets::AssetImportRoute& route,
+            const std::string_view path,
+            const std::span<const std::byte> sourceBytes,
+            Core::IO::IIOBackend& backend)
+        {
+            const std::string pathString{path};
+            std::string basePath = ParentPathOf(pathString);
+            return ModelTextureDecodeRequest{
+                .Route = route,
+                .Path = pathString,
+                .BasePath = basePath,
+                .SourceBytes = sourceBytes,
+                .ReadExternalResource =
+                    [&backend, basePath = std::move(basePath)](
+                        const std::string_view uri)
+                        -> Core::Expected<ExternalResourceRead>
+                    {
+                        return ReadExternalResource(backend, basePath, uri);
+                    },
+            };
+        }
 
         struct AccessorView
         {
@@ -142,7 +239,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string ResolveExternalPath(
-            const Assets::AssetModelTextureIORequest& request,
+            const ModelTextureDecodeRequest& request,
             const std::string_view path)
         {
             const std::filesystem::path candidate{std::string(path)};
@@ -173,7 +270,7 @@ namespace Extrinsic::Runtime
 
         struct GltfFsContext
         {
-            const Assets::AssetModelTextureIORequest* Request{nullptr};
+            const ModelTextureDecodeRequest* Request{nullptr};
             std::vector<Assets::AssetModelExternalResourceDiagnostic>* Diagnostics{nullptr};
         };
 
@@ -307,7 +404,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool SourceLooksLikeGlb(
-            const Assets::AssetModelTextureIORequest& request) noexcept
+            const ModelTextureDecodeRequest& request) noexcept
         {
             if (request.Route.Format == Assets::AssetFileFormat::GLB)
             {
@@ -333,7 +430,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Expected<nlohmann::json> ParseSourceJsonDocument(
-            const Assets::AssetModelTextureIORequest& request)
+            const ModelTextureDecodeRequest& request)
         {
             std::span<const std::byte> jsonBytes = request.SourceBytes;
             if (SourceLooksLikeGlb(request))
@@ -368,7 +465,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Expected<tinygltf::Model> LoadGltfModel(
-            const Assets::AssetModelTextureIORequest& request,
+            const ModelTextureDecodeRequest& request,
             std::vector<Assets::AssetModelExternalResourceDiagnostic>& diagnostics)
         {
             if (request.SourceBytes.empty()
@@ -1293,7 +1390,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Expected<std::vector<std::uint32_t>> ResolveMeshPrimitives(
             const tinygltf::Model& model,
             const std::size_t meshIndex,
-            const Assets::AssetModelTextureIORequest& request,
+            const ModelTextureDecodeRequest& request,
             std::vector<std::vector<PrimitiveCacheEntry>>& primitiveCache,
             Assets::AssetModelScenePayload& payload)
         {
@@ -1419,7 +1516,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Expected<Assets::AssetModelScenePayload> BuildScenePayload(
             tinygltf::Model model,
-            const Assets::AssetModelTextureIORequest& request,
+            const ModelTextureDecodeRequest& request,
             std::vector<Assets::AssetModelExternalResourceDiagnostic> diagnostics)
         {
             Assets::AssetModelScenePayload payload{};
@@ -1651,7 +1748,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Expected<Assets::AssetTexture2DPayload> DecodeStbTexture(
-            const Assets::AssetModelTextureIORequest& request)
+            const ModelTextureDecodeRequest& request)
         {
             if (request.SourceBytes.empty()
                 || request.SourceBytes.size()
@@ -1743,7 +1840,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Expected<Assets::AssetModelScenePayload> DecodeGltfScene(
-            const Assets::AssetModelTextureIORequest& request)
+            const ModelTextureDecodeRequest& request)
         {
             std::vector<Assets::AssetModelExternalResourceDiagnostic> diagnostics{};
             auto model = LoadGltfModel(request, diagnostics);
@@ -1755,30 +1852,77 @@ namespace Extrinsic::Runtime
         }
     }
 
-    Core::Result RegisterPromotedModelTextureIOCallbacks(
-        Assets::AssetModelTextureIOBridge& bridge)
+    Core::Expected<Assets::AssetModelScenePayload> DecodeModelSceneAsset(
+        const std::string_view path,
+        Core::IO::IIOBackend& backend)
     {
-        auto result = bridge.RegisterModelSceneImporter(
-            Assets::AssetFileFormat::GLTF,
-            DecodeGltfScene);
-        result = Combine(
-            std::move(result),
-            bridge.RegisterModelSceneImporter(Assets::AssetFileFormat::GLB, DecodeGltfScene));
-        result = Combine(
-            std::move(result),
-            bridge.RegisterTextureImporter(Assets::AssetFileFormat::PNG, DecodeStbTexture));
-        result = Combine(
-            std::move(result),
-            bridge.RegisterTextureImporter(Assets::AssetFileFormat::JPEG, DecodeStbTexture));
-        result = Combine(
-            std::move(result),
-            bridge.RegisterTextureImporter(Assets::AssetFileFormat::TGA, DecodeStbTexture));
-        result = Combine(
-            std::move(result),
-            bridge.RegisterTextureImporter(Assets::AssetFileFormat::BMP, DecodeStbTexture));
-        result = Combine(
-            std::move(result),
-            bridge.RegisterTextureImporter(Assets::AssetFileFormat::HDR, DecodeStbTexture));
-        return result;
+        auto route = Assets::ResolveAssetImportRoute(
+            path,
+            Assets::AssetRouteOperation::Import,
+            Assets::AssetImportHint{
+                .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+            });
+        if (!route.has_value())
+            return std::unexpected(route.error());
+        if (!Assets::IsSupportedModelSceneImportFormat(route->Format))
+        {
+            return Core::Err<Assets::AssetModelScenePayload>(
+                Core::ErrorCode::AssetUnsupportedFormat);
+        }
+
+        auto bytes = ReadBytes(backend, path);
+        if (!bytes.has_value())
+            return std::unexpected(bytes.error());
+        auto decoded = DecodeGltfScene(MakeDecodeRequest(
+            *route,
+            path,
+            std::span<const std::byte>(*bytes),
+            backend));
+        if (!decoded.has_value())
+            return std::unexpected(decoded.error());
+        const Core::Result valid =
+            Assets::ValidateAssetModelScenePayload(*decoded);
+        if (!valid.has_value())
+            return std::unexpected(valid.error());
+        return decoded;
+    }
+
+    Core::Expected<Assets::AssetTexture2DPayload> DecodeTextureAsset(
+        const std::string_view path,
+        Core::IO::IIOBackend& backend)
+    {
+        auto route = Assets::ResolveAssetImportRoute(
+            path,
+            Assets::AssetRouteOperation::Import,
+            Assets::AssetImportHint{
+                .PayloadKind = Assets::AssetPayloadKind::Texture2D,
+            });
+        if (!route.has_value())
+            return std::unexpected(route.error());
+        if (!Assets::IsSupportedTextureImportFormat(route->Format))
+        {
+            return Core::Err<Assets::AssetTexture2DPayload>(
+                Core::ErrorCode::AssetUnsupportedFormat);
+        }
+        if (route->Format == Assets::AssetFileFormat::KTX)
+        {
+            return Core::Err<Assets::AssetTexture2DPayload>(
+                Core::ErrorCode::AssetLoaderMissing);
+        }
+
+        auto bytes = ReadBytes(backend, path);
+        if (!bytes.has_value())
+            return std::unexpected(bytes.error());
+        auto decoded = DecodeStbTexture(MakeDecodeRequest(
+            *route,
+            path,
+            std::span<const std::byte>(*bytes),
+            backend));
+        if (!decoded.has_value())
+            return std::unexpected(decoded.error());
+        const Core::Result valid = Assets::ValidateAssetTexture2DPayload(*decoded);
+        if (!valid.has_value())
+            return std::unexpected(valid.error());
+        return decoded;
     }
 }

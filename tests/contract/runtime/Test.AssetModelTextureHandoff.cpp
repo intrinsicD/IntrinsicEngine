@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-import Extrinsic.Asset.GeometryIOBridge;
+import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.ModelTexturePayload;

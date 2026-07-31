@@ -11,9 +11,8 @@
 #include <utility>
 #include <vector>
 
-import Extrinsic.Asset.GeometryIOBridge;
+import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.ModelTextureIOBridge;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
@@ -281,42 +280,20 @@ namespace
         backend.AddText("/scene/graph.gltf", json);
         backend.Add("/scene/triangle.bin", TriangleBufferBytes());
 
-        AssetModelTextureIOBridge bridge;
-        const Core::Result registration =
-            Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge);
-        if (!registration.has_value())
-        {
-            return Core::Err<AssetModelScenePayload>(registration.error());
-        }
-        return bridge.ImportModelScene("/scene/graph.gltf", backend);
+        return Extrinsic::Runtime::DecodeModelSceneAsset(
+            "/scene/graph.gltf",
+            backend);
     }
 }
 
-TEST(RuntimeAssetModelTextureIO, RegistersConcretePromotedModelAndTextureDecoders)
-{
-    AssetModelTextureIOBridge bridge;
-    const auto result = Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge);
-    ASSERT_TRUE(result.has_value());
-
-    EXPECT_TRUE(bridge.HasModelSceneImporter(AssetFileFormat::GLTF));
-    EXPECT_TRUE(bridge.HasModelSceneImporter(AssetFileFormat::GLB));
-    EXPECT_TRUE(bridge.HasTextureImporter(AssetFileFormat::PNG));
-    EXPECT_TRUE(bridge.HasTextureImporter(AssetFileFormat::JPEG));
-    EXPECT_TRUE(bridge.HasTextureImporter(AssetFileFormat::TGA));
-    EXPECT_TRUE(bridge.HasTextureImporter(AssetFileFormat::BMP));
-    EXPECT_TRUE(bridge.HasTextureImporter(AssetFileFormat::HDR));
-    EXPECT_FALSE(bridge.HasTextureImporter(AssetFileFormat::KTX));
-}
-
-TEST(RuntimeAssetModelTextureIO, DecodesTextureBytesThroughPromotedBridge)
+TEST(RuntimeAssetModelTextureIO, DecodesTextureBytes)
 {
     FakeIOBackend backend;
     backend.Add("/textures/albedo.png", TinyPngBytes());
 
-    AssetModelTextureIOBridge bridge;
-    ASSERT_TRUE(Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge).has_value());
-
-    auto texture = bridge.ImportTexture2D("/textures/albedo.png", backend);
+    auto texture = Extrinsic::Runtime::DecodeTextureAsset(
+        "/textures/albedo.png",
+        backend);
     ASSERT_TRUE(texture.has_value()) << static_cast<int>(texture.error());
     EXPECT_EQ(texture->Metadata.Width, 1u);
     EXPECT_EQ(texture->Metadata.Height, 1u);
@@ -332,11 +309,9 @@ TEST(RuntimeAssetModelTextureIO, KtxTextureImportFailsClosedWithoutDecoder)
     FakeIOBackend backend;
     backend.AddText("/textures/compressed.ktx2", "ktx2");
 
-    AssetModelTextureIOBridge bridge;
-    ASSERT_TRUE(Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge).has_value());
-    EXPECT_FALSE(bridge.HasTextureImporter(AssetFileFormat::KTX));
-
-    auto texture = bridge.ImportTexture2D("/textures/compressed.ktx2", backend);
+    auto texture = Extrinsic::Runtime::DecodeTextureAsset(
+        "/textures/compressed.ktx2",
+        backend);
     ASSERT_FALSE(texture.has_value());
     EXPECT_EQ(texture.error(), ErrorCode::AssetUnsupportedFormat);
 }
@@ -347,10 +322,9 @@ TEST(RuntimeAssetModelTextureIO, DecodesGltfSceneGeometryImagesAndMaterials)
     backend.AddText("/scene/triangle.gltf", TriangleGltfJson());
     backend.Add("/scene/triangle.bin", TriangleBufferBytes());
 
-    AssetModelTextureIOBridge bridge;
-    ASSERT_TRUE(Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge).has_value());
-
-    auto model = bridge.ImportModelScene("/scene/triangle.gltf", backend);
+    auto model = Extrinsic::Runtime::DecodeModelSceneAsset(
+        "/scene/triangle.gltf",
+        backend);
     ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
     ASSERT_EQ(model->GeometryPayloads.size(), 1u);
     ASSERT_EQ(model->Primitives.size(), 1u);
@@ -420,12 +394,9 @@ TEST(RuntimeAssetModelTextureIO, DecodesGlbSceneRootsAndTransforms)
     FakeIOBackend backend;
     backend.Add("/scene/triangle.glb", TriangleGlbBytes());
 
-    AssetModelTextureIOBridge bridge;
-    ASSERT_TRUE(
-        Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge)
-            .has_value());
-
-    auto model = bridge.ImportModelScene("/scene/triangle.glb", backend);
+    auto model = Extrinsic::Runtime::DecodeModelSceneAsset(
+        "/scene/triangle.glb",
+        backend);
     ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
     ASSERT_EQ(model->RootNodeIndices.size(), 1u);
     ASSERT_EQ(model->Nodes.size(), 1u);
@@ -754,10 +725,9 @@ TEST(RuntimeAssetModelTextureIO, PropagatesGltfDecodeFailuresAsPromotedCoreError
     FakeIOBackend backend;
     backend.AddText("/scene/bad.gltf", "{ not valid json }");
 
-    AssetModelTextureIOBridge bridge;
-    ASSERT_TRUE(Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge).has_value());
-
-    auto model = bridge.ImportModelScene("/scene/bad.gltf", backend);
+    auto model = Extrinsic::Runtime::DecodeModelSceneAsset(
+        "/scene/bad.gltf",
+        backend);
     ASSERT_FALSE(model.has_value());
     EXPECT_EQ(model.error(), ErrorCode::AssetDecodeFailed);
 }

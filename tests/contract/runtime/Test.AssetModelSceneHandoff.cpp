@@ -19,7 +19,7 @@
 #include <glm/glm.hpp>
 
 import Extrinsic.Asset.EventBus;
-import Extrinsic.Asset.GeometryIOBridge;
+import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;

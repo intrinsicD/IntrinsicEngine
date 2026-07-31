@@ -9,7 +9,7 @@ Root scanned: `src`
 | Layer | Module Count |
 |---|---:|
 | `app` | 7 |
-| `assets` | 12 |
+| `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
 | `geometry` | 103 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 64 |
+| `runtime` | 63 |
 
 ## Modules
 
@@ -34,10 +34,9 @@ Root scanned: `src`
 | `Extrinsic.Sandbox.ConfigSections` | `src/app/Sandbox/Sandbox.ConfigSections.cppm` | `app` |
 | `Extrinsic.Sandbox` | `src/app/Sandbox/Sandbox.cppm` | `app` |
 | `Extrinsic.Asset.EventBus` | `src/assets/Asset.EventBus.cppm` | `assets` |
-| `Extrinsic.Asset.GeometryIOBridge` | `src/assets/Asset.GeometryIOBridge.cppm` | `assets` |
+| `Extrinsic.Asset.GeometryPayload` | `src/assets/Asset.GeometryPayload.cppm` | `assets` |
 | `Extrinsic.Asset.ImportRouter` | `src/assets/Asset.ImportRouter.cppm` | `assets` |
 | `Extrinsic.Asset.LoadPipeline` | `src/assets/Asset.LoadPipeline.cppm` | `assets` |
-| `Extrinsic.Asset.ModelTextureIOBridge` | `src/assets/Asset.ModelTextureIOBridge.cppm` | `assets` |
 | `Extrinsic.Asset.ModelTexturePayload` | `src/assets/Asset.ModelTexturePayload.cppm` | `assets` |
 | `Extrinsic.Asset.OperationStatus` | `src/assets/Asset.OperationStatus.cppm` | `assets` |
 | `Extrinsic.Asset.PathIndex` | `src/assets/Asset.PathIndex.cppm` | `assets` |
@@ -345,7 +344,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetGeometryIO` | `src/runtime/Runtime.AssetGeometryIO.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetImportPipeline` | `src/runtime/Runtime.AssetImportPipeline.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | `src/runtime/Runtime.AssetIngestStateMachine.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetMeshNormals` | `src/runtime/Runtime.AssetMeshNormals.cppm` | `runtime` |
@@ -399,4 +397,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **372**
+Total modules: **370**

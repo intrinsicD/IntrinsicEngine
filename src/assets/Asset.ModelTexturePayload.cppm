@@ -9,7 +9,7 @@ module;
 export module Extrinsic.Asset.ModelTexturePayload;
 
 import Extrinsic.Core.Error;
-import Extrinsic.Asset.GeometryIOBridge;
+import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
 
 export namespace Extrinsic::Assets

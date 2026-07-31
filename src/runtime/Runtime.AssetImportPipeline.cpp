@@ -22,9 +22,8 @@ module;
 
 module Extrinsic.Runtime.AssetImportPipeline;
 
-import Extrinsic.Asset.GeometryIOBridge;
+import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.ModelTextureIOBridge;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
@@ -39,7 +38,6 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
@@ -938,27 +936,30 @@ namespace Extrinsic::Runtime
                     Core::ErrorCode::AssetUnsupportedFormat);
             }
 
-            Assets::AssetGeometryIOBridge bridge;
-            if (Core::Result registered = RegisterPromotedGeometryIOCallbacks(bridge);
-                !registered.has_value())
-            {
-                return Core::Err<DecodedGeometryImport>(registered.error());
-            }
-
-            auto decoded = bridge.Import(
-                request.Path,
-                Assets::AssetImportHint{.PayloadKind = route->PayloadKind});
-            if (!decoded.has_value())
-            {
-                return Core::Err<DecodedGeometryImport>(decoded.error());
-            }
-
             switch (route->PayloadKind)
             {
             case Assets::AssetPayloadKind::Mesh:
             {
-                auto meshPayload =
-                    decoded->Read<Geometry::MeshIO::MeshIOResult>();
+                Core::Expected<Geometry::MeshIO::MeshIOResult> meshPayload =
+                    Core::Err<Geometry::MeshIO::MeshIOResult>(
+                        Core::ErrorCode::AssetUnsupportedFormat);
+                switch (route->Format)
+                {
+                case Assets::AssetFileFormat::OBJ:
+                    meshPayload = Geometry::MeshIO::LoadOBJ(request.Path);
+                    break;
+                case Assets::AssetFileFormat::OFF:
+                    meshPayload = Geometry::MeshIO::LoadOFF(request.Path);
+                    break;
+                case Assets::AssetFileFormat::STL:
+                    meshPayload = Geometry::MeshIO::LoadSTL(request.Path);
+                    break;
+                case Assets::AssetFileFormat::PLY:
+                    meshPayload = Geometry::MeshIO::LoadPLY(request.Path);
+                    break;
+                default:
+                    break;
+                }
                 if (!meshPayload.has_value())
                 {
                     return Core::Err<DecodedGeometryImport>(
@@ -969,14 +970,27 @@ namespace Extrinsic::Runtime
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
                     .Payload = DecodedMeshImport{
-                        .Payload = *meshPayload,
+                        .Payload = std::make_shared<Geometry::MeshIO::MeshIOResult>(
+                            std::move(*meshPayload)),
                     },
                 };
             }
             case Assets::AssetPayloadKind::Graph:
             {
-                auto graphPayload =
-                    decoded->Read<Geometry::GraphIO::GraphIOResult>();
+                Core::Expected<Geometry::GraphIO::GraphIOResult> graphPayload =
+                    Core::Err<Geometry::GraphIO::GraphIOResult>(
+                        Core::ErrorCode::AssetUnsupportedFormat);
+                switch (route->Format)
+                {
+                case Assets::AssetFileFormat::TGF:
+                    graphPayload = Geometry::GraphIO::LoadTGF(request.Path);
+                    break;
+                case Assets::AssetFileFormat::EdgeList:
+                    graphPayload = Geometry::GraphIO::LoadEdgeList(request.Path);
+                    break;
+                default:
+                    break;
+                }
                 if (!graphPayload.has_value())
                 {
                     return Core::Err<DecodedGeometryImport>(
@@ -986,13 +1000,35 @@ namespace Extrinsic::Runtime
                 return DecodedGeometryImport{
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
-                    .Payload = DecodedGraphImport{.Payload = *graphPayload},
+                    .Payload = DecodedGraphImport{
+                        .Payload = std::make_shared<
+                            Geometry::GraphIO::GraphIOResult>(
+                                std::move(*graphPayload)),
+                    },
                 };
             }
             case Assets::AssetPayloadKind::PointCloud:
             {
-                auto cloudPayload =
-                    decoded->Read<Geometry::PointCloudIO::PointCloudIOResult>();
+                Core::Expected<Geometry::PointCloudIO::PointCloudIOResult>
+                    cloudPayload =
+                        Core::Err<Geometry::PointCloudIO::PointCloudIOResult>(
+                            Core::ErrorCode::AssetUnsupportedFormat);
+                switch (route->Format)
+                {
+                case Assets::AssetFileFormat::XYZ:
+                case Assets::AssetFileFormat::PTS:
+                case Assets::AssetFileFormat::XYZRGB:
+                    cloudPayload = Geometry::PointCloudIO::LoadXYZ(request.Path);
+                    break;
+                case Assets::AssetFileFormat::PCD:
+                    cloudPayload = Geometry::PointCloudIO::LoadPCD(request.Path);
+                    break;
+                case Assets::AssetFileFormat::PLY:
+                    cloudPayload = Geometry::PointCloudIO::LoadPLY(request.Path);
+                    break;
+                default:
+                    break;
+                }
                 if (!cloudPayload.has_value())
                 {
                     return Core::Err<DecodedGeometryImport>(
@@ -1002,7 +1038,11 @@ namespace Extrinsic::Runtime
                 return DecodedGeometryImport{
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
-                    .Payload = DecodedPointCloudImport{.Payload = *cloudPayload},
+                    .Payload = DecodedPointCloudImport{
+                        .Payload = std::make_shared<
+                            Geometry::PointCloudIO::PointCloudIOResult>(
+                                std::move(*cloudPayload)),
+                    },
                 };
             }
             default:
@@ -2575,15 +2615,6 @@ namespace Extrinsic::Runtime
                             });
                     };
 
-                    Assets::AssetModelTextureIOBridge bridge;
-                    if (Core::Result registered =
-                            RegisterPromotedModelTextureIOCallbacks(bridge);
-                        !registered.has_value())
-                    {
-                        state->Error = registered.error();
-                        return decodeDone();
-                    }
-
                     std::unique_ptr<Core::IO::IIOBackend> backend =
                         ioBackendFactory
                             ? ioBackendFactory()
@@ -2596,7 +2627,7 @@ namespace Extrinsic::Runtime
 
                     if (payloadKind == Assets::AssetPayloadKind::ModelScene)
                     {
-                        auto decoded = bridge.ImportModelScene(path, *backend);
+                        auto decoded = DecodeModelSceneAsset(path, *backend);
                         if (!decoded.has_value())
                         {
                             state->Error = decoded.error();
@@ -2611,7 +2642,7 @@ namespace Extrinsic::Runtime
                     }
                     else
                     {
-                        auto decoded = bridge.ImportTexture2D(path, *backend);
+                        auto decoded = DecodeTextureAsset(path, *backend);
                         if (!decoded.has_value())
                         {
                             state->Error = decoded.error();
@@ -3214,18 +3245,10 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::AssetUnsupportedFormat);
         }
 
-        Assets::AssetModelTextureIOBridge bridge;
-        if (Core::Result registered =
-                RegisterPromotedModelTextureIOCallbacks(bridge);
-            !registered.has_value())
-        {
-            return Core::Err<RuntimeAssetImportResult>(registered.error());
-        }
-
         Core::IO::FileIOBackend backend;
         if (route->PayloadKind == Assets::AssetPayloadKind::ModelScene)
         {
-            auto decoded = bridge.ImportModelScene(request.Path, backend);
+            auto decoded = DecodeModelSceneAsset(request.Path, backend);
             if (!decoded.has_value())
             {
                 return Core::Err<RuntimeAssetImportResult>(decoded.error());
@@ -3244,7 +3267,7 @@ namespace Extrinsic::Runtime
                 std::move(*decoded));
         }
 
-        auto decoded = bridge.ImportTexture2D(request.Path, backend);
+        auto decoded = DecodeTextureAsset(request.Path, backend);
         if (!decoded.has_value())
         {
             return Core::Err<RuntimeAssetImportResult>(decoded.error());

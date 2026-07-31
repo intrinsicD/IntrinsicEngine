@@ -11,7 +11,6 @@ target_sources(${target_name}
         Runtime.AsyncWorkModule.cppm
         Runtime.AssetWorkflowModule.cppm
         Runtime.AssetImportPipeline.cppm
-        Runtime.AssetGeometryIO.cppm
         Runtime.AssetIngestStateMachine.cppm
         Runtime.AssetMeshNormals.cppm
         Runtime.AssetModelSceneHandoff.cppm
@@ -80,7 +79,6 @@ target_sources(${target_name}
         Runtime.AsyncWorkModule.cpp
         Runtime.AssetWorkflowModule.cpp
         Runtime.AssetImportPipeline.cpp
-        Runtime.AssetGeometryIO.cpp
         Runtime.AssetIngestStateMachine.cpp
         Runtime.AssetMeshNormals.cpp
         Runtime.AssetModelSceneHandoff.cpp

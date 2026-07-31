@@ -248,7 +248,6 @@ if(TARGET ExtrinsicRuntime)
         Test.CoreGraphInterfaces.cpp
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.GpuResultReadbackJob.cpp
-        Test.AssetGeometryIO.cpp
         Test.AssetIngestStateMachine.cpp
         Test.AssetImportRecipe.cpp
         Test.AssetImportFormatCoverage.cpp
@@ -611,9 +610,7 @@ intrinsic_test_object_lib(GeometryMethodSlowTestObjs
 # --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
 set(_asset_unit_test_files
     Test.Asset.EventBus.cpp
-    Test.Asset.GeometryIOBridge.cpp
     Test.Asset.ImportRouter.cpp
-    Test.Asset.ModelTextureIOBridge.cpp
     Test.Asset.ModelTexturePayload.cpp
     Test.Asset.OperationStatus.cpp
     Test.Asset.PathIndex.cpp

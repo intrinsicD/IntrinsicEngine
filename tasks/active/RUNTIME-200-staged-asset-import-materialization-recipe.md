@@ -21,8 +21,14 @@ maturity_target: Retired
   authoring, postprocess, completion, request/world generation, and the seven
   ordered stages; copied stage results fail closed on malformed order, stale
   identity, invalid diagnostics, and post-terminal publication.
+- Slice B decoder cleanup completed on 2026-07-31: geometry routes call their
+  owning loaders directly; model/texture routes call plain decoders; the two
+  callback bridge registries, their role-only runtime registration module,
+  and their registry-specific tests are removed. Geometry exporter coverage
+  remains at the owning geometry modules.
 - Current slice: wire the recipe/trace through queued geometry, model-scene,
-  and texture production routes before moving or deleting any legacy surface.
+  and texture production routes, then internalize the remaining handoff and
+  postprocess bodies.
 - Next verification: focused queued route/visibility contracts after recipe
   adoption.
 
@@ -117,7 +123,7 @@ maturity_target: Retired
       the recipe executor private to `AssetWorkflowModule`, the assets-owned
       route and pure external-path resolver, and lower-layer decoders as
       ordinary functions.
-- [ ] Remove the test-only bridge export dispatch while preserving promoted
+- [x] Remove the test-only bridge export dispatch while preserving promoted
       geometry exporter correctness tests at their owning geometry modules; do
       not create an unused replacement export service.
 
