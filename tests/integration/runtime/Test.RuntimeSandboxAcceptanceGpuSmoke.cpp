@@ -86,8 +86,7 @@ import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.Editor.Controller;
-import Extrinsic.Runtime.AssetImportPipeline;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
@@ -96,7 +95,6 @@ import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
-import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
@@ -414,19 +412,64 @@ public:
         auto& engine = Kernel();
         ++Frames;
 
-        if (!UploadRequested &&
+        if (!UploadInitiatedOrObserved &&
             m_GeneratedTexture.IsValid() &&
             engine.GetDevice().IsOperational())
         {
-            UploadRequested = true;
-            RT::AssetModelTextureHandoffOptions uploadOptions{};
-            uploadOptions.TextureSamplerDesc = GeneratedUvSmokeSamplerDesc();
-            auto upload = RT::RequestTextureAssetUpload(RequiredEngineService<Extrinsic::Assets::AssetService>(engine),
-                                                        RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine),
-                                                        m_GeneratedTexture,
-                                                        uploadOptions);
+            UploadInitiatedOrObserved = true;
+            auto& cache =
+                RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine);
+            const Extrinsic::Graphics::GpuAssetState state =
+                cache.GetState(m_GeneratedTexture);
+            if (state == Extrinsic::Graphics::GpuAssetState::GpuUploading ||
+                state == Extrinsic::Graphics::GpuAssetState::Ready)
+            {
+                return;
+            }
+
+            auto& assets = RequiredEngineService<Assets::AssetService>(engine);
+            auto payload = assets.Read<Assets::AssetTexture2DPayload>(
+                m_GeneratedTexture);
+            if (!payload.has_value() || payload->size() != 1u)
+            {
+                UploadError = payload.has_value()
+                    ? Extrinsic::Core::ErrorCode::AssetInvalidData
+                    : payload.error();
+                engine.RequestExit();
+                return;
+            }
+            const auto& texture = (*payload)[0];
+            auto upload = cache.RequestUpload(Extrinsic::Graphics::GpuTextureRequest{
+                    .Id = m_GeneratedTexture,
+                    .Bytes = std::span<const std::byte>(
+                        texture.PixelBytes.data(),
+                        texture.PixelBytes.size()),
+                    .Desc = Extrinsic::RHI::TextureDesc{
+                        .Width = texture.Metadata.Width,
+                        .Height = texture.Metadata.Height,
+                        .MipLevels = 1u,
+                        .Fmt = Extrinsic::RHI::Format::RGBA8_SRGB,
+                        .Usage = Extrinsic::RHI::TextureUsage::Sampled |
+                                 Extrinsic::RHI::TextureUsage::TransferDst,
+                        .DebugName = "Graphics089.GeneratedAlbedoTexture",
+                    },
+                    .SamplerDesc = GeneratedUvSmokeSamplerDesc(),
+                });
             if (!upload.has_value())
             {
+                if (upload.error() ==
+                    Extrinsic::Core::ErrorCode::ResourceBusy)
+                {
+                    const Extrinsic::Graphics::GpuAssetState racedState =
+                        cache.GetState(m_GeneratedTexture);
+                    if (racedState ==
+                            Extrinsic::Graphics::GpuAssetState::GpuUploading ||
+                        racedState ==
+                            Extrinsic::Graphics::GpuAssetState::Ready)
+                    {
+                        return;
+                    }
+                }
                 UploadError = upload.error();
                 engine.RequestExit();
                 return;
@@ -455,7 +498,7 @@ public:
 
     void Shutdown() override {}
 
-    bool UploadRequested{false};
+    bool UploadInitiatedOrObserved{false};
     bool TextureReadyObserved{false};
     bool TimedOut{false};
     std::optional<Extrinsic::Core::ErrorCode> UploadError{};
@@ -3628,7 +3671,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
         "f 1/1 2/2 3/3\n",
     };
 
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
         Extrinsic::Runtime::RuntimeAssetImportRequest{
             .Path = obj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3809,7 +3852,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         "f 1 2 3\n",
     };
 
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
         Extrinsic::Runtime::RuntimeAssetImportRequest{
             .Path = obj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3840,8 +3883,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         MakeGeneratedUvSmokeAlbedoPayload();
     const std::string generatedTexturePath =
         obj.Path.string() + ".graphics089-generated-albedo.texture";
+    auto& assetService =
+        RequiredEngineService<Extrinsic::Assets::AssetService>(engine);
     auto generatedTexture =
-        RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Load<Assets::AssetTexture2DPayload>(
+        assetService.Load<Assets::AssetTexture2DPayload>(
             generatedTexturePath,
             [payload](std::string_view,
                       Assets::AssetId) -> Extrinsic::Core::Expected<Assets::AssetTexture2DPayload>
@@ -3850,6 +3895,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
             });
     ASSERT_TRUE(generatedTexture.has_value())
         << static_cast<int>(generatedTexture.error());
+    ASSERT_TRUE(
+        assetService.CompleteCpuLoadAndFlushEvent(*generatedTexture).has_value())
+        << "Generated texture Ready publication did not complete before the "
+           "operational-frame fallback upload.";
     appPtr->SetGeneratedTexture(*generatedTexture);
 
     const GeometryPresentationFixture presentation =
@@ -3906,9 +3955,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         return;
     }
 
-    ASSERT_TRUE(appPtr->UploadRequested)
-        << "Generated texture upload was never requested after promoted Vulkan "
-           "became operational.";
+    ASSERT_TRUE(appPtr->UploadInitiatedOrObserved)
+        << "Generated texture upload was neither observed nor requested after "
+           "promoted Vulkan became operational.";
     ASSERT_FALSE(appPtr->UploadError.has_value())
         << "Generated texture upload failed after promoted Vulkan became "
            "operational: "
@@ -4351,7 +4400,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
         << "Missing checked-in BUG-094 model-scene fixture: "
         << fixturePath.string();
 
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
         Extrinsic::Runtime::RuntimeAssetImportRequest{
             .Path = fixturePath.string(),
             .PayloadKind = Assets::AssetPayloadKind::ModelScene,
@@ -5257,9 +5306,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         "f 1/1/1 2/2/1 3/3/1\n",
     };
 
-    RT::AssetImportPipeline& importPipeline =
-        RequiredEngineService<RT::AssetImportPipeline>(engine);
-    auto decoyImport = importPipeline.ImportAssetFromPath(
+    RT::AssetWorkflowModule& assetWorkflow =
+        RequiredEngineService<RT::AssetWorkflowModule>(engine);
+    auto decoyImport = assetWorkflow.ImportAssetFromPath(
         RT::RuntimeAssetImportRequest{
             .Path = decoyObj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -5300,7 +5349,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << "The decoy must own a live shared-index slice before the target "
            "entity exists.";
 
-    auto targetImport = importPipeline.ImportAssetFromPath(
+    auto targetImport = assetWorkflow.ImportAssetFromPath(
         RT::RuntimeAssetImportRequest{
             .Path = targetObj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,

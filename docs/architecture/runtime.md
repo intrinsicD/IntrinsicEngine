@@ -441,13 +441,13 @@ and write that snapshot on the worker lane. Queued editor scene loads read and
 parse into a temporary registry on the worker lane, then run the documented
 scene-replacement lifecycle from the same main-thread apply drain. The apply
 step is the only place that mutates `AssetService`, ECS scene state,
-texture/model-scene handoffs, selection/focus state, stable entity lookup, or
+texture/model-scene residency state, selection/focus state, stable entity lookup, or
 editor document history.
 
 The assets-owned model-scene payload consumed at this boundary is CPU-only. It
 identifies the active-scene roots, stores reachable nodes in deterministic
 pre-order with column-major local transforms, and lets those nodes reference
-shared primitive prototypes. The model-scene handoff materializes one ECS node
+shared primitive prototypes. The workflow's private model materializer creates one ECS node
 entity per reachable node and one primitive leaf per node primitive reference,
 preserving authored child order, local transforms, and distinct world-space
 instances while reusing the decoded CPU prototype as the source for each
@@ -455,31 +455,29 @@ entity-owned `GeometrySources` record. Runtime rejects node matrices that are
 non-finite, non-affine, or cannot round-trip through the ECS TRS representation
 before creating any scene entities.
 
-After a geometry payload creates an entity, runtime invokes ordered
-import-authoring policies, populates the decoded geometry, then invokes ordered
-post-import processors with the decoded payload context. Processors may enqueue
-deferred work through `JobService`, but the main-thread apply boundary
-remains the only place that mutates imported ECS or asset state. Once the import
-is materialized, ordered import-completed handlers receive the created entity
-span plus an optional focus target. Sandbox/default composition installs the
-current direct-mesh generated-normal processor, import authoring defaults,
-auto-select behavior, optional focus-on-import, and optional `F` action from
-four plain descriptor factories on
-`Extrinsic.Runtime.SandboxEditorFacades`. The former exported
-`Extrinsic.Runtime.SandboxDefaultPolicies` module and Engine-bound lifecycle
-helper are absent. Sandbox requires the exact published `AssetImportPipeline`
-and built-in `RuntimeInputActionRegistry` before installing anything, retains
-their typed handles in one app-private transactional record, and rolls back in
-reverse order on failure. A bare `Engine` with no registrations still
-materializes geometry without those policies. The import-completed descriptor
-captures only the optional exact `CameraControllerRegistry`; its auto-selection
-uses the `SelectionController` supplied in `RuntimeImportCompletedServices` by
-the pipeline. The separate `F` descriptor is registered only when both optional
-exact camera and selection services exist.
+`AssetWorkflowModule` is the sole published import service. Every import enters
+through one validated `AssetImportRecipe` and emits typed copied results for the
+ordered route → decode → CPU materialize → ECS author → postprocess → GPU
+residency → complete stages. The copied execution identity carries the request,
+world, binding generation, and cancellation generation; malformed ordering,
+stale identities, and publication after a terminal stage fail closed. Worker
+stages own only copied CPU data and use `JobService`; the bounded main-thread
+apply boundary remains the only place that mutates imported ECS or asset state.
+Direct synchronous imports produce the same seven-stage trace.
+
+The default recipe authors renderable/selectable state, runs the named
+direct-mesh normal/UV/property-texture postprocess, and requests one final
+selection/focus action. Optional `SelectionController` and
+`CameraControllerRegistry` services decide whether those completion requests
+can run. The former import-authoring, postprocessor, and completion callback
+registries, their role modules, the exported
+`Extrinsic.Runtime.SandboxDefaultPolicies` module, and the public
+`AssetImportPipeline` are absent. Sandbox installs only the separate `F` input
+action when both optional camera and selection services exist.
 Model-scene imports use the same contract: every primitive leaf is authored as
 a mesh in deterministic scene order, then exactly one model-scene completion
 receives only those leaves and an aggregate focus target enclosing their finite
-world-space bounds. With the sandbox defaults installed, this makes every leaf
+world-space bounds. With the default recipe, this makes every leaf
 renderable and mouse-pick eligible, selects the first leaf, and focuses the
 camera once after the complete hierarchy is ready.
 
@@ -696,9 +694,8 @@ boundary to cancel imports, invalidate bindings, detach provider borrows, and
 release strong participant handles. Engine then detaches window callbacks and
 runs the one generic `JobServiceGpuQueueBridge` participant-shutdown/device-idle
 boundary. Application shutdown follows while the persistent
-`AssetImportPipeline` and `RuntimeInputActionRegistry` still exist; Sandbox
-unregisters optional `F`, the direct-mesh postprocessor, the completed handler,
-and PointCloud/Graph/Mesh authoring policies in that reverse order. Ordinary
+`AssetWorkflowModule` and `RuntimeInputActionRegistry` still exist; Sandbox
+unregisters its optional `F` action. Ordinary
 reverse name-sorted module teardown then shuts down AsyncWork before
 AssetWorkflow and destroys providers, followed by world, frame graph,
 render-extraction plus renderer, device, window, and scheduler. The Dear ImGui

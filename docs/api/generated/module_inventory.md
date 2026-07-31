@@ -9,7 +9,7 @@ Root scanned: `src`
 | Layer | Module Count |
 |---|---:|
 | `app` | 7 |
-| `assets` | 12 |
+| `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
 | `geometry` | 103 |
@@ -34,10 +34,9 @@ Root scanned: `src`
 | `Extrinsic.Sandbox.ConfigSections` | `src/app/Sandbox/Sandbox.ConfigSections.cppm` | `app` |
 | `Extrinsic.Sandbox` | `src/app/Sandbox/Sandbox.cppm` | `app` |
 | `Extrinsic.Asset.EventBus` | `src/assets/Asset.EventBus.cppm` | `assets` |
-| `Extrinsic.Asset.GeometryIOBridge` | `src/assets/Asset.GeometryIOBridge.cppm` | `assets` |
+| `Extrinsic.Asset.GeometryPayload` | `src/assets/Asset.GeometryPayload.cppm` | `assets` |
 | `Extrinsic.Asset.ImportRouter` | `src/assets/Asset.ImportRouter.cppm` | `assets` |
 | `Extrinsic.Asset.LoadPipeline` | `src/assets/Asset.LoadPipeline.cppm` | `assets` |
-| `Extrinsic.Asset.ModelTextureIOBridge` | `src/assets/Asset.ModelTextureIOBridge.cppm` | `assets` |
 | `Extrinsic.Asset.ModelTexturePayload` | `src/assets/Asset.ModelTexturePayload.cppm` | `assets` |
 | `Extrinsic.Asset.OperationStatus` | `src/assets/Asset.OperationStatus.cppm` | `assets` |
 | `Extrinsic.Asset.PathIndex` | `src/assets/Asset.PathIndex.cppm` | `assets` |
@@ -345,14 +344,14 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetGeometryIO` | `src/runtime/Runtime.AssetGeometryIO.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetImportPipeline` | `src/runtime/Runtime.AssetImportPipeline.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | `src/runtime/Runtime.AssetIngestStateMachine.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetMeshNormals` | `src/runtime/Runtime.AssetMeshNormals.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetModelSceneHandoff` | `src/runtime/Runtime.AssetModelSceneHandoff.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetModelTextureHandoff` | `src/runtime/Runtime.AssetModelTextureHandoff.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetModelTextureIO` | `src/runtime/Runtime.AssetModelTextureIO.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowGeometryMaterialization` | `src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowImportExecutor` | `src/runtime/Runtime.AssetWorkflowImportExecutor.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowModelMaterialization` | `src/runtime/Runtime.AssetWorkflowModelMaterialization.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowModelTextureDecode` | `src/runtime/Runtime.AssetWorkflowModelTextureDecode.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowModule` | `src/runtime/Runtime.AssetWorkflowModule.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowRecipePolicies` | `src/runtime/Runtime.AssetWorkflowRecipePolicies.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowTextureResidency` | `src/runtime/Runtime.AssetWorkflowTextureResidency.cppm` | `runtime` |
 | `Extrinsic.Runtime.AsyncWorkModule` | `src/runtime/Runtime.AsyncWorkModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.CommandBus` | `src/runtime/Runtime.CommandBus.cppm` | `runtime` |
 | `Extrinsic.Runtime.DeviceBootstrap` | `src/runtime/Runtime.DeviceBootstrap.cppm` | `runtime` |
@@ -399,4 +398,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **372**
+Total modules: **371**

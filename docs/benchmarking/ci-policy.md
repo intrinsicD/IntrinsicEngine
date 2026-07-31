@@ -372,7 +372,7 @@ failures, errors, duplicates, or unrelated cases
 (`sha256:5b402222068439b7297f32cd2b6e2632b3e7e2c789392e280894f446c0f0faac`).
 
 One additional measured outlier,
-`RuntimeAssetImportFormatCoverage.AssetImportPipelineAccessorExposesQueueAndEventState`,
+`RuntimeAssetImportFormatCoverage.AssetWorkflowModuleAccessorExposesQueueAndEventState`,
 waited two seconds before the engine could pump queued work. That harness defect
 was removed rather than classified `slow`; the existing blocked-worker contract
 remains in `SlowQueuedTextureReadDoesNotBlockRunFrame`.

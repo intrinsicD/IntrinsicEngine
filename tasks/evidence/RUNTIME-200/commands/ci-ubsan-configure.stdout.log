@@ -1,0 +1,305 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="Debug"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+  CMAKE_TOOLCHAIN_FILE:FILEPATH="/home/alex/Documents/IntrinsicEngine/external/vcpkg/scripts/buildsystems/vcpkg.cmake"
+  EXTRINSIC_BACKEND="Vulkan"
+  EXTRINSIC_PLATFORM="Linux"
+  INTRINSIC_BUILD_SANDBOX="OFF"
+  INTRINSIC_BUILD_TESTS="ON"
+  INTRINSIC_ENABLE_CUDA="OFF"
+  INTRINSIC_ENABLE_SANITIZERS="ON"
+  INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN="OFF"
+  INTRINSIC_SANITIZER_MODE="undefined"
+  VCPKG_CHAINLOAD_TOOLCHAIN_FILE="/home/alex/Documents/IntrinsicEngine/cmake/IntrinsicClangToolchain.cmake"
+  VCPKG_INSTALLED_DIR="/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci-ubsan"
+  VCPKG_MANIFEST_MODE="ON"
+
+-- IntrinsicEngine selected Clang 23: /bin/clang-23, /bin/clang++-23, /bin/clang-scan-deps-23
+-- Running vcpkg install
+Detecting compiler hash for triplet x64-linux...
+Compiler found: /usr/bin/c++
+The following packages will be rebuilt:
+    draco:x64-linux@1.5.7
+    eigen3:x64-linux@5.0.1
+    entt:x64-linux@3.16.0
+    glfw3:x64-linux@3.4#1
+    glm:x64-linux@1.0.3
+    gtest:x64-linux@1.17.0#2
+    imgui[core,docking-experimental]:x64-linux@1.92.8 -- /home/alex/Documents/IntrinsicEngine/tools/vcpkg/overlay-ports/imgui
+    imguizmo:x64-linux@1.10
+    implot:x64-linux@1.0
+    nlohmann-json:x64-linux@3.12.0#2
+    stb:x64-linux@2024-07-29#1
+    tinygltf:x64-linux@3.0.0
+  * vcpkg-cmake:x64-linux@2024-04-23
+  * vcpkg-cmake-config:x64-linux@2024-05-23
+    volk:x64-linux@1.4.350.0
+  * vulkan-headers:x64-linux@1.4.350.0
+    vulkan-memory-allocator:x64-linux@3.4.0
+    xatlas:x64-linux@f700c779 -- /home/alex/Documents/IntrinsicEngine/tools/vcpkg/overlay-ports/xatlas
+Additional packages (*) will be modified to complete this operation.
+Restored 18 package(s) from /home/alex/.cache/vcpkg/archives in 337 ms. Use --debug to see more details.
+Removing 1/36 vulkan-memory-allocator:x64-linux
+Elapsed time to handle vulkan-memory-allocator:x64-linux: 687 us
+Removing 2/36 volk:x64-linux
+Elapsed time to handle volk:x64-linux: 374 us
+Removing 3/36 vulkan-headers:x64-linux
+Elapsed time to handle vulkan-headers:x64-linux: 1.57 ms
+Removing 4/36 imguizmo:x64-linux
+Elapsed time to handle imguizmo:x64-linux: 365 us
+Removing 5/36 glfw3:x64-linux
+Elapsed time to handle glfw3:x64-linux: 388 us
+Removing 6/36 xatlas:x64-linux
+Elapsed time to handle xatlas:x64-linux: 297 us
+Removing 7/36 tinygltf:x64-linux
+Elapsed time to handle tinygltf:x64-linux: 273 us
+Removing 8/36 stb:x64-linux
+Elapsed time to handle stb:x64-linux: 516 us
+Removing 9/36 nlohmann-json:x64-linux
+Elapsed time to handle nlohmann-json:x64-linux: 970 us
+Removing 10/36 implot:x64-linux
+Elapsed time to handle implot:x64-linux: 316 us
+Removing 11/36 imgui:x64-linux
+Elapsed time to handle imgui:x64-linux: 517 us
+Removing 12/36 gtest:x64-linux
+Elapsed time to handle gtest:x64-linux: 1.04 ms
+Removing 13/36 glm:x64-linux
+Elapsed time to handle glm:x64-linux: 3.99 ms
+Removing 14/36 entt:x64-linux
+Elapsed time to handle entt:x64-linux: 1.39 ms
+Removing 15/36 eigen3:x64-linux
+Elapsed time to handle eigen3:x64-linux: 7.57 ms
+Removing 16/36 draco:x64-linux
+Elapsed time to handle draco:x64-linux: 2.62 ms
+Removing 17/36 vcpkg-cmake:x64-linux
+Elapsed time to handle vcpkg-cmake:x64-linux: 269 us
+Removing 18/36 vcpkg-cmake-config:x64-linux
+Elapsed time to handle vcpkg-cmake-config:x64-linux: 256 us
+Installing 19/36 vcpkg-cmake-config:x64-linux@2024-05-23...
+vcpkg-cmake-config:x64-linux@2024-05-23 package ABI: 345384f10d8a110e527baf280cfbb2c3ab599fb2a8cb7df571de8afa41fb79a4
+Elapsed time to handle vcpkg-cmake-config:x64-linux: 442 us
+Installing 20/36 vcpkg-cmake:x64-linux@2024-04-23...
+vcpkg-cmake:x64-linux@2024-04-23 package ABI: 07a717cbb20bd9edf1636c4ab9540c41f67be6c38790b5bc2df3dd76b07f215f
+Elapsed time to handle vcpkg-cmake:x64-linux: 642 us
+Installing 21/36 draco:x64-linux@1.5.7...
+draco:x64-linux@1.5.7 package ABI: a66848de69d6b4effb107e76ceec8a3219bccfdf16fa65f899c063131b220cd1
+Elapsed time to handle draco:x64-linux: 1.8 ms
+Installing 22/36 eigen3:x64-linux@5.0.1...
+eigen3:x64-linux@5.0.1 package ABI: 2797666afd5e46703688e030ecc891c3ce98c7775cefcdd75a54bc778a3732ec
+Elapsed time to handle eigen3:x64-linux: 4.24 ms
+Installing 23/36 entt:x64-linux@3.16.0...
+entt:x64-linux@3.16.0 package ABI: 3b68d6e5915e131f5d29f4b9cd5ff155d9707d545865a5e957d291c24b917a2d
+Elapsed time to handle entt:x64-linux: 1.61 ms
+Installing 24/36 glm:x64-linux@1.0.3...
+glm:x64-linux@1.0.3 package ABI: cbb79cda7c3f45156a47fd8d27feaf207ab8e05e7d51eea3caaa0fffdc52dae3
+Elapsed time to handle glm:x64-linux: 3.93 ms
+Installing 25/36 gtest:x64-linux@1.17.0#2...
+gtest:x64-linux@1.17.0#2 package ABI: 6931f6d9b4dce3c1de7d388f0c775108de7a899c72e0f36367f57092ea1a3a64
+Elapsed time to handle gtest:x64-linux: 1.99 ms
+Installing 26/36 imgui[core,docking-experimental]:x64-linux@1.92.8...
+imgui[core,docking-experimental]:x64-linux@1.92.8 package ABI: 32d5f532da0636e8d19782fcd3f380460f4ebfeef2a0e8dc8e4a7f4f898073d4
+Elapsed time to handle imgui:x64-linux: 1.52 ms
+Installing 27/36 implot:x64-linux@1.0...
+implot:x64-linux@1.0 package ABI: 6712fbbe989f6e0c1d4d2c912e89cf51c990dfab0e77bc06823ca38e05362279
+Elapsed time to handle implot:x64-linux: 1.36 ms
+Installing 28/36 nlohmann-json:x64-linux@3.12.0#2...
+nlohmann-json:x64-linux@3.12.0#2 package ABI: bd75497ac23e582ecad8bcd8b47164b19fbe11065226c08c2e392f0eb158c8f1
+Elapsed time to handle nlohmann-json:x64-linux: 1.71 ms
+Installing 29/36 stb:x64-linux@2024-07-29#1...
+stb:x64-linux@2024-07-29#1 package ABI: 524a3853b190f639d4b53532a9b9dd774994c4168fc8e4be2056b309fce824f2
+Elapsed time to handle stb:x64-linux: 1.61 ms
+Installing 30/36 tinygltf:x64-linux@3.0.0...
+tinygltf:x64-linux@3.0.0 package ABI: e5ba558a5797b3599a519aec506f2965905b9bd73ef4bc5ac1927a6a4933cb58
+Elapsed time to handle tinygltf:x64-linux: 1.37 ms
+Installing 31/36 xatlas:x64-linux@f700c779...
+xatlas:x64-linux@f700c779 package ABI: b18cf1f1d698b6d4feb12b920ee26cc3c615db0614731b93d9afeaa48f62360b
+Elapsed time to handle xatlas:x64-linux: 1.53 ms
+Installing 32/36 glfw3:x64-linux@3.4#1...
+glfw3:x64-linux@3.4#1 package ABI: f8a9ac55524176818eb051cb5671d23ec43101658eb580fdc10a8aea3ec28194
+Elapsed time to handle glfw3:x64-linux: 1.57 ms
+Installing 33/36 imguizmo:x64-linux@1.10...
+imguizmo:x64-linux@1.10 package ABI: 13ab2b82028dd402f67932533fe769d108925ed4763014ffd56d9b7130cfff90
+Elapsed time to handle imguizmo:x64-linux: 1.44 ms
+Installing 34/36 vulkan-headers:x64-linux@1.4.350.0...
+vulkan-headers:x64-linux@1.4.350.0 package ABI: 45f25ac1a7c8ac6aa5013fd22de5b698cc355182a04e9e51745fe252cd7cb7fa
+Elapsed time to handle vulkan-headers:x64-linux: 1.77 ms
+Installing 35/36 volk:x64-linux@1.4.350.0...
+volk:x64-linux@1.4.350.0 package ABI: fa6f84b6a35ece31a96a9ed3bf63c3cc06adce7874417fac4fe1d8f6d21f27f7
+Elapsed time to handle volk:x64-linux: 1.47 ms
+Installing 36/36 vulkan-memory-allocator:x64-linux@3.4.0...
+vulkan-memory-allocator:x64-linux@3.4.0 package ABI: 13a4968c638844830c21ab09e312bed11e62f3347b4c7808e010218078ed786f
+Elapsed time to handle vulkan-memory-allocator:x64-linux: 1.33 ms
+Installed contents are licensed to you by owners. Microsoft is not responsible for, nor does it grant any licenses to, third-party packages.
+Some packages did not declare an SPDX license. Check the `copyright` file for each package for more information about their licensing.
+Packages installed in this vcpkg installation declare the following licenses:
+(Apache-2.0 OR MIT)
+(MIT OR CC-PDDC)
+Apache-2.0
+BSD-3-Clause
+MIT
+MPL-2.0
+Zlib
+draco provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(draco CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE draco::draco)
+
+draco provides pkg-config modules:
+
+  # Draco geometry de(com)pression library.
+  draco
+
+eigen3 provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(Eigen3 CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Eigen3::Eigen)
+
+eigen3 provides pkg-config modules:
+
+  # A C++ template library for linear algebra: vectors, matrices, and related algorithms
+  eigen3
+
+entt provides CMake targets:
+
+    find_package(EnTT CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE EnTT::EnTT)
+
+The package glm provides CMake targets:
+
+    find_package(glm CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glm::glm)
+
+    # Or use the header-only version
+    find_package(glm CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glm::glm-header-only)
+
+The package gtest is compatible with built-in CMake targets:
+
+    enable_testing()
+    
+    find_package(GTest CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE GTest::gtest GTest::gtest_main GTest::gmock GTest::gmock_main)
+    
+    add_test(AllTestsInMain main)
+
+imgui provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(imgui CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE imgui::imgui)
+
+implot provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(implot CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE implot::implot)
+
+The package nlohmann-json provides CMake targets:
+
+    find_package(nlohmann_json CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE nlohmann_json::nlohmann_json)
+
+The package nlohmann-json can be configured to not provide implicit conversions via a custom triplet file:
+
+    set(nlohmann-json_IMPLICIT_CONVERSIONS OFF)
+
+For more information, see the docs here:
+    
+    https://json.nlohmann.me/api/macros/json_use_implicit_conversions/
+
+The package stb provides CMake targets:
+
+    find_package(Stb REQUIRED)
+    target_include_directories(main PRIVATE ${Stb_INCLUDE_DIR})
+tinygltf is header-only and can be used from CMake via:
+
+  find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
+  target_include_directories(main PRIVATE ${TINYGLTF_INCLUDE_DIRS})
+
+xatlas provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(xatlas CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE xatlas::xatlas)
+
+glfw3 provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(glfw3 CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE glfw)
+
+glfw3 provides pkg-config modules:
+
+  # A multi-platform library for OpenGL, window and input
+  glfw3
+
+imguizmo provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(imguizmo CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE imguizmo::imguizmo)
+
+volk provides CMake targets:
+
+    find_package(volk CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE volk::volk volk::volk_headers)
+
+VulkanMemoryAllocator provides official find_package support. However, it requires the user to provide the include directory containing `vulkan/vulkan.h`. There are multiple ways to achieve this and VulkanMemoryAllocator is compatible with all of them.
+
+    find_package(Vulkan) # https://cmake.org/cmake/help/latest/module/FindVulkan.html, CMake 3.21+
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator)
+
+or
+
+    find_package(Vulkan) # CMake 3.21+
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Headers GPUOpen::VulkanMemoryAllocator)
+
+or
+
+    find_package(VulkanHeaders CONFIG) # From the vulkan-headers port
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Headers GPUOpen::VulkanMemoryAllocator)
+
+See the documentation for more information on setting up your project: https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/index.html
+
+All requested installations completed successfully in: 56.3 ms
+-- Running vcpkg install - done
+-- IntrinsicEngine using auto-selected compilers: /bin/clang-23, /bin/clang++-23
+-- The CXX compiler identification is Clang 23.0.0
+-- The C compiler identification is Clang 23.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /bin/clang++-23 - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /bin/clang-23 - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- IntrinsicEngine Clang requirement: using C=23.0.0 and CXX=23.0.0; minimum is 20.0
+-- Performing Test INTRINSIC_ASAN_AVAILABLE
+-- Performing Test INTRINSIC_ASAN_AVAILABLE - Success
+-- Performing Test INTRINSIC_UBSAN_AVAILABLE
+-- Performing Test INTRINSIC_UBSAN_AVAILABLE - Success
+-- Sanitizers ENABLED (ubsan; undefined) for Debug/RelWithDebInfo builds
+-- Clang source coverage instrumentation DISABLED
+-- Using CCache: /usr/bin/ccache
+-- Intrinsic dependencies: using vcpkg manifest packages
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- Found nlohmann_json: /home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci-ubsan/x64-linux/share/nlohmann_json/nlohmann_jsonConfig.cmake (found version "3.12.0") 
+-- Found Stb: /home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci-ubsan/x64-linux/include  
+-- Found Vulkan: /home/alex/Documents/vulkansdk-linux-x86_64-1.4.309.0/1.4.309.0/x86_64/lib/libvulkan.so (found version "1.4.350") found components: glslc glslangValidator 
+-- CUDA compute backend DISABLED
+-- IntrinsicEngine configure identity: platform=Linux; graphics_backend=Vulkan; platform_backend_request=Auto; platform_backend_selected=Glfw; headless_no_glfw=OFF
+-- Found Python3: /home/alex/miniconda3/bin/python3 (found version "3.12.9") found components: Interpreter 
+-- Configuring done (8.5s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/alex/Documents/IntrinsicEngine/build/ci-ubsan

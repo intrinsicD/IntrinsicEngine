@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture$",
+    "--repeat",
+    "until-fail:20",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R '^RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture$' --repeat until-fail:20 --timeout 180",
+  "cwd": ".",
+  "duration_ms": 68629,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T19:30:31Z",
+  "label": "review-v2-vulkan-texture-repeat20",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T19:29:23Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-texture-repeat20.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-texture-repeat20.stdout.log",
+  "stdout_sha256": "d24cb92d2c0bc454e8d87c30bf78a6e06f569b720be8bed7927e6fdb78504bb8",
+  "task_id": "RUNTIME-200"
+}

@@ -28,16 +28,15 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- blocked by `RUNTIME-200`: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
+- unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- blocked by `RUNTIME-200`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+- blocked by `RUNTIME-202`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- unblocked: `RUNTIME-200` — Staged asset-import and materialization recipe (tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md)
-- blocked by `RUNTIME-200`: `RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models (tasks/backlog/runtime/RUNTIME-202-retire-sandbox-runtime-facade.md)
-- blocked by `RUNTIME-200`: `RUNTIME-203` — Internalize one-consumer runtime composition helpers (tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
+- unblocked: `RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models (tasks/backlog/runtime/RUNTIME-202-retire-sandbox-runtime-facade.md)
+- unblocked: `RUNTIME-203` — Internalize one-consumer runtime composition helpers (tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 - blocked by `RUNTIME-202`: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 
@@ -51,6 +50,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-110` — Implicit smoothing applies boundary pins after rather than during solve (tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-123` — Retired queued scene save intermittently loses its terminal event (tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md)
+- unblocked: `BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot (tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md)
 
 ## Theme I — Research method implementation
 

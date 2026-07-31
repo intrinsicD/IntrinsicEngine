@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py",
+  "cwd": ".",
+  "duration_ms": 153,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T18:27:31Z",
+  "label": "strict-task-validation",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T18:27:31Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/strict-task-validation.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/strict-task-validation.stdout.log",
+  "stdout_sha256": "9b900369568e1cb90c205e66b49c4ea06fc5b7400489e1582c0079aa13c5a878",
+  "task_id": "RUNTIME-200"
+}

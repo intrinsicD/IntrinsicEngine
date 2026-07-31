@@ -1212,3 +1212,26 @@ observations:
     promoted_to: "logic/solution/heuristics.md:H15"
     crystallized_via: verbal-affirmation
     stale: false
+  - id: O81
+    timestamp: "2026-07-31T22:05+02:00"
+    provenance: ai-executed
+    content: >
+      Production runtime asset import can use one copied seven-stage recipe and
+      one published AssetWorkflowModule service while decode/materialization,
+      ECS authoring, postprocess, bake/residency, and completion helpers remain
+      private and lower assets/geometry layers retain ordinary CPU ownership.
+    context: >
+      RUNTIME-200 closure combines 101 focused import/workflow contracts, the
+      complete 4,013-case CPU selector, complete 2,667-case ASan and UBSan
+      selectors, 20 repeated queued-reimport contracts, 20 repeated
+      generated-texture Vulkan smokes, and four targeted promoted-Vulkan
+      import/model smokes. The former public pipeline, callback registries, IO
+      bridges, handoffs, and wrapper-only tests are absent. Open BUG-123 and
+      BUG-124 retain unrelated observations; this is a capability/lifecycle
+      claim, not a performance claim.
+    potential_type: architecture
+    bound_to: [N268, N269, N288]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

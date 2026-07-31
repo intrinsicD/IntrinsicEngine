@@ -1,7 +1,5 @@
 module;
 
-#include <array>
-#include <cstddef>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -9,7 +7,6 @@ module;
 module Extrinsic.Sandbox;
 
 import Extrinsic.Sandbox.Editor.Controller;
-import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.ReferenceScene;
@@ -20,26 +17,11 @@ import Extrinsic.Runtime.WorldHandle;
 namespace Extrinsic::Sandbox {
 namespace {
 struct SandboxDefaultPolicyHandles {
-  Runtime::AssetImportPipeline *Pipeline{nullptr};
   Runtime::RuntimeInputActionRegistry *InputActions{nullptr};
-  std::array<Runtime::RuntimeImportEntityAuthoringPolicyHandle, 3>
-      ImportAuthoring{};
-  Runtime::RuntimeImportCompletedHandlerHandle ImportCompleted{};
-  Runtime::RuntimePostImportProcessorHandle DirectMeshPostProcessor{};
   std::optional<Runtime::RuntimeInputActionHandle> FocusAction{};
 
   [[nodiscard]] bool IsEmpty() const noexcept {
-    if (Pipeline != nullptr || InputActions != nullptr ||
-        ImportCompleted.IsValid() || DirectMeshPostProcessor.IsValid() ||
-        FocusAction.has_value()) {
-      return false;
-    }
-    for (const auto handle : ImportAuthoring) {
-      if (handle.IsValid()) {
-        return false;
-      }
-    }
-    return true;
+    return InputActions == nullptr && !FocusAction.has_value();
   }
 };
 
@@ -50,74 +32,19 @@ void UninstallSandboxDefaultPolicies(
   }
   handles.FocusAction.reset();
 
-  if (handles.Pipeline != nullptr) {
-    if (handles.DirectMeshPostProcessor.IsValid()) {
-      handles.Pipeline->UnregisterPostImportProcessor(
-          handles.DirectMeshPostProcessor);
-    }
-    handles.DirectMeshPostProcessor = {};
-
-    if (handles.ImportCompleted.IsValid()) {
-      handles.Pipeline->UnregisterImportCompletedHandler(
-          handles.ImportCompleted);
-    }
-    handles.ImportCompleted = {};
-
-    for (std::size_t index = handles.ImportAuthoring.size(); index > 0u;
-         --index) {
-      const auto handle = handles.ImportAuthoring[index - 1u];
-      if (handle.IsValid()) {
-        handles.Pipeline->UnregisterImportEntityAuthoringPolicy(handle);
-      }
-      handles.ImportAuthoring[index - 1u] = {};
-    }
-  } else {
-    handles.DirectMeshPostProcessor = {};
-    handles.ImportCompleted = {};
-    handles.ImportAuthoring = {};
-  }
-
   handles.InputActions = nullptr;
-  handles.Pipeline = nullptr;
 }
 
 [[nodiscard]] bool InstallSandboxDefaultPolicies(
-    Runtime::AssetImportPipeline *const pipeline,
     Runtime::RuntimeInputActionRegistry *const inputActions,
     Runtime::CameraControllerRegistry *const cameraControllers,
     Runtime::SelectionController *const selection,
     SandboxDefaultPolicyHandles &handles) {
-  if (!handles.IsEmpty() || pipeline == nullptr || inputActions == nullptr) {
+  if (!handles.IsEmpty() || inputActions == nullptr) {
     return false;
   }
 
-  handles.Pipeline = pipeline;
   handles.InputActions = inputActions;
-
-  auto authoring = Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-  for (std::size_t index = 0u; index < authoring.size(); ++index) {
-    handles.ImportAuthoring[index] =
-        pipeline->RegisterImportEntityAuthoringPolicy(
-            std::move(authoring[index]));
-    if (!handles.ImportAuthoring[index].IsValid()) {
-      UninstallSandboxDefaultPolicies(handles);
-      return false;
-    }
-  }
-
-  handles.ImportCompleted = pipeline->RegisterImportCompletedHandler(
-      Runtime::MakeSandboxDefaultImportCompletedHandler(cameraControllers));
-  if (!handles.ImportCompleted.IsValid()) {
-    UninstallSandboxDefaultPolicies(handles);
-    return false;
-  }
-
-  handles.DirectMeshPostProcessor = pipeline->RegisterPostImportProcessor(
-      Runtime::MakeSandboxDefaultDirectMeshPostProcessor());
-  if (!handles.DirectMeshPostProcessor.IsValid()) {
-    UninstallSandboxDefaultPolicies(handles);
-    return false;
-  }
 
   if (cameraControllers != nullptr && selection != nullptr) {
     const Runtime::RuntimeInputActionHandle focusAction =
@@ -158,11 +85,10 @@ struct SandboxSession::Impl {
       }
     }
 
-    auto *const pipeline = services.Find<Runtime::AssetImportPipeline>();
     auto *const inputActions =
         services.Find<Runtime::RuntimeInputActionRegistry>();
     auto *const selection = services.Find<Runtime::SelectionController>();
-    (void)InstallSandboxDefaultPolicies(pipeline, inputActions,
+    (void)InstallSandboxDefaultPolicies(inputActions,
                                         m_CameraControllers, selection,
                                         m_DefaultPolicies);
     m_EditorController.Attach(worlds, services);

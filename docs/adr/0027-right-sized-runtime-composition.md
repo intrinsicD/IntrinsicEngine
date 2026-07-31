@@ -380,6 +380,23 @@ snapshot to 22 plain imports, zero domain imports, 2 re-exports, and 10 public
 getter names. These remain migration evidence, not the final allowed-surface
 budget.
 
+## Implementation update: RUNTIME-200
+
+`RUNTIME-200` applies the same deletion test inside asset workflow
+composition. `AssetWorkflowModule` is now the sole published import service and
+exports one validated recipe plus typed copied stage results. Route, decode,
+CPU materialization, ECS authoring, postprocess, GPU residency, and completion
+execute in that fixed order under a copied request/world/binding/cancellation
+identity. The executor and geometry/model/texture materialization and residency
+helpers are private implementation modules.
+
+The former public `AssetImportPipeline`, lower callback bridges, role-only
+runtime IO modules, mesh-normal helper surface, texture/model handoff surfaces,
+and import policy callback registries are deleted. Sandbox retains only its
+independent `F` input-action handle; recipe policy owns import authoring,
+postprocess, selection, and focus. This consolidation introduces no replacement
+registry, service, wrapper, Engine surface, or dependency edge.
+
 ## Consequences
 
 - Positive: `ARCH-014` can converge without manufacturing unused registries,

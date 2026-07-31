@@ -65,7 +65,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
@@ -142,46 +142,8 @@ constexpr std::uint32_t kInvalidIndex =
 void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
         auto* const pipeline =
-            engine.Services().Find<Runtime::AssetImportPipeline>();
-        auto* const inputActions =
-            engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
+            engine.Services().Find<Runtime::AssetWorkflowModule>();
         ASSERT_NE(pipeline, nullptr);
-        ASSERT_NE(inputActions, nullptr);
-
-        auto authoring =
-            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-        for (auto& desc : authoring)
-        {
-            ASSERT_TRUE(
-                pipeline->RegisterImportEntityAuthoringPolicy(
-                    std::move(desc))
-                    .IsValid());
-        }
-        ASSERT_TRUE(
-            pipeline->RegisterImportCompletedHandler(
-                Runtime::MakeSandboxDefaultImportCompletedHandler(
-                    engine.Services()
-                        .Find<Runtime::CameraControllerRegistry>()))
-                .IsValid());
-        ASSERT_TRUE(
-            pipeline->RegisterPostImportProcessor(
-                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
-                .IsValid());
-
-        auto* const cameraControllers =
-            engine.Services().Find<Runtime::CameraControllerRegistry>();
-        auto* const selection =
-            engine.Services().Find<Runtime::SelectionController>();
-        if (cameraControllers != nullptr && selection != nullptr)
-        {
-            ASSERT_TRUE(
-                inputActions
-                    ->Register(
-                        Runtime::MakeSandboxDefaultFocusInputAction(
-                            *cameraControllers,
-                            *selection))
-                    .IsValid());
-        }
     }
 
 [[nodiscard]] bool HasDiagnostic(
@@ -3367,7 +3329,7 @@ TEST(SandboxEditorUi,
 
     auto imported =
         RequiredEngineService<
-            Extrinsic::Runtime::AssetImportPipeline>(engine)
+            Extrinsic::Runtime::AssetWorkflowModule>(engine)
             .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3469,7 +3431,7 @@ TEST(SandboxEditorUi,
 
     auto imported =
         RequiredEngineService<
-            Extrinsic::Runtime::AssetImportPipeline>(engine)
+            Extrinsic::Runtime::AssetWorkflowModule>(engine)
             .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3590,7 +3552,7 @@ TEST(SandboxEditorUi, DirectMeshPostProcessDiscardsCompletionAfterBindingChange)
     ASSERT_TRUE(workerBarrier.WaitUntilStarted());
 
     auto imported =
-        RequiredEngineService<Runtime::AssetImportPipeline>(engine)
+        RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
             .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3684,7 +3646,7 @@ TEST(SandboxEditorUi, DirectMeshPostProcessPendingStateGatesMutatingActions)
 
     auto imported =
         RequiredEngineService<
-            Extrinsic::Runtime::AssetImportPipeline>(engine)
+            Extrinsic::Runtime::AssetWorkflowModule>(engine)
             .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3825,7 +3787,7 @@ TEST(SandboxEditorUi, DirectMeshPostProcessDiscardsCompletionAfterWorldSwitch)
     ASSERT_TRUE(workerBarrier.WaitUntilStarted());
 
     auto imported =
-        RequiredEngineService<Runtime::AssetImportPipeline>(engine)
+        RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
             .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3929,7 +3891,7 @@ TEST(SandboxEditorUi, DirectMeshPostProcessWorldDestructionIsLifetimeSafe)
     ASSERT_TRUE(workerBarrier.WaitUntilStarted());
 
     auto imported =
-        RequiredEngineService<Runtime::AssetImportPipeline>(engine)
+        RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
             .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3975,7 +3937,7 @@ TEST(SandboxEditorUi, DirectMeshPostProcessRejectsRecycledEntityTarget)
     ASSERT_TRUE(workerBarrier.WaitUntilStarted());
 
     auto imported =
-        RequiredEngineService<Runtime::AssetImportPipeline>(engine)
+        RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
             .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -4973,8 +4935,8 @@ TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeModule)
     engine.EmplaceModule<Runtime::TextureBakeModule>();
     engine.Initialize();
 
-    Runtime::AssetImportPipeline& pipeline =
-        RequiredEngineService<Runtime::AssetImportPipeline>(engine);
+    Runtime::AssetWorkflowModule& pipeline =
+        RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
     Runtime::TextureBakeService& textureBake =
         RequiredEngineService<Runtime::TextureBakeService>(engine);
     EXPECT_EQ(

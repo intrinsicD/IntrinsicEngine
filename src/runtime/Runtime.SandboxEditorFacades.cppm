@@ -36,7 +36,7 @@ import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 export import Extrinsic.Runtime.ClusteringModule;
@@ -71,18 +71,6 @@ export import Geometry.Parameterization;
 
 export namespace Extrinsic::Runtime
 {
-    [[nodiscard]] std::array<
-        RuntimeImportEntityAuthoringPolicyDesc,
-        3>
-        MakeSandboxDefaultImportAuthoringPolicies();
-
-    [[nodiscard]] RuntimeImportCompletedHandlerDesc
-        MakeSandboxDefaultImportCompletedHandler(
-            CameraControllerRegistry* cameraControllers);
-
-    [[nodiscard]] RuntimePostImportProcessorDesc
-        MakeSandboxDefaultDirectMeshPostProcessor();
-
     [[nodiscard]] RuntimeInputActionDesc
         MakeSandboxDefaultFocusInputAction(
             CameraControllerRegistry& cameraControllers,

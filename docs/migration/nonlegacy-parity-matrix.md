@@ -9,7 +9,7 @@ historical replacement mappings and value-gated decision context.
 ## Sources and scope
 
 - Module list source: `docs/api/generated/module_inventory.md` generated on
-  2026-07-01 by `tools/repo/generate_module_inventory.py`.
+  2026-07-31 by `tools/repo/generate_module_inventory.py`.
 - Promoted source roots inspected: `src/core`, `src/assets`, `src/ecs`,
   `src/geometry`, `src/physics`, `src/graphics/{framegraph,renderer,rhi,vulkan}`,
   `src/platform`, `src/runtime`, and `src/app`.
@@ -19,6 +19,16 @@ historical replacement mappings and value-gated decision context.
   maturity; collision contacts and solver/island/sleep behavior remain
   follow-up work.
 - Legacy references below use historical module names from the retired tree.
+- The detailed cells preserve chronological promotion steps. Their references
+  to `Asset.GeometryIOBridge`, `Asset.ModelTextureIOBridge`,
+  `Runtime.AssetGeometryIO`, `Runtime.AssetModelTextureIO`,
+  `Runtime.AssetModelTextureHandoff`, `Runtime.AssetModelSceneHandoff`,
+  `Runtime.AssetMeshNormals`, and `Runtime.AssetImportPipeline` are historical:
+  `RUNTIME-200` deleted those public seams. Current imports enter through the
+  sole published `Runtime.AssetWorkflowModule`, whose private executor runs one
+  typed route → decode → CPU materialize → ECS author → postprocess → GPU
+  residency → complete recipe. Geometry codecs and asset payload/router types
+  remain at their owning lower layers without callback registries.
 - “Missing behavior” means missing or not yet proven by promoted contracts,
   tests, and runtime wiring. It does not imply a live legacy fallback remains.
 - Maturity vocabulary used by the readiness cells below
@@ -217,7 +227,7 @@ shape are not promoted as compatibility APIs.
 compatibility test. Retained promoted behavior is represented by
 `AssetService` path interning, typed payload storage/reads, reload and destroy
 ordering, `AssetLoadPipeline` state transitions, `AssetEventBus` fanout, and
-runtime-owned texture/model GPU handoff. The old `AssetLease` pin-count API,
+runtime-owned staged texture/model residency. The old `AssetLease` pin-count API,
 `TryGetFast` read-phase API, `AssetManager::Clear()` handle invalidation
 semantics, and compile-only ownership check against legacy `Graphics::Material`
 are not promoted as asset-layer endpoints.
@@ -225,8 +235,8 @@ are not promoted as asset-layer endpoints.
 `LEGACY-042` retires the legacy `Asset.Pipeline` transfer-token compatibility
 test. Retained promoted behavior is represented by `AssetLoadPipeline` staged
 CPU/GPU state transitions and fence completion, `AssetService` event flushing,
-`Graphics.GpuAssetCache` texture/buffer residency requests, and
-`Extrinsic.Runtime.AssetModelTextureHandoff` / `AssetModelSceneHandoff` wiring.
+`Graphics.GpuAssetCache` texture/buffer residency requests, and the private
+texture/model stages owned by `Extrinsic.Runtime.AssetWorkflowModule`.
 The old `Runtime::AssetPipeline` main-thread task queue, loaded-material list,
 `RHI::TransferToken` polling, and direct `AssetManager` finalization surface are
 not promoted as compatibility APIs.

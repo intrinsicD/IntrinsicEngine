@@ -28,7 +28,7 @@ module;
 module Extrinsic.Runtime.SandboxEditorFacades;
 
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.GeometryIOBridge;
+import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
@@ -62,7 +62,8 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Platform.Window;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ClusteringModule;
@@ -11368,7 +11369,7 @@ namespace Extrinsic::Runtime
 
             if (const auto* enrichment =
                     context.Scene->Raw().try_get<
-                        Internal::DirectMeshEnrichmentState>(*selected))
+                        AssetImportMeshEnrichmentState>(*selected))
             {
                 model.DirectMeshEnrichmentStatus = enrichment->Status;
                 model.DirectMeshEnrichmentPending =
@@ -12670,7 +12671,7 @@ namespace Extrinsic::Runtime
             SceneInteractionModule* const interaction  = services.Find<SceneInteractionModule>();
             SelectionController* const selection       = services.Find<SelectionController>();
             Assets::AssetService* const assetService   = services.Find<Assets::AssetService>();
-            AssetImportPipeline* const assetImportPipeline = services.Find<AssetImportPipeline>();
+            AssetWorkflowModule* const assetWorkflow = services.Find<AssetWorkflowModule>();
             TextureBakeService* const textureBake          = services.Find<TextureBakeService>();
             SandboxEditorContext context{
                 .Scene          = activeScene,
@@ -12692,9 +12693,9 @@ namespace Extrinsic::Runtime
                 .AssetImportCommands =
                     SandboxEditorAssetImportCommandSurface{
                         .Import =
-                            [assetImportPipeline](const SandboxEditorFileImportCommand& command)
+                            [assetWorkflow](const SandboxEditorFileImportCommand& command)
                         {
-                            if (assetImportPipeline == nullptr)
+                            if (assetWorkflow == nullptr)
                             {
                                 return SandboxEditorFileImportResult{
                                     .Status =
@@ -12716,17 +12717,13 @@ namespace Extrinsic::Runtime
                                 (IsModelTextureImportPayload(route->PayloadKind) ||
                                  Assets::IsGeometryPayloadKind(route->PayloadKind)))
                             {
-                                const RuntimeAssetImportRequest request{
+                                AssetImportRecipe recipe{
                                     .Path = command.Path,
                                     .PayloadKind = route->PayloadKind,
                                 };
-                                auto queued = Assets::IsGeometryPayloadKind(
-                                                  route->PayloadKind)
-                                    ? assetImportPipeline->QueueGeometryImport(
-                                          request)
-                                    : assetImportPipeline->
-                                          QueueModelTextureImport(
-                                          request);
+                                auto queued =
+                                    assetWorkflow->QueueAssetImport(
+                                        std::move(recipe));
                                 if (!queued.has_value())
                                 {
                                     return SandboxEditorFileImportResult{
@@ -12749,7 +12746,7 @@ namespace Extrinsic::Runtime
                             }
 
                             auto imported =
-                                assetImportPipeline->ImportAssetFromPath(
+                                assetWorkflow->ImportAssetFromPath(
                                 RuntimeAssetImportRequest{
                                     .Path = command.Path,
                                     .PayloadKind = command.PayloadKind,
@@ -12787,18 +12784,18 @@ namespace Extrinsic::Runtime
                 .AssetImportQueueCommands =
                     SandboxEditorAssetImportQueueCommandSurface{
                         .ClearCompleted =
-                            [assetImportPipeline]()
+                            [assetWorkflow]()
                         {
-                            return assetImportPipeline != nullptr
-                                ? assetImportPipeline->
+                            return assetWorkflow != nullptr
+                                ? assetWorkflow->
                                       ClearCompletedAssetImports()
                                 : std::size_t{0u};
                         },
                         .Cancel =
-                            [assetImportPipeline](const RuntimeAssetIngestHandle operation)
+                            [assetWorkflow](const RuntimeAssetIngestHandle operation)
                         {
-                            return assetImportPipeline != nullptr
-                                ? assetImportPipeline->
+                            return assetWorkflow != nullptr
+                                ? assetWorkflow->
                                       CancelAssetImport(operation)
                                 : Core::Err(
                                       Core::ErrorCode::InvalidState);
@@ -12997,8 +12994,8 @@ namespace Extrinsic::Runtime
                     renderExtraction != nullptr
                         ? renderExtraction->GetVisualizationRecipeRevision()
                         : 0u,
-                .AssetImportQueue   = assetImportPipeline != nullptr
-                                          ? assetImportPipeline->GetAssetImportQueueSnapshot()
+                .AssetImportQueue   = assetWorkflow != nullptr
+                                          ? assetWorkflow->GetAssetImportQueueSnapshot()
                                           : RuntimeAssetImportQueueSnapshot{},
                 .RenderGraphStats =
                     renderer != nullptr ? &renderer->GetLastRenderGraphStats() : nullptr,
@@ -13008,7 +13005,7 @@ namespace Extrinsic::Runtime
                     const EditorUiHost* host = services.Find<EditorUiHost>();
                     return host != nullptr && host->IsOperational();
                 }(),
-                .AssetImportCommandsAvailable   = assetImportPipeline != nullptr,
+                .AssetImportCommandsAvailable   = assetWorkflow != nullptr,
                 .SceneFileCommandsAvailable     = true,
                 .CameraRenderCommandsAvailable  = true,
                 .VisualizationCommandsAvailable = true,
@@ -18970,11 +18967,11 @@ namespace Extrinsic::Runtime
         {
             return false;
         }
-        const AssetImportPipeline* const assetImportPipeline =
-            m_Services->Find<AssetImportPipeline>();
+        const AssetWorkflowModule* const assetWorkflow =
+            m_Services->Find<AssetWorkflowModule>();
         const std::optional<RuntimeAssetImportEvent>* const runtimeImport =
-            assetImportPipeline != nullptr
-                ? &assetImportPipeline->GetLastAssetImportEvent()
+            assetWorkflow != nullptr
+                ? &assetWorkflow->GetLastAssetImportEvent()
                 : nullptr;
         if (runtimeImport != nullptr &&
             runtimeImport->has_value() &&

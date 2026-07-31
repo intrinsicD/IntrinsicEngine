@@ -1,0 +1,27 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicCpuTests",
+    "--clean-first"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci-asan --target IntrinsicCpuTests --clean-first",
+  "cwd": ".",
+  "duration_ms": 527766,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T17:44:54Z",
+  "label": "ci-asan-ccache-disabled-clean-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T17:36:07Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/ci-asan-ccache-disabled-clean-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/ci-asan-ccache-disabled-clean-build.stdout.log",
+  "stdout_sha256": "93ecbaa349dbb8f5b6b309563e6e302486d097d0ea530ef2d13e3369db06616b",
+  "task_id": "RUNTIME-200"
+}

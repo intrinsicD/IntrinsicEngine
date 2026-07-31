@@ -1,0 +1,43 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-asan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-asan
+    Start 842: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+    Test #842: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ...   Passed    0.13 sec
+    Start 842: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+    Test #842: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ...   Passed    0.19 sec
+    Start 842: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+    Test #842: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ...***Failed    0.13 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeSceneLifecycle
+[ RUN      ] RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued scene save: path='/tmp/runtime179_retired_scene_save.json'[0m
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp:854: Failure
+Value of: event.has_value()
+  Actual: false
+Expected: true
+
+[  FAILED  ] RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent (84 ms)
+[----------] 1 test from RuntimeSceneLifecycle (84 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (84 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+
+ 1 FAILED TEST
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+contract    =   0.13 sec*proc (1 test)
+runtime     =   0.13 sec*proc (1 test)
+
+Total Test time (real) =   0.52 sec
+
+The following tests FAILED:
+	842 - RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent (Failed)

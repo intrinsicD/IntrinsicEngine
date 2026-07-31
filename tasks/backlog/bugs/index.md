@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
+  the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
+  expects an unsupported slot from a fixture whose current combinations all
+  resolve without that flag; align the fixture and counter contract without
+  deleting meaningful unsupported-path coverage or weakening the gate.
 - [`BUG-123` — Retired queued scene save intermittently loses its terminal event](BUG-123-retired-scene-save-terminal-event-race.md):
   world cancellation can leave the queued save task `Cancelled` while its
   unpublished finalizer fails to publish the required exactly-once terminal

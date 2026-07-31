@@ -41,9 +41,8 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetImportPipeline;
-import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -195,9 +194,9 @@ namespace
             ObserveServices(engine);
             if (ExpectAssets && !ImportPath.empty())
             {
-                Runtime::AssetImportPipeline* const pipeline =
+                Runtime::AssetWorkflowModule* const pipeline =
                     engine.Services()
-                        .Find<Runtime::AssetImportPipeline>();
+                        .Find<Runtime::AssetWorkflowModule>();
                 ASSERT_NE(pipeline, nullptr);
                 auto imported =
                     pipeline->ImportAssetFromPath(
@@ -221,9 +220,9 @@ namespace
             ObserveServices(engine);
             if (ExpectAssets && !ImportPath.empty())
             {
-                Runtime::AssetImportPipeline* const pipeline =
+                Runtime::AssetWorkflowModule* const pipeline =
                     engine.Services()
-                        .Find<Runtime::AssetImportPipeline>();
+                        .Find<Runtime::AssetWorkflowModule>();
                 ASSERT_NE(pipeline, nullptr);
                 auto imported =
                     pipeline->ImportAssetFromPath(
@@ -246,7 +245,7 @@ namespace
                 engine.Services()
                     .Find<Assets::AssetService>() != nullptr &&
                 engine.Services()
-                    .Find<Runtime::AssetImportPipeline>() !=
+                    .Find<Runtime::AssetWorkflowModule>() !=
                     nullptr &&
                 engine.Services()
                     .Find<Graphics::GpuAssetCache>() !=
@@ -339,7 +338,7 @@ namespace
                 context.Services.Find<Assets::AssetService>() !=
                     nullptr &&
                 context.Services
-                        .Find<Runtime::AssetImportPipeline>() !=
+                        .Find<Runtime::AssetWorkflowModule>() !=
                     nullptr &&
                 context.Services
                         .Find<Graphics::GpuAssetCache>() !=
@@ -791,8 +790,8 @@ TEST(AssetWorkflowModule,
 
     Assets::AssetService* const firstAssets =
         harness.Services.Find<Assets::AssetService>();
-    Runtime::AssetImportPipeline* const firstPipeline =
-        harness.Services.Find<Runtime::AssetImportPipeline>();
+    Runtime::AssetWorkflowModule* const firstPipeline =
+        harness.Services.Find<Runtime::AssetWorkflowModule>();
     Graphics::GpuAssetCache* const firstCache =
         harness.Services.Find<Graphics::GpuAssetCache>();
     Core::IAssetFrameHooks* const firstHooks =
@@ -845,7 +844,7 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Assets::AssetService>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -857,7 +856,7 @@ TEST(AssetWorkflowModule,
     ASSERT_TRUE(harness.Start(
         /*assetFirst=*/false).has_value());
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         firstPipeline);
     EXPECT_NE(
         harness.Services.Find<Assets::AssetService>(),
@@ -1099,7 +1098,7 @@ TEST(
         ASSERT_TRUE(harness.ProvideBuiltins().has_value());
 
         Assets::AssetService existingAssets{};
-        Runtime::AssetImportPipeline existingPipeline{};
+        Runtime::AssetWorkflowModule existingPipeline{};
         Graphics::GpuAssetCache existingCache{
             harness.Renderer->GetBufferManager(),
             harness.Renderer->GetTextureManager(),
@@ -1117,7 +1116,7 @@ TEST(
             break;
         case Conflict::Pipeline:
             ASSERT_TRUE(harness.Services
-                .Provide<Runtime::AssetImportPipeline>(
+                .Provide<Runtime::AssetWorkflowModule>(
                     existingPipeline, "Conflict")
                 .has_value());
             break;
@@ -1147,7 +1146,7 @@ TEST(
                 ? &existingAssets
                 : nullptr);
         EXPECT_EQ(
-            harness.Services.Find<Runtime::AssetImportPipeline>(),
+            harness.Services.Find<Runtime::AssetWorkflowModule>(),
             conflict == Conflict::Pipeline
                 ? &existingPipeline
                 : nullptr);
@@ -1184,7 +1183,7 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Assets::AssetService>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -1218,7 +1217,7 @@ TEST(AssetWorkflowModule,
             harness.Services.Find<Assets::AssetService>(),
             nullptr);
         EXPECT_EQ(
-            harness.Services.Find<Runtime::AssetImportPipeline>(),
+            harness.Services.Find<Runtime::AssetWorkflowModule>(),
             nullptr);
         EXPECT_EQ(
             harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -1265,7 +1264,7 @@ TEST(AssetWorkflowModule,
             harness.Services.Find<Assets::AssetService>(),
             nullptr);
         EXPECT_EQ(
-            harness.Services.Find<Runtime::AssetImportPipeline>(),
+            harness.Services.Find<Runtime::AssetWorkflowModule>(),
             nullptr);
         EXPECT_EQ(
             harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -1319,7 +1318,7 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Assets::AssetService>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -1342,8 +1341,8 @@ TEST(AssetWorkflowModule,
     DirectHarness harness;
     ASSERT_TRUE(harness.Start().has_value());
     harness.Initialized = true;
-    Runtime::AssetImportPipeline* const pipeline =
-        harness.Services.Find<Runtime::AssetImportPipeline>();
+    Runtime::AssetWorkflowModule* const pipeline =
+        harness.Services.Find<Runtime::AssetWorkflowModule>();
     Core::IAssetFrameHooks* const hooks =
         harness.Services.Find<Core::IAssetFrameHooks>();
     Graphics::GpuAssetCache* const cache =
@@ -1376,36 +1375,7 @@ TEST(AssetWorkflowModule,
     TempSceneFile invalidScene{
         "runtime183-binding-invalid.scene.json", "not json"};
 
-    Runtime::TextureBakeService* postImportTextureBake = nullptr;
-    Runtime::WorldHandle bakeWorld{};
-    const auto serviceProbe =
-        pipeline->RegisterPostImportProcessor(
-            Runtime::RuntimePostImportProcessorDesc{
-                .DebugName =
-                    "RUNTIME-183 document replacement queue probe",
-                .PayloadKind =
-                    Assets::AssetPayloadKind::Mesh,
-                .Process =
-                    [&postImportTextureBake,
-                     &bakeWorld](
-                        const Runtime::
-                            RuntimePostImportProcessorContext&,
-                        Runtime::
-                            RuntimePostImportProcessorServices&
-                                services)
-                        -> Core::Result
-                    {
-                        postImportTextureBake =
-                            services.TextureBake;
-                        bakeWorld = services.World;
-                        return postImportTextureBake != nullptr
-                            ? Core::Ok()
-                            : Core::Err(
-                                  Core::ErrorCode::
-                                      InvalidState);
-                    },
-            });
-    ASSERT_TRUE(serviceProbe.IsValid());
+    const Runtime::WorldHandle bakeWorld = harness.InitialWorld;
 
     auto* const initialScene =
         harness.Worlds.Get(harness.InitialWorld);
@@ -1518,7 +1488,7 @@ TEST(AssetWorkflowModule,
     ASSERT_TRUE(first.has_value())
         << static_cast<int>(first.error());
     ASSERT_GT(EntityCount(*initialScene), 0u);
-    ASSERT_EQ(postImportTextureBake, textureBake);
+    ASSERT_EQ(pipeline->GetTextureBakeServiceForTest(), textureBake);
 
     prepareReplacement();
     afterReplacementPath = afterNewMesh.Path.string();
@@ -1781,7 +1751,6 @@ TEST(AssetWorkflowModule,
         harness.Worlds.Contains(harness.InitialWorld));
     EXPECT_FALSE(assets->IsAlive(*retainedTexture));
 
-    pipeline->UnregisterPostImportProcessor(serviceProbe);
     EXPECT_TRUE(
         harness.Document
             .UnregisterReplacementParticipant(*observer)
@@ -1860,8 +1829,8 @@ TEST(AssetWorkflowModule,
     harness.Services.Lock();
     harness.Initialized = true;
 
-    Runtime::AssetImportPipeline* const pipeline =
-        harness.Services.Find<Runtime::AssetImportPipeline>();
+    Runtime::AssetWorkflowModule* const pipeline =
+        harness.Services.Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     EXPECT_EQ(
         harness.Services.Find<Runtime::SelectionController>(),
@@ -1904,7 +1873,7 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Assets::AssetService>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -2046,7 +2015,7 @@ TEST(AssetWorkflowModule,
      BakeParticipantRegistersOncePerBootAndCleansBeforeOwnedState)
 {
     DirectHarness harness;
-    Runtime::AssetImportPipeline* persistentPipeline =
+    Runtime::AssetWorkflowModule* persistentPipeline =
         nullptr;
 
     for (std::uint32_t boot = 0u; boot < 2u; ++boot)
@@ -2055,9 +2024,9 @@ TEST(AssetWorkflowModule,
         ASSERT_TRUE(harness.Start().has_value());
         harness.Initialized = true;
 
-        Runtime::AssetImportPipeline* const pipeline =
+        Runtime::AssetWorkflowModule* const pipeline =
             harness.Services.Find<
-                Runtime::AssetImportPipeline>();
+                Runtime::AssetWorkflowModule>();
         ASSERT_NE(pipeline, nullptr);
         if (persistentPipeline == nullptr)
             persistentPipeline = pipeline;
@@ -2070,57 +2039,12 @@ TEST(AssetWorkflowModule,
                 .DrainGpuQueueCompletedTransfers(),
             1u);
 
-        Runtime::TextureBakeService* textureBake = nullptr;
-        ECS::EntityHandle bakeEntity =
-            ECS::InvalidEntityHandle;
-        bool processorCalled = false;
-        bool operational = false;
+        Runtime::TextureBakeService* const textureBake =
+            harness.Services.Find<Runtime::TextureBakeService>();
+        ASSERT_NE(textureBake, nullptr);
+        ASSERT_TRUE(textureBake->Available());
         const std::uint64_t bakeKey =
             static_cast<std::uint64_t>(boot) + 1u;
-        const auto processor =
-            pipeline->RegisterPostImportProcessor(
-                Runtime::RuntimePostImportProcessorDesc{
-                    .DebugName =
-                        "RUNTIME-183 composed bake probe",
-                    .PayloadKind =
-                        Assets::AssetPayloadKind::Mesh,
-                    .Process =
-                        [&](const Runtime::
-                                RuntimePostImportProcessorContext&,
-                            Runtime::
-                                RuntimePostImportProcessorServices&
-                                    services)
-                            -> Core::Result
-                        {
-                            processorCalled = true;
-                            textureBake = services.TextureBake;
-                            operational =
-                                textureBake != nullptr &&
-                                textureBake->Available();
-                            if (textureBake == nullptr ||
-                                services.Scene == nullptr)
-                            {
-                                return Core::Err(
-                                    Core::ErrorCode::
-                                        InvalidState);
-                            }
-                            bakeEntity =
-                                MakeTextureBakeMesh(
-                                    *services.Scene);
-                            const auto scheduled =
-                                textureBake->Bake(
-                                    MakeBakeRequest(
-                                        bakeKey,
-                                        services.World,
-                                        bakeEntity));
-                            return scheduled.Succeeded()
-                                ? Core::Ok()
-                                : Core::Err(
-                                      Core::ErrorCode::
-                                          InvalidState);
-                        },
-                });
-        ASSERT_TRUE(processor.IsValid());
 
         TempObjFile mesh{
             boot == 0u
@@ -2135,9 +2059,18 @@ TEST(AssetWorkflowModule,
                 });
         ASSERT_TRUE(imported.has_value())
             << static_cast<int>(imported.error());
-        ASSERT_TRUE(processorCalled);
-        ASSERT_TRUE(operational);
-        ASSERT_NE(textureBake, nullptr);
+        ECS::Scene::Registry* const scene =
+            harness.Worlds.Get(harness.InitialWorld);
+        ASSERT_NE(scene, nullptr);
+        const ECS::EntityHandle bakeEntity =
+            MakeTextureBakeMesh(*scene);
+        const auto scheduled =
+            textureBake->Bake(
+                MakeBakeRequest(
+                    bakeKey,
+                    harness.InitialWorld,
+                    bakeEntity));
+        ASSERT_TRUE(scheduled.Succeeded());
         EXPECT_EQ(
             textureBake
                 ->Snapshot(
@@ -2157,13 +2090,12 @@ TEST(AssetWorkflowModule,
         EXPECT_EQ(
             harness.GpuIdleWaits, idleBefore + 1u);
 
-        pipeline->UnregisterPostImportProcessor(processor);
         harness.Stop();
         // Quiescence above proves the sole participant released its work
         // before the asset/cache owners were torn down.
         EXPECT_EQ(
             harness.Services.Find<
-                Runtime::AssetImportPipeline>(),
+                Runtime::AssetWorkflowModule>(),
             nullptr);
     }
 }
@@ -2226,9 +2158,9 @@ TEST(AssetWorkflowModule,
         harness.Services.Lock();
         harness.Initialized = true;
 
-        Runtime::AssetImportPipeline* const pipeline =
+        Runtime::AssetWorkflowModule* const pipeline =
             harness.Services.Find<
-                Runtime::AssetImportPipeline>();
+                Runtime::AssetWorkflowModule>();
         Runtime::EditorCommandHistory* const history =
             harness.Services.Find<
                 Runtime::EditorCommandHistory>();
@@ -2237,6 +2169,7 @@ TEST(AssetWorkflowModule,
 
         std::atomic_bool workerStarted{false};
         std::atomic_bool releaseWorker{false};
+        std::atomic_bool workerFinished{false};
         WorkerRelease releaseOnExit{releaseWorker};
         pipeline->
             SetQueuedGeometryImportBeforeDecodeHookForTest(
@@ -2250,6 +2183,8 @@ TEST(AssetWorkflowModule,
                     {
                         std::this_thread::sleep_for(1ms);
                     }
+                    workerFinished.store(
+                        true, std::memory_order_release);
                 });
 
         TempObjFile mesh{
@@ -2307,6 +2242,7 @@ TEST(AssetWorkflowModule,
                 true, std::memory_order_release);
             async.OnShutdown(context);
         }
+        ASSERT_TRUE(WaitUntil(workerFinished));
         harness.TextureBakeRegistered = false;
         harness.TextureBakeResolved = false;
         harness.AssetRegistered = false;
@@ -2472,7 +2408,7 @@ TEST(AssetWorkflowModule,
         nullptr);
     EXPECT_EQ(
         engine.Services()
-            .Find<Runtime::AssetImportPipeline>(),
+            .Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         engine.Services().Find<Graphics::GpuAssetCache>(),
@@ -2542,9 +2478,9 @@ TEST(AssetWorkflowModule,
     engine.EmplaceModule<Runtime::TextureBakeModule>();
 
     engine.Initialize();
-    Runtime::AssetImportPipeline* const firstPipeline =
+    Runtime::AssetWorkflowModule* const firstPipeline =
         engine.Services()
-            .Find<Runtime::AssetImportPipeline>();
+            .Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(firstPipeline, nullptr);
     engine.Run();
     engine.Shutdown();
@@ -2552,7 +2488,7 @@ TEST(AssetWorkflowModule,
     engine.Initialize();
     EXPECT_EQ(
         engine.Services()
-            .Find<Runtime::AssetImportPipeline>(),
+            .Find<Runtime::AssetWorkflowModule>(),
         firstPipeline);
     engine.Run();
     engine.Shutdown();

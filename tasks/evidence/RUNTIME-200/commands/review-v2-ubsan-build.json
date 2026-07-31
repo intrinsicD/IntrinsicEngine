@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-ubsan",
+    "--target",
+    "IntrinsicCpuTests"
+  ],
+  "command_display": "cmake --build --preset ci-ubsan --target IntrinsicCpuTests",
+  "cwd": ".",
+  "duration_ms": 31453,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T19:26:57Z",
+  "label": "review-v2-ubsan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T19:26:26Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/review-v2-ubsan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/review-v2-ubsan-build.stdout.log",
+  "stdout_sha256": "95e1637a681e48b83e52ff56493f0a37997929d1a21ee5907cd2bc70d864c9fb",
+  "task_id": "RUNTIME-200"
+}

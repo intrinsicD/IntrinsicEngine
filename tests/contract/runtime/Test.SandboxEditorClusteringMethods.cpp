@@ -61,7 +61,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;

@@ -10,6 +10,12 @@ import Extrinsic.Core.Tasks;
 
 namespace Extrinsic::Assets
 {
+    struct AssetLoadPipeline::AsyncState
+    {
+        std::mutex Mutex{};
+        AssetLoadPipeline* Owner{nullptr};
+    };
+
     namespace
     {
         // Call SetState on the registry while NOT holding the pipeline's mutex.
@@ -21,6 +27,32 @@ namespace Extrinsic::Assets
             return registry->SetState(id, from, to);
         }
 
+    }
+
+    AssetLoadPipeline::AssetLoadPipeline()
+        : m_AsyncState(std::make_shared<AsyncState>())
+    {
+        m_AsyncState->Owner = this;
+    }
+
+    AssetLoadPipeline::~AssetLoadPipeline()
+    {
+        Shutdown();
+    }
+
+    void AssetLoadPipeline::Shutdown()
+    {
+        const std::shared_ptr<AsyncState> asyncState = m_AsyncState;
+        if (asyncState)
+        {
+            std::scoped_lock asyncLock(asyncState->Mutex);
+            if (asyncState->Owner == this)
+                asyncState->Owner = nullptr;
+        }
+        std::scoped_lock lock(m_Mutex);
+        m_Accepting = false;
+        m_Registry = nullptr;
+        m_EventBus = nullptr;
     }
 
     void AssetLoadPipeline::AppendStageStamp(InFlightEntry& entry, Stage stage)
@@ -81,7 +113,7 @@ namespace Extrinsic::Assets
         AssetEventBus* eventBus = nullptr;
         {
             std::scoped_lock lock(m_Mutex);
-            if (m_Registry == nullptr)
+            if (!m_Accepting || m_Registry == nullptr)
             {
                 return Core::Err(Core::ErrorCode::InvalidState);
             }
@@ -113,9 +145,14 @@ namespace Extrinsic::Assets
 
         if (Core::Tasks::Scheduler::IsInitialized())
         {
-            Core::Tasks::Scheduler::Dispatch([this, id]
+            const std::shared_ptr<AsyncState> asyncState =
+                m_AsyncState;
+            Core::Tasks::Scheduler::Dispatch(
+                [asyncState, id]
             {
-                (void)OnCpuDecoded(id);
+                std::scoped_lock lock(asyncState->Mutex);
+                if (asyncState->Owner != nullptr)
+                    (void)asyncState->Owner->OnCpuDecoded(id);
             });
             return Core::Ok();
         }

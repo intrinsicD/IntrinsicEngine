@@ -1,0 +1,53 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.47 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.43 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.40 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.42 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.41 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.38 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.40 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.43 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.42 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.40 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.39 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.47 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.41 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.45 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.39 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.41 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.47 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.44 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+    Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.49 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+1/1 Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture ...   Passed    3.42 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =   3.42 sec*proc (1 test)
+graphics       =   3.42 sec*proc (1 test)
+integration    =   3.42 sec*proc (1 test)
+runtime        =   3.42 sec*proc (1 test)
+vulkan         =   3.42 sec*proc (1 test)
+
+Total Test time (real) =  68.62 sec

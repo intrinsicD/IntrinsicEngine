@@ -29,7 +29,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
@@ -237,7 +237,7 @@ namespace
         return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
             MeshHasVertexProperty(engine, entity, "v:normal") &&
             RequiredEngineService<
-                Extrinsic::Runtime::AssetImportPipeline>(engine)
+                Extrinsic::Runtime::AssetWorkflowModule>(engine)
                 .GetLastAssetImportEvent()
                 .has_value();
     }
@@ -245,26 +245,8 @@ namespace
     void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
         auto* const pipeline =
-            engine.Services().Find<Runtime::AssetImportPipeline>();
+            engine.Services().Find<Runtime::AssetWorkflowModule>();
         ASSERT_NE(pipeline, nullptr);
-
-        auto authoring =
-            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-        for (auto& desc : authoring)
-        {
-            ASSERT_TRUE(
-                pipeline->RegisterImportEntityAuthoringPolicy(
-                    std::move(desc))
-                    .IsValid());
-        }
-        ASSERT_TRUE(
-            pipeline->RegisterImportCompletedHandler(
-                Runtime::MakeSandboxDefaultImportCompletedHandler(nullptr))
-                .IsValid());
-        ASSERT_TRUE(
-            pipeline->RegisterPostImportProcessor(
-                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
-                .IsValid());
     }
 }
 
@@ -290,7 +272,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
         InstallSandboxDefaultRuntimePolicies(closingEngine);
 
         auto imported =
-            RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(closingEngine).ImportAssetFromPath(
+            RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(closingEngine).ImportAssetFromPath(
                 Runtime::RuntimeAssetImportRequest{
                     .Path = meshFile.Path.string(),
                     .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -327,7 +309,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
     InstallSandboxDefaultRuntimePolicies(completedEngine);
 
     auto imported =
-        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(completedEngine).ImportAssetFromPath(
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(completedEngine).ImportAssetFromPath(
             Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,

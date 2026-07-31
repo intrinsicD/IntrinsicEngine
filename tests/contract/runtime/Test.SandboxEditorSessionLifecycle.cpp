@@ -61,7 +61,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
@@ -414,7 +414,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         firstEngine.EmplaceModule<Runtime::SceneDocumentModule>();
         firstEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
         firstEngine.Initialize();
-        EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(firstEngine)
+        EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(firstEngine)
                          .ImportAssetFromPath(
                              Runtime::RuntimeAssetImportRequest{
                                  .Path =
@@ -423,7 +423,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
                                      Assets::AssetPayloadKind::Mesh,
                              })
                          .has_value());
-        const auto& event = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(firstEngine)
+        const auto& event = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(firstEngine)
                                 .GetLastAssetImportEvent();
         ASSERT_TRUE(event.has_value());
         firstSequence = event->Sequence;
@@ -447,7 +447,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         secondEngine.EmplaceModule<Runtime::SceneDocumentModule>();
         secondEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
         secondEngine.Initialize();
-        EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(secondEngine)
+        EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(secondEngine)
                          .ImportAssetFromPath(
                              Runtime::RuntimeAssetImportRequest{
                                  .Path =
@@ -456,7 +456,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
                                      Assets::AssetPayloadKind::PointCloud,
                              })
                          .has_value());
-        const auto& event = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(secondEngine)
+        const auto& event = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(secondEngine)
                                 .GetLastAssetImportEvent();
         ASSERT_TRUE(event.has_value());
         ASSERT_EQ(event->Sequence, firstSequence);

@@ -53,7 +53,7 @@ import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;

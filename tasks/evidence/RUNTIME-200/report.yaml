@@ -1,0 +1,434 @@
+schema_version: 1
+task_id: RUNTIME-200
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-07-31T20:04:40Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 46937f8e2487849fdad3079f132309d5cb0dd100
+  head_revision: 3732513ff719feb1b02a2df740505a881260fb24
+  branch: codex/runtime-200-staged-import-recipe
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: ara/logic/solution/architecture.md
+    sha256: 77f56af0f2019d02b4e5c5fe793850d67eb5205efff6499e2b8016920b923659
+  - path: ara/staging/observations.yaml
+    sha256: 93fa83abd452180d890958d8cb6a6fe159f74e9b01a963286942860197098335
+  - path: docs/adr/0027-right-sized-runtime-composition.md
+    sha256: 1bdc3599b7ac0135faa39517e0db6197860550cddad0cb6ac76617edb2986e22
+  - path: docs/api/generated/module_inventory.md
+    sha256: a7218fae3a6e5a2bc6b0736e98a499c7e9068974ab5d3a07e613a44ce09b16fb
+  - path: docs/architecture/parameterization-mapping-roadmap.md
+    sha256: 83c958b7c1599254ebc663627e4f635cf6b44c2f4bf82cfb3b5a53d129598917
+  - path: docs/architecture/runtime.md
+    sha256: d599c6a06635884df69208671c102e930a373d5273a28c83c9a6f99e19a0fe51
+  - path: docs/benchmarking/ci-policy.md
+    sha256: fa417e6188e363eb7774ab461f9a2b5e5aaf4f1b6e15a9dad2c52dacb35b2f83
+  - path: docs/migration/nonlegacy-parity-matrix.md
+    sha256: 09918824683139f4230064cd763f21b27cf1b76118e2c6a010816ed01d513ebd
+  - path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+    sha256: 29b9331af56fc3710cb98e9d660b2bc57178c7c4ab9f390a34fa4e86b4b1405e
+  - path: src/app/Sandbox/README.md
+    sha256: 496cb54265aabdd07270617a138a27a2315d9d83187b7db653555dd5e9a86ca3
+  - path: src/app/Sandbox/Sandbox.cpp
+    sha256: 7da4bfb754fe6ea2ec5d8a1871eac3d49a8956ce5916f492305fdc8d600e584f
+  - path: src/assets/Asset.GeometryIOBridge.cpp
+    sha256: null
+  - path: src/assets/Asset.GeometryIOBridge.cppm
+    sha256: null
+  - path: src/assets/Asset.GeometryPayload.cppm
+    sha256: bd4169fed38c2d5d088f846d5ad40d936063444a97289a55d51d06b33cecd52c
+  - path: src/assets/Asset.LoadPipeline.cpp
+    sha256: 11c8cbed2e1ec7ded392d01c756bff0be7e8d003a6775a05afd72a394e517256
+  - path: src/assets/Asset.LoadPipeline.cppm
+    sha256: 2bbcc055178c557b24b7c0797cf4d6c76a43b1cbaf4cd13c963e3038a08eb225
+  - path: src/assets/Asset.ModelTextureIOBridge.cpp
+    sha256: null
+  - path: src/assets/Asset.ModelTextureIOBridge.cppm
+    sha256: null
+  - path: src/assets/Asset.ModelTexturePayload.cppm
+    sha256: 2a038f6435ab06268acf8b2294462f6437c901463beb7ecb2730a2241b931a21
+  - path: src/assets/Asset.Service.cpp
+    sha256: bf46ae38e9865dc6bf2e5e42913ed5f9f84fc95b508622c6cae51477d73af626
+  - path: src/assets/CMakeLists.txt
+    sha256: f55f4556746f2eb6bad4b1a6b3d2d88c90ba400bdfd8f5990a00e4264d7f5bfc
+  - path: src/assets/README.md
+    sha256: c6a8eb7cdeaca26d1a658075e6bc677d6060faf350ce81ff115d167f6def48a1
+  - path: src/graphics/assets/README.md
+    sha256: 64ee921abae3b3ff651dcfd32f763dddacaff1a914061960635c00104c70ed05
+  - path: src/runtime/CMakeLists.txt
+    sha256: 372b31550c166e407955383724f10aa8b450d719b952e9f8fa9a6e616fff5d02
+  - path: src/runtime/README.md
+    sha256: 6f8477f329f6897ba0a8a5a4685e85db605aedfa0788e40c66407d8f7cc398df
+  - path: src/runtime/Runtime.AssetGeometryIO.cpp
+    sha256: null
+  - path: src/runtime/Runtime.AssetGeometryIO.cppm
+    sha256: null
+  - path: src/runtime/Runtime.AssetImportPipeline.cppm
+    sha256: null
+  - path: src/runtime/Runtime.AssetModelTextureIO.cppm
+    sha256: null
+  - path: src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cpp
+    sha256: 2fbc7509a933d8b61efc7962e5b1efbc243c1370fed0264a27a09433568500f1
+  - path: src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cppm
+    sha256: 44104d7db3f3ad8c08b846b16032bb3da4381325d8c47680a2d6619421f572da
+  - path: src/runtime/Runtime.AssetWorkflowImportExecutor.cpp
+    sha256: 388b247640fb73d5bfac371a4011113f4e570f3e23b53482a45880723d2f7eee
+  - path: src/runtime/Runtime.AssetWorkflowImportExecutor.cppm
+    sha256: bcbb615d491d2f4627b5086a8ab3829aee998b9cda54fd40379051963669491d
+  - path: src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp
+    sha256: 132e4370bdd5387b7d2107471c464c61c0d55471af2152be3ef2481d5b68e4fe
+  - path: src/runtime/Runtime.AssetWorkflowModelMaterialization.cppm
+    sha256: ce6566d57b903cb2e0015908e674f5400d2022ca1dabe0c0c34958e7cbe62f96
+  - path: src/runtime/Runtime.AssetWorkflowModelTextureDecode.cpp
+    sha256: e8bb4b239f0e5ce17be3a7670f4d786ff43084cb49387f872265857f155332c4
+  - path: src/runtime/Runtime.AssetWorkflowModelTextureDecode.cppm
+    sha256: c0cac4dd3336701db72eb4b4d8e4d42ceb4f523c6de91f430907543dc6adacec
+  - path: src/runtime/Runtime.AssetWorkflowModule.cpp
+    sha256: 5f6641f8eaad674961ca57735e649451e6c8c9875782993771258416cf5152ac
+  - path: src/runtime/Runtime.AssetWorkflowModule.cppm
+    sha256: 985b3e409fd7e9669ad8cd74613acd3ae3907025a05f4403996685948caa8516
+  - path: src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp
+    sha256: a1d8d403ad08e766ae3ee8b9e4e7e94633e24b2580aa18d1577df4f49a1a8e93
+  - path: src/runtime/Runtime.AssetWorkflowRecipePolicies.cppm
+    sha256: 76a485013662e2ffeadc0e2ebdd21cf643e165f93fd5bcd2b7ca206fadb126d9
+  - path: src/runtime/Runtime.AssetWorkflowTextureResidency.cpp
+    sha256: f682dd5c1cff0489e3e49f8aaafda35deb712e32fd1a9688c6a2ff8171898815
+  - path: src/runtime/Runtime.AssetWorkflowTextureResidency.cppm
+    sha256: 2934d0a737b57d56fb6db3c5b96f5041403004c55f6c2a3ee64174d934238192
+  - path: src/runtime/Runtime.Engine.cpp
+    sha256: 9d2e1ec7f38140139f4956aa026f00dea07784c4b9bb6f5f46d6e06f15c4a34d
+  - path: src/runtime/Runtime.SandboxDefaultPolicies.cpp
+    sha256: 6fce988b0c27f08257f3b28b8f94b1a04104b98e9cf7cd6e7f1e69b7d315a871
+  - path: src/runtime/Runtime.SandboxEditorFacades.Internal.hpp
+    sha256: c0038cdf48dbe337456b470519ad9fc7274b0debdb241f8ed8e91283dadbbc96
+  - path: src/runtime/Runtime.SandboxEditorFacades.cpp
+    sha256: 723c5d4ef4d708a6af5d38af2d4ac9f7e2fad6f6abaae4e59f72eac622e68a62
+  - path: src/runtime/Runtime.SandboxEditorFacades.cppm
+    sha256: f7aa86952d4af6dd63740cc81c6cc2ad416aca289f93a3367e89b3630d81ef76
+  - path: src/runtime/Runtime.SandboxMethodFacade.cpp
+    sha256: 96cdcb601c567b21ed22101a45f8b619907e446b64d415f72578f3d166ec3e14
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 36159129d8683eb31c2c1c83601d531a3e1197b0832ffc905ba83d0ca2330fa9
+  - path: tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
+    sha256: 0c67d456def018c4a9ac5de59eae234e16082e9773d0ddd872449c757ffaa742
+  - path: tasks/backlog/bugs/index.md
+    sha256: 57e1c88cbd5f596f7e5e85d8e164f943f6fc2ac853f33cd211abfb029d27791c
+  - path: tasks/backlog/runtime/README.md
+    sha256: f7e3fd80dfbdec220d0fcda032cb2f6c057da06d03b943866cdf538d59411b36
+  - path: tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 75ee639ba0e06475882e0cd73b03a1336014c8d1375c86625f57436ed04541f4
+  - path: tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md
+    sha256: 96a2967ad412d08031fccd18a0970a90782f4a8609d84523178d88ab668c2f33
+  - path: tests/CMakeLists.txt
+    sha256: 1bbb53559cf58d95e26eb38fe6854b7dc044f5544106b0a596ab59375c31c682
+  - path: tests/README.md
+    sha256: b3600676011b42bf175f73e69768467972e31476d04e393876f605fa8ad4432a
+  - path: tests/contract/runtime/Test.AssetGeometryIO.cpp
+    sha256: null
+  - path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+    sha256: 94bf243f9e3056316e4fec1b43ae703bf9ce6b1aa9aea4b06fa1ffe01d8a8a2a
+  - path: tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp
+    sha256: 8fc2b949ef51c119b8d703e89d34b740bb2f3ff1d94960d3f97f98667773e83f
+  - path: tests/contract/runtime/Test.AssetImportRecipe.cpp
+    sha256: 8af748c30bcaf696efd46dbf3338049f6a9cdaa4edcea26d559b9041c229b966
+  - path: tests/contract/runtime/Test.AssetMeshNormals.cpp
+    sha256: null
+  - path: tests/contract/runtime/Test.AssetModelSceneHandoff.cpp
+    sha256: null
+  - path: tests/contract/runtime/Test.AssetModelTextureHandoff.cpp
+    sha256: null
+  - path: tests/contract/runtime/Test.AssetModelTextureIO.cpp
+    sha256: null
+  - path: tests/contract/runtime/Test.AssetWorkflowModule.cpp
+    sha256: 09828aa30dbd453eb9e6d8c4b67e1c6aed360a5f635fd31aae17f831a87b95d6
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: e0f5c2d36fab25f12265d06b395bc3c013c136ad09a1d50fd6f71e2832f35146
+  - path: tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+    sha256: d96f7601ac0fae784a0cb87e21cff978fce21a28cc56dd7ff4b5138f8d5ef2b8
+  - path: tests/contract/runtime/Test.RuntimeWorldRegistry.cpp
+    sha256: c7d44747ac82a04efcfe148c3ae584a062da18387c47169e468ecac3bc10da2c
+  - path: tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    sha256: 6614b54e5be3de4142e914c4a9aa22123c4cc312fc105b268891ac4e7bd63215
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: 484338c7f1c0d0da9f912edd63c6dc8319e1ec752f8409a9f23d838678c3da8c
+  - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    sha256: 46cc370dccab9cf42c9511dc90e67988149e40b2faf2bc6c39e7581c2413fa58
+  - path: tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+    sha256: 5b9b64317602ebe14ca82b568844dfa7a2b7fb51959d85ce3f129d4308da2871
+  - path: tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+    sha256: 82b8ca7572b4efba5ffb4663b6d87bed161ff6e3ac042e1f9325ba685d94cde2
+  - path: tests/contract/runtime/Test.SandboxEditorVisualization.cpp
+    sha256: 48160cc874027ac32a89b0f5d68784f8494c9d62bee36198e2f1cf2dba3001ce
+  - path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    sha256: 9f8cee96a92fc697b69cc70ee197b61c149074d732992a7a30b399d0b52a8910
+  - path: tests/integration/runtime/Test.SandboxAppComposition.cpp
+    sha256: 8ffde2c2a5f07be733c2f0452e30543c01225a7a1aae030a31a208c82ddc284b
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: c6b4316c77bc29526eef1b55e7cb916eaaf58307a6e6ab827d87757405256d6d
+  - path: tests/unit/assets/Test.Asset.GeometryIOBridge.cpp
+    sha256: null
+  - path: tests/unit/assets/Test.Asset.ModelTextureIOBridge.cpp
+    sha256: null
+  - path: tests/unit/assets/Test.Asset.ModelTexturePayload.cpp
+    sha256: 0ce4a5684c52377d5788eccc16e20d975e01256bf03fceb48902403144ec8431
+  content_digest: a45a6e47e0cec08185b1316fca12ded76518e44035140edb32f73ed77bfb7992
+touched:
+  paths:
+  - ara/logic/solution/architecture.md
+  - ara/staging/observations.yaml
+  - docs/adr/0027-right-sized-runtime-composition.md
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/parameterization-mapping-roadmap.md
+  - docs/architecture/runtime.md
+  - docs/benchmarking/ci-policy.md
+  - docs/migration/nonlegacy-parity-matrix.md
+  - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+  - src/app/Sandbox/README.md
+  - src/app/Sandbox/Sandbox.cpp
+  - src/assets/Asset.GeometryIOBridge.cpp
+  - src/assets/Asset.GeometryIOBridge.cppm
+  - src/assets/Asset.GeometryPayload.cppm
+  - src/assets/Asset.LoadPipeline.cpp
+  - src/assets/Asset.LoadPipeline.cppm
+  - src/assets/Asset.ModelTextureIOBridge.cpp
+  - src/assets/Asset.ModelTextureIOBridge.cppm
+  - src/assets/Asset.ModelTexturePayload.cppm
+  - src/assets/Asset.Service.cpp
+  - src/assets/CMakeLists.txt
+  - src/assets/README.md
+  - src/graphics/assets/README.md
+  - src/runtime/CMakeLists.txt
+  - src/runtime/README.md
+  - src/runtime/Runtime.AssetGeometryIO.cpp
+  - src/runtime/Runtime.AssetGeometryIO.cppm
+  - src/runtime/Runtime.AssetImportPipeline.cppm
+  - src/runtime/Runtime.AssetModelTextureIO.cppm
+  - src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cpp
+  - src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cppm
+  - src/runtime/Runtime.AssetWorkflowImportExecutor.cpp
+  - src/runtime/Runtime.AssetWorkflowImportExecutor.cppm
+  - src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp
+  - src/runtime/Runtime.AssetWorkflowModelMaterialization.cppm
+  - src/runtime/Runtime.AssetWorkflowModelTextureDecode.cpp
+  - src/runtime/Runtime.AssetWorkflowModelTextureDecode.cppm
+  - src/runtime/Runtime.AssetWorkflowModule.cpp
+  - src/runtime/Runtime.AssetWorkflowModule.cppm
+  - src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp
+  - src/runtime/Runtime.AssetWorkflowRecipePolicies.cppm
+  - src/runtime/Runtime.AssetWorkflowTextureResidency.cpp
+  - src/runtime/Runtime.AssetWorkflowTextureResidency.cppm
+  - src/runtime/Runtime.Engine.cpp
+  - src/runtime/Runtime.SandboxDefaultPolicies.cpp
+  - src/runtime/Runtime.SandboxEditorFacades.Internal.hpp
+  - src/runtime/Runtime.SandboxEditorFacades.cpp
+  - src/runtime/Runtime.SandboxEditorFacades.cppm
+  - src/runtime/Runtime.SandboxMethodFacade.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md
+  - tests/CMakeLists.txt
+  - tests/README.md
+  - tests/contract/runtime/Test.AssetGeometryIO.cpp
+  - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+  - tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp
+  - tests/contract/runtime/Test.AssetImportRecipe.cpp
+  - tests/contract/runtime/Test.AssetMeshNormals.cpp
+  - tests/contract/runtime/Test.AssetModelSceneHandoff.cpp
+  - tests/contract/runtime/Test.AssetModelTextureHandoff.cpp
+  - tests/contract/runtime/Test.AssetModelTextureIO.cpp
+  - tests/contract/runtime/Test.AssetWorkflowModule.cpp
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  - tests/contract/runtime/Test.RuntimeWorldRegistry.cpp
+  - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+  - tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+  - tests/contract/runtime/Test.SandboxEditorVisualization.cpp
+  - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+  - tests/integration/runtime/Test.SandboxAppComposition.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/unit/assets/Test.Asset.GeometryIOBridge.cpp
+  - tests/unit/assets/Test.Asset.ModelTextureIOBridge.cpp
+  - tests/unit/assets/Test.Asset.ModelTexturePayload.cpp
+  layers:
+  - app
+  - assets
+  - graphics
+  - runtime
+  modules:
+  - Extrinsic.Asset.LoadPipeline
+  - Extrinsic.Runtime.AssetWorkflowImportExecutor
+  - Extrinsic.Runtime.AssetWorkflowModule
+extension_seam: Add formats through lower-layer decoders and versioned recipe route data; expose no second
+  import orchestrator without a present independent composition owner.
+future_change_plan: Extend recipe fields, typed payloads, and ordered stages through fail-closed validation
+  and the existing private executor; preserve the sole AssetWorkflowModule service.
+acceptance:
+- criterion: Every production import route executes the same explicit stage model
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Each layer owns only its stage data/operation; runtime alone composes ECS,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Real route/visibility/parity tests pass before the old IO bridges,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-asan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-asan-ccache-disabled-clean-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-asan-configure.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-asan-full-cpu-fixed.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-asan-lifetime-regressions-clean.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-build-intrinsic-tests.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-final-surface-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-final-surface-focused.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-focused-import-contracts.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-ubsan-configure.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-ubsan-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-vulkan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-vulkan-configure.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-vulkan-import-model-smoke-fixed.json
+- receipt: tasks/evidence/RUNTIME-200/commands/ci-vulkan-race-fix-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/debug-tag-scan.json
+- receipt: tasks/evidence/RUNTIME-200/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-200/commands/module-inventory-refresh.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-diff-check.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-session-brief-refresh.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-doc-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-task-policy.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-strict-task-validation.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-v4-diff-check.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-v4-strict-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-v4-strict-doc-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/retirement-v4-strict-task-policy.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-asan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-asan-full-cpu-retry.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ci-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ci-focused.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ci-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-debug-tag-scan.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-diff-check.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-final-diff-check.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-final-doc-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-module-inventory-refresh.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-queued-reimport-repeat20.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-session-brief-refresh.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-doc-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-layering.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-task-policy.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-task-validation.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-strict-test-layout.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-ubsan-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-build.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-import-model.json
+- receipt: tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-texture-repeat20.json
+- receipt: tasks/evidence/RUNTIME-200/commands/session-brief-refresh.json
+- receipt: tasks/evidence/RUNTIME-200/commands/strict-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-200/commands/strict-doc-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/strict-layering.json
+- receipt: tasks/evidence/RUNTIME-200/commands/strict-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-200/commands/strict-task-policy.json
+- receipt: tasks/evidence/RUNTIME-200/commands/strict-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-200/commands/strict-task-validation.json
+- receipt: tasks/evidence/RUNTIME-200/commands/strict-test-layout.json
+changed_public_contracts:
+- AssetWorkflowModule is the sole published runtime import service and owns the seven-stage AssetImportRecipe
+  contract.
+- AssetLoadPipeline invalidates queued callbacks during teardown without waiting for unrelated scheduler
+  work.
+diagnostics_and_previews:
+- Copied stage traces distinguish route, decode, CPU materialization, ECS authoring, postprocess, GPU
+  residency, and exactly-once completion outcomes.
+- Queued geometry reimport preserves ExistingAsset through ingest, reloads the same asset generation,
+  and authors no duplicate ECS entity.
+- Failed ASan and Vulkan diagnostic attempts are retained byte-for-byte as observation artifacts; every
+  JSON receipt remaining in commands is generator-included and passing.
+- The required four import/model-scene Vulkan cases and 20 repeated generated-texture contention cases
+  pass; the extra 48-case sweep exposed unrelated BUG-124.
+benchmark_or_parity_evidence:
+- No formal claim-grade or performance claim is made; high-risk evidence covers implementation correctness
+  and review only.
+docs_sync:
+  task_file: tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- BUG-123 remains an unrelated intermittent retired-scene-save terminal-event race; the unchanged complete
+  ASan selector passed after the preserved reproductions.
+- BUG-124 leaves the unrelated full geometry-presentation Vulkan sweep at 47/48 while all RUNTIME-200-specific
+  Vulkan cases pass.
+skipped_checks: []
+artifacts:
+- path: tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md
+  sha256: 96a2967ad412d08031fccd18a0970a90782f4a8609d84523178d88ab668c2f33
+  kind: file
+- path: docs/architecture/runtime.md
+  sha256: d599c6a06635884df69208671c102e930a373d5273a28c83c9a6f99e19a0fe51
+  kind: file
+- path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+  sha256: 29b9331af56fc3710cb98e9d660b2bc57178c7c4ab9f390a34fa4e86b4b1405e
+  kind: file
+- path: tests/contract/runtime/Test.AssetImportRecipe.cpp
+  sha256: 8af748c30bcaf696efd46dbf3338049f6a9cdaa4edcea26d559b9041c229b966
+  kind: file
+- path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+  sha256: 94bf243f9e3056316e4fec1b43ae703bf9ce6b1aa9aea4b06fa1ffe01d8a8a2a
+  kind: file
+- path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+  sha256: 9f8cee96a92fc697b69cc70ee197b61c149074d732992a7a30b399d0b52a8910
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/README.md
+  sha256: ec1c5d1272dc29143769e0e8e58098ab3f53d123a9cfd830c5c8f09a67a5c233
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/ci-asan-full-cpu.json
+  sha256: 227280401ae3f6692f544e7a1f560bc7c5654064652d85b4e91023658bc1693c
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/ci-vulkan-import-model-smoke.json
+  sha256: e88b331125625d155feb69eb7879a9dd7259e5ae798813b40146afdd18467857
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/ci-vulkan-full-gate.json
+  sha256: b0b7feb6568fee8e3f2216f3c25bf03452156e904c1c8ad6cd65aad58291c41c
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/review-v2-asan-full-cpu.json
+  sha256: f1888d735fd4aa5f69608f4774ac533f3f0c58b62e2d1f7cbf5936792d918a3f
+  kind: file
+- path: tasks/evidence/RUNTIME-200/observations/review-v2-asan-bug123-repeat20.json
+  sha256: c646ef94620222d72779a29a8d4ebd4276eefe79204616291b3a48f9dc382c9a
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-200/handoff.jsonl
+review: tasks/evidence/RUNTIME-200/reviews.jsonl

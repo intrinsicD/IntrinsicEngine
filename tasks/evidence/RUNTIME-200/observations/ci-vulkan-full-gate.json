@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 120",
+  "cwd": ".",
+  "duration_ms": 449119,
+  "exit_code": 8,
+  "finished_at": "2026-07-31T18:23:48Z",
+  "label": "ci-vulkan-full-gate",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T18:16:19Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/ci-vulkan-full-gate.stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/ci-vulkan-full-gate.stdout.log",
+  "stdout_sha256": "66d66825f86ce8dfec479ca3a3b702aff7928b0a83b92fbaa790078156f9c638",
+  "task_id": "RUNTIME-200"
+}

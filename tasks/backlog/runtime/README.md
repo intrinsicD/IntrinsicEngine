@@ -16,10 +16,6 @@ cleanup slice:
 
 #### Open tasks
 
-- [`RUNTIME-200` — Staged asset-import and materialization recipe](RUNTIME-200-staged-asset-import-materialization-recipe.md)
-  unifies route/decode/materialize/author/postprocess/residency/completion and
-  deletes the role callback/IO bridge/monolithic handoff paths after workflow
-  visibility parity.
 - [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](RUNTIME-202-retire-sandbox-runtime-facade.md)
   is the final feature-workflow migration/removal task: app owns Sandbox view
   aggregation while runtime exposes narrow feature operations/snapshots. It
@@ -31,6 +27,11 @@ cleanup slice:
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-200` — Staged asset-import and materialization recipe](../../done/RUNTIME-200-staged-asset-import-materialization-recipe.md)
+  converged every production route on the seven-stage recipe behind the sole
+  published `AssetWorkflowModule`, made recipe policy and executors private,
+  and deleted the public pipeline, callback registries, IO bridges, and
+  monolithic handoff surfaces after CPU, sanitizer, and promoted-Vulkan parity.
 - [`RUNTIME-201` — Unified editor mutation and history transaction](../../done/RUNTIME-201-unified-editor-mutation-history-transaction.md)
   converged every undoable production entity/geometry edit on one internal
   generation-validated transaction and `EditorCommandHistory`, retained
@@ -175,8 +176,10 @@ additionally on `ARCH-011`). `ARCH-013` completed the post-seam re-review:
 composition accessor that should be shapeable into a narrow service/module seam
 later, while `RUNTIME-148` and `RUNTIME-149` remained unchanged mechanical
 extractions. `RUNTIME-146` is retired; boot-time config resolution now lives in
-the free-standing `Extrinsic.Runtime.EngineConfigBoot` module. `RUNTIME-147` is
-retired; asset import now lives in `Extrinsic.Runtime.AssetImportPipeline`.
+the free-standing `Extrinsic.Runtime.EngineConfigBoot` module. `RUNTIME-147`
+is retired; its extracted `Extrinsic.Runtime.AssetImportPipeline` was an
+intermediate state subsequently deleted by `RUNTIME-200`, and current import
+composition lives behind the sole published `AssetWorkflowModule` service.
 `RUNTIME-148` is retired; its first scene-persistence subsystem is superseded
 by retired `RUNTIME-172`'s app-composed
 `Extrinsic.Runtime.SceneDocumentModule`. `RUNTIME-149` is retired; render-recipe
@@ -666,7 +669,9 @@ split; narratives live in the retirement log.
   decode/materialize helpers, queue snapshot/cancel/clear state, and import
   dirty-state marking. `Engine` keeps only
   `GetAssetImportPipeline()` and platform drop delegation; Sandbox default
-  policies, editor UI, and runtime tests call the pipeline directly.
+  policies, editor UI, and runtime tests called the pipeline directly. This is
+  historical intermediate evidence; `RUNTIME-200` later deleted that public
+  pipeline and moved all callers to `AssetWorkflowModule`.
 - [RUNTIME-148 — Extract the scene-document facade out of Engine](../../archive/RUNTIME-148-extract-scene-document-subsystem.md)
   (done, 2026-07-08, `Operational`): runtime scene persistence now lives in
   `Extrinsic.Runtime.SceneDocument`, including direct and queued scene

@@ -27,7 +27,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
@@ -111,7 +111,7 @@ namespace
                 m_Deadline = now + m_Timeout;
             }
             ++m_ObservedFrames;
-            if (RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent().has_value())
+            if (RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetLastAssetImportEvent().has_value())
             {
                 m_EventObserved = true;
                 m_Elapsed = now - m_StartedAt;
@@ -794,7 +794,7 @@ TEST(SandboxEditorPresentation, RuntimeImportEventIsReflectedByAppFilePanel)
     SandboxEditor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
 
-    const auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
+    const auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = "/tmp/intrinsic-arch-006-missing.ply",
             .PayloadKind =
@@ -842,24 +842,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     ComposeEditorUiAndInitialize(engine);
     auto& pipeline =
-        RequiredEngineService<Runtime::AssetImportPipeline>(engine);
-    auto authoring =
-        Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-    for (auto& desc : authoring)
-    {
-        EXPECT_TRUE(
-            pipeline.RegisterImportEntityAuthoringPolicy(
-                std::move(desc))
-                .IsValid());
-    }
-    EXPECT_TRUE(
-        pipeline.RegisterImportCompletedHandler(
-            Runtime::MakeSandboxDefaultImportCompletedHandler(nullptr))
-            .IsValid());
-    EXPECT_TRUE(
-        pipeline.RegisterPostImportProcessor(
-            Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
-            .IsValid());
+        RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
 
     SandboxEditor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());

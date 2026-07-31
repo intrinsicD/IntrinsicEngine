@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -43,7 +44,8 @@ export namespace Extrinsic::Assets
             std::chrono::steady_clock::time_point timestamp{};
         };
 
-        AssetLoadPipeline() = default;
+        AssetLoadPipeline();
+        ~AssetLoadPipeline();
         AssetLoadPipeline(const AssetLoadPipeline&) = delete;
         AssetLoadPipeline& operator=(const AssetLoadPipeline&) = delete;
 
@@ -72,11 +74,16 @@ export namespace Extrinsic::Assets
             bool uploadDone = false;
             bool finalized = false;
         };
+        struct AsyncState;
+
         static void AppendStageStamp(InFlightEntry& entry, Stage stage);
         void ArchiveTrailUnlocked(AssetId id);
+        void Shutdown();
 
         mutable std::mutex m_Mutex{};
         static constexpr std::size_t kCompletedTrailCapacity = 256;
+        bool m_Accepting{true};
+        std::shared_ptr<AsyncState> m_AsyncState{};
         AssetRegistry* m_Registry = nullptr;
         AssetEventBus* m_EventBus = nullptr;
         std::unordered_map<AssetId, InFlightEntry, AssetIdHash> m_AssetsInFlight{};

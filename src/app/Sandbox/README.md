@@ -79,11 +79,11 @@ Document New/Load/Close, active-world switch/retirement, and shutdown clear the
 cohort without resurrecting old state.
 
 Sandbox also explicitly composes optional `Runtime::AssetWorkflowModule` after
-the document and interaction owners. The module owns the per-boot asset
-authority, GPU residency, model handoffs, and exact published
-`AssetImportPipeline`, plus the persistent import and object-space-normal-bake
-objects that must survive async drain. Editor/default-policy consumers resolve
-the published asset services locally. Omitting the module leaves the generic
+the document and interaction owners. The module is the exact published import
+service and owns the per-boot asset authority, GPU residency, private staged
+import executor, and object-space-normal-bake state that must survive async
+drain. Editor consumers resolve the workflow and its published asset services
+locally. Omitting the module leaves the generic
 Engine, world, renderer, transfer, async, and render-extraction geometry
 maintenance paths operational; asset commands are unavailable and platform
 drops fail closed.
@@ -113,20 +113,14 @@ result presentation. K-Means and Progressive Poisson command/config/result
 implementations compile in a private runtime facade unit; all other panel
 models, processing commands, history/jobs, validation, and result sinks likewise
 remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
-dependencies. The app installs Sandbox defaults transactionally without an
-exported lifecycle owner. It first resolves the exact required published
-`Runtime::AssetImportPipeline` and built-in
-`Runtime::RuntimeInputActionRegistry`; if either is absent, it registers
-nothing. It obtains the fixed authoring array, import-completed handler,
-direct-mesh postprocessor, and `F` action descriptors from
-`Runtime::SandboxEditorFacades`, while the callback implementations stay
-runtime-private. One file-local handle record retains only the two required
-provider borrows and typed registration handles. Optional
-`Runtime::CameraControllerRegistry` and `Runtime::SelectionController` lookups
-are independent: the completed handler receives only the optional camera and
-uses pipeline-provided selection for auto-selection, while `F` is registered
-only when both optional services exist. Partial install rolls back in exact
-reverse order.
+dependencies. Import authoring, direct-mesh postprocess, selection, and focus
+are fields of the runtime-owned `AssetImportRecipe`; Sandbox owns no import
+callback registry or registration handles. The app installs only its separate
+default `F` action without an exported lifecycle owner. It resolves the built-in
+`Runtime::RuntimeInputActionRegistry` plus optional
+`Runtime::CameraControllerRegistry` and `Runtime::SelectionController`; the
+action is registered only when both optional services exist, and teardown
+unregisters that exact handle.
 The app remains a runtime-only consumer: `EditorShell` registers its
 parameterless frame contribution and windows through the resolved host, reads
 scene and selection state through runtime APIs, emits selection and
@@ -137,15 +131,15 @@ views by authoring ECS `RenderEdges` / `RenderPoints` through runtime
 command/history seams, routes material/scalar/color visualization choices
 through `VisualizationConfig`, routes copied visualization recipes through
 runtime extraction-cache state, and submits frame-driven file/import commands
-through the exact published `AssetImportPipeline::QueueGeometryImport(...)` or
-`QueueModelTextureImport(...)`. Every supported `File / Import` payload is
+through the exact published `AssetWorkflowModule::QueueAssetImport(...)` with a
+validated recipe. Every supported `File / Import` payload is
 therefore queued before decode; the worker reads and decodes while bounded
 main-thread completion owns `AssetService`, ECS, selection, focus, and document
 history mutation. The direct `ImportAssetFromPath(...)` API remains synchronous
 for explicit non-frame callers and is not used by the Sandbox ImGui callback.
 Asset routing, decoding, materialization, texture-upload requests, and default
-import/input policy implementation remain runtime/asset owned; the sandbox app
-implementation only composes the runtime-provided defaults.
+import recipe policy remain runtime/asset owned; the sandbox app only requests
+the workflow.
 
 `File / Import` is a linear path -> payload-hint -> import workflow. The path
 field remains editable whenever the window is bound, while the runtime facade
@@ -158,7 +152,7 @@ second extension or importer-capability table. The same disabled-tooltip
 convention is used by the AssetIO queue's clear and cancel commands.
 
 The `File / Import` editor window also polls
-`AssetImportPipeline::GetAssetImportQueueSnapshot()` through exact service
+`AssetWorkflowModule::GetAssetImportQueueSnapshot()` through exact service
 discovery for the
 runtime-owned AssetIO queue. Rows show queued/running/apply/upload/terminal
 import stages, payload kind, path basename, elapsed time, determinate progress
@@ -252,7 +246,7 @@ The default module list explicitly composes `AsyncWorkModule`, `CameraModule`,
 `SceneInteractionModule`, followed by `AssetWorkflowModule`. Camera remains
 optional at the runtime contract:
 when omitted, Sandbox policy registration omits `F` and autofocus, editor
-camera controls report unavailable, and pipeline-provided import auto-selection
+camera controls report unavailable, and workflow-provided import auto-selection
 plus non-camera behavior continue. When interaction/selection alone is omitted,
 `F` is absent but a present camera may still consume an import focus target;
 materialization does not require selection. Scene document and scene
@@ -265,11 +259,9 @@ requires the document/history services when it is composed.
 During shutdown, the announcement first cancels imports and detaches their
 provider borrows, then the generic GPU-participant bridge drains and performs
 any required device-idle wait. Sandbox application shutdown next detaches the
-editor and unregisters `F`, the direct-mesh postprocessor, the completed
-handler, and PointCloud/Graph/Mesh authoring handles while both required
-registries remain live. Reverse AsyncWork/AssetWorkflow module and provider
-teardown follows. Repeated app shutdown sees an empty handle record and is a
-no-op.
+editor and unregisters its exact `F` action while the input registry remains
+live. Reverse AsyncWork/AssetWorkflow module and provider teardown follows.
+Repeated app shutdown sees an empty handle record and is a no-op.
 
 ## Build presets
 

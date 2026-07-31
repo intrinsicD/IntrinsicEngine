@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-R",
+    "RuntimeAssetImportFormatCoverage.ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities|AssetWorkflowModule.BlockedImportIsSafeInBothOrdinaryOwnerShutdownOrders|RuntimeAssetImportFormatCoverage.ImportAssetFromPathDoesNotWaitForUnrelatedSchedulerWork",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -R 'RuntimeAssetImportFormatCoverage.ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities|AssetWorkflowModule.BlockedImportIsSafeInBothOrdinaryOwnerShutdownOrders|RuntimeAssetImportFormatCoverage.ImportAssetFromPathDoesNotWaitForUnrelatedSchedulerWork' --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 1670,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T17:45:04Z",
+  "label": "ci-asan-lifetime-regressions-clean",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T17:45:03Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/ci-asan-lifetime-regressions-clean.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/ci-asan-lifetime-regressions-clean.stdout.log",
+  "stdout_sha256": "1e8ff17b41466d7cf8ea32813a5e61373b6959c79fed2155ed30ce0ee75e9bab",
+  "task_id": "RUNTIME-200"
+}

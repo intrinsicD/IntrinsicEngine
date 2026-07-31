@@ -1,0 +1,30 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "-R",
+    "Import|ModelScene",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R 'Import|ModelScene' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 14272,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T19:30:55Z",
+  "label": "review-v2-vulkan-import-model",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T19:30:40Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-import-model.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/review-v2-vulkan-import-model.stdout.log",
+  "stdout_sha256": "017bef8e97147265ea9a8c4716d77be9843e50fdded61489c24a3961cf5cee4d",
+  "task_id": "RUNTIME-200"
+}

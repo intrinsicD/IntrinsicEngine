@@ -1033,19 +1033,20 @@ TEST(RuntimeEngineLayering, MaintenanceHasNoOptionalStreamingFacade)
 
 TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
 {
-    const auto assetImport =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetImportPipeline.cpp");
+    const auto assetImport = ReadFile(
+        RepoRoot() /
+        "src/runtime/Runtime.AssetWorkflowImportExecutor.cpp");
     const auto sceneDocument =
         ReadFile(
             RepoRoot() /
             "src/runtime/Scene/Runtime.SceneDocumentModule.cpp");
-    const auto sandboxPolicies =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxDefaultPolicies.cpp");
+    const auto importPolicies =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp");
     const auto visualization =
         ReadFile(RepoRoot() /
                  "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp");
     const auto modelHandoff =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetModelSceneHandoff.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp");
     const auto methodFacade =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxMethodFacade.cpp");
     const auto clusteringModule = ReadFile(
@@ -1066,8 +1067,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     // designator rather than MakeCpuJobDesc's positional scope argument.
     EXPECT_EQ(CountOccurrences(sceneDocument, "JobDesc{"), 2u);
     EXPECT_EQ(CountOccurrences(sceneDocument, ".Scope = world"), 2u);
-    EXPECT_EQ(CountOccurrences(sandboxPolicies, "JobDesc{"), 2u);
-    EXPECT_EQ(CountOccurrences(sandboxPolicies, ".Scope = world"), 2u);
+    EXPECT_EQ(CountOccurrences(importPolicies, "JobDesc{"), 2u);
+    EXPECT_EQ(CountOccurrences(importPolicies, ".Scope = world"), 2u);
     EXPECT_EQ(CountOccurrences(visualization, "JobDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(visualization, ".Scope = request.World"), 1u);
 
@@ -1746,7 +1747,7 @@ TEST(RuntimeEngineLayering,
     const auto workflowAnnouncement = SliceBetween(
         workflowImpl,
         "void AnnounceShutdown()",
-        "AssetImportPipeline Pipeline{}");
+        "AssetWorkflowImportExecutor ImportExecutor{}");
     const auto workflowResolve = SliceBetween(
         workflowImpl,
         "Core::Result AssetWorkflowModule::OnResolve(",
@@ -1782,13 +1783,13 @@ TEST(RuntimeEngineLayering,
               std::string::npos);
 
     const auto cancelImports = workflowAnnouncement.find(
-        "Pipeline->CancelActiveAssetImportsForShutdown()");
+        "ImportExecutor->CancelActiveAssetImportsForShutdown()");
     const auto detachPipeline =
-        workflowAnnouncement.find("DetachPipeline();");
+        workflowAnnouncement.find("DetachImportExecutor();");
     const auto stopCallbacks =
         workflowAnnouncement.find("AcceptingCallbacks = false;");
     const auto detachScene =
-        workflowAnnouncement.find("SceneHandoff.reset();");
+        workflowAnnouncement.find("ModelMaterializer.reset();");
     const auto releaseDocument =
         workflowAnnouncement.find("ReleaseDocumentParticipant();");
     const auto clearSelection =

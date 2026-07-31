@@ -63,7 +63,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;

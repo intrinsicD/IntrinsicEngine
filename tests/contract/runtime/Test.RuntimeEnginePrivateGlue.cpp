@@ -706,7 +706,7 @@ TEST(RuntimeEnginePrivateGlue,
         std::string{"GetPendingObjectSpaceNormalBake"} +
             "CountForTest(",
         "m_AssetService",
-        "m_AssetImportPipeline",
+        "m_AssetWorkflowModule",
         "m_AssetResidencyService",
         "m_ObjectSpaceNormalBakeService",
         "BindActiveSceneAssetHandoffs",
@@ -729,13 +729,13 @@ TEST(RuntimeEnginePrivateGlue,
     constexpr std::string_view ownedCompositionTokens[] = {
         "std::unique_ptr<Assets::AssetService> Assets{}",
         "std::unique_ptr<Graphics::GpuAssetCache> Cache{}",
-        "AssetImportPipeline Pipeline{}",
+        "AssetWorkflowImportExecutor ImportExecutor{}",
         "Provide<Assets::AssetService>",
-        "Provide<AssetImportPipeline>",
+        "Provide<AssetWorkflowModule>",
         "Provide<Graphics::GpuAssetCache>",
         "Provide<Core::IAssetFrameHooks>",
-        "std::make_unique<AssetModelTextureHandoff>",
-        "std::make_unique<AssetModelSceneHandoff>",
+        "std::make_unique<AssetWorkflowTextureResidency>",
+        "std::make_unique<AssetWorkflowModelMaterializer>",
     };
     for (const auto token : ownedCompositionTokens)
     {
@@ -806,7 +806,7 @@ TEST(RuntimeEnginePrivateGlue,
                   "Core::IAssetFrameHooks>()"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "m_Impl->m_ServiceRegistry.Find<AssetImportPipeline>()"),
+                  "m_Impl->m_ServiceRegistry.Find<AssetWorkflowModule>()"),
               std::string::npos);
     EXPECT_NE(frameLoop.find("if (AssetWorkflow != nullptr)"),
               std::string::npos);
@@ -823,6 +823,56 @@ TEST(RuntimeEnginePrivateGlue,
               std::string::npos);
     EXPECT_EQ(runtimeCMake.find("Runtime.AssetResidencyService"),
               std::string::npos);
+}
+
+TEST(RuntimeEnginePrivateGlue,
+     AssetWorkflowImplementationModulesStayPrivateAndRetiredNamesStayDeleted)
+{
+    const auto root = RepoRoot();
+    const auto runtimeCMake = ReadFile(root / "src/runtime/CMakeLists.txt");
+    const auto privateBoundary = runtimeCMake.find("        PRIVATE\n");
+    ASSERT_NE(privateBoundary, std::string::npos);
+    const std::string publicSources = runtimeCMake.substr(0u, privateBoundary);
+
+    constexpr std::string_view privateModules[] = {
+        "Runtime.AssetWorkflowImportExecutor.cppm",
+        "Runtime.AssetWorkflowGeometryMaterialization.cppm",
+        "Runtime.AssetWorkflowModelMaterialization.cppm",
+        "Runtime.AssetWorkflowModelTextureDecode.cppm",
+        "Runtime.AssetWorkflowRecipePolicies.cppm",
+        "Runtime.AssetWorkflowTextureResidency.cppm",
+    };
+    for (const auto module : privateModules)
+    {
+        EXPECT_EQ(publicSources.find(module), std::string::npos) << module;
+        EXPECT_NE(runtimeCMake.find(module), std::string::npos) << module;
+    }
+
+    constexpr std::string_view retiredStems[] = {
+        "AssetImportPipeline",
+        "AssetImportPolicies",
+        "AssetGeometryIO",
+        "AssetMeshNormals",
+        "AssetModelSceneHandoff",
+        "AssetModelTextureHandoff",
+        "AssetModelTextureIO",
+    };
+    for (const auto stem : retiredStems)
+    {
+        EXPECT_EQ(runtimeCMake.find(stem), std::string::npos) << stem;
+        EXPECT_FALSE(std::filesystem::exists(
+            root / "src/runtime" /
+            (std::string{"Runtime."} + std::string{stem} + ".cppm")))
+            << stem;
+        EXPECT_FALSE(std::filesystem::exists(
+            root / "src/runtime" /
+            (std::string{"Runtime."} + std::string{stem} + ".cpp")))
+            << stem;
+    }
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/assets/Asset.GeometryIOBridge.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/assets/Asset.ModelTextureIOBridge.cppm"));
 }
 
 TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)

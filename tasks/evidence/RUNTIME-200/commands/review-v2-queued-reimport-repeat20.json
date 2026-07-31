@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities$",
+    "--repeat",
+    "until-fail:20",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities$' --repeat until-fail:20 --timeout 60",
+  "cwd": ".",
+  "duration_ms": 1064,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T19:13:54Z",
+  "label": "review-v2-queued-reimport-repeat20",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T19:13:53Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/review-v2-queued-reimport-repeat20.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/review-v2-queued-reimport-repeat20.stdout.log",
+  "stdout_sha256": "4e5f237f387fe8c1757851d4cc34da5fd1a431883a239bf8b5ee46a3834fbe6f",
+  "task_id": "RUNTIME-200"
+}

@@ -41,7 +41,7 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.FramePacingDiagnostics;
@@ -1074,8 +1074,8 @@ namespace Extrinsic::Runtime
     {
         Core::Log::Info("[Runtime] File drop received: path_count={}",
                         event.Paths.size());
-        if (AssetImportPipeline* const pipeline =
-                m_Impl->m_ServiceRegistry.Find<AssetImportPipeline>();
+        if (AssetWorkflowModule* const pipeline =
+                m_Impl->m_ServiceRegistry.Find<AssetWorkflowModule>();
             pipeline != nullptr)
         {
             pipeline->ImportDroppedFilePaths(event.Paths);

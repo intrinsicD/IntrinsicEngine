@@ -32,7 +32,7 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
@@ -100,7 +100,7 @@ namespace
             }
 
             m_Probe.PipelineLiveAfterSandboxShutdown =
-                engine.Services().Find<Runtime::AssetImportPipeline>() !=
+                engine.Services().Find<Runtime::AssetWorkflowModule>() !=
                 nullptr;
             m_Probe.InputRegistryLiveAfterSandboxShutdown =
                 engine.Services()
@@ -119,9 +119,8 @@ namespace
         std::atomic_bool WorkerStarted{false};
         std::atomic_bool ReleaseWorker{false};
         std::atomic_bool GpuParticipantShutdown{false};
-        std::atomic_uint32_t CompletionCalls{0u};
         Runtime::RuntimeAssetIngestHandle Operation{};
-        Runtime::AssetImportPipeline* ExpectedPipeline{nullptr};
+        Runtime::AssetWorkflowModule* ExpectedPipeline{nullptr};
         Runtime::RuntimeInputActionRegistry* ExpectedInputRegistry{nullptr};
         std::uint32_t ObservedFrames{0u};
         bool FrameLimitExceeded{false};
@@ -191,7 +190,7 @@ namespace
                 m_Probe->GpuParticipantShutdown.load(
                     std::memory_order_acquire);
             m_Probe->PipelineIdentityLiveBeforeSandboxShutdown =
-                engine.Services().Find<Runtime::AssetImportPipeline>() ==
+                engine.Services().Find<Runtime::AssetWorkflowModule>() ==
                 m_Probe->ExpectedPipeline;
             m_Probe->InputIdentityLiveBeforeSandboxShutdown =
                 engine.Services()
@@ -222,7 +221,7 @@ namespace
             m_Sandbox.Shutdown();
 
             m_Probe->PipelineIdentityLiveAfterSandboxShutdown =
-                engine.Services().Find<Runtime::AssetImportPipeline>() ==
+                engine.Services().Find<Runtime::AssetWorkflowModule>() ==
                 m_Probe->ExpectedPipeline;
             m_Probe->InputIdentityLiveAfterSandboxShutdown =
                 engine.Services()
@@ -412,7 +411,7 @@ namespace
     }
 }
 
-TEST(SandboxAppComposition, MissingAssetWorkflowLeavesRequiredPolicySetAbsent)
+TEST(SandboxAppComposition, MissingAssetWorkflowStillComposesIndependentFocusAction)
 {
     SandboxLifecycleProbe probe{};
     Intrinsic::Tests::RuntimeTestKernel engine(
@@ -422,7 +421,7 @@ TEST(SandboxAppComposition, MissingAssetWorkflowLeavesRequiredPolicySetAbsent)
     engine.Initialize();
 
     EXPECT_EQ(
-        engine.Services().Find<Runtime::AssetImportPipeline>(),
+        engine.Services().Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_NE(
         engine.Services().Find<Runtime::RuntimeInputActionRegistry>(),
@@ -446,7 +445,7 @@ TEST(SandboxAppComposition, MissingAssetWorkflowLeavesRequiredPolicySetAbsent)
         ReplaceMainCameraWithRecording(engine);
     ASSERT_NE(recording, nullptr);
     DispatchFocusAction(engine);
-    EXPECT_EQ(recording->FocusCalls, 0u);
+    EXPECT_EQ(recording->FocusCalls, 1u);
 
     engine.Shutdown();
     EXPECT_FALSE(probe.PipelineLiveAfterSandboxShutdown);
@@ -468,7 +467,7 @@ TEST(SandboxAppComposition, PipelineSelectionDoesNotRequireCamera)
     engine.Initialize();
 
     auto* const pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     const auto imported = pipeline->ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
@@ -505,7 +504,7 @@ TEST(SandboxAppComposition, MaterializationAndAutofocusDoNotRequireSelection)
     engine.Initialize();
 
     auto* const pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     auto* const cameras =
         engine.Services().Find<Runtime::CameraControllerRegistry>();
@@ -566,7 +565,7 @@ TEST(SandboxAppComposition, ReinitializeAndRepeatedShutdownDoNotDuplicateState)
 
     engine.Initialize();
     auto* pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     ASSERT_TRUE(
         pipeline
@@ -590,7 +589,7 @@ TEST(SandboxAppComposition, ReinitializeAndRepeatedShutdownDoNotDuplicateState)
 
     engine.Initialize();
     pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     RecordingCameraController* const recording =
         ReplaceMainCameraWithRecording(engine);
@@ -641,31 +640,11 @@ TEST(SandboxAppComposition,
     engine.Initialize();
 
     probe->ExpectedPipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     probe->ExpectedInputRegistry =
         engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
     ASSERT_NE(probe->ExpectedPipeline, nullptr);
     ASSERT_NE(probe->ExpectedInputRegistry, nullptr);
-
-    const Runtime::RuntimeImportCompletedHandlerHandle completionProbe =
-        probe->ExpectedPipeline->RegisterImportCompletedHandler(
-            Runtime::RuntimeImportCompletedHandlerDesc{
-                .DebugName =
-                    "RUNTIME-168 blocked shutdown completion probe",
-                .PayloadKind =
-                    Extrinsic::Assets::AssetPayloadKind::Mesh,
-                .Handle =
-                    [probe](
-                        const Runtime::RuntimeImportCompletedContext&,
-                        Runtime::RuntimeImportCompletedServices&)
-                    {
-                        probe->CompletionCalls.fetch_add(
-                            1u,
-                            std::memory_order_acq_rel);
-                        return Core::Ok();
-                    },
-            });
-    ASSERT_TRUE(completionProbe.IsValid());
 
     const Runtime::GpuQueueParticipantHandle gpuParticipant =
         engine.Jobs().RegisterGpuQueueParticipant(
@@ -714,10 +693,6 @@ TEST(SandboxAppComposition,
     ASSERT_TRUE(probe->ExitRequestedWhileWorkerBlocked);
     ASSERT_FALSE(
         probe->ReleaseWorker.load(std::memory_order_acquire));
-    EXPECT_EQ(
-        probe->CompletionCalls.load(std::memory_order_acquire),
-        0u);
-
     engine.Shutdown();
 
     EXPECT_TRUE(probe->WorkerBlockedBeforeSandboxShutdown);
@@ -731,10 +706,6 @@ TEST(SandboxAppComposition,
     EXPECT_TRUE(probe->ReleaseIssuedAfterSandboxShutdown);
     EXPECT_TRUE(
         probe->ReleaseWorker.load(std::memory_order_acquire));
-    EXPECT_EQ(
-        probe->CompletionCalls.load(std::memory_order_acquire),
-        0u);
-
     const Runtime::RuntimeAssetImportQueueSnapshot snapshot =
         probe->ExpectedPipeline->GetAssetImportQueueSnapshot();
     ASSERT_EQ(snapshot.Entries.size(), 1u);
@@ -744,7 +715,7 @@ TEST(SandboxAppComposition,
         Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
 }
 
-TEST(SandboxAppComposition, DefaultPolicyLifecycleIsPrivateAndTransactional)
+TEST(SandboxAppComposition, DefaultFocusLifecycleIsPrivateAndTransactional)
 {
     const std::string runtimeCMake =
         WithoutWhitespace(
@@ -789,20 +760,14 @@ TEST(SandboxAppComposition, DefaultPolicyLifecycleIsPrivateAndTransactional)
         std::string::npos);
 
     EXPECT_EQ(
-        CountOccurrences(
-            facade,
-            "MakeSandboxDefaultImportAuthoringPolicies"),
-        1u);
+        facade.find("MakeSandboxDefaultImportAuthoringPolicies"),
+        std::string::npos);
     EXPECT_EQ(
-        CountOccurrences(
-            facade,
-            "MakeSandboxDefaultImportCompletedHandler"),
-        1u);
+        facade.find("MakeSandboxDefaultImportCompletedHandler"),
+        std::string::npos);
     EXPECT_EQ(
-        CountOccurrences(
-            facade,
-            "MakeSandboxDefaultDirectMeshPostProcessor"),
-        1u);
+        facade.find("MakeSandboxDefaultDirectMeshPostProcessor"),
+        std::string::npos);
     EXPECT_EQ(
         CountOccurrences(
             facade,
@@ -817,6 +782,24 @@ TEST(SandboxAppComposition, DefaultPolicyLifecycleIsPrivateAndTransactional)
         std::string::npos);
     EXPECT_NE(
         app.find("structSandboxDefaultPolicyHandles"),
+        std::string::npos);
+    EXPECT_EQ(
+        app.find("RegisterImportEntityAuthoringPolicy"),
+        std::string::npos);
+    EXPECT_EQ(
+        app.find("RegisterImportCompletedHandler"),
+        std::string::npos);
+    EXPECT_EQ(
+        app.find("RegisterPostImportProcessor"),
+        std::string::npos);
+    EXPECT_EQ(
+        app.find("UnregisterImportEntityAuthoringPolicy"),
+        std::string::npos);
+    EXPECT_EQ(
+        app.find("UnregisterImportCompletedHandler"),
+        std::string::npos);
+    EXPECT_EQ(
+        app.find("UnregisterPostImportProcessor"),
         std::string::npos);
 
     const auto appShutdownBegin = app.find("voidShutdown()noexcept{");
@@ -847,40 +830,12 @@ TEST(SandboxAppComposition, DefaultPolicyLifecycleIsPrivateAndTransactional)
 
     EXPECT_NE(
         install.find(
-            "if(!handles.IsEmpty()||pipeline==nullptr||"
-            "inputActions==nullptr)"),
+            "if(!handles.IsEmpty()||inputActions==nullptr)"),
         std::string_view::npos);
 
-    const auto installMesh =
-        install.find(
-            "pipeline->RegisterImportEntityAuthoringPolicy");
-    const auto installCompleted =
-        install.find(
-            "pipeline->RegisterImportCompletedHandler");
-    const auto installPost =
-        install.find(
-            "pipeline->RegisterPostImportProcessor");
     const auto installFocus =
         install.find("inputActions->Register");
-    ASSERT_NE(installMesh, std::string_view::npos);
-    ASSERT_NE(installCompleted, std::string_view::npos);
-    ASSERT_NE(installPost, std::string_view::npos);
     ASSERT_NE(installFocus, std::string_view::npos);
-    EXPECT_LT(installMesh, installCompleted);
-    EXPECT_LT(installCompleted, installPost);
-    EXPECT_LT(installPost, installFocus);
-
-    EXPECT_NE(
-        install.find(
-            "if(!handles.ImportAuthoring[index].IsValid())"),
-        std::string_view::npos);
-    EXPECT_NE(
-        install.find("if(!handles.ImportCompleted.IsValid())"),
-        std::string_view::npos);
-    EXPECT_NE(
-        install.find(
-            "if(!handles.DirectMeshPostProcessor.IsValid())"),
-        std::string_view::npos);
     EXPECT_NE(
         install.find("if(!focusAction.IsValid())"),
         std::string_view::npos);
@@ -888,7 +843,7 @@ TEST(SandboxAppComposition, DefaultPolicyLifecycleIsPrivateAndTransactional)
         CountOccurrences(
             install,
             "UninstallSandboxDefaultPolicies(handles);"),
-        4u);
+        1u);
 
     const auto uninstallBegin =
         app.find("voidUninstallSandboxDefaultPolicies(");
@@ -905,28 +860,7 @@ TEST(SandboxAppComposition, DefaultPolicyLifecycleIsPrivateAndTransactional)
 
     const auto uninstallFocus =
         uninstall.find("handles.InputActions->Unregister");
-    const auto uninstallPost =
-        uninstall.find(
-            "handles.Pipeline->UnregisterPostImportProcessor");
-    const auto uninstallCompleted =
-        uninstall.find(
-            "handles.Pipeline->UnregisterImportCompletedHandler");
-    const auto uninstallAuthoring =
-        uninstall.find(
-            "handles.Pipeline->"
-            "UnregisterImportEntityAuthoringPolicy");
     ASSERT_NE(uninstallFocus, std::string_view::npos);
-    ASSERT_NE(uninstallPost, std::string_view::npos);
-    ASSERT_NE(uninstallCompleted, std::string_view::npos);
-    ASSERT_NE(uninstallAuthoring, std::string_view::npos);
-    EXPECT_LT(uninstallFocus, uninstallPost);
-    EXPECT_LT(uninstallPost, uninstallCompleted);
-    EXPECT_LT(uninstallCompleted, uninstallAuthoring);
-    EXPECT_NE(
-        uninstall.find(
-            "for(std::size_tindex=handles.ImportAuthoring.size();"
-            "index>0u;--index)"),
-        std::string_view::npos);
 
     const auto editorTarget =
         appCMake.find(
