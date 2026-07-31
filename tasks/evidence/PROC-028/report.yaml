@@ -1,63 +1,42 @@
 schema_version: 1
 task_id: PROC-028
 workflow_profile: high-risk
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-30T22:22:09Z'
+generated_at: '2026-07-31T09:36:23Z'
 claim_eligible: false
 source:
   base_ref: origin/main
-  base_revision: 572d7d2ef1d7d563a11eba2e1a3b15467247f8f0
-  head_revision: c5e3970358f74f82761368aae80dbcf15eaa9a75
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
+  base_revision: 16eed9610a5579bb47db07c12c946f2d74cf2fc7
+  head_revision: 1d68310e17be75b35178b5443ab0a6cd070d5fd5
+  branch: task/proc-028-close-20260731
+  worktree: /tmp/intrinsic-proc028-close-20260731
   dirty: false
   surface:
-  - path: ara/trace/exploration_tree.yaml
-    sha256: 46208429335b0c86559c2afe148ed3a1523a6b19d3e51283be6ca2a10bec395d
-  - path: ara/trace/pm_reasoning_log.yaml
-    sha256: f8f5ecffd31a4491f4a8ca36c976cc44640771111a6267ca1cd597bc34f761f7
-  - path: ara/trace/sessions/2026-07-30_001.yaml
-    sha256: 7cb406c214aa87208bc625ffb2c4f24132055e6192d78d248599e6fa67f29318
-  - path: ara/trace/sessions/2026-07-31_001.yaml
-    sha256: 5bec36c5af131fa27bbeb24fa0f3c687e4ef110f7769a94442a1641ed16ee540
-  - path: ara/trace/sessions/session_index.yaml
-    sha256: 4988032d9a924cf05ca40e40b59a97f5d2a36f2efa89bec6c197e8c293858384
-  - path: docs/agent/review-checklist.md
-    sha256: c4ce07448998ed364e36a387ca7c82ec8e9192f45a19af9faf3d80884010ec26
-  - path: docs/agent/workflow-evidence.md
-    sha256: 27eef7e3bfa602807d920cb209ca8b905d3f5bc649b022c1c9b5f456651bee37
-  - path: tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
-    sha256: 914cfa8511c7645eddf3de48a8d714b7c1e73d3d89410708fded957eefdd06a3
-  - path: tests/regression/tooling/Test.ExperimentCustody.py
-    sha256: 8de2691bd9f01b32011004bd839f2d3c66ad76be86a6c346784b782190577718
-  - path: tests/regression/tooling/Test.WorkflowEvidence.py
-    sha256: 020c8ce4eb839a0b02e1691dbd51f3933de3866b75bb2d846c7b8a92b6fd6f26
-  - path: tools/agents/experiment_custody.py
-    sha256: 80db7f82fb84e18783750a8e5108ba3cf24bce8f205288e38f2339c5f4e976e0
-  - path: tools/agents/skills/intrinsicengine-review/references/review-checklist.md
-    sha256: a163a84e08d8c224a1767428a3ed6d8d63473ba8a9c10e58516852736ca4835f
-  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-    sha256: 27eef7e3bfa602807d920cb209ca8b905d3f5bc649b022c1c9b5f456651bee37
-  - path: tools/agents/workflow_evidence.py
-    sha256: 71e21c6103fe15c6ad51a7766f5acf6abbfbaf2fe99f04adfc8d91ecaa22750a
-  content_digest: c66519538b5877f3433cd804943cf7d62f3a8cd11c98628908ae842aed1552ea
+  - path: ara/logic/solution/architecture.md
+    sha256: 1c7bd2041bdf6f4e8adb552af95b1eb9f594c3fff6a883ad2dd528c437243a07
+  - path: ara/logic/solution/heuristics.md
+    sha256: ca20e2b63f60640c42b4eab97502b7e4c0b38dfba32f4ed03a75e1439c2a02fd
+  - path: tasks/SESSION-BRIEF.md
+    sha256: f400b92298f89f304d42c42dd346944f6bca44d973ce0314041e4440a001e58b
+  - path: tasks/active/README.md
+    sha256: 6ac05a2cebcdfb3450b322173fa308d2b4bde4ea193df723b6f432557bde17f9
+  - path: tasks/backlog/process/README.md
+    sha256: 4b97e13f1fd24779d9c9feb4e5bda02c37d3b1aea3004fd45cd57047a5fb1585
+  - path: tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
+    sha256: c2ab82e4f83dfe785752749c33804b42df467fc36a6c49e4edb0a8bfce6cfffb
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 8a2409e855eb5d9c8fe188f0a05435228997a255ef3df4826a5292fa788596d0
+  content_digest: 7e206bba57cb520688d1433f4de7af77f18d53e7a3b5adb391dd5b5fcc6e4bc5
 touched:
   paths:
-  - ara/trace/exploration_tree.yaml
-  - ara/trace/pm_reasoning_log.yaml
-  - ara/trace/sessions/2026-07-30_001.yaml
-  - ara/trace/sessions/2026-07-31_001.yaml
-  - ara/trace/sessions/session_index.yaml
-  - docs/agent/review-checklist.md
-  - docs/agent/workflow-evidence.md
-  - tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
-  - tests/regression/tooling/Test.ExperimentCustody.py
-  - tests/regression/tooling/Test.WorkflowEvidence.py
-  - tools/agents/experiment_custody.py
-  - tools/agents/skills/intrinsicengine-review/references/review-checklist.md
-  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-  - tools/agents/workflow_evidence.py
+  - ara/logic/solution/architecture.md
+  - ara/logic/solution/heuristics.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/process/README.md
+  - tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
+  - tasks/done/RETIREMENT-LOG.md
   layers:
   - tools
   modules:
@@ -65,7 +44,7 @@ touched:
   - experiment-custody
   - task-claim
   - workflow-evidence
-extension_seam: Schema-versioned plain YAML, JSON, and JSONL files validated by small repository Python
+extension_seam: Schema-versioned plain YAML, JSON, and JSONL files validated by focused repository Python
   CLIs and existing strict CI.
 future_change_plan: Add fields only through an explicit schema migration with adversarial regression fixtures,
   canonical documentation updates, and prospective task migration.
@@ -81,8 +60,8 @@ acceptance:
   evidence: []
   reason: null
 - criterion: '`PROC-028` itself has a valid generated `report.yaml`, complete command'
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 - criterion: Existing task, skill, method, benchmark, ARA, docs, and CI authorities
@@ -134,47 +113,48 @@ commands:
 - receipt: tasks/evidence/PROC-028/commands/repair-python-quality.json
 - receipt: tasks/evidence/PROC-028/commands/repair-structural-gates.json
 - receipt: tasks/evidence/PROC-028/commands/repair-workflow-regressions.json
+- receipt: tasks/evidence/PROC-028/commands/retirement-concurrency-gate.json
+- receipt: tasks/evidence/PROC-028/commands/retirement-source-docs-sync.json
+- receipt: tasks/evidence/PROC-028/commands/retirement-source-structural-gates-retry-2.json
 - receipt: tasks/evidence/PROC-028/commands/structural-gates.json
 - receipt: tasks/evidence/PROC-028/commands/workflow-regressions.json
 changed_public_contracts:
 - Task front-matter workflow_schema/profile/evidence/ownership fields and deterministic prospective grandfathering.
 - Generated task-evidence report, command-receipt, handoff, and fixed-revision review schema version 1.
-- High-risk handoff and review records derive their exact clean-commit or dirty-worktree revision from
-  report source identity.
+- High-risk handoff and review records derive and enforce their exact clean-commit or dirty-worktree revision
+  from report source identity.
 - Claim-grade/protected completion requires validated protocol, run, terminal cells, bundle, audit, and
   protected authority/attempt custody.
-- Benchmark result schema version 2 with exact manifest/source/config binding and stable benchmark plus
-  append-only run/attempt identities.
-- Git-common-dir task/path claim CLI with bounded leases and retained release/recovery history.
+- Benchmark result schema version 2 binds exact manifest/source/config identity while preserving stable
+  benchmark and append-only run/attempt identities.
+- Git-common-dir task/path claims use bounded leases and retained release/recovery history.
 diagnostics_and_previews:
-- Repaired workflow-evidence regressions pass 21/21 and experiment-custody regressions pass 21/21.
-- Complete focused workflow and benchmark bundle passes 96/96; Ruff lint/format and Python syntax checks
-  pass.
-- Strict task, docs, skill, workflow, experiment, ARA, method, benchmark, layering, test-layout, root-hygiene,
+- Repaired workflow-evidence and experiment-custody suites pass 21/21 each; the complete focused workflow
+  and benchmark bundle passes 96/96.
+- The final retirement concurrency gate passes Test.WorkflowConcurrency.py 19/19 and Test.TestCohortParity.py
+  7/7 after BUG-120 retirement.
+- Strict task, state-link, docs, skill, experiment, ARA, method, benchmark, layering, test-layout, root-hygiene,
   and session-brief gates pass.
-- Prior ci/IntrinsicTests/default CPU receipts remain hash-valid; this Python/process-only repair changes
-  no engine source, CMake input, module surface, dependency edge, or compiled test.
-- Test.WorkflowConcurrency remains a pre-existing BUG-120 failure against byte-identical origin/main sources.
+- Two structural attempts failed closed on stale retirement metadata and links; their raw records are
+  retained as artifacts and the corrected required retry passes.
+- Prior ci configuration, IntrinsicTests, IntrinsicBenchmarks, benchmark validation, and the complete
+  4,042-case CPU selector receipts remain hash-valid; the retirement surface changes no compiled input.
 benchmark_or_parity_evidence:
 - All seven checked-in result payloads validate under schema v2 without renaming stable benchmark IDs.
 - The non-claim-eligible geometry.example.small fixture traverses strict result validation, bundle derivation,
   replay/view receipt checks, and independent cooperative audit.
 docs_sync:
-  task_file: tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
+  task_file: tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
   session_brief_present: true
-  canonical_docs_changed: true
+  canonical_docs_changed: false
   skill_mirrors_checked: true
 residual_risks:
 - Owner, driver, reviewer, auditor, and authorizer labels are cooperative metadata and do not authenticate
   people or agents.
-- PROC-028 remains active until a genuinely distinct reviewer accepts the exact clean fixed revision;
-  self-review is provisional.
-- Pre-existing BUG-120 remains a separate retirement dependency.
 - Git-common-dir claims coordinate sibling worktrees on one local clone, not cross-host distributed ownership.
-skipped_checks:
-- check: Test.WorkflowConcurrency.py
-  reason: Pre-existing BUG-120 reproduces against byte-identical origin/main workflow/test sources; PROC-028
-    does not weaken or repair that separate CTest reservation snapshot.
+- Remote hosted CI was not rerun for the task-only retirement surface; all strongest relevant local process
+  and prior compiled receipts are recorded.
+skipped_checks: []
 artifacts:
 - path: benchmarks/reports/examples/example_smoke_result.json
   sha256: 0a89ccd116a4289574927a7e6c544d3b246595ff2ee1c7364c01d270bbae6fe9
@@ -190,6 +170,24 @@ artifacts:
   kind: file
 - path: ara/trace/sessions/2026-07-31_001.yaml
   sha256: 5bec36c5af131fa27bbeb24fa0f3c687e4ef110f7769a94442a1641ed16ee540
+  kind: file
+- path: tasks/evidence/PROC-028/attempts/retirement-source-structural-gates.json
+  sha256: 9ab5a769a94de803e97830614f7b9bc62ad52b0a36f64948c869701c41662f11
+  kind: file
+- path: tasks/evidence/PROC-028/attempts/retirement-source-structural-gates.stdout.log
+  sha256: 6eba7829798597b4a816e19a626d3fd900c750aa6743cb08008a1fed04b32b28
+  kind: file
+- path: tasks/evidence/PROC-028/attempts/retirement-source-structural-gates.stderr.log
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  kind: file
+- path: tasks/evidence/PROC-028/attempts/retirement-source-structural-gates-retry.json
+  sha256: 491ab6c7f58964147e0983a65ccd648021553086d7d61f9fb741d9c1bacfc346
+  kind: file
+- path: tasks/evidence/PROC-028/attempts/retirement-source-structural-gates-retry.stdout.log
+  sha256: f8460775e7e303134f724ee91bef0e978a3353a42e15bbd5f05dff57673d2635
+  kind: file
+- path: tasks/evidence/PROC-028/attempts/retirement-source-structural-gates-retry.stderr.log
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   kind: file
 self_review:
   completed: true
