@@ -123,6 +123,12 @@ deterministic digest; it is not an escape hatch for a caller-selected value.
 Tracked symlink entries are hashed as their lexical link bytes in the worktree,
 matching the mode-120000 Git blob used by fixed-revision validation; report
 generation never substitutes the current symlink target's contents.
+Referenced artifacts retain that lexical entry hash but are stricter than the
+changed-path surface: their symlink chain must remain inside the repository and
+terminate at a regular file. Generation and validation enforce the same rule in
+the current worktree for dirty reports and in the exact recorded Git tree for
+clean reports, so an external or broken link cannot be substituted after
+review.
 
 For a report with `source.dirty: false`, validation reads the recorded surface
 and referenced artifact blobs from the exact `source.head_revision` commit and

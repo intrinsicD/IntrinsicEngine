@@ -26,9 +26,13 @@ close those paths, while exact frozen-run provenance comparison closes the
 adjacent bundle substitution surface. Experiment protocol schema v2 makes the
 summary-definition migration explicit. A final fixed-surface review exposed a
 tracked-symlink hash mismatch between report generation and Git validation;
-lexical mode-120000 blob semantics and one direct regression close it. The
-final focused workflow/benchmark bundle passes 104/104. The original task-only
-CPU receipt passes 4,042/4,042 cases with one
+lexical mode-120000 blob semantics and one direct regression close it. A
+subsequent review found that validation still accepted generator-forbidden
+external and broken symlink artifacts after review; exact-tree/worktree
+containment and terminal-file checks plus three direct tests close that path.
+The artifact kind is also pinned to `file`. The final focused
+workflow/benchmark bundle passes 108/108. The original
+task-only CPU receipt passes 4,042/4,042 cases with one
 expected GLFW/LSan self-skip, while the current concurrency and cohort-parity
 retirement gate passes 19/19 and 7/7. Strict repository, benchmark, ARA,
 documentation, and workflow checks pass. `BUG-120` was repaired and retired

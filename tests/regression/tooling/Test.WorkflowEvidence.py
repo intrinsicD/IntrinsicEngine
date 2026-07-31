@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -136,7 +138,9 @@ class Fixture:
         complete: bool = True,
         replace: bool = False,
         skip: str | None = None,
-    ) -> None:
+        artifact: str = "artifact.txt",
+        expected: int | None = 0,
+    ) -> subprocess.CompletedProcess[str]:
         command = [
             "generate-report",
             "--root",
@@ -150,7 +154,7 @@ class Fixture:
             "--future-change-plan",
             "Add fields only through schema migration",
             "--artifact",
-            "artifact.txt",
+            artifact,
             "--self-review-complete",
         ]
         if complete:
@@ -159,7 +163,7 @@ class Fixture:
             command.append("--replace")
         if skip:
             command.extend(["--skip", skip])
-        run(self.repo, *command, expected=0)
+        return run(self.repo, *command, expected=expected)
 
     def validate(self) -> subprocess.CompletedProcess[str]:
         return run(
@@ -303,6 +307,110 @@ class WorkflowEvidenceTests(unittest.TestCase):
             result = fixture.validate()
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_clean_fixed_revision_allows_contained_symlink_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp, profile="high-risk")
+            fixture.receipt()
+            link = fixture.repo / "linked-artifact.txt"
+            link.symlink_to("artifact.txt")
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "add contained symlink artifact")
+            fixture.generate(artifact="linked-artifact.txt")
+            fixture.handoff()
+            fixture.review()
+            report = fixture.report_data()
+            result = fixture.validate()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(
+            report["artifacts"][0]["sha256"],
+            hashlib.sha256(b"artifact.txt").hexdigest(),
+        )
+
+    def test_clean_fixed_revision_rejects_unsafe_symlink_artifacts(self) -> None:
+        for link_target, expected in (
+            ("../outside.txt", "artifact path escapes repository"),
+            ("missing.txt", "artifact is missing or not a file"),
+            ("unsafe-artifact", "artifact symlink cycle"),
+        ):
+            with (
+                self.subTest(link_target=link_target),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
+                root = Path(tmp)
+                repo = root / "repo"
+                repo.mkdir()
+                fixture = self.fixture(str(repo), profile="high-risk")
+                fixture.receipt()
+                (root / "outside.txt").write_text("outside\n", encoding="utf-8")
+                link = fixture.repo / "unsafe-artifact"
+                link.symlink_to(link_target)
+                git(fixture.repo, "add", ".")
+                git(fixture.repo, "commit", "-qm", "add unsafe artifact link")
+                generated = fixture.generate(artifact=link.name, expected=None)
+                self.assertNotEqual(generated.returncode, 0, generated.stdout)
+                self.assertIn(expected, generated.stdout)
+                fixture.generate()
+                report = fixture.report_data()
+                report["artifacts"] = [
+                    {
+                        "path": link.name,
+                        "sha256": hashlib.sha256(
+                            os.readlink(os.fsencode(link))
+                        ).hexdigest(),
+                        "kind": "file",
+                    }
+                ]
+                fixture.report.write_text(
+                    yaml.safe_dump(report, sort_keys=False), encoding="utf-8"
+                )
+                fixture.handoff()
+                fixture.review()
+                result = fixture.validate()
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn(expected, result.stdout)
+
+    def test_dirty_report_rejects_unsafe_symlink_artifacts(self) -> None:
+        for link_target, expected in (
+            ("../outside.txt", "path escapes repository"),
+            ("missing.txt", "artifact is not a file"),
+            ("unsafe-artifact", "path cannot be resolved"),
+        ):
+            with (
+                self.subTest(link_target=link_target),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
+                root = Path(tmp)
+                repo = root / "repo"
+                repo.mkdir()
+                fixture = self.fixture(str(repo), profile="high-risk")
+                fixture.receipt()
+                (root / "outside.txt").write_text("outside\n", encoding="utf-8")
+                link = fixture.repo / "unsafe-artifact"
+                link.symlink_to(link_target)
+                generated = fixture.generate(artifact=link.name, expected=None)
+                self.assertNotEqual(generated.returncode, 0, generated.stdout)
+                self.assertIn(expected, generated.stdout)
+                fixture.generate()
+                report = fixture.report_data()
+                self.assertTrue(report["source"]["dirty"])
+                report["artifacts"] = [
+                    {
+                        "path": link.name,
+                        "sha256": hashlib.sha256(
+                            os.readlink(os.fsencode(link))
+                        ).hexdigest(),
+                        "kind": "file",
+                    }
+                ]
+                fixture.report.write_text(
+                    yaml.safe_dump(report, sort_keys=False), encoding="utf-8"
+                )
+                fixture.handoff()
+                fixture.review()
+                result = fixture.validate()
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn(expected, result.stdout)
+
     def test_clean_fixed_revision_rejects_recorded_blob_hash_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = self.fixture(tmp)
@@ -433,6 +541,20 @@ class WorkflowEvidenceTests(unittest.TestCase):
             result = fixture.validate()
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("artifact hash mismatch", result.stdout)
+
+    def test_artifact_kind_must_be_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp)
+            fixture.receipt()
+            fixture.generate()
+            report = fixture.report_data()
+            report["artifacts"][0]["kind"] = "symlink"
+            fixture.report.write_text(
+                yaml.safe_dump(report, sort_keys=False), encoding="utf-8"
+            )
+            result = fixture.validate()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("artifact kind must equal file", result.stdout)
 
     def test_unjustified_skip_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -242,7 +242,10 @@ def repository_relative_path(value: object) -> str:
 
 def resolve_repo_path(repo_root: Path, value: object) -> Path:
     relative = repository_relative_path(value)
-    resolved = (repo_root / relative).resolve()
+    try:
+        resolved = (repo_root / relative).resolve()
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"path cannot be resolved: {value}") from exc
     try:
         resolved.relative_to(repo_root.resolve())
     except ValueError as exc:
@@ -350,6 +353,12 @@ def require_commit(repo_root: Path, revision: object, location: str) -> str:
 
 def sha256_at_revision(repo_root: Path, revision: str, value: object) -> str | None:
     relative = repository_relative_path(value)
+    blob = blob_at_revision(repo_root, revision, relative)
+    return sha256_bytes(blob) if blob is not None else None
+
+
+def blob_at_revision(repo_root: Path, revision: str, value: object) -> bytes | None:
+    relative = repository_relative_path(value)
     result = subprocess.run(
         ["git", "-C", str(repo_root), "cat-file", "blob", f"{revision}:{relative}"],
         stdout=subprocess.PIPE,
@@ -358,7 +367,102 @@ def sha256_at_revision(repo_root: Path, revision: str, value: object) -> str | N
     )
     if result.returncode != 0:
         return None
-    return sha256_bytes(result.stdout)
+    return result.stdout
+
+
+def git_entry_mode_at_revision(
+    repo_root: Path, revision: str, value: object
+) -> str | None:
+    relative = repository_relative_path(value)
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "ls-tree", "-z", revision, "--", relative],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    expected_path = os.fsencode(relative)
+    for record in result.stdout.split(b"\0"):
+        if not record or b"\t" not in record:
+            continue
+        metadata, path = record.split(b"\t", 1)
+        if path == expected_path:
+            return metadata.split(b" ", 1)[0].decode("ascii")
+    return None
+
+
+def sha256_artifact_at_revision(repo_root: Path, revision: str, value: object) -> str:
+    relative = repository_relative_path(value)
+    pending = relative.split("/")
+    resolved: list[str] = []
+    visited: set[tuple[str, tuple[str, ...]]] = set()
+    artifact_hash: str | None = None
+
+    while pending:
+        component = pending.pop(0)
+        candidate = "/".join((*resolved, component))
+        mode = git_entry_mode_at_revision(repo_root, revision, candidate)
+        if mode is None:
+            raise ValueError(
+                f"artifact is missing or not a file at fixed revision: {value}"
+            )
+        if mode == "120000":
+            state = (candidate, tuple(pending))
+            if state in visited or len(visited) >= 40:
+                raise ValueError(f"artifact symlink cycle at fixed revision: {value}")
+            visited.add(state)
+            target_blob = blob_at_revision(repo_root, revision, candidate)
+            if target_blob is None or b"\0" in target_blob:
+                raise ValueError(
+                    f"artifact is missing or not a file at fixed revision: {value}"
+                )
+            if not pending and artifact_hash is None:
+                artifact_hash = sha256_bytes(target_blob)
+            target = os.fsdecode(target_blob)
+            if not target:
+                raise ValueError(
+                    f"artifact is missing or not a file at fixed revision: {value}"
+                )
+            if os.path.isabs(target):
+                combined = os.path.normpath(os.path.join(target, *pending))
+            else:
+                parent = repo_root.joinpath(*resolved)
+                combined = os.path.normpath(os.path.join(str(parent), target, *pending))
+            try:
+                rebound = Path(combined).relative_to(repo_root).as_posix()
+            except ValueError as exc:
+                raise ValueError(
+                    f"artifact path escapes repository at fixed revision: {value}"
+                ) from exc
+            if rebound in {"", "."}:
+                raise ValueError(
+                    f"artifact is missing or not a file at fixed revision: {value}"
+                )
+            pending = rebound.split("/")
+            resolved = []
+            continue
+        if pending:
+            if mode != "040000":
+                raise ValueError(
+                    f"artifact is missing or not a file at fixed revision: {value}"
+                )
+            resolved.append(component)
+            continue
+        if mode not in {"100644", "100755"}:
+            raise ValueError(
+                f"artifact is missing or not a file at fixed revision: {value}"
+            )
+        if artifact_hash is not None:
+            return artifact_hash
+        blob = blob_at_revision(repo_root, revision, candidate)
+        if blob is None:
+            raise ValueError(
+                f"artifact is missing or not a file at fixed revision: {value}"
+            )
+        return sha256_bytes(blob)
+
+    raise ValueError(f"artifact is missing or not a file at fixed revision: {value}")
 
 
 def sha256_worktree_entry(repo_root: Path, value: object) -> str | None:
@@ -368,6 +472,16 @@ def sha256_worktree_entry(repo_root: Path, value: object) -> str | None:
         return sha256_bytes(os.readlink(os.fsencode(lexical_path)))
     path = resolve_repo_path(repo_root, value)
     return sha256_file(path) if path.is_file() else None
+
+
+def sha256_worktree_artifact(repo_root: Path, value: object) -> str:
+    path = resolve_repo_path(repo_root, value)
+    if not path.is_file():
+        raise ValueError(f"artifact is not a file: {value}")
+    digest = sha256_worktree_entry(repo_root, value)
+    if digest is None:
+        raise ValueError(f"artifact is not a file: {value}")
+    return digest
 
 
 def surface_entries(repo_root: Path, paths: Iterable[str]) -> list[dict[str, Any]]:
@@ -637,15 +751,18 @@ def generate_report(args: argparse.Namespace) -> int:
         }
         for text, checked in acceptance_items(parsed)
     ]
+    head_revision = git(repo_root, "rev-parse", "HEAD")
+    dirty = bool(git(repo_root, "status", "--porcelain"))
     artifacts: list[dict[str, Any]] = []
     for value in args.artifact:
-        path = resolve_repo_path(repo_root, value)
-        if not path.is_file():
-            raise ValueError(f"artifact is not a file: {value}")
+        if dirty:
+            artifact_hash = sha256_worktree_artifact(repo_root, value)
+        else:
+            artifact_hash = sha256_artifact_at_revision(repo_root, head_revision, value)
         artifacts.append(
             {
                 "path": value,
-                "sha256": sha256_worktree_entry(repo_root, value),
+                "sha256": artifact_hash,
                 "kind": "file",
             }
         )
@@ -662,10 +779,10 @@ def generate_report(args: argparse.Namespace) -> int:
         "source": {
             "base_ref": args.base_ref,
             "base_revision": base_revision,
-            "head_revision": git(repo_root, "rev-parse", "HEAD"),
+            "head_revision": head_revision,
             "branch": git(repo_root, "branch", "--show-current"),
             "worktree": str(repo_root),
-            "dirty": bool(git(repo_root, "status", "--porcelain")),
+            "dirty": dirty,
             "surface": entries,
             "content_digest": surface_digest(entries),
         },
@@ -1148,23 +1265,19 @@ def validate_report(
     for index, value in enumerate(artifacts):
         entry = _require_mapping(value, f"artifacts[{index}]", findings)
         try:
+            if entry.get("kind") != "file":
+                raise ValueError("artifact kind must equal file")
             if clean_head is not None:
-                actual_hash = sha256_at_revision(
+                actual_hash = sha256_artifact_at_revision(
                     repo_root, clean_head, entry.get("path")
                 )
-                missing_detail = (
-                    f"artifact is missing at fixed revision: {entry.get('path')}"
-                )
             elif dirty is True:
-                actual_hash = sha256_worktree_entry(repo_root, entry.get("path"))
-                missing_detail = f"artifact is missing: {entry.get('path')}"
+                actual_hash = sha256_worktree_artifact(repo_root, entry.get("path"))
             else:
                 actual_hash = entry.get("sha256")
-                missing_detail = (
+                raise ValueError(
                     f"artifact revision state is invalid: {entry.get('path')}"
                 )
-            if actual_hash is None:
-                raise ValueError(missing_detail)
             if actual_hash != entry.get("sha256"):
                 raise ValueError(f"artifact hash mismatch: {entry.get('path')}")
         except ValueError as exc:
