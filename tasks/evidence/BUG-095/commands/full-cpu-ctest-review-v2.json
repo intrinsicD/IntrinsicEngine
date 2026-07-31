@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 73385,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T14:09:35Z",
+  "label": "full-cpu-ctest-review-v2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T14:08:21Z",
+  "stderr_path": "tasks/evidence/BUG-095/commands/full-cpu-ctest-review-v2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-095/commands/full-cpu-ctest-review-v2.stdout.log",
+  "stdout_sha256": "557bb6c2ab64e02b4b0b762c87d39daa6067f10bdab351dc68cb61d0761d946b",
+  "task_id": "BUG-095"
+}

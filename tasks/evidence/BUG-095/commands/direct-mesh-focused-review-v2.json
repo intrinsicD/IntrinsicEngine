@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^SandboxEditorUi\\.DirectMeshPostProcess(DiscardsCompletionAfterGeometryEdit|PreservesNewerUvAndSourceProperties|DiscardsCompletionAfterBindingChange|PendingStateGatesMutatingActions|DiscardsCompletionAfterWorldSwitch|WorldDestructionIsLifetimeSafe|RejectsRecycledEntityTarget)$",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\\.DirectMeshPostProcess(DiscardsCompletionAfterGeometryEdit|PreservesNewerUvAndSourceProperties|DiscardsCompletionAfterBindingChange|PendingStateGatesMutatingActions|DiscardsCompletionAfterWorldSwitch|WorldDestructionIsLifetimeSafe|RejectsRecycledEntityTarget)$' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 828,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T14:05:40Z",
+  "label": "direct-mesh-focused-review-v2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T14:05:40Z",
+  "stderr_path": "tasks/evidence/BUG-095/commands/direct-mesh-focused-review-v2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-095/commands/direct-mesh-focused-review-v2.stdout.log",
+  "stdout_sha256": "2ac055cf7e844f535c844da6f293a90764d9fb268b1f527efede7481f3068299",
+  "task_id": "BUG-095"
+}

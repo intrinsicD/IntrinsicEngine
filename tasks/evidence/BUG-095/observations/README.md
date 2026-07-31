@@ -14,3 +14,9 @@ favor of the durable entity-sidecar `Published` assertion already in the
 test. Its concurrent repeat invocation also raced CTest discovery in the same
 build tree. Both receipts are retained here, and the final focused/repeat
 commands were run sequentially.
+
+The first strict clean-workshop rerun after the independent review repair
+correctly rejected the moved task because its status used "Implementation
+revision" instead of the workflow schema's required `Commit:` field. The task
+record was corrected after the exact repair commit existed, and the failed
+receipt is retained here rather than overwritten.

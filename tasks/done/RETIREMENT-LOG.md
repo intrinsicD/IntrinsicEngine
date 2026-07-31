@@ -8,6 +8,26 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-095`](BUG-095-direct-mesh-postprocess-stale-overwrite.md) — deferred
+direct-mesh enrichment retired on 2026-07-31 at `Operational`. The world-scoped
+job now captures and revalidates the complete active mesh-source content,
+deleted counts, topology markers, vertex-channel bindings, entity generation,
+asset-workflow binding epoch, and latest sidecar token immediately before
+main-thread apply. Apply/finalization resolve the scene through the live world
+registry, so switched, replaced, or destroyed worlds and recycled entities
+cannot target retired storage. Stale, cancelled, failed, and successful
+outcomes remain observable in the copied selected-entity processing model, and
+every conflicting mutating action is unavailable while enrichment is pending.
+The former vertex-normal-only merge is deleted. Seven deterministic real-engine
+regressions passed 20 consecutive repetitions each; the canonical CPU selector
+passed 4,065/4,065 with the expected GLFW/LSan self-skip, and strict repository
+validators passed. An earlier unchanged CPU run reproduced open `BUG-123`; its
+receipt is retained without weakening the gate. The initial implementation is
+`c5977d5ee4cebc440eb5e2dc0ea964c1948d9360`; fixed-surface review findings were
+closed by `74d87442eaa49bdd0b3cde03e4b730d26fe07bd2` and both review dispositions
+remain in the append-only record. `RUNTIME-200` must preserve these contracts
+when the import recipe migrates; no GPU/Vulkan or performance claim is made.
+
 [`PROC-028`](PROC-028-enforced-agent-evidence-review-experiment-workflow.md) —
 agent evidence, review, benchmark-result, experiment-custody, protected-attempt,
 and concurrent-ownership enforcement retired on 2026-07-31 at the

@@ -1,0 +1,176 @@
+schema_version: 1
+task_id: BUG-095
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-07-31T14:13:13Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 67301c047ac11d635183e72b0216bd16331f1528
+  head_revision: 74d87442eaa49bdd0b3cde03e4b730d26fe07bd2
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: docs/architecture/runtime.md
+    sha256: 0e29aa8bb9c90630c2cbb767b2e09e2c8d1ea76e7a3b2dddf119723d5e62b903
+  - path: src/runtime/README.md
+    sha256: 0000e6bf89449862694c9031603be9ce378cce9c8ce4e28c96495ab717fcbc1e
+  - path: src/runtime/Runtime.AssetImportPipeline.cpp
+    sha256: 32a8f0f2ff1a2d100ddc2abfd70c153edd6c88a171e0b642be7161bafb7d95d7
+  - path: src/runtime/Runtime.AssetImportPipeline.cppm
+    sha256: 06961a664d879b68694324a21987b80622f8b97c34d96c2157fa1db44fa767b7
+  - path: src/runtime/Runtime.AssetWorkflowModule.cpp
+    sha256: 60a1a9a004368ec089abe44dcea0d64e806b7a0d3f6aa8fdfd916c08c298b4c4
+  - path: src/runtime/Runtime.SandboxDefaultPolicies.cpp
+    sha256: 7c30849f45be1b46f6ec823d87023a2ed4e2467df1796b6a2265794fb224b23a
+  - path: src/runtime/Runtime.SandboxEditorFacades.Internal.hpp
+    sha256: 33025a267db9acdc7cf7f296b964ff5e6392cb90ac96a24e349c207102cda0fa
+  - path: src/runtime/Runtime.SandboxEditorFacades.cpp
+    sha256: 313f5ac56379466cd94f7765f952b36fe010fe6f20ef0a916e2780b8531c939f
+  - path: src/runtime/Runtime.SandboxEditorFacades.cppm
+    sha256: ccb7847c4f68d01e8758c245d30f6240bfbffea26c9031357976e62ddccab69c
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 7af8f7cf53794abc7a37f0931217bcab8b50cfe42ddde54e09f15fc5aff8bec3
+  - path: tasks/backlog/bugs/index.md
+    sha256: ca859376c37aeb6a36117793910e4d40275b314c0881f602e1391d14a51efec0
+  - path: tasks/done/BUG-095-direct-mesh-postprocess-stale-overwrite.md
+    sha256: 3582710b32971e56ac0bfec0192582846ed0c5afb7980dd46e7761840db87ace
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: d2206337dbfa198869ee1bef7d01990e449a91b0fa7d9902fb2d5e644f011051
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: a548cb5dd62184da17deab19f1341c7f80aec262035229dd70011709eea8a36f
+  content_digest: c0f4fe336f0017047b497d86e21b22362748712a7a7d9e0e09574f32351e4588
+touched:
+  paths:
+  - docs/architecture/runtime.md
+  - src/runtime/README.md
+  - src/runtime/Runtime.AssetImportPipeline.cpp
+  - src/runtime/Runtime.AssetImportPipeline.cppm
+  - src/runtime/Runtime.AssetWorkflowModule.cpp
+  - src/runtime/Runtime.SandboxDefaultPolicies.cpp
+  - src/runtime/Runtime.SandboxEditorFacades.Internal.hpp
+  - src/runtime/Runtime.SandboxEditorFacades.cpp
+  - src/runtime/Runtime.SandboxEditorFacades.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-095-direct-mesh-postprocess-stale-overwrite.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.AssetImportPipeline
+  - Extrinsic.Runtime.SandboxEditorFacades
+extension_seam: Private direct-mesh sidecar and content-signature helpers plus one injected asset-workflow
+  binding validator; no new service, interface, registry, queue, bridge, or module.
+future_change_plan: RUNTIME-200 must preserve exact entity/token/content/binding validation, callback-time
+  world lookup, and pending/terminal readiness when migrating direct-mesh enrichment into the staged import
+  recipe.
+acceptance:
+- criterion: A position, topology, UV, property, entity-generation, or source-binding
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Stale discard preserves the exact newer geometry, properties, selection,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: An unchanged completion still applies asynchronously exactly once.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Runtime action readiness reports pending enrichment consistently and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Deterministic real-engine contracts pass repeatedly without sleeps, data
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-095/commands/ara-claims-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/ara-claims.json
+- receipt: tasks/evidence/BUG-095/commands/ci-configure.json
+- receipt: tasks/evidence/BUG-095/commands/clean-workshop-review-v3.json
+- receipt: tasks/evidence/BUG-095/commands/clean-workshop.json
+- receipt: tasks/evidence/BUG-095/commands/direct-mesh-focused-final-v2.json
+- receipt: tasks/evidence/BUG-095/commands/direct-mesh-focused-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/direct-mesh-focused.json
+- receipt: tasks/evidence/BUG-095/commands/direct-mesh-repeat-20-final-v2.json
+- receipt: tasks/evidence/BUG-095/commands/direct-mesh-repeat-20-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/direct-mesh-repeat-20.json
+- receipt: tasks/evidence/BUG-095/commands/doc-links-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/doc-links.json
+- receipt: tasks/evidence/BUG-095/commands/docs-sync-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/docs-sync.json
+- receipt: tasks/evidence/BUG-095/commands/full-cpu-ctest-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/full-cpu-ctest.json
+- receipt: tasks/evidence/BUG-095/commands/intrinsic-tests-build-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/intrinsic-tests-build.json
+- receipt: tasks/evidence/BUG-095/commands/layering-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/layering.json
+- receipt: tasks/evidence/BUG-095/commands/root-hygiene-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/root-hygiene.json
+- receipt: tasks/evidence/BUG-095/commands/runtime-contract-build-final-v2.json
+- receipt: tasks/evidence/BUG-095/commands/runtime-contract-build-final.json
+- receipt: tasks/evidence/BUG-095/commands/runtime-contract-build-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/runtime-contract-build.json
+- receipt: tasks/evidence/BUG-095/commands/task-policy-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/task-policy.json
+- receipt: tasks/evidence/BUG-095/commands/task-state-links-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-095/commands/test-layout-review-v2.json
+- receipt: tasks/evidence/BUG-095/commands/test-layout.json
+changed_public_contracts:
+- RuntimePostImportProcessorServices and AssetImportPipelineDependencies now carry the active WorldRegistry
+  and a binding-epoch validator so deferred processors can fail closed across world/document rebinding.
+- SandboxEditorGeometryProcessingModel carries direct-mesh enrichment pending, terminal status, and diagnostic
+  fields while pending enrichment gates every geometry-mutating action.
+diagnostics_and_previews:
+- Entity-sidecar pending and terminal diagnostics distinguish Published, StaleDiscarded, Cancelled, Dropped,
+  and Rejected outcomes without exposing JobService internals.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-095-direct-mesh-postprocess-stale-overwrite.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Signature capture and pre-apply validation are O(total active mesh property bytes); the correctness
+  boundary requires this until a canonical mutation generation covers every authoritative property and
+  binding edit.
+skipped_checks:
+- check: gpu-vulkan
+  reason: GPU/Vulkan execution was not run because stale overwrite, lifetime, and editor readiness are
+    backend-neutral CPU/runtime contracts.
+artifacts:
+- path: tasks/evidence/BUG-095/observations/README.md
+  sha256: 44c7c115de68b90ce8384fbd2322e594ead4c3d6e25dd0258c005f1af237c936
+  kind: file
+- path: tasks/evidence/BUG-095/observations/full-cpu-ctest-known-bug-123.json
+  sha256: 6a3863e46ac205dbf9968e5bebf547c50872970a4cfa70571d471e8907916fde
+  kind: file
+- path: tasks/evidence/BUG-095/observations/direct-mesh-focused-final.json
+  sha256: edee2592e9f37781204c081460293e36f34f66712b070c363d0519cb2e802efc
+  kind: file
+- path: tasks/evidence/BUG-095/observations/direct-mesh-repeat-20-final.json
+  sha256: 1bcf5bcb09e88f42d2c0610f9c4046b46a657921677a3ea4081b792b2dbeab0b
+  kind: file
+- path: tasks/evidence/BUG-095/observations/clean-workshop-review-v2.json
+  sha256: 1a7fc75b7f24096a6da43437e8357cdbdde90143763c0ef23fab1495e4921435
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-095/handoff.jsonl
+review: tasks/evidence/BUG-095/reviews.jsonl

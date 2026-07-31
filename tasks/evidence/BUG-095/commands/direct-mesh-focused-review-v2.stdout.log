@@ -1,0 +1,23 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 1031: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit
+1/7 Test #1031: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit ....   Passed    0.06 sec
+    Start 1032: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties
+2/7 Test #1032: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties ....   Passed    0.06 sec
+    Start 1033: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterBindingChange
+3/7 Test #1033: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterBindingChange ...   Passed    0.06 sec
+    Start 1034: SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions
+4/7 Test #1034: SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions .......   Passed    0.06 sec
+    Start 1035: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterWorldSwitch
+5/7 Test #1035: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterWorldSwitch .....   Passed    0.06 sec
+    Start 1036: SandboxEditorUi.DirectMeshPostProcessWorldDestructionIsLifetimeSafe
+6/7 Test #1036: SandboxEditorUi.DirectMeshPostProcessWorldDestructionIsLifetimeSafe .........   Passed    0.06 sec
+    Start 1037: SandboxEditorUi.DirectMeshPostProcessRejectsRecycledEntityTarget
+7/7 Test #1037: SandboxEditorUi.DirectMeshPostProcessRejectsRecycledEntityTarget ............   Passed    0.05 sec
+
+100% tests passed, 0 tests failed out of 7
+
+Label Time Summary:
+contract    =   0.40 sec*proc (7 tests)
+runtime     =   0.40 sec*proc (7 tests)
+
+Total Test time (real) =   0.79 sec

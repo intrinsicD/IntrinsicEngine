@@ -54,17 +54,21 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   so geometry silently executes point-to-point while the editor reports the
   requested point-to-plane variant; the fix targets the canonical property
   reference and `JobService` operation before the thin facade wrapper retires.
-- [`BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry](../../active/BUG-095-direct-mesh-postprocess-stale-overwrite.md):
-  deferred import enrichment validates only entity liveness before replacing
-  live geometry, allowing newer position, topology, UV, or property edits to be
-  lost; apply must be generation-keyed and stale-safe on `JobService`, and
-  `RUNTIME-200` must preserve the regression when the import recipe migrates.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-07-31: [`BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry](../../done/BUG-095-direct-mesh-postprocess-stale-overwrite.md).
+  Deferred enrichment now validates the exact live mesh-source content and
+  binding signature, asset-workflow binding epoch, and entity-sidecar job token
+  before apply; callback-time world lookup makes world destruction and entity
+  recycling lifetime-safe. It publishes stale/cancelled diagnostics without
+  overwriting newer state and gates all mutating processing actions while
+  pending. Seven deterministic real-engine contracts passed 20 consecutive
+  repetitions each and the canonical CPU gate passed 4,065/4,065.
 
 - Closed 2026-07-30: [`BUG-120` — Test.WorkflowConcurrency drifted from the CPU test sources it mirrors](../../done/BUG-120-workflow-concurrency-ctest-processors-drift.md).
   The exact source-derived reservation parity is restored at 73 cases

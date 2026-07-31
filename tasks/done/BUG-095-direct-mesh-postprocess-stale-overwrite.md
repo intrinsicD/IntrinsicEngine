@@ -13,6 +13,39 @@ maturity_target: Operational
 ---
 # BUG-095 — Direct-mesh postprocess can overwrite newer editor geometry
 
+## Status
+- Completed and retired on 2026-07-31 at `Operational`.
+- Commit: initial implementation
+  `c5977d5ee4cebc440eb5e2dc0ea964c1948d9360`; independent-review lifetime
+  repair `74d87442eaa49bdd0b3cde03e4b730d26fe07bd2`.
+- The world-scoped direct-mesh enrichment job now revalidates the live entity,
+  asset-workflow binding epoch, latest sidecar token, complete mesh-source
+  content signature, and vertex channel bindings immediately before
+  main-thread apply. Apply and finalization resolve the scene through the live
+  world registry, so a switched, replaced, or destroyed world and a recycled
+  entity cannot target retired storage. Any mismatch reaches an observable
+  terminal stale state without an ECS, history, or selection write; an
+  unchanged job still publishes once.
+- The selected-entity processing model carries copied pending/status/reason
+  state and exposes no geometry-mutating action while enrichment is active.
+  The normal-only restoration workaround is removed.
+- Verification: the seven deterministic real-engine contracts passed once and
+  20 consecutive repetitions each; the canonical CPU-supported gate passed
+  4,065/4,065 with the expected GLFW/LSan self-skip. Strict layering,
+  test-layout, task, ARA, root-hygiene, clean-workshop, task-state, docs-sync,
+  and doc-link checks passed.
+- The first fixed-surface review requested revisions for world-binding
+  invalidation, a retained scene reference, coupled property/binding coverage,
+  and missing world-destruction/entity-recycling contracts. The repair above
+  closes each finding; both the rejected review and its revision-bound
+  re-review are retained in the append-only evidence stream.
+- A first unchanged full-CPU run reproduced open `BUG-123` once and then passed
+  the duplicate registration in the same run. Its receipt remains under
+  `tasks/evidence/BUG-095/observations/`; the unchanged rerun is the completion
+  evidence. No gate was weakened.
+- `RUNTIME-200` owns migration to the staged import recipe and must retain this
+  exact validation, terminal diagnostic, readiness, and regression contract.
+
 ## Goal
 - Make asynchronous direct-mesh import enrichment generation-safe so a stale
   completion can never overwrite newer editor positions, topology, UVs, or
@@ -58,72 +91,76 @@ maturity_target: Operational
   readiness now that the work completes in bounded time.
 
 ## Required changes
-- [ ] Introduce the smallest runtime-owned direct-mesh enrichment generation
+- [x] Introduce the smallest runtime-owned direct-mesh enrichment generation
       key using the existing entity, geometry, source-property, and binding
       generations/signatures already authoritative for derived jobs.
-- [ ] Capture the key with the immutable worker snapshot at submission and
+- [x] Capture the key with the immutable worker snapshot at submission and
       validate it on the main thread immediately before apply. A mismatch must
       produce an observable `StaleDiscarded`/cancelled status and leave every
       current ECS geometry and source property byte-for-byte unchanged.
-- [ ] Remove the vertex-normal-only overwrite workaround once the general
+- [x] Remove the vertex-normal-only overwrite workaround once the general
       generation guard covers the same case; do not merge stale output
       selectively into newer topology.
-- [ ] Ensure entity destruction/replacement and source binding changes use the
+- [x] Ensure entity destruction/replacement and source binding changes use the
       same fail-closed completion path and cannot target a recycled entity.
-- [ ] Surface pending direct-mesh enrichment, and its non-empty reason, in the
+- [x] Surface pending direct-mesh enrichment, and its non-empty reason, in the
       runtime selected-entity processing/action-readiness model. Conflicting
       geometry-mutating actions must remain disabled until apply, failure, or
       stale discard resolves the pending state.
-- [ ] Keep initial raw publication, selection, focus, worker execution, and
+- [x] Keep initial raw publication, selection, focus, worker execution, and
       main-thread apply asynchronous. Do not block the frame loop waiting for
       enrichment.
 
 ## Tests
-- [ ] Regression first: replace or generalize the existing normal-only
+- [x] Regression first: replace or generalize the existing normal-only
       regression in
       `tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp` with
       `SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit`.
       Use a deterministic worker/apply barrier, edit positions and topology
       after submission, release completion, and assert the edited mesh,
       generations, undo history, and selection remain unchanged.
-- [ ] Add
+- [x] Add
       `SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties`
       using a small generated fixture. Author non-default UVs and an arbitrary
       vertex property before deferred apply, then assert exact values and an
       observable stale-discard diagnostic after pumping maintenance.
-- [ ] Retain explicit coverage that a completion with an unchanged generation
+- [x] Retain explicit coverage that a completion with an unchanged generation
       applies once, publishes enriched output, advances the expected
       generation, and resolves pending state.
-- [ ] Add
+- [x] Add
       `SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions`
       to assert readiness is false with a non-empty pending reason between
       submission and resolution, then true after successful apply, failure, or
       stale discard.
-- [ ] Exercise the real `Engine`, direct import policy, canonical
+- [x] Isolate binding-only invalidation from UV/property invalidation, and add
+      deterministic world-switch, world-destruction, and recycled-entity
+      contracts. Callback-time scene resolution must remain lifetime-safe when
+      the submitted world no longer exists.
+- [x] Exercise the real `Engine`, direct import policy, canonical
       `JobService`, bounded completion apply, and Null backend; the tests must
       coordinate with a barrier/test seam rather than wall-clock sleeps.
 
 ## Docs
-- [ ] Document the direct-mesh enrichment generation key, stale-discard
+- [x] Document the direct-mesh enrichment generation key, stale-discard
       semantics, and pending action-readiness ownership in the runtime import
       documentation.
-- [ ] Remove documentation that implies postprocess completion may merge into
+- [x] Remove documentation that implies postprocess completion may merge into
       arbitrarily newer authoritative mesh state.
-- [ ] Update task indexes, session brief, and retirement records when the
+- [x] Update task indexes, session brief, and retirement records when the
       implementation and repeat verification are complete.
 
 ## Acceptance criteria
-- [ ] A position, topology, UV, property, entity-generation, or source-binding
+- [x] A position, topology, UV, property, entity-generation, or source-binding
       change after submission makes the old completion stale and prevents every
       write from that completion.
-- [ ] Stale discard preserves the exact newer geometry, properties, selection,
+- [x] Stale discard preserves the exact newer geometry, properties, selection,
       command history, and generation values and emits an actionable terminal
       status rather than silently pretending to apply.
-- [ ] An unchanged completion still applies asynchronously exactly once.
-- [ ] Runtime action readiness reports pending enrichment consistently and
+- [x] An unchanged completion still applies asynchronously exactly once.
+- [x] Runtime action readiness reports pending enrichment consistently and
       prevents conflicting mutating commands until the terminal completion is
       observed.
-- [ ] Deterministic real-engine contracts pass repeatedly without sleeps, data
+- [x] Deterministic real-engine contracts pass repeatedly without sleeps, data
       races, user datasets, or a production test-only delay.
 
 ## Verification
@@ -131,10 +168,10 @@ maturity_target: Operational
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicRuntimeContractTests
 ctest --test-dir build/ci --output-on-failure \
-  -R '^SandboxEditorUi\.(DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit|DirectMeshPostProcessPreservesNewerUvAndSourceProperties|DirectMeshPostProcessPendingStateGatesMutatingActions)$' \
+  -R '^SandboxEditorUi\.DirectMeshPostProcess(DiscardsCompletionAfterGeometryEdit|PreservesNewerUvAndSourceProperties|DiscardsCompletionAfterBindingChange|PendingStateGatesMutatingActions|DiscardsCompletionAfterWorldSwitch|WorldDestructionIsLifetimeSafe|RejectsRecycledEntityTarget)$' \
   --repeat until-fail:20 --timeout 60
 ctest --test-dir build/ci --output-on-failure \
-  -R '^SandboxEditorUi\.(DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit|DirectMeshPostProcessPreservesNewerUvAndSourceProperties|DirectMeshPostProcessPendingStateGatesMutatingActions)$' \
+  -R '^SandboxEditorUi\.DirectMeshPostProcess(DiscardsCompletionAfterGeometryEdit|PreservesNewerUvAndSourceProperties|DiscardsCompletionAfterBindingChange|PendingStateGatesMutatingActions|DiscardsCompletionAfterWorldSwitch|WorldDestructionIsLifetimeSafe|RejectsRecycledEntityTarget)$' \
   --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure \

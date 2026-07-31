@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_test_layout.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_test_layout.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 36,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T14:10:11Z",
+  "label": "test-layout-review-v2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T14:10:11Z",
+  "stderr_path": "tasks/evidence/BUG-095/commands/test-layout-review-v2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-095/commands/test-layout-review-v2.stdout.log",
+  "stdout_sha256": "164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2",
+  "task_id": "BUG-095"
+}

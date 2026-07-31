@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 1539,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T14:10:13Z",
+  "label": "doc-links-review-v2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T14:10:11Z",
+  "stderr_path": "tasks/evidence/BUG-095/commands/doc-links-review-v2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-095/commands/doc-links-review-v2.stdout.log",
+  "stdout_sha256": "9de0372e82245aac50a8e5132a6f2b4691633e1941cd65474afb871b8f194f3e",
+  "task_id": "BUG-095"
+}
