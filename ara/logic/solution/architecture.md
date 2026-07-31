@@ -217,7 +217,7 @@
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [N290, N291, N292,
-  tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md,
+  tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md,
   docs/agent/workflow-evidence.md, tools/agents/workflow_evidence.py,
   tools/agents/experiment_custody.py, tools/agents/task_claim.py,
   .github/workflows/ci-docs.yml]

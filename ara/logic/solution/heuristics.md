@@ -194,7 +194,7 @@
 - **Code ref**: [tools/agents/task_claim.py,
   tests/regression/tooling/Test.TaskClaim.py,
   docs/agent/workflow-evidence.md,
-  tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md,
+  tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md,
   N290, N291, N292]
 - **From staging**: O74
 

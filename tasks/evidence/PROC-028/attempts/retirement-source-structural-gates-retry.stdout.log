@@ -1,0 +1,12 @@
+Validated 177 task file(s); findings: 0; mode: strict.
+Validated 177 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /tmp/intrinsic-proc028-close-20260731
+[check_task_maturity_followups] Open task files scanned: 82
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_task_state_links] Root: /tmp/intrinsic-proc028-close-20260731
+[check_task_state_links] Indexed task IDs: 813
+[check_task_state_links] Mode: strict
+[check_task_state_links] Findings:
+  - tasks/active/README.md:14: PROC-028: link targets tasks/active, but actual location is done:tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
+[check_task_state_links] STRICT MODE: failing.

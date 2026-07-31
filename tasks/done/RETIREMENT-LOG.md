@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-028`](PROC-028-enforced-agent-evidence-review-experiment-workflow.md) —
+agent evidence, review, benchmark-result, experiment-custody, protected-attempt,
+and concurrent-ownership enforcement retired on 2026-07-31 at the
+process-governance `Retired` endpoint. Schema-versioned plain YAML, JSON, and
+JSONL records plus focused Python CLIs now generate completion reports and
+receipts, require revision-bound independent review for high-risk work, seal
+claim-grade/protected attempts, validate canonical benchmark result schema v2,
+and coordinate local Git-common-dir task claims. Independent review found four
+fixed-revision and cumulative-custody bypasses; six direct negative regressions
+now pin their repair, and the final focused workflow/benchmark bundle passes
+96/96. The original task-only CPU receipt passes 4,042/4,042 cases with one
+expected GLFW/LSan self-skip, while the current concurrency and cohort-parity
+retirement gate passes 19/19 and 7/7. Strict repository, benchmark, ARA,
+documentation, and workflow checks pass. `BUG-120` was repaired and retired
+separately. This retirement adds no engine source or external service and makes
+no engine capability, backend-parity, or performance claim.
+
 [`PROC-029`](PROC-029-intrinsicengine-architecture-diagram-skill.md) —
 the IntrinsicEngine architecture-diagram skill retired on 2026-07-30 at
 `Operational`. Its dependency-free Python renderer now exposes an

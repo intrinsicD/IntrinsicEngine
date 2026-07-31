@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`PROC-028` — Enforce agent evidence, review, and experiment custody](PROC-028-enforced-agent-evidence-review-experiment-workflow.md)
-  is implemented and integrated on local `main`. Retirement remains blocked
-  on a distinct fixed-revision review.
+- None.
 
 ## History
 

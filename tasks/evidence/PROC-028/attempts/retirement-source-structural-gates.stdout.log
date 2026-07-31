@@ -1,0 +1,2 @@
+[ERROR] tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md: done task must include PR/commit reference placeholder or value.
+Validated 177 task file(s); findings: 1; mode: strict.

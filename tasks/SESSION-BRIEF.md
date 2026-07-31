@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `PROC-028` — Enforce agent evidence, review, and experiment custody (tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md)
+- none
 
 ## Theme B — Rendering modernization
 

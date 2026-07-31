@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\nmapfile -t changed_files < <({ git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | sort -u)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\nmapfile -t changed_files < <({ git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | sort -u)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict'",
+  "cwd": ".",
+  "duration_ms": 39,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T09:33:28Z",
+  "label": "retirement-source-docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T09:33:28Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/retirement-source-docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-028/commands/retirement-source-docs-sync.stdout.log",
+  "stdout_sha256": "369c06c9c539e9d06bd1534187f461c7f01a4546133486af278b081e60f5087e",
+  "task_id": "PROC-028"
+}

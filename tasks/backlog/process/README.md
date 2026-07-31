@@ -15,7 +15,11 @@ map.
 
 ## Tasks
 
-- [PROC-028 — Enforce agent evidence, review, and experiment custody](../../active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md):
+No process tasks are currently open.
+
+## Retired
+
+- [PROC-028 — Enforce agent evidence, review, and experiment custody](../../done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md):
   one explicitly batched, risk-tiered workflow task covering generated
   completion evidence, strict benchmark results, independent high-risk review,
   durable handoff, claim-grade/protected experiment custody, audited portable
@@ -28,7 +32,7 @@ retirement log.
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
-- Active `PROC-028` implements the already accepted `N123..N125`
+- Retired `PROC-028` implements the already accepted `N123..N125`
   evidence-report decisions and the bounded `N290`/`O71..O75`
   cross-repository workflow findings without replacing the existing task,
   ARA, benchmark, or CI authorities.

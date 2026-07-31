@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tests/regression/tooling/Test.WorkflowConcurrency.py && python3 tests/regression/tooling/Test.TestCohortParity.py"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tests/regression/tooling/Test.WorkflowConcurrency.py && python3 tests/regression/tooling/Test.TestCohortParity.py'",
+  "cwd": ".",
+  "duration_ms": 896,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T09:29:43Z",
+  "label": "retirement-concurrency-gate",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T09:29:42Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/retirement-concurrency-gate.stderr.log",
+  "stderr_sha256": "21d5f0f7460ada02b304fd89de7b0bf6644a374903fee70243590c06aeaec370",
+  "stdout_path": "tasks/evidence/PROC-028/commands/retirement-concurrency-gate.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-028"
+}

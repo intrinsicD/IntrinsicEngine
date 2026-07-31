@@ -5,40 +5,41 @@ depends_on: [BUG-120]
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner: "Codex-Repair-20260730"
-branch: "main"
-worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-07-30T21:56:27Z"
+owner: "Codex-PROC028-Closure-20260731"
+branch: "task/proc-028-close-20260731"
+worktree: "/tmp/intrinsic-proc028-close-20260731"
+claimed_at: "2026-07-31T09:28:53Z"
 ---
 # PROC-028 — Enforce agent evidence, review, and experiment custody
 
 ## Status
 
-- The terminal independent review recorded in
-  `tasks/evidence/PROC-028/reviews.jsonl` sequence 6 rejected revision
-  `e800ede9` on four enforcement defects: a superseded fixed surface, unbound
-  handoff/review revisions, absent claim-grade/protected completion custody,
-  and protocol/run binding substitution.
-- Repair is active in the canonical worktree under the live
-  `Codex-Repair-20260730` claim. The implementation remains plain-file tooling
-  and focused free-function validation; no new framework or engine surface is
-  introduced.
-- The repaired revision binding and cumulative custody regressions pass 21/21,
-  and the repaired experiment-custody suite passes 21/21. The complete focused
-  workflow/benchmark bundle passes 96/96; Python quality and the strict
-  task/docs/skill/ARA/method/benchmark/layering/layout/hygiene bundle also pass.
-  Clean fixed-revision rebinding and distinct independent re-review remain
-  pending.
-- Focused workflow/benchmark regressions, strict touched structural gates,
-  `ci` configuration, `IntrinsicTests`, `IntrinsicBenchmarks`, strict generated
-  benchmark validation, and the complete default CPU-supported CTest selector
-  pass locally. The post-integration workflow regression bundle passes 90/90;
-  the combined main tree passes the 89-case RUNTIME-201 selector and all 4,059
-  CPU-supported cases with one expected GLFW/LSan self-skip.
-- Retirement remains blocked on a distinct fixed-revision independent review
-  and on pre-existing `BUG-120`: `Test.WorkflowConcurrency.py`, already wired
-  into `ci-docs`, fails against byte-identical `origin/main` sources because
-  its expected CTest reservation/config-root snapshot has drifted.
+- Completed: 2026-07-31.
+- Commit: `16eed961` integrates the repaired implementation and resolved
+  `BUG-120`; the generated completion report binds the exact final retirement
+  source revision.
+- Implementation and repair landed through `8be851e4` and `c5e39703`, then
+  integrated with the separate `BUG-120` closure by merge `16eed961`. The
+  generated completion report records the exact final retirement revision.
+- Maturity: `Retired` for process governance. This task makes no engine
+  capability, backend-parity, or performance claim.
+- Independent review sequence 6 rejected four enforcement defects; the repair
+  adds direct negative coverage for exact review revisions, cumulative
+  claim-grade/protected custody, and frozen protocol/run equality. The repaired
+  workflow and experiment-custody suites pass 21/21 each, and the complete
+  focused workflow/benchmark bundle passes 96/96.
+- `BUG-120` is retired separately at `CPUContracted`. The current retirement
+  receipt reruns `Test.WorkflowConcurrency.py` at 19/19 and
+  `Test.TestCohortParity.py` at 7/7, so it is no longer a blocker or skipped
+  gate.
+- Existing generated receipts cover strict structural validation, `ci`
+  configuration, `IntrinsicTests`, `IntrinsicBenchmarks`, benchmark-result
+  validation, and the complete 4,042-case CPU-supported selector with one
+  expected GLFW/LSan self-skip. This final task-state retirement changes no
+  engine source, CMake input, module surface, or compiled test.
+- The high-risk completion gate accepts only a genuinely distinct review bound
+  to the exact final source revision and content digest. The authoritative
+  disposition remains the append-only record under `tasks/evidence/PROC-028/`.
 
 ## Goal
 
@@ -347,7 +348,7 @@ claimed_at: "2026-07-30T21:56:27Z"
 - [x] Every non-trivial task in the prospective enforcement scope either has a
   valid generated report or is blocked from retirement; every micro exemption
   has an explicit validated reason.
-- [ ] `PROC-028` itself has a valid generated `report.yaml`, complete command
+- [x] `PROC-028` itself has a valid generated `report.yaml`, complete command
   receipts, final fixed-revision independent review, terminal verdict, and no
   unresolved blocking evidence finding.
 - [x] Existing task, skill, method, benchmark, ARA, docs, and CI authorities
@@ -392,9 +393,13 @@ python3 tools/agents/generate_session_brief.py --check
 
 python3 tests/regression/tooling/Test.WorkflowEvidence.py
 python3 tests/regression/tooling/Test.ExperimentCustody.py
+python3 tests/regression/tooling/Test.WorkflowConcurrency.py
+python3 tests/regression/tooling/Test.TestCohortParity.py
 python3 tools/agents/experiment_custody.py validate-completion \
   --root . --task-id <CLAIM-TASK-ID> --profile claim-grade \
   --experiment-root tasks/evidence/<CLAIM-TASK-ID>/experiment
+python3 tools/agents/workflow_evidence.py validate \
+  --root . --require-complete PROC-028
 
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
@@ -422,3 +427,8 @@ ctest --test-dir build/ci --output-on-failure \
   suffice.
 - A repository-wide historical evidence backfill.
 - Mechanical file moves mixed with semantic policy or validator changes.
+
+Completed: 2026-07-31. Repair implementation `8be851e4`, evidence preparation
+`c5e39703`, and `BUG-120` integration `16eed961`; the exact final retirement
+revision and accepted independent review are recorded in
+`tasks/evidence/PROC-028/`.
