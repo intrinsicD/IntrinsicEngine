@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -475,6 +476,15 @@ namespace Extrinsic::Runtime
                 const std::uint64_t expectedEpoch =
                     BindingEpoch;
                 const std::weak_ptr<State> weakState = Self;
+                const std::function<bool()> bindingValid =
+                    [weakState, expectedEpoch]
+                    {
+                        if (const auto state = weakState.lock())
+                        {
+                            return state->IsBindingCurrent(expectedEpoch);
+                        }
+                        return false;
+                    };
                 SceneHandoff =
                     std::make_unique<AssetModelSceneHandoff>(
                         *Assets,
@@ -484,18 +494,7 @@ namespace Extrinsic::Runtime
                         AssetModelSceneHandoffOptions{
                             .World = BoundWorld,
                             .BindingEpoch = expectedEpoch,
-                            .BindingValid =
-                                [weakState, expectedEpoch]()
-                                {
-                                    if (const auto state =
-                                            weakState.lock())
-                                    {
-                                        return state->
-                                            IsBindingCurrent(
-                                                expectedEpoch);
-                                    }
-                                    return false;
-                            },
+                            .BindingValid = bindingValid,
                             .TextureBake = TextureBake,
                         });
 
@@ -506,6 +505,7 @@ namespace Extrinsic::Runtime
                         .Jobs = Jobs,
                         .Worlds = Worlds,
                         .World = BoundWorld,
+                        .BindingValid = bindingValid,
                         .AssetService = Assets.get(),
                         .GpuAssetCache = Cache.get(),
                         .ModelTextureHandoff =

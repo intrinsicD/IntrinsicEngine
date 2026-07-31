@@ -3,6 +3,7 @@ module;
 #include <array>
 #include <bit>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -46,6 +47,7 @@ import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
@@ -62,6 +64,9 @@ namespace Extrinsic::Runtime
             Geometry::MeshIO::MeshIOResult Payload{};
             ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
             JobToken Job{};
+            WorldRegistry* Worlds{};
+            WorldHandle World{};
+            std::function<bool()> BindingValid{};
             std::uint64_t SubmittedSignature{0u};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::optional<RuntimeMeshMaterializationResult> Materialized{};
@@ -635,10 +640,33 @@ namespace Extrinsic::Runtime
 
         constexpr std::uint32_t kDirectMeshNormalBakeRetryDrainLimit = 256u;
 
+        [[nodiscard]] ECS::Scene::Registry* ResolveDirectMeshScene(
+            WorldRegistry* const worlds,
+            const WorldHandle world) noexcept
+        {
+            return worlds != nullptr && world.IsValid()
+                ? worlds->Get(world)
+                : nullptr;
+        }
+
+        [[nodiscard]] bool IsDirectMeshBindingCurrent(
+            WorldRegistry* const worlds,
+            const WorldHandle world,
+            const std::function<bool()>& bindingValid)
+        {
+            return bindingValid &&
+                bindingValid() &&
+                worlds != nullptr &&
+                world.IsValid() &&
+                worlds->ActiveWorld() == world &&
+                worlds->Get(world) != nullptr;
+        }
+
         void DeferDirectMeshNormalBakeUntilOperational(
             JobService& jobs,
+            WorldRegistry* const worlds,
             const WorldHandle world,
-            ECS::Scene::Registry& scene,
+            std::function<bool()> bindingValid,
             TextureBakeService& textureBake,
             const ECS::EntityHandle entity,
             std::string sourcePath)
@@ -671,9 +699,16 @@ namespace Extrinsic::Runtime
                                 kDirectMeshNormalBakeRetryDrainLimit;
                         },
                     .ValidateBeforeApply =
-                        [&scene, entity]
+                        [worlds, world, bindingValid, entity]
                         {
-                            return scene.IsValid(entity)
+                            if (!IsDirectMeshBindingCurrent(
+                                    worlds, world, bindingValid))
+                            {
+                                return JobApplyValidation::StaleWorld;
+                            }
+                            const ECS::Scene::Registry* const scene =
+                                ResolveDirectMeshScene(worlds, world);
+                            return scene != nullptr && scene->IsValid(entity)
                                 ? JobApplyValidation::Current
                                 : JobApplyValidation::MissingTarget;
                         },
@@ -721,7 +756,9 @@ namespace Extrinsic::Runtime
 
         void QueueDirectMeshPostProcess(
             JobService* jobs,
+            WorldRegistry* worlds,
             const WorldHandle world,
+            std::function<bool()> bindingValid,
             ECS::Scene::Registry& scene,
             TextureBakeService* textureBake,
             std::string meshPath,
@@ -729,6 +766,9 @@ namespace Extrinsic::Runtime
             const ECS::EntityHandle entity)
         {
             if (jobs == nullptr ||
+                !IsDirectMeshBindingCurrent(
+                    worlds, world, bindingValid) ||
+                worlds->Get(world) != &scene ||
                 entity == ECS::InvalidEntityHandle ||
                 !scene.IsValid(entity))
             {
@@ -739,6 +779,9 @@ namespace Extrinsic::Runtime
             state->Path = std::move(meshPath);
             state->Payload = meshPayload;
             state->Entity = entity;
+            state->Worlds = worlds;
+            state->World = world;
+            state->BindingValid = std::move(bindingValid);
 
             auto& raw = scene.Raw();
             const std::optional<std::uint64_t> submittedSignature =
@@ -807,12 +850,27 @@ namespace Extrinsic::Runtime
                                 });
                         },
                     .ValidateBeforeApply =
-                        [state, &scene]
+                        [state]
                         {
-                            if (!scene.IsValid(state->Entity))
-                                return JobApplyValidation::MissingTarget;
+                            if (!IsDirectMeshBindingCurrent(
+                                    state->Worlds,
+                                    state->World,
+                                    state->BindingValid))
+                            {
+                                return JobApplyValidation::StaleWorld;
+                            }
 
-                            const auto* enrichment = scene.Raw().try_get<
+                            ECS::Scene::Registry* const scene =
+                                ResolveDirectMeshScene(
+                                    state->Worlds,
+                                    state->World);
+                            if (scene == nullptr ||
+                                !scene->IsValid(state->Entity))
+                            {
+                                return JobApplyValidation::MissingTarget;
+                            }
+
+                            const auto* enrichment = scene->Raw().try_get<
                                 Internal::DirectMeshEnrichmentState>(
                                 state->Entity);
                             if (enrichment == nullptr ||
@@ -824,7 +882,7 @@ namespace Extrinsic::Runtime
                             const std::optional<std::uint64_t>
                                 currentSignature =
                                     CaptureDirectMeshGenerationSignature(
-                                        scene.Raw(),
+                                        scene->Raw(),
                                         state->Entity);
                             if (!currentSignature.has_value() ||
                                 *currentSignature != state->SubmittedSignature)
@@ -836,10 +894,8 @@ namespace Extrinsic::Runtime
                     .PublishCompletion =
                         [
                             state,
-                            &scene,
                             jobs,
-                            textureBake,
-                            world
+                            textureBake
                         ](
                                 KernelEventBus&,
                                 const JobResultEnvelope& envelope) -> bool
@@ -852,13 +908,20 @@ namespace Extrinsic::Runtime
                                 return false;
                             }
 
+                            ECS::Scene::Registry* const scene =
+                                ResolveDirectMeshScene(
+                                    state->Worlds,
+                                    state->World);
+                            if (scene == nullptr)
+                                return false;
+
                             if (state->Error != Core::ErrorCode::Success ||
                                 !state->Materialized.has_value())
                             {
-                                if (scene.IsValid(state->Entity))
+                                if (scene->IsValid(state->Entity))
                                 {
                                     UpdateDirectMeshEnrichmentState(
-                                        scene.Raw(),
+                                        scene->Raw(),
                                         state->Entity,
                                         state->Job,
                                         JobState::Dropped,
@@ -872,12 +935,12 @@ namespace Extrinsic::Runtime
                                 return true;
                             }
 
-                            if (!scene.IsValid(state->Entity))
+                            if (!scene->IsValid(state->Entity))
                             {
                                 return true;
                             }
 
-                            auto& raw = scene.Raw();
+                            auto& raw = scene->Raw();
                             Geometry::HalfedgeMesh::Mesh mesh =
                                 std::move(state->Materialized->Mesh);
                             ECS::Components::GeometrySources::PopulateFromMesh(
@@ -895,22 +958,23 @@ namespace Extrinsic::Runtime
                             if (textureBake != nullptr)
                             {
                                 ConfigureDirectMeshNormalPresentationTarget(
-                                    scene,
+                                    *scene,
                                     state->Entity,
                                     "generated-normal");
                                 const PropertyTextureBakeResult result =
                                     textureBake->Bake(
                                         BuildDirectMeshNormalBakeRequest(
                                             state->Entity,
-                                            world));
+                                            state->World));
                                 if (result.Status ==
                                     PropertyTextureBakeStatus::
                                         NonOperationalBackend)
                                 {
                                     DeferDirectMeshNormalBakeUntilOperational(
                                         *jobs,
-                                        world,
-                                        scene,
+                                        state->Worlds,
+                                        state->World,
+                                        state->BindingValid,
                                         *textureBake,
                                         state->Entity,
                                         state->Path);
@@ -928,10 +992,17 @@ namespace Extrinsic::Runtime
                             return true;
                         },
                     .FinalizeUnpublishedOnMainThread =
-                        [state, &scene, jobs]
+                        [state, jobs]
                         {
-                            if (!scene.IsValid(state->Entity))
+                            ECS::Scene::Registry* const scene =
+                                ResolveDirectMeshScene(
+                                    state->Worlds,
+                                    state->World);
+                            if (scene == nullptr ||
+                                !scene->IsValid(state->Entity))
+                            {
                                 return;
+                            }
 
                             const JobState status = jobs->GetState(state->Job);
                             std::string diagnostic;
@@ -956,7 +1027,7 @@ namespace Extrinsic::Runtime
                                     "applying its result.";
                             }
                             UpdateDirectMeshEnrichmentState(
-                                scene.Raw(),
+                                scene->Raw(),
                                 state->Entity,
                                 state->Job,
                                 status,
@@ -1159,6 +1230,8 @@ namespace Extrinsic::Runtime
                     if (context.MeshPayload == nullptr)
                         return Core::Ok();
                     if (services.Jobs == nullptr ||
+                        services.Worlds == nullptr ||
+                        !services.BindingValid ||
                         services.Scene == nullptr)
                     {
                         return Core::Err(
@@ -1167,7 +1240,9 @@ namespace Extrinsic::Runtime
 
                     QueueDirectMeshPostProcess(
                         services.Jobs,
+                        services.Worlds,
                         services.World,
+                        services.BindingValid,
                         *services.Scene,
                         services.TextureBake,
                         std::string{context.Path},

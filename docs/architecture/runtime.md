@@ -273,13 +273,18 @@ direct-mesh enrichment captures the complete published mesh-source generation:
 active domain and topology markers, all vertex/edge/halfedge/face property
 metadata and values, deleted counts, and vertex-channel binding generation and
 property references. Its world-scoped job reaches the main-thread apply only
-when the raw entity is still live, its entity-sidecar token still names that
-job, and the captured generation matches exactly. A mismatch is reported as a
-stale discard and performs no ECS, history, or selection write. The same
-sidecar projects pending/terminal status plus a nonempty reason into the
-selected-entity processing model; while pending, that model exposes no
-geometry-mutating action. `RUNTIME-200` owns migration into the staged import
-recipe and must preserve this validation and readiness contract.
+while the asset-workflow binding epoch still names the same active world and
+scene, the raw entity is still live, its entity-sidecar token still names that
+job, and the captured generation matches exactly. Apply and unpublished
+finalization resolve the scene through `WorldRegistry` at callback time; they
+never retain a scene reference across worker execution. A world switch,
+document replacement, destroyed world, recycled entity, or generation mismatch
+therefore terminates without targeting retired storage. A stale discard
+performs no ECS, history, or selection write. The same sidecar projects
+pending/terminal status plus a nonempty reason into the selected-entity
+processing model; while pending, that model exposes no geometry-mutating
+action. `RUNTIME-200` owns migration into the staged import recipe and must
+preserve this validation, lifetime, and readiness contract.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

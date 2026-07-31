@@ -129,12 +129,17 @@ enrichment captures an exact signature over the active mesh domain and topology
 markers, every vertex/edge/halfedge/face property descriptor and value, deleted
 counts, and vertex-channel binding generation and property references. Its
 world-scoped `JobService` completion applies only when the entity is still live,
-the entity-sidecar job token still matches, and that signature is unchanged;
-otherwise it terminates as stale without writing ECS, history, or selection
-state. The selected-entity processing model exposes the sidecar's pending or
-terminal status and nonempty reason, and pending enrichment removes all
-geometry-mutating actions until the job resolves. The staged workflow
-replacement in `RUNTIME-200` must preserve this contract.
+the asset-workflow binding epoch still names the same active world and scene,
+the entity-sidecar job token still matches, and that signature is unchanged.
+Apply and unpublished finalization resolve the scene through `WorldRegistry`
+at callback time instead of retaining a scene reference across worker
+execution. World switches, document replacement, destroyed worlds, recycled
+entities, and signature mismatches therefore terminate without targeting
+retired storage or writing ECS, history, or selection state. The selected-entity
+processing model exposes the sidecar's pending or terminal status and nonempty
+reason, and pending enrichment removes all geometry-mutating actions until the
+job resolves. The staged workflow replacement in `RUNTIME-200` must preserve
+this validation, lifetime, and readiness contract.
 
 Geometry materialization invokes an ordered post-import processor registry after
 each created entity is populated from its decoded payload. Processors receive

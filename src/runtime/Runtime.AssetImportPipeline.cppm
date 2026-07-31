@@ -73,7 +73,9 @@ namespace Extrinsic::Runtime
     export struct RuntimePostImportProcessorServices
     {
         JobService* Jobs{};
+        WorldRegistry* Worlds{};
         WorldHandle World{DefaultWorldHandle};
+        std::function<bool()> BindingValid{};
         Assets::AssetService* AssetService{};
         Graphics::GpuAssetCache* GpuAssetCache{};
         RenderExtractionCache* RenderExtraction{};
@@ -212,6 +214,7 @@ namespace Extrinsic::Runtime
         JobService* Jobs{};
         WorldRegistry* Worlds{};
         WorldHandle World{DefaultWorldHandle};
+        std::function<bool()> BindingValid{};
         Assets::AssetService* AssetService{};
         Graphics::GpuAssetCache* GpuAssetCache{};
         AssetModelTextureHandoff* ModelTextureHandoff{};
@@ -351,6 +354,7 @@ namespace Extrinsic::Runtime
         BorrowedSubsystem<WorldRegistry> m_WorldRegistry{};
         WorldHandle m_World{DefaultWorldHandle};
         std::uint64_t m_TargetBindingEpoch{0u};
+        std::function<bool()> m_BindingValid{};
         BorrowedSubsystem<Assets::AssetService> m_AssetService{};
         BorrowedSubsystem<Graphics::GpuAssetCache> m_GpuAssetCache{};
         BorrowedSubsystem<AssetModelTextureHandoff> m_AssetModelTextureHandoff{};

@@ -1019,7 +1019,9 @@ namespace Extrinsic::Runtime
             RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
             JobService* jobs,
+            WorldRegistry* worlds,
             const WorldHandle world,
+            std::function<bool()> bindingValid,
             const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
                 importEntityPolicies,
             const std::span<const RuntimePostImportProcessorRecord> postImportProcessors,
@@ -1031,7 +1033,9 @@ namespace Extrinsic::Runtime
             };
             RuntimePostImportProcessorServices postImportServices{
                 .Jobs = jobs,
+                .Worlds = worlds,
                 .World = world,
+                .BindingValid = std::move(bindingValid),
                 .AssetService = &assetService,
                 .GpuAssetCache = &gpuAssetCache,
                 .RenderExtraction = &extraction,
@@ -1458,6 +1462,7 @@ namespace Extrinsic::Runtime
         m_Jobs = BorrowedSubsystem<JobService>{dependencies.Jobs};
         m_WorldRegistry = BorrowedSubsystem<WorldRegistry>{dependencies.Worlds};
         m_World = dependencies.World;
+        m_BindingValid = std::move(dependencies.BindingValid);
         m_AssetService = BorrowedSubsystem<Assets::AssetService>{dependencies.AssetService};
         m_GpuAssetCache = BorrowedSubsystem<Graphics::GpuAssetCache>{dependencies.GpuAssetCache};
         m_AssetModelTextureHandoff =
@@ -2205,7 +2210,9 @@ namespace Extrinsic::Runtime
                         m_RenderExtraction,
                         *submissionScene,
                         m_Jobs.get(),
+                        m_WorldRegistry.get(),
                         submissionWorld,
+                        m_BindingValid,
                         m_ImportEntityAuthoringPolicies,
                         m_PostImportProcessors,
                         m_TextureBake.get(),
@@ -3102,7 +3109,9 @@ namespace Extrinsic::Runtime
                 m_RenderExtraction,
                 *m_Scene,
                 m_Jobs.get(),
+                m_WorldRegistry.get(),
                 m_World,
+                m_BindingValid,
                 m_ImportEntityAuthoringPolicies,
                 m_PostImportProcessors,
                 m_TextureBake.get(),
