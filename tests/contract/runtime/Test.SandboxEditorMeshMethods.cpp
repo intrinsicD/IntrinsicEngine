@@ -143,45 +143,7 @@ void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
         auto* const pipeline =
             engine.Services().Find<Runtime::AssetImportPipeline>();
-        auto* const inputActions =
-            engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
         ASSERT_NE(pipeline, nullptr);
-        ASSERT_NE(inputActions, nullptr);
-
-        auto authoring =
-            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-        for (auto& desc : authoring)
-        {
-            ASSERT_TRUE(
-                pipeline->RegisterImportEntityAuthoringPolicy(
-                    std::move(desc))
-                    .IsValid());
-        }
-        ASSERT_TRUE(
-            pipeline->RegisterImportCompletedHandler(
-                Runtime::MakeSandboxDefaultImportCompletedHandler(
-                    engine.Services()
-                        .Find<Runtime::CameraControllerRegistry>()))
-                .IsValid());
-        ASSERT_TRUE(
-            pipeline->RegisterPostImportProcessor(
-                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
-                .IsValid());
-
-        auto* const cameraControllers =
-            engine.Services().Find<Runtime::CameraControllerRegistry>();
-        auto* const selection =
-            engine.Services().Find<Runtime::SelectionController>();
-        if (cameraControllers != nullptr && selection != nullptr)
-        {
-            ASSERT_TRUE(
-                inputActions
-                    ->Register(
-                        Runtime::MakeSandboxDefaultFocusInputAction(
-                            *cameraControllers,
-                            *selection))
-                    .IsValid());
-        }
     }
 
 [[nodiscard]] bool HasDiagnostic(

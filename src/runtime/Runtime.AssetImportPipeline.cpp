@@ -39,6 +39,7 @@ import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.AssetMeshNormals;
+import Extrinsic.Runtime.AssetImportPolicies;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
@@ -418,99 +419,15 @@ namespace Extrinsic::Runtime
                    result.TextureUploadRequests > 0u;
         }
 
-        void RunPostImportProcessors(
-            const std::span<const RuntimePostImportProcessorRecord> processors,
-            const RuntimePostImportProcessorContext& context,
-            RuntimePostImportProcessorServices& services)
-        {
-            for (const RuntimePostImportProcessorRecord& processor : processors)
-            {
-                const bool payloadMatches =
-                    processor.Desc.PayloadKind == Assets::AssetPayloadKind::Unknown ||
-                    processor.Desc.PayloadKind == context.PayloadKind;
-                if (!payloadMatches || !processor.Desc.Process)
-                    continue;
-
-                Core::Result result =
-                    processor.Desc.Process(context, services);
-                if (!result.has_value())
-                {
-                    Core::Log::Warn(
-                        "[Runtime] Post-import processor '{}' failed: path='{}' error={}",
-                        processor.Desc.DebugName.empty()
-                            ? "<unnamed>"
-                            : processor.Desc.DebugName,
-                        context.Path,
-                        Core::Error::ToString(result.error()));
-                }
-            }
-        }
-
-        void RunImportEntityAuthoringPolicies(
-            const std::span<const RuntimeImportEntityAuthoringPolicyRecord> policies,
-            const RuntimeImportEntityAuthoringPolicyContext& context,
-            RuntimeImportEntityAuthoringPolicyServices& services)
-        {
-            for (const RuntimeImportEntityAuthoringPolicyRecord& policy : policies)
-            {
-                const bool payloadMatches =
-                    policy.Desc.PayloadKind == Assets::AssetPayloadKind::Unknown ||
-                    policy.Desc.PayloadKind == context.PayloadKind;
-                if (!payloadMatches || !policy.Desc.Apply)
-                    continue;
-
-                Core::Result result = policy.Desc.Apply(context, services);
-                if (!result.has_value())
-                {
-                    Core::Log::Warn(
-                        "[Runtime] Import authoring policy '{}' failed: path='{}' error={}",
-                        policy.Desc.DebugName.empty()
-                            ? "<unnamed>"
-                            : policy.Desc.DebugName,
-                        context.Path,
-                        Core::Error::ToString(result.error()));
-                }
-            }
-        }
-
-        void RunImportCompletedHandlers(
-            const std::span<const RuntimeImportCompletedHandlerRecord> handlers,
-            const RuntimeImportCompletedContext& context,
-            RuntimeImportCompletedServices& services)
-        {
-            for (const RuntimeImportCompletedHandlerRecord& handler : handlers)
-            {
-                const bool payloadMatches =
-                    handler.Desc.PayloadKind == Assets::AssetPayloadKind::Unknown ||
-                    handler.Desc.PayloadKind == context.PayloadKind;
-                if (!payloadMatches || !handler.Desc.Handle)
-                    continue;
-
-                Core::Result result = handler.Desc.Handle(context, services);
-                if (!result.has_value())
-                {
-                    Core::Log::Warn(
-                        "[Runtime] Import completed handler '{}' failed: path='{}' error={}",
-                        handler.Desc.DebugName.empty()
-                            ? "<unnamed>"
-                            : handler.Desc.DebugName,
-                        context.Path,
-                        Core::Error::ToString(result.error()));
-                }
-            }
-        }
-
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
         FinalizeModelSceneImport(
             AssetModelSceneHandoff& handoff,
             ECS::Scene::Registry& scene,
-            const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
-                importEntityPolicies,
-            const std::span<const RuntimeImportCompletedHandlerRecord>
-                completedHandlers,
+            const ImportAuthoringRecipe& authoring,
+            const AssetImportCompletionRecipe& completion,
             SelectionController* selection,
+            CameraControllerRegistry* cameraControllers,
             const Core::Config::EngineConfig* config,
-            const std::string_view path,
             RuntimeAssetImportResult result)
         {
             const AssetModelSceneHandoffRecord* record =
@@ -529,54 +446,34 @@ namespace Extrinsic::Runtime
                 primitiveEntities.push_back(primitive.Entity);
             }
 
-            RuntimeImportEntityAuthoringPolicyServices authoringServices{
-                .Scene = &scene,
-            };
-            // Authoring callbacks can trigger arbitrary runtime work, including
-            // asset lifecycle events that replace the handoff record. Never
-            // retain or iterate record-owned storage across a callback.
             for (const ECS::EntityHandle primitiveEntity : primitiveEntities)
             {
-                if (!scene.IsValid(primitiveEntity))
+                if (Core::Result authored = ApplyAssetImportAuthoringRecipe(
+                        Assets::AssetPayloadKind::Mesh,
+                        authoring.AuthorRenderableComponents,
+                        authoring.AuthorSelectableIdentity,
+                        primitiveEntity,
+                        scene);
+                    !authored.has_value())
                 {
                     return Core::Err<RuntimeAssetImportResult>(
-                        Core::ErrorCode::InvalidState);
-                }
-                RunImportEntityAuthoringPolicies(
-                    importEntityPolicies,
-                    RuntimeImportEntityAuthoringPolicyContext{
-                        .Path = path,
-                        // Reuse the canonical direct-mesh policy contract for
-                        // each renderable model primitive. Completion still
-                        // reports ModelScene once for the full import.
-                        .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                        .Entity = primitiveEntity,
-                    },
-                    authoringServices);
-                if (!scene.IsValid(primitiveEntity))
-                {
-                    return Core::Err<RuntimeAssetImportResult>(
-                        Core::ErrorCode::InvalidState);
+                        authored.error());
                 }
             }
 
-            RuntimeImportCompletedServices completedServices{
-                .Scene = &scene,
-                .Selection = selection,
-                .Config = config,
-            };
-            RunImportCompletedHandlers(
-                completedHandlers,
-                RuntimeImportCompletedContext{
-                    .Path = path,
-                    .PayloadKind = Assets::AssetPayloadKind::ModelScene,
-                    .CreatedEntities = std::span<const ECS::EntityHandle>{
-                        primitiveEntities},
-                    .FocusTarget = ComputeFocusTargetForEntities(
-                        scene,
-                        primitiveEntities),
-                },
-                completedServices);
+            if (Core::Result completed = ApplyAssetImportCompletionRecipe(
+                    completion.SelectFirstCreatedEntity,
+                    completion.FocusCameraOnCreatedGeometry,
+                    std::span<const ECS::EntityHandle>{primitiveEntities},
+                    ComputeFocusTargetForEntities(scene, primitiveEntities),
+                    scene,
+                    selection,
+                    config,
+                    cameraControllers);
+                !completed.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(completed.error());
+            }
             return result;
         }
 
@@ -592,11 +489,9 @@ namespace Extrinsic::Runtime
             Assets::AssetService& assetService,
             AssetModelSceneHandoff& handoff,
             ECS::Scene::Registry& scene,
-            const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
-                importEntityPolicies,
-            const std::span<const RuntimeImportCompletedHandlerRecord>
-                completedHandlers,
+            const AssetImportRecipe& recipe,
             SelectionController* selection,
+            CameraControllerRegistry* cameraControllers,
             const Core::Config::EngineConfig* config,
             const RuntimeAssetImportRequest& request,
             const Assets::AssetId existingAsset,
@@ -660,11 +555,11 @@ namespace Extrinsic::Runtime
                 return FinalizeModelSceneImport(
                     handoff,
                     scene,
-                    importEntityPolicies,
-                    completedHandlers,
+                    recipe.Authoring,
+                    recipe.Completion,
                     selection,
+                    cameraControllers,
                     config,
-                    request.Path,
                     std::move(result));
             }
 
@@ -727,11 +622,11 @@ namespace Extrinsic::Runtime
             return FinalizeModelSceneImport(
                 handoff,
                 scene,
-                importEntityPolicies,
-                completedHandlers,
+                recipe.Authoring,
+                recipe.Completion,
                 selection,
+                cameraControllers,
                 config,
-                request.Path,
                 std::move(result));
         }
 
@@ -1120,34 +1015,15 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Expected<MaterializedGeometryImport>
         MaterializeDecodedGeometryImport(
             Assets::AssetService& assetService,
-            Graphics::GpuAssetCache& gpuAssetCache,
-            RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
             JobService* jobs,
             WorldRegistry* worlds,
             const WorldHandle world,
             std::function<bool()> bindingValid,
-            const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
-                importEntityPolicies,
-            const std::span<const RuntimePostImportProcessorRecord> postImportProcessors,
             TextureBakeService* textureBake,
+            const AssetImportRecipe& recipe,
             const DecodedGeometryImport& decoded)
         {
-            RuntimeImportEntityAuthoringPolicyServices authoringServices{
-                .Scene = &scene,
-            };
-            RuntimePostImportProcessorServices postImportServices{
-                .Jobs = jobs,
-                .Worlds = worlds,
-                .World = world,
-                .BindingValid = std::move(bindingValid),
-                .AssetService = &assetService,
-                .GpuAssetCache = &gpuAssetCache,
-                .RenderExtraction = &extraction,
-                .Scene = &scene,
-                .TextureBake = textureBake,
-            };
-
             return std::visit(
                 [&](const auto& payload) -> Core::Expected<MaterializedGeometryImport>
                 {
@@ -1203,14 +1079,18 @@ namespace Extrinsic::Runtime
                                 scene,
                                 GeometryEntityName(decoded.Path, decoded.PayloadKind));
                         auto& raw = scene.Raw();
-                        RunImportEntityAuthoringPolicies(
-                            importEntityPolicies,
-                            RuntimeImportEntityAuthoringPolicyContext{
-                                .Path = decoded.Path,
-                                .PayloadKind = decoded.PayloadKind,
-                                .Entity = entity,
-                            },
-                            authoringServices);
+                        if (Core::Result authored =
+                                ApplyAssetImportAuthoringRecipe(
+                                    decoded.PayloadKind,
+                                    recipe.Authoring.AuthorRenderableComponents,
+                                    recipe.Authoring.AuthorSelectableIdentity,
+                                    entity,
+                                    scene);
+                            !authored.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                authored.error());
+                        }
                         const std::optional<GeometryImportBounds> bounds =
                             BoundsFromHalfedgeMesh(*rawMesh);
                         if (bounds.has_value())
@@ -1221,15 +1101,20 @@ namespace Extrinsic::Runtime
                             raw,
                             entity,
                             *rawMesh);
-                        RunPostImportProcessors(
-                            postImportProcessors,
-                            RuntimePostImportProcessorContext{
-                                .Path = decoded.Path,
-                                .PayloadKind = decoded.PayloadKind,
-                                .Entity = entity,
-                                .MeshPayload = meshPayload.get(),
-                            },
-                            postImportServices);
+                        if (recipe.Postprocess ==
+                            AssetImportPostprocessPolicy::PrepareRenderableGeometry)
+                        {
+                            QueueAssetImportDirectMeshPostprocess(
+                                jobs,
+                                worlds,
+                                world,
+                                bindingValid,
+                                scene,
+                                textureBake,
+                                decoded.Path,
+                                *meshPayload,
+                                entity);
+                        }
 
                         return MaterializedGeometryImport{
                             .Result = RuntimeAssetImportResult{
@@ -1284,14 +1169,18 @@ namespace Extrinsic::Runtime
                                 scene,
                                 GeometryEntityName(decoded.Path, decoded.PayloadKind));
                         auto& raw = scene.Raw();
-                        RunImportEntityAuthoringPolicies(
-                            importEntityPolicies,
-                            RuntimeImportEntityAuthoringPolicyContext{
-                                .Path = decoded.Path,
-                                .PayloadKind = decoded.PayloadKind,
-                                .Entity = entity,
-                            },
-                            authoringServices);
+                        if (Core::Result authored =
+                                ApplyAssetImportAuthoringRecipe(
+                                    decoded.PayloadKind,
+                                    recipe.Authoring.AuthorRenderableComponents,
+                                    recipe.Authoring.AuthorSelectableIdentity,
+                                    entity,
+                                    scene);
+                            !authored.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                authored.error());
+                        }
                         if (bounds.has_value())
                         {
                             AttachGeometryBounds(raw, entity, *bounds);
@@ -1300,15 +1189,6 @@ namespace Extrinsic::Runtime
                             raw,
                             entity,
                             graph);
-                        RunPostImportProcessors(
-                            postImportProcessors,
-                            RuntimePostImportProcessorContext{
-                                .Path = decoded.Path,
-                                .PayloadKind = decoded.PayloadKind,
-                                .Entity = entity,
-                            },
-                            postImportServices);
-
                         return MaterializedGeometryImport{
                             .Result = RuntimeAssetImportResult{
                                 .Asset = *asset,
@@ -1362,14 +1242,18 @@ namespace Extrinsic::Runtime
                                 scene,
                                 GeometryEntityName(decoded.Path, decoded.PayloadKind));
                         auto& raw = scene.Raw();
-                        RunImportEntityAuthoringPolicies(
-                            importEntityPolicies,
-                            RuntimeImportEntityAuthoringPolicyContext{
-                                .Path = decoded.Path,
-                                .PayloadKind = decoded.PayloadKind,
-                                .Entity = entity,
-                            },
-                            authoringServices);
+                        if (Core::Result authored =
+                                ApplyAssetImportAuthoringRecipe(
+                                    decoded.PayloadKind,
+                                    recipe.Authoring.AuthorRenderableComponents,
+                                    recipe.Authoring.AuthorSelectableIdentity,
+                                    entity,
+                                    scene);
+                            !authored.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                authored.error());
+                        }
                         if (bounds.has_value())
                         {
                             AttachGeometryBounds(raw, entity, *bounds);
@@ -1378,15 +1262,6 @@ namespace Extrinsic::Runtime
                             raw,
                             entity,
                             cloud);
-                        RunPostImportProcessors(
-                            postImportProcessors,
-                            RuntimePostImportProcessorContext{
-                                .Path = decoded.Path,
-                                .PayloadKind = decoded.PayloadKind,
-                                .Entity = entity,
-                            },
-                            postImportServices);
-
                         return MaterializedGeometryImport{
                             .Result = RuntimeAssetImportResult{
                                 .Asset = *asset,
@@ -1645,6 +1520,9 @@ namespace Extrinsic::Runtime
         m_Scene = BorrowedSubsystem<ECS::Scene::Registry>{dependencies.Scene};
         m_SelectionController =
             BorrowedSubsystem<SelectionController>{dependencies.Selection};
+        m_CameraControllers =
+            BorrowedSubsystem<CameraControllerRegistry>{
+                dependencies.CameraControllers};
         m_EditorCommandHistory =
             BorrowedSubsystem<EditorCommandHistory>{dependencies.CommandHistory};
         m_TextureBake =
@@ -1665,92 +1543,6 @@ namespace Extrinsic::Runtime
             m_Scene.get() == scene &&
             m_WorldRegistry->ActiveWorld() == world &&
             m_WorldRegistry->Get(world) == scene;
-    }
-
-    RuntimePostImportProcessorHandle AssetImportPipeline::RegisterPostImportProcessor(
-        RuntimePostImportProcessorDesc desc)
-    {
-        if (!desc.Process)
-            return {};
-
-        RuntimePostImportProcessorRecord processor{};
-        processor.Handle = RuntimePostImportProcessorHandle{
-            m_NextPostImportProcessorHandle++};
-        processor.Desc = std::move(desc);
-        m_PostImportProcessors.push_back(std::move(processor));
-        return m_PostImportProcessors.back().Handle;
-    }
-
-    void AssetImportPipeline::UnregisterPostImportProcessor(
-        const RuntimePostImportProcessorHandle handle)
-    {
-        if (!handle.IsValid())
-            return;
-
-        std::erase_if(
-            m_PostImportProcessors,
-            [handle](const RuntimePostImportProcessorRecord& processor) noexcept
-            {
-                return processor.Handle == handle;
-            });
-    }
-
-    RuntimeImportEntityAuthoringPolicyHandle
-    AssetImportPipeline::RegisterImportEntityAuthoringPolicy(
-        RuntimeImportEntityAuthoringPolicyDesc desc)
-    {
-        if (!desc.Apply)
-            return {};
-
-        RuntimeImportEntityAuthoringPolicyRecord policy{};
-        policy.Handle = RuntimeImportEntityAuthoringPolicyHandle{
-            m_NextImportEntityAuthoringPolicyHandle++};
-        policy.Desc = std::move(desc);
-        m_ImportEntityAuthoringPolicies.push_back(std::move(policy));
-        return m_ImportEntityAuthoringPolicies.back().Handle;
-    }
-
-    void AssetImportPipeline::UnregisterImportEntityAuthoringPolicy(
-        const RuntimeImportEntityAuthoringPolicyHandle handle)
-    {
-        if (!handle.IsValid())
-            return;
-
-        std::erase_if(
-            m_ImportEntityAuthoringPolicies,
-            [handle](
-                const RuntimeImportEntityAuthoringPolicyRecord& policy) noexcept
-            {
-                return policy.Handle == handle;
-            });
-    }
-
-    RuntimeImportCompletedHandlerHandle AssetImportPipeline::RegisterImportCompletedHandler(
-        RuntimeImportCompletedHandlerDesc desc)
-    {
-        if (!desc.Handle)
-            return {};
-
-        RuntimeImportCompletedHandlerRecord handler{};
-        handler.Handle = RuntimeImportCompletedHandlerHandle{
-            m_NextImportCompletedHandlerHandle++};
-        handler.Desc = std::move(desc);
-        m_ImportCompletedHandlers.push_back(std::move(handler));
-        return m_ImportCompletedHandlers.back().Handle;
-    }
-
-    void AssetImportPipeline::UnregisterImportCompletedHandler(
-        const RuntimeImportCompletedHandlerHandle handle)
-    {
-        if (!handle.IsValid())
-            return;
-
-        std::erase_if(
-            m_ImportCompletedHandlers,
-            [handle](const RuntimeImportCompletedHandlerRecord& handler) noexcept
-            {
-                return handler.Handle == handle;
-            });
     }
 
     Core::Expected<RuntimeAssetImportResult> AssetImportPipeline::ImportAssetFromPath(
@@ -2475,40 +2267,39 @@ namespace Extrinsic::Runtime
 
                     auto materialized = MaterializeDecodedGeometryImport(
                         *m_AssetService,
-                        *m_GpuAssetCache,
-                        m_RenderExtraction,
                         *submissionScene,
                         m_Jobs.get(),
                         m_WorldRegistry.get(),
                         submissionWorld,
                         m_BindingValid,
-                        m_ImportEntityAuthoringPolicies,
-                        m_PostImportProcessors,
                         m_TextureBake.get(),
+                        state->Recipe,
                         *state->Decoded);
                     if (materialized.has_value())
                     {
                         const ECS::EntityHandle createdEntity =
                             materialized->Entity;
-                        RuntimeImportCompletedServices completedServices{
-                            .Scene = submissionScene,
-                            .Selection = m_SelectionController.get(),
-                            .Config = m_Config.get(),
-                        };
-                        RunImportCompletedHandlers(
-                            m_ImportCompletedHandlers,
-                            RuntimeImportCompletedContext{
-                                .Path = state->Decoded->Path,
-                                .PayloadKind = state->Decoded->PayloadKind,
-                                .CreatedEntities =
+                        result = materialized->Result;
+                        if (Core::Result completed =
+                                ApplyAssetImportCompletionRecipe(
+                                    state->Recipe.Completion
+                                        .SelectFirstCreatedEntity,
+                                    state->Recipe.Completion
+                                        .FocusCameraOnCreatedGeometry,
                                     std::span<const ECS::EntityHandle>(
                                         &createdEntity,
                                         1u),
-                                .FocusTarget = materialized->FocusTarget,
-                            },
-                            completedServices);
-                        result = materialized->Result;
-                        if (RequestsGpuUpload(*result))
+                                    materialized->FocusTarget,
+                                    *submissionScene,
+                                    m_SelectionController.get(),
+                                    m_Config.get(),
+                                    m_CameraControllers.get());
+                            !completed.has_value())
+                        {
+                            result = Core::Err<RuntimeAssetImportResult>(
+                                completed.error());
+                        }
+                        if (result.has_value() && RequestsGpuUpload(*result))
                         {
                             RuntimeAssetIngestTransition upload =
                                 m_AssetIngestStateMachine.BeginGpuUpload(
@@ -3014,9 +2805,9 @@ namespace Extrinsic::Runtime
                             *m_AssetService,
                             *m_AssetModelSceneHandoff,
                             *submissionScene,
-                            m_ImportEntityAuthoringPolicies,
-                            m_ImportCompletedHandlers,
+                            state->Recipe,
                             m_SelectionController.get(),
+                            m_CameraControllers.get(),
                             m_Config.get(),
                             state->Request,
                             existingAsset,
@@ -3463,6 +3254,11 @@ namespace Extrinsic::Runtime
         }
         if (Assets::IsGeometryPayloadKind(route->PayloadKind))
         {
+            const AssetImportRecipe recipe{
+                .Path = request.Path,
+                .PayloadKind = route->PayloadKind,
+                .ExistingAsset = existingAsset,
+            };
             auto decoded = DecodeGeometryImport(
                 RuntimeAssetImportRequest{
                     .Path = request.Path,
@@ -3483,16 +3279,13 @@ namespace Extrinsic::Runtime
 
             auto materialized = MaterializeDecodedGeometryImport(
                 *m_AssetService,
-                *m_GpuAssetCache,
-                m_RenderExtraction,
                 *m_Scene,
                 m_Jobs.get(),
                 m_WorldRegistry.get(),
                 m_World,
                 m_BindingValid,
-                m_ImportEntityAuthoringPolicies,
-                m_PostImportProcessors,
                 m_TextureBake.get(),
+                recipe,
                 *decoded);
             if (!materialized.has_value())
             {
@@ -3500,21 +3293,19 @@ namespace Extrinsic::Runtime
                     materialized.error());
             }
             const ECS::EntityHandle createdEntity = materialized->Entity;
-            RuntimeImportCompletedServices completedServices{
-                .Scene = m_Scene,
-                .Selection = m_SelectionController.get(),
-                .Config = m_Config.get(),
-            };
-            RunImportCompletedHandlers(
-                m_ImportCompletedHandlers,
-                RuntimeImportCompletedContext{
-                    .Path = decoded->Path,
-                    .PayloadKind = decoded->PayloadKind,
-                    .CreatedEntities =
-                        std::span<const ECS::EntityHandle>(&createdEntity, 1u),
-                    .FocusTarget = materialized->FocusTarget,
-                },
-                completedServices);
+            if (Core::Result completed = ApplyAssetImportCompletionRecipe(
+                    recipe.Completion.SelectFirstCreatedEntity,
+                    recipe.Completion.FocusCameraOnCreatedGeometry,
+                    std::span<const ECS::EntityHandle>(&createdEntity, 1u),
+                    materialized->FocusTarget,
+                    *m_Scene,
+                    m_SelectionController.get(),
+                    m_Config.get(),
+                    m_CameraControllers.get());
+                !completed.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(completed.error());
+            }
             return materialized->Result;
         }
         if (route->PayloadKind != Assets::AssetPayloadKind::ModelScene &&
@@ -3527,6 +3318,11 @@ namespace Extrinsic::Runtime
         Core::IO::FileIOBackend backend;
         if (route->PayloadKind == Assets::AssetPayloadKind::ModelScene)
         {
+            const AssetImportRecipe recipe{
+                .Path = request.Path,
+                .PayloadKind = route->PayloadKind,
+                .ExistingAsset = existingAsset,
+            };
             auto decoded = DecodeModelSceneAsset(request.Path, backend);
             if (!decoded.has_value())
             {
@@ -3537,9 +3333,9 @@ namespace Extrinsic::Runtime
                 *m_AssetService,
                 *m_AssetModelSceneHandoff,
                 *m_Scene,
-                m_ImportEntityAuthoringPolicies,
-                m_ImportCompletedHandlers,
+                recipe,
                 m_SelectionController.get(),
+                m_CameraControllers.get(),
                 m_Config.get(),
                 request,
                 existingAsset,

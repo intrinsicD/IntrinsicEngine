@@ -63,6 +63,7 @@ import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetImportPolicies;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ClusteringModule;
@@ -11368,7 +11369,7 @@ namespace Extrinsic::Runtime
 
             if (const auto* enrichment =
                     context.Scene->Raw().try_get<
-                        Internal::DirectMeshEnrichmentState>(*selected))
+                        AssetImportMeshEnrichmentState>(*selected))
             {
                 model.DirectMeshEnrichmentStatus = enrichment->Status;
                 model.DirectMeshEnrichmentPending =

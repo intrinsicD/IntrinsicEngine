@@ -71,18 +71,6 @@ export import Geometry.Parameterization;
 
 export namespace Extrinsic::Runtime
 {
-    [[nodiscard]] std::array<
-        RuntimeImportEntityAuthoringPolicyDesc,
-        3>
-        MakeSandboxDefaultImportAuthoringPolicies();
-
-    [[nodiscard]] RuntimeImportCompletedHandlerDesc
-        MakeSandboxDefaultImportCompletedHandler(
-            CameraControllerRegistry* cameraControllers);
-
-    [[nodiscard]] RuntimePostImportProcessorDesc
-        MakeSandboxDefaultDirectMeshPostProcessor();
-
     [[nodiscard]] RuntimeInputActionDesc
         MakeSandboxDefaultFocusInputAction(
             CameraControllerRegistry& cameraControllers,

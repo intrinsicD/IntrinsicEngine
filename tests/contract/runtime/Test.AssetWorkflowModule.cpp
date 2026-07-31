@@ -1376,36 +1376,7 @@ TEST(AssetWorkflowModule,
     TempSceneFile invalidScene{
         "runtime183-binding-invalid.scene.json", "not json"};
 
-    Runtime::TextureBakeService* postImportTextureBake = nullptr;
-    Runtime::WorldHandle bakeWorld{};
-    const auto serviceProbe =
-        pipeline->RegisterPostImportProcessor(
-            Runtime::RuntimePostImportProcessorDesc{
-                .DebugName =
-                    "RUNTIME-183 document replacement queue probe",
-                .PayloadKind =
-                    Assets::AssetPayloadKind::Mesh,
-                .Process =
-                    [&postImportTextureBake,
-                     &bakeWorld](
-                        const Runtime::
-                            RuntimePostImportProcessorContext&,
-                        Runtime::
-                            RuntimePostImportProcessorServices&
-                                services)
-                        -> Core::Result
-                    {
-                        postImportTextureBake =
-                            services.TextureBake;
-                        bakeWorld = services.World;
-                        return postImportTextureBake != nullptr
-                            ? Core::Ok()
-                            : Core::Err(
-                                  Core::ErrorCode::
-                                      InvalidState);
-                    },
-            });
-    ASSERT_TRUE(serviceProbe.IsValid());
+    const Runtime::WorldHandle bakeWorld = harness.InitialWorld;
 
     auto* const initialScene =
         harness.Worlds.Get(harness.InitialWorld);
@@ -1518,7 +1489,7 @@ TEST(AssetWorkflowModule,
     ASSERT_TRUE(first.has_value())
         << static_cast<int>(first.error());
     ASSERT_GT(EntityCount(*initialScene), 0u);
-    ASSERT_EQ(postImportTextureBake, textureBake);
+    ASSERT_EQ(pipeline->GetTextureBakeServiceForTest(), textureBake);
 
     prepareReplacement();
     afterReplacementPath = afterNewMesh.Path.string();
@@ -1781,7 +1752,6 @@ TEST(AssetWorkflowModule,
         harness.Worlds.Contains(harness.InitialWorld));
     EXPECT_FALSE(assets->IsAlive(*retainedTexture));
 
-    pipeline->UnregisterPostImportProcessor(serviceProbe);
     EXPECT_TRUE(
         harness.Document
             .UnregisterReplacementParticipant(*observer)
@@ -2070,57 +2040,12 @@ TEST(AssetWorkflowModule,
                 .DrainGpuQueueCompletedTransfers(),
             1u);
 
-        Runtime::TextureBakeService* textureBake = nullptr;
-        ECS::EntityHandle bakeEntity =
-            ECS::InvalidEntityHandle;
-        bool processorCalled = false;
-        bool operational = false;
+        Runtime::TextureBakeService* const textureBake =
+            harness.Services.Find<Runtime::TextureBakeService>();
+        ASSERT_NE(textureBake, nullptr);
+        ASSERT_TRUE(textureBake->Available());
         const std::uint64_t bakeKey =
             static_cast<std::uint64_t>(boot) + 1u;
-        const auto processor =
-            pipeline->RegisterPostImportProcessor(
-                Runtime::RuntimePostImportProcessorDesc{
-                    .DebugName =
-                        "RUNTIME-183 composed bake probe",
-                    .PayloadKind =
-                        Assets::AssetPayloadKind::Mesh,
-                    .Process =
-                        [&](const Runtime::
-                                RuntimePostImportProcessorContext&,
-                            Runtime::
-                                RuntimePostImportProcessorServices&
-                                    services)
-                            -> Core::Result
-                        {
-                            processorCalled = true;
-                            textureBake = services.TextureBake;
-                            operational =
-                                textureBake != nullptr &&
-                                textureBake->Available();
-                            if (textureBake == nullptr ||
-                                services.Scene == nullptr)
-                            {
-                                return Core::Err(
-                                    Core::ErrorCode::
-                                        InvalidState);
-                            }
-                            bakeEntity =
-                                MakeTextureBakeMesh(
-                                    *services.Scene);
-                            const auto scheduled =
-                                textureBake->Bake(
-                                    MakeBakeRequest(
-                                        bakeKey,
-                                        services.World,
-                                        bakeEntity));
-                            return scheduled.Succeeded()
-                                ? Core::Ok()
-                                : Core::Err(
-                                      Core::ErrorCode::
-                                          InvalidState);
-                        },
-                });
-        ASSERT_TRUE(processor.IsValid());
 
         TempObjFile mesh{
             boot == 0u
@@ -2135,9 +2060,18 @@ TEST(AssetWorkflowModule,
                 });
         ASSERT_TRUE(imported.has_value())
             << static_cast<int>(imported.error());
-        ASSERT_TRUE(processorCalled);
-        ASSERT_TRUE(operational);
-        ASSERT_NE(textureBake, nullptr);
+        ECS::Scene::Registry* const scene =
+            harness.Worlds.Get(harness.InitialWorld);
+        ASSERT_NE(scene, nullptr);
+        const ECS::EntityHandle bakeEntity =
+            MakeTextureBakeMesh(*scene);
+        const auto scheduled =
+            textureBake->Bake(
+                MakeBakeRequest(
+                    bakeKey,
+                    harness.InitialWorld,
+                    bakeEntity));
+        ASSERT_TRUE(scheduled.Succeeded());
         EXPECT_EQ(
             textureBake
                 ->Snapshot(
@@ -2157,7 +2091,6 @@ TEST(AssetWorkflowModule,
         EXPECT_EQ(
             harness.GpuIdleWaits, idleBefore + 1u);
 
-        pipeline->UnregisterPostImportProcessor(processor);
         harness.Stop();
         // Quiescence above proves the sole participant released its work
         // before the asset/cache owners were torn down.

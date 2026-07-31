@@ -843,23 +843,6 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     ComposeEditorUiAndInitialize(engine);
     auto& pipeline =
         RequiredEngineService<Runtime::AssetImportPipeline>(engine);
-    auto authoring =
-        Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-    for (auto& desc : authoring)
-    {
-        EXPECT_TRUE(
-            pipeline.RegisterImportEntityAuthoringPolicy(
-                std::move(desc))
-                .IsValid());
-    }
-    EXPECT_TRUE(
-        pipeline.RegisterImportCompletedHandler(
-            Runtime::MakeSandboxDefaultImportCompletedHandler(nullptr))
-            .IsValid());
-    EXPECT_TRUE(
-        pipeline.RegisterPostImportProcessor(
-            Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
-            .IsValid());
 
     SandboxEditor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());

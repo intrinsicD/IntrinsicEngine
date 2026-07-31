@@ -30,9 +30,15 @@ maturity_target: Retired
   model-scene, and texture requests now enter through `QueueAssetImport`; each
   queued execution carries a copied identity-bound seven-stage trace through
   success, cancellation, stale rejection, and failure publication.
-- Current slice: make recipe policy own authoring/postprocess/completion, then
-  internalize the remaining handoff and postprocess bodies.
+- Slice B policy ownership completed on 2026-07-31: recipe fields now drive
+  authoring, direct-mesh postprocess, selection, and camera focus directly;
+  the three runtime import-policy callback registries and their Sandbox
+  install/uninstall lifecycle are removed.
+- Current slice: internalize the executor plus remaining handoff/postprocess
+  bodies behind `AssetWorkflowModule` and finish synchronous stage parity.
 - Focused recipe and queued route contracts: 31/31 passed on 2026-07-31.
+- Focused workflow, shutdown, reimport, and Sandbox composition contracts:
+  27/27 passed on 2026-07-31.
 
 ## Goal
 

@@ -1,18 +1,5 @@
 #pragma once
 
-namespace Extrinsic::Runtime::Internal
-{
-    // Runtime-only import lifecycle state. The worker service owns execution;
-    // this entity sidecar lets selected-entity readiness remain copied data
-    // without teaching the editor model how to inspect JobService internals.
-    struct DirectMeshEnrichmentState
-    {
-        JobToken Job{};
-        JobState Status{JobState::Invalid};
-        std::string Diagnostic{};
-    };
-}
-
 namespace Extrinsic::Runtime::Detail
 {
     struct SandboxEditorMeshSourceSnapshot

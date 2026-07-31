@@ -28,6 +28,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryPresentation;
@@ -62,6 +63,7 @@ namespace Extrinsic::Runtime
             SceneDocumentModule* Documents{nullptr};
             EditorCommandHistory* History{nullptr};
             SelectionController* Selection{nullptr};
+            CameraControllerRegistry* CameraControllers{nullptr};
 
             std::unique_ptr<Assets::AssetService> Assets{};
             std::unique_ptr<Graphics::GpuAssetCache> Cache{};
@@ -515,6 +517,7 @@ namespace Extrinsic::Runtime
                         .RenderExtraction = Extraction,
                         .Scene = BoundRegistry,
                         .Selection = Selection,
+                        .CameraControllers = CameraControllers,
                         .CommandHistory = History,
                         .TextureBake = TextureBake,
                     });
@@ -605,6 +608,7 @@ namespace Extrinsic::Runtime
                 Documents = nullptr;
                 History = nullptr;
                 Selection = nullptr;
+                CameraControllers = nullptr;
                 Config = nullptr;
                 Initialized = nullptr;
                 Worlds = nullptr;
@@ -1020,6 +1024,8 @@ namespace Extrinsic::Runtime
         state.History = &history->get();
         state.Selection =
             setup.Services().Find<SelectionController>();
+        state.CameraControllers =
+            setup.Services().Find<CameraControllerRegistry>();
         state.TextureBake =
             setup.Services().Find<TextureBakeService>();
         state.AcceptingCallbacks = true;

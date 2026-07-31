@@ -143,26 +143,6 @@ void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
         ASSERT_NE(pipeline, nullptr);
         ASSERT_NE(inputActions, nullptr);
 
-        auto authoring =
-            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-        for (auto& desc : authoring)
-        {
-            ASSERT_TRUE(
-                pipeline->RegisterImportEntityAuthoringPolicy(
-                    std::move(desc))
-                    .IsValid());
-        }
-        ASSERT_TRUE(
-            pipeline->RegisterImportCompletedHandler(
-                Runtime::MakeSandboxDefaultImportCompletedHandler(
-                    engine.Services()
-                        .Find<Runtime::CameraControllerRegistry>()))
-                .IsValid());
-        ASSERT_TRUE(
-            pipeline->RegisterPostImportProcessor(
-                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
-                .IsValid());
-
         auto* const cameraControllers =
             engine.Services().Find<Runtime::CameraControllerRegistry>();
         auto* const selection =
@@ -609,7 +589,9 @@ void CaptureAssetImportEventWaitPhase(
         diagnostics.LastTerminalStatus = entry->TerminalStatus;
         diagnostics.LastStageText = entry->StageText;
         diagnostics.LastDiagnosticText = entry->DiagnosticText;
-        if (entry->Stage == Runtime::RuntimeAssetImportQueueStage::MainThreadApply)
+        if (entry->Stage == Runtime::RuntimeAssetImportQueueStage::MainThreadApply ||
+            entry->TerminalStatus ==
+                Runtime::RuntimeAssetImportQueueTerminalStatus::Complete)
         {
             std::int64_t expected = -1;
             (void)diagnostics.MainThreadApplyAtMicros.compare_exchange_strong(
@@ -872,11 +854,9 @@ struct ShutdownBlockedGeometryImportState
         std::size_t BaselineLiveAssetCount{0u};
         std::uint32_t InitializeCalls{0u};
         std::uint32_t ShutdownCalls{0u};
-        std::uint32_t CompletionCalls{0u};
-        bool PoliciesRegistered{false};
-        bool CompletionProbeRegistered{false};
+        bool RuntimeReady{false};
         bool ExitRequestedWhileWorkerBlocked{false};
-        bool PoliciesUnregisteredBeforeWorkerRelease{false};
+        bool SessionDetachedBeforeWorkerRelease{false};
         bool WorkerReleasedFromOnShutdown{false};
     };
 
@@ -898,8 +878,9 @@ struct ShutdownBlockedGeometryImportState
             ++m_State->InitializeCalls;
             m_ObservedFrames = 0u;
             m_ExitRequested = false;
-            m_State->PoliciesRegistered =
-                InstallDefaultPolicies(engine);
+            m_State->RuntimeReady =
+                engine.Services().Find<Runtime::AssetImportPipeline>() !=
+                nullptr;
             m_Editor.Attach(engine.Worlds(), engine.Services());
         }
 
@@ -929,12 +910,10 @@ struct ShutdownBlockedGeometryImportState
             auto& engine = Kernel();
             (void)engine;
             m_Editor.Detach();
-            UninstallDefaultPolicies();
 
             if (m_State->ShutdownCalls == 0u)
             {
-                m_State->PoliciesUnregisteredBeforeWorkerRelease =
-                    DefaultPoliciesAreEmpty() &&
+                m_State->SessionDetachedBeforeWorkerRelease =
                     !m_State->Release.load(std::memory_order_acquire);
                 m_State->WorkerReleasedFromOnShutdown = true;
             }
@@ -948,168 +927,8 @@ struct ShutdownBlockedGeometryImportState
         }
 
     private:
-        [[nodiscard]] bool DefaultPoliciesAreEmpty() const noexcept
-        {
-            if (m_Pipeline != nullptr ||
-                m_InputActions != nullptr ||
-                m_ImportCompleted.IsValid() ||
-                m_DirectMeshPostProcessor.IsValid() ||
-                m_FocusAction.has_value())
-            {
-                return false;
-            }
-            return std::ranges::none_of(
-                m_ImportAuthoring,
-                [](const auto handle)
-                {
-                    return handle.IsValid();
-                });
-        }
-
-        void UninstallDefaultPolicies() noexcept
-        {
-            if (m_InputActions != nullptr &&
-                m_FocusAction.has_value())
-            {
-                m_InputActions->Unregister(*m_FocusAction);
-            }
-            m_FocusAction.reset();
-
-            if (m_Pipeline != nullptr)
-            {
-                if (m_DirectMeshPostProcessor.IsValid())
-                {
-                    m_Pipeline->UnregisterPostImportProcessor(
-                        m_DirectMeshPostProcessor);
-                }
-                m_DirectMeshPostProcessor = {};
-
-                if (m_ImportCompleted.IsValid())
-                {
-                    m_Pipeline->UnregisterImportCompletedHandler(
-                        m_ImportCompleted);
-                }
-                m_ImportCompleted = {};
-
-                for (std::size_t index = m_ImportAuthoring.size();
-                     index > 0u;
-                     --index)
-                {
-                    const auto handle =
-                        m_ImportAuthoring[index - 1u];
-                    if (handle.IsValid())
-                    {
-                        m_Pipeline
-                            ->UnregisterImportEntityAuthoringPolicy(
-                                handle);
-                    }
-                    m_ImportAuthoring[index - 1u] = {};
-                }
-            }
-            else
-            {
-                m_DirectMeshPostProcessor = {};
-                m_ImportCompleted = {};
-                m_ImportAuthoring = {};
-            }
-
-            m_InputActions = nullptr;
-            m_Pipeline = nullptr;
-        }
-
-        [[nodiscard]] bool InstallDefaultPolicies(
-            Runtime::Engine& engine)
-        {
-            if (!DefaultPoliciesAreEmpty())
-                return false;
-
-            m_Pipeline =
-                engine.Services()
-                    .Find<Runtime::AssetImportPipeline>();
-            m_InputActions =
-                engine.Services()
-                    .Find<Runtime::RuntimeInputActionRegistry>();
-            if (m_Pipeline == nullptr || m_InputActions == nullptr)
-            {
-                UninstallDefaultPolicies();
-                return false;
-            }
-
-            auto authoring =
-                Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-            for (std::size_t index = 0u;
-                 index < authoring.size();
-                 ++index)
-            {
-                m_ImportAuthoring[index] =
-                    m_Pipeline
-                        ->RegisterImportEntityAuthoringPolicy(
-                            std::move(authoring[index]));
-                if (!m_ImportAuthoring[index].IsValid())
-                {
-                    UninstallDefaultPolicies();
-                    return false;
-                }
-            }
-
-            auto* const cameraControllers =
-                engine.Services()
-                    .Find<Runtime::CameraControllerRegistry>();
-            m_ImportCompleted =
-                m_Pipeline->RegisterImportCompletedHandler(
-                    Runtime::MakeSandboxDefaultImportCompletedHandler(
-                        cameraControllers));
-            if (!m_ImportCompleted.IsValid())
-            {
-                UninstallDefaultPolicies();
-                return false;
-            }
-
-            m_DirectMeshPostProcessor =
-                m_Pipeline->RegisterPostImportProcessor(
-                    Runtime::
-                        MakeSandboxDefaultDirectMeshPostProcessor());
-            if (!m_DirectMeshPostProcessor.IsValid())
-            {
-                UninstallDefaultPolicies();
-                return false;
-            }
-
-            auto* const selection =
-                engine.Services()
-                    .Find<Runtime::SelectionController>();
-            if (cameraControllers != nullptr &&
-                selection != nullptr)
-            {
-                const auto focusAction =
-                    m_InputActions->Register(
-                        Runtime::
-                            MakeSandboxDefaultFocusInputAction(
-                                *cameraControllers,
-                                *selection));
-                if (!focusAction.IsValid())
-                {
-                    UninstallDefaultPolicies();
-                    return false;
-                }
-                m_FocusAction = focusAction;
-            }
-            return true;
-        }
-
         std::shared_ptr<ShutdownBlockedGeometryImportState> m_State{};
         Runtime::SandboxEditorSession m_Editor{};
-        Runtime::AssetImportPipeline* m_Pipeline{nullptr};
-        Runtime::RuntimeInputActionRegistry* m_InputActions{nullptr};
-        std::array<
-            Runtime::RuntimeImportEntityAuthoringPolicyHandle,
-            3> m_ImportAuthoring{};
-        Runtime::RuntimeImportCompletedHandlerHandle
-            m_ImportCompleted{};
-        Runtime::RuntimePostImportProcessorHandle
-            m_DirectMeshPostProcessor{};
-        std::optional<Runtime::RuntimeInputActionHandle>
-            m_FocusAction{};
         std::uint32_t m_MaxFrames{1u};
         std::uint32_t m_ObservedFrames{0u};
         bool m_ExitRequested{false};
@@ -2337,23 +2156,6 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
         decodeState->BaselineLiveAssetCount =
             RequiredEngineService<Extrinsic::Assets::AssetService>(engine).LiveAssetCount();
 
-        std::uint32_t completionCalls = 0u;
-        const Runtime::RuntimeImportCompletedHandlerHandle completionHandle =
-            RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).RegisterImportCompletedHandler(
-                Runtime::RuntimeImportCompletedHandlerDesc{
-                    .DebugName = "BUG-100 queued manual geometry completion probe",
-                    .PayloadKind = importCase.PayloadKind,
-                    .Handle =
-                        [&completionCalls](
-                            const Runtime::RuntimeImportCompletedContext&,
-                            Runtime::RuntimeImportCompletedServices&)
-                        {
-                            ++completionCalls;
-                            return Core::Ok();
-                        },
-                });
-        ASSERT_TRUE(completionHandle.IsValid());
-
         auto recordingController =
             std::make_unique<RecordingImportCameraController>();
         RecordingImportCameraController* recorder = recordingController.get();
@@ -2442,7 +2244,6 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
         EXPECT_EQ(Selection(engine).SelectedStableIds().size(), 1u);
         EXPECT_EQ(recorder->FocusCalls, 1u);
         EXPECT_TRUE(recorder->LastFocus.has_value());
-        EXPECT_EQ(completionCalls, 1u);
 
         const auto importedEntity =
             FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), importCase.Domain);
@@ -2505,23 +2306,6 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
         ->Replace(
         Runtime::CameraControllerSlot::Main,
         std::move(recordingController));
-
-    std::uint32_t completionCalls = 0u;
-    const Runtime::RuntimeImportCompletedHandlerHandle completionHandle =
-        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).RegisterImportCompletedHandler(
-            Runtime::RuntimeImportCompletedHandlerDesc{
-                .DebugName = "BUG-100 cancelled manual geometry completion probe",
-                .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                .Handle =
-                    [&completionCalls](
-                        const Runtime::RuntimeImportCompletedContext&,
-                        Runtime::RuntimeImportCompletedServices&)
-                    {
-                        ++completionCalls;
-                        return Core::Ok();
-                    },
-            });
-    ASSERT_TRUE(completionHandle.IsValid());
 
     RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine)
         .SetQueuedGeometryImportBeforeDecodeHookForTest(
@@ -2609,13 +2393,12 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 0u);
     EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
     EXPECT_EQ(recorder->FocusCalls, 0u);
-    EXPECT_EQ(completionCalls, 0u);
 
     session.Detach();
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister)
+TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown)
 {
     TmpFile meshFile(
         "runtime_manual_queue_shutdown_mesh.obj",
@@ -2637,29 +2420,12 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(application));
     ComposeAsyncWorkAndInitialize(engine);
     ASSERT_EQ(shutdownState->InitializeCalls, 1u);
-    ASSERT_TRUE(shutdownState->PoliciesRegistered);
+    ASSERT_TRUE(shutdownState->RuntimeReady);
     shutdownState->BaselineLiveAssetCount =
         RequiredEngineService<Extrinsic::Assets::AssetService>(engine).LiveAssetCount();
     Runtime::AssetImportPipeline* const pipeline =
         &RequiredEngineService<
             Extrinsic::Runtime::AssetImportPipeline>(engine);
-
-    const Runtime::RuntimeImportCompletedHandlerHandle completionProbe =
-        pipeline->RegisterImportCompletedHandler(
-            Runtime::RuntimeImportCompletedHandlerDesc{
-                .DebugName = "BUG-100 shutdown cancellation completion probe",
-                .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                .Handle =
-                    [shutdownState](
-                        const Runtime::RuntimeImportCompletedContext&,
-                        Runtime::RuntimeImportCompletedServices&)
-                    {
-                        ++shutdownState->CompletionCalls;
-                        return Core::Ok();
-                    },
-            });
-    shutdownState->CompletionProbeRegistered = completionProbe.IsValid();
-    ASSERT_TRUE(shutdownState->CompletionProbeRegistered);
 
     pipeline->SetQueuedGeometryImportBeforeDecodeHookForTest(
             [shutdownState](const Runtime::RuntimeAssetImportRequest&)
@@ -2704,7 +2470,6 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 0u);
     EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
-    EXPECT_EQ(shutdownState->CompletionCalls, 0u);
 
     const Runtime::RuntimeAssetImportQueueSnapshot activeQueue =
         pipeline->GetAssetImportQueueSnapshot();
@@ -2718,10 +2483,9 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
     engine.Shutdown();
 
     EXPECT_EQ(shutdownState->ShutdownCalls, 1u);
-    EXPECT_TRUE(shutdownState->PoliciesUnregisteredBeforeWorkerRelease);
+    EXPECT_TRUE(shutdownState->SessionDetachedBeforeWorkerRelease);
     EXPECT_TRUE(shutdownState->WorkerReleasedFromOnShutdown);
     EXPECT_TRUE(shutdownState->Release.load(std::memory_order_acquire));
-    EXPECT_EQ(shutdownState->CompletionCalls, 0u);
 
     const Runtime::RuntimeAssetImportQueueSnapshot cancelledQueue =
         pipeline->GetAssetImportQueueSnapshot();
@@ -2754,7 +2518,6 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
     engine.Initialize();
 
     EXPECT_EQ(shutdownState->InitializeCalls, 2u);
-    EXPECT_EQ(shutdownState->CompletionCalls, 0u);
     EXPECT_EQ(
         engine.Services().Find<Runtime::AssetImportPipeline>(),
         pipeline);
@@ -2773,8 +2536,6 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
               Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
 
     pipeline->SetQueuedGeometryImportBeforeDecodeHookForTest({});
-    pipeline->UnregisterImportCompletedHandler(
-        completionProbe);
     engine.Shutdown();
     EXPECT_EQ(shutdownState->ShutdownCalls, 2u);
 }
@@ -2804,23 +2565,6 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
         ->Replace(
         Runtime::CameraControllerSlot::Main,
         std::move(recordingController));
-
-    std::uint32_t completionCalls = 0u;
-    const Runtime::RuntimeImportCompletedHandlerHandle completionHandle =
-        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).RegisterImportCompletedHandler(
-            Runtime::RuntimeImportCompletedHandlerDesc{
-                .DebugName = "BUG-100 failed manual geometry completion probe",
-                .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                .Handle =
-                    [&completionCalls](
-                        const Runtime::RuntimeImportCompletedContext&,
-                        Runtime::RuntimeImportCompletedServices&)
-                    {
-                        ++completionCalls;
-                        return Core::Ok();
-                    },
-            });
-    ASSERT_TRUE(completionHandle.IsValid());
 
     Runtime::SandboxEditorSession session;
     session.Attach(engine.Worlds(), engine.Services());
@@ -2888,7 +2632,6 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 0u);
     EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
     EXPECT_EQ(recorder->FocusCalls, 0u);
-    EXPECT_EQ(completionCalls, 0u);
 
     session.Detach();
     engine.Shutdown();
@@ -3150,24 +2893,6 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    const Runtime::RuntimeImportCompletedHandlerHandle applyProbe =
-        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).RegisterImportCompletedHandler(
-            Runtime::RuntimeImportCompletedHandlerDesc{
-                .DebugName = "BUG-117 main-thread apply probe",
-                .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                .Handle =
-                    [waitDiagnostics](
-                        const Runtime::RuntimeImportCompletedContext&,
-                        Runtime::RuntimeImportCompletedServices&)
-                    {
-                        waitDiagnostics->MainThreadApplyAtMicros.store(
-                            waitDiagnostics->ElapsedMicros(),
-                            std::memory_order_release);
-                        return Core::Ok();
-                    },
-            });
-    ASSERT_TRUE(applyProbe.IsValid());
-
     constexpr std::uint32_t formerFrameBudget = 128u;
     waitDiagnostics->Arm();
     RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine)
@@ -3250,7 +2975,6 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
         << waitDiagnostics->Describe();
     EXPECT_LT(eventObservedAt, std::chrono::seconds(10).count() * 1'000'000)
         << waitDiagnostics->Describe();
-    RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).UnregisterImportCompletedHandler(applyProbe);
     ASSERT_TRUE(droppedEvent->Succeeded());
     ASSERT_TRUE(droppedEvent->Result.has_value());
     const Assets::AssetId droppedAsset = droppedEvent->Result->Asset;

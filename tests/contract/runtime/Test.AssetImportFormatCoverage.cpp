@@ -669,6 +669,34 @@ namespace
         return count;
     }
 
+    [[nodiscard]] std::vector<ECS::EntityHandle> FindEntitiesWithDomain(
+        ECS::Scene::Registry& registry,
+        const GS::Domain domain)
+    {
+        std::vector<ECS::EntityHandle> entities{};
+        auto& raw = registry.Raw();
+        raw.view<entt::entity>().each([&](const ECS::EntityHandle entity)
+        {
+            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
+            if (source.ActiveDomain == domain)
+                entities.push_back(entity);
+        });
+        std::ranges::sort(
+            entities,
+            [&raw](const ECS::EntityHandle left, const ECS::EntityHandle right)
+            {
+                const auto* const leftBounds =
+                    raw.try_get<Culling::World::Bounds>(left);
+                const auto* const rightBounds =
+                    raw.try_get<Culling::World::Bounds>(right);
+                if (leftBounds == nullptr || rightBounds == nullptr)
+                    return entt::to_integral(left) < entt::to_integral(right);
+                return leftBounds->WorldBoundingSphere.Center.x <
+                    rightBounds->WorldBoundingSphere.Center.x;
+            });
+        return entities;
+    }
+
     [[nodiscard]] std::optional<ECS::EntityHandle> FindFirstEntityWithDomain(
         ECS::Scene::Registry& registry,
         const GS::Domain domain)
@@ -678,27 +706,6 @@ namespace
         raw.view<entt::entity>().each([&](const ECS::EntityHandle entity)
         {
             if (found.has_value() || !raw.all_of<Sel::SelectableTag>(entity))
-            {
-                return;
-            }
-            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
-            if (source.ActiveDomain == domain)
-            {
-                found = entity;
-            }
-        });
-        return found;
-    }
-
-    [[nodiscard]] std::optional<ECS::EntityHandle> FindFirstEntityWithDomainAny(
-        ECS::Scene::Registry& registry,
-        const GS::Domain domain)
-    {
-        std::optional<ECS::EntityHandle> found{};
-        auto& raw = registry.Raw();
-        raw.view<entt::entity>().each([&](const ECS::EntityHandle entity)
-        {
-            if (found.has_value())
             {
                 return;
             }
@@ -804,41 +811,16 @@ namespace
     struct ComposedNormalBakeProbe
     {
         Runtime::TextureBakeService* Service{nullptr};
-        Runtime::RuntimePostImportProcessorHandle Handle{};
     };
 
     void InstallComposedNormalBakeProbe(
         Runtime::Engine& engine,
         ComposedNormalBakeProbe& probe)
     {
-        probe.Handle =
-            RequiredEngineService<
-                Runtime::AssetImportPipeline>(engine)
-                .RegisterPostImportProcessor(
-                    Runtime::RuntimePostImportProcessorDesc{
-                        .DebugName =
-                            "RUNTIME-183 composed normal-bake probe",
-                        .PayloadKind =
-                            Assets::AssetPayloadKind::Mesh,
-                        .Process =
-                            [&probe](
-                                const Runtime::
-                                    RuntimePostImportProcessorContext&,
-                                Runtime::
-                                    RuntimePostImportProcessorServices&
-                                        services)
-                                -> Core::Result
-                            {
-                                probe.Service =
-                                    services.TextureBake;
-                                return probe.Service != nullptr
-                                    ? Core::Ok()
-                                    : Core::Err(
-                                          Core::ErrorCode::
-                                              InvalidState);
-                            },
-                    });
-        EXPECT_TRUE(probe.Handle.IsValid());
+        probe.Service =
+            RequiredEngineService<Runtime::AssetImportPipeline>(engine)
+                .GetTextureBakeServiceForTest();
+        EXPECT_NE(probe.Service, nullptr);
     }
 
     [[nodiscard]] bool DirectMeshPostProcessReady(
@@ -903,45 +885,7 @@ namespace
     {
         auto* const pipeline =
             engine.Services().Find<Runtime::AssetImportPipeline>();
-        auto* const inputActions =
-            engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
         ASSERT_NE(pipeline, nullptr);
-        ASSERT_NE(inputActions, nullptr);
-
-        auto authoring =
-            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-        for (auto& desc : authoring)
-        {
-            ASSERT_TRUE(
-                pipeline->RegisterImportEntityAuthoringPolicy(
-                    std::move(desc))
-                    .IsValid());
-        }
-        ASSERT_TRUE(
-            pipeline->RegisterImportCompletedHandler(
-                Runtime::MakeSandboxDefaultImportCompletedHandler(
-                    engine.Services()
-                        .Find<Runtime::CameraControllerRegistry>()))
-                .IsValid());
-        ASSERT_TRUE(
-            pipeline->RegisterPostImportProcessor(
-                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
-                .IsValid());
-
-        auto* const cameraControllers =
-            engine.Services().Find<Runtime::CameraControllerRegistry>();
-        auto* const selection =
-            engine.Services().Find<Runtime::SelectionController>();
-        if (cameraControllers != nullptr && selection != nullptr)
-        {
-            ASSERT_TRUE(
-                inputActions
-                    ->Register(
-                        Runtime::MakeSandboxDefaultFocusInputAction(
-                            *cameraControllers,
-                            *selection))
-                    .IsValid());
-        }
     }
 
     void InitializeAssetImportEngine(Runtime::Engine& engine)
@@ -957,11 +901,8 @@ namespace
 
     struct ModelSceneRouteProbe
     {
-        std::vector<ECS::EntityHandle> AuthoredEntities{};
         std::vector<ECS::EntityHandle> CompletedEntities{};
         std::optional<Runtime::CameraFocusTarget> FocusTarget{};
-        std::uint32_t CompletionCalls{0u};
-        std::size_t AuthoringCountAtCompletion{0u};
         bool CompletionObservedReadyEntities{false};
     };
 
@@ -1021,75 +962,6 @@ namespace
             std::move(recordingController));
 
         Runtime::AssetImportPipeline& pipeline = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine);
-        const Runtime::RuntimeImportEntityAuthoringPolicyHandle authoringHandle =
-            pipeline.RegisterImportEntityAuthoringPolicy(
-                Runtime::RuntimeImportEntityAuthoringPolicyDesc{
-                    .DebugName = "BUG-094 model-scene mesh authoring probe",
-                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                    .Apply =
-                        [&probe](
-                            const Runtime::RuntimeImportEntityAuthoringPolicyContext&
-                                context,
-                            Runtime::RuntimeImportEntityAuthoringPolicyServices&
-                                services)
-                        {
-                            if (services.Scene == nullptr
-                                || !services.Scene->IsValid(context.Entity))
-                            {
-                                return Core::Err(Core::ErrorCode::InvalidState);
-                            }
-                            probe.AuthoredEntities.push_back(context.Entity);
-                            return Core::Ok();
-                        },
-                });
-        ASSERT_TRUE(authoringHandle.IsValid());
-
-        const Runtime::RuntimeImportCompletedHandlerHandle completionHandle =
-            pipeline.RegisterImportCompletedHandler(
-                Runtime::RuntimeImportCompletedHandlerDesc{
-                    .DebugName = "BUG-094 model-scene completion probe",
-                    .PayloadKind = Assets::AssetPayloadKind::ModelScene,
-                    .Handle =
-                        [&probe](
-                            const Runtime::RuntimeImportCompletedContext& context,
-                            Runtime::RuntimeImportCompletedServices& services)
-                        {
-                            ++probe.CompletionCalls;
-                            probe.AuthoringCountAtCompletion =
-                                probe.AuthoredEntities.size();
-                            probe.CompletedEntities.assign(
-                                context.CreatedEntities.begin(),
-                                context.CreatedEntities.end());
-                            probe.FocusTarget = context.FocusTarget;
-
-                            probe.CompletionObservedReadyEntities =
-                                services.Scene != nullptr
-                                && context.CreatedEntities.size() == 2u;
-                            if (services.Scene != nullptr)
-                            {
-                                auto& raw = services.Scene->Raw();
-                                for (const ECS::EntityHandle entity :
-                                     context.CreatedEntities)
-                                {
-                                    const GS::ConstSourceView source =
-                                        GS::BuildConstView(raw, entity);
-                                    probe.CompletionObservedReadyEntities =
-                                        probe.CompletionObservedReadyEntities
-                                        && services.Scene->IsValid(entity)
-                                        && source.Valid()
-                                        && raw.all_of<
-                                            G::RenderSurface,
-                                            Sel::SelectableTag,
-                                            G::VisualizationConfig,
-                                            Culling::Local::Bounds,
-                                            Culling::World::Bounds>(entity);
-                                }
-                            }
-                            return Core::Ok();
-                        },
-                });
-        ASSERT_TRUE(completionHandle.IsValid());
-
         std::optional<Runtime::RuntimeAssetImportResult> importResult{};
         if (queued)
         {
@@ -1142,16 +1014,31 @@ namespace
         EXPECT_TRUE(importResult->MaterializedModelScene);
         EXPECT_EQ(importResult->PrimitiveEntitiesCreated, 2u);
 
-        ASSERT_EQ(probe.AuthoredEntities.size(), 2u);
-        EXPECT_EQ(probe.CompletionCalls, 1u);
-        EXPECT_EQ(probe.AuthoringCountAtCompletion, 2u);
+        ECS::Scene::Registry& activeScene =
+            *engine.Worlds().Get(engine.ActiveWorld());
+        probe.CompletedEntities =
+            FindEntitiesWithDomain(activeScene, GS::Domain::Mesh);
+        probe.FocusTarget = recorder->LastFocus;
+        probe.CompletionObservedReadyEntities =
+            probe.CompletedEntities.size() == 2u;
+        auto& raw = activeScene.Raw();
+        for (const ECS::EntityHandle entity : probe.CompletedEntities)
+        {
+            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
+            probe.CompletionObservedReadyEntities =
+                probe.CompletionObservedReadyEntities &&
+                activeScene.IsValid(entity) && source.Valid() &&
+                raw.all_of<
+                    G::RenderSurface,
+                    Sel::SelectableTag,
+                    G::VisualizationConfig,
+                    Culling::Local::Bounds,
+                    Culling::World::Bounds>(entity);
+        }
         ASSERT_EQ(probe.CompletedEntities.size(), 2u);
-        EXPECT_EQ(probe.AuthoredEntities, probe.CompletedEntities);
         EXPECT_TRUE(probe.CompletionObservedReadyEntities);
-        EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh),
-                  2u);
+        EXPECT_EQ(CountEntitiesWithDomain(activeScene, GS::Domain::Mesh), 2u);
 
-        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
         constexpr glm::vec3 expectedWorldCenters[]{
             {11.0f, 5.0f, 0.0f},
             {17.0f, 1.0f, 0.0f},
@@ -1263,14 +1150,12 @@ namespace
             EXPECT_EQ(repeated->PrimitiveEntitiesCreated, 0u);
             EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh),
                       2u);
-            EXPECT_EQ(probe.CompletionCalls, 2u);
-            EXPECT_EQ(probe.AuthoredEntities.size(), 4u);
-            EXPECT_EQ(probe.CompletedEntities, originalEntities);
+            EXPECT_EQ(
+                FindEntitiesWithDomain(activeScene, GS::Domain::Mesh),
+                originalEntities);
             EXPECT_EQ(recorder->FocusCalls, 2u);
         }
 
-        pipeline.UnregisterImportCompletedHandler(completionHandle);
-        pipeline.UnregisterImportEntityAuthoringPolicy(authoringHandle);
         engine.Shutdown();
     }
 
@@ -1462,55 +1347,16 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenSh
 }
 
 TEST(RuntimeAssetImportFormatCoverage,
-     SandboxDefaultFactoriesDescribeCanonicalPolicies)
+     AssetImportRecipeDefaultsDescribeCanonicalPolicies)
 {
-    auto authoring =
-        Runtime::MakeSandboxDefaultImportAuthoringPolicies();
-    ASSERT_EQ(authoring.size(), 3u);
-
+    const Runtime::AssetImportRecipe recipe{};
+    EXPECT_TRUE(recipe.Authoring.AuthorRenderableComponents);
+    EXPECT_TRUE(recipe.Authoring.AuthorSelectableIdentity);
     EXPECT_EQ(
-        authoring[0].DebugName,
-        "Sandbox.DefaultMeshImportAuthoring");
-    EXPECT_EQ(
-        authoring[0].PayloadKind,
-        Assets::AssetPayloadKind::Mesh);
-    EXPECT_TRUE(authoring[0].Apply);
-
-    EXPECT_EQ(
-        authoring[1].DebugName,
-        "Sandbox.DefaultGraphImportAuthoring");
-    EXPECT_EQ(
-        authoring[1].PayloadKind,
-        Assets::AssetPayloadKind::Graph);
-    EXPECT_TRUE(authoring[1].Apply);
-
-    EXPECT_EQ(
-        authoring[2].DebugName,
-        "Sandbox.DefaultPointCloudImportAuthoring");
-    EXPECT_EQ(
-        authoring[2].PayloadKind,
-        Assets::AssetPayloadKind::PointCloud);
-    EXPECT_TRUE(authoring[2].Apply);
-
-    const Runtime::RuntimeImportCompletedHandlerDesc completed =
-        Runtime::MakeSandboxDefaultImportCompletedHandler(nullptr);
-    EXPECT_EQ(
-        completed.DebugName,
-        "Sandbox.DefaultImportCompletedUx");
-    EXPECT_EQ(
-        completed.PayloadKind,
-        Assets::AssetPayloadKind::Unknown);
-    EXPECT_TRUE(completed.Handle);
-
-    const Runtime::RuntimePostImportProcessorDesc postProcess =
-        Runtime::MakeSandboxDefaultDirectMeshPostProcessor();
-    EXPECT_EQ(
-        postProcess.DebugName,
-        "Sandbox.DirectMeshGeneratedNormal");
-    EXPECT_EQ(
-        postProcess.PayloadKind,
-        Assets::AssetPayloadKind::Mesh);
-    EXPECT_TRUE(postProcess.Process);
+        recipe.Postprocess,
+        Runtime::AssetImportPostprocessPolicy::PrepareRenderableGeometry);
+    EXPECT_TRUE(recipe.Completion.SelectFirstCreatedEntity);
+    EXPECT_TRUE(recipe.Completion.FocusCameraOnCreatedGeometry);
 
     Runtime::CameraControllerRegistry cameras{};
     Runtime::SelectionController selection{};
@@ -1602,75 +1448,6 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
         engine, *meshEntity, bakeProbe));
     ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
         engine, *meshEntity, bakeProbe);
-
-    engine.Shutdown();
-}
-
-TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMinimalGeometry)
-{
-    TempAssetFile meshFile(
-        "assetio144_minimal_import_policy.obj",
-        "v 0 0 0\n"
-        "v 1 0 0\n"
-        "v 0 1 0\n"
-        "vt 0 0\n"
-        "vt 1 0\n"
-        "vt 0 1\n"
-        "vn 0 0 1\n"
-        "vn 0 0 1\n"
-        "vn 0 0 1\n"
-        "f 1/1/1 2/2/2 3/3/3\n");
-
-    std::optional<ECS::EntityHandle> meshEntity{};
-    Core::Config::EngineConfig config = HeadlessConfig();
-    config.Camera.Enabled = true;
-    Intrinsic::Tests::RuntimeTestKernel engine(
-        config, std::make_unique<WaitForConditionApplication>(
-                    [&meshEntity](Runtime::Engine& runningEngine)
-                    {
-                        return meshEntity.has_value() &&
-                               HasGeneratedNormalTextureBinding(runningEngine, *meshEntity);
-                    },
-                    64u));
-    InitializeAssetImportEngine(engine);
-
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
-        .Path = meshFile.Path.string(),
-        .PayloadKind = Assets::AssetPayloadKind::Mesh,
-    });
-    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
-    EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
-    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
-
-    meshEntity = FindFirstEntityWithDomainAny(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
-    ASSERT_TRUE(meshEntity.has_value());
-    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
-    EXPECT_FALSE(raw.all_of<Sel::SelectableTag>(*meshEntity));
-    EXPECT_FALSE(raw.all_of<G::RenderSurface>(*meshEntity));
-    EXPECT_FALSE(raw.all_of<G::RenderEdges>(*meshEntity));
-    EXPECT_FALSE(raw.all_of<G::RenderPoints>(*meshEntity));
-    EXPECT_FALSE(raw.all_of<G::VisualizationConfig>(*meshEntity));
-    EXPECT_FALSE(
-        engine.Services()
-            .Find<Runtime::SelectionController>()
-            ->IsSelected(*meshEntity));
-    EXPECT_EQ(
-        engine.Services()
-            .Find<Runtime::SelectionController>()
-            ->SelectedCount(),
-        0u);
-    auto* cameraControllers =
-        engine.Services().Find<Runtime::CameraControllerRegistry>();
-    ASSERT_NE(cameraControllers, nullptr);
-    EXPECT_EQ(cameraControllers->ResolveOrNull(
-                  Runtime::CameraControllerSlot::Main),
-              nullptr);
-    EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
-
-    engine.Run();
-
-    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
-    EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
     engine.Shutdown();
 }
@@ -1944,128 +1721,6 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelinePreservesImportDirtySt
         pipeline.GetLastAssetImportEvent();
     ASSERT_TRUE(importedEvent.has_value());
     EXPECT_TRUE(importedEvent->Succeeded());
-
-    engine.Shutdown();
-}
-
-TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnregister)
-{
-    TempAssetFile meshFileA(
-        "assetio144_post_import_registry_mesh_a.obj",
-        "v 0 0 0\n"
-        "v 1 0 0\n"
-        "v 0 1 0\n"
-        "f 1 2 3\n");
-    TempAssetFile meshFileB(
-        "assetio144_post_import_registry_mesh_b.obj",
-        "v 0 0 0\n"
-        "v 1 0 0\n"
-        "v 0 1 0\n"
-        "f 1 2 3\n");
-    TempAssetFile meshFileC(
-        "assetio144_post_import_registry_mesh_c.obj",
-        "v 0 0 0\n"
-        "v 1 0 0\n"
-        "v 0 1 0\n"
-        "f 1 2 3\n");
-    TempAssetFile graphFile(
-        "assetio144_post_import_registry_graph.tgf",
-        "1 0 0 0 first\n"
-        "2 1 0 0 second\n"
-        "#\n"
-        "1 2 1.0 edge\n");
-
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
-                                               std::make_unique<OneFrameApplication>());
-    InitializeAssetImportEngine(engine);
-
-    std::vector<int> observedOrder{};
-    const Runtime::RuntimePostImportProcessorHandle first =
-        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
-            .DebugName = "test.first",
-            .PayloadKind = Assets::AssetPayloadKind::Mesh,
-            .Process =
-                [&observedOrder](
-                    const Runtime::RuntimePostImportProcessorContext& context,
-                    Runtime::RuntimePostImportProcessorServices& services)
-                {
-                    observedOrder.push_back(1);
-                    EXPECT_EQ(context.PayloadKind, Assets::AssetPayloadKind::Mesh);
-                    EXPECT_NE(context.Entity, ECS::InvalidEntityHandle);
-                    EXPECT_NE(context.MeshPayload, nullptr);
-                    if (context.MeshPayload != nullptr)
-                        EXPECT_GT(context.MeshPayload->Vertices.Size(), 0u);
-                    EXPECT_NE(services.Jobs, nullptr);
-                    EXPECT_NE(services.AssetService, nullptr);
-                    EXPECT_NE(services.GpuAssetCache, nullptr);
-                    EXPECT_NE(services.RenderExtraction, nullptr);
-                    EXPECT_NE(services.Scene, nullptr);
-                    return Core::Ok();
-                },
-        });
-    ASSERT_TRUE(first.IsValid());
-    const Runtime::RuntimePostImportProcessorHandle failing =
-        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
-            .DebugName = "test.failing",
-            .PayloadKind = Assets::AssetPayloadKind::Mesh,
-            .Process =
-                [&observedOrder](
-                    const Runtime::RuntimePostImportProcessorContext&,
-                    Runtime::RuntimePostImportProcessorServices&)
-                {
-                    observedOrder.push_back(9);
-                    return Core::Err(Core::ErrorCode::InvalidState);
-                },
-        });
-    ASSERT_TRUE(failing.IsValid());
-    const Runtime::RuntimePostImportProcessorHandle second =
-        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).RegisterPostImportProcessor(Runtime::RuntimePostImportProcessorDesc{
-            .DebugName = "test.second",
-            .PayloadKind = Assets::AssetPayloadKind::Mesh,
-            .Process =
-                [&observedOrder](
-                    const Runtime::RuntimePostImportProcessorContext&,
-                    Runtime::RuntimePostImportProcessorServices&)
-                {
-                    observedOrder.push_back(2);
-                    return Core::Ok();
-                },
-        });
-    ASSERT_TRUE(second.IsValid());
-
-    auto meshA = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
-        .Path = meshFileA.Path.string(),
-        .PayloadKind = Assets::AssetPayloadKind::Mesh,
-    });
-    ASSERT_TRUE(meshA.has_value()) << static_cast<int>(meshA.error());
-    EXPECT_EQ(observedOrder, (std::vector<int>{1, 9, 2}));
-
-    observedOrder.clear();
-    auto graph = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
-        .Path = graphFile.Path.string(),
-        .PayloadKind = Assets::AssetPayloadKind::Graph,
-    });
-    ASSERT_TRUE(graph.has_value()) << static_cast<int>(graph.error());
-    EXPECT_TRUE(observedOrder.empty());
-
-    RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).UnregisterPostImportProcessor(first);
-    observedOrder.clear();
-    auto meshB = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
-        .Path = meshFileB.Path.string(),
-        .PayloadKind = Assets::AssetPayloadKind::Mesh,
-    });
-    ASSERT_TRUE(meshB.has_value()) << static_cast<int>(meshB.error());
-    EXPECT_EQ(observedOrder, (std::vector<int>{9, 2}));
-
-    RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).UnregisterPostImportProcessor(failing);
-    RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).UnregisterPostImportProcessor(second);
-    observedOrder.clear();
-    auto meshC = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
-        .Path = meshFileC.Path.string(),
-        .PayloadKind = Assets::AssetPayloadKind::Mesh,
-    });
-    ASSERT_TRUE(meshC.has_value()) << static_cast<int>(meshC.error());
-    EXPECT_TRUE(observedOrder.empty());
 
     engine.Shutdown();
 }
