@@ -1830,6 +1830,137 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
     engine.Shutdown();
 }
 
+TEST(RuntimeAssetImportFormatCoverage,
+     QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities)
+{
+    TempAssetFile meshFile(
+        "assetio101_queued_reimport_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [](Runtime::Engine& runningEngine)
+            {
+                const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                    RequiredEngineService<Runtime::AssetWorkflowModule>(
+                        runningEngine)
+                        .GetAssetImportQueueSnapshot();
+                return queue.Entries.size() == 2u &&
+                    queue.ActiveCount == 0u &&
+                    queue.TerminalCount == 2u;
+            },
+            256u));
+    InitializeAssetImportEngine(engine);
+
+    Runtime::AssetWorkflowModule& assetWorkflow =
+        RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    Assets::AssetService& assetService =
+        RequiredEngineService<Assets::AssetService>(engine);
+    auto imported = assetWorkflow.ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    ASSERT_EQ(
+        CountEntitiesWithDomain(
+            *engine.Worlds().Get(engine.ActiveWorld()),
+            GS::Domain::Mesh),
+        1u);
+    const auto firstTicket = assetService.GetPayloadTicket(imported->Asset);
+    ASSERT_TRUE(firstTicket.has_value());
+
+    {
+        std::ofstream out(
+            meshFile.Path,
+            std::ios::binary | std::ios::trunc);
+        out << "v 0 0 0\n"
+               "v 1 0 0\n"
+               "v 0 1 0\n"
+               "v 0 0 1\n"
+               "f 1 2 3\n"
+               "f 1 3 4\n";
+    }
+
+    auto queued = assetWorkflow.QueueAssetImport(
+        Runtime::AssetImportRecipe{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            .Source = Runtime::RuntimeAssetIngestSource::Reimport,
+            .ExistingAsset = imported->Asset,
+        });
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+
+    engine.Run();
+
+    const Runtime::RuntimeAssetImportQueueSnapshot queue =
+        assetWorkflow.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 2u);
+    const auto reimportEntry = std::ranges::find_if(
+        queue.Entries,
+        [&](const Runtime::RuntimeAssetImportQueueEntry& entry)
+        {
+            return entry.Operation == queued->Operation;
+        });
+    ASSERT_NE(reimportEntry, queue.Entries.end());
+    EXPECT_EQ(
+        reimportEntry->TerminalStatus,
+        Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+    EXPECT_EQ(reimportEntry->Source, Runtime::RuntimeAssetIngestSource::Reimport);
+    EXPECT_EQ(reimportEntry->Asset, imported->Asset);
+    EXPECT_EQ(
+        CountEntitiesWithDomain(
+            *engine.Worlds().Get(engine.ActiveWorld()),
+            GS::Domain::Mesh),
+        1u);
+
+    const auto secondTicket = assetService.GetPayloadTicket(imported->Asset);
+    ASSERT_TRUE(secondTicket.has_value());
+    EXPECT_EQ(secondTicket->slot, firstTicket->slot);
+    EXPECT_GT(secondTicket->generation, firstTicket->generation);
+
+    const auto meshPayload =
+        assetService.Read<Geometry::MeshIO::MeshIOResult>(imported->Asset);
+    ASSERT_TRUE(meshPayload.has_value());
+    ASSERT_EQ(meshPayload->size(), 1u);
+    EXPECT_EQ((*meshPayload)[0].Vertices.Size(), 4u);
+    EXPECT_EQ((*meshPayload)[0].Faces.Size(), 2u);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        assetWorkflow.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 2u);
+    EXPECT_EQ(
+        records[1].Request.Source,
+        Runtime::RuntimeAssetIngestSource::Reimport);
+    EXPECT_EQ(records[1].Request.ExistingAsset, imported->Asset);
+    EXPECT_EQ(records[1].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    ASSERT_TRUE(records[1].Result.has_value());
+    EXPECT_EQ(records[1].Result->Asset, imported->Asset);
+    EXPECT_EQ(records[1].Result->PrimitiveEntitiesCreated, 0u);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        assetWorkflow.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    ASSERT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->Asset, imported->Asset);
+    ASSERT_TRUE(lastEvent->StageTrace.has_value());
+    EXPECT_EQ(lastEvent->StageTrace->Identity.Request, queued->Operation);
+    ASSERT_EQ(lastEvent->StageTrace->Results.size(), 7u);
+    const auto* authored = std::get_if<Runtime::AssetImportEcsAuthorResult>(
+        &lastEvent->StageTrace->Results[3].Payload);
+    ASSERT_NE(authored, nullptr);
+    EXPECT_EQ(authored->CreatedEntityCount, 0u);
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeAssetImportFormatCoverage, ImportAssetFromPathDoesNotWaitForUnrelatedSchedulerWork)
 {
     TempAssetFile meshFile(

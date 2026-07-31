@@ -457,6 +457,19 @@ public:
                 });
             if (!upload.has_value())
             {
+                if (upload.error() ==
+                    Extrinsic::Core::ErrorCode::ResourceBusy)
+                {
+                    const Extrinsic::Graphics::GpuAssetState racedState =
+                        cache.GetState(m_GeneratedTexture);
+                    if (racedState ==
+                            Extrinsic::Graphics::GpuAssetState::GpuUploading ||
+                        racedState ==
+                            Extrinsic::Graphics::GpuAssetState::Ready)
+                    {
+                        return;
+                    }
+                }
                 UploadError = upload.error();
                 engine.RequestExit();
                 return;
@@ -3870,8 +3883,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         MakeGeneratedUvSmokeAlbedoPayload();
     const std::string generatedTexturePath =
         obj.Path.string() + ".graphics089-generated-albedo.texture";
+    auto& assetService =
+        RequiredEngineService<Extrinsic::Assets::AssetService>(engine);
     auto generatedTexture =
-        RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Load<Assets::AssetTexture2DPayload>(
+        assetService.Load<Assets::AssetTexture2DPayload>(
             generatedTexturePath,
             [payload](std::string_view,
                       Assets::AssetId) -> Extrinsic::Core::Expected<Assets::AssetTexture2DPayload>
@@ -3880,6 +3895,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
             });
     ASSERT_TRUE(generatedTexture.has_value())
         << static_cast<int>(generatedTexture.error());
+    ASSERT_TRUE(
+        assetService.CompleteCpuLoadAndFlushEvent(*generatedTexture).has_value())
+        << "Generated texture Ready publication did not complete before the "
+           "operational-frame fallback upload.";
     appPtr->SetGeneratedTexture(*generatedTexture);
 
     const GeometryPresentationFixture presentation =

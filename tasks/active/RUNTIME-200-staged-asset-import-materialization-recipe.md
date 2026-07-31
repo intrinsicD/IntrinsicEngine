@@ -15,8 +15,10 @@ maturity_target: Retired
 
 ## Status
 
-- Implementation and required verification completed on 2026-07-31; fixed-
-  surface high-risk review and retirement evidence remain before merge.
+- Implementation is complete. The first fixed-surface high-risk review on
+  2026-07-31 requested three revisions; all three are implemented, and the
+  revised verification surface plus a second independent review remain before
+  retirement and merge.
 - Slice A contract completed on 2026-07-31: the plain recipe names payload,
   authoring, postprocess, completion, request/world generation, and the seven
   ordered stages; copied stage results fail closed on malformed order, stale
@@ -45,12 +47,28 @@ maturity_target: Retired
   no-op after pipeline teardown without fencing unrelated scheduler work, and
   the test waits for its worker before releasing locals. A ccache-disabled
   clean rebuild reproduced the fixed surface without stale module artifacts.
-- Verification: focused import/runtime contracts passed 85/85; the default CPU
-  gate passed 4,012/4,012; ASan and UBSan each passed 2,666/2,666; and the four
-  import/model-scene Vulkan smokes passed 4/4. The broader optional Vulkan
+- Revised-surface verification: focused import/runtime contracts passed
+  101/101; the default CPU gate passed 4,013/4,013 (one expected GLFW/LSan
+  skip); ASan and UBSan each passed 2,667/2,667; the queued geometry reimport
+  contract passed 20 consecutive repetitions; the generated-texture Vulkan
+  smoke passed 20 consecutive repetitions; and the four import/model-scene
+  Vulkan smokes passed 4/4. One preceding ASan sweep and a focused repeat
+  reproduced the already-tracked unrelated `BUG-123` retired-scene-save
+  terminal-event race; both immutable failure receipts are retained as
+  observations, and the unchanged complete selector subsequently passed. The
+  broader optional Vulkan
   sweep passed 47/48 and exposed the unrelated, pre-existing stale assertion
   tracked by `BUG-124`; its full failure receipt is retained. No performance
   claim is made.
+- Review revision: failed diagnostic attempts are preserved byte-for-byte as
+  observation artifacts rather than filtered from a generated report; queued
+  geometry reimport now carries `ExistingAsset` through ingest and reloads the
+  same asset without ECS duplication; and the generated-texture Vulkan smoke
+  deterministically completes Ready-event publication before its fallback
+  upload while accepting a production residency request that wins the narrow
+  contention window. The new queued-reimport contract and generated-texture
+  Vulkan smoke each passed 20 consecutive direct diagnostic runs before the
+  revised evidence gates.
 
 ## Goal
 

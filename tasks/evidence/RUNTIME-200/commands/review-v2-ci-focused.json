@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "AssetImport|AssetWorkflow|ModelScene|ImportVisibility|RuntimeEngineLayering|RuntimeEnginePrivateGlue",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'AssetImport|AssetWorkflow|ModelScene|ImportVisibility|RuntimeEngineLayering|RuntimeEnginePrivateGlue' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 2622,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T19:14:08Z",
+  "label": "review-v2-ci-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T19:14:06Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/review-v2-ci-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/review-v2-ci-focused.stdout.log",
+  "stdout_sha256": "c91280e4384402ca2a6af3fb41b848704b241e69a4db46a103724276a2c9c134",
+  "task_id": "RUNTIME-200"
+}

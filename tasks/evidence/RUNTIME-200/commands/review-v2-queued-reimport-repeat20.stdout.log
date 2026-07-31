@@ -1,0 +1,50 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.05 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.05 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.05 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.05 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.05 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.05 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.05 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.05 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+    Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+    Start 352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+1/1 Test #352: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+contract    =   0.04 sec*proc (1 test)
+runtime     =   0.04 sec*proc (1 test)
+
+Total Test time (real) =   1.06 sec

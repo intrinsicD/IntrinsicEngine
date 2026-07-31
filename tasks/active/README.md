@@ -13,9 +13,9 @@ Each active task should include:
 
 - [`RUNTIME-200 — Staged asset-import and materialization recipe`](RUNTIME-200-staged-asset-import-materialization-recipe.md)
   — in progress; owner `Codex-RuntimeCleanup`; branch
-  `codex/runtime-200-staged-import-recipe`; next verification is strict
-  task/workflow validation followed by focused asset-workflow contracts after
-  the first recipe-contract slice.
+  `codex/runtime-200-staged-import-recipe`; implementation is complete and the
+  first fixed-surface review revisions are under final verification before a
+  second independent review and retirement.
 
 ## History
 

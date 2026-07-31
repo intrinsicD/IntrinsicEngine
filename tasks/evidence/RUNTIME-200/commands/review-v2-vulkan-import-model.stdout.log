@@ -1,0 +1,21 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3283: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter
+1/4 Test #3283: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter ...................   Passed    3.34 sec
+    Start 3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+2/4 Test #3284: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture .......   Passed    3.41 sec
+    Start 3286: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable
+3/4 Test #3286: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable ......................   Passed    3.78 sec
+    Start 3288: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+4/4 Test #3288: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice ...   Passed    3.61 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Label Time Summary:
+gpu            =  14.14 sec*proc (4 tests)
+graphics       =  14.14 sec*proc (4 tests)
+integration    =  14.14 sec*proc (4 tests)
+runtime        =  14.14 sec*proc (4 tests)
+vulkan         =  14.14 sec*proc (4 tests)
+
+Total Test time (real) =  14.27 sec

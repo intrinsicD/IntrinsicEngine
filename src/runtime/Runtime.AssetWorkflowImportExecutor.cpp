@@ -1985,6 +1985,7 @@ namespace Extrinsic::Runtime
         std::vector<Assets::AssetPayloadKind> payloadKinds)
     {
         const RuntimeAssetIngestSource source = recipe.Source;
+        const Assets::AssetId existingAsset = recipe.ExistingAsset;
         RuntimeAssetImportRequest request{
             .Path = recipe.Path,
             .PayloadKind = recipe.PayloadKind,
@@ -1995,7 +1996,8 @@ namespace Extrinsic::Runtime
             m_AssetIngestStateMachine.Submit(
                 MakeRuntimeAssetIngestRequest(
                     request,
-                    source));
+                    source,
+                    existingAsset));
         if (!submit.Succeeded())
         {
             Core::Log::Warn(
@@ -2297,39 +2299,62 @@ namespace Extrinsic::Runtime
                         return true;
                     }
 
-                    auto materialized = MaterializeDecodedGeometryImport(
-                        *m_AssetService,
-                        *submissionScene,
-                        m_Jobs.get(),
-                        m_WorldRegistry.get(),
-                        submissionWorld,
-                        m_BindingValid,
-                        m_TextureBake.get(),
-                        state->Recipe,
-                        *state->Decoded);
+                    auto materialized = [&]()
+                        -> Core::Expected<MaterializedGeometryImport>
+                    {
+                        if (state->Recipe.ExistingAsset.IsValid())
+                        {
+                            auto reloaded = ReloadDecodedGeometryImport(
+                                *m_AssetService,
+                                state->Recipe.ExistingAsset,
+                                *state->Decoded);
+                            if (!reloaded.has_value())
+                            {
+                                return Core::Err<MaterializedGeometryImport>(
+                                    reloaded.error());
+                            }
+                            return MaterializedGeometryImport{
+                                .Result = *reloaded,
+                            };
+                        }
+
+                        return MaterializeDecodedGeometryImport(
+                            *m_AssetService,
+                            *submissionScene,
+                            m_Jobs.get(),
+                            m_WorldRegistry.get(),
+                            submissionWorld,
+                            m_BindingValid,
+                            m_TextureBake.get(),
+                            state->Recipe,
+                            *state->Decoded);
+                    }();
                     if (materialized.has_value())
                     {
                         const ECS::EntityHandle createdEntity =
                             materialized->Entity;
                         result = materialized->Result;
-                        if (Core::Result completed =
-                                ApplyAssetImportCompletionRecipe(
-                                    state->Recipe.Completion
-                                        .SelectFirstCreatedEntity,
-                                    state->Recipe.Completion
-                                        .FocusCameraOnCreatedGeometry,
-                                    std::span<const ECS::EntityHandle>(
-                                        &createdEntity,
-                                        1u),
-                                    materialized->FocusTarget,
-                                    *submissionScene,
-                                    m_SelectionController.get(),
-                                    m_Config.get(),
-                                    m_CameraControllers.get());
-                            !completed.has_value())
+                        if (createdEntity != ECS::InvalidEntityHandle)
                         {
-                            result = Core::Err<RuntimeAssetImportResult>(
-                                completed.error());
+                            if (Core::Result completed =
+                                    ApplyAssetImportCompletionRecipe(
+                                        state->Recipe.Completion
+                                            .SelectFirstCreatedEntity,
+                                        state->Recipe.Completion
+                                            .FocusCameraOnCreatedGeometry,
+                                        std::span<const ECS::EntityHandle>(
+                                            &createdEntity,
+                                            1u),
+                                        materialized->FocusTarget,
+                                        *submissionScene,
+                                        m_SelectionController.get(),
+                                        m_Config.get(),
+                                        m_CameraControllers.get());
+                                !completed.has_value())
+                            {
+                                result = Core::Err<RuntimeAssetImportResult>(
+                                    completed.error());
+                            }
                         }
                         if (result.has_value() && RequestsGpuUpload(*result))
                         {
