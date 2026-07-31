@@ -12,16 +12,20 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-RuntimeCleanup"
+branch: "codex/runtime-202-retire-sandbox-facade"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-07-31T20:10:33Z"
 maturity_target: Retired
 ---
 # RUNTIME-202 — Retire the Sandbox runtime facade and localize feature models
 
 ## Status
 
+- In progress on 2026-07-31. The task is claimed on
+  `codex/runtime-202-retire-sandbox-facade`; next verification is the focused
+  Sandbox/runtime contract build after the export-to-owner inventory and app
+  context boundary land.
 - Re-gated on 2026-07-30: `RUNTIME-138` is no longer a prerequisite. Facade
   retirement must preserve the current selected-model cache and diagnostic
   behavior, migrate existing selection/property behavior to its feature

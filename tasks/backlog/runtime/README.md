@@ -16,14 +16,11 @@ cleanup slice:
 
 #### Open tasks
 
-- [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](RUNTIME-202-retire-sandbox-runtime-facade.md)
-  is the final feature-workflow migration/removal task: app owns Sandbox view
-  aggregation while runtime exposes narrow feature operations/snapshots. It
-  preserves existing selected-model cache behavior but no longer waits on
-  `RUNTIME-138` or introduces a replacement selected-analysis service.
 - [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
   removes public BMIs for Engine/SceneInteraction/config/device helpers after
   their owner-level behavior tests are in place.
+
+`RUNTIME-202` is active under [`tasks/active/`](../../active/RUNTIME-202-retire-sandbox-runtime-facade.md).
 
 #### Retired prerequisites and completed paths
 
