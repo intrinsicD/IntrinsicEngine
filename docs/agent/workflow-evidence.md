@@ -120,6 +120,9 @@ and remains visible in the report.
 The aggregate content digest is always recomputed from the recorded surface,
 including the valid empty-surface case. An empty diff therefore has one
 deterministic digest; it is not an escape hatch for a caller-selected value.
+Tracked symlink entries are hashed as their lexical link bytes in the worktree,
+matching the mode-120000 Git blob used by fixed-revision validation; report
+generation never substitutes the current symlink target's contents.
 
 For a report with `source.dirty: false`, validation reads the recorded surface
 and referenced artifact blobs from the exact `source.head_revision` commit and

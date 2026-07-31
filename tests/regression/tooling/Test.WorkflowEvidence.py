@@ -289,6 +289,20 @@ class WorkflowEvidenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertNotEqual(current_revision, fixed_revision)
 
+    def test_clean_fixed_revision_hashes_symlink_as_git_blob(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp, profile="high-risk")
+            fixture.receipt()
+            link = fixture.repo / "linked-artifact.txt"
+            link.symlink_to("artifact.txt")
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "add symlink source surface")
+            fixture.generate()
+            fixture.handoff()
+            fixture.review()
+            result = fixture.validate()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_clean_fixed_revision_rejects_recorded_blob_hash_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = self.fixture(tmp)

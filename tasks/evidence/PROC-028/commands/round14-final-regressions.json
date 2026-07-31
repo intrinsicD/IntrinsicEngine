@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\npython3 tests/regression/tooling/Test.ValidateTasks.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py\npython3 tests/regression/tooling/Test.ExperimentCustody.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test_BenchmarkResultValidator.py\npython3 tests/regression/tooling/Test.BenchmarkComparison.py\npython3 tests/regression/tooling/Test_BenchmarkManifestValidator.py\npython3 tests/regression/tooling/Test.CiTiming.py"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\npython3 tests/regression/tooling/Test.ValidateTasks.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py\npython3 tests/regression/tooling/Test.ExperimentCustody.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test_BenchmarkResultValidator.py\npython3 tests/regression/tooling/Test.BenchmarkComparison.py\npython3 tests/regression/tooling/Test_BenchmarkManifestValidator.py\npython3 tests/regression/tooling/Test.CiTiming.py'",
+  "cwd": ".",
+  "duration_ms": 18382,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T10:43:05Z",
+  "label": "round14-final-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T10:42:47Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/round14-final-regressions.stderr.log",
+  "stderr_sha256": "858e74d9ae3be0323c876f82a8ecaa0c35f60b844395d6d18570dd0fa6a96f2d",
+  "stdout_path": "tasks/evidence/PROC-028/commands/round14-final-regressions.stdout.log",
+  "stdout_sha256": "6ae75e2abc2070b2410221d60611494921496b2f5d31b5810d5d5df891a7a5ba",
+  "task_id": "PROC-028"
+}

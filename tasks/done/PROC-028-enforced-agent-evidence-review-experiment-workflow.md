@@ -43,6 +43,12 @@ claimed_at: "2026-07-31T09:28:53Z"
   explicit migration. Four more adversarial regressions bring experiment
   custody to 27/27 and the complete focused workflow/benchmark bundle to
   103/103.
+- Independent review sequence 14 confirmed every custody repair but rejected a
+  clean-report inconsistency for tracked symlinks: generation hashed target
+  bytes while revision validation hashed the Git link blob. Worktree and Git
+  hashing now share lexical symlink semantics, pinned by a direct high-risk
+  report regression. Workflow evidence passes 23/23 and the complete focused
+  bundle passes 104/104.
 - `BUG-120` is retired separately at `CPUContracted`. The current retirement
   receipt reruns `Test.WorkflowConcurrency.py` at 19/19 and
   `Test.TestCohortParity.py` at 7/7, so it is no longer a blocker or skipped
@@ -300,8 +306,8 @@ claimed_at: "2026-07-31T09:28:53Z"
   task-ID mismatch, unaddressed acceptance criteria, missing/failed command
   receipts, artifact hash mismatch, unjustified skips, absent required review,
   stale reviewed revision, arbitrary digest on an empty source surface,
-  self-review presented as independent, and invalid terminal verdict/status
-  pairs.
+  tracked-symlink source hashing, self-review presented as independent, and
+  invalid terminal verdict/status pairs.
 - [x] Extend `Test_BenchmarkResultValidator.py` with duplicate-key, `NaN`,
   positive/negative infinity, boolean-as-number, nested invalid metric,
   manifest mismatch, undeclared metric, threshold/status mismatch, source

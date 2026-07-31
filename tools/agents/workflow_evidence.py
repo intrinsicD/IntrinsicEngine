@@ -361,14 +361,22 @@ def sha256_at_revision(repo_root: Path, revision: str, value: object) -> str | N
     return sha256_bytes(result.stdout)
 
 
+def sha256_worktree_entry(repo_root: Path, value: object) -> str | None:
+    relative = repository_relative_path(value)
+    lexical_path = repo_root / relative
+    if lexical_path.is_symlink():
+        return sha256_bytes(os.readlink(os.fsencode(lexical_path)))
+    path = resolve_repo_path(repo_root, value)
+    return sha256_file(path) if path.is_file() else None
+
+
 def surface_entries(repo_root: Path, paths: Iterable[str]) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for value in sorted(set(paths)):
-        path = resolve_repo_path(repo_root, value)
         entries.append(
             {
                 "path": value,
-                "sha256": sha256_file(path) if path.is_file() else None,
+                "sha256": sha256_worktree_entry(repo_root, value),
             }
         )
     return entries
@@ -634,7 +642,13 @@ def generate_report(args: argparse.Namespace) -> int:
         path = resolve_repo_path(repo_root, value)
         if not path.is_file():
             raise ValueError(f"artifact is not a file: {value}")
-        artifacts.append({"path": value, "sha256": sha256_file(path), "kind": "file"})
+        artifacts.append(
+            {
+                "path": value,
+                "sha256": sha256_worktree_entry(repo_root, value),
+                "kind": "file",
+            }
+        )
 
     status = "complete" if args.complete else "draft"
     report = {
@@ -948,14 +962,13 @@ def validate_report(
     for index, entry_value in enumerate(entries):
         entry = _require_mapping(entry_value, f"source.surface[{index}]", findings)
         try:
-            path = resolve_repo_path(repo_root, entry.get("path"))
             expected_hash = entry.get("sha256")
             if clean_head is not None:
                 actual_hash = sha256_at_revision(
                     repo_root, clean_head, entry.get("path")
                 )
             elif dirty is True:
-                actual_hash = sha256_file(path) if path.is_file() else None
+                actual_hash = sha256_worktree_entry(repo_root, entry.get("path"))
             else:
                 actual_hash = expected_hash
             if actual_hash != expected_hash:
@@ -1135,7 +1148,6 @@ def validate_report(
     for index, value in enumerate(artifacts):
         entry = _require_mapping(value, f"artifacts[{index}]", findings)
         try:
-            path = resolve_repo_path(repo_root, entry.get("path"))
             if clean_head is not None:
                 actual_hash = sha256_at_revision(
                     repo_root, clean_head, entry.get("path")
@@ -1144,7 +1156,7 @@ def validate_report(
                     f"artifact is missing at fixed revision: {entry.get('path')}"
                 )
             elif dirty is True:
-                actual_hash = sha256_file(path) if path.is_file() else None
+                actual_hash = sha256_worktree_entry(repo_root, entry.get("path"))
                 missing_detail = f"artifact is missing: {entry.get('path')}"
             else:
                 actual_hash = entry.get("sha256")
