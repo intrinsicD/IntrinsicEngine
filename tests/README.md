@@ -229,7 +229,7 @@ established these exact pairs:
 | `Simplification_QEM.RepeatedWorkflowStyleSimplificationStaysValid` | 3.194550 / 3.307200 | `Simplification_QEM.RepeatedWorkflowSmallMeshSentinel` | The heavy variant repeats simplify/extract/rebuild/simplify over 5,120 triangles; the sentinel retains repeated-workflow topology validity on a small mesh. |
 
 The measured
-`RuntimeAssetImportFormatCoverage.AssetImportPipelineAccessorExposesQueueAndEventState`
+`RuntimeAssetImportFormatCoverage.AssetWorkflowModuleAccessorExposesQueueAndEventState`
 plateau (2.083790-second median, 2.085490-second p95) was a two-second wait
 before the engine could pump the queued work. That wait was removed rather than
 classified `slow`; discovery and harness defects must be fixed, not routed out

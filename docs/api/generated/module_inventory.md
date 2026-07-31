@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 63 |
+| `runtime` | 64 |
 
 ## Modules
 
@@ -344,13 +344,14 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetImportPipeline` | `src/runtime/Runtime.AssetImportPipeline.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | `src/runtime/Runtime.AssetIngestStateMachine.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetMeshNormals` | `src/runtime/Runtime.AssetMeshNormals.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetModelSceneHandoff` | `src/runtime/Runtime.AssetModelSceneHandoff.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetModelTextureHandoff` | `src/runtime/Runtime.AssetModelTextureHandoff.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetModelTextureIO` | `src/runtime/Runtime.AssetModelTextureIO.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowGeometryMaterialization` | `src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowImportExecutor` | `src/runtime/Runtime.AssetWorkflowImportExecutor.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowModelMaterialization` | `src/runtime/Runtime.AssetWorkflowModelMaterialization.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowModelTextureDecode` | `src/runtime/Runtime.AssetWorkflowModelTextureDecode.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowModule` | `src/runtime/Runtime.AssetWorkflowModule.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowRecipePolicies` | `src/runtime/Runtime.AssetWorkflowRecipePolicies.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetWorkflowTextureResidency` | `src/runtime/Runtime.AssetWorkflowTextureResidency.cppm` | `runtime` |
 | `Extrinsic.Runtime.AsyncWorkModule` | `src/runtime/Runtime.AsyncWorkModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.CommandBus` | `src/runtime/Runtime.CommandBus.cppm` | `runtime` |
 | `Extrinsic.Runtime.DeviceBootstrap` | `src/runtime/Runtime.DeviceBootstrap.cppm` | `runtime` |
@@ -397,4 +398,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **370**
+Total modules: **371**

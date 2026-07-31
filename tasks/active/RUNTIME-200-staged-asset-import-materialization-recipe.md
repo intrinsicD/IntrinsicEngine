@@ -15,8 +15,8 @@ maturity_target: Retired
 
 ## Status
 
-- In progress on 2026-07-31; owner `Codex-RuntimeCleanup`, branch
-  `codex/runtime-200-staged-import-recipe`.
+- Implementation and required verification completed on 2026-07-31; fixed-
+  surface high-risk review and retirement evidence remain before merge.
 - Slice A contract completed on 2026-07-31: the plain recipe names payload,
   authoring, postprocess, completion, request/world generation, and the seven
   ordered stages; copied stage results fail closed on malformed order, stale
@@ -34,11 +34,23 @@ maturity_target: Retired
   authoring, direct-mesh postprocess, selection, and camera focus directly;
   the three runtime import-policy callback registries and their Sandbox
   install/uninstall lifecycle are removed.
-- Current slice: internalize the executor plus remaining handoff/postprocess
-  bodies behind `AssetWorkflowModule` and finish synchronous stage parity.
-- Focused recipe and queued route contracts: 31/31 passed on 2026-07-31.
-- Focused workflow, shutdown, reimport, and Sandbox composition contracts:
-  27/27 passed on 2026-07-31.
+- Slice D completed on 2026-07-31: `AssetWorkflowModule` is the sole published
+  import service; the executor, recipe policies, decode/materialization, and
+  texture-residency modules are private implementation file sets. The public
+  `AssetImportPipeline`, IO bridges, role callback registries, compatibility
+  handoffs, and their duplicate direct tests are deleted.
+- The first serial ASan gate found two lifetime defects: queued asset CPU work
+  could outlive `AssetLoadPipeline`, and one shutdown test borrowed loop-local
+  synchronization state. Shared callback invalidation now makes queued work
+  no-op after pipeline teardown without fencing unrelated scheduler work, and
+  the test waits for its worker before releasing locals. A ccache-disabled
+  clean rebuild reproduced the fixed surface without stale module artifacts.
+- Verification: focused import/runtime contracts passed 85/85; the default CPU
+  gate passed 4,012/4,012; ASan and UBSan each passed 2,666/2,666; and the four
+  import/model-scene Vulkan smokes passed 4/4. The broader optional Vulkan
+  sweep passed 47/48 and exposed the unrelated, pre-existing stale assertion
+  tracked by `BUG-124`; its full failure receipt is retained. No performance
+  claim is made.
 
 ## Goal
 
@@ -108,22 +120,22 @@ maturity_target: Retired
 - [x] Define one plain `AssetImportRecipe` with explicit payload route,
       required stages, `ImportAuthoringRecipe`, postprocess policy, and stable
       request/world generations.
-- [ ] Define typed copied results between decode, CPU materialization, ECS
+- [x] Define typed copied results between decode, CPU materialization, ECS
       authoring, postprocess, residency, and completion; no stage may borrow
       worker/ECS/graphics ownership across boundaries.
-- [ ] Execute background stages through `JobService` and main-thread mutation
+- [x] Execute background stages through `JobService` and main-thread mutation
       through bounded, generation-revalidated apply.
-- [ ] Route generated property textures through `TextureBakeService` and
+- [x] Route generated property textures through `TextureBakeService` and
       geometry uploads through the common residency coordinator; result
       binding/selection/focus remains caller-owned completion policy.
-- [ ] Integrate normal/UV/material preparation into named materialization/
+- [x] Integrate normal/UV/material preparation into named materialization/
       postprocess steps and replace the role-only `AssetMeshNormals` surface.
-- [ ] Migrate direct mesh, point cloud, graph, model scene, standalone texture,
+- [x] Migrate direct mesh, point cloud, graph, model scene, standalone texture,
       editor file/drop, agent, and reference/default import workflows.
-- [ ] Preserve `AssetIngestStateMachine` terminal state, source diagnostics,
+- [x] Preserve `AssetIngestStateMachine` terminal state, source diagnostics,
       generated asset identity, visible fallback, stale discard, and
       exactly-once selection/focus/completion.
-- [ ] Delete `Runtime.AssetGeometryIO`, `Runtime.AssetModelTextureIO`, obsolete
+- [x] Delete `Runtime.AssetGeometryIO`, `Runtime.AssetModelTextureIO`, obsolete
       role callback registries including `Asset.GeometryIOBridge` and
       `Asset.ModelTextureIOBridge`, the public `AssetImportPipeline`,
       `AssetModelTextureHandoff` and monolithic `AssetModelSceneHandoff`
@@ -137,35 +149,36 @@ maturity_target: Retired
 
 ## Tests
 
-- [ ] Stage-machine contracts cover success/failure/cancellation/stale result,
+- [x] Stage-machine contracts cover success/failure/cancellation/stale result,
       malformed stage order, world replacement, and exactly-once completion.
-- [ ] Route matrix covers every supported payload with deterministic fake IO
+- [x] Route matrix covers every supported payload with deterministic fake IO
       and real queued JobService execution.
-- [ ] Import visibility contracts prove authored entities are visible,
+- [x] Import visibility contracts prove authored entities are visible,
       selectable, correctly focused, and material/texture/property outputs use
       the new residency/bake paths.
-- [ ] Existing model/companion and stale-postprocess regressions are migrated
+- [x] Existing model/companion and stale-postprocess regressions are migrated
       to the recipe path before old modules are removed.
-- [ ] Geometry exporter tests continue to call the promoted exporter functions
+- [x] Geometry exporter tests continue to call the promoted exporter functions
       directly after the zero-production-consumer bridge export route is
       removed.
-- [ ] Structural tests prove no production role callback registry or deleted
+- [x] Structural tests prove no production role callback registry or deleted
       IO/handoff module remains.
 
 ## Docs
 
-- [ ] Update asset/runtime import architecture and Sandbox workflow docs with
+- [x] Update asset/runtime import architecture and Sandbox workflow docs with
       the stage ownership and recipe.
-- [ ] Regenerate module inventory and update import visibility documentation.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Regenerate module inventory and update import visibility documentation.
+- [ ] Refresh task indexes, session brief, and retirement records after the
+      accepted fixed-surface review.
 
 ## Acceptance criteria
 
-- [ ] Every production import route executes the same explicit stage model
+- [x] Every production import route executes the same explicit stage model
       through `AssetWorkflowModule`.
-- [ ] Each layer owns only its stage data/operation; runtime alone composes ECS,
+- [x] Each layer owns only its stage data/operation; runtime alone composes ECS,
       postprocess, bake, residency, and completion.
-- [ ] Real route/visibility/parity tests pass before the old IO bridges,
+- [x] Real route/visibility/parity tests pass before the old IO bridges,
       callback registries, and handoff orchestration are deleted.
 
 ## Verification

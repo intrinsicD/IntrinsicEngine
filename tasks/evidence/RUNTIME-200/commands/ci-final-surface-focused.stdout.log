@@ -1,0 +1,213 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+        Start  336: RuntimeAssetImportRecipe.RequiresAnExplicitVisiblePayloadRoute
+  1/100 Test  #336: RuntimeAssetImportRecipe.RequiresAnExplicitVisiblePayloadRoute .......................................   Passed    0.00 sec
+        Start  337: RuntimeAssetImportRecipe.ReimportIdentityMustMatchTheRecipeSource
+  2/100 Test  #337: RuntimeAssetImportRecipe.ReimportIdentityMustMatchTheRecipeSource ....................................   Passed    0.00 sec
+        Start  338: RuntimeAssetImportRecipe.StageTraceAcceptsOnlyTheNamedOrder
+  3/100 Test  #338: RuntimeAssetImportRecipe.StageTraceAcceptsOnlyTheNamedOrder ..........................................   Passed    0.00 sec
+        Start  339: RuntimeAssetImportRecipe.StageTraceFailsClosedForMalformedOrStaleResults
+  4/100 Test  #339: RuntimeAssetImportRecipe.StageTraceFailsClosedForMalformedOrStaleResults .............................   Passed    0.00 sec
+        Start  340: RuntimeAssetImportRecipe.CompleteStageCanReportAWorkflowFailure
+  5/100 Test  #340: RuntimeAssetImportRecipe.CompleteStageCanReportAWorkflowFailure ......................................   Passed    0.00 sec
+        Start  341: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesVertexNormalsInGeometrySources
+  6/100 Test  #341: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesVertexNormalsInGeometrySources ..............   Passed    0.04 sec
+        Start  342: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid
+  7/100 Test  #342: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid ...................   Passed    0.08 sec
+        Start  343: RuntimeAssetImportFormatCoverage.DirectObjImportDefaultsToMaterialDrivenShading
+  8/100 Test  #343: RuntimeAssetImportFormatCoverage.DirectObjImportDefaultsToMaterialDrivenShading ......................   Passed    0.04 sec
+        Start  344: RuntimeAssetImportFormatCoverage.AssetImportRecipeDefaultsDescribeCanonicalPolicies
+  9/100 Test  #344: RuntimeAssetImportFormatCoverage.AssetImportRecipeDefaultsDescribeCanonicalPolicies ..................   Passed    0.00 sec
+        Start  345: RuntimeAssetImportFormatCoverage.DefaultImportPoliciesApplyAuthoringUxAndPostProcess
+ 10/100 Test  #345: RuntimeAssetImportFormatCoverage.DefaultImportPoliciesApplyAuthoringUxAndPostProcess .................   Passed    0.04 sec
+        Start  346: RuntimeAssetImportFormatCoverage.DefaultImportSelectionDoesNotRequireCameraModule
+ 11/100 Test  #346: RuntimeAssetImportFormatCoverage.DefaultImportSelectionDoesNotRequireCameraModule ....................   Passed    0.04 sec
+        Start  347: RuntimeAssetImportFormatCoverage.DirectImportCompletesIngestStateMachineRecord
+ 12/100 Test  #347: RuntimeAssetImportFormatCoverage.DirectImportCompletesIngestStateMachineRecord .......................   Passed    0.04 sec
+        Start  348: RuntimeAssetImportFormatCoverage.AssetWorkflowModuleAccessorExposesQueueAndEventState
+ 13/100 Test  #348: RuntimeAssetImportFormatCoverage.AssetWorkflowModuleAccessorExposesQueueAndEventState ................   Passed    0.04 sec
+        Start  349: RuntimeAssetImportFormatCoverage.ExplicitCancelPublishesOneTerminalEvent
+ 14/100 Test  #349: RuntimeAssetImportFormatCoverage.ExplicitCancelPublishesOneTerminalEvent .............................   Passed    0.04 sec
+        Start  350: RuntimeAssetImportFormatCoverage.AssetWorkflowModulePreservesImportDirtyState
+ 15/100 Test  #350: RuntimeAssetImportFormatCoverage.AssetWorkflowModulePreservesImportDirtyState ........................   Passed    0.04 sec
+        Start  351: RuntimeAssetImportFormatCoverage.ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities
+ 16/100 Test  #351: RuntimeAssetImportFormatCoverage.ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities .....   Passed    0.04 sec
+        Start  352: RuntimeAssetImportFormatCoverage.ImportAssetFromPathDoesNotWaitForUnrelatedSchedulerWork
+ 17/100 Test  #352: RuntimeAssetImportFormatCoverage.ImportAssetFromPathDoesNotWaitForUnrelatedSchedulerWork .............   Passed    0.30 sec
+        Start  353: RuntimeAssetImportFormatCoverage.ReimportInvalidAssetReportsDeterministicIngestDiagnostic
+ 18/100 Test  #353: RuntimeAssetImportFormatCoverage.ReimportInvalidAssetReportsDeterministicIngestDiagnostic ............   Passed    0.05 sec
+        Start  354: RuntimeAssetImportFormatCoverage.DirectObjImportQueuesGeneratedNormalBakeFromAuthoredVertexNormals
+ 19/100 Test  #354: RuntimeAssetImportFormatCoverage.DirectObjImportQueuesGeneratedNormalBakeFromAuthoredVertexNormals ...   Passed    0.04 sec
+        Start  355: RuntimeAssetImportFormatCoverage.DirectObjImportComputesVertexNormalsWhenMissing
+ 20/100 Test  #355: RuntimeAssetImportFormatCoverage.DirectObjImportComputesVertexNormalsWhenMissing .....................   Passed    0.04 sec
+        Start  356: RuntimeAssetImportFormatCoverage.DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake
+ 21/100 Test  #356: RuntimeAssetImportFormatCoverage.DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake ..........   Passed    0.04 sec
+        Start  357: RuntimeAssetImportFormatCoverage.RepresentativePromotedFormatsMaterializeDeterministically
+ 22/100 Test  #357: RuntimeAssetImportFormatCoverage.RepresentativePromotedFormatsMaterializeDeterministically ...........   Passed    0.04 sec
+        Start  358: RuntimeAssetImportFormatCoverage.ModelSceneCompletionSelectsAndFramesCreatedPrimitives
+ 23/100 Test  #358: RuntimeAssetImportFormatCoverage.ModelSceneCompletionSelectsAndFramesCreatedPrimitives ...............   Passed    0.08 sec
+        Start  359: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+ 24/100 Test  #359: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply .....................   Passed    0.04 sec
+        Start  360: RuntimeAssetImportFormatCoverage.QueuedImportRejectsAwayAndBackBindingEpoch
+ 25/100 Test  #360: RuntimeAssetImportFormatCoverage.QueuedImportRejectsAwayAndBackBindingEpoch ..........................   Passed    0.04 sec
+        Start  361: RuntimeAssetImportFormatCoverage.RetiredWorldImportTerminalizesQueueState
+ 26/100 Test  #361: RuntimeAssetImportFormatCoverage.RetiredWorldImportTerminalizesQueueState ............................   Passed    0.05 sec
+        Start  362: RuntimeAssetImportFormatCoverage.DroppedModelSceneAndTextureImportThroughStreamingQueue
+ 27/100 Test  #362: RuntimeAssetImportFormatCoverage.DroppedModelSceneAndTextureImportThroughStreamingQueue ..............   Passed    0.04 sec
+        Start  363: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+ 28/100 Test  #363: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ......   Passed    0.04 sec
+        Start  364: RuntimeAssetImportFormatCoverage.SlowQueuedTextureReadDoesNotBlockRunFrame
+ 29/100 Test  #364: RuntimeAssetImportFormatCoverage.SlowQueuedTextureReadDoesNotBlockRunFrame ...........................   Passed    0.04 sec
+        Start  365: AssetWorkflowModule.PublishesExactServicesGatesInitializationAndReinitializes
+ 30/100 Test  #365: AssetWorkflowModule.PublishesExactServicesGatesInitializationAndReinitializes ........................   Passed    0.03 sec
+        Start  366: AssetWorkflowModule.CallerOwnedBakeReconciliationIsAtomicAndPreservesUnrelatedChannels
+ 31/100 Test  #366: AssetWorkflowModule.CallerOwnedBakeReconciliationIsAtomicAndPreservesUnrelatedChannels ...............   Passed    0.03 sec
+        Start  367: AssetWorkflowModule.RegistrationConflictsLeaveOnlyTheExactExistingProvider
+ 32/100 Test  #367: AssetWorkflowModule.RegistrationConflictsLeaveOnlyTheExactExistingProvider ...........................   Passed    0.10 sec
+        Start  368: AssetWorkflowModule.MissingDeviceFailsRegistrationWithoutPartialPublication
+ 33/100 Test  #368: AssetWorkflowModule.MissingDeviceFailsRegistrationWithoutPartialPublication ..........................   Passed    0.03 sec
+        Start  369: AssetWorkflowModule.MissingDocumentOrHistoryRollsBackEveryPublication
+ 34/100 Test  #369: AssetWorkflowModule.MissingDocumentOrHistoryRollsBackEveryPublication ................................   Passed    0.05 sec
+        Start  370: AssetWorkflowModule.DocumentParticipantConflictRollsBackEveryPublication
+ 35/100 Test  #370: AssetWorkflowModule.DocumentParticipantConflictRollsBackEveryPublication .............................   Passed    0.03 sec
+        Start  371: AssetWorkflowModule.DocumentAndWorldReplacementRebindBeforeSceneUse
+ 36/100 Test  #371: AssetWorkflowModule.DocumentAndWorldReplacementRebindBeforeSceneUse ..................................   Passed    0.04 sec
+        Start  372: AssetWorkflowModule.AnnouncementDetachesImportsAndParticipantBeforeGpuBoundary
+ 37/100 Test  #372: AssetWorkflowModule.AnnouncementDetachesImportsAndParticipantBeforeGpuBoundary .......................   Passed    0.03 sec
+        Start  373: AssetWorkflowModule.BakeParticipantRegistersOncePerBootAndCleansBeforeOwnedState
+ 38/100 Test  #373: AssetWorkflowModule.BakeParticipantRegistersOncePerBootAndCleansBeforeOwnedState .....................   Passed    0.03 sec
+        Start  374: AssetWorkflowModule.BlockedImportIsSafeInBothOrdinaryOwnerShutdownOrders
+ 39/100 Test  #374: AssetWorkflowModule.BlockedImportIsSafeInBothOrdinaryOwnerShutdownOrders .............................   Passed    0.07 sec
+        Start  375: AssetWorkflowModule.RenderExtractionRetirementSurvivesEitherOptionalOwnerOmission
+ 40/100 Test  #375: AssetWorkflowModule.RenderExtractionRetirementSurvivesEitherOptionalOwnerOmission ....................   Passed    0.08 sec
+        Start  376: AssetWorkflowModule.RealEngineReverseShutdownIsAsyncBeforeAssetWorkflow
+ 41/100 Test  #376: AssetWorkflowModule.RealEngineReverseShutdownIsAsyncBeforeAssetWorkflow ..............................   Passed    0.04 sec
+        Start  377: AssetWorkflowModule.OmittedAssetWorkflowPlatformDropFailsClosedWithoutQueuedWorkOrSceneMutation
+ 42/100 Test  #377: AssetWorkflowModule.OmittedAssetWorkflowPlatformDropFailsClosedWithoutQueuedWorkOrSceneMutation ......   Passed    0.04 sec
+        Start  378: AssetWorkflowModule.RealEngineRunSupportsCompositionOmissionAndReinitialize
+ 43/100 Test  #378: AssetWorkflowModule.RealEngineRunSupportsCompositionOmissionAndReinitialize ..........................   Passed    0.09 sec
+        Start  682: RuntimeEngineLayering.RunFrameDoesNotUseGpuResourceOrPassLevelDetails
+ 44/100 Test  #682: RuntimeEngineLayering.RunFrameDoesNotUseGpuResourceOrPassLevelDetails ................................   Passed    0.00 sec
+        Start  683: RuntimeEngineLayering.ProductionSourceHasNoApplicationCallbackLifecycle
+ 45/100 Test  #683: RuntimeEngineLayering.ProductionSourceHasNoApplicationCallbackLifecycle ..............................   Passed    0.01 sec
+        Start  684: RuntimeEngineLayering.RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder
+ 46/100 Test  #684: RuntimeEngineLayering.RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder ................   Passed    0.00 sec
+        Start  685: RuntimeEngineLayering.RunFrameAppliesJobCompletionsWithBoundedBudget
+ 47/100 Test  #685: RuntimeEngineLayering.RunFrameAppliesJobCompletionsWithBoundedBudget .................................   Passed    0.00 sec
+        Start  686: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRendererContract
+ 48/100 Test  #686: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRendererContract ..........................   Passed    0.00 sec
+        Start  687: RuntimeEngineLayering.EngineDelegatesGpuQueueLifecycleToJobService
+ 49/100 Test  #687: RuntimeEngineLayering.EngineDelegatesGpuQueueLifecycleToJobService ...................................   Passed    0.00 sec
+        Start  688: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition
+ 50/100 Test  #688: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition .........................   Passed    0.01 sec
+        Start  689: RuntimeEngineLayering.SceneInteractionModuleOwnsGizmoFrameServiceOutOfEngine
+ 51/100 Test  #689: RuntimeEngineLayering.SceneInteractionModuleOwnsGizmoFrameServiceOutOfEngine .........................   Passed    0.01 sec
+        Start  690: RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface
+ 52/100 Test  #690: RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface .....................   Passed    0.02 sec
+        Start  691: RuntimeEngineLayering.RunFrameCarriesDataOnlyFrameContext
+ 53/100 Test  #691: RuntimeEngineLayering.RunFrameCarriesDataOnlyFrameContext ............................................   Passed    0.00 sec
+        Start  692: RuntimeEngineLayering.GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction
+ 54/100 Test  #692: RuntimeEngineLayering.GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction ..................   Passed    0.00 sec
+        Start  693: RuntimeEngineLayering.PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder
+ 55/100 Test  #693: RuntimeEngineLayering.PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder ..................   Passed    0.00 sec
+        Start  694: RuntimeEngineLayering.RunFrameRegistersPromotedEcsSystemBundleBeforeCompile
+ 56/100 Test  #694: RuntimeEngineLayering.RunFrameRegistersPromotedEcsSystemBundleBeforeCompile ..........................   Passed    0.00 sec
+        Start  695: RuntimeEngineLayering.SupersededWorkSurfacesAreRetiredFromBuild
+ 57/100 Test  #695: RuntimeEngineLayering.SupersededWorkSurfacesAreRetiredFromBuild ......................................   Passed    0.01 sec
+        Start  696: RuntimeEngineLayering.SupersededGpuResultReadbackSurfacesAreRetiredFromBuild
+ 58/100 Test  #696: RuntimeEngineLayering.SupersededGpuResultReadbackSurfacesAreRetiredFromBuild .........................   Passed    0.02 sec
+        Start  697: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService
+ 59/100 Test  #697: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService ...................................   Passed    0.00 sec
+        Start  698: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine
+ 60/100 Test  #698: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine ..........................   Passed    0.00 sec
+        Start  699: RuntimeEngineLayering.MaintenanceHasNoOptionalStreamingFacade
+ 61/100 Test  #699: RuntimeEngineLayering.MaintenanceHasNoOptionalStreamingFacade ........................................   Passed    0.00 sec
+        Start  700: RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope
+ 62/100 Test  #700: RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope ................................   Passed    0.02 sec
+        Start  701: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface
+ 63/100 Test  #701: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface ....................................   Passed    0.01 sec
+        Start  702: RuntimeEngineLayering.FrameLoopContractDoesNotBecomeCompositionRoot
+ 64/100 Test  #702: RuntimeEngineLayering.FrameLoopContractDoesNotBecomeCompositionRoot ..................................   Passed    0.00 sec
+        Start  703: RuntimeEngineLayering.DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine
+ 65/100 Test  #703: RuntimeEngineLayering.DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine ........................   Passed    0.00 sec
+        Start  704: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted
+ 66/100 Test  #704: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted ....................................   Passed    0.00 sec
+        Start  705: RuntimeEngineLayering.CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine
+ 67/100 Test  #705: RuntimeEngineLayering.CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine .......................   Passed    0.00 sec
+        Start  706: RuntimeEngineLayering.InputActionsKeepRegistryAndDispatchOutOfEngine
+ 68/100 Test  #706: RuntimeEngineLayering.InputActionsKeepRegistryAndDispatchOutOfEngine .................................   Passed    0.00 sec
+        Start  707: RuntimeEngineLayering.RuntimeModuleScheduleKeepsRetainedHookPolicyOutOfEngine
+ 69/100 Test  #707: RuntimeEngineLayering.RuntimeModuleScheduleKeepsRetainedHookPolicyOutOfEngine ........................   Passed    0.00 sec
+        Start  708: RuntimeEngineLayering.SelectionReadbackKeepsPickCorrelationCacheOutOfEngine
+ 70/100 Test  #708: RuntimeEngineLayering.SelectionReadbackKeepsPickCorrelationCacheOutOfEngine ..........................   Passed    0.00 sec
+        Start  709: RuntimeEngineLayering.EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics
+ 71/100 Test  #709: RuntimeEngineLayering.EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics ......................   Passed    0.00 sec
+        Start  710: RuntimeEngineLayering.AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence
+ 72/100 Test  #710: RuntimeEngineLayering.AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence .........................   Passed    0.00 sec
+        Start  711: RuntimeEngineLayering.RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers
+ 73/100 Test  #711: RuntimeEngineLayering.RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers ...........................   Passed    0.01 sec
+        Start  712: RuntimeEngineLayering.RetiredSpatialDebugRegistryHasNoProductionSurface
+ 74/100 Test  #712: RuntimeEngineLayering.RetiredSpatialDebugRegistryHasNoProductionSurface ..............................   Passed    0.01 sec
+        Start  713: RuntimeEngineLayering.RetiredProgressivePresentationModulesAndSymbolsStayDeleted
+ 75/100 Test  #713: RuntimeEngineLayering.RetiredProgressivePresentationModulesAndSymbolsStayDeleted .....................   Passed    0.02 sec
+        Start  714: RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains
+ 76/100 Test  #714: RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains ...................................   Passed    0.01 sec
+        Start  715: RuntimeEngineLayering.RetiredGeometryPackerAndLifecycleSurfacesStayDeleted
+ 77/100 Test  #715: RuntimeEngineLayering.RetiredGeometryPackerAndLifecycleSurfacesStayDeleted ...........................   Passed    0.01 sec
+        Start  716: RuntimeEnginePrivateGlue.FrameLoopHelpersArePrivateTextualGlue
+ 78/100 Test  #716: RuntimeEnginePrivateGlue.FrameLoopHelpersArePrivateTextualGlue .......................................   Passed    0.01 sec
+        Start  717: RuntimeEnginePrivateGlue.TypedViewportInputDispatchKeepsCameraOutOfGenericFrameContext
+ 79/100 Test  #717: RuntimeEnginePrivateGlue.TypedViewportInputDispatchKeepsCameraOutOfGenericFrameContext ...............   Passed    0.00 sec
+        Start  718: RuntimeEnginePrivateGlue.EditorUiModuleOwnsOptionalEditorUiComposition
+ 80/100 Test  #718: RuntimeEnginePrivateGlue.EditorUiModuleOwnsOptionalEditorUiComposition ...............................   Passed    0.00 sec
+        Start  719: RuntimeEnginePrivateGlue.RenderExtractionServiceIsEnginePrivateImplementation
+ 81/100 Test  #719: RuntimeEnginePrivateGlue.RenderExtractionServiceIsEnginePrivateImplementation ........................   Passed    0.01 sec
+        Start  720: RuntimeEnginePrivateGlue.EngineInterfaceCarriesOnlyOpaqueImplementationState
+ 82/100 Test  #720: RuntimeEnginePrivateGlue.EngineInterfaceCarriesOnlyOpaqueImplementationState .........................   Passed    0.00 sec
+        Start  721: RuntimeEnginePrivateGlue.AssetWorkflowAndTextureBakeCompositionAreModuleOwned
+ 83/100 Test  #721: RuntimeEnginePrivateGlue.AssetWorkflowAndTextureBakeCompositionAreModuleOwned ........................   Passed    0.03 sec
+        Start  722: RuntimeEnginePrivateGlue.AssetWorkflowImplementationModulesStayPrivateAndRetiredNamesStayDeleted
+ 84/100 Test  #722: RuntimeEnginePrivateGlue.AssetWorkflowImplementationModulesStayPrivateAndRetiredNamesStayDeleted .....   Passed    0.00 sec
+        Start  723: RuntimeEnginePrivateGlue.ClusteringServiceIsTheSoleKMeansRuntimeRoute
+ 85/100 Test  #723: RuntimeEnginePrivateGlue.ClusteringServiceIsTheSoleKMeansRuntimeRoute ................................   Passed    0.00 sec
+        Start  882: SandboxEditorUi.AssetImportQueueModelCopiesRowsProgressAndCommands
+ 86/100 Test  #882: SandboxEditorUi.AssetImportQueueModelCopiesRowsProgressAndCommands ...................................   Passed    0.00 sec
+        Start 1173: SandboxAppComposition.MissingAssetWorkflowStillComposesIndependentFocusAction
+ 87/100 Test #1173: SandboxAppComposition.MissingAssetWorkflowStillComposesIndependentFocusAction ........................   Passed    0.04 sec
+        Start 2911: AssetImportRouter.RoutesObjMeshImportFromPath
+ 88/100 Test #2911: AssetImportRouter.RoutesObjMeshImportFromPath ........................................................   Passed    0.00 sec
+        Start 2912: AssetImportRouter.PlyRequiresExplicitPayloadHint
+ 89/100 Test #2912: AssetImportRouter.PlyRequiresExplicitPayloadHint .....................................................   Passed    0.00 sec
+        Start 2913: AssetImportRouter.RejectsMissingAndUnsupportedExtensions
+ 90/100 Test #2913: AssetImportRouter.RejectsMissingAndUnsupportedExtensions .............................................   Passed    0.00 sec
+        Start 2914: AssetImportRouter.RoutesModelSceneAndTextureImports
+ 91/100 Test #2914: AssetImportRouter.RoutesModelSceneAndTextureImports ..................................................   Passed    0.00 sec
+        Start 2915: AssetImportRouter.ExportRoutesRespectPromotedGeometrySupport
+ 92/100 Test #2915: AssetImportRouter.ExportRoutesRespectPromotedGeometrySupport .........................................   Passed    0.00 sec
+        Start 2916: AssetImportRouter.PublishesDeterministicDebugNamesAndFormatTable
+ 93/100 Test #2916: AssetImportRouter.PublishesDeterministicDebugNamesAndFormatTable .....................................   Passed    0.00 sec
+        Start 2920: AssetModelTexturePayload.ModelScenePayloadValidatesPrimitiveMaterialAndImageRefs
+ 94/100 Test #2920: AssetModelTexturePayload.ModelScenePayloadValidatesPrimitiveMaterialAndImageRefs .....................   Passed    0.00 sec
+        Start 2921: AssetModelTexturePayload.ModelScenePayloadRejectsInvalidReferences
+ 95/100 Test #2921: AssetModelTexturePayload.ModelScenePayloadRejectsInvalidReferences ...................................   Passed    0.00 sec
+        Start 2922: AssetModelTexturePayload.ModelScenePayloadRequiresCompleteReferencedTopology
+ 96/100 Test #2922: AssetModelTexturePayload.ModelScenePayloadRequiresCompleteReferencedTopology .........................   Passed    0.00 sec
+        Start 2923: AssetModelTexturePayload.ModelScenePayloadRejectsOutOfRangeNodeReferences
+ 97/100 Test #2923: AssetModelTexturePayload.ModelScenePayloadRejectsOutOfRangeNodeReferences ............................   Passed    0.00 sec
+        Start 2924: AssetModelTexturePayload.ModelScenePayloadRejectsNonFiniteNodeTransforms
+ 98/100 Test #2924: AssetModelTexturePayload.ModelScenePayloadRejectsNonFiniteNodeTransforms .............................   Passed    0.00 sec
+        Start 2925: AssetModelTexturePayload.ModelScenePayloadRejectsInconsistentOrDuplicateParentage
+ 99/100 Test #2925: AssetModelTexturePayload.ModelScenePayloadRejectsInconsistentOrDuplicateParentage ....................   Passed    0.00 sec
+        Start 2926: AssetModelTexturePayload.ModelScenePayloadRejectsCyclesAndUnreachableNodes
+100/100 Test #2926: AssetModelTexturePayload.ModelScenePayloadRejectsCyclesAndUnreachableNodes ...........................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 100
+
+Label Time Summary:
+assets         =   0.02 sec*proc (13 tests)
+contract       =   2.30 sec*proc (86 tests)
+integration    =   0.04 sec*proc (1 test)
+runtime        =   2.33 sec*proc (87 tests)
+unit           =   0.02 sec*proc (13 tests)
+
+Total Test time (real) =   3.08 sec

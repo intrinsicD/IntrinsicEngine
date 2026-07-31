@@ -412,11 +412,21 @@ public:
         auto& engine = Kernel();
         ++Frames;
 
-        if (!UploadRequested &&
+        if (!UploadInitiatedOrObserved &&
             m_GeneratedTexture.IsValid() &&
             engine.GetDevice().IsOperational())
         {
-            UploadRequested = true;
+            UploadInitiatedOrObserved = true;
+            auto& cache =
+                RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine);
+            const Extrinsic::Graphics::GpuAssetState state =
+                cache.GetState(m_GeneratedTexture);
+            if (state == Extrinsic::Graphics::GpuAssetState::GpuUploading ||
+                state == Extrinsic::Graphics::GpuAssetState::Ready)
+            {
+                return;
+            }
+
             auto& assets = RequiredEngineService<Assets::AssetService>(engine);
             auto payload = assets.Read<Assets::AssetTexture2DPayload>(
                 m_GeneratedTexture);
@@ -429,8 +439,7 @@ public:
                 return;
             }
             const auto& texture = (*payload)[0];
-            auto upload = RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine)
-                .RequestUpload(Extrinsic::Graphics::GpuTextureRequest{
+            auto upload = cache.RequestUpload(Extrinsic::Graphics::GpuTextureRequest{
                     .Id = m_GeneratedTexture,
                     .Bytes = std::span<const std::byte>(
                         texture.PixelBytes.data(),
@@ -476,7 +485,7 @@ public:
 
     void Shutdown() override {}
 
-    bool UploadRequested{false};
+    bool UploadInitiatedOrObserved{false};
     bool TextureReadyObserved{false};
     bool TimedOut{false};
     std::optional<Extrinsic::Core::ErrorCode> UploadError{};
@@ -3927,9 +3936,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         return;
     }
 
-    ASSERT_TRUE(appPtr->UploadRequested)
-        << "Generated texture upload was never requested after promoted Vulkan "
-           "became operational.";
+    ASSERT_TRUE(appPtr->UploadInitiatedOrObserved)
+        << "Generated texture upload was neither observed nor requested after "
+           "promoted Vulkan became operational.";
     ASSERT_FALSE(appPtr->UploadError.has_value())
         << "Generated texture upload failed after promoted Vulkan became "
            "operational: "
@@ -5278,9 +5287,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         "f 1/1/1 2/2/1 3/3/1\n",
     };
 
-    RT::AssetWorkflowModule& importPipeline =
+    RT::AssetWorkflowModule& assetWorkflow =
         RequiredEngineService<RT::AssetWorkflowModule>(engine);
-    auto decoyImport = importPipeline.ImportAssetFromPath(
+    auto decoyImport = assetWorkflow.ImportAssetFromPath(
         RT::RuntimeAssetImportRequest{
             .Path = decoyObj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -5321,7 +5330,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << "The decoy must own a live shared-index slice before the target "
            "entity exists.";
 
-    auto targetImport = importPipeline.ImportAssetFromPath(
+    auto targetImport = assetWorkflow.ImportAssetFromPath(
         RT::RuntimeAssetImportRequest{
             .Path = targetObj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,

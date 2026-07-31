@@ -60,7 +60,11 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
   and failure / completion transitions. Reload requests can queue a `Reloaded`
   event immediately after entering `QueuedIO`, so main-thread subscribers see
-  `Reloaded` before the subsequent `Ready` event.
+  `Reloaded` before the subsequent `Ready` event. Scheduled CPU transitions
+  capture a shared invalidation gate rather than the pipeline object: pipeline
+  destruction makes queued callbacks no-op and waits only when that exact
+  callback is already executing. It does not fence unrelated scheduler work,
+  and the event bus and registry remain alive until the gate is invalidated.
 - `AssetEventBus` batches `Ready`, `Failed`, `Reloaded`, and `Destroyed`
   notifications for main-thread fanout. It can also drain pending events for a
   single asset while preserving unrelated pending events, which `AssetService`
@@ -145,13 +149,13 @@ handle.
 
 GPU-side state lives in a Graphics-owned side table (`GpuAssetCache`), keyed
 by `AssetId`. The bridge is event-driven: `AssetEventBus` publishes `Ready`,
-`Reloaded`, `Failed`, and `Destroyed`; `Runtime` wires the graphics cache
-listener and type-specific handoff objects. `AssetModelTextureHandoff` handles
-texture `Ready` events by reading CPU texture payloads and requesting
-`GpuAssetCache` uploads. `AssetModelSceneHandoff` handles model-scene `Ready`
-events by reading CPU model-scene payloads, minting child `AssetTexture2DPayload`
-assets at stable synthetic paths (`<model-path>.embedded-texture-<image-index>.<ext>`),
-and creating ECS/material records that reference those child texture assets by
+`Reloaded`, `Failed`, and `Destroyed`; runtime's sole published
+`AssetWorkflowModule` wires the cache listener and keeps decode,
+model-materialization, and texture-residency helpers private. Its texture stage
+reads CPU texture payloads and requests `GpuAssetCache` uploads. Its model-scene
+stage reads CPU model payloads, mints child `AssetTexture2DPayload` assets at
+stable synthetic paths (`<model-path>.embedded-texture-<image-index>.<ext>`),
+and creates ECS/material records that reference those child texture assets by
 `AssetId`. Runtime is the only layer that names both sides.
 
 See `AGENTS.md` → "Assets ↔ Graphics boundary" for the full contract

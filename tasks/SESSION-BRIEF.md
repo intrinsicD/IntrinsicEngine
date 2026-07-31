@@ -50,6 +50,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-110` — Implicit smoothing applies boundary pins after rather than during solve (tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-123` — Retired queued scene save intermittently loses its terminal event (tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md)
+- unblocked: `BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot (tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md)
 
 ## Theme I — Research method implementation
 

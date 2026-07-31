@@ -42,7 +42,7 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   binding.
 - KTX/KTX2 is not a current promoted residency path. `Asset.ImportRouter`
   recognizes the extensions, but `Asset.ModelTexturePayload` and
-  `Runtime.AssetModelTextureIO` reject KTX/KTX2 with
+  the private runtime decoder rejects KTX/KTX2 with
   `AssetUnsupportedFormat` because no checked-in assets, renderer tests, or
   material workflows require compressed/mip texture payloads today. A future
   compressed texture slice must extend the asset payload contract and RHI upload
@@ -158,10 +158,10 @@ renderables.
   `VkDescriptorSet` layout and heap write batching remain backend-local
   under `src/graphics/vulkan` and never leak through RHI or renderer
   module surfaces.
-- **Runtime ownership.** Runtime owns both fallback initialization and
-  upload scheduling. `Runtime.Engine::Initialize()` calls
-  `cache.InitializeFallbackTexture(fallbackDesc)` exactly once
-  immediately after constructing the cache (RUNTIME-070), sourcing the
+- **Runtime ownership.** `Runtime.AssetWorkflowModule` owns both fallback
+  initialization and upload scheduling. Its registration calls
+  `cache.InitializeFallbackTexture(fallbackDesc)` exactly once immediately
+  after constructing the cache (RUNTIME-070), sourcing the
   fallback bytes from a runtime-baked compiled-in `constexpr` byte
   array (4×4 `RGBA8_UNORM` magenta-and-black checkerboard, alpha
   `0xFF`); the cache only consumes the `std::span<const std::byte>`.
@@ -170,8 +170,8 @@ renderables.
   passes the renderer's `SamplerManager` into the cache constructor so
   the fallback's nearest/clamp-to-edge sampler descriptor resolves
   through the deduplicated manager path; the cache never reads files.
-  `Extrinsic.Runtime.AssetModelTextureHandoff` subscribes to
-  `AssetEvent::Ready` events on `AssetService::SubscribeAll`, reads promoted
+  Its private texture-residency helper subscribes to `AssetEvent::Ready` events
+  on `AssetService::SubscribeAll`, reads promoted
   `AssetTexture2DPayload` records, maps supported CPU formats to
   `TextureDesc`, constructs `GpuTextureRequest` (`AssetId`, `Bytes` span,
   `TextureDesc`, sampler descriptor), and calls `cache.RequestUpload(req)`
@@ -183,16 +183,15 @@ renderables.
   visualization baking under `GRAPHICS-014Q`), but the final `RequestUpload`
   call is always synchronous from runtime; graphics never schedules CPU work
   and never imports `AssetService` or `AssetEventBus`.
-  `Extrinsic.Runtime.AssetModelSceneHandoff` subscribes to model-scene
-  `AssetEvent::Ready` events, mints deterministic child texture assets for
+  Its private model-materialization helper consumes model-scene `Ready` events
+  within the same staged workflow, mints deterministic child texture assets for
   embedded images (`<model-path>.embedded-texture-<image-index>.<ext>`),
   requests those child uploads through the texture handoff, and records
   `MaterialTextureAssetBindings` keyed by the child `AssetId`s. The material
   system consumes those IDs through `ResolveTextureAssetBindings()`: ready
   children resolve to bindless indices, while pending/missing/failed children
   use the fallback path when available. Post-upload and post-reload material
-  re-resolution is runtime-owned through
-  `AssetModelSceneHandoff::ResolvePendingMaterialTextureBindings()`; graphics
+  re-resolution remains private to `AssetWorkflowModule`; graphics
   continues to expose only cache state and material-resolution primitives.
   `AssetEvent::Destroyed` flows to `cache.NotifyDestroyed(id)` which queues
   live leases for retirement.
@@ -220,17 +219,16 @@ It must **not** depend on:
 
 ## Wiring
 
-`Runtime.Engine` constructs the cache after the renderer is initialized
+`Runtime.AssetWorkflowModule` constructs the cache after the renderer is initialized
 (passing the renderer's `BufferManager`, `TextureManager`, and
 `SamplerManager` plus the device's `TransferQueue`), invokes
 `InitializeFallbackTexture(...)` once on the operational path
 (RUNTIME-070), and subscribes to `AssetEventBus` via
 `AssetService::SubscribeAll`, mapping events to `NotifyFailed` /
 `NotifyReloaded` / `NotifyDestroyed`. `AssetEvent::Ready` is
-intentionally not handled by the cache itself. Runtime-owned type-specific
-bridges are responsible for calling `RequestUpload` once their CPU payload is
-final; `Extrinsic.Runtime.AssetModelTextureHandoff` covers decoded texture
-payloads and `Extrinsic.Runtime.AssetModelSceneHandoff` covers model-scene
+intentionally not handled by the cache itself. The workflow's private typed
+stages call `RequestUpload` once their CPU payload is final: texture residency
+covers decoded texture payloads, while model materialization covers model-scene
 entity/material records plus embedded texture child asset uploads.
 
 `AssetHooks::TickAssets()` calls `cache.Tick(device.GetGlobalFrameNumber(),

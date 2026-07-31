@@ -172,17 +172,22 @@
 
 ## A15: App-Composed Asset Workflow Services
 - **Decision**: An app-composed `AssetWorkflowModule` owns asset service,
-  GPU-cache, import-pipeline, model-handoff, and object-space normal-bake
-  composition. It publishes exact `AssetService`, `AssetImportPipeline`,
-  `GpuAssetCache`, and `IAssetFrameHooks` services; `Runtime.Engine` consumes
-  cache, hooks, and dropped-file import capability through optional registry
-  lookups and exposes none of the retired asset/cache/import or bake-diagnostic
-  getters.
+  GPU-cache, staged import, private model materialization/texture residency, and
+  object-space normal-bake composition. It is itself the sole published import
+  service and exports one recipe with typed copied results for route, decode,
+  CPU materialization, ECS authoring, postprocess, GPU residency, and completion.
+  It additionally publishes exact `AssetService`, `GpuAssetCache`, and
+  `IAssetFrameHooks` services; `Runtime.Engine` consumes cache, hooks, and
+  dropped-file import capability through optional registry lookups and exposes
+  none of the retired asset/cache/import or bake-diagnostic getters. The former
+  public import pipeline, role callback registries, IO bridges, and handoff
+  modules are absent.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [N268, N269, commit 74a15419,
   src/runtime/Runtime.AssetWorkflowModule.cppm,
   src/runtime/Runtime.AssetWorkflowModule.cpp,
+  tests/contract/runtime/Test.AssetWorkflowModule.cpp,
   tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp,
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp]
 - **From staging**: O55

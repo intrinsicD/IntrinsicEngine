@@ -29,8 +29,8 @@ namespace Extrinsic::Assets
         AssetPathIndex pathIndex;
         AssetRegistry registry;
         AssetPayloadStore payloadStore;
-        AssetLoadPipeline loadPipeline;
         AssetEventBus eventBus;
+        AssetLoadPipeline loadPipeline;
 
         mutable std::mutex pathMutex;
         std::unordered_map<AssetId, std::string, AssetIdHash> pathById;

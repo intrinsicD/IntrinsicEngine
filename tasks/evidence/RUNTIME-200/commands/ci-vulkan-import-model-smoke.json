@@ -1,0 +1,30 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "-R",
+    "Import|ModelScene",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R 'Import|ModelScene' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 31837,
+  "exit_code": 8,
+  "finished_at": "2026-07-31T18:11:51Z",
+  "label": "ci-vulkan-import-model-smoke",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T18:11:20Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/ci-vulkan-import-model-smoke.stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/ci-vulkan-import-model-smoke.stdout.log",
+  "stdout_sha256": "d413cfbb13249c2629a381b4982bad65d9255f98239f58769c92fd4db4be83f2",
+  "task_id": "RUNTIME-200"
+}

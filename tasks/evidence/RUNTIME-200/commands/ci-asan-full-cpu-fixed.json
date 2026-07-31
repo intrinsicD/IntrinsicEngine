@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 223926,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T17:49:04Z",
+  "label": "ci-asan-full-cpu-fixed",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T17:45:20Z",
+  "stderr_path": "tasks/evidence/RUNTIME-200/commands/ci-asan-full-cpu-fixed.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-200/commands/ci-asan-full-cpu-fixed.stdout.log",
+  "stdout_sha256": "6f1eb06db55a0ad6b0f756b5d45e63cdb7481542aa0725bee790821d774812ab",
+  "task_id": "RUNTIME-200"
+}

@@ -43,7 +43,6 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
-import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -2170,6 +2169,7 @@ TEST(AssetWorkflowModule,
 
         std::atomic_bool workerStarted{false};
         std::atomic_bool releaseWorker{false};
+        std::atomic_bool workerFinished{false};
         WorkerRelease releaseOnExit{releaseWorker};
         pipeline->
             SetQueuedGeometryImportBeforeDecodeHookForTest(
@@ -2183,6 +2183,8 @@ TEST(AssetWorkflowModule,
                     {
                         std::this_thread::sleep_for(1ms);
                     }
+                    workerFinished.store(
+                        true, std::memory_order_release);
                 });
 
         TempObjFile mesh{
@@ -2240,6 +2242,7 @@ TEST(AssetWorkflowModule,
                 true, std::memory_order_release);
             async.OnShutdown(context);
         }
+        ASSERT_TRUE(WaitUntil(workerFinished));
         harness.TextureBakeRegistered = false;
         harness.TextureBakeResolved = false;
         harness.AssetRegistered = false;
