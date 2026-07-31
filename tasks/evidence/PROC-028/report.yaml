@@ -3,12 +3,12 @@ task_id: PROC-028
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-31T10:01:49Z'
+generated_at: '2026-07-31T10:27:56Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 16eed9610a5579bb47db07c12c946f2d74cf2fc7
-  head_revision: a4d34ec98312bda9310db3cd844dcadb644c9ed2
+  head_revision: 19624d0fa6c7b73ebeffd706ede644fc128820e7
   branch: task/proc-028-close-20260731
   worktree: /tmp/intrinsic-proc028-close-20260731
   dirty: false
@@ -18,7 +18,7 @@ source:
   - path: ara/logic/solution/heuristics.md
     sha256: ca20e2b63f60640c42b4eab97502b7e4c0b38dfba32f4ed03a75e1439c2a02fd
   - path: docs/agent/workflow-evidence.md
-    sha256: e423da8bff16f384c0e2b5ac389cfa8c9baf2bb5c228d7f19f464b23c57ce6a8
+    sha256: 88b136f201acc3561dbe4c1be39fceb783128a45bf8391025a8a4e7c22caed68
   - path: tasks/SESSION-BRIEF.md
     sha256: f400b92298f89f304d42c42dd346944f6bca44d973ce0314041e4440a001e58b
   - path: tasks/active/README.md
@@ -26,20 +26,22 @@ source:
   - path: tasks/backlog/process/README.md
     sha256: 4b97e13f1fd24779d9c9feb4e5bda02c37d3b1aea3004fd45cd57047a5fb1585
   - path: tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
-    sha256: 78db701e0515c183822519f0f4a8ddbdbdfa0826ff2549c6156513a32de32a8b
+    sha256: 9487bff22634733388cb36b5d3a3568dd330fe1fd056c8f7443b0ac0975eedd6
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: 78192f0b1a28520add4388544797ccdb59627d8af756d8fcd8f46dc53593866f
+    sha256: ce60790ca6d9809cd9b5b2d363e613a3a7c937d0c089ac82b143ede3520bbec1
   - path: tests/regression/tooling/Test.ExperimentCustody.py
-    sha256: 41ef00642159a5af5e65a04aa13768f140982ffb78ce22748539c5380ccd9ab6
+    sha256: b46bdbb027abae61d76f552ccc4bdd15bf55d560f1ac05b36d4336c1a44c0d70
   - path: tests/regression/tooling/Test.WorkflowEvidence.py
     sha256: fdc8c1be57e01de71e1b77d9966d886bcf59f372f3a4bb44f3e6a63f5db95965
   - path: tools/agents/experiment_custody.py
-    sha256: 39fad708c49d1ee7972c6845e635eb17d3c640d9793cb199d5e4df01dac7e7bf
+    sha256: a277f63c003808bc9f37aa43806a01fb8b9d47787faf0661162ebeb141e9a1b8
+  - path: tools/agents/fixtures/protected-synthetic/protocol.template.yaml
+    sha256: 7b665bd90980ed56d5937bc43587a7233a8bf0a9d97b30461581a82f0c9751af
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-    sha256: e423da8bff16f384c0e2b5ac389cfa8c9baf2bb5c228d7f19f464b23c57ce6a8
+    sha256: 88b136f201acc3561dbe4c1be39fceb783128a45bf8391025a8a4e7c22caed68
   - path: tools/agents/workflow_evidence.py
-    sha256: 87974100386260aa114874380e6aa3031bbddb8bbe627eab08cc2370adbf556a
-  content_digest: 5210ecb3fc4990f0feb2e6972e6fe11bf93ddfa59875f0a3e33e83fbbc75ce00
+    sha256: 685bd69f16a8e316e4c134877852010a64542331d01560df12bf98e4faa62b82
+  content_digest: 838cc0ceee828fa21b96d3bbab0391fde3a08bbe32864e2424b2d9f18f2dec99
 touched:
   paths:
   - ara/logic/solution/architecture.md
@@ -53,6 +55,7 @@ touched:
   - tests/regression/tooling/Test.ExperimentCustody.py
   - tests/regression/tooling/Test.WorkflowEvidence.py
   - tools/agents/experiment_custody.py
+  - tools/agents/fixtures/protected-synthetic/protocol.template.yaml
   - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
   - tools/agents/workflow_evidence.py
   layers:
@@ -139,6 +142,16 @@ commands:
 - receipt: tasks/evidence/PROC-028/commands/retirement-concurrency-gate.json
 - receipt: tasks/evidence/PROC-028/commands/retirement-source-docs-sync.json
 - receipt: tasks/evidence/PROC-028/commands/retirement-source-structural-gates-retry-2.json
+- receipt: tasks/evidence/PROC-028/commands/round12-final-gates.json
+- receipt: tasks/evidence/PROC-028/commands/round12-final-python-quality.json
+- receipt: tasks/evidence/PROC-028/commands/round12-final-regressions.json
+- receipt: tasks/evidence/PROC-028/commands/round12-repair-final-gates.json
+- receipt: tasks/evidence/PROC-028/commands/round12-repair-python-quality.json
+- receipt: tasks/evidence/PROC-028/commands/round12-repair-regressions.json
+- receipt: tasks/evidence/PROC-028/commands/round12-schema2-final-gates.json
+- receipt: tasks/evidence/PROC-028/commands/round12-schema2-final-python-quality.json
+- receipt: tasks/evidence/PROC-028/commands/round12-schema2-final-regressions.json
+- receipt: tasks/evidence/PROC-028/commands/round12-schema2-retirement-docs.json
 - receipt: tasks/evidence/PROC-028/commands/structural-gates.json
 - receipt: tasks/evidence/PROC-028/commands/workflow-regressions.json
 changed_public_contracts:
@@ -147,25 +160,32 @@ changed_public_contracts:
   aggregate source digests are derived even for an empty surface.
 - High-risk handoff and review records derive and enforce their exact clean-commit or dirty-worktree revision
   from report source identity.
+- Experiment protocol schema version 2 requires frozen raw-column/summary-statistic declarations; schema
+  version 1 is rejected with an explicit migration diagnostic.
 - Claim-grade/protected completion requires validated protocol, run, terminal cells, bundle, audit, and
   protected authority/attempt custody.
-- Claim-eligible protocols bind each sealed implementation blob to the declared exact source commit.
-- Bundle audits reject gate declarations that differ from the frozen protocol and recompute dispositions
-  with frozen thresholds.
+- Claim-eligible protocols bind each sealed implementation blob to its declared lexical path at the exact
+  source commit.
+- Bundle audits reject summary or gate declarations that differ from the frozen protocol, recompute with
+  frozen definitions, and require exact frozen-run provenance.
 - Benchmark result schema version 2 binds exact manifest/source/config identity while preserving stable
   benchmark and append-only run/attempt identities.
 - Git-common-dir task/path claims use bounded leases and retained release/recovery history.
 diagnostics_and_previews:
-- Repaired WorkflowEvidence passes 22/22, ExperimentCustody passes 23/23, and the complete focused workflow/benchmark
-  bundle passes 99/99.
-- 'The three sequence-10 attack reproductions now fail closed: retuned bundle gates, claim-eligible implementation/source
-  mismatch, and arbitrary empty-surface digests.'
+- WorkflowEvidence passes 22/22, ExperimentCustody passes 27/27, and the complete focused workflow/benchmark
+  bundle passes 103/103.
+- 'Sequence-10 attacks remain closed: retuned gates, claim-source implementation mismatch, and arbitrary
+  empty-surface digests fail closed.'
+- 'Sequence-12 attacks are closed: bundle summary retuning and current-symlink redirection fail closed;
+  bundle provenance substitution is also covered directly.'
+- Experiment protocol schema v2 makes frozen summary declarations an explicit fail-closed migration from
+  v1.
 - The final retirement concurrency gate passes Test.WorkflowConcurrency.py 19/19 and Test.TestCohortParity.py
   7/7 after BUG-120 retirement.
 - Strict task, state-link, docs, skill, experiment, ARA, method, benchmark, layering, test-layout, root-hygiene,
   and session-brief gates pass.
-- Two structural attempts failed closed on stale retirement metadata and links; their raw records are
-  retained as artifacts and the corrected required retry passes.
+- Two early retirement structural attempts failed closed on stale metadata and links; their raw records
+  are retained as artifacts and corrected required retries pass.
 - Prior ci configuration, IntrinsicTests, IntrinsicBenchmarks, benchmark validation, and the complete
   4,042-case CPU selector receipts remain hash-valid; the repair changes no compiled input.
 benchmark_or_parity_evidence:
@@ -181,7 +201,7 @@ residual_risks:
 - Owner, driver, reviewer, auditor, and authorizer labels are cooperative metadata and do not authenticate
   people or agents.
 - Git-common-dir claims coordinate sibling worktrees on one local clone, not cross-host distributed ownership.
-- Remote hosted CI was not rerun for the Python policy repair; focused 99/99 regressions, Ruff, py_compile,
+- Remote hosted CI was not rerun for the Python policy repair; focused 103/103 regressions, Ruff, py_compile,
   strict structural gates, and prior compiled receipts are recorded.
 skipped_checks: []
 artifacts:
