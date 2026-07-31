@@ -3,12 +3,12 @@ task_id: PROC-028
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-31T11:07:18Z'
+generated_at: '2026-07-31T11:34:07Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 16eed9610a5579bb47db07c12c946f2d74cf2fc7
-  head_revision: 555127d2818d86cd6472e8fc11aaefdf24d5a141
+  head_revision: f771e6d7a30a23ac1d3c4822eca5453cbdb99e07
   branch: task/proc-028-close-20260731
   worktree: /tmp/intrinsic-proc028-close-20260731
   dirty: false
@@ -18,7 +18,7 @@ source:
   - path: ara/logic/solution/heuristics.md
     sha256: ca20e2b63f60640c42b4eab97502b7e4c0b38dfba32f4ed03a75e1439c2a02fd
   - path: docs/agent/workflow-evidence.md
-    sha256: 8ae5d986bca959a7645b2a9f94bc7541a82da8219e2e3e96e1d7c8a9a8edb37e
+    sha256: 977ce3eab7106ef052e66a42aae9845a23a64c85c79ed18885b4b92473ba516a
   - path: tasks/SESSION-BRIEF.md
     sha256: f400b92298f89f304d42c42dd346944f6bca44d973ce0314041e4440a001e58b
   - path: tasks/active/README.md
@@ -26,22 +26,22 @@ source:
   - path: tasks/backlog/process/README.md
     sha256: 4b97e13f1fd24779d9c9feb4e5bda02c37d3b1aea3004fd45cd57047a5fb1585
   - path: tasks/done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md
-    sha256: c43abba01f22d780db2c8eb51f3742b758b0fee878100bb318b1dff399c982c9
+    sha256: 61a7c81e8d0c21adf64ea18fac46b264c20819005ba9a97533161a7caaaced38
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: 7279ec133257af0f412f391713e9a33fee040deb750e137c6558b5dc9c13fad0
+    sha256: c0e6d342ceaed3fca5874fe1c838591dcc3e9c762e74b58d28cd5d6e028e39f3
   - path: tests/regression/tooling/Test.ExperimentCustody.py
     sha256: b46bdbb027abae61d76f552ccc4bdd15bf55d560f1ac05b36d4336c1a44c0d70
   - path: tests/regression/tooling/Test.WorkflowEvidence.py
-    sha256: d2d5a29ce3e6ff6d4969771ff71fd74369599c3eb762655c491a79adb53a3e96
+    sha256: 64baac00d6cbc5c1dd39cad3b3fcb891278257ebdc3f55b5e6c90786d5f134b2
   - path: tools/agents/experiment_custody.py
     sha256: a277f63c003808bc9f37aa43806a01fb8b9d47787faf0661162ebeb141e9a1b8
   - path: tools/agents/fixtures/protected-synthetic/protocol.template.yaml
     sha256: 7b665bd90980ed56d5937bc43587a7233a8bf0a9d97b30461581a82f0c9751af
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-    sha256: 8ae5d986bca959a7645b2a9f94bc7541a82da8219e2e3e96e1d7c8a9a8edb37e
+    sha256: 977ce3eab7106ef052e66a42aae9845a23a64c85c79ed18885b4b92473ba516a
   - path: tools/agents/workflow_evidence.py
-    sha256: 1bf6281f4cb288eef439a3a242f57bdb3ebeb4772f101850dbfa6e5972b33a92
-  content_digest: 4367e796897919ac102cb2513b29df4c24d40754c621282303c7d4f698f5fdf9
+    sha256: 71c95cad1fa4cb6b8881ce66d9851a32952643bbe81db9412086de1c742fc85a
+  content_digest: 8bd46ed567d46c77e9d991b7d295961ec342ce13833dc2bf93905fa4cee53b0c
 touched:
   paths:
   - ara/logic/solution/architecture.md
@@ -161,6 +161,10 @@ commands:
 - receipt: tasks/evidence/PROC-028/commands/round16-final-gates.json
 - receipt: tasks/evidence/PROC-028/commands/round16-final-python-quality.json
 - receipt: tasks/evidence/PROC-028/commands/round16-final-regressions.json
+- receipt: tasks/evidence/PROC-028/commands/round18-component-concurrency-parity.json
+- receipt: tasks/evidence/PROC-028/commands/round18-component-final-gates.json
+- receipt: tasks/evidence/PROC-028/commands/round18-component-final-python-quality.json
+- receipt: tasks/evidence/PROC-028/commands/round18-component-final-regressions.json
 - receipt: tasks/evidence/PROC-028/commands/structural-gates.json
 - receipt: tasks/evidence/PROC-028/commands/workflow-regressions.json
 changed_public_contracts:
@@ -168,9 +172,10 @@ changed_public_contracts:
 - Generated task-evidence report, command-receipt, handoff, and fixed-revision review schema version 1;
   aggregate source digests are derived even for an empty surface, and clean worktree symlink entries use
   the same link-blob identity as Git.
-- Referenced report artifacts must declare kind file; their symlink chain must remain repository-contained
-  and terminate at a regular file in the current dirty worktree or exact clean source revision while retaining
-  lexical entry hashing.
+- Referenced report artifacts must declare kind file; one shared component-order resolver expands each
+  symlink before parent-directory components, rejects intermediate repository escape, and requires a terminal
+  regular file in the current dirty worktree or exact clean source revision while retaining lexical artifact-entry
+  hashing.
 - High-risk handoff and review records derive and enforce their exact clean-commit or dirty-worktree revision
   from report source identity.
 - Experiment protocol schema version 2 requires frozen raw-column/summary-statistic declarations; schema
@@ -185,19 +190,21 @@ changed_public_contracts:
   benchmark and append-only run/attempt identities.
 - Git-common-dir task/path claims use bounded leases and retained release/recovery history.
 diagnostics_and_previews:
-- WorkflowEvidence passes 27/27, ExperimentCustody passes 27/27, and the complete focused workflow/benchmark
-  bundle passes 108/108.
+- WorkflowEvidence passes 28/28, ExperimentCustody passes 27/27, and the complete focused workflow/benchmark
+  bundle passes 109/109.
 - 'Sequence-10 attacks remain closed: retuned gates, claim-source implementation mismatch, and arbitrary
   empty-surface digests fail closed.'
 - 'Sequence-12 attacks remain closed: bundle summary retuning and current-symlink redirection fail closed;
   bundle provenance substitution is also covered directly.'
 - 'Sequence-14 source-surface symlink attack remains closed: clean generation and fixed-revision validation
   share lexical Git link-blob identity.'
-- 'Sequence-16 artifact substitution attacks are closed: clean and dirty external, broken, and cyclic
+- 'Sequence-16 artifact substitution paths remain closed: clean and dirty external, broken, and cyclic
   symlink artifacts fail during generation and validation, while contained links pass.'
+- 'Sequence-18 component-order path is closed: clean and dirty artifact resolution expands intermediate
+  symlinks before applying .. and rejects intermediate escape symmetrically.'
 - Experiment protocol schema v2 makes frozen summary declarations an explicit fail-closed migration from
   v1.
-- The final retirement concurrency gate passes Test.WorkflowConcurrency.py 19/19 and Test.TestCohortParity.py
+- The current retirement concurrency gate passes Test.WorkflowConcurrency.py 19/19 and Test.TestCohortParity.py
   7/7 after BUG-120 retirement.
 - Strict task, state-link, docs, skill, experiment, ARA, method, benchmark, layering, test-layout, root-hygiene,
   and session-brief gates pass.
@@ -218,7 +225,7 @@ residual_risks:
 - Owner, driver, reviewer, auditor, and authorizer labels are cooperative metadata and do not authenticate
   people or agents.
 - Git-common-dir claims coordinate sibling worktrees on one local clone, not cross-host distributed ownership.
-- Remote hosted CI was not rerun for the Python policy repair; focused 108/108 regressions, Ruff, py_compile,
+- Remote hosted CI was not rerun for the Python policy repair; focused 109/109 regressions, Ruff, py_compile,
   strict structural gates, and prior compiled receipts are recorded.
 skipped_checks: []
 artifacts:
