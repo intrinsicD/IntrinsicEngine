@@ -150,3 +150,40 @@ TEST(RuntimeAssetImportRecipe, StageTraceFailsClosedForMalformedOrStaleResults)
     EXPECT_TRUE(trace.Terminal);
     EXPECT_EQ(trace.Results.size(), 2u);
 }
+
+TEST(RuntimeAssetImportRecipe, CompleteStageCanReportAWorkflowFailure)
+{
+    Runtime::AssetImportStageTrace trace{.Identity = Identity()};
+    constexpr std::array successfulStages{
+        Runtime::AssetImportStage::Route,
+        Runtime::AssetImportStage::Decode,
+        Runtime::AssetImportStage::CpuMaterialize,
+        Runtime::AssetImportStage::EcsAuthor,
+        Runtime::AssetImportStage::Postprocess,
+        Runtime::AssetImportStage::GpuResidency,
+    };
+    for (const auto stage : successfulStages)
+    {
+        ASSERT_TRUE(Runtime::AppendAssetImportStageResult(
+                        trace,
+                        Runtime::AssetImportStageResult{
+                            .Identity = trace.Identity,
+                            .Stage = stage,
+                        })
+                        .has_value());
+    }
+
+    ASSERT_TRUE(Runtime::AppendAssetImportStageResult(
+                    trace,
+                    Runtime::AssetImportStageResult{
+                        .Identity = trace.Identity,
+                        .Stage = Runtime::AssetImportStage::Complete,
+                        .Error = Core::ErrorCode::InvalidState,
+                        .Diagnostic =
+                            Runtime::RuntimeAssetIngestDiagnostic::InvalidTransition,
+                    })
+                    .has_value());
+    EXPECT_TRUE(trace.Terminal);
+    ASSERT_EQ(trace.Results.size(), 7u);
+    EXPECT_FALSE(trace.Results.back().Succeeded());
+}

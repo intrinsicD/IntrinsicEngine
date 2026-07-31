@@ -1788,8 +1788,8 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
 
     Runtime::AssetImportPipeline& pipeline = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine);
 
-    auto queued = pipeline.QueueModelTextureImport(
-        Runtime::RuntimeAssetImportRequest{
+    auto queued = pipeline.QueueAssetImport(
+        Runtime::AssetImportRecipe{
             .Path = textureFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Texture2D,
         });
@@ -1821,6 +1821,10 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
     EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Texture2D);
+    ASSERT_TRUE(lastEvent->StageTrace.has_value());
+    EXPECT_TRUE(lastEvent->StageTrace->Terminal);
+    EXPECT_EQ(lastEvent->StageTrace->Identity.Request, queued->Operation);
+    EXPECT_EQ(lastEvent->StageTrace->Results.size(), 7u);
 
     engine.Shutdown();
 }
@@ -1855,6 +1859,12 @@ TEST(RuntimeAssetImportFormatCoverage, ExplicitCancelPublishesOneTerminalEvent)
     EXPECT_EQ(
         cancelledEvent->IngestDiagnostic,
         Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
+    ASSERT_TRUE(cancelledEvent->StageTrace.has_value());
+    EXPECT_TRUE(cancelledEvent->StageTrace->Terminal);
+    ASSERT_EQ(cancelledEvent->StageTrace->Results.size(), 2u);
+    EXPECT_EQ(
+        cancelledEvent->StageTrace->Results.back().Stage,
+        Runtime::AssetImportStage::Decode);
 
     Core::Tasks::Scheduler::WaitForAll();
     (void)engine.Jobs().DrainCompletions(engine.Events());

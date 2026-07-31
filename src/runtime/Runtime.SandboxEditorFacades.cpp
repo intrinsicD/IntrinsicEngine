@@ -12716,17 +12716,13 @@ namespace Extrinsic::Runtime
                                 (IsModelTextureImportPayload(route->PayloadKind) ||
                                  Assets::IsGeometryPayloadKind(route->PayloadKind)))
                             {
-                                const RuntimeAssetImportRequest request{
+                                AssetImportRecipe recipe{
                                     .Path = command.Path,
                                     .PayloadKind = route->PayloadKind,
                                 };
-                                auto queued = Assets::IsGeometryPayloadKind(
-                                                  route->PayloadKind)
-                                    ? assetImportPipeline->QueueGeometryImport(
-                                          request)
-                                    : assetImportPipeline->
-                                          QueueModelTextureImport(
-                                          request);
+                                auto queued =
+                                    assetImportPipeline->QueueAssetImport(
+                                        std::move(recipe));
                                 if (!queued.has_value())
                                 {
                                     return SandboxEditorFileImportResult{

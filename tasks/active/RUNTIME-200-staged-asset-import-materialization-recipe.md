@@ -26,11 +26,13 @@ maturity_target: Retired
   callback bridge registries, their role-only runtime registration module,
   and their registry-specific tests are removed. Geometry exporter coverage
   remains at the owning geometry modules.
-- Current slice: wire the recipe/trace through queued geometry, model-scene,
-  and texture production routes, then internalize the remaining handoff and
-  postprocess bodies.
-- Next verification: focused queued route/visibility contracts after recipe
-  adoption.
+- Slice B queue adoption completed on 2026-07-31: editor, direct, geometry,
+  model-scene, and texture requests now enter through `QueueAssetImport`; each
+  queued execution carries a copied identity-bound seven-stage trace through
+  success, cancellation, stale rejection, and failure publication.
+- Current slice: make recipe policy own authoring/postprocess/completion, then
+  internalize the remaining handoff and postprocess bodies.
+- Focused recipe and queued route contracts: 31/31 passed on 2026-07-31.
 
 ## Goal
 

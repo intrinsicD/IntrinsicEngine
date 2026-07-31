@@ -83,7 +83,7 @@ namespace Extrinsic::Runtime
         RuntimeAssetIngestHandle Request{};
         WorldHandle World{};
         std::uint64_t BindingGeneration{0u};
-        std::uint32_t CancellationGeneration{0u};
+        std::uint64_t CancellationGeneration{0u};
 
         [[nodiscard]] friend bool operator==(
             const AssetImportExecutionIdentity&,
@@ -274,6 +274,7 @@ namespace Extrinsic::Runtime
         Core::ErrorCode Error{Core::ErrorCode::Success};
         RuntimeAssetIngestDiagnostic IngestDiagnostic{RuntimeAssetIngestDiagnostic::None};
         std::optional<RuntimeAssetImportResult> Result{};
+        std::optional<AssetImportStageTrace> StageTrace{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -352,6 +353,8 @@ namespace Extrinsic::Runtime
 
         void SetDependencies(AssetImportPipelineDependencies dependencies) noexcept;
 
+        [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport> QueueAssetImport(
+            AssetImportRecipe recipe);
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPath(
             RuntimeAssetImportRequest request);
         [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport> QueueModelTextureImport(
@@ -395,14 +398,11 @@ namespace Extrinsic::Runtime
     private:
         [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport>
             QueueGeometryImportWithIngest(
-                RuntimeAssetImportRequest request,
-                RuntimeAssetIngestSource source,
+                AssetImportRecipe recipe,
                 std::vector<Assets::AssetPayloadKind> payloadKinds);
         [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport>
             QueueModelTextureImportWithIngest(
-                RuntimeAssetImportRequest request,
-                RuntimeAssetIngestSource source,
-                Assets::AssetId existingAsset = {});
+                AssetImportRecipe recipe);
         void QueueDroppedModelTextureImport(
             std::string path,
             Assets::AssetPayloadKind payloadKind);
@@ -418,11 +418,13 @@ namespace Extrinsic::Runtime
             bool allowWaitingForMainThreadApply);
         void FinalizeUnpublishedImport(
             RuntimeAssetIngestHandle operation,
-            RuntimeAssetImportRequest request);
+            RuntimeAssetImportRequest request,
+            AssetImportStageTrace* stageTrace);
         void RecordAssetImportEvent(
             const RuntimeAssetImportRequest& request,
             const Core::Expected<RuntimeAssetImportResult>& result,
-            RuntimeAssetIngestDiagnostic ingestDiagnostic);
+            RuntimeAssetIngestDiagnostic ingestDiagnostic,
+            const AssetImportStageTrace* stageTrace = nullptr);
         [[nodiscard]] bool IsCurrentSubmissionTarget(
             WorldHandle world,
             const ECS::Scene::Registry* scene,
@@ -460,6 +462,7 @@ namespace Extrinsic::Runtime
         {
             RuntimeAssetIngestHandle Ingest{};
             JobToken Job{};
+            std::shared_ptr<AssetImportStageTrace> StageTrace{};
         };
         std::vector<RuntimeAssetImportJobRecord> m_AssetImportJobs{};
         std::optional<RuntimeAssetImportEvent> m_LastAssetImportEvent{};
