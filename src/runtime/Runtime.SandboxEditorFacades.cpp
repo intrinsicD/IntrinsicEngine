@@ -11365,6 +11365,27 @@ namespace Extrinsic::Runtime
                 GetSandboxEditorGeometryProcessingCapabilities(
                     *context.Scene,
                     *selected);
+
+            if (const auto* enrichment =
+                    context.Scene->Raw().try_get<
+                        Internal::DirectMeshEnrichmentState>(*selected))
+            {
+                model.DirectMeshEnrichmentStatus = enrichment->Status;
+                model.DirectMeshEnrichmentPending =
+                    IsActiveSandboxEditorJobState(enrichment->Status);
+                model.DirectMeshEnrichmentDiagnostic = enrichment->Diagnostic;
+                if (model.DirectMeshEnrichmentPending &&
+                    model.DirectMeshEnrichmentDiagnostic.empty())
+                {
+                    model.DirectMeshEnrichmentDiagnostic =
+                        "Direct mesh enrichment is pending; geometry-mutating "
+                        "actions are disabled until it resolves.";
+                }
+            }
+
+            if (model.DirectMeshEnrichmentPending)
+                return model;
+
             model.Entries =
                 ResolveSandboxEditorGeometryProcessingEntries(model.Capabilities);
             model.KMeansDomains =

@@ -2,6 +2,13 @@
 id: BUG-095
 theme: G
 depends_on: [RUNTIME-194]
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner: "codex"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-07-31T13:13:41Z"
 maturity_target: Operational
 ---
 # BUG-095 — Direct-mesh postprocess can overwrite newer editor geometry
@@ -137,6 +144,17 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Right-sizing
+- The guard remains private to the direct-mesh policy as plain free functions;
+  no service, interface, registry, queue, or new module was introduced. The
+  existing shared geometry metadata signature cannot detect property-value
+  edits, while adding erased content hashing to the public geometry property
+  API would widen a lower-layer contract for one runtime caller.
+- Readiness uses one private entity sidecar and three copied fields on the
+  existing processing model. This is load-bearing async lifetime state, not a
+  second job-state framework; a broader seam is justified only if another
+  import route needs the identical generation/readiness contract.
 
 ## Forbidden changes
 - Restoring selected properties from a stale result while allowing the stale

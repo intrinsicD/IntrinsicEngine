@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry (tasks/active/BUG-095-direct-mesh-postprocess-stale-overwrite.md)
 
 ## Theme B — Rendering modernization
 
@@ -44,7 +44,6 @@ the authoritative open/unblocked view.
 ## Theme G — Active bugs
 
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
-- unblocked: `BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry (tasks/backlog/bugs/BUG-095-direct-mesh-postprocess-stale-overwrite.md)
 - unblocked: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-108` — Fibonacci sphere sampling small-count and endpoint safety (tasks/backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md)

@@ -4,12 +4,14 @@
 #include <bit>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -32,6 +34,7 @@ import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Logging;
@@ -73,6 +76,8 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -87,6 +92,7 @@ import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
@@ -651,57 +657,106 @@ void AddPlanarCycleGraphSource(ECS::Scene::Registry& registry,
         return config;
     }
 
-[[nodiscard]] bool MeshHasVertexProperty(
-        Runtime::Engine& engine,
-        const ECS::EntityHandle entity,
-        const std::string_view propertyName)
+    class DirectMeshPostProcessWorkerBarrier final
     {
-        if (!engine.Worlds().Get(engine.ActiveWorld())->IsValid(entity))
+    public:
+        DirectMeshPostProcessWorkerBarrier() = default;
+        ~DirectMeshPostProcessWorkerBarrier()
         {
-            return false;
+            Release();
         }
 
-        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
-        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-        return view.Valid() &&
-            view.ActiveDomain == GS::Domain::Mesh &&
-            view.VertexSource != nullptr &&
-            view.VertexSource->Properties.Exists(propertyName);
-    }
+        DirectMeshPostProcessWorkerBarrier(
+            const DirectMeshPostProcessWorkerBarrier&) = delete;
+        DirectMeshPostProcessWorkerBarrier& operator=(
+            const DirectMeshPostProcessWorkerBarrier&) = delete;
 
-[[nodiscard]] bool DirectMeshPostProcessReady(
-        Runtime::Engine& engine,
-        const ECS::EntityHandle entity)
-    {
-        return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
-            MeshHasVertexProperty(engine, entity, "v:normal") &&
-            RequiredEngineService<
-                Extrinsic::Runtime::AssetImportPipeline>(engine)
-                .GetLastAssetImportEvent()
-                .has_value();
-    }
-
-void ExpectMeshVertexNormalsNear(
-        Runtime::Engine& engine,
-        const ECS::EntityHandle entity,
-        const std::span<const glm::vec3> expected)
-    {
-        ASSERT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(entity));
-        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
-        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-        ASSERT_TRUE(view.Valid());
-        ASSERT_EQ(view.ActiveDomain, GS::Domain::Mesh);
-        ASSERT_NE(view.VertexSource, nullptr);
-
-        const auto normals = view.VertexSource->Properties.Get<glm::vec3>(PN::kNormal);
-        ASSERT_TRUE(normals);
-        ASSERT_EQ(normals.Vector().size(), expected.size());
-        for (std::size_t i = 0; i < expected.size(); ++i)
+        [[nodiscard]] Runtime::JobToken Submit(
+            Runtime::JobService& jobs,
+            const Runtime::WorldHandle world)
         {
-            EXPECT_NEAR(normals.Vector()[i].x, expected[i].x, 1.0e-5f) << i;
-            EXPECT_NEAR(normals.Vector()[i].y, expected[i].y, 1.0e-5f) << i;
-            EXPECT_NEAR(normals.Vector()[i].z, expected[i].z, 1.0e-5f) << i;
+            return jobs.Submit(Runtime::JobDesc{
+                .DebugName = "Test.DirectMeshPostProcessWorkerBarrier",
+                .Scope = world,
+                .Priority = Extrinsic::Core::Dag::TaskPriority::Normal,
+                .Kind = Runtime::RuntimeTaskKinds::Generic,
+                .EstimatedCost = 1u,
+                .Work =
+                    [this](const Runtime::JobCancellation&)
+                    {
+                        std::unique_lock lock(m_Mutex);
+                        m_Started = true;
+                        m_Condition.notify_all();
+                        m_Condition.wait(
+                            lock,
+                            [this]
+                            {
+                                return m_Released;
+                            });
+                        return Runtime::JobResultEnvelope::Make<bool>(true);
+                    },
+                .PublishCompletion =
+                    [](
+                        Runtime::KernelEventBus&,
+                        const Runtime::JobResultEnvelope& envelope)
+                    {
+                        return envelope.TryGet<bool>() != nullptr;
+                    },
+            });
         }
+
+        [[nodiscard]] bool WaitUntilStarted()
+        {
+            std::unique_lock lock(m_Mutex);
+            return m_Condition.wait_for(
+                lock,
+                std::chrono::seconds(5),
+                [this]
+                {
+                    return m_Started;
+                });
+        }
+
+        void Release()
+        {
+            {
+                std::lock_guard lock(m_Mutex);
+                m_Released = true;
+            }
+            m_Condition.notify_all();
+        }
+
+    private:
+        std::mutex m_Mutex{};
+        std::condition_variable m_Condition{};
+        bool m_Started{false};
+        bool m_Released{false};
+    };
+
+    [[nodiscard]] std::unique_ptr<Intrinsic::Tests::RuntimeTestModule>
+    MakeDirectMeshPostProcessExitApplication()
+    {
+        return std::make_unique<WaitForConditionApplication>(
+            [](Runtime::Engine& runningEngine)
+            {
+                const Runtime::JobServiceStats stats =
+                    RequiredEngineService<Runtime::JobService>(runningEngine)
+                        .Stats();
+                return stats.InFlightJobs == 0u &&
+                    stats.PublishedCompletions + stats.StaleDiscardedJobs >= 2u;
+            },
+            128u);
+    }
+
+    void InitializeDirectMeshPostProcessEngine(
+        Intrinsic::Tests::RuntimeTestKernel& engine)
+    {
+        engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
+        engine.EmplaceModule<Runtime::AssetWorkflowModule>();
+        engine.Initialize();
+        InstallSandboxDefaultRuntimePolicies(engine);
     }
 
 void ExpectFiniteUnitNormal(const glm::vec3 normal,
@@ -3281,10 +3336,11 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
     }
 }
-TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProcess)
+TEST(SandboxEditorUi,
+     DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit)
 {
     TmpFile meshFile(
-        "runtime_mesh_normals_postprocess_race.obj",
+        "runtime_mesh_postprocess_stale_geometry.obj",
         "v 0 0 0\n"
         "v 1 0 0\n"
         "v 0 1 0\n"
@@ -3296,88 +3352,368 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
         "vn 1 0 0\n"
         "f 1/1/1 2/2/2 3/3/3\n");
 
-    std::optional<ECS::EntityHandle> meshEntity{};
-    std::optional<std::uint32_t> stableId{};
     Intrinsic::Tests::RuntimeTestKernel engine(
-        HeadlessConfig(), std::make_unique<WaitForConditionApplication>(
-                              [&meshEntity](Runtime::Engine& runningEngine)
-                              {
-                                  return meshEntity.has_value() &&
-                                         DirectMeshPostProcessReady(runningEngine, *meshEntity);
-                              },
-                              128u));
-    engine.EmplaceModule<Runtime::AsyncWorkModule>();
-    engine.EmplaceModule<Runtime::SceneDocumentModule>();
-    engine.EmplaceModule<Runtime::SceneInteractionModule>();
-    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
-    engine.Initialize();
-    InstallSandboxDefaultRuntimePolicies(engine);
+        HeadlessConfig(),
+        MakeDirectMeshPostProcessExitApplication());
+    InitializeDirectMeshPostProcessEngine(engine);
 
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
-        .Path = meshFile.Path.string(),
-        .PayloadKind = Assets::AssetPayloadKind::Mesh,
-    });
-    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    Runtime::JobService& jobs =
+        RequiredEngineService<Runtime::JobService>(engine);
+    DirectMeshPostProcessWorkerBarrier workerBarrier{};
+    const Runtime::JobToken blocker =
+        workerBarrier.Submit(jobs, engine.ActiveWorld());
+    ASSERT_TRUE(blocker.IsValid());
+    ASSERT_TRUE(workerBarrier.WaitUntilStarted());
 
-    meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    auto imported =
+        RequiredEngineService<
+            Extrinsic::Runtime::AssetImportPipeline>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value())
+        << static_cast<int>(imported.error());
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(
+            *engine.Worlds().Get(engine.ActiveWorld()),
+            GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
-    stableId = Runtime::SelectionController::ToStableEntityId(*meshEntity);
-
-    ExpectMeshVertexNormalsNear(
-        engine,
-        *meshEntity,
-        std::array{
-            glm::vec3{1.0f, 0.0f, 0.0f},
-            glm::vec3{1.0f, 0.0f, 0.0f},
-            glm::vec3{1.0f, 0.0f, 0.0f},
-        });
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(*meshEntity);
 
     Runtime::SandboxEditorContext context =
         MakeContext(
             *engine.Worlds().Get(engine.ActiveWorld()),
-            *engine.Services().Find<
-                Runtime::SelectionController>());
-    const Runtime::SandboxEditorMeshVertexNormalsResult recomputed =
-        Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+            *engine.Services().Find<Runtime::SelectionController>());
+    Runtime::EditorCommandHistory& history =
+        RequiredEngineService<Runtime::EditorCommandHistory>(engine);
+    context.CommandHistory = &history;
+    const Runtime::SandboxEditorMeshSubdivideResult edited =
+        Runtime::ApplySandboxEditorMeshSubdivideCommand(
             context,
-            Runtime::SandboxEditorMeshVertexNormalsCommand{
-                .StableEntityId = *stableId,
-                .Weighting = GN::AveragingMode::AreaWeighted,
+            Runtime::SandboxEditorMeshSubdivideCommand{
+                .StableEntityId = stableId,
+                .Operator =
+                    Runtime::SandboxEditorMeshSubdivideOperator::Loop,
+                .Iterations = 1u,
+                .PreserveLoopFeatureEdges = true,
             });
-    ASSERT_TRUE(recomputed.Succeeded()) << recomputed.Message;
-    ExpectMeshVertexNormalsNear(
-        engine,
-        *meshEntity,
-        std::array{
-            glm::vec3{0.0f, 0.0f, 1.0f},
-            glm::vec3{0.0f, 0.0f, 1.0f},
-            glm::vec3{0.0f, 0.0f, 1.0f},
-        });
+    ASSERT_TRUE(edited.Succeeded()) << edited.Message;
 
+    ECS::Scene::Registry& scene =
+        *engine.Worlds().Get(engine.ActiveWorld());
+    const MeshCounts editedCounts = SourceMeshCounts(scene, *meshEntity);
+    const std::vector<glm::vec3> editedPositions =
+        MeshVertexPositions(scene, *meshEntity);
+    const Runtime::EditorCommandHistorySnapshot editedHistory =
+        history.Snapshot();
+    ASSERT_GT(editedCounts.Vertices, 3u);
+    ASSERT_GT(editedCounts.Faces, 1u);
+
+    workerBarrier.Release();
     engine.Run();
 
-    const Runtime::RenderExtractionCache* extraction =
-        engine.Services().Find<Runtime::RenderExtractionCache>();
-    ASSERT_NE(extraction, nullptr);
-    const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
-        extraction->GetMaterialTextureAssetBindings(*stableId);
-    if (bindings.has_value())
-    {
-        EXPECT_FALSE(bindings->Normal.IsValid());
-    }
-    EXPECT_TRUE(
+    const Runtime::JobServiceStats stats = jobs.Stats();
+    EXPECT_EQ(stats.StaleDiscardedJobs, 1u);
+    ExpectMeshCountsEqual(
+        SourceMeshCounts(scene, *meshEntity),
+        editedCounts);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(scene, *meshEntity),
+        editedPositions);
+
+    const Runtime::EditorCommandHistorySnapshot finalHistory =
+        history.Snapshot();
+    EXPECT_EQ(finalHistory.Revision, editedHistory.Revision);
+    EXPECT_EQ(finalHistory.UndoCount, editedHistory.UndoCount);
+    EXPECT_EQ(finalHistory.RedoCount, editedHistory.RedoCount);
+    const std::span<const std::uint32_t> selectedStableIds =
+        RequiredEngineService<Runtime::SelectionController>(engine)
+            .SelectedStableIds();
+    ASSERT_EQ(selectedStableIds.size(), 1u);
+    EXPECT_EQ(selectedStableIds.front(), stableId);
+
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi,
+     DirectMeshPostProcessPreservesNewerUvAndSourceProperties)
+{
+    TmpFile meshFile(
+        "runtime_mesh_postprocess_stale_properties.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "f 1/1/1 2/2/2 3/3/3\n");
+
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        MakeDirectMeshPostProcessExitApplication());
+    InitializeDirectMeshPostProcessEngine(engine);
+
+    Runtime::JobService& jobs =
+        RequiredEngineService<Runtime::JobService>(engine);
+    DirectMeshPostProcessWorkerBarrier workerBarrier{};
+    const Runtime::JobToken blocker =
+        workerBarrier.Submit(jobs, engine.ActiveWorld());
+    ASSERT_TRUE(blocker.IsValid());
+    ASSERT_TRUE(workerBarrier.WaitUntilStarted());
+
+    auto imported =
         RequiredEngineService<
             Extrinsic::Runtime::AssetImportPipeline>(engine)
-            .GetLastAssetImportEvent()
-            .has_value());
-    ExpectMeshVertexNormalsNear(
-        engine,
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value())
+        << static_cast<int>(imported.error());
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(
+            *engine.Worlds().Get(engine.ActiveWorld()),
+            GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    ECS::Scene::Registry& scene =
+        *engine.Worlds().Get(engine.ActiveWorld());
+    auto& vertexProperties =
+        scene.Raw().get<GS::Vertices>(*meshEntity).Properties;
+    auto texcoords = vertexProperties.GetOrAdd<glm::vec2>(
+        "v:texcoord", glm::vec2{0.0f});
+    ASSERT_TRUE(texcoords);
+    const std::vector<glm::vec2> expectedTexcoords{
+        {0.125f, 0.875f},
+        {0.625f, 0.375f},
+        {0.9375f, 0.0625f},
+    };
+    texcoords.Vector() = expectedTexcoords;
+
+    auto paint = vertexProperties.GetOrAdd<glm::vec4>(
+        "v:bug095-paint", glm::vec4{0.0f});
+    ASSERT_TRUE(paint);
+    const std::vector<glm::vec4> expectedPaint{
+        {0.25f, 0.5f, 0.75f, 1.0f},
+        {0.75f, 0.25f, 0.5f, 1.0f},
+        {0.5f, 0.75f, 0.25f, 1.0f},
+    };
+    paint.Vector() = expectedPaint;
+
+    const Runtime::VertexChannelBindingSet expectedBindings{
+        .Normal = Runtime::VertexChannelSourceBinding{
+            .Enabled = true,
+            .Property = Runtime::GeometryPropertyRef{
+                .Domain = Runtime::GeometryElementDomain::MeshVertex,
+                .Name = std::string{PN::kNormal},
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            },
+        },
+        .Color = Runtime::VertexChannelSourceBinding{
+            .Enabled = true,
+            .Property = Runtime::GeometryPropertyRef{
+                .Domain = Runtime::GeometryElementDomain::MeshVertex,
+                .Name = "v:bug095-paint",
+                .ValueKind = Geometry::PropertyValueKind::Vec4,
+            },
+        },
+        .BindingGeneration = 17u,
+    };
+    scene.Raw().emplace_or_replace<Runtime::VertexChannelBindingSet>(
         *meshEntity,
-        std::array{
-            glm::vec3{0.0f, 0.0f, 1.0f},
-            glm::vec3{0.0f, 0.0f, 1.0f},
-            glm::vec3{0.0f, 0.0f, 1.0f},
-        });
+        expectedBindings);
+
+    const MeshCounts expectedCounts =
+        SourceMeshCounts(scene, *meshEntity);
+    const std::vector<glm::vec3> expectedPositions =
+        MeshVertexPositions(scene, *meshEntity);
+
+    workerBarrier.Release();
+    engine.Run();
+
+    EXPECT_EQ(jobs.Stats().StaleDiscardedJobs, 1u);
+    ExpectMeshCountsEqual(
+        SourceMeshCounts(scene, *meshEntity),
+        expectedCounts);
+    ExpectPositionsExactlyEqual(
+        MeshVertexPositions(scene, *meshEntity),
+        expectedPositions);
+
+    const GS::ConstSourceView finalView =
+        GS::BuildConstView(scene.Raw(), *meshEntity);
+    ASSERT_NE(finalView.VertexSource, nullptr);
+    const auto finalTexcoords =
+        finalView.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    const auto finalPaint =
+        finalView.VertexSource->Properties.Get<glm::vec4>(
+            "v:bug095-paint");
+    ASSERT_TRUE(finalTexcoords);
+    ASSERT_TRUE(finalPaint);
+    ExpectTexcoordsExactlyEqual(
+        finalTexcoords.Vector(),
+        expectedTexcoords);
+    ExpectColorsExactlyEqual(finalPaint.Vector(), expectedPaint);
+
+    const auto* finalBindings =
+        scene.Raw().try_get<Runtime::VertexChannelBindingSet>(*meshEntity);
+    ASSERT_NE(finalBindings, nullptr);
+    EXPECT_EQ(finalBindings->BindingGeneration,
+              expectedBindings.BindingGeneration);
+    EXPECT_EQ(finalBindings->Normal.Enabled, expectedBindings.Normal.Enabled);
+    EXPECT_EQ(finalBindings->Normal.Property,
+              expectedBindings.Normal.Property);
+    EXPECT_EQ(finalBindings->Color.Enabled, expectedBindings.Color.Enabled);
+    EXPECT_EQ(finalBindings->Color.Property,
+              expectedBindings.Color.Property);
+
+    Runtime::SandboxEditorContext context = MakeContext(
+        scene,
+        RequiredEngineService<Runtime::SelectionController>(engine));
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_FALSE(model.Processing.DirectMeshEnrichmentPending);
+    EXPECT_EQ(
+        model.Processing.DirectMeshEnrichmentStatus,
+        Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(
+        model.Processing.DirectMeshEnrichmentDiagnostic.empty());
+    EXPECT_FALSE(model.Processing.Entries.empty());
+    EXPECT_TRUE(model.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(model.Processing.MeshRemeshAvailable);
+    EXPECT_TRUE(model.Processing.MeshSubdivideAvailable);
+    EXPECT_TRUE(model.Processing.MeshSimplifyAvailable);
+    EXPECT_TRUE(model.Processing.MeshVertexNormalsAvailable);
+
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DirectMeshPostProcessPendingStateGatesMutatingActions)
+{
+    TmpFile meshFile(
+        "runtime_mesh_postprocess_pending_readiness.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "f 1/1/1 2/2/2 3/3/3\n");
+
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        MakeDirectMeshPostProcessExitApplication());
+    InitializeDirectMeshPostProcessEngine(engine);
+
+    Runtime::JobService& jobs =
+        RequiredEngineService<Runtime::JobService>(engine);
+    DirectMeshPostProcessWorkerBarrier workerBarrier{};
+    const Runtime::JobToken blocker =
+        workerBarrier.Submit(jobs, engine.ActiveWorld());
+    ASSERT_TRUE(blocker.IsValid());
+    ASSERT_TRUE(workerBarrier.WaitUntilStarted());
+
+    auto imported =
+        RequiredEngineService<
+            Extrinsic::Runtime::AssetImportPipeline>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value())
+        << static_cast<int>(imported.error());
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(
+            *engine.Worlds().Get(engine.ActiveWorld()),
+            GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    ECS::Scene::Registry& scene =
+        *engine.Worlds().Get(engine.ActiveWorld());
+    Runtime::SandboxEditorContext context = MakeContext(
+        scene,
+        RequiredEngineService<Runtime::SelectionController>(engine));
+    const Runtime::SandboxEditorDomainWindowModel pendingModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(pendingModel.Processing.DirectMeshEnrichmentPending);
+    EXPECT_TRUE(Runtime::IsActiveSandboxEditorJobState(
+        pendingModel.Processing.DirectMeshEnrichmentStatus));
+    EXPECT_FALSE(
+        pendingModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
+    EXPECT_TRUE(pendingModel.Processing.Entries.empty());
+    EXPECT_TRUE(pendingModel.Processing.KMeansDomains.empty());
+    EXPECT_FALSE(pendingModel.Processing.MeshDenoiseAvailable);
+    EXPECT_FALSE(pendingModel.Processing.MeshCurvatureAvailable);
+    EXPECT_FALSE(pendingModel.Processing.MeshRemeshAvailable);
+    EXPECT_FALSE(pendingModel.Processing.MeshSubdivideAvailable);
+    EXPECT_FALSE(pendingModel.Processing.MeshSimplifyAvailable);
+    EXPECT_FALSE(pendingModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_FALSE(pendingModel.Processing.MeshProgressivePoissonAvailable);
+
+    Runtime::JobToken enrichmentJob{};
+    for (const Runtime::JobSnapshot& job : jobs.SnapshotAll())
+    {
+        if (job.DebugName.starts_with("Runtime.DirectMeshPostProcess."))
+        {
+            ASSERT_FALSE(enrichmentJob.IsValid());
+            enrichmentJob = job.Token;
+        }
+    }
+    ASSERT_TRUE(enrichmentJob.IsValid());
+
+    EXPECT_FALSE(
+        scene.Raw()
+            .get<GS::Vertices>(*meshEntity)
+            .Properties.Exists("v:texcoord"));
+
+    workerBarrier.Release();
+    engine.Run();
+
+    EXPECT_EQ(jobs.Stats().PublishedCompletions, 2u);
+    EXPECT_EQ(jobs.Stats().StaleDiscardedJobs, 0u);
+    EXPECT_EQ(jobs.DrainCompletions(engine.Events()), 0u);
+
+    const GS::ConstSourceView enriched =
+        GS::BuildConstView(scene.Raw(), *meshEntity);
+    ASSERT_NE(enriched.VertexSource, nullptr);
+    EXPECT_TRUE(
+        enriched.VertexSource->Properties.Exists("v:normal"));
+    EXPECT_TRUE(
+        enriched.VertexSource->Properties.Exists("v:texcoord"));
+
+    const Runtime::SandboxEditorDomainWindowModel readyModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_FALSE(readyModel.Processing.DirectMeshEnrichmentPending);
+    EXPECT_EQ(
+        readyModel.Processing.DirectMeshEnrichmentStatus,
+        Runtime::JobState::Published);
+    EXPECT_FALSE(
+        readyModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
+    EXPECT_FALSE(readyModel.Processing.Entries.empty());
+    EXPECT_FALSE(readyModel.Processing.KMeansDomains.empty());
+    EXPECT_TRUE(readyModel.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(readyModel.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(readyModel.Processing.MeshRemeshAvailable);
+    EXPECT_TRUE(readyModel.Processing.MeshSubdivideAvailable);
+    EXPECT_TRUE(readyModel.Processing.MeshSimplifyAvailable);
+    EXPECT_TRUE(readyModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_TRUE(readyModel.Processing.MeshProgressivePoissonAvailable);
 
     engine.Shutdown();
 }

@@ -1,0 +1,25 @@
+CMake Error at /home/alex/.local/lib/python3.11/site-packages/cmake/data/share/cmake-4.3/Modules/GoogleTestAddTests.cmake:227 (string):
+  string sub-command JSON failed parsing json string:
+
+
+
+  * Line 1, Column 1
+
+    Syntax error: value, object or array expected.
+
+  .
+Call Stack (most recent call first):
+  /home/alex/.local/lib/python3.11/site-packages/cmake/data/share/cmake-4.3/Modules/GoogleTestAddTests.cmake:393 (parse_tests_from_json)
+  /home/alex/Documents/IntrinsicEngine/build/ci/tests/IntrinsicRuntimeContractTests[1]_include.cmake:6 (gtest_discover_tests_impl)
+  /home/alex/Documents/IntrinsicEngine/build/ci/tests/CTestTestfile.cmake:13 (include)
+  CTestTestfile.cmake:20 (subdirs)
+
+
+CMake Error at /home/alex/Documents/IntrinsicEngine/build/ci/tests/IntrinsicTestPropertyFixups.cmake:775 (message):
+  Discovery did not publish IntrinsicRuntimeContractTests_TESTS
+Call Stack (most recent call first):
+  /home/alex/Documents/IntrinsicEngine/build/ci/tests/CTestTestfile.cmake:44 (include)
+  CTestTestfile.cmake:20 (subdirs)
+
+
+Errors while running CTest

@@ -2195,6 +2195,9 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorGeometryProcessingModel
     {
         bool HasSelectedEntity{false};
+        bool DirectMeshEnrichmentPending{false};
+        JobState DirectMeshEnrichmentStatus{JobState::Invalid};
+        std::string DirectMeshEnrichmentDiagnostic{};
         SandboxEditorGeometryProcessingCapabilities Capabilities{};
         std::vector<SandboxEditorGeometryProcessingEntry> Entries{};
         std::vector<SandboxEditorGeometryProcessingDomain> KMeansDomains{};

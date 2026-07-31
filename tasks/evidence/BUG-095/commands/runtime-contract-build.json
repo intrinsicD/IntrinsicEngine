@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicRuntimeContractTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicRuntimeContractTests",
+  "cwd": ".",
+  "duration_ms": 12283,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T13:19:04Z",
+  "label": "runtime-contract-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T13:18:51Z",
+  "stderr_path": "tasks/evidence/BUG-095/commands/runtime-contract-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-095/commands/runtime-contract-build.stdout.log",
+  "stdout_sha256": "e26887428e47adbd4889727f1b4777b3ed72d07995be501f56d44a77338337ff",
+  "task_id": "BUG-095"
+}

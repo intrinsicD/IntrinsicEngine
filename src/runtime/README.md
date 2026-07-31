@@ -124,9 +124,17 @@ Successful scene-changing import completion uses
 `EditorCommandHistory::MarkDirty` as a document-lifecycle transition: it
 advances document revision/dirty state but deliberately creates no undo entry.
 Entity creation, automatic authoring, and post-import enrichment are one import
-lifecycle rather than editor-authored mutations. Generation-safe stale discard
-for the deferred direct-mesh enrichment is owned by `BUG-095`; the staged
-workflow replacement in `RUNTIME-200` must preserve that contract.
+lifecycle rather than editor-authored mutations. Deferred direct-mesh
+enrichment captures an exact signature over the active mesh domain and topology
+markers, every vertex/edge/halfedge/face property descriptor and value, deleted
+counts, and vertex-channel binding generation and property references. Its
+world-scoped `JobService` completion applies only when the entity is still live,
+the entity-sidecar job token still matches, and that signature is unchanged;
+otherwise it terminates as stale without writing ECS, history, or selection
+state. The selected-entity processing model exposes the sidecar's pending or
+terminal status and nonempty reason, and pending enrichment removes all
+geometry-mutating actions until the job resolves. The staged workflow
+replacement in `RUNTIME-200` must preserve this contract.
 
 Geometry materialization invokes an ordered post-import processor registry after
 each created entity is populated from its decoded payload. Processors receive

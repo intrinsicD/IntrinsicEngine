@@ -268,9 +268,18 @@ Asset import is intentionally outside that undoable editor-mutation set.
 Successful scene-changing materialization calls
 `EditorCommandHistory::MarkDirty` to advance document dirty/revision state
 without adding an undo record; entity creation, authoring defaults, and
-post-import enrichment remain one automatic import lifecycle. `BUG-095` owns
-generation-safe stale discard for the deferred direct-mesh enrichment, and
-`RUNTIME-200` owns its migration into the staged import recipe.
+post-import enrichment remain one automatic import lifecycle. Deferred
+direct-mesh enrichment captures the complete published mesh-source generation:
+active domain and topology markers, all vertex/edge/halfedge/face property
+metadata and values, deleted counts, and vertex-channel binding generation and
+property references. Its world-scoped job reaches the main-thread apply only
+when the raw entity is still live, its entity-sidecar token still names that
+job, and the captured generation matches exactly. A mismatch is reported as a
+stale discard and performs no ECS, history, or selection write. The same
+sidecar projects pending/terminal status plus a nonempty reason into the
+selected-entity processing model; while pending, that model exposes no
+geometry-mutating action. `RUNTIME-200` owns migration into the staged import
+recipe and must preserve this validation and readiness contract.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

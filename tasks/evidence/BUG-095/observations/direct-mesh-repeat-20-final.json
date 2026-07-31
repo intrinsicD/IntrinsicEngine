@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^SandboxEditorUi\\.(DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit|DirectMeshPostProcessPreservesNewerUvAndSourceProperties|DirectMeshPostProcessPendingStateGatesMutatingActions)$",
+    "--repeat",
+    "until-fail:20",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\\.(DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit|DirectMeshPostProcessPreservesNewerUvAndSourceProperties|DirectMeshPostProcessPendingStateGatesMutatingActions)$' --repeat until-fail:20 --timeout 60",
+  "cwd": ".",
+  "duration_ms": 141,
+  "exit_code": 8,
+  "finished_at": "2026-07-31T13:34:51Z",
+  "label": "direct-mesh-repeat-20-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T13:34:51Z",
+  "stderr_path": "tasks/evidence/BUG-095/observations/direct-mesh-repeat-20-final.stderr.log",
+  "stderr_sha256": "f2b170c6f7023e39948f1420a9b3cda3f087a0637b3d4cd0a8ec58c2b59ca538",
+  "stdout_path": "tasks/evidence/BUG-095/observations/direct-mesh-repeat-20-final.stdout.log",
+  "stdout_sha256": "b30b6be0d0fe1ea96dd1df4f92e2c9b8c03d2f98b806c3162516643af163efc3",
+  "task_id": "BUG-095"
+}

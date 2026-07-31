@@ -1,11 +1,13 @@
 module;
 
 #include <array>
+#include <bit>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -42,10 +44,13 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
+
+#include "Runtime.SandboxEditorFacades.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -56,9 +61,374 @@ namespace Extrinsic::Runtime
             std::string Path{};
             Geometry::MeshIO::MeshIOResult Payload{};
             ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+            JobToken Job{};
+            std::uint64_t SubmittedSignature{0u};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::optional<RuntimeMeshMaterializationResult> Materialized{};
         };
+
+        constexpr std::uint64_t kDirectMeshSignatureOffset =
+            1469598103934665603ull;
+        constexpr std::uint64_t kDirectMeshSignaturePrime =
+            1099511628211ull;
+
+        void MixDirectMeshSignatureByte(
+            std::uint64_t& signature,
+            const std::uint8_t value) noexcept
+        {
+            signature ^= value;
+            signature *= kDirectMeshSignaturePrime;
+        }
+
+        void MixDirectMeshSignature(
+            std::uint64_t& signature,
+            std::uint64_t value) noexcept
+        {
+            for (std::uint32_t byte = 0u; byte < 8u; ++byte)
+            {
+                MixDirectMeshSignatureByte(
+                    signature,
+                    static_cast<std::uint8_t>(
+                        (value >> (byte * 8u)) & 0xffu));
+            }
+        }
+
+        void MixDirectMeshSignatureString(
+            std::uint64_t& signature,
+            const std::string_view value) noexcept
+        {
+            MixDirectMeshSignature(
+                signature,
+                static_cast<std::uint64_t>(value.size()));
+            for (const char character : value)
+            {
+                MixDirectMeshSignatureByte(
+                    signature,
+                    static_cast<std::uint8_t>(character));
+            }
+        }
+
+        template <typename TValue>
+        void MixDirectMeshPropertyValue(
+            std::uint64_t& signature,
+            const TValue& value) noexcept
+        {
+            if constexpr (std::is_same_v<TValue, bool>)
+            {
+                MixDirectMeshSignature(signature, value ? 1u : 0u);
+            }
+            else if constexpr (std::is_same_v<TValue, std::int32_t>)
+            {
+                MixDirectMeshSignature(
+                    signature,
+                    std::bit_cast<std::uint32_t>(value));
+            }
+            else if constexpr (
+                std::is_same_v<TValue, std::uint32_t> ||
+                std::is_same_v<TValue, std::uint64_t>)
+            {
+                MixDirectMeshSignature(signature, value);
+            }
+            else if constexpr (std::is_same_v<TValue, float>)
+            {
+                MixDirectMeshSignature(
+                    signature,
+                    std::bit_cast<std::uint32_t>(value));
+            }
+            else if constexpr (std::is_same_v<TValue, double>)
+            {
+                MixDirectMeshSignature(
+                    signature,
+                    std::bit_cast<std::uint64_t>(value));
+            }
+            else if constexpr (std::is_same_v<TValue, glm::vec2>)
+            {
+                MixDirectMeshPropertyValue(signature, value.x);
+                MixDirectMeshPropertyValue(signature, value.y);
+            }
+            else if constexpr (std::is_same_v<TValue, glm::vec3>)
+            {
+                MixDirectMeshPropertyValue(signature, value.x);
+                MixDirectMeshPropertyValue(signature, value.y);
+                MixDirectMeshPropertyValue(signature, value.z);
+            }
+            else if constexpr (std::is_same_v<TValue, glm::vec4>)
+            {
+                MixDirectMeshPropertyValue(signature, value.x);
+                MixDirectMeshPropertyValue(signature, value.y);
+                MixDirectMeshPropertyValue(signature, value.z);
+                MixDirectMeshPropertyValue(signature, value.w);
+            }
+            else if constexpr (std::is_same_v<
+                                   TValue,
+                                   Geometry::HalfedgeMesh::VertexConnectivity>)
+            {
+                MixDirectMeshSignature(signature, value.Halfedge.Index);
+            }
+            else if constexpr (std::is_same_v<
+                                   TValue,
+                                   Geometry::HalfedgeMesh::HalfedgeConnectivity>)
+            {
+                MixDirectMeshSignature(signature, value.Vertex.Index);
+                MixDirectMeshSignature(signature, value.Next.Index);
+                MixDirectMeshSignature(signature, value.Prev.Index);
+            }
+            else if constexpr (std::is_same_v<
+                                   TValue,
+                                   Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>)
+            {
+                MixDirectMeshSignature(signature, value.Face.Index);
+            }
+            else if constexpr (std::is_same_v<
+                                   TValue,
+                                   Geometry::HalfedgeMesh::FaceConnectivity>)
+            {
+                MixDirectMeshSignature(signature, value.Halfedge.Index);
+            }
+        }
+
+        template <typename TValue>
+        [[nodiscard]] bool AppendDirectMeshTypedPropertySignature(
+            std::uint64_t& signature,
+            const Geometry::PropertySet& properties,
+            const Geometry::PropertyDescriptor& descriptor)
+        {
+            const auto property = properties.Get<TValue>(descriptor.Name);
+            if (!property ||
+                property.Vector().size() != descriptor.ElementCount)
+            {
+                return false;
+            }
+
+            if constexpr (std::is_same_v<TValue, bool>)
+            {
+                for (const bool value : property.Vector())
+                    MixDirectMeshPropertyValue(signature, value);
+            }
+            else
+            {
+                for (const TValue& value : property.Vector())
+                    MixDirectMeshPropertyValue(signature, value);
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool AppendDirectMeshPropertySetSignature(
+            std::uint64_t& signature,
+            const std::uint64_t domainTag,
+            const Geometry::PropertySet* properties,
+            const std::size_t deletedCount)
+        {
+            MixDirectMeshSignature(signature, domainTag);
+            if (properties == nullptr)
+            {
+                MixDirectMeshSignature(signature, 0u);
+                return true;
+            }
+
+            MixDirectMeshSignature(signature, 1u);
+            MixDirectMeshSignature(
+                signature,
+                static_cast<std::uint64_t>(properties->Size()));
+            MixDirectMeshSignature(
+                signature,
+                static_cast<std::uint64_t>(deletedCount));
+            const std::vector<Geometry::PropertyDescriptor> descriptors =
+                properties->Registry().Descriptors(false);
+            MixDirectMeshSignature(
+                signature,
+                static_cast<std::uint64_t>(descriptors.size()));
+
+            std::uint64_t order = 0u;
+            for (const Geometry::PropertyDescriptor& descriptor : descriptors)
+            {
+                MixDirectMeshSignature(signature, order++);
+                MixDirectMeshSignatureString(signature, descriptor.Name);
+                MixDirectMeshSignature(
+                    signature,
+                    static_cast<std::uint64_t>(descriptor.ValueKind));
+                MixDirectMeshSignature(
+                    signature,
+                    static_cast<std::uint64_t>(descriptor.ElementCount));
+
+                bool appended = false;
+                switch (descriptor.ValueKind)
+                {
+                case Geometry::PropertyValueKind::Bool:
+                    appended = AppendDirectMeshTypedPropertySignature<bool>(
+                        signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::Int32:
+                    appended =
+                        AppendDirectMeshTypedPropertySignature<std::int32_t>(
+                            signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::UInt32:
+                    appended =
+                        AppendDirectMeshTypedPropertySignature<std::uint32_t>(
+                            signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::UInt64:
+                    appended =
+                        AppendDirectMeshTypedPropertySignature<std::uint64_t>(
+                            signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::Float:
+                    appended = AppendDirectMeshTypedPropertySignature<float>(
+                        signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::Double:
+                    appended = AppendDirectMeshTypedPropertySignature<double>(
+                        signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::Vec2:
+                    appended = AppendDirectMeshTypedPropertySignature<glm::vec2>(
+                        signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::Vec3:
+                    appended = AppendDirectMeshTypedPropertySignature<glm::vec3>(
+                        signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::Vec4:
+                    appended = AppendDirectMeshTypedPropertySignature<glm::vec4>(
+                        signature, *properties, descriptor);
+                    break;
+                case Geometry::PropertyValueKind::Unknown:
+                    if (descriptor.Name == "v:connectivity")
+                    {
+                        appended = AppendDirectMeshTypedPropertySignature<
+                            Geometry::HalfedgeMesh::VertexConnectivity>(
+                                signature, *properties, descriptor);
+                    }
+                    else if (descriptor.Name == "h:connectivity")
+                    {
+                        appended = AppendDirectMeshTypedPropertySignature<
+                            Geometry::HalfedgeMesh::HalfedgeConnectivity>(
+                                signature, *properties, descriptor);
+                    }
+                    else if (descriptor.Name == "h:face")
+                    {
+                        appended = AppendDirectMeshTypedPropertySignature<
+                            Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>(
+                                signature, *properties, descriptor);
+                    }
+                    else if (descriptor.Name == "f:connectivity")
+                    {
+                        appended = AppendDirectMeshTypedPropertySignature<
+                            Geometry::HalfedgeMesh::FaceConnectivity>(
+                                signature, *properties, descriptor);
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                    break;
+                }
+                if (!appended)
+                    return false;
+            }
+            return true;
+        }
+
+        void AppendDirectMeshPropertyRefSignature(
+            std::uint64_t& signature,
+            const GeometryPropertyRef& property)
+        {
+            MixDirectMeshSignature(
+                signature,
+                static_cast<std::uint64_t>(property.Domain));
+            MixDirectMeshSignatureString(signature, property.Name);
+            MixDirectMeshSignature(
+                signature,
+                static_cast<std::uint64_t>(property.ValueKind));
+        }
+
+        [[nodiscard]] std::optional<std::uint64_t>
+        CaptureDirectMeshGenerationSignature(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            namespace GS = ECS::Components::GeometrySources;
+            const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+            if (!view.Valid() || view.ActiveDomain != GS::Domain::Mesh)
+                return std::nullopt;
+
+            std::uint64_t signature = kDirectMeshSignatureOffset;
+            MixDirectMeshSignature(
+                signature,
+                static_cast<std::uint64_t>(view.ActiveDomain));
+            MixDirectMeshSignature(
+                signature,
+                view.HasMeshTopologyMarker ? 1u : 0u);
+            MixDirectMeshSignature(
+                signature,
+                view.HasGraphTopologyMarker ? 1u : 0u);
+
+            if (!AppendDirectMeshPropertySetSignature(
+                    signature,
+                    1u,
+                    view.VertexSource != nullptr
+                        ? &view.VertexSource->Properties
+                        : nullptr,
+                    view.VertexSource != nullptr
+                        ? view.VertexSource->NumDeleted
+                        : 0u) ||
+                !AppendDirectMeshPropertySetSignature(
+                    signature,
+                    2u,
+                    view.EdgeSource != nullptr
+                        ? &view.EdgeSource->Properties
+                        : nullptr,
+                    view.EdgeSource != nullptr
+                        ? view.EdgeSource->NumDeleted
+                        : 0u) ||
+                !AppendDirectMeshPropertySetSignature(
+                    signature,
+                    3u,
+                    view.HalfedgeSource != nullptr
+                        ? &view.HalfedgeSource->Properties
+                        : nullptr,
+                    0u) ||
+                !AppendDirectMeshPropertySetSignature(
+                    signature,
+                    4u,
+                    view.FaceSource != nullptr
+                        ? &view.FaceSource->Properties
+                        : nullptr,
+                    view.FaceSource != nullptr
+                        ? view.FaceSource->NumDeleted
+                        : 0u))
+            {
+                return std::nullopt;
+            }
+
+            if (const auto* bindings =
+                    raw.try_get<VertexChannelBindingSet>(entity))
+            {
+                MixDirectMeshSignature(signature, 1u);
+                MixDirectMeshSignature(
+                    signature,
+                    bindings->BindingGeneration);
+                MixDirectMeshSignature(
+                    signature,
+                    bindings->Normal.Enabled ? 1u : 0u);
+                AppendDirectMeshPropertyRefSignature(
+                    signature,
+                    bindings->Normal.Property);
+                MixDirectMeshSignature(
+                    signature,
+                    bindings->Color.Enabled ? 1u : 0u);
+                AppendDirectMeshPropertyRefSignature(
+                    signature,
+                    bindings->Color.Property);
+            }
+            else
+            {
+                MixDirectMeshSignature(signature, 0u);
+            }
+
+            return signature;
+        }
 
         [[nodiscard]] std::string FileNameFromPath(const std::string_view path)
         {
@@ -235,58 +605,19 @@ namespace Extrinsic::Runtime
             ECS::Components::DirtyTags::MarkEdgeTopologyDirty(raw, entity);
         }
 
-        [[nodiscard]] std::vector<glm::vec3> SnapshotCurrentMeshVertexNormals(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity)
-        {
-            namespace GS = ECS::Components::GeometrySources;
-
-            const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-            if (!view.Valid() || view.ActiveDomain != GS::Domain::Mesh ||
-                view.VertexSource == nullptr)
-            {
-                return {};
-            }
-
-            const auto normals =
-                view.VertexSource->Properties.Get<glm::vec3>(
-                    GS::PropertyNames::kNormal);
-            if (!normals)
-            {
-                return {};
-            }
-
-            return std::vector<glm::vec3>(
-                normals.Vector().begin(),
-                normals.Vector().end());
-        }
-
-        [[nodiscard]] bool RestoreMeshVertexNormalsIfCompatible(
+        void UpdateDirectMeshEnrichmentState(
             entt::registry& raw,
             const ECS::EntityHandle entity,
-            const std::vector<glm::vec3>& normals)
+            const JobToken job,
+            const JobState status,
+            std::string diagnostic)
         {
-            if (normals.empty())
-            {
-                return false;
-            }
-
-            namespace GS = ECS::Components::GeometrySources;
-            auto* vertices = raw.try_get<GS::Vertices>(entity);
-            if (vertices == nullptr)
-            {
-                return false;
-            }
-
-            auto target =
-                vertices->Properties.Get<glm::vec3>(GS::PropertyNames::kNormal);
-            if (!target || target.Vector().size() != normals.size())
-            {
-                return false;
-            }
-
-            target.Vector() = normals;
-            return true;
+            auto* enrichment =
+                raw.try_get<Internal::DirectMeshEnrichmentState>(entity);
+            if (enrichment == nullptr || enrichment->Job != job)
+                return;
+            enrichment->Status = status;
+            enrichment->Diagnostic = std::move(diagnostic);
         }
 
         // The deferred post-process only carries its outcome forward in the
@@ -398,7 +729,8 @@ namespace Extrinsic::Runtime
             const ECS::EntityHandle entity)
         {
             if (jobs == nullptr ||
-                entity == ECS::InvalidEntityHandle)
+                entity == ECS::InvalidEntityHandle ||
+                !scene.IsValid(entity))
             {
                 return;
             }
@@ -408,6 +740,37 @@ namespace Extrinsic::Runtime
             state->Payload = meshPayload;
             state->Entity = entity;
 
+            auto& raw = scene.Raw();
+            const std::optional<std::uint64_t> submittedSignature =
+                CaptureDirectMeshGenerationSignature(raw, entity);
+            if (!submittedSignature.has_value())
+            {
+                raw.emplace_or_replace<
+                    Internal::DirectMeshEnrichmentState>(
+                    entity,
+                    Internal::DirectMeshEnrichmentState{
+                        .Status = JobState::Rejected,
+                        .Diagnostic =
+                            "Direct mesh enrichment was rejected because the "
+                            "published mesh source could not be signed.",
+                    });
+                Core::Log::Warn(
+                    "[Runtime] Direct mesh post-process signature capture "
+                    "failed: path='{}'",
+                    state->Path);
+                return;
+            }
+
+            state->SubmittedSignature = *submittedSignature;
+            raw.emplace_or_replace<Internal::DirectMeshEnrichmentState>(
+                entity,
+                Internal::DirectMeshEnrichmentState{
+                    .Status = JobState::Queued,
+                    .Diagnostic =
+                        "Direct mesh enrichment is pending; geometry-mutating "
+                        "actions are disabled until it resolves.",
+                });
+
             const JobToken handle = jobs->Submit(
                 JobDesc{
                     .DebugName = "Runtime.DirectMeshPostProcess." +
@@ -416,6 +779,7 @@ namespace Extrinsic::Runtime
                     .Priority = Core::Dag::TaskPriority::Low,
                     .Kind = RuntimeTaskKinds::AssetDecode,
                     .EstimatedCost = 8u,
+                    .CancellationGeneration = jobs->WorldGeneration(world),
                     .Work =
                         [state](const JobCancellation&)
                         {
@@ -442,6 +806,33 @@ namespace Extrinsic::Runtime
                                     .Entity = state->Entity,
                                 });
                         },
+                    .ValidateBeforeApply =
+                        [state, &scene]
+                        {
+                            if (!scene.IsValid(state->Entity))
+                                return JobApplyValidation::MissingTarget;
+
+                            const auto* enrichment = scene.Raw().try_get<
+                                Internal::DirectMeshEnrichmentState>(
+                                state->Entity);
+                            if (enrichment == nullptr ||
+                                enrichment->Job != state->Job)
+                            {
+                                return JobApplyValidation::StaleGeneration;
+                            }
+
+                            const std::optional<std::uint64_t>
+                                currentSignature =
+                                    CaptureDirectMeshGenerationSignature(
+                                        scene.Raw(),
+                                        state->Entity);
+                            if (!currentSignature.has_value() ||
+                                *currentSignature != state->SubmittedSignature)
+                            {
+                                return JobApplyValidation::StaleGeneration;
+                            }
+                            return JobApplyValidation::Current;
+                        },
                     .PublishCompletion =
                         [
                             state,
@@ -464,6 +855,16 @@ namespace Extrinsic::Runtime
                             if (state->Error != Core::ErrorCode::Success ||
                                 !state->Materialized.has_value())
                             {
+                                if (scene.IsValid(state->Entity))
+                                {
+                                    UpdateDirectMeshEnrichmentState(
+                                        scene.Raw(),
+                                        state->Entity,
+                                        state->Job,
+                                        JobState::Dropped,
+                                        "Direct mesh enrichment failed while "
+                                        "materializing the imported mesh.");
+                                }
                                 Core::Log::Warn(
                                     "[Runtime] Deferred mesh post-process failed: path='{}' error={}",
                                     state->Path,
@@ -477,21 +878,19 @@ namespace Extrinsic::Runtime
                             }
 
                             auto& raw = scene.Raw();
-                            const std::vector<glm::vec3> currentNormals =
-                                SnapshotCurrentMeshVertexNormals(
-                                    raw,
-                                    state->Entity);
                             Geometry::HalfedgeMesh::Mesh mesh =
                                 std::move(state->Materialized->Mesh);
                             ECS::Components::GeometrySources::PopulateFromMesh(
                                 raw,
                                 state->Entity,
                                 mesh);
-                            (void)RestoreMeshVertexNormalsIfCompatible(
+                            MarkMeshGeometryDirty(raw, state->Entity);
+                            UpdateDirectMeshEnrichmentState(
                                 raw,
                                 state->Entity,
-                                currentNormals);
-                            MarkMeshGeometryDirty(raw, state->Entity);
+                                state->Job,
+                                JobState::Published,
+                                "Direct mesh enrichment applied successfully.");
 
                             if (textureBake != nullptr)
                             {
@@ -528,16 +927,66 @@ namespace Extrinsic::Runtime
                             }
                             return true;
                         },
+                    .FinalizeUnpublishedOnMainThread =
+                        [state, &scene, jobs]
+                        {
+                            if (!scene.IsValid(state->Entity))
+                                return;
+
+                            const JobState status = jobs->GetState(state->Job);
+                            std::string diagnostic;
+                            if (status == JobState::StaleDiscarded)
+                            {
+                                diagnostic =
+                                    "Direct mesh enrichment was discarded "
+                                    "because the entity, geometry, source "
+                                    "properties, bindings, or world changed "
+                                    "after submission.";
+                            }
+                            else if (status == JobState::Cancelled)
+                            {
+                                diagnostic =
+                                    "Direct mesh enrichment was cancelled "
+                                    "before it could be applied.";
+                            }
+                            else
+                            {
+                                diagnostic =
+                                    "Direct mesh enrichment ended without "
+                                    "applying its result.";
+                            }
+                            UpdateDirectMeshEnrichmentState(
+                                scene.Raw(),
+                                state->Entity,
+                                state->Job,
+                                status,
+                                std::move(diagnostic));
+                        },
                 });
+
+            state->Job = handle;
 
             if (handle.IsValid())
             {
+                auto* enrichment = raw.try_get<
+                    Internal::DirectMeshEnrichmentState>(entity);
+                if (enrichment != nullptr && !enrichment->Job.IsValid())
+                    enrichment->Job = handle;
                 Core::Log::Info(
                     "[Runtime] Queued direct mesh post-process: path='{}'",
                     state->Path);
             }
             else
             {
+                auto* enrichment = raw.try_get<
+                    Internal::DirectMeshEnrichmentState>(entity);
+                if (enrichment != nullptr && !enrichment->Job.IsValid())
+                {
+                    enrichment->Status = JobState::Rejected;
+                    enrichment->Diagnostic =
+                        "Direct mesh enrichment could not be submitted to the "
+                        "runtime job lane.";
+                }
                 Core::Log::Warn(
                     "[Runtime] Direct mesh post-process queue submission failed: path='{}'",
                     state->Path);

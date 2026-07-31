@@ -1,0 +1,45 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 1031: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit
+1/3 Test #1031: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit ...   Passed    0.06 sec
+    Start 1032: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties
+2/3 Test #1032: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties ...   Passed    0.06 sec
+    Start 1033: SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions
+3/3 Test #1033: SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions ......***Failed    0.06 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from SandboxEditorUi
+[ RUN      ] SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/runtime_mesh_postprocess_pending_readiness.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/runtime_mesh_postprocess_pending_readiness.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp:3688: Failure
+Expected equality of these values:
+  jobs.GetState(enrichmentJob)
+    Which is: 1-byte object <00>
+  Runtime::JobState::Published
+    Which is: 1-byte object <06>
+
+[  FAILED  ] SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions (54 ms)
+[----------] 1 test from SandboxEditorUi (54 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (54 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions
+
+ 1 FAILED TEST
+
+
+67% tests passed, 1 tests failed out of 3
+
+Label Time Summary:
+contract    =   0.18 sec*proc (3 tests)
+runtime     =   0.18 sec*proc (3 tests)
+
+Total Test time (real) =   0.57 sec
+
+The following tests FAILED:
+	1033 - SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions (Failed) contract runtime

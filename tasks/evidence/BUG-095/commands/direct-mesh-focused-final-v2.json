@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^SandboxEditorUi\\.(DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit|DirectMeshPostProcessPreservesNewerUvAndSourceProperties|DirectMeshPostProcessPendingStateGatesMutatingActions)$",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\\.(DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit|DirectMeshPostProcessPreservesNewerUvAndSourceProperties|DirectMeshPostProcessPendingStateGatesMutatingActions)$' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 604,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T13:36:20Z",
+  "label": "direct-mesh-focused-final-v2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T13:36:20Z",
+  "stderr_path": "tasks/evidence/BUG-095/commands/direct-mesh-focused-final-v2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-095/commands/direct-mesh-focused-final-v2.stdout.log",
+  "stdout_sha256": "7e80e4da4ff21d72d8c406315c74889f4a627bc6f370b8ebf3b0b6b830ea2775",
+  "task_id": "BUG-095"
+}
