@@ -11,7 +11,7 @@ module;
 #include <utility>
 #include <vector>
 
-export module Extrinsic.Runtime.AssetImportPipeline;
+export module Extrinsic.Runtime.AssetWorkflowImportExecutor;
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.ImportRouter;
@@ -23,6 +23,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.AssetIngestStateMachine;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
@@ -37,135 +38,7 @@ import Geometry.HalfedgeMesh.IO;
 
 namespace Extrinsic::Runtime
 {
-    export enum class AssetImportStage : std::uint8_t
-    {
-        Route,
-        Decode,
-        CpuMaterialize,
-        EcsAuthor,
-        Postprocess,
-        GpuResidency,
-        Complete,
-    };
-
-    export struct ImportAuthoringRecipe
-    {
-        bool AuthorRenderableComponents{true};
-        bool AuthorSelectableIdentity{true};
-    };
-
-    export enum class AssetImportPostprocessPolicy : std::uint8_t
-    {
-        None,
-        PrepareRenderableGeometry,
-    };
-
-    export struct AssetImportCompletionRecipe
-    {
-        bool SelectFirstCreatedEntity{true};
-        bool FocusCameraOnCreatedGeometry{true};
-    };
-
-    export struct AssetImportRecipe
-    {
-        std::string Path{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        RuntimeAssetIngestSource Source{RuntimeAssetIngestSource::ManualImport};
-        Assets::AssetId ExistingAsset{};
-        ImportAuthoringRecipe Authoring{};
-        AssetImportPostprocessPolicy Postprocess{
-            AssetImportPostprocessPolicy::PrepareRenderableGeometry};
-        AssetImportCompletionRecipe Completion{};
-    };
-
-    export struct AssetImportExecutionIdentity
-    {
-        RuntimeAssetIngestHandle Request{};
-        WorldHandle World{};
-        std::uint64_t BindingGeneration{0u};
-        std::uint64_t CancellationGeneration{0u};
-
-        [[nodiscard]] friend bool operator==(
-            const AssetImportExecutionIdentity&,
-            const AssetImportExecutionIdentity&) noexcept = default;
-    };
-
-    export struct AssetImportStageResult
-    {
-        AssetImportExecutionIdentity Identity{};
-        AssetImportStage Stage{AssetImportStage::Route};
-        Core::ErrorCode Error{Core::ErrorCode::Success};
-        RuntimeAssetIngestDiagnostic Diagnostic{RuntimeAssetIngestDiagnostic::None};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Error == Core::ErrorCode::Success;
-        }
-    };
-
-    export struct AssetImportStageTrace
-    {
-        AssetImportExecutionIdentity Identity{};
-        std::vector<AssetImportStageResult> Results{};
-        bool Terminal{false};
-    };
-
-    export [[nodiscard]] Core::Result ValidateAssetImportRecipe(
-        const AssetImportRecipe& recipe) noexcept;
-
-    export [[nodiscard]] Core::Result AppendAssetImportStageResult(
-        AssetImportStageTrace& trace,
-        AssetImportStageResult result);
-
-    export struct RuntimeAssetImportRequest
-    {
-        std::string Path{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-    };
-
-    export struct RuntimeAssetReimportRequest
-    {
-        Assets::AssetId Asset{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-    };
-
-    export using RuntimeIOBackendFactory =
-        std::function<std::unique_ptr<Core::IO::IIOBackend>()>;
-
-    export struct RuntimeAssetImportResult
-    {
-        Assets::AssetId Asset{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-        std::uint64_t PrimitiveEntitiesCreated{0};
-        std::uint64_t EmbeddedTextureAssetsCreated{0};
-        std::uint64_t TextureUploadRequests{0};
-        bool MaterializedModelScene{false};
-        bool RequestedTextureUpload{false};
-    };
-
-    export struct RuntimeAssetImportEvent
-    {
-        std::uint64_t Sequence{0};
-        std::string Path{};
-        Assets::AssetPayloadKind RequestedPayloadKind{Assets::AssetPayloadKind::Unknown};
-        Core::ErrorCode Error{Core::ErrorCode::Success};
-        RuntimeAssetIngestDiagnostic IngestDiagnostic{RuntimeAssetIngestDiagnostic::None};
-        std::optional<RuntimeAssetImportResult> Result{};
-        std::optional<AssetImportStageTrace> StageTrace{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Result.has_value() && Error == Core::ErrorCode::Success;
-        }
-    };
-
-    export struct RuntimeQueuedAssetImport
-    {
-        RuntimeAssetIngestHandle Operation{};
-        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
-    };
-
-    export struct AssetImportPipelineDependencies
+    export struct AssetWorkflowImportExecutorDependencies
     {
         const bool* Initialized{};
         const Core::Config::EngineConfig* Config{};
@@ -218,18 +91,22 @@ namespace Extrinsic::Runtime
         }
     };
 
-    export class AssetImportPipeline
+    export class AssetWorkflowImportExecutor
     {
     public:
-        AssetImportPipeline() = default;
-        explicit AssetImportPipeline(AssetImportPipelineDependencies dependencies);
+        AssetWorkflowImportExecutor() = default;
+        explicit AssetWorkflowImportExecutor(
+            AssetWorkflowImportExecutorDependencies dependencies);
 
-        AssetImportPipeline(const AssetImportPipeline&) = delete;
-        AssetImportPipeline& operator=(const AssetImportPipeline&) = delete;
-        AssetImportPipeline(AssetImportPipeline&&) = delete;
-        AssetImportPipeline& operator=(AssetImportPipeline&&) = delete;
+        AssetWorkflowImportExecutor(const AssetWorkflowImportExecutor&) = delete;
+        AssetWorkflowImportExecutor& operator=(
+            const AssetWorkflowImportExecutor&) = delete;
+        AssetWorkflowImportExecutor(AssetWorkflowImportExecutor&&) = delete;
+        AssetWorkflowImportExecutor& operator=(
+            AssetWorkflowImportExecutor&&) = delete;
 
-        void SetDependencies(AssetImportPipelineDependencies dependencies) noexcept;
+        void SetDependencies(
+            AssetWorkflowImportExecutorDependencies dependencies) noexcept;
 
         [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport> QueueAssetImport(
             AssetImportRecipe recipe);

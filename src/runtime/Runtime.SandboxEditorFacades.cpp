@@ -62,7 +62,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Platform.Window;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetImportPolicies;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -12671,7 +12671,7 @@ namespace Extrinsic::Runtime
             SceneInteractionModule* const interaction  = services.Find<SceneInteractionModule>();
             SelectionController* const selection       = services.Find<SelectionController>();
             Assets::AssetService* const assetService   = services.Find<Assets::AssetService>();
-            AssetImportPipeline* const assetImportPipeline = services.Find<AssetImportPipeline>();
+            AssetWorkflowModule* const assetImportPipeline = services.Find<AssetWorkflowModule>();
             TextureBakeService* const textureBake          = services.Find<TextureBakeService>();
             SandboxEditorContext context{
                 .Scene          = activeScene,
@@ -18967,8 +18967,8 @@ namespace Extrinsic::Runtime
         {
             return false;
         }
-        const AssetImportPipeline* const assetImportPipeline =
-            m_Services->Find<AssetImportPipeline>();
+        const AssetWorkflowModule* const assetImportPipeline =
+            m_Services->Find<AssetWorkflowModule>();
         const std::optional<RuntimeAssetImportEvent>* const runtimeImport =
             assetImportPipeline != nullptr
                 ? &assetImportPipeline->GetLastAssetImportEvent()

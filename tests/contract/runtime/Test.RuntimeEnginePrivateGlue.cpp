@@ -706,7 +706,7 @@ TEST(RuntimeEnginePrivateGlue,
         std::string{"GetPendingObjectSpaceNormalBake"} +
             "CountForTest(",
         "m_AssetService",
-        "m_AssetImportPipeline",
+        "m_AssetWorkflowModule",
         "m_AssetResidencyService",
         "m_ObjectSpaceNormalBakeService",
         "BindActiveSceneAssetHandoffs",
@@ -729,9 +729,9 @@ TEST(RuntimeEnginePrivateGlue,
     constexpr std::string_view ownedCompositionTokens[] = {
         "std::unique_ptr<Assets::AssetService> Assets{}",
         "std::unique_ptr<Graphics::GpuAssetCache> Cache{}",
-        "AssetImportPipeline Pipeline{}",
+        "AssetWorkflowImportExecutor ImportExecutor{}",
         "Provide<Assets::AssetService>",
-        "Provide<AssetImportPipeline>",
+        "Provide<AssetWorkflowModule>",
         "Provide<Graphics::GpuAssetCache>",
         "Provide<Core::IAssetFrameHooks>",
         "std::make_unique<AssetModelTextureHandoff>",
@@ -806,7 +806,7 @@ TEST(RuntimeEnginePrivateGlue,
                   "Core::IAssetFrameHooks>()"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "m_Impl->m_ServiceRegistry.Find<AssetImportPipeline>()"),
+                  "m_Impl->m_ServiceRegistry.Find<AssetWorkflowModule>()"),
               std::string::npos);
     EXPECT_NE(frameLoop.find("if (AssetWorkflow != nullptr)"),
               std::string::npos);

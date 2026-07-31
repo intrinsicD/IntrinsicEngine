@@ -41,7 +41,7 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
@@ -195,9 +195,9 @@ namespace
             ObserveServices(engine);
             if (ExpectAssets && !ImportPath.empty())
             {
-                Runtime::AssetImportPipeline* const pipeline =
+                Runtime::AssetWorkflowModule* const pipeline =
                     engine.Services()
-                        .Find<Runtime::AssetImportPipeline>();
+                        .Find<Runtime::AssetWorkflowModule>();
                 ASSERT_NE(pipeline, nullptr);
                 auto imported =
                     pipeline->ImportAssetFromPath(
@@ -221,9 +221,9 @@ namespace
             ObserveServices(engine);
             if (ExpectAssets && !ImportPath.empty())
             {
-                Runtime::AssetImportPipeline* const pipeline =
+                Runtime::AssetWorkflowModule* const pipeline =
                     engine.Services()
-                        .Find<Runtime::AssetImportPipeline>();
+                        .Find<Runtime::AssetWorkflowModule>();
                 ASSERT_NE(pipeline, nullptr);
                 auto imported =
                     pipeline->ImportAssetFromPath(
@@ -246,7 +246,7 @@ namespace
                 engine.Services()
                     .Find<Assets::AssetService>() != nullptr &&
                 engine.Services()
-                    .Find<Runtime::AssetImportPipeline>() !=
+                    .Find<Runtime::AssetWorkflowModule>() !=
                     nullptr &&
                 engine.Services()
                     .Find<Graphics::GpuAssetCache>() !=
@@ -339,7 +339,7 @@ namespace
                 context.Services.Find<Assets::AssetService>() !=
                     nullptr &&
                 context.Services
-                        .Find<Runtime::AssetImportPipeline>() !=
+                        .Find<Runtime::AssetWorkflowModule>() !=
                     nullptr &&
                 context.Services
                         .Find<Graphics::GpuAssetCache>() !=
@@ -791,8 +791,8 @@ TEST(AssetWorkflowModule,
 
     Assets::AssetService* const firstAssets =
         harness.Services.Find<Assets::AssetService>();
-    Runtime::AssetImportPipeline* const firstPipeline =
-        harness.Services.Find<Runtime::AssetImportPipeline>();
+    Runtime::AssetWorkflowModule* const firstPipeline =
+        harness.Services.Find<Runtime::AssetWorkflowModule>();
     Graphics::GpuAssetCache* const firstCache =
         harness.Services.Find<Graphics::GpuAssetCache>();
     Core::IAssetFrameHooks* const firstHooks =
@@ -845,7 +845,7 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Assets::AssetService>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -857,7 +857,7 @@ TEST(AssetWorkflowModule,
     ASSERT_TRUE(harness.Start(
         /*assetFirst=*/false).has_value());
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         firstPipeline);
     EXPECT_NE(
         harness.Services.Find<Assets::AssetService>(),
@@ -1099,7 +1099,7 @@ TEST(
         ASSERT_TRUE(harness.ProvideBuiltins().has_value());
 
         Assets::AssetService existingAssets{};
-        Runtime::AssetImportPipeline existingPipeline{};
+        Runtime::AssetWorkflowModule existingPipeline{};
         Graphics::GpuAssetCache existingCache{
             harness.Renderer->GetBufferManager(),
             harness.Renderer->GetTextureManager(),
@@ -1117,7 +1117,7 @@ TEST(
             break;
         case Conflict::Pipeline:
             ASSERT_TRUE(harness.Services
-                .Provide<Runtime::AssetImportPipeline>(
+                .Provide<Runtime::AssetWorkflowModule>(
                     existingPipeline, "Conflict")
                 .has_value());
             break;
@@ -1147,7 +1147,7 @@ TEST(
                 ? &existingAssets
                 : nullptr);
         EXPECT_EQ(
-            harness.Services.Find<Runtime::AssetImportPipeline>(),
+            harness.Services.Find<Runtime::AssetWorkflowModule>(),
             conflict == Conflict::Pipeline
                 ? &existingPipeline
                 : nullptr);
@@ -1184,7 +1184,7 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Assets::AssetService>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -1218,7 +1218,7 @@ TEST(AssetWorkflowModule,
             harness.Services.Find<Assets::AssetService>(),
             nullptr);
         EXPECT_EQ(
-            harness.Services.Find<Runtime::AssetImportPipeline>(),
+            harness.Services.Find<Runtime::AssetWorkflowModule>(),
             nullptr);
         EXPECT_EQ(
             harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -1265,7 +1265,7 @@ TEST(AssetWorkflowModule,
             harness.Services.Find<Assets::AssetService>(),
             nullptr);
         EXPECT_EQ(
-            harness.Services.Find<Runtime::AssetImportPipeline>(),
+            harness.Services.Find<Runtime::AssetWorkflowModule>(),
             nullptr);
         EXPECT_EQ(
             harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -1319,7 +1319,7 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Assets::AssetService>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -1342,8 +1342,8 @@ TEST(AssetWorkflowModule,
     DirectHarness harness;
     ASSERT_TRUE(harness.Start().has_value());
     harness.Initialized = true;
-    Runtime::AssetImportPipeline* const pipeline =
-        harness.Services.Find<Runtime::AssetImportPipeline>();
+    Runtime::AssetWorkflowModule* const pipeline =
+        harness.Services.Find<Runtime::AssetWorkflowModule>();
     Core::IAssetFrameHooks* const hooks =
         harness.Services.Find<Core::IAssetFrameHooks>();
     Graphics::GpuAssetCache* const cache =
@@ -1830,8 +1830,8 @@ TEST(AssetWorkflowModule,
     harness.Services.Lock();
     harness.Initialized = true;
 
-    Runtime::AssetImportPipeline* const pipeline =
-        harness.Services.Find<Runtime::AssetImportPipeline>();
+    Runtime::AssetWorkflowModule* const pipeline =
+        harness.Services.Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     EXPECT_EQ(
         harness.Services.Find<Runtime::SelectionController>(),
@@ -1874,7 +1874,7 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Assets::AssetService>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Runtime::AssetImportPipeline>(),
+        harness.Services.Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
@@ -2016,7 +2016,7 @@ TEST(AssetWorkflowModule,
      BakeParticipantRegistersOncePerBootAndCleansBeforeOwnedState)
 {
     DirectHarness harness;
-    Runtime::AssetImportPipeline* persistentPipeline =
+    Runtime::AssetWorkflowModule* persistentPipeline =
         nullptr;
 
     for (std::uint32_t boot = 0u; boot < 2u; ++boot)
@@ -2025,9 +2025,9 @@ TEST(AssetWorkflowModule,
         ASSERT_TRUE(harness.Start().has_value());
         harness.Initialized = true;
 
-        Runtime::AssetImportPipeline* const pipeline =
+        Runtime::AssetWorkflowModule* const pipeline =
             harness.Services.Find<
-                Runtime::AssetImportPipeline>();
+                Runtime::AssetWorkflowModule>();
         ASSERT_NE(pipeline, nullptr);
         if (persistentPipeline == nullptr)
             persistentPipeline = pipeline;
@@ -2096,7 +2096,7 @@ TEST(AssetWorkflowModule,
         // before the asset/cache owners were torn down.
         EXPECT_EQ(
             harness.Services.Find<
-                Runtime::AssetImportPipeline>(),
+                Runtime::AssetWorkflowModule>(),
             nullptr);
     }
 }
@@ -2159,9 +2159,9 @@ TEST(AssetWorkflowModule,
         harness.Services.Lock();
         harness.Initialized = true;
 
-        Runtime::AssetImportPipeline* const pipeline =
+        Runtime::AssetWorkflowModule* const pipeline =
             harness.Services.Find<
-                Runtime::AssetImportPipeline>();
+                Runtime::AssetWorkflowModule>();
         Runtime::EditorCommandHistory* const history =
             harness.Services.Find<
                 Runtime::EditorCommandHistory>();
@@ -2405,7 +2405,7 @@ TEST(AssetWorkflowModule,
         nullptr);
     EXPECT_EQ(
         engine.Services()
-            .Find<Runtime::AssetImportPipeline>(),
+            .Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_EQ(
         engine.Services().Find<Graphics::GpuAssetCache>(),
@@ -2475,9 +2475,9 @@ TEST(AssetWorkflowModule,
     engine.EmplaceModule<Runtime::TextureBakeModule>();
 
     engine.Initialize();
-    Runtime::AssetImportPipeline* const firstPipeline =
+    Runtime::AssetWorkflowModule* const firstPipeline =
         engine.Services()
-            .Find<Runtime::AssetImportPipeline>();
+            .Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(firstPipeline, nullptr);
     engine.Run();
     engine.Shutdown();
@@ -2485,7 +2485,7 @@ TEST(AssetWorkflowModule,
     engine.Initialize();
     EXPECT_EQ(
         engine.Services()
-            .Find<Runtime::AssetImportPipeline>(),
+            .Find<Runtime::AssetWorkflowModule>(),
         firstPipeline);
     engine.Run();
     engine.Shutdown();

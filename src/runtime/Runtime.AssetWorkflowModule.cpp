@@ -1,11 +1,16 @@
 module;
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
+#include <span>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <entt/entity/registry.hpp>
 
@@ -25,7 +30,7 @@ import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowImportExecutor;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
@@ -49,7 +54,7 @@ namespace Extrinsic::Runtime
     {
         struct State
         {
-            AssetImportPipeline* Pipeline{nullptr};
+            AssetWorkflowImportExecutor* ImportExecutor{nullptr};
             TextureBakeService* TextureBake{nullptr};
 
             JobService* Jobs{nullptr};
@@ -425,16 +430,16 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            void DetachPipeline() noexcept
+            void DetachImportExecutor() noexcept
             {
-                if (Pipeline != nullptr)
-                    Pipeline->SetDependencies({});
+                if (ImportExecutor != nullptr)
+                    ImportExecutor->SetDependencies({});
             }
 
             void DestroySceneBinding(
                 const bool clearRenderAndBakeState)
             {
-                DetachPipeline();
+                DetachImportExecutor();
 
                 if (clearRenderAndBakeState)
                 {
@@ -469,9 +474,9 @@ namespace Extrinsic::Runtime
                     TextureHandoff == nullptr ||
                     Renderer == nullptr ||
                     Device == nullptr ||
-                    Pipeline == nullptr)
+                    ImportExecutor == nullptr)
                 {
-                    DetachPipeline();
+                    DetachImportExecutor();
                     return;
                 }
 
@@ -500,8 +505,8 @@ namespace Extrinsic::Runtime
                             .TextureBake = TextureBake,
                         });
 
-                Pipeline->SetDependencies(
-                    AssetImportPipelineDependencies{
+                ImportExecutor->SetDependencies(
+                    AssetWorkflowImportExecutorDependencies{
                         .Initialized = Initialized,
                         .Config = Config,
                         .Jobs = Jobs,
@@ -592,9 +597,9 @@ namespace Extrinsic::Runtime
                 ShutdownAnnounced = true;
 
                 // Cancellation needs the still-live optional streaming owner.
-                if (Pipeline != nullptr)
-                    Pipeline->CancelActiveAssetImportsForShutdown();
-                DetachPipeline();
+                if (ImportExecutor != nullptr)
+                    ImportExecutor->CancelActiveAssetImportsForShutdown();
+                DetachImportExecutor();
 
                 AcceptingCallbacks = false;
                 // TextureBakeModule owns and quiesces its GPU queue before
@@ -620,13 +625,13 @@ namespace Extrinsic::Runtime
             }
         };
 
-        AssetImportPipeline Pipeline{};
+        AssetWorkflowImportExecutor ImportExecutor{};
         std::shared_ptr<State> Shared{};
         KernelEventSubscription ActiveWorldChangedSubscription{};
         KernelEventSubscription WorldDestroyedSubscription{};
         KernelEventSubscription ShutdownSubscription{};
         bool AssetServicePublished{false};
-        bool PipelinePublished{false};
+        bool WorkflowServicePublished{false};
         bool CachePublished{false};
         bool AssetHooksPublished{false};
 
@@ -677,12 +682,12 @@ namespace Extrinsic::Runtime
             }
             CachePublished = false;
 
-            if (PipelinePublished)
+            if (WorkflowServicePublished)
             {
-                (void)services->Withdraw<AssetImportPipeline>(
-                    Pipeline);
+                (void)services->Withdraw<AssetWorkflowModule>(
+                    module);
             }
-            PipelinePublished = false;
+            WorkflowServicePublished = false;
 
             if (Shared != nullptr &&
                 AssetServicePublished &&
@@ -726,7 +731,7 @@ namespace Extrinsic::Runtime
             {
                 auto& state = *Shared;
                 state.AcceptingCallbacks = false;
-                state.DetachPipeline();
+                state.DetachImportExecutor();
                 state.ReleaseDocumentParticipant();
             }
 
@@ -749,13 +754,104 @@ namespace Extrinsic::Runtime
         return "Runtime.AssetWorkflowModule";
     }
 
+    Core::Expected<RuntimeQueuedAssetImport>
+    AssetWorkflowModule::QueueAssetImport(AssetImportRecipe recipe)
+    {
+        return m_Impl->ImportExecutor.QueueAssetImport(std::move(recipe));
+    }
+
+    Core::Expected<RuntimeAssetImportResult>
+    AssetWorkflowModule::ImportAssetFromPath(RuntimeAssetImportRequest request)
+    {
+        return m_Impl->ImportExecutor.ImportAssetFromPath(std::move(request));
+    }
+
+    Core::Expected<RuntimeQueuedAssetImport>
+    AssetWorkflowModule::QueueModelTextureImport(RuntimeAssetImportRequest request)
+    {
+        return m_Impl->ImportExecutor.QueueModelTextureImport(
+            std::move(request));
+    }
+
+    Core::Expected<RuntimeQueuedAssetImport>
+    AssetWorkflowModule::QueueGeometryImport(RuntimeAssetImportRequest request)
+    {
+        return m_Impl->ImportExecutor.QueueGeometryImport(std::move(request));
+    }
+
+    Core::Expected<RuntimeAssetImportResult>
+    AssetWorkflowModule::ReimportAsset(RuntimeAssetReimportRequest request)
+    {
+        return m_Impl->ImportExecutor.ReimportAsset(std::move(request));
+    }
+
+    const std::optional<RuntimeAssetImportEvent>&
+    AssetWorkflowModule::GetLastAssetImportEvent() const noexcept
+    {
+        return m_Impl->ImportExecutor.GetLastAssetImportEvent();
+    }
+
+    std::vector<RuntimeAssetIngestRecord>
+    AssetWorkflowModule::GetAssetIngestRecordsForTest() const
+    {
+        return m_Impl->ImportExecutor.GetAssetIngestRecordsForTest();
+    }
+
+    void AssetWorkflowModule::SetModelTextureImportIOBackendFactoryForTest(
+        RuntimeIOBackendFactory factory)
+    {
+        m_Impl->ImportExecutor.SetModelTextureImportIOBackendFactoryForTest(
+            std::move(factory));
+    }
+
+    void AssetWorkflowModule::SetQueuedGeometryImportBeforeDecodeHookForTest(
+        std::function<void(const RuntimeAssetImportRequest&)> hook)
+    {
+        m_Impl->ImportExecutor.SetQueuedGeometryImportBeforeDecodeHookForTest(
+            std::move(hook));
+    }
+
+    RuntimeAssetImportQueueSnapshot
+    AssetWorkflowModule::GetAssetImportQueueSnapshot() const
+    {
+        return m_Impl->ImportExecutor.GetAssetImportQueueSnapshot();
+    }
+
+    TextureBakeService*
+    AssetWorkflowModule::GetTextureBakeServiceForTest() const noexcept
+    {
+        return m_Impl->ImportExecutor.GetTextureBakeServiceForTest();
+    }
+
+    std::size_t AssetWorkflowModule::ClearCompletedAssetImports()
+    {
+        return m_Impl->ImportExecutor.ClearCompletedAssetImports();
+    }
+
+    Core::Result AssetWorkflowModule::CancelAssetImport(
+        const RuntimeAssetIngestHandle operation)
+    {
+        return m_Impl->ImportExecutor.CancelAssetImport(operation);
+    }
+
+    void AssetWorkflowModule::CancelActiveAssetImportsForShutdown()
+    {
+        m_Impl->ImportExecutor.CancelActiveAssetImportsForShutdown();
+    }
+
+    void AssetWorkflowModule::ImportDroppedFilePaths(
+        const std::span<const std::string> paths)
+    {
+        m_Impl->ImportExecutor.ImportDroppedFilePaths(paths);
+    }
+
     Core::Result AssetWorkflowModule::OnRegister(
         EngineSetup& setup)
     {
         if (!m_Impl ||
             m_Impl->Shared ||
             m_Impl->AssetServicePublished ||
-            m_Impl->PipelinePublished ||
+            m_Impl->WorkflowServicePublished ||
             m_Impl->CachePublished ||
             m_Impl->AssetHooksPublished ||
             m_Impl->ActiveWorldChangedSubscription.IsValid() ||
@@ -765,7 +861,7 @@ namespace Extrinsic::Runtime
                 ServiceRegistryPhase::Registration ||
             setup.Services().Find<Assets::AssetService>() !=
                 nullptr ||
-            setup.Services().Find<AssetImportPipeline>() !=
+            setup.Services().Find<AssetWorkflowModule>() !=
                 nullptr ||
             setup.Services().Find<Graphics::GpuAssetCache>() !=
                 nullptr ||
@@ -801,7 +897,7 @@ namespace Extrinsic::Runtime
         m_Impl->Shared = std::make_shared<Impl::State>();
         auto& state = *m_Impl->Shared;
         state.Self = m_Impl->Shared;
-        state.Pipeline = &m_Impl->Pipeline;
+        state.ImportExecutor = &m_Impl->ImportExecutor;
         state.Jobs = &setup.Jobs();
         state.Worlds = &setup.Worlds();
         state.Initialized = setup.InitializedState();
@@ -869,8 +965,8 @@ namespace Extrinsic::Runtime
         m_Impl->AssetServicePublished = true;
 
         if (Core::Result provided =
-                setup.Services().Provide<AssetImportPipeline>(
-                    m_Impl->Pipeline, Name());
+                setup.Services().Provide<AssetWorkflowModule>(
+                    *this, Name());
             !provided.has_value())
         {
             m_Impl->RollBack(
@@ -881,7 +977,7 @@ namespace Extrinsic::Runtime
                 true);
             return provided;
         }
-        m_Impl->PipelinePublished = true;
+        m_Impl->WorkflowServicePublished = true;
 
         if (Core::Result provided =
                 setup.Services().Provide<Graphics::GpuAssetCache>(
@@ -966,13 +1062,12 @@ namespace Extrinsic::Runtime
 
         if (!m_Impl->Shared ||
             !m_Impl->AssetServicePublished ||
-            !m_Impl->PipelinePublished ||
+            !m_Impl->WorkflowServicePublished ||
             !m_Impl->CachePublished ||
             !m_Impl->AssetHooksPublished ||
             setup.Services().Find<Assets::AssetService>() !=
                 m_Impl->Shared->Assets.get() ||
-            setup.Services().Find<AssetImportPipeline>() !=
-                &m_Impl->Pipeline ||
+            setup.Services().Find<AssetWorkflowModule>() != this ||
             setup.Services().Find<Graphics::GpuAssetCache>() !=
                 m_Impl->Shared->Cache.get() ||
             setup.Services().Find<Core::IAssetFrameHooks>() !=

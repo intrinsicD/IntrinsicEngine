@@ -86,7 +86,7 @@ import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.Editor.Controller;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
@@ -3628,7 +3628,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
         "f 1/1 2/2 3/3\n",
     };
 
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
         Extrinsic::Runtime::RuntimeAssetImportRequest{
             .Path = obj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -3809,7 +3809,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         "f 1 2 3\n",
     };
 
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
         Extrinsic::Runtime::RuntimeAssetImportRequest{
             .Path = obj.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -4351,7 +4351,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
         << "Missing checked-in BUG-094 model-scene fixture: "
         << fixturePath.string();
 
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
         Extrinsic::Runtime::RuntimeAssetImportRequest{
             .Path = fixturePath.string(),
             .PayloadKind = Assets::AssetPayloadKind::ModelScene,
@@ -5257,8 +5257,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         "f 1/1/1 2/2/1 3/3/1\n",
     };
 
-    RT::AssetImportPipeline& importPipeline =
-        RequiredEngineService<RT::AssetImportPipeline>(engine);
+    RT::AssetWorkflowModule& importPipeline =
+        RequiredEngineService<RT::AssetWorkflowModule>(engine);
     auto decoyImport = importPipeline.ImportAssetFromPath(
         RT::RuntimeAssetImportRequest{
             .Path = decoyObj.Path.string(),

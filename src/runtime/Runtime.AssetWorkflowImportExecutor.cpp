@@ -20,7 +20,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-module Extrinsic.Runtime.AssetImportPipeline;
+module Extrinsic.Runtime.AssetWorkflowImportExecutor;
 
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
@@ -1421,80 +1421,14 @@ namespace Extrinsic::Runtime
         }
     }
 
-    Core::Result ValidateAssetImportRecipe(
-        const AssetImportRecipe& recipe) noexcept
-    {
-        if (recipe.Path.empty() ||
-            recipe.PayloadKind == Assets::AssetPayloadKind::Unknown)
-        {
-            return Core::Err(Core::ErrorCode::InvalidArgument);
-        }
-
-        const bool isReimport =
-            recipe.Source == RuntimeAssetIngestSource::Reimport;
-        if (isReimport != recipe.ExistingAsset.IsValid())
-        {
-            return Core::Err(Core::ErrorCode::InvalidArgument);
-        }
-
-        if (recipe.PayloadKind != Assets::AssetPayloadKind::Texture2D &&
-            (!recipe.Authoring.AuthorRenderableComponents ||
-             !recipe.Authoring.AuthorSelectableIdentity))
-        {
-            return Core::Err(Core::ErrorCode::InvalidArgument);
-        }
-        return Core::Ok();
-    }
-
-    Core::Result AppendAssetImportStageResult(
-        AssetImportStageTrace& trace,
-        AssetImportStageResult result)
-    {
-        constexpr std::array<AssetImportStage, 7> orderedStages{
-            AssetImportStage::Route,
-            AssetImportStage::Decode,
-            AssetImportStage::CpuMaterialize,
-            AssetImportStage::EcsAuthor,
-            AssetImportStage::Postprocess,
-            AssetImportStage::GpuResidency,
-            AssetImportStage::Complete,
-        };
-
-        if (trace.Terminal ||
-            trace.Results.size() >= orderedStages.size() ||
-            result.Identity != trace.Identity ||
-            result.Stage != orderedStages[trace.Results.size()])
-        {
-            return Core::Err(Core::ErrorCode::InvalidState);
-        }
-
-        if (result.Succeeded())
-        {
-            if (result.Diagnostic != RuntimeAssetIngestDiagnostic::None)
-            {
-                return Core::Err(Core::ErrorCode::InvalidArgument);
-            }
-        }
-        else if (result.Diagnostic == RuntimeAssetIngestDiagnostic::None)
-        {
-            return Core::Err(Core::ErrorCode::InvalidArgument);
-        }
-
-        const bool terminal =
-            !result.Succeeded() || result.Stage == AssetImportStage::Complete;
-        trace.Results.push_back(std::move(result));
-        trace.Terminal = terminal;
-        return Core::Ok();
-    }
-
-    AssetImportPipeline::AssetImportPipeline(
-        AssetImportPipelineDependencies dependencies)
+    AssetWorkflowImportExecutor::AssetWorkflowImportExecutor(
+        AssetWorkflowImportExecutorDependencies dependencies)
     {
         SetDependencies(dependencies);
     }
 
-    void AssetImportPipeline::SetDependencies(
-        AssetImportPipelineDependencies dependencies) noexcept
+    void AssetWorkflowImportExecutor::SetDependencies(
+        AssetWorkflowImportExecutorDependencies dependencies) noexcept
     {
         // Active-scene handoffs are replaced on every world switch. The world
         // handle and scene address can both become equal again after an
@@ -1530,7 +1464,7 @@ namespace Extrinsic::Runtime
                 dependencies.TextureBake};
     }
 
-    bool AssetImportPipeline::IsCurrentSubmissionTarget(
+    bool AssetWorkflowImportExecutor::IsCurrentSubmissionTarget(
         const WorldHandle world,
         const ECS::Scene::Registry* const scene,
         const std::uint64_t bindingEpoch) const noexcept
@@ -1545,7 +1479,7 @@ namespace Extrinsic::Runtime
             m_WorldRegistry->Get(world) == scene;
     }
 
-    Core::Expected<RuntimeAssetImportResult> AssetImportPipeline::ImportAssetFromPath(
+    Core::Expected<RuntimeAssetImportResult> AssetWorkflowImportExecutor::ImportAssetFromPath(
         RuntimeAssetImportRequest request)
     {
         auto result = ImportAssetFromPathWithIngest(
@@ -1559,7 +1493,7 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    Core::Expected<RuntimeQueuedAssetImport> AssetImportPipeline::QueueModelTextureImport(
+    Core::Expected<RuntimeQueuedAssetImport> AssetWorkflowImportExecutor::QueueModelTextureImport(
         RuntimeAssetImportRequest request)
     {
         return QueueAssetImport(AssetImportRecipe{
@@ -1568,7 +1502,7 @@ namespace Extrinsic::Runtime
         });
     }
 
-    Core::Expected<RuntimeQueuedAssetImport> AssetImportPipeline::QueueGeometryImport(
+    Core::Expected<RuntimeQueuedAssetImport> AssetWorkflowImportExecutor::QueueGeometryImport(
         RuntimeAssetImportRequest request)
     {
         return QueueAssetImport(AssetImportRecipe{
@@ -1577,7 +1511,7 @@ namespace Extrinsic::Runtime
         });
     }
 
-    Core::Expected<RuntimeQueuedAssetImport> AssetImportPipeline::QueueAssetImport(
+    Core::Expected<RuntimeQueuedAssetImport> AssetWorkflowImportExecutor::QueueAssetImport(
         AssetImportRecipe recipe)
     {
         auto route = Assets::ResolveAssetImportRoute(
@@ -1605,7 +1539,7 @@ namespace Extrinsic::Runtime
             Core::ErrorCode::AssetTypeMismatch);
     }
 
-    Core::Expected<RuntimeAssetImportResult> AssetImportPipeline::ReimportAsset(
+    Core::Expected<RuntimeAssetImportResult> AssetWorkflowImportExecutor::ReimportAsset(
         RuntimeAssetReimportRequest request)
     {
         RuntimeAssetImportRequest importRequest{
@@ -1650,31 +1584,31 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    const std::optional<RuntimeAssetImportEvent>& AssetImportPipeline::GetLastAssetImportEvent()
+    const std::optional<RuntimeAssetImportEvent>& AssetWorkflowImportExecutor::GetLastAssetImportEvent()
         const noexcept
     {
         return m_LastAssetImportEvent;
     }
 
     std::vector<RuntimeAssetIngestRecord>
-    AssetImportPipeline::GetAssetIngestRecordsForTest() const
+    AssetWorkflowImportExecutor::GetAssetIngestRecordsForTest() const
     {
         return m_AssetIngestStateMachine.SnapshotAll();
     }
 
-    void AssetImportPipeline::SetModelTextureImportIOBackendFactoryForTest(
+    void AssetWorkflowImportExecutor::SetModelTextureImportIOBackendFactoryForTest(
         RuntimeIOBackendFactory factory)
     {
         m_ModelTextureImportIOBackendFactoryForTest = std::move(factory);
     }
 
-    void AssetImportPipeline::SetQueuedGeometryImportBeforeDecodeHookForTest(
+    void AssetWorkflowImportExecutor::SetQueuedGeometryImportBeforeDecodeHookForTest(
         std::function<void(const RuntimeAssetImportRequest&)> hook)
     {
         m_QueuedGeometryImportBeforeDecodeHookForTest = std::move(hook);
     }
 
-    RuntimeAssetImportQueueSnapshot AssetImportPipeline::GetAssetImportQueueSnapshot() const
+    RuntimeAssetImportQueueSnapshot AssetWorkflowImportExecutor::GetAssetImportQueueSnapshot() const
     {
         RuntimeAssetImportQueueSnapshot snapshot =
             m_AssetIngestStateMachine.SnapshotQueue();
@@ -1729,18 +1663,18 @@ namespace Extrinsic::Runtime
         return snapshot;
     }
 
-    std::size_t AssetImportPipeline::ClearCompletedAssetImports()
+    std::size_t AssetWorkflowImportExecutor::ClearCompletedAssetImports()
     {
         return m_AssetIngestStateMachine.ClearCompletedQueueEntries();
     }
 
-    Core::Result AssetImportPipeline::CancelAssetImport(
+    Core::Result AssetWorkflowImportExecutor::CancelAssetImport(
         const RuntimeAssetIngestHandle operation)
     {
         return CancelAssetImportImpl(operation, false);
     }
 
-    void AssetImportPipeline::CancelActiveAssetImportsForShutdown()
+    void AssetWorkflowImportExecutor::CancelActiveAssetImportsForShutdown()
     {
         for (const RuntimeAssetImportJobRecord& task :
              m_AssetImportJobs)
@@ -1753,7 +1687,7 @@ namespace Extrinsic::Runtime
         }
     }
 
-    Core::Result AssetImportPipeline::CancelAssetImportImpl(
+    Core::Result AssetWorkflowImportExecutor::CancelAssetImportImpl(
         const RuntimeAssetIngestHandle operation,
         const bool allowWaitingForMainThreadApply)
     {
@@ -1819,7 +1753,7 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
-    void AssetImportPipeline::FinalizeUnpublishedImport(
+    void AssetWorkflowImportExecutor::FinalizeUnpublishedImport(
         const RuntimeAssetIngestHandle operation,
         RuntimeAssetImportRequest request,
         AssetImportStageTrace* const stageTrace)
@@ -1852,7 +1786,7 @@ namespace Extrinsic::Runtime
             stageTrace);
     }
 
-    void AssetImportPipeline::ImportDroppedFilePaths(std::span<const std::string> paths)
+    void AssetWorkflowImportExecutor::ImportDroppedFilePaths(std::span<const std::string> paths)
     {
         for (const std::string& path : paths)
         {
@@ -1956,7 +1890,7 @@ namespace Extrinsic::Runtime
     }
 
     Core::Expected<RuntimeQueuedAssetImport>
-    AssetImportPipeline::QueueGeometryImportWithIngest(
+    AssetWorkflowImportExecutor::QueueGeometryImportWithIngest(
         AssetImportRecipe recipe,
         std::vector<Assets::AssetPayloadKind> payloadKinds)
     {
@@ -2439,7 +2373,7 @@ namespace Extrinsic::Runtime
     }
 
     Core::Expected<RuntimeQueuedAssetImport>
-    AssetImportPipeline::QueueModelTextureImportWithIngest(
+    AssetWorkflowImportExecutor::QueueModelTextureImportWithIngest(
         AssetImportRecipe recipe)
     {
         const RuntimeAssetIngestSource source = recipe.Source;
@@ -2956,7 +2890,7 @@ namespace Extrinsic::Runtime
         };
     }
 
-    void AssetImportPipeline::QueueDroppedModelTextureImport(
+    void AssetWorkflowImportExecutor::QueueDroppedModelTextureImport(
         std::string path,
         const Assets::AssetPayloadKind payloadKind)
     {
@@ -2969,7 +2903,7 @@ namespace Extrinsic::Runtime
     }
 
     Core::Expected<RuntimeAssetImportResult>
-    AssetImportPipeline::ImportAssetFromPathWithIngest(
+    AssetWorkflowImportExecutor::ImportAssetFromPathWithIngest(
         RuntimeAssetImportRequest request,
         const RuntimeAssetIngestSource source,
         const Assets::AssetId existingAsset)
@@ -3175,7 +3109,7 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    void AssetImportPipeline::RecordAssetImportEvent(
+    void AssetWorkflowImportExecutor::RecordAssetImportEvent(
         const RuntimeAssetImportRequest& request,
         const Core::Expected<RuntimeAssetImportResult>& result,
         const RuntimeAssetIngestDiagnostic ingestDiagnostic,
@@ -3222,7 +3156,7 @@ namespace Extrinsic::Runtime
         m_LastAssetImportEvent = std::move(event);
     }
 
-    Core::Expected<RuntimeAssetImportResult> AssetImportPipeline::ImportAssetFromPathImpl(
+    Core::Expected<RuntimeAssetImportResult> AssetWorkflowImportExecutor::ImportAssetFromPathImpl(
         RuntimeAssetImportRequest request,
         const Assets::AssetId existingAsset)
     {

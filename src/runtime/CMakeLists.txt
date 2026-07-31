@@ -10,7 +10,6 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.AsyncWorkModule.cppm
         Runtime.AssetWorkflowModule.cppm
-        Runtime.AssetImportPipeline.cppm
         Runtime.AssetImportPolicies.cppm
         Runtime.AssetIngestStateMachine.cppm
         Runtime.AssetMeshNormals.cppm
@@ -73,13 +72,16 @@ target_sources(${target_name}
         Runtime.VertexChannelStreams.cppm
         Visualization/Runtime.VisualizationRecipes.cppm
         PRIVATE
+        FILE_SET asset_workflow_impl TYPE CXX_MODULES FILES
+        Runtime.AssetWorkflowImportExecutor.cppm
+        PRIVATE
         FILE_SET render_extraction_impl TYPE CXX_MODULES FILES
         Runtime.GeometryPlanBuilders.cppm
         Runtime.RenderExtraction.Internal.cpp
         PRIVATE
         Runtime.AsyncWorkModule.cpp
         Runtime.AssetWorkflowModule.cpp
-        Runtime.AssetImportPipeline.cpp
+        Runtime.AssetWorkflowImportExecutor.cpp
         Runtime.AssetImportPolicies.cpp
         Runtime.AssetIngestStateMachine.cpp
         Runtime.AssetMeshNormals.cpp

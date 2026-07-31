@@ -32,7 +32,7 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
-import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
@@ -100,7 +100,7 @@ namespace
             }
 
             m_Probe.PipelineLiveAfterSandboxShutdown =
-                engine.Services().Find<Runtime::AssetImportPipeline>() !=
+                engine.Services().Find<Runtime::AssetWorkflowModule>() !=
                 nullptr;
             m_Probe.InputRegistryLiveAfterSandboxShutdown =
                 engine.Services()
@@ -120,7 +120,7 @@ namespace
         std::atomic_bool ReleaseWorker{false};
         std::atomic_bool GpuParticipantShutdown{false};
         Runtime::RuntimeAssetIngestHandle Operation{};
-        Runtime::AssetImportPipeline* ExpectedPipeline{nullptr};
+        Runtime::AssetWorkflowModule* ExpectedPipeline{nullptr};
         Runtime::RuntimeInputActionRegistry* ExpectedInputRegistry{nullptr};
         std::uint32_t ObservedFrames{0u};
         bool FrameLimitExceeded{false};
@@ -190,7 +190,7 @@ namespace
                 m_Probe->GpuParticipantShutdown.load(
                     std::memory_order_acquire);
             m_Probe->PipelineIdentityLiveBeforeSandboxShutdown =
-                engine.Services().Find<Runtime::AssetImportPipeline>() ==
+                engine.Services().Find<Runtime::AssetWorkflowModule>() ==
                 m_Probe->ExpectedPipeline;
             m_Probe->InputIdentityLiveBeforeSandboxShutdown =
                 engine.Services()
@@ -221,7 +221,7 @@ namespace
             m_Sandbox.Shutdown();
 
             m_Probe->PipelineIdentityLiveAfterSandboxShutdown =
-                engine.Services().Find<Runtime::AssetImportPipeline>() ==
+                engine.Services().Find<Runtime::AssetWorkflowModule>() ==
                 m_Probe->ExpectedPipeline;
             m_Probe->InputIdentityLiveAfterSandboxShutdown =
                 engine.Services()
@@ -421,7 +421,7 @@ TEST(SandboxAppComposition, MissingAssetWorkflowStillComposesIndependentFocusAct
     engine.Initialize();
 
     EXPECT_EQ(
-        engine.Services().Find<Runtime::AssetImportPipeline>(),
+        engine.Services().Find<Runtime::AssetWorkflowModule>(),
         nullptr);
     EXPECT_NE(
         engine.Services().Find<Runtime::RuntimeInputActionRegistry>(),
@@ -467,7 +467,7 @@ TEST(SandboxAppComposition, PipelineSelectionDoesNotRequireCamera)
     engine.Initialize();
 
     auto* const pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     const auto imported = pipeline->ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
@@ -504,7 +504,7 @@ TEST(SandboxAppComposition, MaterializationAndAutofocusDoNotRequireSelection)
     engine.Initialize();
 
     auto* const pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     auto* const cameras =
         engine.Services().Find<Runtime::CameraControllerRegistry>();
@@ -565,7 +565,7 @@ TEST(SandboxAppComposition, ReinitializeAndRepeatedShutdownDoNotDuplicateState)
 
     engine.Initialize();
     auto* pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     ASSERT_TRUE(
         pipeline
@@ -589,7 +589,7 @@ TEST(SandboxAppComposition, ReinitializeAndRepeatedShutdownDoNotDuplicateState)
 
     engine.Initialize();
     pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     ASSERT_NE(pipeline, nullptr);
     RecordingCameraController* const recording =
         ReplaceMainCameraWithRecording(engine);
@@ -640,7 +640,7 @@ TEST(SandboxAppComposition,
     engine.Initialize();
 
     probe->ExpectedPipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
+        engine.Services().Find<Runtime::AssetWorkflowModule>();
     probe->ExpectedInputRegistry =
         engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
     ASSERT_NE(probe->ExpectedPipeline, nullptr);
