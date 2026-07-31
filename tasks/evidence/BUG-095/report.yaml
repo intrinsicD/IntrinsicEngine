@@ -3,15 +3,15 @@ task_id: BUG-095
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-07-31T14:13:13Z'
+generated_at: '2026-07-31T15:00:27Z'
 claim_eligible: false
 source:
-  base_ref: origin/main
+  base_ref: 67301c047ac11d635183e72b0216bd16331f1528
   base_revision: 67301c047ac11d635183e72b0216bd16331f1528
-  head_revision: 74d87442eaa49bdd0b3cde03e4b730d26fe07bd2
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  head_revision: fb497f202b23f7403ea6ea0c92ea01be578c9948
+  branch: codex/bug-095-evidence-rebind
+  worktree: /tmp/intrinsic-bug095-evidence.D94Nv3
+  dirty: false
   surface:
   - path: docs/architecture/runtime.md
     sha256: 0e29aa8bb9c90630c2cbb767b2e09e2c8d1ea76e7a3b2dddf119723d5e62b903
