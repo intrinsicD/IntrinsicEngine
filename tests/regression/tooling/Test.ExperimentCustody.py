@@ -20,6 +20,26 @@ def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def seal_protocol(protocol: dict) -> dict:
+    protocol["state"] = "frozen"
+    protocol["frozen_at"] = "2026-07-31T00:00:00Z"
+    canonical = {
+        key: value
+        for key, value in protocol.items()
+        if key not in {"protocol_digest", "frozen_at"}
+    }
+    protocol["protocol_digest"] = hashlib.sha256(
+        json.dumps(
+            canonical,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()
+    return protocol
+
+
 def invoke(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(TOOL), *args],
@@ -123,7 +143,7 @@ true
         self.protocol = self.experiment / "protocol.yaml"
         self.protocol.parent.mkdir(parents=True)
         protocol = {
-            "schema_version": 1,
+            "schema_version": 2,
             "task_id": "TEST-001",
             "protocol_id": "synthetic-v1",
             "profile": profile,
@@ -166,6 +186,7 @@ true
                 }
             ],
             "statistical_tests": [{"name": "descriptive-mean", "alpha": None}],
+            "summaries": [{"name": "score", "column": "score", "statistic": "mean"}],
             "killing_gates": [{"metric": "score", "operator": "<=", "threshold": 2.0}],
             "screening_confirmation_policy": "No retuning after confirmation begins.",
             "resources": {"cpu_threads": 1, "gpu": False},
@@ -430,6 +451,18 @@ class ExperimentCustodyTests(unittest.TestCase):
         self.assertNotIn("http://", template)
         self.assertNotIn("https://", template)
 
+    def test_protocol_schema_one_requires_explicit_summary_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp))
+            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
+            protocol["schema_version"] = 1
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+            result = fixture.freeze()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("protocol schema_version must equal 2", result.stdout)
+
     def test_claim_grade_end_to_end_bundle_and_audit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ExperimentFixture(
@@ -486,6 +519,13 @@ class ExperimentCustodyTests(unittest.TestCase):
                     "direction": "minimize",
                     "unit": "milliseconds",
                     "statistical_unit": "benchmark attempt",
+                }
+            ]
+            protocol["summaries"] = [
+                {
+                    "name": "runtime_ms",
+                    "column": "runtime_ms",
+                    "statistic": "mean",
                 }
             ]
             protocol["killing_gates"] = [
@@ -551,22 +591,7 @@ class ExperimentCustodyTests(unittest.TestCase):
             fixture.implementation.write_text("def run(): return 2\n", encoding="utf-8")
             protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
             protocol["implementation"][0]["sha256"] = sha(fixture.implementation)
-            protocol["state"] = "frozen"
-            protocol["frozen_at"] = "2026-07-31T00:00:00Z"
-            canonical = {
-                key: value
-                for key, value in protocol.items()
-                if key not in {"protocol_digest", "frozen_at"}
-            }
-            protocol["protocol_digest"] = hashlib.sha256(
-                json.dumps(
-                    canonical,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                    default=str,
-                ).encode("utf-8")
-            ).hexdigest()
+            seal_protocol(protocol)
             fixture.protocol.write_text(
                 yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
             )
@@ -575,6 +600,28 @@ class ExperimentCustodyTests(unittest.TestCase):
             result = fixture.init()
         self.assertEqual(result.returncode, 2, result.stdout)
         self.assertIn("hash differs from claim-eligible source revision", result.stdout)
+
+    def test_claim_source_path_cannot_follow_current_worktree_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            alias = fixture.repo / "src/declared_alias.py"
+            alias.symlink_to("implementation.py")
+            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
+            protocol["implementation"] = [
+                {
+                    "path": alias.relative_to(fixture.repo).as_posix(),
+                    "sha256": sha(alias),
+                }
+            ]
+            seal_protocol(protocol)
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "freeze symlinked implementation")
+            result = fixture.init()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("is missing from claim-eligible source revision", result.stdout)
 
     def test_run_root_cannot_be_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -703,6 +750,31 @@ class ExperimentCustodyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("Audit rejected", result.stdout)
 
+    def test_audit_rejects_bundle_provenance_substitution(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp))
+            fixture.freeze()
+            fixture.init()
+            fixture.bundle()
+            bundle_path = fixture.run_root / "bundle.yaml"
+            bundle = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
+            bundle["provenance"]["source"] = {"revision": "substituted"}
+            bundle["resolved_config"] = dict(bundle["environment"])
+            bundle["environment"] = {"path": "substituted"}
+            bundle["claim_authorized"] = True
+            bundle_path.write_text(
+                yaml.safe_dump(bundle, sort_keys=False), encoding="utf-8"
+            )
+            audit = fixture.audit()
+            audit_errors = json.loads(
+                (fixture.run_root / "audit.json").read_text(encoding="utf-8")
+            )["errors"]
+        self.assertEqual(audit.returncode, 1, audit.stdout)
+        self.assertIn("bundle provenance differs from frozen run", audit_errors)
+        self.assertIn("bundle resolved config differs from frozen run", audit_errors)
+        self.assertIn("bundle environment differs from frozen run", audit_errors)
+        self.assertIn("bundle must not claim authorization", audit_errors)
+
     def test_audit_rejects_gate_retuned_after_bundle_creation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ExperimentFixture(Path(tmp))
@@ -731,6 +803,42 @@ class ExperimentCustodyTests(unittest.TestCase):
             completion = fixture.completion()
         self.assertEqual(audit.returncode, 1, audit.stdout)
         self.assertIn("gates[0] declaration differs from frozen protocol", audit_errors)
+        self.assertEqual(completion.returncode, 1, completion.stdout)
+        self.assertIn("declaration differs from frozen protocol", completion.stdout)
+
+    def test_audit_rejects_summary_retuned_after_bundle_creation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp))
+            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
+            protocol["killing_gates"][0]["threshold"] = 1.0
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+            fixture.freeze()
+            fixture.init()
+            fixture.cell("started")
+            fixture.cell("completed")
+            fixture.bundle()
+            bundle_path = fixture.run_root / "bundle.yaml"
+            bundle = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
+            self.assertEqual(bundle["summaries"][0]["value"], 1.5)
+            self.assertFalse(bundle["gates"][0]["passed"])
+            bundle["summaries"][0]["statistic"] = "min"
+            bundle["summaries"][0]["value"] = 1.0
+            bundle["gates"][0]["observed"] = 1.0
+            bundle["gates"][0]["passed"] = True
+            bundle_path.write_text(
+                yaml.safe_dump(bundle, sort_keys=False), encoding="utf-8"
+            )
+            audit = fixture.audit()
+            audit_errors = json.loads(
+                (fixture.run_root / "audit.json").read_text(encoding="utf-8")
+            )["errors"]
+            completion = fixture.completion()
+        self.assertEqual(audit.returncode, 1, audit.stdout)
+        self.assertIn(
+            "summaries[0] declaration differs from frozen protocol", audit_errors
+        )
         self.assertEqual(completion.returncode, 1, completion.stdout)
         self.assertIn("declaration differs from frozen protocol", completion.stdout)
 

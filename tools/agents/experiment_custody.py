@@ -62,6 +62,7 @@ PROTOCOL_REQUIRED = {
     "comparators",
     "primary_metrics",
     "statistical_tests",
+    "summaries",
     "killing_gates",
     "screening_confirmation_policy",
     "resources",
@@ -100,6 +101,7 @@ RUN_STATES = {"initialized", "completed", "failed", "abandoned"}
 ATTEMPT_STATES = {"started", "failed", "completed"}
 GATE_OPERATORS = {"<=", "<", ">=", ">", "==", "!="}
 SUMMARY_STATISTICS = {"mean", "median", "min", "max", "count", "sum"}
+PROTOCOL_SCHEMA_VERSION = 2
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
@@ -159,6 +161,18 @@ def implementation_digest(protocol: dict[str, Any]) -> str:
             sort_keys=True,
         ).encode("utf-8")
     )
+
+
+def protocol_summary_declarations(protocol: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": entry.get("name"),
+            "column": entry.get("column"),
+            "statistic": entry.get("statistic"),
+        }
+        for entry in protocol.get("summaries", [])
+        if isinstance(entry, dict)
+    ]
 
 
 def _validate_claim_source_implementation(
@@ -232,8 +246,11 @@ def validate_protocol_data(
     missing = sorted(PROTOCOL_REQUIRED - protocol.keys())
     if missing:
         errors.append(f"missing protocol fields: {', '.join(missing)}")
-    if protocol.get("schema_version") != SCHEMA_VERSION:
-        errors.append("schema_version must equal 1")
+    if protocol.get("schema_version") != PROTOCOL_SCHEMA_VERSION:
+        errors.append(
+            "protocol schema_version must equal 2; migrate frozen summary "
+            "declarations explicitly"
+        )
     for key in (
         "task_id",
         "protocol_id",
@@ -337,6 +354,28 @@ def validate_protocol_data(
     tests = _require_list(protocol, "statistical_tests", errors)
     if not tests:
         errors.append("statistical_tests must not be empty")
+    summaries = _require_list(protocol, "summaries", errors)
+    if not summaries:
+        errors.append("summaries must not be empty")
+    summary_names: set[str] = set()
+    for index, summary in enumerate(summaries):
+        if not isinstance(summary, dict):
+            errors.append(f"summaries[{index}] must be a mapping")
+            continue
+        for key in ("name", "column", "statistic"):
+            if not isinstance(summary.get(key), str) or not summary[key].strip():
+                errors.append(f"summaries[{index}].{key} must be non-empty")
+        name = summary.get("name")
+        if isinstance(name, str):
+            if name in summary_names:
+                errors.append(f"duplicate summary name: {name}")
+            summary_names.add(name)
+            if name not in metric_names:
+                errors.append(f"summaries[{index}] names undeclared primary metric")
+        if summary.get("statistic") not in SUMMARY_STATISTICS:
+            errors.append(f"summaries[{index}].statistic is invalid")
+    for name in sorted(metric_names - summary_names):
+        errors.append(f"primary metric {name} is missing a frozen summary")
     gates = _require_list(protocol, "killing_gates", errors)
     if not gates:
         errors.append("killing_gates must not be empty")
@@ -827,6 +866,8 @@ def create_bundle(args: argparse.Namespace) -> int:
         raw_path = resolve_repo_path(repo_root, args.raw_rows)
         raw_value = args.raw_rows
     rows = _load_raw_rows(raw_path)
+    protocol = strict_yaml_load(resolve_repo_path(repo_root, run["protocol_path"]))
+    frozen_summaries = protocol_summary_declarations(protocol)
     summaries: list[dict[str, Any]] = []
     for spec in args.summary:
         parts = spec.split(":")
@@ -851,8 +892,13 @@ def create_bundle(args: argparse.Namespace) -> int:
                 "value": _summary_value(values, statistic),
             }
         )
+    summary_declarations = [
+        {key: entry[key] for key in ("name", "column", "statistic")}
+        for entry in summaries
+    ]
+    if summary_declarations != frozen_summaries:
+        raise CustodyError("summary declarations differ from frozen protocol")
     summary_by_name = {entry["name"]: entry["value"] for entry in summaries}
-    protocol = strict_yaml_load(resolve_repo_path(repo_root, run["protocol_path"]))
     gates: list[dict[str, Any]] = []
     for gate in protocol["killing_gates"]:
         metric = gate["metric"]
@@ -943,15 +989,31 @@ def _validate_bundle(
     for key in ("task_id", "run_id", "attempt_id", "protocol_digest"):
         if bundle.get(key) != run.get(key):
             errors.append(f"bundle {key} does not match run")
+    expected_provenance = {
+        "source": run.get("source"),
+        "task_sha256": run.get("task_sha256"),
+        "implementation_digest": run.get("implementation_digest"),
+        "datasets": run.get("datasets"),
+    }
+    if bundle.get("provenance") != expected_provenance:
+        errors.append("bundle provenance differs from frozen run")
+    if bundle.get("resolved_config") != run.get("config"):
+        errors.append("bundle resolved config differs from frozen run")
+    if bundle.get("environment") != run.get("environment"):
+        errors.append("bundle environment differs from frozen run")
+    if bundle.get("claim_authorized") is not False:
+        errors.append("bundle must not claim authorization")
     try:
         protocol_path = resolve_repo_path(repo_root, run.get("protocol_path"))
         protocol = strict_yaml_load(protocol_path)
+        frozen_summaries = protocol_summary_declarations(protocol)
         frozen_gates = protocol.get("killing_gates")
         if not isinstance(frozen_gates, list):
             errors.append("frozen protocol killing_gates must be a list")
             frozen_gates = []
     except (ValueError, CustodyError) as exc:
-        errors.append(f"frozen protocol gates: {exc}")
+        errors.append(f"frozen protocol declarations: {exc}")
+        frozen_summaries = []
         frozen_gates = []
     try:
         raw = bundle.get("raw_rows", {})
@@ -965,12 +1027,26 @@ def _validate_bundle(
         errors.append(str(exc))
         rows = []
     recomputed: list[dict[str, Any]] = []
-    for index, summary in enumerate(bundle.get("summaries", [])):
+    bundle_summaries = bundle.get("summaries")
+    if not isinstance(bundle_summaries, list):
+        errors.append("bundle summaries must be a list")
+        bundle_summaries = []
+    if len(bundle_summaries) != len(frozen_summaries):
+        errors.append("bundle summary count differs from frozen protocol")
+    for index, summary in enumerate(bundle_summaries):
         if not isinstance(summary, dict):
             errors.append(f"summaries[{index}] must be a mapping")
             continue
-        column = summary.get("column")
-        statistic = summary.get("statistic")
+        frozen_summary = (
+            frozen_summaries[index] if index < len(frozen_summaries) else summary
+        )
+        declaration = {key: value for key, value in summary.items() if key != "value"}
+        if declaration != frozen_summary:
+            errors.append(
+                f"summaries[{index}] declaration differs from frozen protocol"
+            )
+        column = frozen_summary.get("column")
+        statistic = frozen_summary.get("statistic")
         try:
             values = []
             for row in rows:
@@ -988,7 +1064,7 @@ def _validate_bundle(
                 errors.append(
                     f"summary {summary.get('name')} is inconsistent with raw rows"
                 )
-            recomputed.append({**summary, "value": actual})
+            recomputed.append({**frozen_summary, "value": actual})
         except (CustodyError, TypeError) as exc:
             errors.append(f"summaries[{index}]: {exc}")
     summary_values = {entry.get("name"): entry.get("value") for entry in recomputed}

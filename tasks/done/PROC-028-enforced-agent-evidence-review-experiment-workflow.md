@@ -30,11 +30,19 @@ claimed_at: "2026-07-31T09:28:53Z"
   focused workflow/benchmark bundle passed 96/96.
 - Independent review sequence 10 then rejected three additional fail-open
   paths: retuned bundle gates, claim-eligible implementation/source mismatch,
-  and arbitrary digests on empty source surfaces. The final repair binds all
+  and arbitrary digests on empty source surfaces. The second repair binds all
   three cases directly to their frozen or derived authority and adds an
   adversarial regression for each. The repaired workflow suite passes 22/22,
-  experiment custody passes 23/23, and the complete focused
-  workflow/benchmark bundle passes 99/99.
+  and experiment custody passed 23/23 at that review round.
+- Independent review sequence 12 confirmed those repairs, then rejected
+  bundle-controlled summary aggregation and current-symlink redirection of a
+  declared Git implementation path. Frozen protocols now own exact summary
+  declarations, revision hashing uses the declared lexical Git path, and the
+  same audit surface now compares bundle provenance exactly with the frozen
+  run. Experiment protocol schema v2 makes the new frozen-summary field an
+  explicit migration. Four more adversarial regressions bring experiment
+  custody to 27/27 and the complete focused workflow/benchmark bundle to
+  103/103.
 - `BUG-120` is retired separately at `CPUContracted`. The current retirement
   receipt reruns `Test.WorkflowConcurrency.py` at 19/19 and
   `Test.TestCohortParity.py` at 7/7, so it is no longer a blocker or skipped
@@ -236,8 +244,9 @@ claimed_at: "2026-07-31T09:28:53Z"
 - [x] Define the claim-grade frozen protocol fields: question, hypothesis,
   claim boundary, evidence phase, claim eligibility, datasets and byte hashes,
   disjoint splits, seeds, input policy, matched comparators/budgets, primary
-  metrics, statistical unit/tests, killing gates, screening/confirmation
-  policy, resources, exact command, expected artifacts, and blockers.
+  metrics, statistical unit/tests, frozen raw-column/summary-statistic
+  declarations, killing gates, screening/confirmation policy, resources,
+  exact command, expected artifacts, and blockers.
 - [x] Add ready/init/freeze semantics: scratch work cannot become claim
   evidence; official initialization binds task/protocol/data/source/config/
   environment identities; initialized protocols are immutable; changed
@@ -301,10 +310,11 @@ claimed_at: "2026-07-31T09:28:53Z"
   remove tests that depend on first-textual-key grep behavior.
 - [x] Add claim-grade protocol tests for dirty official source, changed task or
   seal after initialization, implementation mismatch at the declared source
-  commit, overwrite attempts, changed protocol under one run ID, reused cell
-  keys, missing/error visibility, retuned bundle gates, invalid relative links,
-  inconsistent report numbers, missing preview/readback, and absent replay/view
-  smoke receipt.
+  commit, current-symlink redirection of the declared source path, overwrite
+  attempts, changed protocol under one run ID, reused cell keys, missing/error
+  visibility, retuned bundle summaries/gates, invalid relative links,
+  substituted bundle provenance, inconsistent report numbers, missing
+  preview/readback, and absent replay/view smoke receipt.
 - [x] Add protected-profile tests for stale digests, nonzero protected access,
   review/authorization conflation, machine rehearsal presented as independent
   review, second attempt creation, and retry after each of

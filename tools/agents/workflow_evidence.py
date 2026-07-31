@@ -231,13 +231,18 @@ def relative_path(repo_root: Path, path: Path) -> str:
         raise ValueError(f"path is outside repository: {path}") from exc
 
 
-def resolve_repo_path(repo_root: Path, value: object) -> Path:
+def repository_relative_path(value: object) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError("expected a non-empty repository-relative path")
     candidate = Path(value)
     if candidate.is_absolute() or ".." in candidate.parts:
         raise ValueError(f"path must be repository-relative without '..': {value}")
-    resolved = (repo_root / candidate).resolve()
+    return candidate.as_posix()
+
+
+def resolve_repo_path(repo_root: Path, value: object) -> Path:
+    relative = repository_relative_path(value)
+    resolved = (repo_root / relative).resolve()
     try:
         resolved.relative_to(repo_root.resolve())
     except ValueError as exc:
@@ -344,8 +349,7 @@ def require_commit(repo_root: Path, revision: object, location: str) -> str:
 
 
 def sha256_at_revision(repo_root: Path, revision: str, value: object) -> str | None:
-    path = resolve_repo_path(repo_root, value)
-    relative = relative_path(repo_root, path)
+    relative = repository_relative_path(value)
     result = subprocess.run(
         ["git", "-C", str(repo_root), "cat-file", "blob", f"{revision}:{relative}"],
         stdout=subprocess.PIPE,

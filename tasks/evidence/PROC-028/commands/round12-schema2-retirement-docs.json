@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\npython3 tools/agents/validate_tasks.py --root tasks --strict\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/agents/check_task_state_links.py --root . --strict\npython3 tools/agents/sync_skills.py --check\nmapfile -t changed_files < <({ git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | sort -u)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/agents/generate_session_brief.py --check\ngit diff --check"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\npython3 tools/agents/validate_tasks.py --root tasks --strict\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/agents/check_task_state_links.py --root . --strict\npython3 tools/agents/sync_skills.py --check\nmapfile -t changed_files < <({ git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | sort -u)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/agents/generate_session_brief.py --check\ngit diff --check'",
+  "cwd": ".",
+  "duration_ms": 1147,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T10:27:03Z",
+  "label": "round12-schema2-retirement-docs",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T10:27:02Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/round12-schema2-retirement-docs.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-028/commands/round12-schema2-retirement-docs.stdout.log",
+  "stdout_sha256": "662fed5cfe4d929be9a71a5f36f1ce03167ca67e4bc87104f2e6307e9d527d4d",
+  "task_id": "PROC-028"
+}

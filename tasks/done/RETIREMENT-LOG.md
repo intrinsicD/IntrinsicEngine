@@ -19,8 +19,13 @@ and coordinate local Git-common-dir task claims. Independent review found four
 fixed-revision and cumulative-custody bypasses; six direct negative regressions
 now pin their repair. A later exact-surface review found three more fail-open
 paths in frozen gate, claim-source, and empty-surface digest binding; one direct
-adversarial regression now pins each repair, and the final focused
-workflow/benchmark bundle passes 99/99. The original task-only CPU receipt
+adversarial regression now pins each repair. A third exact-surface review found
+bundle-controlled summary aggregation and current-symlink redirection during
+revision hashing; frozen summary declarations and lexical Git-path lookup now
+close those paths, while exact frozen-run provenance comparison closes the
+adjacent bundle substitution surface. Experiment protocol schema v2 makes the
+summary-definition migration explicit. Four more regressions bring the final
+focused workflow/benchmark bundle to 103/103. The original task-only CPU receipt
 passes 4,042/4,042 cases with one
 expected GLFW/LSan self-skip, while the current concurrency and cohort-parity
 retirement gate passes 19/19 and 7/7. Strict repository, benchmark, ARA,

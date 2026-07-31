@@ -1,0 +1,22 @@
+Validated 177 task file(s); findings: 0; mode: strict.
+Validated 177 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /tmp/intrinsic-proc028-close-20260731
+[check_task_maturity_followups] Open task files scanned: 82
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_task_state_links] Root: /tmp/intrinsic-proc028-close-20260731
+[check_task_state_links] Indexed task IDs: 813
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+Skill mirror sync complete. mode=check files=18 surfaces=3.
+[check_docs_sync] Root: /tmp/intrinsic-proc028-close-20260731
+[check_docs_sync] Rules: tools/docs/docs_sync_rules.yaml
+[check_docs_sync] Changed files source: --files
+[check_docs_sync] Changed files count: 35
+[check_docs_sync] Triggered rules: 1
+[check_docs_sync] Docs sync rules satisfied.
+[check_doc_links] Root: /tmp/intrinsic-proc028-close-20260731
+[check_doc_links] Checked relative links: 2993
+[check_doc_links] Mode: warning
+[check_doc_links] No broken relative links found.
+tasks/SESSION-BRIEF.md is up to date.

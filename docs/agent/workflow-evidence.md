@@ -157,17 +157,23 @@ record. Other terminal dispositions are `rejected`, `inconclusive`, and
 ## Claim-grade experiment custody
 
 `tools/agents/experiment_custody.py` owns plain-file experiment state. A ready
-protocol declares:
+protocol uses experiment-protocol schema version 2 and declares:
 
 - question, hypothesis, claim boundary, evidence phase, and explicit claim
   eligibility;
 - byte-hashed datasets, disjoint splits, seeds, and input policy;
-- matched comparators/budgets, primary metrics, statistical units/tests, and
-  killing gates;
+- matched comparators/budgets, primary metrics, statistical units/tests,
+  frozen raw-column/summary-statistic definitions, and killing gates;
 - screening/confirmation policy, resources, exact argv, expected artifacts,
   and blockers;
 - exact source revision/cleanliness plus hashed config, environment, and
   implementation files.
+
+Protocol schema version 2 adds the mandatory frozen `summaries` declarations.
+Version 1 protocols are rejected with an explicit migration diagnostic rather
+than silently inferring result-sensitive aggregation after the fact. Run,
+bundle, audit, and task-workflow records retain their own existing schema
+versions.
 
 `freeze-protocol` validates and seals that content. A frozen protocol is
 immutable; changing it invalidates its digest and requires a new run identity.
@@ -175,7 +181,9 @@ immutable; changing it invalidates its digest and requires a new run identity.
 protocol, task hash, source, config, environment, datasets, and implementation.
 Claim-eligible initialization requires a clean worktree and an exact commit.
 Each sealed implementation file must also exist with the declared hash in that
-exact source commit; matching only the current clean worktree is insufficient.
+exact source commit. The declared repository-relative path is looked up
+lexically in the Git tree, so a current-worktree symlink cannot redirect the
+revision check. Matching only the current clean worktree is insufficient.
 Scratch-phase protocols can never be claim eligible.
 
 Run validation compares the recorded task identity, claim eligibility, source,
@@ -192,11 +200,14 @@ and abandoned/negative work is not erased.
 recomputed summaries and gates, diagnostics, relative hashed links,
 previews/readbacks for visual work, exact replay/view argv, and successful
 smoke receipts. Large artifacts remain external but must have path/hash
-bindings. `audit-bundle` rejects any bundle gate declaration that differs from
-the frozen protocol, then independently recomputes gate dispositions from raw
-rows using the frozen metric, operator, and threshold. It also validates links
-and smoke receipts and writes a separate terminal audit receipt. An audit never
-authorizes a claim.
+bindings. `audit-bundle` rejects any bundle summary or gate declaration that
+differs from the frozen protocol, recomputes summaries from raw rows using the
+frozen column/statistic definitions, and then recomputes gate dispositions
+using the frozen metric, operator, and threshold. Bundle source, task,
+implementation, dataset, resolved-config, and environment provenance must
+exactly equal the initialized frozen run. The audit also validates links and
+smoke receipts and writes a separate terminal audit receipt; neither bundle nor
+audit may authorize a claim.
 
 Workflow completion for `claim-grade` and `protected` profiles invokes the
 experiment-custody completion gate. At least one canonical run must bind a

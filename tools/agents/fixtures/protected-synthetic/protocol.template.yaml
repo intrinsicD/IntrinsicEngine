@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 task_id: __TASK_ID__
 protocol_id: synthetic-protected-v1
 profile: protected
@@ -34,6 +34,10 @@ primary_metrics:
 statistical_tests:
   - name: descriptive-mean
     alpha: null
+summaries:
+  - name: score
+    column: score
+    statistic: mean
 killing_gates:
   - metric: score
     operator: <=
