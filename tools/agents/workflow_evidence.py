@@ -965,9 +965,7 @@ def validate_report(
             checked_entries.append({"path": entry.get("path"), "sha256": expected_hash})
         except ValueError as exc:
             findings.append(Finding("error", f"source.surface[{index}]", str(exc)))
-    if checked_entries and surface_digest(checked_entries) != source.get(
-        "content_digest"
-    ):
+    if surface_digest(checked_entries) != source.get("content_digest"):
         findings.append(
             Finding("error", "source.content_digest", "surface digest mismatch")
         )

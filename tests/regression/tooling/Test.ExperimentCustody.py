@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import sys
 import tempfile
@@ -544,6 +545,37 @@ class ExperimentCustodyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout)
         self.assertIn("clean worktree", result.stdout)
 
+    def test_claim_eligible_source_must_contain_sealed_implementation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            fixture.implementation.write_text("def run(): return 2\n", encoding="utf-8")
+            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
+            protocol["implementation"][0]["sha256"] = sha(fixture.implementation)
+            protocol["state"] = "frozen"
+            protocol["frozen_at"] = "2026-07-31T00:00:00Z"
+            canonical = {
+                key: value
+                for key, value in protocol.items()
+                if key not in {"protocol_digest", "frozen_at"}
+            }
+            protocol["protocol_digest"] = hashlib.sha256(
+                json.dumps(
+                    canonical,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                    default=str,
+                ).encode("utf-8")
+            ).hexdigest()
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "freeze mismatched implementation")
+            result = fixture.init()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("hash differs from claim-eligible source revision", result.stdout)
+
     def test_run_root_cannot_be_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ExperimentFixture(Path(tmp))
@@ -670,6 +702,37 @@ class ExperimentCustodyTests(unittest.TestCase):
             result = fixture.audit()
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("Audit rejected", result.stdout)
+
+    def test_audit_rejects_gate_retuned_after_bundle_creation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp))
+            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
+            protocol["killing_gates"][0]["threshold"] = 1.0
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+            fixture.freeze()
+            fixture.init()
+            fixture.cell("started")
+            fixture.cell("completed")
+            fixture.bundle()
+            bundle_path = fixture.run_root / "bundle.yaml"
+            bundle = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
+            self.assertFalse(bundle["gates"][0]["passed"])
+            bundle["gates"][0]["threshold"] = 2.0
+            bundle["gates"][0]["passed"] = True
+            bundle_path.write_text(
+                yaml.safe_dump(bundle, sort_keys=False), encoding="utf-8"
+            )
+            audit = fixture.audit()
+            audit_errors = json.loads(
+                (fixture.run_root / "audit.json").read_text(encoding="utf-8")
+            )["errors"]
+            completion = fixture.completion()
+        self.assertEqual(audit.returncode, 1, audit.stdout)
+        self.assertIn("gates[0] declaration differs from frozen protocol", audit_errors)
+        self.assertEqual(completion.returncode, 1, completion.stdout)
+        self.assertIn("declaration differs from frozen protocol", completion.stdout)
 
     def test_protected_review_must_be_result_free(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

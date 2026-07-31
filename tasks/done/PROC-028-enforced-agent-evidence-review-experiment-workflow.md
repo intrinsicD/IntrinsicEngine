@@ -26,8 +26,15 @@ claimed_at: "2026-07-31T09:28:53Z"
 - Independent review sequence 6 rejected four enforcement defects; the repair
   adds direct negative coverage for exact review revisions, cumulative
   claim-grade/protected custody, and frozen protocol/run equality. The repaired
-  workflow and experiment-custody suites pass 21/21 each, and the complete
-  focused workflow/benchmark bundle passes 96/96.
+  workflow and experiment-custody suites passed 21/21 each, and the complete
+  focused workflow/benchmark bundle passed 96/96.
+- Independent review sequence 10 then rejected three additional fail-open
+  paths: retuned bundle gates, claim-eligible implementation/source mismatch,
+  and arbitrary digests on empty source surfaces. The final repair binds all
+  three cases directly to their frozen or derived authority and adds an
+  adversarial regression for each. The repaired workflow suite passes 22/22,
+  experiment custody passes 23/23, and the complete focused
+  workflow/benchmark bundle passes 99/99.
 - `BUG-120` is retired separately at `CPUContracted`. The current retirement
   receipt reruns `Test.WorkflowConcurrency.py` at 19/19 and
   `Test.TestCohortParity.py` at 7/7, so it is no longer a blocker or skipped
@@ -283,8 +290,9 @@ claimed_at: "2026-07-31T09:28:53Z"
 - [x] Add adversarial task-evidence tests for missing fields, duplicate keys,
   task-ID mismatch, unaddressed acceptance criteria, missing/failed command
   receipts, artifact hash mismatch, unjustified skips, absent required review,
-  stale reviewed revision, self-review presented as independent, and invalid
-  terminal verdict/status pairs.
+  stale reviewed revision, arbitrary digest on an empty source surface,
+  self-review presented as independent, and invalid terminal verdict/status
+  pairs.
 - [x] Extend `Test_BenchmarkResultValidator.py` with duplicate-key, `NaN`,
   positive/negative infinity, boolean-as-number, nested invalid metric,
   manifest mismatch, undeclared metric, threshold/status mismatch, source
@@ -292,10 +300,11 @@ claimed_at: "2026-07-31T09:28:53Z"
 - [x] Add regression coverage for schema-aware performance comparison and
   remove tests that depend on first-textual-key grep behavior.
 - [x] Add claim-grade protocol tests for dirty official source, changed task or
-  seal after initialization, overwrite attempts, changed protocol under one
-  run ID, reused cell keys, missing/error visibility, retuned gates, invalid
-  relative links, inconsistent report numbers, missing preview/readback, and
-  absent replay/view smoke receipt.
+  seal after initialization, implementation mismatch at the declared source
+  commit, overwrite attempts, changed protocol under one run ID, reused cell
+  keys, missing/error visibility, retuned bundle gates, invalid relative links,
+  inconsistent report numbers, missing preview/readback, and absent replay/view
+  smoke receipt.
 - [x] Add protected-profile tests for stale digests, nonzero protected access,
   review/authorization conflation, machine rehearsal presented as independent
   review, second attempt creation, and retry after each of

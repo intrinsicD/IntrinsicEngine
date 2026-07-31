@@ -30,6 +30,7 @@ from workflow_evidence import (  # noqa: E402
     repo_root_from,
     resolve_repo_path,
     sha256_bytes,
+    sha256_at_revision,
     sha256_file,
     strict_json_load,
     strict_yaml_load,
@@ -158,6 +159,40 @@ def implementation_digest(protocol: dict[str, Any]) -> str:
             sort_keys=True,
         ).encode("utf-8")
     )
+
+
+def _validate_claim_source_implementation(
+    repo_root: Path, protocol: dict[str, Any], errors: list[str]
+) -> None:
+    if protocol.get("claim_eligible") is not True:
+        return
+    source = protocol.get("source")
+    revision = source.get("revision") if isinstance(source, dict) else None
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+        return
+    implementation = protocol.get("implementation")
+    if not isinstance(implementation, list):
+        return
+    for index, entry in enumerate(implementation):
+        if not isinstance(entry, dict):
+            continue
+        path = entry.get("path")
+        expected = entry.get("sha256")
+        try:
+            actual = sha256_at_revision(repo_root, revision, path)
+        except ValueError as exc:
+            errors.append(f"implementation[{index}]: {exc}")
+            continue
+        if actual is None:
+            errors.append(
+                f"implementation[{index}]: {path} is missing from "
+                "claim-eligible source revision"
+            )
+        elif actual != expected:
+            errors.append(
+                f"implementation[{index}]: {path} hash differs from "
+                "claim-eligible source revision"
+            )
 
 
 def _validate_sealed_file(
@@ -356,6 +391,7 @@ def validate_protocol_data(
         errors.append("implementation must not be empty")
     for index, entry in enumerate(implementation):
         _validate_sealed_file(repo_root, entry, f"implementation[{index}]", errors)
+    _validate_claim_source_implementation(repo_root, protocol, errors)
 
     if state == "frozen":
         expected = protocol.get("protocol_digest")
@@ -908,6 +944,16 @@ def _validate_bundle(
         if bundle.get(key) != run.get(key):
             errors.append(f"bundle {key} does not match run")
     try:
+        protocol_path = resolve_repo_path(repo_root, run.get("protocol_path"))
+        protocol = strict_yaml_load(protocol_path)
+        frozen_gates = protocol.get("killing_gates")
+        if not isinstance(frozen_gates, list):
+            errors.append("frozen protocol killing_gates must be a list")
+            frozen_gates = []
+    except (ValueError, CustodyError) as exc:
+        errors.append(f"frozen protocol gates: {exc}")
+        frozen_gates = []
+    try:
         raw = bundle.get("raw_rows", {})
         raw_path = resolve_repo_path(repo_root, raw.get("path"))
         if sha256_file(raw_path) != raw.get("sha256"):
@@ -947,18 +993,44 @@ def _validate_bundle(
             errors.append(f"summaries[{index}]: {exc}")
     summary_values = {entry.get("name"): entry.get("value") for entry in recomputed}
     recomputed_gates: list[dict[str, Any]] = []
-    for index, gate in enumerate(bundle.get("gates", [])):
+    bundle_gates = bundle.get("gates")
+    if not isinstance(bundle_gates, list):
+        errors.append("bundle gates must be a list")
+        bundle_gates = []
+    if len(bundle_gates) != len(frozen_gates):
+        errors.append("bundle gate count differs from frozen protocol")
+    for index, gate in enumerate(bundle_gates):
         if not isinstance(gate, dict):
             errors.append(f"gates[{index}] must be a mapping")
             continue
+        frozen_gate = frozen_gates[index] if index < len(frozen_gates) else gate
+        if isinstance(frozen_gate, dict):
+            declaration = {
+                key: value
+                for key, value in gate.items()
+                if key not in {"observed", "passed"}
+            }
+            if declaration != frozen_gate:
+                errors.append(
+                    f"gates[{index}] declaration differs from frozen protocol"
+                )
+        else:
+            errors.append(f"frozen killing_gates[{index}] must be a mapping")
+            frozen_gate = gate
         try:
-            observed = float(summary_values[gate["metric"]])
-            passed = _compare(observed, gate["operator"], float(gate["threshold"]))
+            observed = float(summary_values[frozen_gate["metric"]])
+            passed = _compare(
+                observed,
+                frozen_gate["operator"],
+                float(frozen_gate["threshold"]),
+            )
             if gate.get("passed") is not passed or not math.isclose(
                 float(gate.get("observed")), observed, rel_tol=1e-12, abs_tol=1e-12
             ):
                 errors.append(f"gate {gate.get('metric')} disposition is inconsistent")
-            recomputed_gates.append({**gate, "observed": observed, "passed": passed})
+            recomputed_gates.append(
+                {**frozen_gate, "observed": observed, "passed": passed}
+            )
         except (KeyError, TypeError, ValueError) as exc:
             errors.append(f"gates[{index}] cannot be recomputed: {exc}")
     for collection in ("links", "previews"):

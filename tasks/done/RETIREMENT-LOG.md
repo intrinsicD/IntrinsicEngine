@@ -17,8 +17,11 @@ receipts, require revision-bound independent review for high-risk work, seal
 claim-grade/protected attempts, validate canonical benchmark result schema v2,
 and coordinate local Git-common-dir task claims. Independent review found four
 fixed-revision and cumulative-custody bypasses; six direct negative regressions
-now pin their repair, and the final focused workflow/benchmark bundle passes
-96/96. The original task-only CPU receipt passes 4,042/4,042 cases with one
+now pin their repair. A later exact-surface review found three more fail-open
+paths in frozen gate, claim-source, and empty-surface digest binding; one direct
+adversarial regression now pins each repair, and the final focused
+workflow/benchmark bundle passes 99/99. The original task-only CPU receipt
+passes 4,042/4,042 cases with one
 expected GLFW/LSan self-skip, while the current concurrency and cohort-parity
 retirement gate passes 19/19 and 7/7. Strict repository, benchmark, ARA,
 documentation, and workflow checks pass. `BUG-120` was repaired and retired

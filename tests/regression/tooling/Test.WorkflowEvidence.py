@@ -444,6 +444,33 @@ class WorkflowEvidenceTests(unittest.TestCase):
         self.assertIn("needs handoff", result.stdout)
         self.assertIn("needs review", result.stdout)
 
+    def test_empty_surface_digest_is_still_recomputed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp, profile="high-risk")
+            fixture.receipt()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "freeze empty review surface")
+            fixture.base = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=fixture.repo,
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip()
+            fixture.generate()
+            report = fixture.report_data()
+            self.assertEqual(report["source"]["surface"], [])
+            forged_digest = "f" * 64
+            report["source"]["content_digest"] = forged_digest
+            fixture.report.write_text(
+                yaml.safe_dump(report, sort_keys=False), encoding="utf-8"
+            )
+            fixture.handoff(digest=forged_digest)
+            fixture.review(digest=forged_digest)
+            result = fixture.validate()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("surface digest mismatch", result.stdout)
+
     def test_stale_review_digest_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = self.fixture(tmp, profile="high-risk")

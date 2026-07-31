@@ -117,6 +117,10 @@ surface, stale artifact hashes, missing reasons, and absent profile-specific
 records are blocking errors. A justified skipped check is an explicit warning
 and remains visible in the report.
 
+The aggregate content digest is always recomputed from the recorded surface,
+including the valid empty-surface case. An empty diff therefore has one
+deterministic digest; it is not an escape hatch for a caller-selected value.
+
 For a report with `source.dirty: false`, validation reads the recorded surface
 and referenced artifact blobs from the exact `source.head_revision` commit and
 compares `source.base_revision..source.head_revision`. This keeps a
@@ -170,6 +174,8 @@ immutable; changing it invalidates its digest and requires a new run identity.
 `init-run` creates a non-overwriting canonical run root and binds the frozen
 protocol, task hash, source, config, environment, datasets, and implementation.
 Claim-eligible initialization requires a clean worktree and an exact commit.
+Each sealed implementation file must also exist with the declared hash in that
+exact source commit; matching only the current clean worktree is insufficient.
 Scratch-phase protocols can never be claim eligible.
 
 Run validation compares the recorded task identity, claim eligibility, source,
@@ -186,9 +192,11 @@ and abandoned/negative work is not erased.
 recomputed summaries and gates, diagnostics, relative hashed links,
 previews/readbacks for visual work, exact replay/view argv, and successful
 smoke receipts. Large artifacts remain external but must have path/hash
-bindings. `audit-bundle` independently recomputes summaries and gates from raw
-rows, validates links and smoke receipts, and writes a separate terminal audit
-receipt. An audit never authorizes a claim.
+bindings. `audit-bundle` rejects any bundle gate declaration that differs from
+the frozen protocol, then independently recomputes gate dispositions from raw
+rows using the frozen metric, operator, and threshold. It also validates links
+and smoke receipts and writes a separate terminal audit receipt. An audit never
+authorizes a claim.
 
 Workflow completion for `claim-grade` and `protected` profiles invokes the
 experiment-custody completion gate. At least one canonical run must bind a

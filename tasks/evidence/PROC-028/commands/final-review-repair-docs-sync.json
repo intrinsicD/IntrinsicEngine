@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\nmapfile -t changed_files < <({ git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | sort -u)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\nmapfile -t changed_files < <({ git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | sort -u)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict'",
+  "cwd": ".",
+  "duration_ms": 42,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T09:59:03Z",
+  "label": "final-review-repair-docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T09:59:03Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/final-review-repair-docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-028/commands/final-review-repair-docs-sync.stdout.log",
+  "stdout_sha256": "8e847aeeb0f77c3c6721351bc82bdb3de7954f30ad29e56d7e535bfda5f8a4ee",
+  "task_id": "PROC-028"
+}
