@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-029`](PROC-029-intrinsicengine-architecture-diagram-skill.md) —
+the IntrinsicEngine architecture-diagram skill retired on 2026-07-30 at
+`Operational`. Its dependency-free Python renderer now exposes an
+evidence-complete `audit` profile and a self-contained ELK/neo
+`presentation` profile over the existing deterministic C++23 module graph.
+Presentation views use restrained styling, move routine layer-edge counts
+into evidence comments, retain visible violation labels, and can focus one
+layer while keeping every layer node as context and marking omitted edges
+`visible=no`. Module presentation changes layout and styling without changing
+the selected neighbourhood. The default output remains audit mode, and
+runtime composition, sequence, and data-flow views still require concrete
+source inspection. Twenty-one focused regressions, Ruff lint/format, skill and
+mirror validation, strict task/docs/ARA checks, live generation over 372
+modules, and a real Mermaid/Chrome SVG render passed. The live runtime focus
+retained 10 layer nodes while projecting 9 of 20 cross-layer pairs. No engine
+source, module edge, layering policy, dependency manifest, renderer
+abstraction, or generated diagram source of truth changed.
+
 [`BUG-120`](BUG-120-workflow-concurrency-ctest-processors-drift.md) — workflow
 concurrency snapshot drift retired on 2026-07-30 at `CPUContracted`. The
 one-worker config-root inventory now follows the current runtime test helpers,

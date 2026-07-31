@@ -1,12 +1,13 @@
 # IntrinsicEngine Agent Skills
 
-This folder contains twenty-one [Agent Skills](https://agentskills.io). Six of
+This folder contains twenty-two [Agent Skills](https://agentskills.io). Six of
 them wrap the IntrinsicEngine `AGENTS.md` contract and the procedure docs
-under `docs/agent/`; twelve add IntrinsicEngine-specific cross-cutting workflow
+under `docs/agent/`; thirteen add IntrinsicEngine-specific cross-cutting workflow
 disciplines (diagnosis, Vulkan frame triage, GPU smoke authoring, stale-build
 triage, import-visibility contract, geometry-IO format, sandbox input/lifecycle,
-research ideation, results audit, right-sizing, zoom-out, handoff) that don't have a single source doc under
-`docs/agent/`; three are imported third-party productivity skills.
+research ideation, results audit, right-sizing, architecture diagrams,
+zoom-out, handoff) that don't have a single source doc under `docs/agent/`;
+three are imported third-party productivity skills.
 The skills are designed to load *progressively*: only the metadata (~100 tokens
 per skill) sits in context by default, with full content loaded only when the
 skill's trigger description matches the current task.
@@ -52,7 +53,7 @@ authoritative source-to-mirror mapping is `REFERENCE_MAP` in
 `tools/agents/sync_skills.py`; if that map and this table disagree, the map
 wins.
 
-### Cross-cutting workflow disciplines (twelve)
+### Cross-cutting workflow disciplines (thirteen)
 
 These skills do not wrap a single source doc under `docs/agent/`. They encode
 disciplines that apply across multiple touched scopes. The skill body is
@@ -70,6 +71,7 @@ authoritative for these.
 | `intrinsicengine-research-ideation` | Generates and adversarially audits a diverse, falsifiable research portfolio (recombination + assumption surgery + primitive invention + new-evidence programs + cross-domain mechanism transfer), with an operational novelty taxonomy, a prior-art audit, and a cheapest-killing-experiment per candidate. Never claims absolute novelty; ideation only — a selected candidate enters the Theme I / method workflow. First-party (MIT, A. Dieckmann), adapted from `transformational-research-skill-kit` v1.0.0; carries hand-authored `references/`, `assets/`, `evals/`, and `scripts/` companion files. | proposing novel/unconventional/cross-domain/transformational/publishable research directions, research roadmaps, high-risk/high-reward experiments — not ordinary feature brainstorming or implementing an already-chosen method |
 | `intrinsicengine-results-audit` | Adversarial scientist pass over method, benchmark, backend-parity, capability-maturity, and quantitative claims: independently recompute results, verify backend execution/config parity, and confirm, narrow, or retire every claim with same-change evidence updates. | after method/benchmark/GPU evidence; before performance, parity, `Operational`/`ParityProven`, default, retirement, or results-bearing PR claims; whenever numbers lack an independent check |
 | `intrinsicengine-right-sizing` | Identify over-engineering (single-impl interfaces, one-consumer frameworks, forwarding facades, feature fragmentation, glue-dominated slices), run the justified-complexity keep-list test, plan the simpler alternative with blast radius and a reintroduction trigger, and implement that instead — without stripping load-bearing seams (RHI/platform Null backends, render graph) or confusing simple with sloppy. | plan time before new abstraction surface, diffs adding pass-through code, small changes fanning out across many files, "over-engineered", "too much glue"/"Kleber", "ceremony", "YAGNI", "simplify" |
+| `intrinsicengine-draw-architecture` | Draw bounded, evidence-backed Mermaid views of the engine's layer DAG, focused C++23 module neighbourhoods, reverse-dependency impact, and source-audited composition/runtime flows; provides exact audit and ELK-styled presentation profiles with layer focus, and routes complete-graph exploration to the existing knowledge graph. | "architecture diagram", "visualize/map the layers", polished/presentation architecture view, focus a layer, module dependencies, blast radius/change impact, composition or runtime sequence/data flow, Mermaid/UML/C4 requests for IntrinsicEngine |
 | `intrinsicengine-zoom-out` | One-shot layer-cake map of an unfamiliar file using the engine's domain vocabulary (`core`/`geometry`/`assets`/`ecs`/`physics`/`graphics/*`/`runtime`/`app`/`methods`) and `.cppm` module surfaces. | user-invoked only (`/intrinsicengine-zoom-out`): "zoom out", "where does this fit" |
 | `intrinsicengine-handoff` | Compact the current conversation into a handoff document for the next agent. Saves to `$TMPDIR`, never into the repo (no in-tree planning docs). | "handoff", "compact this", end-of-session summarization |
 
@@ -132,8 +134,11 @@ layout:
 ```
 intrinsicengine-<name>/
 ├── SKILL.md              # YAML frontmatter + routing/summary body
-└── references/           # Generated mirrors of the source docs; loaded on demand
-    └── <doc>.md
+├── agents/               # Optional harness-facing UI metadata
+│   └── openai.yaml
+├── references/           # Generated or discipline-owned guidance
+│   └── <doc>.md
+└── scripts/              # Optional deterministic skill utilities
 ```
 
 The `SKILL.md` body is a routing layer with checklist summaries and pointers;

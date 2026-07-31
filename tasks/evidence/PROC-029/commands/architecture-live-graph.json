@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/build_knowledge_graph.py"
+  ],
+  "command_display": "python3 tools/repo/build_knowledge_graph.py",
+  "cwd": ".",
+  "duration_ms": 222,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T19:44:08Z",
+  "label": "architecture-live-graph",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T19:44:08Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-live-graph.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-live-graph.stdout.log",
+  "stdout_sha256": "210fbc10f2df104988f15789120e550cf5a2f58eac9efaa933fd8749265b5192",
+  "task_id": "PROC-029"
+}

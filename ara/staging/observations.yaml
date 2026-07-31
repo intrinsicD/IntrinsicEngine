@@ -1130,3 +1130,85 @@ observations:
     promoted_to: "logic/claims.md:C16"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O77
+    timestamp: "2026-07-30T21:13+02:00"
+    provenance: ai-suggested
+    content: >
+      A reusable architecture-cartography workflow should keep one
+      evidence-backed graph model separate from several bounded,
+      question-specific views, with generic view-selection and rendering in
+      the skill and repository-specific extraction in adapters. A complete
+      dependency graph remains an interactive exploration surface rather than
+      a single static architecture diagram.
+    context: >
+      The local IntrinsicEngine graph already contains 466 nodes and 2,508
+      links, including 388 modules and 2,053 import relationships; the existing
+      zoom-out skill asks the right repository questions but emits only a text
+      map. The user has not yet selected or commissioned an implementation.
+    potential_type: architecture
+    bound_to: [N299]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O78
+    timestamp: "2026-07-30T21:13+02:00"
+    provenance: ai-suggested
+    content: >
+      C4-style zoom levels should organize multi-scale architectural
+      navigation, while UML package/class/sequence views and dependency or
+      data-flow graphs should be selected only when they answer the current
+      question; renderer syntax such as Mermaid, PlantUML, D2, or DOT is an
+      output choice rather than the architecture model.
+    context: >
+      Official C4, Mermaid, Structurizr, PlantUML, D2, Graphviz, and clang-uml
+      documentation was compared against IntrinsicEngine's layer and C++23
+      module contracts. This is an unconfirmed recommendation.
+    potential_type: heuristic
+    bound_to: [N299]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H14"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O79
+    timestamp: "2026-07-30T21:41+02:00"
+    provenance: ai-executed
+    content: >
+      IntrinsicEngine architecture visualization can remain one
+      repository-owned skill over the existing deterministic knowledge graph:
+      generated layer and bounded module-import views answer structural
+      questions, source-audited sequence and data-flow views answer behavioral
+      questions, and Graphify retains complete-graph exploration. This avoids
+      a parallel architecture model or rendering dependency.
+    context: >
+      The user selected an IntrinsicEngine-only first implementation.
+      PROC-029 retired at Operational after 14 focused regressions, skill and
+      mirror validation, strict repository checks, and live generation over
+      372 modules; the renderer explicitly excludes includes, CMake links,
+      runtime calls, ownership, and data flow from static graph evidence.
+    potential_type: architecture
+    bound_to: [N299, N300, N301]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A18"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O80
+    timestamp: "2026-07-30T22:29+02:00"
+    provenance: ai-suggested
+    content: >
+      Architecture tooling should keep evidence-complete audit output separate
+      from reader-facing presentation projections. Presentation may suppress
+      routine labels or non-focus edges only when deterministic metadata
+      preserves every count and visibility decision and every violation stays
+      visible.
+    context: >
+      The user explicitly adopted the proposed audit/presentation split and
+      layer focus. PROC-029 now implements the rule in the renderer, view
+      guide, and 21-case regression, and a live runtime-focused Mermaid view
+      rendered successfully to SVG.
+    potential_type: heuristic
+    bound_to: [N302, N303]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H15"
+    crystallized_via: verbal-affirmation
+    stale: false

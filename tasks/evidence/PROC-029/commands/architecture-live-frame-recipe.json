@@ -1,0 +1,31 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py",
+    "modules",
+    "--focus",
+    "src/graphics/renderer/Graphics.FrameRecipe.cppm",
+    "--direction",
+    "both",
+    "--radius",
+    "1",
+    "--max-nodes",
+    "30",
+    "--output",
+    "/tmp/frame-recipe-neighbourhood.mmd"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py modules --focus src/graphics/renderer/Graphics.FrameRecipe.cppm --direction both --radius 1 --max-nodes 30 --output /tmp/frame-recipe-neighbourhood.mmd",
+  "cwd": ".",
+  "duration_ms": 47,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T19:44:08Z",
+  "label": "architecture-live-frame-recipe",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T19:44:08Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-live-frame-recipe.stderr.log",
+  "stderr_sha256": "8231ceda3f99ad66d558e5eb1aa9b281226369256100a48de35c4d9f834a4fec",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-live-frame-recipe.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-029"
+}

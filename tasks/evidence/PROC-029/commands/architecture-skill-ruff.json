@@ -1,0 +1,22 @@
+{
+  "command": [
+    "ruff",
+    "check",
+    "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py",
+    "tests/regression/tooling/Test.ArchitectureDiagramSkill.py"
+  ],
+  "command_display": "ruff check tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py tests/regression/tooling/Test.ArchitectureDiagramSkill.py",
+  "cwd": ".",
+  "duration_ms": 5,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T19:44:07Z",
+  "label": "architecture-skill-ruff",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T19:44:07Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-skill-ruff.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-skill-ruff.stdout.log",
+  "stdout_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "task_id": "PROC-029"
+}

@@ -5,20 +5,30 @@ depends_on: [BUG-120]
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner: "Codex"
+owner: "Codex-Repair-20260730"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-07-29T23:11:03Z"
+claimed_at: "2026-07-30T21:56:27Z"
 ---
 # PROC-028 — Enforce agent evidence, review, and experiment custody
 
 ## Status
 
-- Implementation and the fixed-revision evidence-validation repair are
-  integrated on local `main`; owner: Codex.
-- The implementation claim was released after integration. The task is paused
-  without a live writer in the canonical
-  `/home/alex/Documents/IntrinsicEngine` worktree.
+- The terminal independent review recorded in
+  `tasks/evidence/PROC-028/reviews.jsonl` sequence 6 rejected revision
+  `e800ede9` on four enforcement defects: a superseded fixed surface, unbound
+  handoff/review revisions, absent claim-grade/protected completion custody,
+  and protocol/run binding substitution.
+- Repair is active in the canonical worktree under the live
+  `Codex-Repair-20260730` claim. The implementation remains plain-file tooling
+  and focused free-function validation; no new framework or engine surface is
+  introduced.
+- The repaired revision binding and cumulative custody regressions pass 21/21,
+  and the repaired experiment-custody suite passes 21/21. The complete focused
+  workflow/benchmark bundle passes 96/96; Python quality and the strict
+  task/docs/skill/ARA/method/benchmark/layering/layout/hygiene bundle also pass.
+  Clean fixed-revision rebinding and distinct independent re-review remain
+  pending.
 - Focused workflow/benchmark regressions, strict touched structural gates,
   `ci` configuration, `IntrinsicTests`, `IntrinsicBenchmarks`, strict generated
   benchmark validation, and the complete default CPU-supported CTest selector
@@ -257,6 +267,15 @@ claimed_at: "2026-07-29T23:11:03Z"
 - [x] Keep path claims conditional: if the final policy forbids shared-worktree
   parallel writes entirely, implement only the minimum cross-worktree overlap
   protection and record why an always-on path registry is not applicable.
+- [x] Derive the exact high-risk evidence revision from the report
+  (`source.head_revision` when clean or `worktree:<content_digest>` when dirty)
+  and reject mismatched handoff/review appends and latest records.
+- [x] Make claim-grade/protected completion invoke a task-scoped custody gate
+  requiring a frozen protocol, exact initialized run, terminal cell journal,
+  portable bundle, and accepted independent audit; additionally require
+  current authority and a terminal attempt for protected work.
+- [x] Compare initialized run task/claim/source/config/environment/dataset/
+  implementation/command bindings exactly with the frozen protocol.
 
 ## Tests
 
@@ -285,6 +304,10 @@ claimed_at: "2026-07-29T23:11:03Z"
   recovery, wrong-owner release, and one-writer shared-worktree enforcement.
 - [x] Prove `micro` and routine `standard` tasks do not inherit high-risk,
   claim-grade, or protected ceremony.
+- [x] Add adversarial regressions for wrong but syntactically valid review and
+  handoff revisions, claim-grade/protected completion without custody,
+  protected completion without terminal attempt consumption, and substitution
+  of one valid sealed run binding for another.
 - [x] Run the existing strict task, docs, link, skill-mirror, ARA, method,
   benchmark-manifest, benchmark-result, layering, test-layout, and root-hygiene
   checks after final integration.
@@ -367,7 +390,11 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/repo/check_root_hygiene.py --root .
 python3 tools/agents/generate_session_brief.py --check
 
-# Add focused Python regression commands for each implemented workflow tool.
+python3 tests/regression/tooling/Test.WorkflowEvidence.py
+python3 tests/regression/tooling/Test.ExperimentCustody.py
+python3 tools/agents/experiment_custody.py validate-completion \
+  --root . --task-id <CLAIM-TASK-ID> --profile claim-grade \
+  --experiment-root tasks/evidence/<CLAIM-TASK-ID>/experiment
 
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests

@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "-m",
+    "ruff",
+    "format",
+    "--check",
+    "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py",
+    "tests/regression/tooling/Test.ArchitectureDiagramSkill.py"
+  ],
+  "command_display": "python3 -m ruff format --check tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py tests/regression/tooling/Test.ArchitectureDiagramSkill.py",
+  "cwd": ".",
+  "duration_ms": 20,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T20:27:48Z",
+  "label": "architecture-style-format",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T20:27:48Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-style-format.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-style-format.stdout.log",
+  "stdout_sha256": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938",
+  "task_id": "PROC-029"
+}

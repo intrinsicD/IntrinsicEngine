@@ -335,6 +335,20 @@ true
             self.source_revision,
         )
 
+    def completion(self) -> subprocess.CompletedProcess[str]:
+        return invoke(
+            self.repo,
+            "validate-completion",
+            "--root",
+            str(self.repo),
+            "--task-id",
+            "TEST-001",
+            "--profile",
+            self.profile,
+            "--experiment-root",
+            self.experiment.relative_to(self.repo).as_posix(),
+        )
+
     def review(
         self,
         *,
@@ -427,8 +441,18 @@ class ExperimentCustodyTests(unittest.TestCase):
             self.assertEqual(fixture.bundle().returncode, 0)
             audit = fixture.audit()
             validation = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
+            completion = fixture.completion()
         self.assertEqual(audit.returncode, 0, audit.stdout)
         self.assertEqual(validation.returncode, 0, validation.stdout)
+        self.assertEqual(completion.returncode, 0, completion.stdout)
+
+    def test_completion_requires_protocol_run_bundle_and_audit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), profile="claim-grade")
+            result = fixture.completion()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("protocol must be frozen", result.stdout)
+        self.assertIn("at least one initialized run", result.stdout)
 
     def test_existing_benchmark_smoke_routes_through_bundle_and_audit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -566,6 +590,21 @@ class ExperimentCustodyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("hash mismatch", result.stdout)
 
+    def test_run_bindings_must_equal_frozen_protocol(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp))
+            fixture.freeze()
+            fixture.init()
+            run_path = fixture.run_root / "run.yaml"
+            run_data = yaml.safe_load(run_path.read_text(encoding="utf-8"))
+            run_data["config"] = dict(run_data["environment"])
+            run_path.write_text(
+                yaml.safe_dump(run_data, sort_keys=False), encoding="utf-8"
+            )
+            result = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("run config differs from frozen protocol", result.stdout)
+
     def test_cell_keys_are_append_only_and_errors_remain_visible(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ExperimentFixture(Path(tmp))
@@ -684,6 +723,30 @@ class ExperimentCustodyTests(unittest.TestCase):
                 retry = fixture.attempt("started")
                 self.assertEqual(retry.returncode, 2, retry.stdout)
                 self.assertIn("retry is forbidden", retry.stdout)
+
+    def test_protected_completion_requires_authority_and_terminal_attempt(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), profile="protected")
+            fixture.freeze()
+            fixture.review()
+            fixture.authorize()
+            fixture.init()
+            fixture.cell("started")
+            fixture.cell("completed")
+            fixture.bundle()
+            fixture.audit()
+            before_attempt = fixture.completion()
+            fixture.attempt("started")
+            started = fixture.completion()
+            fixture.attempt("completed")
+            completed = fixture.completion()
+        self.assertEqual(before_attempt.returncode, 1, before_attempt.stdout)
+        self.assertIn("attempt consumption is missing", before_attempt.stdout)
+        self.assertEqual(started.returncode, 1, started.stdout)
+        self.assertIn("terminal attempt", started.stdout)
+        self.assertEqual(completed.returncode, 0, completed.stdout)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,27 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py",
+    "layers",
+    "--style",
+    "presentation",
+    "--focus",
+    "runtime",
+    "--output",
+    "/tmp/intrinsic-runtime-presentation.mmd"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py layers --style presentation --focus runtime --output /tmp/intrinsic-runtime-presentation.mmd",
+  "cwd": ".",
+  "duration_ms": 48,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T20:27:49Z",
+  "label": "architecture-style-live-focus",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T20:27:49Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-style-live-focus.stderr.log",
+  "stderr_sha256": "122b63852dc03bec778828ac4c8f875c6ccca67610766fda925683aa061e044b",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-style-live-focus.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-029"
+}

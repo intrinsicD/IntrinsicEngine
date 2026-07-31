@@ -166,6 +166,7 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Authoring or changing an opt-in `gpu;vulkan` readback smoke, or proving a fix `Operational` | `intrinsicengine-gpu-smoke-authoring` |
 | Unexplained SEGV/ASan/vtable/ICE failure, especially after `.cppm` module changes | `intrinsicengine-stale-build-triage` |
 | Getting a layer-cake map of an unfamiliar file before editing | read `tools/agents/skills/intrinsicengine-zoom-out/SKILL.md` directly (user-invoked slash skill, not model-invocable) |
+| Drawing a layer, module-neighbourhood, change-impact, composition, sequence, or data-flow architecture diagram | `intrinsicengine-draw-architecture` |
 | Navigating module deps, change impact, or paper→method→code links | Knowledge-graph discovery aid (below) |
 | Compacting a long session into a handoff doc for the next agent | `intrinsicengine-handoff` |
 

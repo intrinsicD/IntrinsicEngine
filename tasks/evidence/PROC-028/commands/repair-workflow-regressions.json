@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\npython3 tests/regression/tooling/Test.ValidateTasks.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py\npython3 tests/regression/tooling/Test.ExperimentCustody.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test_BenchmarkResultValidator.py\npython3 tests/regression/tooling/Test.BenchmarkComparison.py\npython3 tests/regression/tooling/Test_BenchmarkManifestValidator.py\npython3 tests/regression/tooling/Test.CiTiming.py"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\npython3 tests/regression/tooling/Test.ValidateTasks.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py\npython3 tests/regression/tooling/Test.ExperimentCustody.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test_BenchmarkResultValidator.py\npython3 tests/regression/tooling/Test.BenchmarkComparison.py\npython3 tests/regression/tooling/Test_BenchmarkManifestValidator.py\npython3 tests/regression/tooling/Test.CiTiming.py'",
+  "cwd": ".",
+  "duration_ms": 17190,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T22:12:57Z",
+  "label": "repair-workflow-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T22:12:40Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/repair-workflow-regressions.stderr.log",
+  "stderr_sha256": "a1884e219ce9999f792846afd63741ef317c182bd15ad5e6aaa7f316ee98e8a6",
+  "stdout_path": "tasks/evidence/PROC-028/commands/repair-workflow-regressions.stdout.log",
+  "stdout_sha256": "5dfdd36eedb2305d27f3c063f6a1a7a260de4aabb11a91531e4cb4c387e34bf1",
+  "task_id": "PROC-028"
+}

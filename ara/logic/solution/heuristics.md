@@ -197,3 +197,38 @@
   tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md,
   N290, N291, N292]
 - **From staging**: O74
+
+## H14: Choose the Architecture Question Before the Notation
+- **Rationale**: Use C4-style levels to choose the smallest useful scale, then
+  select notation by relationship: layer/module dependency flowcharts for
+  static structure, sequence diagrams for one ordered runtime scenario, and
+  data-flow diagrams for representation changes. Mermaid, PlantUML, D2, or
+  DOT are rendering choices rather than the architecture model, so a renderer
+  can change without changing the evidenced relationships.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: medium
+- **Code ref**: [tools/agents/skills/intrinsicengine-draw-architecture/SKILL.md,
+  tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md,
+  tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py,
+  tests/regression/tooling/Test.ArchitectureDiagramSkill.py,
+  tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md,
+  N299, N300, N301]
+- **From staging**: O78
+
+## H15: Separate Architecture Audit from Presentation
+- **Rationale**: Preserve an evidence-complete audit projection as the default,
+  then derive reader-facing presentation views from the same graph. Reduce
+  visible label and edge density only when deterministic comments retain every
+  aggregate count and visibility decision, all context nodes remain explicit,
+  and every violation remains visible.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: medium
+- **Code ref**: [tools/agents/skills/intrinsicengine-draw-architecture/SKILL.md,
+  tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md,
+  tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py,
+  tests/regression/tooling/Test.ArchitectureDiagramSkill.py,
+  tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md,
+  N302, N303]
+- **From staging**: O80

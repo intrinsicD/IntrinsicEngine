@@ -6967,6 +6967,8 @@ tree:
       - "N290"
     status: resolved
   - id: N292
+    # CONFLICT: see N308
+    # RESOLVED: see N310 and N311
     type: experiment
     title: "Implement and exercise the enforced agent workflow"
     provenance: ai-executed
@@ -7158,4 +7160,289 @@ tree:
       evidence retains one explicit warning for the separately tracked
       BUG-120 skip owned by active PROC-028. No production change, promoted-
       Vulkan result, or performance claim was introduced.
+    status: resolved
+  - id: N299
+    type: question
+    title: "Define a multi-scale code architecture diagram skill"
+    provenance: user
+    timestamp: "2026-07-30T21:13+02:00"
+    description: >
+      Determine how a reusable Codex skill should visualize relationships
+      among code elements across whole-system, layer, module, symbol, and
+      runtime-behavior scales for IntrinsicEngine and other codebases; clarify
+      whether UML, C4, knowledge graphs, or another notation should organize
+      the views and whether an equivalent skill already exists.
+    status: resolved
+  - id: N300
+    type: decision
+    title: "Implement the architecture skill for IntrinsicEngine first"
+    provenance: user
+    timestamp: "2026-07-30T21:41+02:00"
+    also_depends_on: [N299]
+    choice: >
+      Implement the multi-scale architecture-diagram skill inside
+      IntrinsicEngine now and defer any language-generic or cross-repository
+      adapter framework.
+    alternatives:
+      - "Build a generic cross-repository architecture-cartography framework first."
+      - "Install a global or plugin-owned diagram skill outside IntrinsicEngine."
+      - "Leave the design as guidance without implementing it."
+    evidence:
+      - "User direction: implement this skill in IntrinsicEngine only for now."
+      - "tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md"
+    status: resolved
+  - id: N301
+    type: experiment
+    title: "Generate bounded architecture views from the live engine graph"
+    provenance: ai-executed
+    timestamp: "2026-07-30T21:41+02:00"
+    also_depends_on: [N299, N300]
+    evidence:
+      - "tools/agents/skills/intrinsicengine-draw-architecture/SKILL.md"
+      - "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py"
+      - "tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md"
+      - "tests/regression/tooling/Test.ArchitectureDiagramSkill.py"
+      - "14/14 focused tooling regressions"
+      - "Ruff and skill-creator validation passed"
+      - "live graph: 372 modules and 1,903 module-import edges"
+      - "live layer view: 10 layers and 20 cross-layer pairs"
+      - "live FrameRecipe view: 9 modules and 23 import edges"
+    result: >
+      PROC-029 retired at Operational with one dependency-free repository
+      skill and deterministic Mermaid renderer. The renderer aggregates the
+      existing module graph or walks a bounded dependency/dependent
+      neighbourhood, fails instead of truncating above its declared budget,
+      and embeds evidence scope and blind spots. Source-audited sequence and
+      data-flow guidance covers behavior that imports cannot establish, while
+      Graphify remains the complete-graph exploration surface. Strict
+      task/docs/skill/ARA checks passed. No engine source, module edge,
+      external dependency, or layering authority changed; the optional SVG
+      path was not run because mmdc was absent.
+    status: resolved
+  - id: N302
+    type: decision
+    title: "Separate architecture audit and presentation output"
+    provenance: user
+    timestamp: "2026-07-30T22:29+02:00"
+    also_depends_on: [N299, N300, N301]
+    choice: >
+      Extend PROC-029 with an evidence-complete audit profile, a polished
+      presentation profile, and focused layer views while keeping audit as
+      the compatibility default.
+    alternatives:
+      - "Keep one exhaustive diagram style for both review and explanation."
+      - "Replace Mermaid with a new rendering dependency."
+      - "Remove edge counts globally to improve appearance."
+    evidence:
+      - "User affirmation: yes please."
+      - "tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md"
+      - "tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md"
+    status: resolved
+  - id: N303
+    type: experiment
+    title: "Exercise audit-compatible and focused presentation diagrams"
+    provenance: ai-executed
+    timestamp: "2026-07-30T22:29+02:00"
+    also_depends_on: [N301, N302]
+    evidence:
+      - "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py"
+      - "tests/regression/tooling/Test.ArchitectureDiagramSkill.py"
+      - "tasks/evidence/PROC-029/commands/architecture-style-regression.json"
+      - "tasks/evidence/PROC-029/commands/architecture-style-live-focus.json"
+      - "tasks/evidence/PROC-029/commands/architecture-style-svg.json"
+      - "21/21 focused tooling regressions"
+      - "live graph: 372 modules, 1,903 module-import edges, and 20 cross-layer pairs"
+      - "runtime presentation: 10 layer nodes and 9 visible focus-incident pairs"
+    result: >
+      Default and explicit audit output matched, while presentation output
+      embedded ELK/neo layout metadata, removed routine visible edge-count
+      labels, preserved every aggregate count and visibility decision in
+      Mermaid comments, and retained every violation. Focusing runtime kept
+      all ten layer nodes while projecting nine of twenty cross-layer pairs.
+      The installed Mermaid CLI rendered the focused source through packaged
+      Chrome to SVG. No renderer dependency or engine/module edge was added.
+    status: resolved
+  - id: N304
+    type: decision
+    title: "Publish PROC-029 on a dedicated remote branch"
+    provenance: user
+    timestamp: "2026-07-30T23:08+02:00"
+    also_depends_on: [N300, N302, N303]
+    choice: >
+      Commit the complete PROC-029 architecture-diagram skill and its
+      fixed-revision completion evidence, then push the result to the remote
+      repository without opening a pull request.
+    alternatives:
+      - "Leave the verified work uncommitted in the local main worktree."
+      - "Push the changes directly to main."
+      - "Open a pull request in the same operation."
+    evidence:
+      - "User direction: commit and push to remote."
+      - "branch agent/proc-029-architecture-diagram-skill"
+      - "implementation commit c992a16c"
+      - "evidence-binding commit 3d5981c2"
+    status: resolved
+  - id: N305
+    type: experiment
+    title: "Verify and publish the fixed PROC-029 revision"
+    provenance: ai-executed
+    timestamp: "2026-07-30T23:08+02:00"
+    also_depends_on: [N303, N304]
+    evidence:
+      - "implementation commit c992a16c"
+      - "evidence-binding commit 3d5981c2"
+      - "tasks/evidence/PROC-029/report.yaml"
+      - "21/21 focused tooling regressions"
+      - "Ruff lint and format checks"
+      - "skill, mirror, task, docs, root-hygiene, ARA, and workflow-evidence validators"
+      - "live 372-module graph generation and Mermaid/Chrome SVG render"
+      - "origin/agent/proc-029-architecture-diagram-skill"
+    result: >
+      The coherent PROC-029 surface was committed on a dedicated branch, its
+      standard-profile report was rebound to the exact clean implementation
+      revision, and both commits were pushed with local and upstream tips
+      equal at 3d5981c2. Workflow-evidence validation reported zero errors;
+      its two warnings remain the explicit BUG-120 concurrency skip and the
+      justified C++/CTest skip for this tooling-only change. No pull request,
+      direct-main mutation, new architecture claim, or generic adapter
+      commitment was made.
+    status: resolved
+  - id: N306
+    type: decision
+    title: "Integrate PROC-029 directly into remote main"
+    provenance: user
+    timestamp: "2026-07-30T23:12+02:00"
+    also_depends_on: [N304, N305]
+    choice: >
+      Fast-forward the verified PROC-029 branch into local main and push the
+      identical history directly to origin/main.
+    alternatives:
+      - "Leave PROC-029 published only on its dedicated remote branch."
+      - "Open and merge a pull request."
+      - "Create a non-fast-forward merge commit."
+    evidence:
+      - "User direction: merge to main and push to remote."
+      - "origin/main at e217c3a6 before integration"
+      - "agent/proc-029-architecture-diagram-skill at 08dbea0c"
+    status: resolved
+  - id: N307
+    type: experiment
+    title: "Fast-forward and publish PROC-029 on main"
+    provenance: ai-executed
+    timestamp: "2026-07-30T23:12+02:00"
+    also_depends_on: [N305, N306]
+    evidence:
+      - "fast-forward range e217c3a6..08dbea0c"
+      - "21/21 focused tooling regressions"
+      - "Ruff lint and format checks"
+      - "skill and mirror validation"
+      - "strict docs, task, workflow-evidence, layering, test-layout, root-hygiene, and ARA validators"
+      - "git push origin main"
+      - "post-push main and origin/main divergence: 0/0 at 08dbea0c"
+    result: >
+      Fresh fetch and ancestry checks showed origin/main unchanged and the
+      PROC-029 branch three commits ahead with main as its direct ancestor.
+      The complete tooling and structural gate passed, local main
+      fast-forwarded without conflict or a merge commit, and origin/main
+      accepted the identical history through 08dbea0c. The integration
+      introduces no additional source change, capability claim, pull request,
+      or commitment to the deferred generic adapter.
+    status: resolved
+  - id: N308
+    # CONFLICT: see N292
+    # RESOLVED: see N310 and N311
+    type: experiment
+    title: "Reject the recorded PROC-028 fixed revision"
+    provenance: ai-executed
+    timestamp: "2026-07-30T23:27+02:00"
+    also_depends_on: [N292, N297]
+    evidence:
+      - "tasks/evidence/PROC-028/reviews.jsonl sequence 6"
+      - "presented revision e800ede9e7590e4eb225ceac9c0ce807b2ff10d9"
+      - "presented content digest ad1d044a680964d892e6fb882e50c869b5f04d04ff120779f1d6acc3818fa24b"
+      - "later task-scoped commits b1c2d7b3, 6b5a224e, and 9d66faf2"
+      - "fixed-revision focused regressions: 88/88"
+      - "current-main focused regressions: 90/90"
+      - "fixed-revision strict structural validators passed"
+      - "adversarial review-revision mismatch probe accepted an unrelated revision"
+      - "claim-grade completion probe passed without experiment custody"
+      - "run-binding probe passed after replacing the protocol config binding"
+    result: >
+      The final independent review issued a terminal rejected verdict. The
+      presented revision is not the final PROC-028 surface; high-risk handoff
+      and review revisions are not bound to the report source revision;
+      claim-grade and protected completion do not require experiment custody;
+      and run bindings are not compared with the frozen protocol. The passing
+      regression and structural bundles therefore do not satisfy the task's
+      adversarial enforcement contract. BUG-120 and remote CI remain separate
+      recorded limitations rather than causes of this rejection.
+    status: resolved
+  - id: N309
+    type: decision
+    title: "Resolve the PROC-028 enforcement contradiction before retirement"
+    provenance: ai-suggested
+    timestamp: "2026-07-30T23:27+02:00"
+    also_depends_on: [N292, N297, N308]
+    choice: >
+      Resolved by N310: repair all four rejected enforcement paths, bind a new
+      completion report and handoff to one clean contiguous final revision,
+      and obtain a new genuinely independent fixed-revision accepted review
+      before retiring PROC-028.
+    alternatives:
+      - "Narrow PROC-028's acceptance criteria and the implementation result recorded in N292."
+      - "Treat the ordinary passing regression suite as sufficient despite the adversarial counterexamples."
+      - "Retire the recorded fixed revision as superseded without completing its high-risk acceptance contract."
+    evidence:
+      - "N308"
+      - "N310"
+      - "N311"
+      - "tasks/evidence/PROC-028/reviews.jsonl sequence 6"
+    status: resolved
+  - id: N310
+    type: decision
+    title: "Repair all rejected PROC-028 enforcement findings"
+    provenance: user
+    timestamp: "2026-07-31T00:15+02:00"
+    also_depends_on: [N308, N309]
+    choice: >
+      Fix the four blocking findings from the final fixed-revision independent
+      review without narrowing PROC-028's cumulative workflow contract.
+    alternatives:
+      - "Leave the rejected implementation unchanged."
+      - "Narrow the task contract to match the existing validator behavior."
+      - "Repair only the stale evidence binding and defer the custody defects."
+    evidence:
+      - "User direction: please fix these."
+      - "tasks/evidence/PROC-028/reviews.jsonl sequence 6"
+    status: resolved
+  - id: N311
+    type: experiment
+    title: "Enforce final revision and cumulative experiment custody"
+    provenance: ai-executed
+    timestamp: "2026-07-31T00:15+02:00"
+    also_depends_on: [N308, N309, N310]
+    evidence:
+      - "review-record commit 2a2f52ae"
+      - "repair implementation commit 8be851e4"
+      - "tools/agents/workflow_evidence.py"
+      - "tools/agents/experiment_custody.py"
+      - "tests/regression/tooling/Test.WorkflowEvidence.py: 21/21"
+      - "tests/regression/tooling/Test.ExperimentCustody.py: 21/21"
+      - "complete focused workflow/benchmark bundle: 96/96"
+      - "Ruff lint/format and Python syntax checks passed"
+      - "strict task, docs, skill, ARA, method, benchmark, layering, test-layout, root-hygiene, and session-brief gates passed"
+      - "tasks/evidence/PROC-028/commands/repair-workflow-regressions.json"
+      - "tasks/evidence/PROC-028/commands/repair-python-quality.json"
+    result: >
+      High-risk appends and validation now derive the exact reviewed identity
+      from the report: clean reports bind source.head_revision and dirty
+      reports bind worktree:content_digest. Claim-grade/protected completion
+      invokes a task-scoped custody gate requiring a frozen matching protocol,
+      exact run bindings, terminal cell journal, portable bundle, and accepted
+      independent audit; protected completion additionally requires current
+      prospective authority and a terminal consumed attempt. Run task, claim,
+      source, config, environment, dataset, implementation, and command
+      bindings are compared exactly with the frozen protocol. The three
+      adversarial reproductions now fail closed. Independent acceptance and
+      BUG-120 remain separate open gates.
     status: resolved

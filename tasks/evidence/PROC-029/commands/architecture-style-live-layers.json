@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py",
+    "layers",
+    "--style",
+    "presentation",
+    "--output",
+    "/tmp/intrinsic-layers-presentation.mmd"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-draw-architecture/scripts/render_architecture.py layers --style presentation --output /tmp/intrinsic-layers-presentation.mmd",
+  "cwd": ".",
+  "duration_ms": 47,
+  "exit_code": 0,
+  "finished_at": "2026-07-30T20:27:48Z",
+  "label": "architecture-style-live-layers",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-30T20:27:48Z",
+  "stderr_path": "tasks/evidence/PROC-029/commands/architecture-style-live-layers.stderr.log",
+  "stderr_sha256": "eb25a322ac01e536931c98432d44e7786163305cd07106d5063a70f494112ce5",
+  "stdout_path": "tasks/evidence/PROC-029/commands/architecture-style-live-layers.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-029"
+}
