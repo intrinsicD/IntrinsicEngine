@@ -128,7 +128,9 @@ changed-path surface: their symlink chain must remain inside the repository and
 terminate at a regular file. Generation and validation enforce the same rule in
 the current worktree for dirty reports and in the exact recorded Git tree for
 clean reports, so an external or broken link cannot be substituted after
-review.
+review. Resolution walks components and expands each symlink before applying a
+following parent-directory component; it never pre-normalizes across a symlink
+or permits an intermediate target to leave and re-enter the repository.
 
 For a report with `source.dirty: false`, validation reads the recorded surface
 and referenced artifact blobs from the exact `source.head_revision` commit and

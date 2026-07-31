@@ -30,8 +30,11 @@ lexical mode-120000 blob semantics and one direct regression close it. A
 subsequent review found that validation still accepted generator-forbidden
 external and broken symlink artifacts after review; exact-tree/worktree
 containment and terminal-file checks plus three direct tests close that path.
-The artifact kind is also pinned to `file`. The final focused
-workflow/benchmark bundle passes 108/108. The original
+The artifact kind is also pinned to `file`. A final component-order review
+showed that pre-normalizing `pivot/../outside.txt` could skip an intermediate
+external symlink; one shared clean/dirty component walker and a direct symmetry
+test now expand links before applying `..` and reject intermediate escape. The
+final focused workflow/benchmark bundle passes 109/109. The original
 task-only CPU receipt passes 4,042/4,042 cases with one
 expected GLFW/LSan self-skip, while the current concurrency and cohort-parity
 retirement gate passes 19/19 and 7/7. Strict repository, benchmark, ARA,

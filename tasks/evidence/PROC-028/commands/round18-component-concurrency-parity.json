@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\npython3 tests/regression/tooling/Test.WorkflowConcurrency.py\npython3 tests/regression/tooling/Test.TestCohortParity.py"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\npython3 tests/regression/tooling/Test.WorkflowConcurrency.py\npython3 tests/regression/tooling/Test.TestCohortParity.py'",
+  "cwd": ".",
+  "duration_ms": 921,
+  "exit_code": 0,
+  "finished_at": "2026-07-31T11:32:48Z",
+  "label": "round18-component-concurrency-parity",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-31T11:32:47Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/round18-component-concurrency-parity.stderr.log",
+  "stderr_sha256": "057562cd991ed90e4c19dede733317ce755c8132c7ecdeb1c4305119cf9fafac",
+  "stdout_path": "tasks/evidence/PROC-028/commands/round18-component-concurrency-parity.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-028"
+}

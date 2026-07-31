@@ -22,7 +22,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -94,6 +94,13 @@ class Finding:
     severity: str
     location: str
     message: str
+
+
+@dataclass(frozen=True)
+class ArtifactPathEntry:
+    kind: str
+    digest: str | None = None
+    target: str | None = None
 
 
 def utc_now() -> str:
@@ -392,77 +399,123 @@ def git_entry_mode_at_revision(
     return None
 
 
-def sha256_artifact_at_revision(repo_root: Path, revision: str, value: object) -> str:
+def artifact_entry_at_revision(
+    repo_root: Path, revision: str, value: object
+) -> ArtifactPathEntry | None:
+    mode = git_entry_mode_at_revision(repo_root, revision, value)
+    if mode is None:
+        return None
+    if mode == "040000":
+        return ArtifactPathEntry("directory")
+    if mode not in {"100644", "100755", "120000"}:
+        return ArtifactPathEntry("other")
+    blob = blob_at_revision(repo_root, revision, value)
+    if blob is None:
+        return None
+    if mode == "120000":
+        if b"\0" in blob:
+            return ArtifactPathEntry("other")
+        return ArtifactPathEntry(
+            "symlink", digest=sha256_bytes(blob), target=os.fsdecode(blob)
+        )
+    return ArtifactPathEntry("file", digest=sha256_bytes(blob))
+
+
+def artifact_entry_in_worktree(
+    repo_root: Path, value: object
+) -> ArtifactPathEntry | None:
     relative = repository_relative_path(value)
-    pending = relative.split("/")
+    path = repo_root / relative
+    try:
+        if path.is_symlink():
+            target = os.readlink(os.fsencode(path))
+            return ArtifactPathEntry(
+                "symlink", digest=sha256_bytes(target), target=os.fsdecode(target)
+            )
+        if path.is_dir():
+            return ArtifactPathEntry("directory")
+        if path.is_file():
+            return ArtifactPathEntry("file", digest=sha256_file(path))
+        if path.exists():
+            return ArtifactPathEntry("other")
+    except (OSError, RuntimeError):
+        return None
+    return None
+
+
+def sha256_resolved_artifact(
+    repo_root: Path,
+    value: object,
+    entry_at_path: Callable[[str], ArtifactPathEntry | None],
+    *,
+    fixed_revision: bool,
+) -> str:
+    relative = repository_relative_path(value)
+    pending = [part for part in relative.split("/") if part not in {"", "."}]
     resolved: list[str] = []
     visited: set[tuple[str, tuple[str, ...]]] = set()
     artifact_hash: str | None = None
+    location = " at fixed revision" if fixed_revision else ""
+    missing = (
+        f"artifact is missing or not a file{location}: {value}"
+        if fixed_revision
+        else f"artifact is not a file: {value}"
+    )
 
     while pending:
         component = pending.pop(0)
+        if component == "..":
+            if not resolved:
+                raise ValueError(f"artifact path escapes repository{location}: {value}")
+            resolved.pop()
+            continue
         candidate = "/".join((*resolved, component))
-        mode = git_entry_mode_at_revision(repo_root, revision, candidate)
-        if mode is None:
-            raise ValueError(
-                f"artifact is missing or not a file at fixed revision: {value}"
-            )
-        if mode == "120000":
+        entry = entry_at_path(candidate)
+        if entry is None:
+            raise ValueError(missing)
+        if entry.kind == "symlink":
             state = (candidate, tuple(pending))
             if state in visited or len(visited) >= 40:
-                raise ValueError(f"artifact symlink cycle at fixed revision: {value}")
+                raise ValueError(f"artifact symlink cycle{location}: {value}")
             visited.add(state)
-            target_blob = blob_at_revision(repo_root, revision, candidate)
-            if target_blob is None or b"\0" in target_blob:
-                raise ValueError(
-                    f"artifact is missing or not a file at fixed revision: {value}"
-                )
+            if entry.target is None or entry.digest is None or not entry.target:
+                raise ValueError(missing)
             if not pending and artifact_hash is None:
-                artifact_hash = sha256_bytes(target_blob)
-            target = os.fsdecode(target_blob)
-            if not target:
-                raise ValueError(
-                    f"artifact is missing or not a file at fixed revision: {value}"
-                )
-            if os.path.isabs(target):
-                combined = os.path.normpath(os.path.join(target, *pending))
+                artifact_hash = entry.digest
+            if os.path.isabs(entry.target):
+                target_parts = list(Path(entry.target).parts)
+                root_parts = list(repo_root.parts)
+                if target_parts[: len(root_parts)] != root_parts:
+                    raise ValueError(
+                        f"artifact path escapes repository{location}: {value}"
+                    )
+                resolved = []
+                pending = target_parts[len(root_parts) :] + pending
             else:
-                parent = repo_root.joinpath(*resolved)
-                combined = os.path.normpath(os.path.join(str(parent), target, *pending))
-            try:
-                rebound = Path(combined).relative_to(repo_root).as_posix()
-            except ValueError as exc:
-                raise ValueError(
-                    f"artifact path escapes repository at fixed revision: {value}"
-                ) from exc
-            if rebound in {"", "."}:
-                raise ValueError(
-                    f"artifact is missing or not a file at fixed revision: {value}"
-                )
-            pending = rebound.split("/")
-            resolved = []
+                pending = entry.target.split("/") + pending
+            pending = [part for part in pending if part not in {"", "."}]
             continue
         if pending:
-            if mode != "040000":
-                raise ValueError(
-                    f"artifact is missing or not a file at fixed revision: {value}"
-                )
+            if entry.kind != "directory":
+                raise ValueError(missing)
             resolved.append(component)
             continue
-        if mode not in {"100644", "100755"}:
-            raise ValueError(
-                f"artifact is missing or not a file at fixed revision: {value}"
-            )
+        if entry.kind != "file" or entry.digest is None:
+            raise ValueError(missing)
         if artifact_hash is not None:
             return artifact_hash
-        blob = blob_at_revision(repo_root, revision, candidate)
-        if blob is None:
-            raise ValueError(
-                f"artifact is missing or not a file at fixed revision: {value}"
-            )
-        return sha256_bytes(blob)
+        return entry.digest
 
-    raise ValueError(f"artifact is missing or not a file at fixed revision: {value}")
+    raise ValueError(missing)
+
+
+def sha256_artifact_at_revision(repo_root: Path, revision: str, value: object) -> str:
+    return sha256_resolved_artifact(
+        repo_root,
+        value,
+        lambda path: artifact_entry_at_revision(repo_root, revision, path),
+        fixed_revision=True,
+    )
 
 
 def sha256_worktree_entry(repo_root: Path, value: object) -> str | None:
@@ -475,13 +528,12 @@ def sha256_worktree_entry(repo_root: Path, value: object) -> str | None:
 
 
 def sha256_worktree_artifact(repo_root: Path, value: object) -> str:
-    path = resolve_repo_path(repo_root, value)
-    if not path.is_file():
-        raise ValueError(f"artifact is not a file: {value}")
-    digest = sha256_worktree_entry(repo_root, value)
-    if digest is None:
-        raise ValueError(f"artifact is not a file: {value}")
-    return digest
+    return sha256_resolved_artifact(
+        repo_root,
+        value,
+        lambda path: artifact_entry_in_worktree(repo_root, path),
+        fixed_revision=False,
+    )
 
 
 def surface_entries(repo_root: Path, paths: Iterable[str]) -> list[dict[str, Any]]:

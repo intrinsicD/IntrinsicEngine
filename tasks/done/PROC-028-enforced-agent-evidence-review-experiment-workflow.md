@@ -56,6 +56,13 @@ claimed_at: "2026-07-31T09:28:53Z"
   exact recorded Git tree. A positive contained-link test plus direct clean and
   dirty external/broken-link regressions and a pinned artifact-kind check bring
   workflow evidence to 27/27 and the complete focused bundle to 108/108.
+- Independent review sequence 18 then found a component-order inconsistency in
+  the clean Git-tree resolver: pre-normalizing `pivot/../outside.txt` could hide
+  that `pivot` itself resolved outside the repository. Clean and dirty artifact
+  checks now use one component walker that expands each link before applying
+  `..` and rejects any intermediate escape. A direct clean/dirty symmetry
+  regression brings workflow evidence to 28/28 and the focused bundle to
+  109/109.
 - `BUG-120` is retired separately at `CPUContracted`. The current retirement
   receipt reruns `Test.WorkflowConcurrency.py` at 19/19 and
   `Test.TestCohortParity.py` at 7/7, so it is no longer a blocker or skipped

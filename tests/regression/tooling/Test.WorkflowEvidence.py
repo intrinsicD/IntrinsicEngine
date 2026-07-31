@@ -373,7 +373,7 @@ class WorkflowEvidenceTests(unittest.TestCase):
         for link_target, expected in (
             ("../outside.txt", "path escapes repository"),
             ("missing.txt", "artifact is not a file"),
-            ("unsafe-artifact", "path cannot be resolved"),
+            ("unsafe-artifact", "artifact symlink cycle"),
         ):
             with (
                 self.subTest(link_target=link_target),
@@ -410,6 +410,52 @@ class WorkflowEvidenceTests(unittest.TestCase):
                 result = fixture.validate()
             self.assertEqual(result.returncode, 1, result.stdout)
             self.assertIn(expected, result.stdout)
+
+    def test_clean_and_dirty_artifact_resolution_preserve_component_order(
+        self,
+    ) -> None:
+        for clean in (False, True):
+            with self.subTest(clean=clean), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                repo = root / "repo"
+                repo.mkdir()
+                external = root / "external"
+                (external / "pivot").mkdir(parents=True)
+                (external / "outside.txt").write_text("external\n", encoding="utf-8")
+                fixture = self.fixture(str(repo), profile="high-risk")
+                fixture.receipt()
+                (repo / "outside.txt").write_text("decoy\n", encoding="utf-8")
+                (repo / "pivot").symlink_to(external / "pivot")
+                artifact = repo / "ordered-artifact"
+                artifact.symlink_to("pivot/../outside.txt")
+                if clean:
+                    git(repo, "add", ".")
+                    git(repo, "commit", "-qm", "freeze ordered artifact links")
+
+                generated = fixture.generate(artifact=artifact.name, expected=None)
+                self.assertNotEqual(generated.returncode, 0, generated.stdout)
+                self.assertIn("artifact path escapes repository", generated.stdout)
+
+                fixture.generate()
+                report = fixture.report_data()
+                self.assertEqual(report["source"]["dirty"], not clean)
+                report["artifacts"] = [
+                    {
+                        "path": artifact.name,
+                        "sha256": hashlib.sha256(
+                            os.readlink(os.fsencode(artifact))
+                        ).hexdigest(),
+                        "kind": "file",
+                    }
+                ]
+                fixture.report.write_text(
+                    yaml.safe_dump(report, sort_keys=False), encoding="utf-8"
+                )
+                fixture.handoff()
+                fixture.review()
+                result = fixture.validate()
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn("artifact path escapes repository", result.stdout)
 
     def test_clean_fixed_revision_rejects_recorded_blob_hash_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,0 +1,74 @@
+Validated 177 task file(s); findings: 0; mode: strict.
+Validated 177 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /tmp/intrinsic-proc028-close-20260731
+[check_task_maturity_followups] Open task files scanned: 82
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_task_state_links] Root: /tmp/intrinsic-proc028-close-20260731
+[check_task_state_links] Indexed task IDs: 813
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+Skill mirror sync complete. mode=check files=18 surfaces=3.
+Experiment custody validation passed for 0 protocol(s) and 0 run(s).
+check_ara_claims: OK (16 claims)
+Method manifest validation passed for 9 file(s).
+Benchmark manifest validation passed for 30 file(s).
+Benchmark result JSON validation passed for 7 file(s), 7 stable benchmark ID(s), and 7 append-only run/attempt identity tuple(s).
+[check_docs_sync] Root: /tmp/intrinsic-proc028-close-20260731
+[check_docs_sync] Rules: tools/docs/docs_sync_rules.yaml
+[check_docs_sync] Changed files source: git diff origin/main...HEAD
+[check_docs_sync] Changed files count: 104
+[check_docs_sync] Triggered rules: 2
+[check_docs_sync] Docs sync rules satisfied.
+[check_docs_sync] Root: /tmp/intrinsic-proc028-close-20260731
+[check_docs_sync] Rules: tools/docs/docs_sync_rules.yaml
+[check_docs_sync] Changed files source: --files
+[check_docs_sync] Changed files count: 15
+[check_docs_sync] Triggered rules: 1
+[check_docs_sync] Docs sync rules satisfied.
+[check_doc_links] Root: /tmp/intrinsic-proc028-close-20260731
+[check_doc_links] Checked relative links: 2993
+[check_doc_links] Mode: warning
+[check_doc_links] No broken relative links found.
+[check_layering] Scan root: /tmp/intrinsic-proc028-close-20260731/src
+[check_layering] Files scanned: 720
+[check_layering] References scanned: 6327 import/include, 85 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+test layout check complete. findings=0 mode=strict
+[check_root_hygiene] Root: /tmp/intrinsic-proc028-close-20260731
+[check_root_hygiene] Root markdown files:
+  - AGENTS.md: allowed
+  - CLAUDE.md: allowed
+  - README.md: allowed
+[check_root_hygiene] Root allowlist: /tmp/intrinsic-proc028-close-20260731/tools/repo/root_allowlist.yaml
+[check_root_hygiene] Allowed repository entries present:
+  - .claude/
+  - .codex/
+  - .github/
+  - .gitignore
+  - .mcp.json
+  - AGENTS.md
+  - CLAUDE.md
+  - CMakeLists.txt
+  - CMakePresets.json
+  - README.md
+  - ara/
+  - assets/
+  - benchmarks/
+  - cmake/
+  - docs/
+  - lsan.supp
+  - methods/
+  - research/
+  - src/
+  - tasks/
+  - tests/
+  - tools/
+  - vcpkg-configuration.json
+  - vcpkg.json
+[check_root_hygiene] Ignored named local entries:
+  - .ruff_cache/
+[check_root_hygiene] Root entries match repository-owned policy.
+tasks/SESSION-BRIEF.md is up to date.
