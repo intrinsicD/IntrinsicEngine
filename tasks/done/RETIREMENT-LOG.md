@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-017`](METHOD-017-continuous-lop-clop-reference-backend.md) —
+Continuous LOP completed on 2026-08-01 at `CPUContracted`.
+`Geometry.PointCloud.Consolidation` now exposes a typed `ClopStrategy` beside
+LOP/WLOP, fits the input density through deterministic seeded
+`Geometry.GaussianMixture::FitEM`, evaluates the original paper's closed-form
+three-Gaussian attraction in fixed order, and reuses the shared repulsion
+kernel. Six CLOP-specific cases cover the independent equation oracle,
+plane/sphere denoising, WLOP parity, mixture-resolution work, sparse outliers,
+fail-closed controls, serial repetition, and concurrent callers. The disjoint
+schema-v2 confirmation smoke reports denoising, WLOP parity, uniformity,
+outlier displacement, mixture resolution/convergence, projection iterations,
+and explicit failure status; its quality-error L2 is `0.015830867` against the
+frozen `0.03` gate. The default 4,029-test CPU gate and grouped ASan/UBSan
+geometry cohorts pass. The literature record covers LOP, WLOP, bilateral FLOP,
+original CLOP, and the later incomplete-gamma improvement while retaining the
+original CLOP equations as this reference. Runtime/config and editor
+integration remain owned by `RUNTIME-175`/`UI-035`; no speed claim is made.
+
 [`METHOD-016`](METHOD-016-locally-optimal-projection-reference-backend.md) —
 LOP/WLOP point-cloud consolidation completed on 2026-08-01 at
 `CPUContracted`. `Geometry.PointCloud.Consolidation` now owns one deterministic

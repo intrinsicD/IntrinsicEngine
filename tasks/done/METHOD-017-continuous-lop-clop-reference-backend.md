@@ -41,6 +41,18 @@ maturity_target: CPUContracted
   baseline is deferred to `METHOD-019`; `gpu_vulkan_compute` is deferred to
   `METHOD-020`.
 
+## Status
+
+- Completed on 2026-08-01 at `CPUContracted`. The shared strategy surface now
+  includes deterministic CLOP backed by `Geometry.GaussianMixture::FitEM`, the
+  original paper's closed-form Gaussian-product attraction, shared repulsion,
+  explicit mixture/projection diagnostics, and fail-closed states.
+- Implementation commit: `cd7bba69`; completion-evidence commit: pending.
+- The literature review covers the original LOP/WLOP/CLOP lineage, bilateral
+  FLOP, and the 2024 incomplete-gamma improvement. The governing reference
+  remains original CLOP; improved kernels require a separately named strategy
+  and parity evidence rather than silently changing the frozen oracle.
+
 ## Slice plan
 - **Slice A — intake/continuous-term contract.** Freeze GMM/objective units,
   normalization, component policy, stopping rules, fixtures, tolerances,
@@ -62,35 +74,35 @@ maturity_target: CPUContracted
   the exact same operation.
 
 ## Required changes
-- [ ] Clone `methods/_template/` to `methods/geometry/continuous_lop/`.
-- [ ] Fill `method.yaml` (`id: geometry.continuous_lop`;
+- [x] Clone `methods/_template/` to `methods/geometry/continuous_lop/`.
+- [x] Fill `method.yaml` (`id: geometry.continuous_lop`;
       `backends: [cpu_reference]`; metrics:
       `mean_distance_to_reference_surface`,
       `uniformity_min_pairwise_distance`, `mixture_component_count`,
       `iterations`, `runtime_ms`). `correctness_tests` and `benchmarks`
       resolve to real paths before this task can retire.
-- [ ] Fill `paper.md` with the claim capture (closed-form continuous data term, component-count-bounded cost, expected quality versus WLOP on non-uniform input).
-- [ ] Freeze coordinate/covariance units, mixture-weight normalization,
+- [x] Fill `paper.md` with the claim capture (closed-form continuous data term, component-count-bounded cost, expected quality versus WLOP on non-uniform input).
+- [x] Freeze coordinate/covariance units, mixture-weight normalization,
       closed-form objective, EM/projection stopping rules, scale-normalized
       fixtures, tolerances, and explicit failure states before implementation.
-- [ ] Extend `Geometry.PointCloud.Consolidation` with a `Clop` strategy: a strategy payload struct (target `mixture_component_count` or component density, GMM regularization/`sigma²` floor passthrough to `GEOM-058`, plus the shared support radius `h`, repulsion weight `mu ∈ [0, 0.5)`, iteration count, seed) and a closed-form continuous attraction step evaluated over the fitted mixture; the repulsion term reuses `Geometry.PointCloud.Kernels`.
-- [ ] Build the input GMM through `Geometry.GaussianMixture::FitEM` (seeded, k-means++ init); do not add a private mixture fitter.
-- [ ] Deterministic: identical `(seed, input, params)` produce bitwise-identical output across runs and thread counts (seeded EM init + fixed iteration order).
-- [ ] Fail-closed on empty/too-small clouds, non-finite positions, `mu` outside `[0, 0.5)`, non-positive `h`, and a requested component count exceeding the point count, with explicit failure states (no NaN/Inf).
-- [ ] No `src/geometry/CMakeLists.txt` change if `Consolidation` already exists from `METHOD-016`; otherwise add nothing new beyond that module.
+- [x] Extend `Geometry.PointCloud.Consolidation` with a `Clop` strategy: a strategy payload struct (target `mixture_component_count` or component density, GMM regularization/`sigma²` floor passthrough to `GEOM-058`, plus the shared support radius `h`, repulsion weight `mu ∈ [0, 0.5)`, iteration count, seed) and a closed-form continuous attraction step evaluated over the fitted mixture; the repulsion term reuses `Geometry.PointCloud.Kernels`.
+- [x] Build the input GMM through `Geometry.GaussianMixture::FitEM` (seeded, k-means++ init); do not add a private mixture fitter.
+- [x] Deterministic: identical `(seed, input, params)` produce bitwise-identical output across runs and thread counts (seeded EM init + fixed iteration order).
+- [x] Fail-closed on empty/too-small clouds, non-finite positions, `mu` outside `[0, 0.5)`, non-positive `h`, and a requested component count exceeding the point count, with explicit failure states (no NaN/Inf).
+- [x] No `src/geometry/CMakeLists.txt` change if `Consolidation` already exists from `METHOD-016`; otherwise add nothing new beyond that module.
 
 ## Tests
-- [ ] `tests/unit/geometry/Test.PointCloudConsolidation.cpp` (extend the `METHOD-016` file) with `unit;geometry` labels for the `Clop` strategy.
-- [ ] Denoising: on noisy plane and sphere fixtures, CLOP mean distance to the true surface strictly decreases versus the raw input and falls under a documented bound.
-- [ ] WLOP parity: on a dense, near-uniform fixture, CLOP with a sufficiently rich mixture matches the `METHOD-016` WLOP result within a documented tolerance.
-- [ ] Component-count scaling: reducing `mixture_component_count` reduces the reported per-iteration work (component count is reported in diagnostics) while denoising stays within tolerance — cost tracks components, not raw point count.
-- [ ] Outliers: sparse injected outliers do not pull the projected set beyond tolerance.
-- [ ] Determinism and fail-closed cases as listed above.
+- [x] `tests/unit/geometry/Test.PointCloudConsolidation.cpp` (extend the `METHOD-016` file) with `unit;geometry` labels for the `Clop` strategy.
+- [x] Denoising: on noisy plane and sphere fixtures, CLOP mean distance to the true surface strictly decreases versus the raw input and falls under a documented bound.
+- [x] WLOP parity: on a dense, near-uniform fixture, CLOP with a sufficiently rich mixture matches the `METHOD-016` WLOP result within a documented tolerance.
+- [x] Component-count scaling: reducing `mixture_component_count` reduces the reported per-iteration work (component count is reported in diagnostics) while denoising stays within tolerance — cost tracks components, not raw point count.
+- [x] Outliers: sparse injected outliers do not pull the projected set beyond tolerance.
+- [x] Determinism and fail-closed cases as listed above.
 
 ## Docs
-- [ ] `methods/geometry/continuous_lop/README.md` with a backend-status table (`cpu_reference` → `METHOD-017`; optimized → `METHOD-019`; GPU → `METHOD-020`), WLOP-versus-CLOP guidance (when the continuous term wins), and known limitations (mixture-resolution/thin-structure trade-offs).
-- [ ] Note the `Clop` strategy and its parameters in the `Geometry.PointCloud.Consolidation` interface documentation.
-- [ ] Executable smoke manifest
+- [x] `methods/geometry/continuous_lop/README.md` with a backend-status table (`cpu_reference` → `METHOD-017`; optimized → `METHOD-019`; GPU → `METHOD-020`), WLOP-versus-CLOP guidance (when the continuous term wins), and known limitations (mixture-resolution/thin-structure trade-offs).
+- [x] Note the `Clop` strategy and its parameters in the `Geometry.PointCloud.Consolidation` interface documentation.
+- [x] Executable smoke manifest
       `benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml`
       (`benchmark_id: geometry.continuous_lop.reference.smoke`) on a stable
       built-in deterministic dataset, with `intent: correctness`, fixed seed,
@@ -98,15 +110,15 @@ maturity_target: CPUContracted
       `quality_error_l2`, and schema-valid `cpu_reference` result JSON.
       Mixture resolution, WLOP parity, denoising/uniformity, EM/projection
       iterations, and failure status belong in diagnostics.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if the module surface changes.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if the module surface changes.
 
 ## Acceptance criteria
-- [ ] `Clop` is selectable on the shared `ConsolidationParams::Strategy` axis alongside `Wlop`/`Lop`.
-- [ ] All correctness tests (including WLOP parity) pass in the default CPU gate.
-- [ ] Benchmark smoke manifest validates and runs.
-- [ ] Emitted smoke result validates and reports quality/convergence
+- [x] `Clop` is selectable on the shared `ConsolidationParams::Strategy` axis alongside `Wlop`/`Lop`.
+- [x] All correctness tests (including WLOP parity) pass in the default CPU gate.
+- [x] Benchmark smoke manifest validates and runs.
+- [x] Emitted smoke result validates and reports quality/convergence
       diagnostics, not runtime alone.
-- [ ] Public API exposes only `std`/`glm`/scalar types; the `GEOM-058` mixture backs the density model (no private Gaussian/EM code).
+- [x] Public API exposes only `std`/`glm`/scalar types; the `GEOM-058` mixture backs the density model (no private Gaussian/EM code).
 
 ## Verification
 ```bash
@@ -128,6 +140,23 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 - No optimized/GPU backend before reference parity; no performance claims without a baseline (`METHOD-019` owns the speed claim versus WLOP).
 - No private Gaussian-mixture or EM re-implementation.
 - No `std::rand` or global RNG state.
+
+## Verification evidence
+
+- Clang 23 built `IntrinsicTests` and `IntrinsicBenchmarkSmoke`; all 16
+  point-cloud consolidation cases and the 33-test consolidation/GMM/kernel
+  selector passed.
+- The default exclusion-only CPU gate passed 4,029/4,029 tests; the GLFW/LSan
+  process test was intentionally skipped by its own runtime capability check.
+- Replacement-only `IntrinsicGeometryTests.Grouped` passed serially under both
+  ASan and UBSan.
+- The manifest-bound schema-v2 smoke ran and validated. Its disjoint
+  confirmation cohort reported quality-error L2 `0.015830867 <= 0.03`, WLOP
+  parity distance `0.034874247`, reduced analytic work at 8 versus 28 mixture
+  components, finite denoising/uniformity/outlier diagnostics, converged EM,
+  and `invalid_mixture_component_count` fail-closed evidence.
+- Strict method/benchmark manifests, layering, documentation links, generated
+  module inventory, and `git diff --check` passed.
 
 ## Maturity
 - Target: `CPUContracted` for the `Clop` reference strategy.
