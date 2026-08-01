@@ -23,13 +23,14 @@ maturity_target: Retired
 
 ## Status
 
-- Implementation complete on 2026-08-01. `BUG-125` retired the two diagnosed
-  queued-import scheduling races and its merged 4,010-case CPU gate passes.
-  The task remains claimed on `codex/runtime-202-retire-sandbox-facade` while
-  final hash-bound verification and independent fixed-surface review run.
-  The aggregate `IntrinsicTests` build, 194/194 focused Sandbox/runtime/config
-  tests, and the pre-merge structural checks already pass; the policy-defined
-  GLFW/LSan process test is skipped by the CPU selector.
+- Implementation and final verification are complete on 2026-08-01.
+  `BUG-125` retired the two diagnosed queued-import scheduling races. On the
+  merged source, the aggregate `IntrinsicTests` build, 194/194 focused
+  Sandbox/runtime/config tests, 4,010/4,010 default CPU tests, compile-hotspot
+  tooling tests, and all structural checks pass. The policy-defined GLFW/LSan
+  process test is skipped by the CPU selector. The task remains claimed on
+  `codex/runtime-202-retire-sandbox-facade` for independent fixed-surface
+  review and retirement bookkeeping.
 - Re-gated on 2026-07-30: `RUNTIME-138` is no longer a prerequisite. Facade
   retirement must preserve the current selected-model cache and diagnostic
   behavior, migrate existing selection/property behavior to its feature

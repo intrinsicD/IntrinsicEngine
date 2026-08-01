@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.CompileHotspots.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.CompileHotspots.py",
+  "cwd": ".",
+  "duration_ms": 74,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T01:31:00Z",
+  "label": "final-compile-hotspots-tooling",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T01:31:00Z",
+  "stderr_path": "tasks/evidence/RUNTIME-202/commands/final-compile-hotspots-tooling.stderr.log",
+  "stderr_sha256": "8d07bcca4d98c58e6e61982273d511fc9a19d64a50b606a43b2218d829583a76",
+  "stdout_path": "tasks/evidence/RUNTIME-202/commands/final-compile-hotspots-tooling.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "RUNTIME-202"
+}
