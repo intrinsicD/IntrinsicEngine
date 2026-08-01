@@ -1,0 +1,85 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.locally_optimal_projection.reference.smoke",
+  "claim_eligible": true,
+  "commit": "89193bef887bac1d3876b9e8cb29cc43bd9ca9bf",
+  "config_digest": "6b1a7de97e2a920db016f91020263828f633bab3a75cb8bbe2dc3a3338ca2e20",
+  "dataset": "builtin.noisy_plane_sphere.lop_family.confirmation.v2",
+  "diagnostics": {
+    "lop_iterations": 1,
+    "measured_iterations": 8,
+    "mode": "correctness_smoke",
+    "outlier_patch_max_displacement": 1.6324e-05,
+    "raw_plane_error": 0.030374999,
+    "raw_sphere_error": 0.017714293,
+    "runner": "IntrinsicBenchmarkSmoke",
+    "strategies": [
+      "lop",
+      "wlop"
+    ],
+    "uniformity_with_repulsion": 0.143427372,
+    "uniformity_without_repulsion": 0.0,
+    "warmup_iterations": 1,
+    "wlop_plane_error": 0.02294086,
+    "wlop_plane_iterations": 1,
+    "wlop_sphere_error": 0.01759561,
+    "wlop_sphere_iterations": 3
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml",
+    "sha256": "2ff28bf453268a783f7795dc6190219c6243c26f50dda99a460d40f405725159"
+  },
+  "method": "geometry.locally_optimal_projection",
+  "metrics": {
+    "quality_error_l2": 0.020443686,
+    "runtime_ms": 28.103004875
+  },
+  "resolved_params": {
+    "intent": "correctness",
+    "measured_iterations": 8,
+    "repulsion_weight_uniformity": 0.45,
+    "seed": 29,
+    "strategies": [
+      "lop",
+      "wlop"
+    ],
+    "support_radius_plane": 0.58,
+    "support_radius_sphere": 0.82,
+    "warmup_iterations": 1
+  },
+  "run_id": "run-001",
+  "schema_version": 2,
+  "source": {
+    "revision": "89193bef887bac1d3876b9e8cb29cc43bd9ca9bf",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 500,
+      "metric": "runtime_ms",
+      "observed": 28.103004875,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 0.03,
+      "metric": "quality_error_l2",
+      "observed": 0.020443686,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 0.03,
+    "smoke_runtime_ms_max": 500
+  },
+  "warmup_policy": {
+    "measured_iterations": 8,
+    "warmup_iterations": 1
+  }
+}

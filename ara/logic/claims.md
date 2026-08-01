@@ -450,8 +450,9 @@
   improves the declared plane/sphere error and repulsion-uniformity measures,
   and fails closed for invalid or resource-bounded requests.
 - **Status**: supported — Clang 23 CPU correctness, serial ASan/UBSan geometry
-  groups, and schema-v2 claim-eligible confirmation evidence; no scanner-data
-  generalization, runtime/UI, GPU, optimized-backend, or performance claim
+  groups, and independently accepted schema-v2 claim-grade confirmation
+  evidence; no scanner-data generalization, runtime/UI, GPU, optimized-backend,
+  or performance claim
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: The one-step equation oracle diverges; identical
@@ -464,7 +465,7 @@
   tests/unit/geometry/Test.PointCloudConsolidation.cpp,
   benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml,
   tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json,
-  tasks/evidence/METHOD-016/experiment/bundle.json]
+  tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml]
 - **Dependencies**: []
 - **Tags**: geometry, point cloud, LOP, WLOP, CPU reference, deterministic
 - **From staging**: O88
