@@ -69,6 +69,8 @@ maturity_target: ParityProven
   conditional branches in this task.
 
 ## Frozen parity and comparison protocol
+- Preregistered at clean revision
+  `6f2277b079044c96d6c38405941393f93861384b`, before optimized source changes.
 - Frozen before optimized source changes in
   `methods/geometry/locally_optimal_projection/reports/METHOD-019-protocol.md`
   and executable manifest
