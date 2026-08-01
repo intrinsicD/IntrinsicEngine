@@ -1,0 +1,139 @@
+schema_version: 2
+task_id: METHOD-019
+protocol_id: lop-family-optimized-cpu-comparison-v1
+profile: claim-grade
+state: frozen
+question: Do any of the four deterministic LOP-family optimized CPU candidates preserve the frozen reference
+  contract and achieve the preregistered useful-acceleration ratio?
+hypothesis: All candidates preserve reference parity, but no candidate achieves a median paired optimized/reference
+  runtime ratio at or below 0.80 on the frozen confirmation suite.
+claim_boundary: Checked-in deterministic LOP, WLOP, CLOP, and EAR fixtures on this serial CPU confirmation
+  host only; no scanner-data generalization, public optimized-backend capability, runtime/UI availability,
+  GPU result, or cross-host performance claim.
+evidence_phase: confirmation
+claim_eligible: true
+datasets:
+- id: lop-family-screening-v1
+  path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: 93f50a4cbe56787a9441c4b9138623a0763e71f2cf817c051af902f55c6cd8f7
+  split: screening
+- id: lop-family-confirmation-v1
+  path: benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp
+  sha256: d81dc0c6b0156ee81c6f6043eb274ab5521fe2e0bbe1003316b2d53e7460e213
+  split: confirmation
+disjoint_splits:
+- left: screening
+  right: confirmation
+  method: The confirmation suite uses different point counts, grid dimensions, noise equations, seeds,
+    target counts, support radii, iteration budgets, mixture controls, dihedral spacing, and insertion
+    counts from the unit-test screening fixtures.
+seeds:
+- 17
+- 1901
+- 1902
+- 1903
+- 1904
+input_policy: Use only the checked-in analytic fixtures and exact parameters frozen in the preregistration
+  and executable manifest. Screening observations may not change fixtures, candidate scope, parity tolerances,
+  sampling order, or the 0.80 adoption threshold.
+comparators:
+- id: cpu-reference
+  budget: matched-input-params-seed-and-single-thread
+- id: cpu-optimized-candidate
+  budget: matched-input-params-seed-and-single-thread
+primary_metrics:
+- name: minimum_median_runtime_ratio
+  direction: maximize
+  unit: optimized-over-reference-ratio
+  statistical_unit: strategy
+- name: maximum_parity_failure
+  direction: minimize
+  unit: binary-failure
+  statistical_unit: strategy
+- name: adopted_strategy_count
+  direction: target
+  unit: strategies
+  statistical_unit: confirmation-suite
+statistical_tests:
+- name: deterministic-paired-median-and-bounded-parity
+  alpha: null
+summaries:
+- name: minimum_median_runtime_ratio
+  column: median_runtime_ratio
+  statistic: min
+- name: maximum_parity_failure
+  column: parity_failure
+  statistic: max
+- name: adopted_strategy_count
+  column: adopted
+  statistic: sum
+killing_gates:
+- metric: minimum_median_runtime_ratio
+  operator: '>'
+  threshold: 0.8
+- metric: maximum_parity_failure
+  operator: ==
+  threshold: 0
+- metric: adopted_strategy_count
+  operator: ==
+  threshold: 0
+screening_confirmation_policy: The METHOD-019 preregistration and executable manifest were committed before
+  candidate implementation. The clean confirmation run decides each strategy once; a failed acceleration
+  gate remains negative evidence and cannot trigger retuning or public backend exposure.
+resources:
+  cpu_threads: 1
+  gpu: false
+command:
+- env
+- GIT_COMMIT=cfd0d9bdebe6c46969394d61593bf4305365ebec
+- python3
+- tools/benchmark/run_and_seal.py
+- --executable
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- --output
+- build/ci/custody/METHOD-019/confirmation-raw
+- --manifests-root
+- benchmarks
+- --run-id
+- method-019-confirmation-v1
+- --attempt-id
+- attempt-001
+expected_artifacts:
+- tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json
+- tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl
+- tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml
+blockers: []
+source:
+  revision: cfd0d9bdebe6c46969394d61593bf4305365ebec
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml
+  sha256: 72807a914d77045a9996e9f4ba96ce300f3e70b0dac009ba13ce5b12c3fb7825
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+implementation:
+- path: methods/geometry/locally_optimal_projection/reports/METHOD-019-protocol.md
+  sha256: 0d58f67dd1d4af8066e2662a5fe115a069a4f2ad65ea50e9c37f3801f131bcd0
+- path: src/geometry/Geometry.PointCloud.Consolidation.cppm
+  sha256: 44640287e56943ac31af420d3861f90f81f88f6da96184d99b3a211464de8b2e
+- path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+  sha256: 6f4bb0bcad9431cc54653e1ec3e84cd0e9bef32c0aabd6ca2429934d9ed82939
+- path: src/geometry/Geometry.PointCloud.Kernels.cppm
+  sha256: 464d8aa1590f7b3c3497b865f0a798cf614ff771f827de3ce4f9f952fcebc1a4
+- path: src/geometry/Geometry.PointCloud.Kernels.cpp
+  sha256: 54ebd4d0304b6c0a4eab84ee9154df244ab5ad8b36a08f07671d0955da97850f
+- path: src/geometry/Geometry.KDTree.cppm
+  sha256: 139fb1b4f1175eb14f80567d6e8c4111e07dfbd61fd965aeaacd503e543d5c35
+- path: src/geometry/Geometry.KDTree.cpp
+  sha256: 5ab92b1f8eb8030ddbc7f3a7045f1f0b642dd525846c99019024523a3515c560
+- path: src/geometry/Geometry.GaussianMixture.cpp
+  sha256: 3073e159d45abdd82854af8b7f4907d7349a5ac50e50663a848c07dd5fbb301a
+- path: benchmarks/geometry/Bench.LopFamilyComparisonSmoke.hpp
+  sha256: 97e24b9d3f4d30433c2f4f6f1e24842583d2f40c0d883570c384b45a636c3dda
+- path: benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp
+  sha256: d81dc0c6b0156ee81c6f6043eb274ab5521fe2e0bbe1003316b2d53e7460e213
+- path: benchmarks/runners/BenchmarkSmokeRunner.cpp
+  sha256: ebe4f57bc262b7ceb55aa8c1a3a6f361d8fd3cc3f0c9bc002308ac597eb7ea96
+frozen_at: '2026-08-01T21:24:58Z'
+protocol_digest: b912a481725591d8434963e2016e4deffe21a31b388c039fe7d8b2d65b1df70c
