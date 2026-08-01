@@ -1,0 +1,48 @@
+schema_version: 1
+task_id: METHOD-019
+run_id: run-001
+attempt_id: attempt-001
+status: initialized
+initialized_at: '2026-08-01T23:30:08Z'
+claim_eligible: true
+protocol_path: tasks/evidence/METHOD-019/experiment/protocol.yaml
+protocol_digest: b912a481725591d8434963e2016e4deffe21a31b388c039fe7d8b2d65b1df70c
+task_path: tasks/done/METHOD-019-lop-family-optimized-cpu-backend.md
+task_sha256: 41a775bc02cdc249c8140e9cc48f70b9e3806613b0e8f67e90a5e362813aa91c
+source:
+  revision: cfd0d9bdebe6c46969394d61593bf4305365ebec
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml
+  sha256: 72807a914d77045a9996e9f4ba96ce300f3e70b0dac009ba13ce5b12c3fb7825
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+datasets:
+- id: lop-family-screening-v1
+  path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: 93f50a4cbe56787a9441c4b9138623a0763e71f2cf817c051af902f55c6cd8f7
+  split: screening
+- id: lop-family-confirmation-v1
+  path: benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp
+  sha256: d81dc0c6b0156ee81c6f6043eb274ab5521fe2e0bbe1003316b2d53e7460e213
+  split: confirmation
+implementation_digest: fef6dd79d0d1ca97ea309b82a99e53b289babdd9ab53a29bf50ef41736111af3
+command:
+- env
+- GIT_COMMIT=cfd0d9bdebe6c46969394d61593bf4305365ebec
+- python3
+- tools/benchmark/run_and_seal.py
+- --executable
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- --output
+- build/ci/custody/METHOD-019/confirmation-raw
+- --manifests-root
+- benchmarks
+- --run-id
+- method-019-confirmation-v1
+- --attempt-id
+- attempt-001
+cell_journal: tasks/evidence/METHOD-019/experiment/runs/run-001/cells.jsonl
+bundle: tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml
+audit: tasks/evidence/METHOD-019/experiment/runs/run-001/audit.json

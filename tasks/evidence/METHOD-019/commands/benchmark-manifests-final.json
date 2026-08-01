@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/benchmark/validate_benchmark_manifests.py",
+    "--root",
+    "benchmarks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict",
+  "cwd": ".",
+  "duration_ms": 58,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T23:46:43Z",
+  "label": "benchmark-manifests-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T23:46:43Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/benchmark-manifests-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/benchmark-manifests-final.stdout.log",
+  "stdout_sha256": "c181595d1e04b0b0af82b88290c2a6e39e5787ac058517d8f6358d2cc6421156",
+  "task_id": "METHOD-019"
+}

@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-019`](METHOD-019-lop-family-optimized-cpu-backend.md) — LOP-family
+optimized-CPU evaluation retired on 2026-08-02 as a claim-grade negative
+confirmation. Validation-only candidates for LOP, WLOP, CLOP, and EAR retained
+exact reference parity, deterministic identity, and zero fallback, but their
+paired-median candidate/reference runtime ratios were respectively
+`0.961823997`, `0.966844794`, `0.998817796`, and `1.037145476`; none met the
+preregistered `<= 0.80` useful-acceleration gate. Consequently no public
+`cpu_optimized` backend, runtime config token, or UI choice was adopted. The
+post-repair focused selector passed 54/54, the supported CPU gate passed
+4,812/4,812, and isolated ASan and UBSan gates each passed 2,655/2,655. The
+schema-v2 benchmark result, frozen protocol, source/data/config seals, raw
+strategy rows, negative decision, and independent audit are retained under
+claim-grade experiment custody; strict method, benchmark, layering, task,
+documentation, inventory, ARA, and diff-hygiene checks close the evidence.
+
 [`BUG-123`](BUG-123-retired-scene-save-terminal-event-race.md) — retired
 queued-scene-save terminal publication repaired on 2026-08-01. A worker could
 publish `Cancelled`, race immediately behind an empty main-thread completion

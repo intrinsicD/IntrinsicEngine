@@ -1,0 +1,7 @@
+[check_doc_links] Root: /tmp/intrinsic-geometry-e2e.GJlhXS
+[check_doc_links] Checked relative links: 3036
+[check_doc_links] Mode: warning
+[check_doc_links] Broken relative links:
+  - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md -> ../../tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md
+[check_doc_links] Action: update moved paths or convert to canonical links.
+[check_doc_links] WARNING MODE: non-fatal.

@@ -475,9 +475,11 @@ first-class, P1 scheduling target alongside Theme B (rendering) and Theme C
 
 Open members: `METHOD-003`, `METHOD-004`, `METHOD-005`, `METHOD-006` (blocked by
 `GEOM-024`), `METHOD-007`, `METHOD-014`, and `METHOD-015`; the remaining LOP
-consolidation leaves are `METHOD-019` optimized CPU and `METHOD-020` GPU
-(blocked by `METHOD-019`). Their CPU-reference methods `METHOD-016..018` and
-engine-integration leaves `RUNTIME-175`/`UI-035` retired on 2026-08-01. The
+consolidation leaf is `METHOD-020` GPU. `METHOD-019` retired on 2026-08-02 as a
+negative optimized-CPU confirmation with no public selector after all four
+candidates missed its frozen acceleration gate. The CPU-reference methods
+`METHOD-016..018` and engine-integration leaves `RUNTIME-175`/`UI-035` retired
+on 2026-08-01. The
 parameterization family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
 `GEOM-064`), `METHOD-022` SLIM (blocked by `GEOM-064`/`METHOD-021`),
 `METHOD-023` BFF (retired),

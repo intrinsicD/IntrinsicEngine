@@ -1,0 +1,59 @@
+{
+  "attempt_id": "attempt-001",
+  "audited_at": "2026-08-01T23:41:29Z",
+  "audited_revision": "cfd0d9bdebe6c46969394d61593bf4305365ebec",
+  "auditor_label": "Noether-METHOD019-ClaimGrade-Auditor",
+  "bundle_path": "tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml",
+  "bundle_sha256": "3a8baf18b27ec592f58b5afac288fac3817a7abcb94515e20cbf90d6b935485d",
+  "claim_authorized": false,
+  "disposition": "accepted",
+  "driver_label": "Codex-GeometryE2E",
+  "errors": [],
+  "identity_assurance": "cooperative-label-only",
+  "recomputed_gates": [
+    {
+      "metric": "minimum_median_runtime_ratio",
+      "observed": 0.961823997,
+      "operator": ">",
+      "passed": true,
+      "threshold": 0.8
+    },
+    {
+      "metric": "maximum_parity_failure",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "adopted_strategy_count",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "threshold": 0
+    }
+  ],
+  "recomputed_summaries": [
+    {
+      "column": "median_runtime_ratio",
+      "name": "minimum_median_runtime_ratio",
+      "statistic": "min",
+      "value": 0.961823997
+    },
+    {
+      "column": "parity_failure",
+      "name": "maximum_parity_failure",
+      "statistic": "max",
+      "value": 0.0
+    },
+    {
+      "column": "adopted",
+      "name": "adopted_strategy_count",
+      "statistic": "sum",
+      "value": 0.0
+    }
+  ],
+  "run_id": "run-001",
+  "schema_version": 1,
+  "task_id": "METHOD-019"
+}
