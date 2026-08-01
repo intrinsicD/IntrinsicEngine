@@ -1778,8 +1778,9 @@ Concretely:
   moving the bytes to the feature owner exactly once. Cancellation suppresses
   consumption but retains in-flight sink storage until delivery. Typed parsing
   stays with the K-Means, Poisson, or other feature owner; the transfer facade
-  contains no method semantics. Frame-correlated renderer picking remains on
-  `SelectionReadback` and is intentionally excluded from this operation.
+  contains no method semantics. Frame-correlated renderer picking remains in
+  runtime-owned `SceneInteractionModule` state and is intentionally excluded
+  from this operation.
 - Promoted visualization resolves material, uniform, scalar-field, and
   per-element RGBA color sources through `GpuEntityConfig` and the shared
   `assets/shaders/common/gpu_scene.glsl` helper in the promoted surface

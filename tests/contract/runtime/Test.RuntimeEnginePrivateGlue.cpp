@@ -154,14 +154,14 @@ TEST(RuntimeEnginePrivateGlue,
     const auto interactionViewport =
         interactionImpl.find("void RunViewportInput(");
     const auto gizmoInput = interactionImpl.find(
-        "Gizmo.DriveInputForFrame(", interactionViewport);
+        "DriveGizmoInteractionForFrame(", interactionViewport);
     const auto interactionExtraction =
         interactionImpl.find("void RunBeforeExtraction(");
     const auto picking = interactionImpl.find(
-        "Readback.DrainPendingPickForFrame(",
+        "Selection.ConsumePendingPick()",
         interactionExtraction);
     const auto gizmoPackets = interactionImpl.find(
-        "Gizmo.BuildRenderPackets(", interactionExtraction);
+        "GizmoPacketBuilder.Build(", interactionExtraction);
     ASSERT_NE(interactionViewport, std::string::npos);
     ASSERT_NE(gizmoInput, std::string::npos);
     ASSERT_NE(interactionExtraction, std::string::npos);

@@ -290,7 +290,6 @@ if(TARGET ExtrinsicRuntime)
         Test.SandboxEditorSessionLifecycle.cpp
         Test.TextureBakeModule.cpp
         Test.SelectionController.cpp
-        Test.SelectionReadbackCorrelation.cpp
         Test.SelectionSnapshotExtraction.cpp
         Test.SelectionStableLookupComposition.cpp
         Test.StableEntityLookup.cpp

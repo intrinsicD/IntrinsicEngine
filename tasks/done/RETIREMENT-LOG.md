@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-205`](RUNTIME-205-internalize-scene-interaction-helpers.md) — scene-
+interaction helper internalization completed on 2026-08-01 at `Retired`.
+`SceneInteractionModule` now directly owns gizmo interaction/packet/scratch
+state and bounded world/epoch-qualified pick-correlation/refinement state. The
+one-consumer `GizmoFrameService` and `SelectionReadback` BMIs, implementations,
+CMake entries, and ten helper-only tests are deleted without a replacement
+wrapper; five owner-level cases preserve correlation bounds and ordering,
+stale-result rejection, capture/history gating, one undoable drag, and live-
+registry cancellation across world replacement. Focused interaction/layering
+coverage passed 70/70; the default CPU selector passed 3,991/3,991 with its
+expected environmental GLFW/LSan skip; grouped ASan and UBSan selectors each
+passed 2,645/2,645, with UBSan carrying the policy-defined skip. Strict
+structural and documentation gates plus an independent revision-bound review
+close the high-risk surface deletion. Durable `GizmoInteraction`,
+`SelectionController`, copied interaction snapshots, graphics readbacks, and
+primitive refinement remain unchanged. No GPU/Vulkan or performance claim is
+made.
+
 [`RUNTIME-203`](RUNTIME-203-internalize-engine-composition-helpers.md) — Engine
 composition-helper internalization completed on 2026-08-01 at `Retired`.
 Deterministic frame/viewport hook records and dispatch, promoted ECS fixed-step

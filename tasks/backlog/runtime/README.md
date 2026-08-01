@@ -9,20 +9,20 @@ another backlog directory.
 
 ### Runtime abstraction consolidation (seeded 2026-07-24)
 
-The source-complete runtime surface audit re-gated `REVIEW-003`. Each remaining
-task is scoped to one concrete production owner: it preserves public behavior
-first and deletes only the shallow exported helper surface.
-
-#### Open tasks
-
-- [`RUNTIME-205` — Internalize SceneInteraction helpers](../../active/RUNTIME-205-internalize-scene-interaction-helpers.md)
-  separately removes GizmoFrameService and SelectionReadback after interaction-
-  owner behavior/lifetime coverage exists. RenderRecipeActivation and
-  DeviceBootstrap remain outside both tasks because their current production
-  census has multiple load-bearing consumers.
+The source-complete runtime surface audit re-gated `REVIEW-003`. `RUNTIME-203`
+and `RUNTIME-205` closed the one-consumer helper findings through their concrete
+production owners while preserving public behavior first.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-205` — Internalize SceneInteraction helpers](../../done/RUNTIME-205-internalize-scene-interaction-helpers.md)
+  moved gizmo frame orchestration/scratch and pick correlation/refinement state
+  directly into the sole production owner, `SceneInteractionModule`, then
+  deleted both helper BMIs and their direct tests after owner-level CPU and
+  sanitizer parity. Durable `GizmoInteraction`, `SelectionController`, copied
+  snapshots, and graphics selection contracts remain. `RenderRecipeActivation`
+  and `DeviceBootstrap` stay public because their current production census has
+  multiple load-bearing consumers.
 - [`RUNTIME-203` — Internalize Engine composition helpers](../../done/RUNTIME-203-internalize-engine-composition-helpers.md)
   moved deterministic module-hook records, promoted ECS composition, and the
   JobService renderer-hook lifecycle into Engine-private implementation state,
@@ -211,9 +211,10 @@ it first extracted runtime-module scheduling from Engine, then `RUNTIME-185`
 deleted the unused sim-system/DAG lane and `RUNTIME-203` moved the remaining
 deterministic frame/viewport hook records and dispatch directly into
 Engine-private implementation state before deleting the one-consumer schedule
-BMI. `RUNTIME-157` is retired; selection pick
-readback correlation state, refined primitive cache ownership, and the readback
-drain bridge now live behind `Extrinsic.Runtime.SelectionReadback`.
+BMI. `RUNTIME-157` is retired; it first extracted selection pick-readback
+correlation state, refined primitive cache ownership, and the readback drain
+bridge. `RUNTIME-205` later internalizes that one-consumer state directly in
+`SceneInteractionModule` and deletes the helper BMI.
 `RUNTIME-158` is retired; the exported frame-pacing diagnostics record and
 ImGui/render-graph counter-copy policy now live behind
 `Extrinsic.Runtime.FramePacingDiagnostics`.
@@ -233,10 +234,11 @@ ownership and shutdown sequencing from Engine. Retired `RUNTIME-129` closed
 that production Vulkan path, and retired `RUNTIME-191` subsequently absorbed
 its guarantees into the canonical property-texture participant and deleted
 the extracted specialized service.
-`RUNTIME-162` is retired; transform-gizmo frame state, selected-entity scratch,
-gizmo/selection pointer interlock, and transform-gizmo packet building now live
-behind `Extrinsic.Runtime.GizmoFrameService` while preserving the public Engine
-gizmo accessors.
+`RUNTIME-162` is retired; it first extracted transform-gizmo frame state,
+selected-entity scratch, the gizmo/selection pointer interlock, and packet
+building. `RUNTIME-205` later internalizes that one-consumer frame state
+directly in `SceneInteractionModule` and deletes the helper BMI; the durable
+`GizmoInteraction` contract remains.
 `RUNTIME-163` is retired; `RenderExtractionCache`, render-world pool, last
 extraction stats, frame-index ownership, and render-extraction facade delegation
 now live in an Engine-private `RenderExtractionService`.
@@ -759,8 +761,9 @@ split; narratives live in the retirement log.
 - [RUNTIME-157 — Extract selection readback state out of Engine](../../archive/RUNTIME-157-extract-selection-readback-state.md)
   (done, 2026-07-09, `Operational`): selection pick readback correlation,
   completed readback draining, primitive refinement, and the editor-facing
-  refined primitive cache now live in `Extrinsic.Runtime.SelectionReadback`.
-  `Engine` keeps public accessors as delegating compatibility facades.
+  refined primitive cache were first extracted behind a dedicated helper.
+  `RUNTIME-205` later internalizes that one-consumer state directly in
+  `SceneInteractionModule` and deletes the helper BMI; Engine has no facade.
 - [RUNTIME-158 — Extract frame pacing diagnostics out of Engine](../../archive/RUNTIME-158-extract-frame-pacing-diagnostics.md)
   (done, 2026-07-09, `Operational`): `RuntimeFramePacingDiagnostics` and the
   ImGui/render-graph counter mirroring helpers now live behind
@@ -790,9 +793,10 @@ split; narratives live in the retirement log.
 - [RUNTIME-162 — Extract gizmo frame service out of Engine](../../archive/RUNTIME-162-extract-gizmo-frame-service.md)
   (done, 2026-07-09, `Operational`): transform-gizmo interaction state, undo
   storage, selected-entity scratch, gizmo/selection pointer interlock, and
-  transform-gizmo packet building now live in
-  `Extrinsic.Runtime.GizmoFrameService`. `Engine` keeps frame ordering plus the
-  public gizmo interaction and undo-stack compatibility facades.
+  transform-gizmo packet building were first extracted behind a dedicated
+  helper. `RUNTIME-205` later internalizes that one-consumer frame state in
+  `SceneInteractionModule` and deletes the helper BMI; the public
+  `GizmoInteraction` behavior contract remains.
 - [RUNTIME-140 — Remove the global scheduler barrier from the import apply path](../../archive/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
   (done, 2026-07-05, `CPUContracted`): runtime import materialization now
   drains only the specific `AssetId` load/event through

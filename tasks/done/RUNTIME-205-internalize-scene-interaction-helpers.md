@@ -16,6 +16,24 @@ maturity_target: Retired
 ---
 # RUNTIME-205 — Internalize SceneInteraction helpers
 
+## Status
+
+- Completed and retired on 2026-08-01 at `Retired`. The final census confirmed
+  `SceneInteractionModule` as the sole production owner of both helpers. Its
+  PImpl now directly owns gizmo interaction/packet/scratch state and bounded
+  world/epoch-qualified pick-correlation/refinement state. The four helper
+  module source files, their CMake entries, and ten direct helper tests are
+  deleted without a replacement service or test seam; five owner-level tests
+  cover the relocated lifecycle behavior. Focused interaction/layering
+  coverage passed 70/70, the complete default CPU selector passed 3,991/3,991
+  with its expected environmental GLFW/LSan skip, and the grouped ASan and
+  UBSan selectors each passed 2,645/2,645 (UBSan carries the policy-defined
+  skip). Strict layering, test-layout, task/docs, inventory, and independent
+  fixed-surface review evidence close the high-risk deletion. No GPU/Vulkan,
+  byte-layout, or performance claim is made.
+- Commit: the implementation/retirement commit plus the generated completion
+  report and accepted revision-bound review provide the exact source binding.
+
 ## Goal
 
 - Remove the exported `GizmoFrameService` and `SelectionReadback` helper BMIs
@@ -60,51 +78,51 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Re-run production/test consumer census and confirm both helpers have one
+- [x] Re-run production/test consumer census and confirm both helpers have one
       production owner before privatization.
-- [ ] Move `GizmoFrameService` input orchestration, scratch, packets, and drag
+- [x] Move `GizmoFrameService` input orchestration, scratch, packets, and drag
       cancellation into SceneInteraction implementation detail; keep
       `GizmoInteraction` as the durable lower behavior owner.
-- [ ] Move `SelectionReadbackState` correlation, in-flight contexts,
+- [x] Move `SelectionReadbackState` correlation, in-flight contexts,
       refinement cache, and readback drain/apply behavior into SceneInteraction
       implementation detail.
-- [ ] Preserve exact frame-phase ordering, editor-capture gating, history
+- [x] Preserve exact frame-phase ordering, editor-capture gating, history
       requirements, world/document epoch revalidation, stale/out-of-order
       rejection, and scene-clear/shutdown resets.
-- [ ] Delete both exported helper modules, CMake entries, direct imports, and
+- [x] Delete both exported helper modules, CMake entries, direct imports, and
       tests that exist only to instantiate their state outside the owner.
 
 ## Tests
 
-- [ ] SceneInteraction public contracts cover gizmo input, one undoable drag,
+- [x] SceneInteraction public contracts cover gizmo input, one undoable drag,
       capture gating, scene-clear cancellation/restoration, packet publication,
       and shutdown/reinitialize state reset.
-- [ ] SceneInteraction public contracts cover pending pick issue, exact
+- [x] SceneInteraction public contracts cover pending pick issue, exact
       sequence correlation, out-of-order completion, stale world/entity /
       interaction-epoch rejection, cache bounds, and copied refined selection.
-- [ ] World replacement and SceneDocument/SceneInteraction separation tests
+- [x] World replacement and SceneDocument/SceneInteraction separation tests
       remain green with no retained live registry or history references.
-- [ ] Structural ratchets prove `GizmoFrameService` and `SelectionReadback`
+- [x] Structural ratchets prove `GizmoFrameService` and `SelectionReadback`
       public modules/direct imports are absent.
-- [ ] Default CPU and sanitizer-supported gates required by the high-risk
+- [x] Default CPU and sanitizer-supported gates required by the high-risk
       surface deletion pass.
 
 ## Docs
 
-- [ ] Update runtime scene-interaction ownership docs and remove the two helper
+- [x] Update runtime scene-interaction ownership docs and remove the two helper
       module inventory entries.
-- [ ] Regenerate the module inventory and refresh task/session/retirement
+- [x] Regenerate the module inventory and refresh task/session/retirement
       records.
 
 ## Acceptance criteria
 
-- [ ] Gizmo and pick/readback behavior remains observable and covered through
+- [x] Gizmo and pick/readback behavior remains observable and covered through
       `SceneInteractionModule` public hooks/services/copied snapshots only.
-- [ ] No production or test source imports the two helper modules, and their
+- [x] No production or test source imports the two helper modules, and their
       BMIs/CMake entries are absent.
-- [ ] SceneDocument ownership, graphics packet/readback ownership, and app
+- [x] SceneDocument ownership, graphics packet/readback ownership, and app
       layering remain unchanged.
-- [ ] No replacement helper service, registry, bridge, or Engine facade is
+- [x] No replacement helper service, registry, bridge, or Engine facade is
       introduced.
 
 ## Verification

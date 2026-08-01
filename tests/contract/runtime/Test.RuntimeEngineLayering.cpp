@@ -411,7 +411,7 @@ TEST(RuntimeEngineLayering,
 }
 
 TEST(RuntimeEngineLayering,
-     SceneInteractionModuleOwnsGizmoFrameServiceOutOfEngine)
+     SceneInteractionPrivatelyOwnsGizmoFrameState)
 {
     const auto root = RepoRoot();
     const auto engineInterface =
@@ -434,14 +434,10 @@ TEST(RuntimeEngineLayering,
         ReadFile(
             root /
             "src/runtime/Gizmos/Runtime.GizmoInteraction.cppm");
-    const auto serviceInterface =
-        ReadFile(
-            root /
-            "src/runtime/Gizmos/Runtime.GizmoFrameService.cppm");
-    const auto serviceImpl =
-        ReadFile(
-            root /
-            "src/runtime/Gizmos/Runtime.GizmoFrameService.cpp");
+    const auto runtimeCMake =
+        ReadFile(root / "src/runtime/CMakeLists.txt");
+    const auto moduleInventory =
+        ReadFile(root / "docs/api/generated/module_inventory.md");
 
     EXPECT_EQ(engineInterface.find("GizmoFrameService"),
               std::string::npos);
@@ -478,24 +474,36 @@ TEST(RuntimeEngineLayering,
         std::string::npos);
     EXPECT_NE(interactionInterface.find("struct Impl;"),
               std::string::npos);
-    EXPECT_NE(
+    EXPECT_EQ(
         interactionImpl.find(
             "import Extrinsic.Runtime.GizmoFrameService;"),
         std::string::npos);
     EXPECT_NE(
-        interactionImpl.find("GizmoFrameService Gizmo{}"),
+        interactionImpl.find("GizmoInteraction Gizmo{}"),
         std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
-            "Gizmo.DriveInputForFrame("),
+            "DriveGizmoInteractionForFrame("),
         std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
-            "Gizmo.BuildRenderPackets("),
+            "GizmoPacketBuilder.Build("),
         std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
-            "Gizmo.ClearSceneState(BoundRegistry)"),
+            "Gizmo.DragCancel(*BoundRegistry)"),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "Gizmo = GizmoInteraction{gizmoConfig}"),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "std::vector<ECS::EntityHandle> GizmoSelectedEntities"),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "TransformGizmoRenderPacketBuilder GizmoPacketBuilder"),
         std::string::npos);
     EXPECT_EQ(
         interactionInterface.find("UndoStack"),
@@ -511,12 +519,12 @@ TEST(RuntimeEngineLayering,
             "void BindTo(");
     const auto gizmoClear =
         unifiedClear.find(
-            "Gizmo.ClearSceneState(BoundRegistry)");
+            "Gizmo = GizmoInteraction{gizmoConfig}");
     const auto selectionClear =
         unifiedClear.find(
             "Selection.ClearSceneState(*BoundRegistry)");
     const auto readbackClear =
-        unifiedClear.find("Readback.ClearSceneState()");
+        unifiedClear.find("InFlightPickContexts.clear()");
     const auto lookupDetach =
         unifiedClear.find(
             "Selection.SetStableEntityLookup(nullptr)");
@@ -540,27 +548,24 @@ TEST(RuntimeEngineLayering,
     EXPECT_LT(lookupDisconnect, lookupClear);
     EXPECT_LT(lookupClear, snapshotClear);
 
-    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.GizmoFrameService"),
+    constexpr std::string_view retiredInterface =
+        "src/runtime/Gizmos/Runtime.GizmoFrame" "Service.cppm";
+    constexpr std::string_view retiredImpl =
+        "src/runtime/Gizmos/Runtime.GizmoFrame" "Service.cpp";
+    EXPECT_FALSE(std::filesystem::exists(root / retiredInterface));
+    EXPECT_FALSE(std::filesystem::exists(root / retiredImpl));
+    EXPECT_EQ(runtimeCMake.find(
+                  std::filesystem::path{retiredInterface}
+                      .filename()
+                      .string()),
               std::string::npos);
-    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.GizmoInteraction"),
+    EXPECT_EQ(runtimeCMake.find(
+                  std::filesystem::path{retiredImpl}
+                      .filename()
+                      .string()),
               std::string::npos);
-    EXPECT_NE(serviceInterface.find("GizmoInteraction m_Interaction"),
-              std::string::npos);
-    EXPECT_EQ(serviceInterface.find("GizmoUndoStack"),
-              std::string::npos);
-    EXPECT_EQ(serviceInterface.find("m_UndoStack"),
-              std::string::npos);
-    EXPECT_NE(serviceInterface.find("EditorCommandHistory* CommandHistory"),
-              std::string::npos);
-    EXPECT_NE(serviceInterface.find("TransformGizmoRenderPacketBuilder m_PacketBuilder"),
-              std::string::npos);
-    EXPECT_NE(serviceInterface.find("std::vector<ECS::EntityHandle> m_SelectedEntities"),
-              std::string::npos);
-    EXPECT_NE(serviceImpl.find("DriveGizmoInteractionForFrame"),
-              std::string::npos);
-    EXPECT_NE(serviceImpl.find("SubmitViewportSelectionClickForFrame"),
-              std::string::npos);
-    EXPECT_NE(serviceImpl.find("BuildRenderPackets"),
+    EXPECT_EQ(moduleInventory.find(
+                  "Extrinsic.Runtime.GizmoFrame" "Service`"),
               std::string::npos);
 }
 
@@ -1527,7 +1532,7 @@ TEST(RuntimeEngineLayering, RetiredEngineCompositionHelperBmisAreAbsent)
     EXPECT_EQ(engineImpl.find("record.Desc.Options"), std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngine)
+TEST(RuntimeEngineLayering, SceneInteractionPrivatelyOwnsPickCorrelationState)
 {
     const auto root = RepoRoot();
     const auto engineInterface =
@@ -1554,10 +1559,12 @@ TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngin
         ReadFile(
             root /
             "src/runtime/Scene/Runtime.SceneDocumentModule.cpp");
-    const auto readbackInterface =
-        ReadFile(root / "src/runtime/Runtime.SelectionReadback.cppm");
-    const auto readbackImpl =
-        ReadFile(root / "src/runtime/Runtime.SelectionReadback.cpp");
+    const auto runtimeCMake =
+        ReadFile(root / "src/runtime/CMakeLists.txt");
+    const auto testsCMake =
+        ReadFile(root / "tests/CMakeLists.txt");
+    const auto moduleInventory =
+        ReadFile(root / "docs/api/generated/module_inventory.md");
 
     EXPECT_EQ(engineInterface.find("SelectionReadback"),
               std::string::npos);
@@ -1582,15 +1589,15 @@ TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngin
               std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
-            "SelectionReadbackState Readback{}"),
+            "struct InFlightPickContext"),
         std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
-            "Readback.DrainPendingPickForFrame("),
+            "std::vector<InFlightPickContext> InFlightPickContexts"),
         std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
-            "Readback.DrainCompletedReadbacksForFrame("),
+            "std::optional<PrimitiveSelectionResult> LastRefinedPrimitive"),
         std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
@@ -1624,27 +1631,42 @@ TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngin
     EXPECT_EQ(sceneDocumentInterface.find("LastRefinedPrimitiveGeneration{}"),
               std::string::npos);
 
-    EXPECT_NE(readbackInterface.find("export module Extrinsic.Runtime.SelectionReadback"),
+    EXPECT_NE(interactionImpl.find("BuildPickReadbackContextForFrame"),
               std::string::npos);
-    EXPECT_NE(readbackInterface.find("struct InFlightPickContext"),
+    EXPECT_NE(interactionImpl.find("selectionSystem.PopPickResult()"),
               std::string::npos);
-    EXPECT_NE(readbackInterface.find("std::vector<InFlightPickContext> m_InFlightPickContexts"),
+    EXPECT_NE(interactionImpl.find("result->Sequence == 0u"),
               std::string::npos);
-    EXPECT_NE(readbackInterface.find("std::optional<PrimitiveSelectionResult> m_LastRefinedPrimitive"),
-              std::string::npos);
-    EXPECT_NE(readbackImpl.find("BuildPickReadbackContextForFrame"),
-              std::string::npos);
-    EXPECT_NE(readbackImpl.find("selectionSystem.PopPickResult()"),
-              std::string::npos);
-    EXPECT_NE(readbackImpl.find("result->Sequence == 0u"),
-              std::string::npos);
-    EXPECT_NE(readbackImpl.find("context.World != world"),
+    EXPECT_NE(interactionImpl.find("pickContext.World != BoundWorld"),
               std::string::npos);
     EXPECT_NE(
-        readbackImpl.find(
-            "context.InteractionEpoch != interactionEpoch"),
+        interactionImpl.find(
+            "pickContext.InteractionEpoch !="),
         std::string::npos);
-    EXPECT_NE(readbackImpl.find("RefinePickReadbackResult("),
+    EXPECT_NE(interactionImpl.find("RefinePickReadbackResult("),
+              std::string::npos);
+
+    constexpr std::string_view retiredInterface =
+        "src/runtime/Runtime.Selection" "Readback.cppm";
+    constexpr std::string_view retiredImpl =
+        "src/runtime/Runtime.Selection" "Readback.cpp";
+    EXPECT_FALSE(std::filesystem::exists(root / retiredInterface));
+    EXPECT_FALSE(std::filesystem::exists(root / retiredImpl));
+    EXPECT_EQ(runtimeCMake.find(
+                  std::filesystem::path{retiredInterface}
+                      .filename()
+                      .string()),
+              std::string::npos);
+    EXPECT_EQ(runtimeCMake.find(
+                  std::filesystem::path{retiredImpl}
+                      .filename()
+                      .string()),
+              std::string::npos);
+    EXPECT_EQ(testsCMake.find(
+                  "Test.Selection" "ReadbackCorrelation.cpp"),
+              std::string::npos);
+    EXPECT_EQ(moduleInventory.find(
+                  "Extrinsic.Runtime.Selection" "Readback`"),
               std::string::npos);
 }
 

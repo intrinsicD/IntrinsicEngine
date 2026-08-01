@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 72 |
+| `runtime` | 70 |
 
 ## Modules
 
@@ -340,7 +340,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EditorUiHost` | `src/runtime/Editor/Runtime.EditorUiHost.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorUiModule` | `src/runtime/Editor/Runtime.EditorUiModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWindowRegistry` | `src/runtime/Editor/Runtime.EditorWindowRegistry.cppm` | `runtime` |
-| `Extrinsic.Runtime.GizmoFrameService` | `src/runtime/Gizmos/Runtime.GizmoFrameService.cppm` | `runtime` |
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringConfig` | `src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm` | `runtime` |
@@ -389,7 +388,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneEditingOperations` | `src/runtime/Runtime.SceneEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Runtime.SelectionController.cppm` | `runtime` |
-| `Extrinsic.Runtime.SelectionReadback` | `src/runtime/Runtime.SelectionReadback.cppm` | `runtime` |
 | `Extrinsic.Runtime.ServiceRegistry` | `src/runtime/Runtime.ServiceRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.TextureBakeModule` | `src/runtime/Runtime.TextureBakeModule.cppm` | `runtime` |
@@ -406,4 +404,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **379**
+Total modules: **377**

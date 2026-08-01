@@ -8,31 +8,38 @@
 
 #include <gtest/gtest.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -48,6 +55,7 @@ namespace
     namespace Platform = Extrinsic::Platform;
     namespace Runtime = Extrinsic::Runtime;
     namespace Sel = Extrinsic::ECS::Components::Selection;
+    namespace Tf = Extrinsic::ECS::Components::Transform;
 
     class ExitAfterOneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
@@ -85,6 +93,8 @@ namespace
             Core::Config::WindowConfig windowConfig{};
             windowConfig.Backend =
                 Core::Config::WindowBackend::Null;
+            windowConfig.Width = 800;
+            windowConfig.Height = 600;
             Window = Platform::CreateWindow(windowConfig);
             Renderer = Graphics::CreateRenderer();
             Services.BeginRegistration();
@@ -265,6 +275,13 @@ namespace
             RendererInitialized = true;
         }
 
+        [[nodiscard]] Platform::Backends::Null::NullWindow&
+        InputWindow()
+        {
+            return static_cast<
+                Platform::Backends::Null::NullWindow&>(*Window);
+        }
+
         void InvokeViewportHook(
             const std::size_t index,
             Graphics::RenderFrameInput& renderInput,
@@ -368,6 +385,70 @@ namespace
         scene.Raw().emplace<Sel::SelectableTag>(entity);
         return entity;
     }
+
+    [[nodiscard]] ECS::EntityHandle MakeTransformSelectable(
+        ECS::Scene::Registry& scene,
+        const glm::vec3 position = glm::vec3{0.0f})
+    {
+        const ECS::EntityHandle entity = MakeSelectable(scene);
+        scene.Raw().emplace<Tf::Component>(
+            entity,
+            Tf::Component{
+                .Position = position,
+                .Scale = glm::vec3{1.0f},
+            });
+        return entity;
+    }
+
+    [[nodiscard]] Graphics::CameraViewInput OrthoCameraInput()
+    {
+        Graphics::CameraViewInput input{};
+        input.View = glm::lookAt(
+            glm::vec3{0.0f, 0.0f, 5.0f},
+            glm::vec3{0.0f},
+            glm::vec3{0.0f, 1.0f, 0.0f});
+        input.Projection = glm::ortho(
+            -4.0f, 4.0f, -3.0f, 3.0f, 0.1f, 100.0f);
+        input.Position = {0.0f, 0.0f, 5.0f};
+        input.Forward = {0.0f, 0.0f, -1.0f};
+        input.Up = {0.0f, 1.0f, 0.0f};
+        input.NearPlane = 0.1f;
+        input.FarPlane = 100.0f;
+        input.Valid = true;
+        return input;
+    }
+
+    [[nodiscard]] bool HasSelectedTag(
+        const ECS::Scene::Registry& scene,
+        const ECS::EntityHandle entity)
+    {
+        return scene.Raw().all_of<Sel::SelectedTag>(entity);
+    }
+
+    [[nodiscard]] bool HasHoveredTag(
+        const ECS::Scene::Registry& scene,
+        const ECS::EntityHandle entity)
+    {
+        return scene.Raw().all_of<Sel::HoveredTag>(entity);
+    }
+
+    void PublishHit(
+        Graphics::SelectionSystem& system,
+        const ECS::EntityHandle entity,
+        const std::uint64_t sequence)
+    {
+        system.PublishPickResult(
+            Graphics::PickReadbackResult{
+                .EncodedId = Graphics::EncodeSelectionId(
+                    Graphics::SelectionPrimitiveDomain::Entity,
+                    1u),
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(
+                        entity),
+                .Hit = true,
+                .Sequence = sequence,
+            });
+    }
 }
 
 TEST(SceneInteractionModule,
@@ -384,10 +465,6 @@ TEST(SceneInteractionModule,
         harness.Services
             .Find<Runtime::SelectionController>();
     ASSERT_NE(selection, nullptr);
-    EXPECT_EQ(
-        harness.Services
-            .Find<Runtime::SelectionReadbackState>(),
-        nullptr);
     EXPECT_EQ(
         harness.Interaction
             .LastRefinedPrimitiveGeneration(),
@@ -737,6 +814,342 @@ TEST(SceneInteractionModule,
         harness.Interaction
             .LastRefinedPrimitiveGeneration(),
         2u);
+}
+
+TEST(SceneInteractionModule,
+     OwnerHooksCorrelateOutOfOrderAndMissingReadbacksBySequence)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start().has_value());
+
+    Runtime::SelectionController& selection =
+        *harness.Services.Find<Runtime::SelectionController>();
+    ECS::Scene::Registry& scene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    Graphics::SelectionSystem& selectionSystem =
+        harness.Renderer->GetSelectionSystem();
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+
+    const auto issuePick =
+        [&](const bool hover,
+            const std::uint32_t x,
+            const std::uint32_t y)
+        {
+            if (hover)
+                selection.RequestHoverPick(x, y);
+            else
+                selection.RequestClickPick(x, y);
+            Graphics::RenderFrameInput input{};
+            input.Camera = OrthoCameraInput();
+            harness.InvokeViewportHook(0u, input, capture);
+            harness.InvokeFrameHook(0u, capture, pacing);
+            EXPECT_TRUE(input.HasPendingPick);
+            EXPECT_NE(input.Pick.Sequence, 0u);
+            EXPECT_TRUE(selectionSystem.ConsumePick().has_value());
+            return input.Pick.Sequence;
+        };
+
+    const ECS::EntityHandle clickTarget = MakeSelectable(scene);
+    const ECS::EntityHandle hoverTarget = MakeSelectable(scene);
+    const std::uint64_t clickSequence =
+        issuePick(false, 1u, 1u);
+    const std::uint64_t hoverSequence =
+        issuePick(true, 2u, 2u);
+    ASSERT_NE(clickSequence, hoverSequence);
+    PublishHit(selectionSystem, hoverTarget, hoverSequence);
+    PublishHit(selectionSystem, clickTarget, clickSequence);
+    harness.InvokeFrameHook(1u, capture, pacing);
+
+    EXPECT_TRUE(selection.IsSelected(clickTarget));
+    EXPECT_TRUE(HasSelectedTag(scene, clickTarget));
+    EXPECT_TRUE(selection.HasHovered());
+    EXPECT_EQ(selection.HoveredEntity(), hoverTarget);
+    EXPECT_TRUE(HasHoveredTag(scene, hoverTarget));
+    EXPECT_EQ(selection.InFlightPickCount(), 0u);
+
+    const ECS::EntityHandle lostHoverTarget = MakeSelectable(scene);
+    const ECS::EntityHandle newerClickTarget = MakeSelectable(scene);
+    const std::uint64_t lostHoverSequence =
+        issuePick(true, 3u, 3u);
+    const std::uint64_t newerClickSequence =
+        issuePick(false, 4u, 4u);
+    PublishHit(
+        selectionSystem,
+        newerClickTarget,
+        newerClickSequence);
+    harness.InvokeFrameHook(1u, capture, pacing);
+
+    EXPECT_TRUE(selection.IsSelected(newerClickTarget));
+    EXPECT_FALSE(HasSelectedTag(scene, lostHoverTarget));
+    EXPECT_FALSE(HasHoveredTag(scene, lostHoverTarget));
+    EXPECT_EQ(selection.InFlightPickCount(), 1u);
+    EXPECT_EQ(
+        selection.OldestInFlightSequence(),
+        lostHoverSequence);
+}
+
+TEST(SceneInteractionModule,
+     OwnerBoundsCorrelationAndRejectsZeroUnknownAndStaleWorldResults)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start().has_value());
+
+    Runtime::SelectionController& selection =
+        *harness.Services.Find<Runtime::SelectionController>();
+    selection.GetConfig().MaxTrackedInFlightPicks = 0u;
+    ECS::Scene::Registry& firstScene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle target = MakeSelectable(firstScene);
+    Graphics::SelectionSystem& selectionSystem =
+        harness.Renderer->GetSelectionSystem();
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+
+    std::uint64_t firstSequence = 0u;
+    std::uint64_t lastSequence = 0u;
+    for (std::uint32_t index = 0u; index < 33u; ++index)
+    {
+        selection.RequestClickPick(index, index);
+        Graphics::RenderFrameInput input{};
+        input.Camera = OrthoCameraInput();
+        harness.InvokeViewportHook(0u, input, capture);
+        harness.InvokeFrameHook(0u, capture, pacing);
+        ASSERT_TRUE(input.HasPendingPick);
+        ASSERT_NE(input.Pick.Sequence, 0u);
+        ASSERT_TRUE(selectionSystem.ConsumePick().has_value());
+        if (index == 0u)
+            firstSequence = input.Pick.Sequence;
+        lastSequence = input.Pick.Sequence;
+    }
+    ASSERT_NE(firstSequence, 0u);
+    ASSERT_NE(lastSequence, 0u);
+    EXPECT_EQ(selection.InFlightPickCount(), 32u);
+
+    PublishHit(selectionSystem, target, firstSequence);
+    selectionSystem.PublishNoHit();
+    harness.InvokeFrameHook(1u, capture, pacing);
+    EXPECT_FALSE(selection.IsSelected(target));
+    EXPECT_EQ(selection.InFlightPickCount(), 32u);
+    EXPECT_EQ(
+        harness.Interaction.LastRefinedPrimitiveGeneration(),
+        0u);
+
+    const Runtime::WorldHandle secondWorld =
+        harness.Worlds.CreateWorld("Second interaction world");
+    ASSERT_TRUE(
+        harness.Worlds.RequestSetActiveWorld(secondWorld)
+            .has_value());
+    (void)harness.Worlds.ApplyMaintenance(
+        harness.Events, harness.Jobs);
+    (void)harness.Interaction.ResolveEntityByStableId(
+        ECSC::StableId{0x205u, 0xB0u});
+    EXPECT_EQ(selection.InFlightPickCount(), 0u);
+    EXPECT_EQ(
+        harness.Interaction.LastRefinedPrimitiveGeneration(),
+        1u);
+
+    PublishHit(selectionSystem, target, lastSequence);
+    harness.InvokeFrameHook(1u, capture, pacing);
+    EXPECT_FALSE(HasSelectedTag(firstScene, target));
+    EXPECT_EQ(selection.SelectedCount(), 0u);
+    EXPECT_EQ(
+        harness.Interaction.LastRefinedPrimitiveGeneration(),
+        1u);
+}
+
+TEST(SceneInteractionModule,
+     DocumentEpochResetRejectsLateCorrelatedReadback)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start(true).has_value());
+
+    Runtime::SelectionController& selection =
+        *harness.Services.Find<Runtime::SelectionController>();
+    ECS::Scene::Registry& scene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle target = MakeSelectable(scene);
+    Graphics::SelectionSystem& selectionSystem =
+        harness.Renderer->GetSelectionSystem();
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+
+    selection.RequestClickPick(9u, 10u);
+    Graphics::RenderFrameInput input{};
+    input.Camera = OrthoCameraInput();
+    harness.InvokeViewportHook(0u, input, capture);
+    harness.InvokeFrameHook(0u, capture, pacing);
+    ASSERT_TRUE(input.HasPendingPick);
+    ASSERT_TRUE(selectionSystem.ConsumePick().has_value());
+
+    ASSERT_TRUE(
+        harness.Document->NewSceneDocument().has_value());
+    EXPECT_EQ(selection.InFlightPickCount(), 0u);
+    EXPECT_EQ(
+        harness.Interaction.LastRefinedPrimitiveGeneration(),
+        1u);
+    PublishHit(selectionSystem, target, input.Pick.Sequence);
+    harness.InvokeFrameHook(1u, capture, pacing);
+    EXPECT_EQ(selection.SelectedCount(), 0u);
+    EXPECT_FALSE(
+        harness.Interaction.LastRefinedPrimitive().has_value());
+    EXPECT_EQ(
+        harness.Interaction.LastRefinedPrimitiveGeneration(),
+        1u);
+}
+
+TEST(SceneInteractionModule,
+     ViewportGizmoRequiresHistoryHonorsCaptureAndCommitsOneUndoableDrag)
+{
+    {
+        DirectHarness harness;
+        ASSERT_TRUE(harness.Start().has_value());
+        Runtime::SelectionController& selection =
+            *harness.Services.Find<Runtime::SelectionController>();
+        ECS::Scene::Registry& scene =
+            *harness.Worlds.Get(harness.InitialWorld);
+        const ECS::EntityHandle entity =
+            MakeTransformSelectable(scene);
+        ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
+
+        Graphics::RenderFrameInput input{};
+        input.Camera = OrthoCameraInput();
+        auto& window = harness.InputWindow();
+        window.QueueCursor(450.0, 300.0);
+        window.QueueMouseButton(0, true);
+        window.PollEvents();
+        harness.InvokeViewportHook(
+            0u,
+            input,
+            {},
+            Platform::Extent2D{.Width = 800, .Height = 600});
+        EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
+    }
+
+    DirectHarness harness;
+    ASSERT_TRUE(harness.Start(true).has_value());
+    Runtime::SelectionController& selection =
+        *harness.Services.Find<Runtime::SelectionController>();
+    Runtime::EditorCommandHistory* const history =
+        harness.Services.Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    ECS::Scene::Registry& scene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle entity =
+        MakeTransformSelectable(scene);
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
+
+    Graphics::RenderFrameInput input{};
+    input.Camera = OrthoCameraInput();
+    auto& window = harness.InputWindow();
+    const Platform::Extent2D viewport{
+        .Width = 800,
+        .Height = 600,
+    };
+    Runtime::EditorInputCaptureSnapshot captured{
+        .CapturedMouse = true,
+    };
+
+    window.QueueCursor(450.0, 300.0);
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, captured, viewport);
+    EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
+    EXPECT_FALSE(selection.HasPendingPick());
+
+    window.QueueMouseButton(0, false);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, captured, viewport);
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, {}, viewport);
+    ASSERT_TRUE(harness.Interaction.Interaction().IsDragging());
+
+    window.QueueCursor(550.0, 300.0);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, {}, viewport);
+    EXPECT_GT(
+        scene.Raw().get<Tf::Component>(entity).Position.x,
+        0.0f);
+
+    window.QueueMouseButton(0, false);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, {}, viewport);
+    EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
+    ASSERT_EQ(history->UndoCount(), 1u);
+    EXPECT_EQ(
+        history->Undo().Status,
+        Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(
+        scene.Raw().get<Tf::Component>(entity).Position,
+        glm::vec3{0.0f});
+}
+
+TEST(SceneInteractionModule,
+     WorldSwitchCancelsDragAndPreservesGizmoTuning)
+{
+    DirectHarness harness;
+    ASSERT_TRUE(harness.Start().has_value());
+    ECS::Scene::Registry& firstScene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle entity =
+        MakeTransformSelectable(
+            firstScene,
+            glm::vec3{1.0f, 0.0f, 0.0f});
+    Runtime::GizmoInteraction& gizmo =
+        harness.Interaction.Interaction();
+    gizmo.Config().AxisLength = 2.5f;
+    gizmo.SetMode(Runtime::GizmoMode::Scale);
+    gizmo.SetOrientation(Runtime::GizmoOrientation::Local);
+    const ECS::EntityHandle selected[] = {entity};
+    ASSERT_TRUE(gizmo.BeginDrag(
+        firstScene,
+        Runtime::GizmoHitResult{
+            .Hit = true,
+            .Axis = Runtime::GizmoAxis::X,
+            .Entity = entity,
+        },
+        Runtime::PickRay{
+            .Origin = {2.0f, 0.0f, 5.0f},
+            .Direction = {0.0f, 0.0f, -1.0f},
+        },
+        selected));
+    ASSERT_TRUE(gizmo.DragTick(
+        firstScene,
+        Runtime::PickRay{
+            .Origin = {3.0f, 0.0f, 5.0f},
+            .Direction = {0.0f, 0.0f, -1.0f},
+        }));
+    EXPECT_FLOAT_EQ(
+        firstScene.Raw().get<Tf::Component>(entity).Scale.x,
+        2.0f);
+
+    const Runtime::WorldHandle secondWorld =
+        harness.Worlds.CreateWorld("Gizmo reset world");
+    ASSERT_TRUE(
+        harness.Worlds.RequestSetActiveWorld(secondWorld)
+            .has_value());
+    (void)harness.Worlds.ApplyMaintenance(
+        harness.Events, harness.Jobs);
+    (void)harness.Interaction.ResolveEntityByStableId(
+        ECSC::StableId{0x205u, 0x61u});
+
+    EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
+    EXPECT_FLOAT_EQ(
+        firstScene.Raw().get<Tf::Component>(entity).Scale.x,
+        1.0f);
+    EXPECT_EQ(
+        harness.Interaction.Interaction().Mode(),
+        Runtime::GizmoMode::Scale);
+    EXPECT_EQ(
+        harness.Interaction.Interaction().Orientation(),
+        Runtime::GizmoOrientation::Local);
+    EXPECT_FLOAT_EQ(
+        harness.Interaction.Interaction().Config().AxisLength,
+        2.5f);
 }
 
 TEST(SceneInteractionModule,

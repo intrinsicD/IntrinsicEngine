@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-205` — Internalize SceneInteraction helpers (tasks/active/RUNTIME-205-internalize-scene-interaction-helpers.md)
+- none
 
 ## Theme B — Rendering modernization
 
