@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GEOM-058`](GEOM-058-gaussian-mixture-em-anderson-acceleration.md) — Gaussian-
+mixture numerics completed on 2026-08-01 at `CPUContracted`.
+`Geometry.GaussianMixture` now owns deterministic 3D Gaussian evaluation,
+seeded sampling, responsibilities, likelihood, and regularized EM fitting;
+`Geometry.FixedPoint.Anderson` supplies a narrow windowed, damped, residual-
+safeguarded fixed-point mixer. EM reuses the new seeded D²
+`Geometry.KMeans::KMeansPlusPlus` initializer, reports explicit convergence,
+likelihood, regularization, and acceleration diagnostics, and accepts an
+accelerated proposal only after model and monotonic-likelihood validation.
+Focused two-/three-component recovery, monotonicity, acceleration,
+determinism, and degenerate-input coverage passed 8/8, and the full geometry
+CPU label gate passed 1,604/1,604. The aggregate `IntrinsicTests` target and
+strict layering check pass. Both modules stay narrow imports with no public
+Eigen types or umbrella re-export. Optimized/GPU variants remain future
+method-workflow work only when a concrete consumer justifies them; no
+performance claim is made.
+
 [`RUNTIME-205`](RUNTIME-205-internalize-scene-interaction-helpers.md) — scene-
 interaction helper internalization completed on 2026-08-01 at `Retired`.
 `SceneInteractionModule` now directly owns gizmo interaction/packet/scratch

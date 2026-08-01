@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GEOM-058` — Gaussian mixture models and Anderson-accelerated EM seam (tasks/active/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -71,7 +71,7 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-006` — Surface cross-field design CPU reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
-- blocked by `GEOM-058`: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
+- unblocked: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
 - blocked by `GEOM-062`: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
 - blocked by `METHOD-016`: `METHOD-017` — Continuous LOP (CLOP) reference backend (tasks/backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md)
 - blocked by `METHOD-016`: `METHOD-018` — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend (tasks/backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)

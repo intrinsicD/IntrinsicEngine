@@ -3,7 +3,7 @@ id: GEOM-058
 theme: I
 depends_on: []
 workflow_schema: 1
-workflow_profile: standard
+workflow_profile: high-risk
 evidence: required
 owner: "Codex-GeometryE2E"
 branch: "feature/lop-consolidation-e2e"
@@ -30,31 +30,31 @@ maturity_target: CPUContracted
 - Gates `METHOD-015` (CPD family) — encoded in that task's `depends_on` front matter.
 
 ## Required changes
-- [ ] Add module `Geometry.GaussianMixture` (`.cppm` interface + `.cpp` implementation unit): `MultivariateGaussian` (mean/covariance, log-pdf, seeded sampling), `GaussianMixture` (weights + components, responsibility evaluation, log-likelihood), and `FitEM(points, k, params)` with k-means++ initialization, a covariance regularization floor, and an explicit iteration/convergence report.
-- [ ] Add a windowed Anderson-acceleration utility for fixed-point iterations (own small module or a partition of an existing numerics module, whichever review prefers) with damping and residual-safeguarded fallback to plain iteration.
-- [ ] `FitEM` accepts an acceleration policy (`None` | `Anderson`) so plain EM and accelerated EM share one code path.
-- [ ] Deterministic seeding: identical `(seed, input)` produce bitwise-identical fits across runs and thread counts.
-- [ ] Fail-closed handling for empty input, `k == 0`, `k` greater than the point count, and duplicate/coincident points (the regularization floor engages instead of producing non-finite values).
-- [ ] Register modules in `src/geometry/CMakeLists.txt`; no umbrella re-export.
+- [x] Add module `Geometry.GaussianMixture` (`.cppm` interface + `.cpp` implementation unit): `MultivariateGaussian` (mean/covariance, log-pdf, seeded sampling), `GaussianMixture` (weights + components, responsibility evaluation, log-likelihood), and `FitEM(points, k, params)` with k-means++ initialization, a covariance regularization floor, and an explicit iteration/convergence report.
+- [x] Add a windowed Anderson-acceleration utility for fixed-point iterations (own small module or a partition of an existing numerics module, whichever review prefers) with damping and residual-safeguarded fallback to plain iteration.
+- [x] `FitEM` accepts an acceleration policy (`None` | `Anderson`) so plain EM and accelerated EM share one code path.
+- [x] Deterministic seeding: identical `(seed, input)` produce bitwise-identical fits across runs and thread counts.
+- [x] Fail-closed handling for empty input, `k == 0`, `k` greater than the point count, and duplicate/coincident points (the regularization floor engages instead of producing non-finite values).
+- [x] Register modules in `src/geometry/CMakeLists.txt`; no umbrella re-export.
 
 ## Tests
-- [ ] `tests/unit/geometry/Test.GaussianMixture.cpp` with `unit;geometry` labels.
-- [ ] Recovery: synthetic 2- and 3-component mixtures with known parameters are recovered within documented tolerance.
-- [ ] Monotonicity: plain-EM log-likelihood is non-decreasing across iterations on fixtures.
-- [ ] Acceleration: Anderson-accelerated EM reaches the same optimum as plain EM within tolerance in fewer or equal iterations on a fixture (iteration-count assertion, no wall-clock claim).
-- [ ] Robustness: the degenerate inputs above return explicit failure states or floored covariances; no NaN/Inf escapes.
-- [ ] Determinism: same seed produces bitwise-identical parameters across two runs.
+- [x] `tests/unit/geometry/Test.GaussianMixture.cpp` with `unit;geometry` labels.
+- [x] Recovery: synthetic 2- and 3-component mixtures with known parameters are recovered within documented tolerance.
+- [x] Monotonicity: plain-EM log-likelihood is non-decreasing across iterations on fixtures.
+- [x] Acceleration: Anderson-accelerated EM reaches the same optimum as plain EM within tolerance in fewer or equal iterations on a fixture (iteration-count assertion, no wall-clock claim).
+- [x] Robustness: the degenerate inputs above return explicit failure states or floored covariances; no NaN/Inf escapes.
+- [x] Determinism: same seed produces bitwise-identical parameters across two runs.
 
 ## Docs
-- [ ] Interface documentation per geometry API style, including the regularization-floor and failure-state contract.
-- [ ] Regenerate the module inventory.
-- [ ] Update the port-gap cluster notes in `tasks/backlog/geometry/README.md`.
+- [x] Interface documentation per geometry API style, including the regularization-floor and failure-state contract.
+- [x] Regenerate the module inventory.
+- [x] Update the port-gap cluster notes in `tasks/backlog/geometry/README.md`.
 
 ## Acceptance criteria
-- [ ] Public surface exposes only `std`/`glm`/scalar types.
-- [ ] All listed tests pass in the default CPU gate.
-- [ ] `METHOD-015` can express its E-step against this surface without private includes.
-- [ ] Layering check passes (`geometry -> core` only).
+- [x] Public surface exposes only `std`/`glm`/scalar types.
+- [x] All listed tests pass in the default CPU gate.
+- [x] `METHOD-015` can express its E-step against this surface without private includes.
+- [x] Layering check passes (`geometry -> core` only).
 
 ## Verification
 ```bash
@@ -70,6 +70,14 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No `std::rand`/`std::default_random_engine`; RNG derives from explicit seeds only.
 - No public Eigen types on module interfaces.
 - Mixing mechanical file moves with semantic refactors.
+
+## Completion
+
+- Completed 2026-08-01. Implementation commit: `79044265`. The deterministic
+  CPU reference, narrow Anderson utility, seeded k-means++ initialization,
+  public diagnostics, two-/three-component recovery, degeneracy coverage, and
+  1,604-case geometry CPU gate are complete. Optimized/GPU variants remain
+  method-workflow follow-ups only when a concrete consumer justifies them.
 
 ## Maturity
 - Target: `CPUContracted`; no `Operational` follow-up is owed — optimized/GPU variants open per the method workflow only when a consumer needs them.

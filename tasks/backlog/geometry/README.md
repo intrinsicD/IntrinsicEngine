@@ -13,8 +13,6 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam](../../active/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
-  (gates `methods/METHOD-015`; framework24 port-gap follow-up).
 - [GEOM-059 — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam](GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
   (framework24 port-gap follow-up).
 - [GEOM-060 — Permutohedral lattice fast high-dimensional filtering seam](GEOM-060-permutohedral-lattice-highdim-filtering.md)
@@ -69,8 +67,8 @@ retired; see the retired entries below.
 
 A second port-gap sweep (2026-07-07, direct comparison against the
 `framework24` checkout of `bcg_framework`) seeded the remaining
-research-numerics gaps that the 2026-06-26 review did not cover: `GEOM-058`
-(Gaussian mixtures + Anderson-accelerated EM), `GEOM-059` (kernel
+research-numerics gaps that the 2026-06-26 review did not cover: retired
+`GEOM-058` (Gaussian mixtures + Anderson-accelerated EM), `GEOM-059` (kernel
 matrices/Nyström/Gaussian-process interpolation), `GEOM-060` (permutohedral
 lattice filtering), and `GEOM-061` (grid-downsampling reduction strategies),
 plus the method packages `methods/METHOD-015` (Coherent Point Drift family)
@@ -205,6 +203,11 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam](../../done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
+  (done, 2026-08-01, `CPUContracted`): adds narrow deterministic
+  `Geometry.GaussianMixture` and `Geometry.FixedPoint.Anderson` modules plus
+  seeded k-means++ initialization; these are the shared numerical prerequisites
+  for the CPD and LOP-consolidation method families.
 - [DOCS-003 — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template](../../archive/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) (done).
 - [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](../../archive/GEOM-020-sparse-direct-factorization-seam.md) (done).
 - [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](../../archive/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) (done).
