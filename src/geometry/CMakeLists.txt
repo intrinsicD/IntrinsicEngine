@@ -75,6 +75,7 @@ target_sources(${target_name}
         Geometry.PointCloud.Conversion.cppm
         Geometry.PointCloud.Features.cppm
         Geometry.PointCloud.IO.cppm
+        Geometry.PointCloud.Kernels.cppm
         Geometry.PointCloud.Normals.cppm
         Geometry.PointCloud.QualityMetrics.cppm
         Geometry.PointCloud.SurfaceSampling.cppm
@@ -172,6 +173,7 @@ target_sources(${target_name}
         Geometry.PointCloud.Conversion.cpp
         Geometry.PointCloud.Features.cpp
         Geometry.PointCloud.IO.cpp
+        Geometry.PointCloud.Kernels.cpp
         Geometry.PointCloud.Normals.cpp
         Geometry.PointCloud.QualityMetrics.cpp
         Geometry.PointCloud.SurfaceSampling.cpp

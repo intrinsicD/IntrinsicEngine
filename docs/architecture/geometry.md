@@ -304,6 +304,31 @@ statistical-only distance-distribution diagnostics (`MeanDistance`,
 whose decision is neighbor-count based. The filtering/outlier pack is exercised
 by the `geometry.pointcloud_filtering.smoke` benchmark.
 
+### Point-cloud projection kernels
+
+`Geometry.PointCloud.Kernels` is the narrow, geometry-owned weighting seam for
+the LOP-family consolidation methods. All radial kernels use coordinate-space
+support radius `h`, return exactly zero for `r >= h`, and accumulate density in
+double precision:
+
+- `Gaussian` uses `sigma = h/4` and
+  `exp(-r² / (2 sigma²))` inside the support.
+- `ThetaLop` is the LOP/WLOP convention
+  `exp(-r² / (h/4)²)` inside the support.
+- `WendlandC2` is `(1-r/h)^4 (1+4r/h)` inside the support.
+
+The companion repulsion primitive is the WLOP linear potential
+`eta(r,h) = -r/h`, with derivative `-1/h`; both stay finite as `r` approaches
+zero and leave directional normalization to the consolidation owner.
+`ComputeDensityWeights` returns either `1 + sum(theta)` or its reciprocal in
+point-index order using an internally built or exactly matching supplied
+`Geometry.KDTree`. Non-positive/non-finite support, invalid enum values,
+non-finite positions, index/query defects, resource overflow, and any point
+without another positive-weight neighbor fail closed with a structured status
+and no published weight vector. The module does not own projection iterations,
+point-cloud mutation, normal estimation, or backend selection, and is not
+re-exported through the broad `Geometry` umbrella.
+
 `Geometry.PointCloud.SurfaceSampling` converts a triangle `HalfedgeMesh::Mesh`
 into a deterministic dense `PointCloud::Cloud` by area-weighted face selection
 and sqrt-corrected barycentric sampling. The API returns a result record rather

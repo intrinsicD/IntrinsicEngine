@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 105 |
+| `geometry` | 106 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 71 |
@@ -186,6 +186,7 @@ Root scanned: `src`
 | `Geometry.PointCloud.Features` | `src/geometry/Geometry.PointCloud.Features.cppm` | `geometry` |
 | `Geometry.PointCloud.Fwd` | `src/geometry/Geometry.PointCloud.Fwd.cppm` | `geometry` |
 | `Geometry.PointCloud.IO` | `src/geometry/Geometry.PointCloud.IO.cppm` | `geometry` |
+| `Geometry.PointCloud.Kernels` | `src/geometry/Geometry.PointCloud.Kernels.cppm` | `geometry` |
 | `Geometry.PointCloud.Normals` | `src/geometry/Geometry.PointCloud.Normals.cppm` | `geometry` |
 | `Geometry.PointCloud.QualityMetrics` | `src/geometry/Geometry.PointCloud.QualityMetrics.cppm` | `geometry` |
 | `Geometry.PointCloud.SurfaceSampling` | `src/geometry/Geometry.PointCloud.SurfaceSampling.cppm` | `geometry` |
@@ -406,4 +407,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **379**
+Total modules: **380**
