@@ -654,7 +654,11 @@ the service lock when cancellation, dependency cancellation, or stale-result
 discard prevents publication. Asset ingest uses the finalizer only to reconcile
 its queue record and publish the terminal event; scene IO uses it only to
 publish terminal failure state. Neither finalizer owns decoded payload commit
-or borrows the retiring world.
+or borrows the retiring world. A worker-visible terminal state is therefore not
+alone sufficient for completion: while an unpublished finalizer remains
+unsettled, `IsComplete()` returns false and `ReapCompleted()` retains the job.
+This makes a drain-until-complete loop close over the finalizer even when an
+empty drain races immediately ahead of the worker queuing it.
 
 Active-world asset-import and scene-document operations additionally capture
 the submission `{WorldHandle, Scene::Registry*}` pair on the main thread.

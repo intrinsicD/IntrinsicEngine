@@ -1,0 +1,10 @@
+CMake Error at /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci/tests/IntrinsicSandboxEditorIntegrationTests[1]_tests.cmake:31:
+  Parse error.  Function missing ending ")".  Instead found unterminated
+  bracket with text "SandboxEditorPresentation.".
+Call Stack (most recent call first):
+  /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci/tests/IntrinsicSandboxEditorIntegrationTests[1]_include.cmake:23 (include)
+  /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci/tests/CTestTestfile.cmake:14 (include)
+  CTestTestfile.cmake:20 (subdirs)
+
+
+Errors while running CTest

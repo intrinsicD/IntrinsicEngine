@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 247104,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T22:41:10Z",
+  "label": "ci-asan-cpu-ctest",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T22:37:03Z",
+  "stderr_path": "tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.stdout.log",
+  "stdout_sha256": "501807c366bde24fdb503d95ffbacf3feda5a4109060631358c5f9fe7cc3c5ce",
+  "task_id": "BUG-123"
+}

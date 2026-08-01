@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^RuntimeSceneLifecycle\\.RetiredQueuedSceneSavePublishesTerminalEvent$",
+    "--repeat",
+    "until-fail:100",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^RuntimeSceneLifecycle\\.RetiredQueuedSceneSavePublishesTerminalEvent$' --repeat until-fail:100 --timeout 60",
+  "cwd": ".",
+  "duration_ms": 223,
+  "exit_code": 8,
+  "finished_at": "2026-08-01T22:24:23Z",
+  "label": "scene-save-contract-repeat",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T22:24:23Z",
+  "stderr_path": "tasks/evidence/BUG-123/commands/scene-save-contract-repeat.stderr.log",
+  "stderr_sha256": "e09f8829012e1592c122bb507a8dcc910618b1afc2f50adfe58e585718f43d27",
+  "stdout_path": "tasks/evidence/BUG-123/commands/scene-save-contract-repeat.stdout.log",
+  "stdout_sha256": "c42a35efae0e7772fdb85fcdbfcdf4c0d2ce74edf74d0e21fad7acda2b4d47d3",
+  "task_id": "BUG-123"
+}

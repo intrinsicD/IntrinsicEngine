@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(RuntimeJobService|RuntimeSceneLifecycle|SceneDocumentModule)\\.",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(RuntimeJobService|RuntimeSceneLifecycle|SceneDocumentModule)\\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 3417,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T22:25:36Z",
+  "label": "focused-job-scene-contracts",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T22:25:32Z",
+  "stderr_path": "tasks/evidence/BUG-123/commands/focused-job-scene-contracts.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-123/commands/focused-job-scene-contracts.stdout.log",
+  "stdout_sha256": "e7d14e5823b15a768eec35983e14ac3df2cb650eb0a10fa7f8188d51a0513467",
+  "task_id": "BUG-123"
+}

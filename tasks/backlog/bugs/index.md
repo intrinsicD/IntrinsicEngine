@@ -10,13 +10,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   expects an unsupported slot from a fixture whose current combinations all
   resolve without that flag; align the fixture and counter contract without
   deleting meaningful unsupported-path coverage or weakening the gate.
-- [`BUG-123` — Retired queued scene save intermittently loses its terminal event](BUG-123-retired-scene-save-terminal-event-race.md):
-  world cancellation can leave the queued save task `Cancelled` while its
-  unpublished finalizer fails to publish the required exactly-once terminal
-  `RuntimeSceneFileEvent`. The RUNTIME-191 full CPU gate reproduced the loss
-  twice, and a focused repeat passed nine iterations before failing the tenth;
-  replace the timing race with a deterministic interlock and repair the
-  cancellation/completion ordering without sleeps or quarantine.
+- [`BUG-123` — Retired queued scene save intermittently loses its terminal event](../../active/BUG-123-retired-scene-save-terminal-event-race.md):
+  active fixed-surface review. `IsComplete()` and reaping now wait for a
+  finalizer-owning terminal job's main-thread reconciliation; deterministic
+  and original scene-save selectors each pass their 100-repeat contract, and
+  normal, ASan, and UBSan CPU gates are green without weakened assertions.
 - [`BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state](BUG-122-runtime-asset-asan-test-lifetimes.md):
   one shutdown test lets a queued hook retain loop-local synchronization state,
   while three progressive model-scene tests retain pointers into temporary

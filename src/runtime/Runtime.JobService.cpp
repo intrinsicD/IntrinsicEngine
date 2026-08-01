@@ -77,6 +77,12 @@ namespace Extrinsic::Runtime
         // dependency cancel, drop) can each try to claim it and exactly one
         // wins.
         std::atomic<bool> FinalizerClaimed{false};
+        // Jobs with an unpublished finalizer are not complete/reapable until
+        // that main-thread reconciliation has actually run. This closes the
+        // worker-terminal/drain interleaving where a caller could observe a
+        // terminal state immediately after an empty drain while the worker had
+        // not queued the finalizer yet.
+        std::atomic<bool> UnpublishedFinalizerSettled{true};
     };
 
     struct JobService::SharedState
@@ -192,14 +198,19 @@ namespace Extrinsic::Runtime
         std::uint64_t finalized = 0;
         for (const auto& job : pending)
         {
-            if (!job || !job->FinalizeUnpublishedOnMainThread)
+            if (!job)
                 continue;
-            // Outside the lock: a finalizer may submit or cancel work. Released
-            // afterwards so the consumer's captured state does not outlive the
-            // one call it is entitled to.
-            job->FinalizeUnpublishedOnMainThread();
-            job->FinalizeUnpublishedOnMainThread = {};
-            finalized += 1;
+            if (job->FinalizeUnpublishedOnMainThread)
+            {
+                // Outside the lock: a finalizer may submit or cancel work.
+                // Released afterwards so the consumer's captured state does
+                // not outlive the one call it is entitled to.
+                job->FinalizeUnpublishedOnMainThread();
+                job->FinalizeUnpublishedOnMainThread = {};
+                finalized += 1;
+            }
+            job->UnpublishedFinalizerSettled.store(
+                true, std::memory_order_release);
         }
 
         if (finalized != 0)
@@ -267,6 +278,9 @@ namespace Extrinsic::Runtime
             job->ValidateBeforeApply = std::move(desc.ValidateBeforeApply);
             job->FinalizeUnpublishedOnMainThread =
                 std::move(desc.FinalizeUnpublishedOnMainThread);
+            job->UnpublishedFinalizerSettled.store(
+                !static_cast<bool>(job->FinalizeUnpublishedOnMainThread),
+                std::memory_order_relaxed);
             job->DependsOn.reserve(desc.DependsOn.size());
             for (const JobDependency& dependency : desc.DependsOn)
             {
@@ -300,11 +314,26 @@ namespace Extrinsic::Runtime
         job->State.store(JobState::Queued, std::memory_order_release);
         Core::Tasks::Scheduler::Dispatch([state, job]() mutable
         {
+            const auto finishUnpublished =
+                [&state, &job](const JobState terminalState,
+                               const bool countDropped)
+                {
+                    job->State.store(terminalState,
+                                     std::memory_order_release);
+                    if (state->TestHooks.BeforeWorkerUnpublishedQueued)
+                    {
+                        state->TestHooks.BeforeWorkerUnpublishedQueued(
+                            job->Token);
+                    }
+                    std::lock_guard lock(state->Mutex);
+                    if (countDropped)
+                        state->Stats.DroppedCompletions += 1;
+                    QueueUnpublishedFinalizerLocked(*state, job);
+                };
+
             if (job->CancelRequested->load(std::memory_order_acquire))
             {
-                job->State.store(JobState::Cancelled, std::memory_order_release);
-                std::lock_guard lock(state->Mutex);
-                QueueUnpublishedFinalizerLocked(*state, job);
+                finishUnpublished(JobState::Cancelled, false);
                 return;
             }
 
@@ -315,18 +344,13 @@ namespace Extrinsic::Runtime
 
             if (job->CancelRequested->load(std::memory_order_acquire))
             {
-                job->State.store(JobState::Cancelled, std::memory_order_release);
-                std::lock_guard lock(state->Mutex);
-                QueueUnpublishedFinalizerLocked(*state, job);
+                finishUnpublished(JobState::Cancelled, false);
                 return;
             }
 
             if (!result.IsValid())
             {
-                job->State.store(JobState::Dropped, std::memory_order_release);
-                std::lock_guard lock(state->Mutex);
-                state->Stats.DroppedCompletions += 1;
-                QueueUnpublishedFinalizerLocked(*state, job);
+                finishUnpublished(JobState::Dropped, true);
                 Core::Log::Error(
                     "[JobService] Job '{}' produced an empty result envelope; "
                     "completion dropped.",
@@ -427,7 +451,17 @@ namespace Extrinsic::Runtime
 
     bool JobService::IsComplete(const JobToken token) const
     {
-        return IsTerminal(GetState(token));
+        if (!token.IsValid() || !m_State)
+            return false;
+
+        std::lock_guard lock(m_State->Mutex);
+        const auto it = m_State->Jobs.find(token);
+        if (it == m_State->Jobs.end() || !it->second)
+            return false;
+        const std::shared_ptr<JobRecord>& job = it->second;
+        return IsTerminal(job->State.load(std::memory_order_acquire)) &&
+               job->UnpublishedFinalizerSettled.load(
+                   std::memory_order_acquire);
     }
 
     JobState JobService::GetState(const JobToken token) const
@@ -540,6 +574,9 @@ namespace Extrinsic::Runtime
                 job->PublishCompletion(events, completion.Result);
             if (didPublish)
             {
+                job->UnpublishedFinalizerSettled.store(
+                    true, std::memory_order_release);
+                job->FinalizeUnpublishedOnMainThread = {};
                 job->State.store(JobState::Published, std::memory_order_release);
                 published += 1;
             }
@@ -771,7 +808,9 @@ namespace Extrinsic::Runtime
         {
             const std::shared_ptr<JobService::JobRecord>& job = it->second;
             if (!job ||
-                IsTerminal(job->State.load(std::memory_order_acquire)))
+                (IsTerminal(job->State.load(std::memory_order_acquire)) &&
+                 job->UnpublishedFinalizerSettled.load(
+                     std::memory_order_acquire)))
             {
                 it = m_State->Jobs.erase(it);
                 reaped += 1;
