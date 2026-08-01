@@ -474,14 +474,11 @@ first-class, P1 scheduling target alongside Theme B (rendering) and Theme C
 *invariants* P1/P3/P5 are owned separately by `PROC-010` (`AGENTS.md` §5).
 
 Open members: `METHOD-003`, `METHOD-004`, `METHOD-005`, `METHOD-006` (blocked by
-`GEOM-024`), `METHOD-007`, `METHOD-014`, `METHOD-015` (blocked by `GEOM-058`);
-the LOP consolidation family `METHOD-016` (blocked by `GEOM-062`), `METHOD-017`
-CLOP (blocked by `METHOD-016`/`GEOM-058`/`GEOM-062`), `METHOD-018`
-EAR/anisotropic (blocked by `METHOD-016`/`GEOM-062`), `METHOD-019` optimized CPU
-(blocked by `METHOD-016`/`017`/`018`), `METHOD-020` GPU (blocked by
-`METHOD-019`), and its engine-integration leaves `RUNTIME-175` (blocked by
-`METHOD-016`) and `UI-035` (blocked by `RUNTIME-175`); the parameterization
-family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
+`GEOM-024`), `METHOD-007`, `METHOD-014`, and `METHOD-015`; the remaining LOP
+consolidation leaves are `METHOD-019` optimized CPU and `METHOD-020` GPU
+(blocked by `METHOD-019`). Their CPU-reference methods `METHOD-016..018` and
+engine-integration leaves `RUNTIME-175`/`UI-035` retired on 2026-08-01. The
+parameterization family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
 `GEOM-064`), `METHOD-022` SLIM (blocked by `GEOM-064`/`METHOD-021`),
 `METHOD-023` BFF (retired),
 `METHOD-024` SCP (blocked by `GEOM-024`), `METHOD-025` Progressive SLIM
@@ -490,12 +487,14 @@ optimized CPU (blocked by `METHOD-022`), `METHOD-026` iterative-strategy GPU (bl
 strategies only), and its delivered engine-integration/view leaves
 `RUNTIME-176`, `UI-036`, and `GRAPHICS-122` (all retired 2026-07-15;
 `GRAPHICS-122` delivered the optional GPU-shaded UV target at `Operational`).
-The method-readiness seams are `GEOM-013`,
-`GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`, `GEOM-062`,
+The remaining method-readiness seams are `GEOM-013`,
+`GEOM-024`, `GEOM-059`, `GEOM-060`, `GEOM-061`, and
 `GEOM-064`, plus the 2026-07-16 consolidation leaves `GEOM-068` weighted
 Dijkstra, `GEOM-069` A* (blocked by `GEOM-068`), `GEOM-070` rectangular
 LSQR/LSCM, `GEOM-071` shared sharp-feature classification, and `GEOM-072`
-Catmull-Clark creases (blocked by `GEOM-071`). The post-stability Issue 445 research incubations are
+Catmull-Clark creases (blocked by `GEOM-071`). Retired `GEOM-058` and
+`GEOM-062` delivered the Gaussian-mixture and shared projection-kernel
+prerequisites consumed by the LOP reference family. The post-stability Issue 445 research incubations are
 `GEOM-065`, `METHOD-027..031`, and `HARDEN-084`; each is blocked first by
 `REVIEW-003`, and their task files require killing tests or concrete
 two-consumer evidence before opening broader engine integration. The

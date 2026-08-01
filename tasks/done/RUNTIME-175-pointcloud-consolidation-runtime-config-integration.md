@@ -16,10 +16,24 @@ evidence: required
 owner: "Codex-GeometryE2E"
 branch: "feature/lop-consolidation-e2e"
 worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
-claimed_at: "2026-08-01T17:25:45Z"
+claimed_at: "2026-08-01T19:46:55Z"
 maturity_target: Operational
 ---
 # RUNTIME-175 — Point-cloud consolidation runtime operation and config lane
+
+## Status
+- Completed on 2026-08-01. The feature-owned config/module/service path now
+  runs all four CPU-reference strategies from immutable selected-entity
+  snapshots, rejects stale completion, publishes through one undoable
+  `GeometrySources` mutation, and reports pointer-free implementation and
+  convergence diagnostics.
+- Config-file boot/live apply, `Editor`, `AgentCli`, and `Programmatic` source
+  tags, and the retired `UI-035` panel all use the same registered validation
+  and hot-apply path. The canonical focused runtime/UI cases pass 10/10, the
+  complete default CPU selector passes 4,044/4,044 with one expected GLFW/LSan
+  self-skip, and the four focused contracts pass under the promoted preset's
+  combined ASan/UBSan instrumentation.
+- Commit: pending this retirement checkpoint.
 
 ## Goal
 - Wire the CPU-reference LOP-family consolidation surface into the engine
@@ -133,7 +147,7 @@ maturity_target: Operational
 - [x] A selected point cloud is consolidated and visibly updated through the
       typed runtime operation with the CPU reference under the Null/default
       runtime.
-- [ ] The strategy and parameters are choosable from a config file, an
+- [x] The strategy and parameters are choosable from a config file, an
       agent/programmatic apply, and (via `UI-035`) the UI, all through one
       validated apply path with source tagging.
 - [x] No requested-backend token or unavailable implementation is exposed.
@@ -144,10 +158,10 @@ maturity_target: Operational
 - The runtime module, app-owned config registration, editor operation binding,
   exact stale-source gate, undo/redo publication, source-parity coverage, and
   deterministic runtime coverage are implemented.
-- Focused `ci-fast` runtime and Sandbox config suites pass. The remaining open
-  acceptance item is the app-owned presentation and headless panel contract in
-  `UI-035`; retirement evidence is intentionally deferred until that dependent
-  slice consumes this operation end to end.
+- The retired `UI-035` app presentation consumes the same typed config and
+  operation, with a prepared-workspace test covering Editor-sourced hot apply,
+  queued execution, result projection, ECS publication, and undo. No deferred
+  integration acceptance item remains.
 
 ## Verification
 ```bash

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/active/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -71,7 +71,7 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - unblocked: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
-- blocked by `RUNTIME-175`: `METHOD-019` — LOP-family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md)
+- unblocked: `METHOD-019` — LOP-family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md)
 - blocked by `METHOD-019`: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
 - blocked by `GEOM-064`: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
 - blocked by `GEOM-064`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)

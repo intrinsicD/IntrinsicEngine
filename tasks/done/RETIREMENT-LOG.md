@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-175`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md) —
+point-cloud consolidation runtime/config integration completed on 2026-08-01
+at `Operational`. The runtime-owned registered config, module, service, and
+editor-operation path captures immutable selected-point-cloud snapshots, runs
+LOP/WLOP/CLOP/EAR through canonical `JobService`, rejects stale
+world/entity/source completion, and commits a current result through one
+undoable `GeometrySources` mutation with exact dirty tags. Config files plus
+`Editor`, `AgentCli`, and `Programmatic` hot apply share one validator and
+source-tagged control path; retired `UI-035` consumes that exact surface. The
+pointer-free result reports actual `cpu_reference` identity and strategy,
+convergence/displacement, normal, and insertion diagnostics without reserving
+a backend selector. Ten focused runtime/config/UI cases, all 4,044 selected
+default CPU tests, and the four focused contracts under combined ASan/UBSan
+instrumentation pass. Optimized CPU and Vulkan backends remain evidence-gated
+by `METHOD-019`/`METHOD-020`; no performance claim is made.
+
 [`UI-035`](UI-035-sandbox-pointcloud-consolidation-editor-panel.md) — the
 Sandbox point-cloud consolidation panel completed on 2026-08-01 at
 `Operational`. The decentralized editor registry now exposes

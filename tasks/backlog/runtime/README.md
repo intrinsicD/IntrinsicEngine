@@ -504,8 +504,8 @@ consumer lives here because `runtime` owns composition over `geometry`.
 `Extrinsic.Runtime.SpatialDebugClosestFace`. Editor method windows for the
 ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
-- [`RUNTIME-175 — Point-cloud consolidation runtime operation and config lane`](../../active/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-  is the engine-integration leaf for the LOP consolidation method family
+- [`RUNTIME-175 — Point-cloud consolidation runtime operation and config lane`](../../done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+  is the retired engine-integration leaf for the LOP consolidation method family
   (`methods/METHOD-016..018`): a runtime-owned
   `sandbox.point_cloud_consolidation` section registered by Sandbox on the
   generic CORE-009 config lane, an `EngineConfigControl` hot-apply path, and a
@@ -667,6 +667,13 @@ these as runtime work when scheduling and review:
 
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
+
+- [RUNTIME-175 — Point-cloud consolidation runtime operation and config lane](../../done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+  (done, 2026-08-01, `Operational`): one runtime-owned config/module/service
+  path runs the promoted LOP/WLOP/CLOP/EAR CPU references asynchronously,
+  rejects stale source snapshots, publishes through one undoable
+  `GeometrySources` mutation, and serves config-file, agent/programmatic, and
+  retired UI-035 callers without a placeholder backend axis.
 
 - [RUNTIME-146 — Extract engine config boot into a free-standing module](../../archive/RUNTIME-146-extract-engine-config-boot-module.md)
   (done, 2026-07-08, `Operational`): boot-time config resolution now lives in

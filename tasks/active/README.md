@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`RUNTIME-175` — Point-cloud consolidation runtime operation and config lane](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-  (`Codex-GeometryE2E`, branch `feature/lop-consolidation-e2e`): promote the
-  accepted LOP/WLOP/CLOP/EAR CPU references through one runtime module,
-  config lane, existing ECS geometry sources, and undoable writeback.
+No tasks are currently active.
 
 ## History
 
