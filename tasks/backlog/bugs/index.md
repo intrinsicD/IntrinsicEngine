@@ -5,12 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-125` — Queued-import contracts race asynchronous state transitions](BUG-125-queued-import-contract-state-observation-races.md):
-  the active-world-switch case can apply one ready result before the deferred
-  switch, while the manual model/texture case can leave `Decoding` before its
-  immediate `CanCancel` snapshot. Both exact failures passed 20/20 alone after
-  one hash-bound full-gate failure; add deterministic test-only interlocks and
-  retain the terminal/materialization assertions without quarantine.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
@@ -71,6 +65,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-01: [`BUG-125` — Queued-import contracts raced asynchronous state transitions](../../done/BUG-125-queued-import-contract-state-observation-races.md).
+  Test-only decode/read interlocks now order the active-world transition and
+  initial cancellability snapshot explicitly. Both cases passed 100/100
+  normally and 100/100 pinned to one CPU; all 26 format-coverage cases, the
+  19 concurrency-policy checks, and the 4,010-case CPU gate pass. Three exact
+  multi-worker cases now carry source-audited CTest reservations.
 
 - Closed 2026-07-31: [`BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry](../../done/BUG-095-direct-mesh-postprocess-stale-overwrite.md).
   Deferred enrichment now validates the exact live mesh-source content and

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check"
+  ],
+  "command_display": "git diff --check",
+  "cwd": ".",
+  "duration_ms": 9,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T01:21:10Z",
+  "label": "diff-check",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T01:21:10Z",
+  "stderr_path": "tasks/evidence/BUG-125/commands/diff-check.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-125/commands/diff-check.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-125"
+}

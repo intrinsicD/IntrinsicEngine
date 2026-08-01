@@ -5,12 +5,21 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-BUG125"
+branch: "codex/bug-125-queued-import-contract-races"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-01T01:09:47Z"
 ---
 # BUG-125 — Queued-import contracts race asynchronous state transitions
+
+## Status
+- Completed on 2026-08-01. The world-switch contract holds geometry and model
+  decode until the replacement world is active; the initial-state contract
+  holds model/texture reads until its cancellability snapshot is complete.
+  Both cases passed 100 consecutive repetitions normally and another 100 each
+  pinned to one CPU. All 26 format-coverage cases, the 19 concurrency-policy
+  checks, the aggregate build, and the 4,010-case CPU gate pass.
+- Commit: pending this retirement checkpoint.
 
 ## Goal
 - Make the queued asset-import world-switch and initial queue-state contracts
@@ -23,8 +32,8 @@ claimed_at:
   while these failures use unique paths and expose state-observation timing.
 
 ## Context
-- The RUNTIME-202 hash-bound default-CPU receipt
-  `tasks/evidence/RUNTIME-202/commands/ci-full-cpu.json` failed only
+- The RUNTIME-202 hash-bound default-CPU receipt retained at
+  `tasks/evidence/RUNTIME-202/observations/ci-full-cpu.json` failed only
   `RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply`
   and
   `RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming`.
@@ -42,28 +51,28 @@ claimed_at:
   confirms schedule sensitivity but does not repair it.
 
 ## Required changes
-- [ ] Hold geometry/model decode behind deterministic test-only interlocks until
+- [x] Hold geometry/model decode behind deterministic test-only interlocks until
       the active-world transition has committed, then assert both stale results
       fail before any materialization.
-- [ ] Hold model/texture reads while asserting the initial queue snapshot, then
+- [x] Hold model/texture reads while asserting the initial queue snapshot, then
       release them before driving the completion loop.
-- [ ] Preserve the terminal state, ingest diagnostic, asset identity, and ECS
+- [x] Preserve the terminal state, ingest diagnostic, asset identity, and ECS
       materialization assertions; do not replace them with timing sleeps.
 
 ## Tests
-- [ ] Both exact cases pass at least 100 consecutive repetitions together and
+- [x] Both exact cases pass at least 100 consecutive repetitions together and
       under a bounded CPU-contention probe.
-- [ ] The complete `RuntimeAssetImportFormatCoverage` group and canonical
+- [x] The complete `RuntimeAssetImportFormatCoverage` group and canonical
       default CPU gate pass.
 
 ## Docs
-- [ ] Record the diagnosed interlocks and verification evidence here and move
+- [x] Record the diagnosed interlocks and verification evidence here and move
       the issue to the closed bug index when retired.
 
 ## Acceptance criteria
-- [ ] Neither contract relies on the worker remaining in an initial state for
+- [x] Neither contract relies on the worker remaining in an initial state for
       an unspecified scheduling window.
-- [ ] The tests still fail if stale world results materialize or if a blocked
+- [x] The tests still fail if stale world results materialize or if a blocked
       active import is not cancellable.
 
 ## Verification

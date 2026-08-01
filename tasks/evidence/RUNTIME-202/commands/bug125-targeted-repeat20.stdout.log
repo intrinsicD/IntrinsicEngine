@@ -1,0 +1,148 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+    Test #357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply ..................   Passed    0.06 sec
+    Start 357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+    Test #357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply ..................   Passed    0.06 sec
+    Start 357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+    Test #357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply ..................   Passed    0.06 sec
+    Start 357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+    Test #357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply ..................***Failed    0.06 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeAssetImportFormatCoverage
+[ RUN      ] RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued geometry import: source=ManualImport path='/tmp/runtime179_world_scoped_import.obj' payload=Mesh candidate_count=1[0m
+[32m[INFO] [Runtime] Queued model/texture import: source=ManualImport path='/tmp/runtime179_world_scoped_import.gltf' payload=ModelScene[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/runtime179_world_scoped_import.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/runtime179_world_scoped_import.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[33m[WARN] [Runtime] Asset import failed: path='/tmp/runtime179_world_scoped_import.gltf' requested_payload=ModelScene ingest_diagnostic=MaterializationFailed error=InvalidState[0m
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:2447: Failure
+Expected equality of these values:
+  CountEntitiesWithDomain(*submissionScene, GS::Domain::Mesh)
+    Which is: 1
+  0u
+    Which is: 0
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:2462: Failure
+Value of: std::all_of( queue.Entries.begin(), queue.Entries.end(), [](const Runtime::RuntimeAssetImportQueueEntry& entry) { return entry.TerminalStatus == Runtime::RuntimeAssetImportQueueTerminalStatus::Failed; })
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:2478: Failure
+Expected equality of these values:
+  record->Phase
+    Which is: 1-byte object <07>
+  Runtime::RuntimeAssetIngestPhase::Failed
+    Which is: 1-byte object <08>
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:2481: Failure
+Expected equality of these values:
+  record->Diagnostic
+    Which is: 1-byte object <00>
+  Runtime::RuntimeAssetIngestDiagnostic::MaterializationFailed
+    Which is: 1-byte object <0B>
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:2482: Failure
+Expected equality of these values:
+  record->Error
+    Which is: 4-byte object <00-00 00-00>
+  Core::ErrorCode::InvalidState
+    Which is: 4-byte object <2D-01 00-00>
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:2483: Failure
+Value of: record->Result.has_value()
+  Actual: true
+Expected: false
+
+[  FAILED  ] RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply (56 ms)
+[----------] 1 test from RuntimeAssetImportFormatCoverage (56 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (56 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+
+ 1 FAILED TEST
+
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.07 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.07 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...   Passed    0.06 sec
+    Start 361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+    Test #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ...***Failed    0.06 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeAssetImportFormatCoverage
+[ RUN      ] RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued model/texture import: source=ManualImport path='/tmp/assetio142_manual_triangle.gltf' payload=ModelScene[0m
+[32m[INFO] [Runtime] Queued model/texture import: source=ManualImport path='/tmp/assetio142_manual_albedo.png' payload=Texture2D[0m
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:2856: Failure
+Value of: queue.Entries[0].CanCancel
+  Actual: false
+Expected: true
+
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/assetio142_manual_triangle.gltf' requested_payload=ModelScene result_payload=ModelScene ingest_diagnostic=None primitive_entities=1 embedded_textures=1 texture_upload_requests=0 materialized_model_scene=true requested_texture_upload=false[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/assetio142_manual_albedo.png' requested_payload=Texture2D result_payload=Texture2D ingest_diagnostic=None primitive_entities=0 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[  FAILED  ] RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming (52 ms)
+[----------] 1 test from RuntimeAssetImportFormatCoverage (52 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (53 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+
+ 1 FAILED TEST
+
+
+0% tests passed, 2 tests failed out of 2
+
+Label Time Summary:
+contract    =   0.12 sec*proc (2 tests)
+runtime     =   0.12 sec*proc (2 tests)
+
+Total Test time (real) =   1.66 sec
+
+The following tests FAILED:
+	357 - RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply (Failed)
+	361 - RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming (Failed)
