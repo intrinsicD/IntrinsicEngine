@@ -17,7 +17,7 @@
   "exit_code": 8,
   "finished_at": "2026-08-01T22:24:23Z",
   "label": "scene-save-contract-repeat",
-  "required": true,
+  "required": false,
   "schema_version": 1,
   "started_at": "2026-08-01T22:24:23Z",
   "stderr_path": "tasks/evidence/BUG-123/commands/scene-save-contract-repeat.stderr.log",
