@@ -8,10 +8,10 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-RuntimeCleanup"
+branch: "cleanup/runtime-139-203-205"
+worktree: "/tmp/intrinsic-runtime-cleanup.ae4UkC"
+claimed_at: "2026-08-01T10:01:47Z"
 maturity_target: Retired
 ---
 # RUNTIME-205 — Internalize SceneInteraction helpers

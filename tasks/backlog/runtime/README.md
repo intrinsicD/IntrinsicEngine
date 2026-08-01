@@ -15,7 +15,7 @@ first and deletes only the shallow exported helper surface.
 
 #### Open tasks
 
-- [`RUNTIME-205` — Internalize SceneInteraction helpers](RUNTIME-205-internalize-scene-interaction-helpers.md)
+- [`RUNTIME-205` — Internalize SceneInteraction helpers](../../active/RUNTIME-205-internalize-scene-interaction-helpers.md)
   separately removes GizmoFrameService and SelectionReadback after interaction-
   owner behavior/lifetime coverage exists. RenderRecipeActivation and
   DeviceBootstrap remain outside both tasks because their current production
