@@ -3,12 +3,12 @@ task_id: METHOD-019
 workflow_profile: claim-grade
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T23:48:19Z'
+generated_at: '2026-08-01T23:59:12Z'
 claim_eligible: true
 source:
   base_ref: 515abbda
   base_revision: 515abbdabdfbe992d5a8bd030119cced1fa4eed5
-  head_revision: 515db69fe1f655fd3267f98870e5a487a41f13e1
+  head_revision: 29e32756f185a82001bd1fb0e49681365c66a1a5
   branch: feature/lop-consolidation-e2e
   worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
   dirty: false
@@ -29,6 +29,8 @@ source:
     sha256: ebe4f57bc262b7ceb55aa8c1a3a6f361d8fd3cc3f0c9bc002308ac597eb7ea96
   - path: docs/architecture/runtime.md
     sha256: 261882123b7e01807624beed379fe080f538b91c444426af04c92c67e9616e2d
+  - path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+    sha256: b22c14f275306a6af59bc2c796cfc31587ddbf9db358a43518c0645e98d626c8
   - path: methods/geometry/continuous_lop/README.md
     sha256: 29047e9a08d11a9a60836656bf3cafaab532e6df4f247fae7ce3f14b64b9d81c
   - path: methods/geometry/continuous_lop/benchmarks/README.md
@@ -221,7 +223,7 @@ source:
     sha256: c6e3fbd8f3cb58f4da88bd45674df6f9f9c10d5e879610edf277452227c02197
   - path: tests/unit/geometry/Test_KDTree.cpp
     sha256: 54cbf0574f043189b34ecea59ef73616412b9831e6e3a2017eb5d00c5e6168e8
-  content_digest: 8728dc178b9578738198c3cc1ab38837625df718267633b0647fc3823a5f9404
+  content_digest: f4489b624c56c6fb1ac29d15856fc10b09d34b43d13f1773108f1dbba2d04fb9
 touched:
   paths:
   - ara/logic/claims.md
@@ -232,6 +234,7 @@ touched:
   - benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml
   - benchmarks/runners/BenchmarkSmokeRunner.cpp
   - docs/architecture/runtime.md
+  - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
   - methods/geometry/continuous_lop/README.md
   - methods/geometry/continuous_lop/benchmarks/README.md
   - methods/geometry/continuous_lop/method.yaml
@@ -391,6 +394,7 @@ commands:
 - receipt: tasks/evidence/METHOD-019/commands/ci-ubsan-cpu-ctest-post-bug123.json
 - receipt: tasks/evidence/METHOD-019/commands/ci-ubsan-cpu-ctest.json
 - receipt: tasks/evidence/METHOD-019/commands/claim-custody-final.json
+- receipt: tasks/evidence/METHOD-019/commands/clean-workshop-strict-round2.json
 - receipt: tasks/evidence/METHOD-019/commands/configure-ci-asan.json
 - receipt: tasks/evidence/METHOD-019/commands/configure-ci-ubsan.json
 - receipt: tasks/evidence/METHOD-019/commands/confirmation-benchmark.json
@@ -399,6 +403,7 @@ commands:
 - receipt: tasks/evidence/METHOD-019/commands/diff-check.json
 - receipt: tasks/evidence/METHOD-019/commands/docs-links-final.json
 - receipt: tasks/evidence/METHOD-019/commands/docs-links-retirement.json
+- receipt: tasks/evidence/METHOD-019/commands/docs-links-strict-round2.json
 - receipt: tasks/evidence/METHOD-019/commands/experiment-completion-final.json
 - receipt: tasks/evidence/METHOD-019/commands/focused-tests-post-bug123.json
 - receipt: tasks/evidence/METHOD-019/commands/focused-tests.json
@@ -425,6 +430,7 @@ diagnostics_and_previews:
   with exact output parity and zero fallback; all candidates remain validation-only.
 - The benchmark and runtime lifecycle discovery receipts preserve failed diagnostics as optional while
   post-repair required receipts pass.
+- Round-two strict docs-link and clean-workshop receipts close the stale BUG-123 retirement-link finding.
 benchmark_or_parity_evidence:
 - 'tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml: all negative-confirmation gates independently
   accepted; minimum candidate/reference ratio 0.961823997 > 0.80, maximum parity failure 0, adopted count
