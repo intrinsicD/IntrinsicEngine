@@ -25,7 +25,9 @@ claimed_at: "2026-08-01T22:08:28Z"
   either normal publication wins or the unpublished main-thread finalizer has
   actually run. A test-only worker interlock forces the historical ordering
   without sleeps.
-- Commit: pending fixed-surface evidence binding.
+- Implementation commit: `90d4fb3014515e5ae5801e2bd1bb88fa67fd36c5`;
+  completion evidence and independent review are bound separately under
+  `tasks/evidence/BUG-123/`.
 
 ## Goal
 - Make world cancellation of a queued scene save publish exactly one terminal

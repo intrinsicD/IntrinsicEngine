@@ -10,11 +10,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   expects an unsupported slot from a fixture whose current combinations all
   resolve without that flag; align the fixture and counter contract without
   deleting meaningful unsupported-path coverage or weakening the gate.
-- [`BUG-123` — Retired queued scene save intermittently loses its terminal event](../../active/BUG-123-retired-scene-save-terminal-event-race.md):
-  active fixed-surface review. `IsComplete()` and reaping now wait for a
-  finalizer-owning terminal job's main-thread reconciliation; deterministic
-  and original scene-save selectors each pass their 100-repeat contract, and
-  normal, ASan, and UBSan CPU gates are green without weakened assertions.
 - [`BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state](BUG-122-runtime-asset-asan-test-lifetimes.md):
   one shutdown test lets a queued hook retain loop-local synchronization state,
   while three progressive model-scene tests retain pointers into temporary
@@ -63,6 +58,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-01: [`BUG-123` — Retired queued scene save intermittently
+  loses its terminal event](../../done/BUG-123-retired-scene-save-terminal-event-race.md).
+  `IsComplete()` and terminal reaping now wait for a finalizer-owning job's
+  main-thread reconciliation. The forced ordering and original scene-save
+  selectors each pass 200 registered executions, and the normal, ASan, and
+  UBSan CPU gates are green without weakened assertions.
 
 - Closed 2026-08-01: [`BUG-127` — Task claim corrupts multiline dependency
   front matter](../../done/BUG-127-task-claim-multiline-dependency-front-matter.md).

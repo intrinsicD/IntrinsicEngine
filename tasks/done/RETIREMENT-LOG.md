@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-123`](BUG-123-retired-scene-save-terminal-event-race.md) — retired
+queued-scene-save terminal publication repaired on 2026-08-01. A worker could
+publish `Cancelled`, race immediately behind an empty main-thread completion
+drain, and only then queue the scene operation's unpublished finalizer; a
+drain-until-terminal caller consequently returned before the required event.
+Finalizer-owning jobs now remain incomplete and unreapable until normal
+publication wins or the exactly-once main-thread finalizer actually runs. A
+test-only two-gate interlock forces that ordering without sleeps. Both the
+interlock and original scene-save selectors passed 200 registered executions,
+the focused JobService/scene cohort passed 92/92, the canonical CPU gate passed
+4,812/4,812, and isolated ASan and UBSan gates each passed 2,655/2,655. Strict
+layering, test-layout, task/docs, inventory, and diff-hygiene checks pass; no
+timeout, assertion, label, or quarantine was weakened.
+
 [`BUG-127`](BUG-127-task-claim-multiline-dependency-front-matter.md) — task
 claim multiline-dependency preservation retired on 2026-08-01. The textual
 front-matter updater now advances past the complete indented `depends_on`

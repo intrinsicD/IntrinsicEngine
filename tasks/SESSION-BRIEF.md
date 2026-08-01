@@ -8,7 +8,6 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-123` — Retired queued scene save intermittently loses its terminal event (tasks/active/BUG-123-retired-scene-save-terminal-event-race.md)
 - `METHOD-019` — LOP-family optimized CPU backend and comparison benchmark (tasks/active/METHOD-019-lop-family-optimized-cpu-backend.md)
 
 ## Theme B — Rendering modernization
