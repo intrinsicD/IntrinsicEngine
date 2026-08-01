@@ -15,7 +15,7 @@ first and deletes only the shallow exported helper surface.
 
 #### Open tasks
 
-- [`RUNTIME-203` — Internalize Engine composition helpers](RUNTIME-203-internalize-engine-composition-helpers.md)
+- [`RUNTIME-203` — Internalize Engine composition helpers](../../active/RUNTIME-203-internalize-engine-composition-helpers.md)
   removes the one-consumer ModuleSchedule, EcsSystemBundle, and
   JobServiceGpuQueueBridge BMIs after Engine-level behavior coverage exists.
 - [`RUNTIME-205` — Internalize SceneInteraction helpers](RUNTIME-205-internalize-scene-interaction-helpers.md)

@@ -7,10 +7,10 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-RuntimeCleanup"
+branch: "cleanup/runtime-139-203-205"
+worktree: "/tmp/intrinsic-runtime-cleanup.ae4UkC"
+claimed_at: "2026-08-01T08:36:34Z"
 maturity_target: Retired
 ---
 # RUNTIME-203 — Internalize Engine composition helpers
@@ -141,4 +141,3 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 - Target: `Retired`; public helper surfaces disappear only after owner-level
   behavior and lifecycle parity are proven.
-
