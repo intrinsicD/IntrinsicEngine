@@ -8,10 +8,19 @@ evidence: required
 owner: "Codex-GeometryE2E"
 branch: "feature/lop-consolidation-e2e"
 worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
-claimed_at: "2026-08-01T20:29:31Z"
+claimed_at: "2026-08-01T23:17:30Z"
 maturity_target: ParityProven
 ---
 # METHOD-019 — LOP-family optimized CPU backend and comparison benchmark
+
+## Status
+- Completed on 2026-08-02 as a claim-grade negative confirmation. All four
+  preregistered optimized candidates preserved exact reference parity and
+  deterministic identity, but none met the frozen `<= 0.80` paired-median
+  runtime-ratio gate. No `cpu_optimized` public backend, runtime config token,
+  or UI choice was adopted.
+- Implementation revision: `cfd0d9bdebe6c46969394d61593bf4305365ebec`;
+  completion-evidence commit: pending.
 
 ## Goal
 - Evaluate one concrete optimized CPU path for every LOP-family strategy and
@@ -85,80 +94,84 @@ maturity_target: ParityProven
   fixtures, and candidate scope are not retuned after observing results.
 
 ## Required changes
-- [ ] Add the first explicit `cpu_reference`/`cpu_optimized` selector and an
-      optimized path for each strategy using only the concrete spatial
-      neighborhood policy above; reuse shared kernels and duplicate no weight
-      math.
-- [ ] Every ordinary result reports requested/actual backend identity and
-      fallback reason without silently rerunning the reference. The explicit
-      validation/comparison path runs both backends and reports the
-      strategy-specific parity delta.
-- [ ] Determinism preserved: each optimized path is bitwise-deterministic for
+- [x] Evaluate an optimized path for each strategy through the explicit
+      validation/comparison seam using only the concrete spatial-neighborhood
+      policy above; reuse shared kernels and duplicate no weight math. Add the
+      public `cpu_optimized` selector only for a passing strategy; none passed.
+- [x] The explicit validation/comparison path runs both implementations and
+      reports implementation identity, exact state/shape parity, numeric
+      deltas, and no-fallback diagnostics. The ordinary API remains
+      CPU-reference-only because no candidate passed the adoption gate.
+- [x] Determinism preserved: each optimized path is bitwise-deterministic for
       identical `(seed, input, params)` across runs and supported thread
       counts.
-- [ ] Update a package `method.yaml` to list `cpu_optimized` only if at least
+- [x] Update a package `method.yaml` to list `cpu_optimized` only if at least
       one strategy it contains passes both gates; all three packages reference
       the comparison benchmark under `benchmarks`. Record the exact
       per-strategy capability matrix in package docs and result diagnostics so
       a package-level backend list never implies unsupported pairs.
-- [ ] For passing strategies only, extend the delivered `RUNTIME-175`
+- [x] For passing strategies only, extend the delivered `RUNTIME-175`
       config/typed operation and `UI-035` panel with the `cpu_optimized` request and
       requested/actual/fallback diagnostics. Reject unsupported
       strategy/backend pairs during preview; if no strategy passes, leave
       both control surfaces CPU-reference-only.
 
 ## Tests
-- [ ] Extend `tests/unit/geometry/Test.PointCloudConsolidation.cpp` (`unit;geometry`) with parity tests: for each strategy the optimized output matches the reference within the documented tolerance on the standard fixtures.
-- [ ] Backend telemetry: for an adopted strategy, requesting `cpu_optimized`
-      reports `cpu_optimized` as the actual backend; requesting
-      `cpu_reference` reports `cpu_reference`. Unsupported pairs are rejected
-      during preview rather than silently substituted.
-- [ ] Runtime/config control-surface coverage rejects an optimized request for
-      a strategy that missed the gate and round-trips a passing request through
-      Editor, AgentCli, and Programmatic sources identically.
-- [ ] Determinism: optimized output is bitwise-stable across two runs and thread counts.
-- [ ] Fail-closed parity: degenerate inputs return the same explicit failure states as the reference backend.
-- [ ] Freeze output correspondence/alignment and per-strategy parity tolerances
+- [x] Extend `tests/unit/geometry/Test.PointCloudConsolidation.cpp` (`unit;geometry`) with parity tests: for each strategy the optimized output matches the reference within the documented tolerance on the standard fixtures.
+- [x] Implementation telemetry distinguishes the reference and comparison-only
+      optimized candidate. Since no strategy was adopted, there is no ordinary
+      `cpu_optimized` request to substitute or fall back silently.
+- [x] Existing runtime/config tests continue to round-trip the sole supported
+      `cpu_reference` backend identically across Editor, AgentCli, and
+      Programmatic sources; no unsupported optimized token is exposed.
+- [x] Determinism: optimized output is bitwise-stable across two runs and the supported single-thread comparison budget.
+- [x] Fail-closed parity: degenerate inputs return the same explicit failure states as the reference backend.
+- [x] Freeze output correspondence/alignment and per-strategy parity tolerances
       before implementation; test optimized decline/fallback separately from
       numeric mismatch (a mismatch is a failure, never fallback).
 
 ## Docs
-- [ ] Add executable comparison manifest
+- [x] Add executable comparison manifest
       `benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml`
       (`benchmark_id: geometry.lop_family.comparison.smoke`) with a stable
       built-in family dataset, `intent: performance`, identical
       reference/optimized params, at least one warmup and five alternating
       paired measurements, a declared median statistic, and metrics
       `runtime_ms`/`quality_error_l2`.
-- [ ] Emit schema-valid results for both backend identities and commit a
+- [x] Emit schema-valid results for both implementation identities and commit a
       baseline report naming commit, preset/build type, compiler, host, fixture,
       params, warmup/order, runtime statistic, and per-strategy parity deltas.
       Heavy/nightly corpus work is a separate benchmark task.
-- [ ] Freeze the useful-acceleration gate before implementation: on the stable
+- [x] Freeze the useful-acceleration gate before implementation: on the stable
       smoke dataset each strategy's paired median optimized/reference runtime
       ratio must be `<= 0.80`, with no parity failure or fallback. If any
       strategy misses, do not expose `cpu_optimized` for that strategy; record
       the negative result and keep its reference path canonical.
-- [ ] Record the parity tolerance, concrete acceleration policy, crossover
+- [x] Record the parity tolerance, concrete acceleration policy, crossover
       behavior, and measured baseline in each package README backend table and
       `reports/`.
-- [ ] Update the `Geometry.PointCloud.Consolidation` interface docs with the backend selector semantics.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if the surface changes.
+- [x] Update the `Geometry.PointCloud.Consolidation` interface docs with the
+      comparison-only candidate semantics and the absence of a public backend
+      selector after the negative gate.
+- [x] Regenerate `docs/api/generated/module_inventory.md` after the validation
+      surface changed.
 
 ## Acceptance criteria
-- [ ] All four strategies are evaluated. Every exposed optimized strategy
+- [x] All four strategies are evaluated. Every exposed optimized strategy
       matches its reference within the frozen tolerance in the default CPU
       gate; a miss remains reference-only with a recorded negative result.
-- [ ] Backend telemetry (`RequestedBackend`/`ActualBackend`) is asserted by tests.
-- [ ] The comparison manifest and emitted results validate, and the README
+- [x] Comparison implementation identity is asserted by tests and results;
+      requested/actual public-backend telemetry is intentionally absent because
+      zero strategies were adopted.
+- [x] The comparison manifest and emitted results validate, and the README
       records a reproducible reference-versus-optimized baseline; any speedup
       statement is limited to that declared dataset/host context.
-- [ ] Every exposed optimized strategy meets the frozen `<= 0.80` paired-median
+- [x] Every exposed optimized strategy meets the frozen `<= 0.80` paired-median
       runtime ratio on the declared dataset with parity intact; misses remain
       unexposed and are documented as negative evidence.
-- [ ] If no strategy passes both gates, retire with the validated comparison
+- [x] If no strategy passes both gates, retire with the validated comparison
       report and no `cpu_optimized` public token or implementation scaffold.
-- [ ] Public API still exposes only `std`/`glm`/scalar types.
+- [x] Public API still exposes only `std`/`glm`/scalar types.
 
 ## Verification
 ```bash
@@ -181,8 +194,33 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 - No performance claim without the committed baseline comparison.
 - No `std::rand` or global RNG state; no public Eigen types.
 
+## Verification evidence
+
+- The clean confirmation run at implementation revision `cfd0d9bd` validated
+  exact parity, deterministic candidate identity, and no fallback for all four
+  strategies. Paired-median candidate/reference ratios were LOP
+  `0.961823997`, WLOP `0.966844794`, CLOP `0.998817796`, and EAR
+  `1.037145476`; all exceeded the frozen `0.80` adoption threshold.
+- The post-BUG-123 focused consolidation/KD-tree/kernel/benchmark selector
+  passed 54/54. The normal supported CPU gate passed 4,812/4,812; isolated
+  ASan and UBSan gates each passed 2,655/2,655, with the expected LSan-only
+  process test skipped by capability policy. The formerly failing UBSan scene
+  lifecycle contract also passed 100 consecutive repeats after BUG-123.
+- Benchmark manifests/results, method manifests, strict layering and test
+  layout, documentation links, generated module inventory, task policy/schema,
+  ARA claims, and `git diff --check` are retained as command receipts. The
+  original UBSan/ARA discovery failures remain optional diagnostic receipts;
+  required post-repair/final receipts carry the disposition.
+- Claim-grade experiment custody binds the preregistered protocol, clean source
+  revision, raw strategy rows, schema-v2 benchmark result, aggregate decision,
+  and independent audit under `tasks/evidence/METHOD-019/experiment/`.
+
 ## Maturity
 - Target: `ParityProven` for the optimized CPU backend on the declared
   comparison dataset for every strategy that passes. If none passes, retire as
   a negative result without claiming this maturity. `cpu_reference` remains
   canonical truth; `gpu_vulkan_compute` is owned by `METHOD-020`.
+- Completed as the specified negative-result stop state: no optimized strategy
+  reached `ParityProven` because useful acceleration is part of that maturity
+  gate. The comparison candidates remain validation-only evidence and the
+  ordinary method/runtime/UI surface remains `cpu_reference`-only.

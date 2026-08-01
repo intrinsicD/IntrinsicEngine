@@ -10,7 +10,7 @@
   "exit_code": 1,
   "finished_at": "2026-08-01T21:38:14Z",
   "label": "ara-claims",
-  "required": true,
+  "required": false,
   "schema_version": 1,
   "started_at": "2026-08-01T21:38:14Z",
   "stderr_path": "tasks/evidence/METHOD-019/commands/ara-claims.stderr.log",

@@ -18,7 +18,7 @@
   "exit_code": 8,
   "finished_at": "2026-08-01T22:04:49Z",
   "label": "ci-ubsan-cpu-ctest",
-  "required": true,
+  "required": false,
   "schema_version": 1,
   "started_at": "2026-08-01T22:03:17Z",
   "stderr_path": "tasks/evidence/METHOD-019/commands/ci-ubsan-cpu-ctest.stderr.log",

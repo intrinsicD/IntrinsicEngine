@@ -1,0 +1,121 @@
+Internal ctest changing into directory: /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+Test project /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+      Start 1056: PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField
+ 1/54 Test #1056: PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField ....................................   Passed    0.01 sec
+      Start 1057: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo
+ 2/54 Test #1057: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo ......................   Passed    0.04 sec
+      Start 1058: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+ 3/54 Test #1058: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ................................   Passed    0.04 sec
+      Start 1059: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput
+ 4/54 Test #1059: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput ..............   Passed    0.04 sec
+      Start 1152: PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField
+ 5/54 Test #1152: PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField ....................................   Passed    0.01 sec
+      Start 1153: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo
+ 6/54 Test #1153: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo ......................   Passed    0.04 sec
+      Start 1154: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+ 7/54 Test #1154: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ................................   Passed    0.04 sec
+      Start 1155: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput
+ 8/54 Test #1155: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput ..............   Passed    0.04 sec
+      Start 1925: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState
+ 9/54 Test #1925: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState ..............   Passed    0.11 sec
+      Start 1956: SandboxPointCloudConsolidationPanel.RegistrationIsStableAndIdempotent
+10/54 Test #1956: SandboxPointCloudConsolidationPanel.RegistrationIsStableAndIdempotent ...........................   Passed    0.04 sec
+      Start 1957: SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed
+11/54 Test #1957: SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed ..............   Passed    0.00 sec
+      Start 1958: SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure
+12/54 Test #1958: SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure ..........   Passed    0.00 sec
+      Start 1959: SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace
+13/54 Test #1959: SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace ...   Passed    0.04 sec
+      Start 2169: KDTree.RejectsDegenerateBuildInputs
+14/54 Test #2169: KDTree.RejectsDegenerateBuildInputs .............................................................   Passed    0.00 sec
+      Start 2170: KDTree.KnnMatchesBruteForceOrderingForPointAabbs
+15/54 Test #2170: KDTree.KnnMatchesBruteForceOrderingForPointAabbs ................................................   Passed    0.00 sec
+      Start 2171: KDTree.RadiusQueryMatchesBruteForceSetForPointAabbs
+16/54 Test #2171: KDTree.RadiusQueryMatchesBruteForceSetForPointAabbs .............................................   Passed    0.00 sec
+      Start 2172: KDTree.RadiusQueryScratchPreservesOrderingAcrossReuse
+17/54 Test #2172: KDTree.RadiusQueryScratchPreservesOrderingAcrossReuse ...........................................   Passed    0.00 sec
+      Start 2173: KDTree.SupportsVolumetricElementsThroughAabbInput
+18/54 Test #2173: KDTree.SupportsVolumetricElementsThroughAabbInput ...............................................   Passed    0.00 sec
+      Start 2174: KDTree.HandlesCoincidentElementsAndInvalidQueries
+19/54 Test #2174: KDTree.HandlesCoincidentElementsAndInvalidQueries ...............................................   Passed    0.00 sec
+      Start 3096: PointCloudNormals.SuppliedKDTreePathReusesCallerIndex
+20/54 Test #3096: PointCloudNormals.SuppliedKDTreePathReusesCallerIndex ...........................................   Passed    0.01 sec
+      Start 3101: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic
+21/54 Test #3101: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic ....................   Passed    0.02 sec
+      Start 3102: PointCloudConsolidation.OptimizedCandidateFailureMatchesReference
+22/54 Test #3102: PointCloudConsolidation.OptimizedCandidateFailureMatchesReference ...............................   Passed    0.01 sec
+      Start 3103: PointCloudConsolidation.WlopDenoisesPlaneAndSphere
+23/54 Test #3103: PointCloudConsolidation.WlopDenoisesPlaneAndSphere ..............................................   Passed    0.01 sec
+      Start 3104: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast
+24/54 Test #3104: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast ................................   Passed    0.01 sec
+      Start 3105: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature
+25/54 Test #3105: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature .......................................   Passed    0.01 sec
+      Start 3106: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable
+26/54 Test #3106: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable ...........................   Passed    0.01 sec
+      Start 3107: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload
+27/54 Test #3107: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload ...............................   Passed    0.00 sec
+      Start 3108: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing
+28/54 Test #3108: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing ......................................   Passed    0.01 sec
+      Start 3109: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle
+29/54 Test #3109: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle ....................................   Passed    0.01 sec
+      Start 3110: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop
+30/54 Test #3110: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop ................................   Passed    0.01 sec
+      Start 3111: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch
+31/54 Test #3111: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch .......................   Passed    0.01 sec
+      Start 3112: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation
+32/54 Test #3112: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation ...............................   Passed    0.00 sec
+      Start 3113: PointCloudConsolidation.ClopDenoisesPlaneAndSphere
+33/54 Test #3113: PointCloudConsolidation.ClopDenoisesPlaneAndSphere ..............................................   Passed    0.02 sec
+      Start 3114: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop
+34/54 Test #3114: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop ..................................   Passed    0.02 sec
+      Start 3115: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded
+35/54 Test #3115: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded ..................................   Passed    0.01 sec
+      Start 3116: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed
+36/54 Test #3116: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed .......................................   Passed    0.01 sec
+      Start 3117: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic
+37/54 Test #3117: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic ..................................   Passed    0.05 sec
+      Start 3118: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic
+38/54 Test #3118: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic ................................   Passed    0.01 sec
+      Start 3119: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic
+39/54 Test #3119: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic ............................   Passed    0.01 sec
+      Start 3120: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions
+40/54 Test #3120: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions ...........................   Passed    0.00 sec
+      Start 3121: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite
+41/54 Test #3121: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite ...............................   Passed    0.01 sec
+      Start 3122: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots
+42/54 Test #3122: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots ........................................   Passed    0.00 sec
+      Start 3140: PointCloudKernels.RadialWeightsMatchDocumentedClosedForms
+43/54 Test #3140: PointCloudKernels.RadialWeightsMatchDocumentedClosedForms .......................................   Passed    0.00 sec
+      Start 3141: PointCloudKernels.RadialWeightsFailClosed
+44/54 Test #3141: PointCloudKernels.RadialWeightsFailClosed .......................................................   Passed    0.00 sec
+      Start 3142: PointCloudKernels.RadialWeightsPreserveZeroDistanceAtExtremeSupportScales
+45/54 Test #3142: PointCloudKernels.RadialWeightsPreserveZeroDistanceAtExtremeSupportScales .......................   Passed    0.00 sec
+      Start 3143: PointCloudKernels.DirectionalWeightMatchesEdgeAwareEquation
+46/54 Test #3143: PointCloudKernels.DirectionalWeightMatchesEdgeAwareEquation .....................................   Passed    0.00 sec
+      Start 3144: PointCloudKernels.DirectionalWeightFailsClosed
+47/54 Test #3144: PointCloudKernels.DirectionalWeightFailsClosed ..................................................   Passed    0.00 sec
+      Start 3145: PointCloudKernels.LinearRepulsionHasFiniteZeroLimit
+48/54 Test #3145: PointCloudKernels.LinearRepulsionHasFiniteZeroLimit .............................................   Passed    0.00 sec
+      Start 3146: PointCloudKernels.DensityDistinguishesDenseClusterFromSparseTail
+49/54 Test #3146: PointCloudKernels.DensityDistinguishesDenseClusterFromSparseTail ................................   Passed    0.00 sec
+      Start 3147: PointCloudKernels.UniformGridInteriorHasConstantDensity
+50/54 Test #3147: PointCloudKernels.UniformGridInteriorHasConstantDensity .........................................   Passed    0.00 sec
+      Start 3148: PointCloudKernels.SuppliedIndexAndRepeatedRunsAreBitwiseDeterministic
+51/54 Test #3148: PointCloudKernels.SuppliedIndexAndRepeatedRunsAreBitwiseDeterministic ...........................   Passed    0.00 sec
+      Start 3149: PointCloudKernels.RadiusScratchPreservesDensityWeightsAcrossReuse
+52/54 Test #3149: PointCloudKernels.RadiusScratchPreservesDensityWeightsAcrossReuse ...............................   Passed    0.00 sec
+      Start 3150: PointCloudKernels.DensityBroadPhaseIncludesDoubleSupportBoundary
+53/54 Test #3150: PointCloudKernels.DensityBroadPhaseIncludesDoubleSupportBoundary ................................   Passed    0.00 sec
+      Start 3151: PointCloudKernels.DensityFailuresPublishNoWeights
+54/54 Test #3151: PointCloudKernels.DensityFailuresPublishNoWeights ...............................................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 54
+
+Label Time Summary:
+contract       =   0.27 sec*proc (8 tests)
+geometry       =   0.33 sec*proc (41 tests)
+integration    =   0.20 sec*proc (5 tests)
+runtime        =   0.46 sec*proc (13 tests)
+unit           =   0.33 sec*proc (41 tests)
+
+Total Test time (real) =   0.98 sec

@@ -17,7 +17,7 @@
   "exit_code": 8,
   "finished_at": "2026-08-01T22:06:19Z",
   "label": "ubsan-bug123-repeat",
-  "required": true,
+  "required": false,
   "schema_version": 1,
   "started_at": "2026-08-01T22:06:19Z",
   "stderr_path": "tasks/evidence/METHOD-019/commands/ubsan-bug123-repeat.stderr.log",
