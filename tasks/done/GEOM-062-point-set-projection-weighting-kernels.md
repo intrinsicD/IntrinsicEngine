@@ -74,11 +74,14 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Completion
 
-- Completed 2026-08-01. Implementation commit: `b5e93e16`. The compactly
+- Completed 2026-08-01. Initial implementation commit: `b5e93e16`; fixed-surface
+  numerical closure: `40c11f49`. The compactly
   supported Gaussian, LOP theta, and Wendland C2 weights; finite normalized
   linear repulsion potential; and deterministic direct/reciprocal KD-tree
-  density estimates are complete. Focused normal, ASan, and UBSan selectors
-  pass 7/7, and the CPU-only geometry selector passes 1,616/1,616. The module
+  density estimates are complete. Independent review identified and the second
+  revision closed extreme-support overflow/underflow plus float broad-phase
+  boundary exclusion. Focused normal, ASan, and UBSan selectors pass 9/9, and
+  the CPU-only geometry selector passes 1,618/1,618. The module
   remains a narrow `geometry -> core` import with no projection control flow,
   backend axis, or unrelated point-cloud Gaussian migration.
 

@@ -3,12 +3,12 @@ task_id: GEOM-062
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T12:24:56Z'
+generated_at: '2026-08-01T12:41:35Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: fb494cfc7cdc319fcb050a73b2e291ff73cc6d1d
-  head_revision: 469224cf425d5d51e4cfe2e92f9668a6e89c7d0e
+  head_revision: 40c11f49091f475b9ac9a07b435f5de66bd5c837
   branch: feature/lop-consolidation-e2e
   worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
   dirty: false
@@ -32,7 +32,7 @@ source:
   - path: src/geometry/Geometry.KMeans.cppm
     sha256: 3304d60b0143a432854a3d74c4bc7970185f0957edecb36580fade188f04c2eb
   - path: src/geometry/Geometry.PointCloud.Kernels.cpp
-    sha256: 573e1b5b29bca5e860e45d2a676d494aa31ee5091d4bc9c18518466fb161ca9b
+    sha256: 12af3735071129039d3436438bafb35f303b883765500a2c1e271d36cdaa86c8
   - path: src/geometry/Geometry.PointCloud.Kernels.cppm
     sha256: ccfa9aa393e23dd3a26357a75a7f7e15b75f37e5edc53db3298fa8dbc5f7b19a
   - path: tasks/SESSION-BRIEF.md
@@ -200,8 +200,8 @@ source:
   - path: tests/unit/geometry/Test.GaussianMixture.cpp
     sha256: 72ee70a9241b8bb7397044f7159bbe9d3ecd3cbe3a506b0b1ee3aead36de61f4
   - path: tests/unit/geometry/Test.PointCloudKernels.cpp
-    sha256: 1271d59aa40f83f29d5044d37b11ffe8561a75ee72b94599232a02fabb8a1e9e
-  content_digest: 1a063c3b2ee5914ed41a377c9b4fcd7c3e2a03aa201c5ba7141ebacee0fb622d
+    sha256: faa97e2eb36cd027b9136f9b97071c1c615238336c3061bb194a874f3c3d3526
+  content_digest: 54175239e3b8b4d89205117d319738df1c01e067d1728d9c7ddcb644de97c738
 touched:
   paths:
   - docs/api/generated/module_inventory.md
@@ -340,6 +340,10 @@ commands:
 - receipt: tasks/evidence/GEOM-062/commands/layering.json
 - receipt: tasks/evidence/GEOM-062/commands/module-inventory-final.json
 - receipt: tasks/evidence/GEOM-062/commands/module-inventory.json
+- receipt: tasks/evidence/GEOM-062/commands/review2-asan-focused.json
+- receipt: tasks/evidence/GEOM-062/commands/review2-focused-kernels.json
+- receipt: tasks/evidence/GEOM-062/commands/review2-geometry-cpu-gate.json
+- receipt: tasks/evidence/GEOM-062/commands/review2-ubsan-focused.json
 - receipt: tasks/evidence/GEOM-062/commands/task-policy-final.json
 - receipt: tasks/evidence/GEOM-062/commands/task-policy.json
 - receipt: tasks/evidence/GEOM-062/commands/test-layout.json
@@ -349,7 +353,7 @@ changed_public_contracts:
   direct or reciprocal local density with structured failure diagnostics
 diagnostics_and_previews:
 - DensityWeightStatus and query/contribution/empty-neighborhood counters fail closed without partial weights
-  or NaN/Inf
+  or NaN/Inf; extreme support and float/double broad-phase boundaries are regression-covered
 benchmark_or_parity_evidence: []
 docs_sync:
   task_file: tasks/done/GEOM-062-point-set-projection-weighting-kernels.md
@@ -364,10 +368,13 @@ skipped_checks:
   reason: Pure CPU geometry numerics add no device, RHI, shader, or runtime behavior
 artifacts:
 - path: tests/unit/geometry/Test.PointCloudKernels.cpp
-  sha256: 1271d59aa40f83f29d5044d37b11ffe8561a75ee72b94599232a02fabb8a1e9e
+  sha256: faa97e2eb36cd027b9136f9b97071c1c615238336c3061bb194a874f3c3d3526
   kind: file
 - path: src/geometry/Geometry.PointCloud.Kernels.cppm
   sha256: ccfa9aa393e23dd3a26357a75a7f7e15b75f37e5edc53db3298fa8dbc5f7b19a
+  kind: file
+- path: src/geometry/Geometry.PointCloud.Kernels.cpp
+  sha256: 12af3735071129039d3436438bafb35f303b883765500a2c1e271d36cdaa86c8
   kind: file
 - path: tasks/done/GEOM-062-point-set-projection-weighting-kernels.md
   sha256: 4e7959e54e3b5610970497814c629cc03649fe781aecb3c5f1436e0ef25092b8
