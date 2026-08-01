@@ -1,0 +1,6 @@
+[ERROR] tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md: done task must include PR/commit reference placeholder or value.
+Validated 180 task file(s); findings: 1; mode: strict.
+[check_task_maturity_followups] Root: /tmp/intrinsic-runtime-cleanup.ae4UkC
+[check_task_maturity_followups] Open task files scanned: 80
+[check_task_maturity_followups] No maturity follow-up findings.
+ERROR: validate_tasks.py strict mode reported task-format violations

@@ -1,0 +1,16 @@
+[clean-workshop-review] Running scorecard-relevant validators at root: /tmp/intrinsic-runtime-cleanup.ae4UkC
+[check_layering] Scan root: /tmp/intrinsic-runtime-cleanup.ae4UkC/src
+[check_layering] Files scanned: 745
+[check_layering] References scanned: 6975 import/include, 85 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+[check_layering_allowlist_quality] Allowlist: /tmp/intrinsic-runtime-cleanup.ae4UkC/tools/repo/layering_allowlist.yaml
+[check_layering_allowlist_quality] Entries: 0
+[check_layering_allowlist_quality] No findings.
+[ERROR] tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md: done task must include PR/commit reference placeholder or value.
+Validated 180 task file(s); findings: 1; mode: strict.
+[check_task_maturity_followups] Root: /tmp/intrinsic-runtime-cleanup.ae4UkC
+[check_task_maturity_followups] Open task files scanned: 80
+[check_task_maturity_followups] No maturity follow-up findings.
+ERROR: validate_tasks.py strict mode reported task-format violations

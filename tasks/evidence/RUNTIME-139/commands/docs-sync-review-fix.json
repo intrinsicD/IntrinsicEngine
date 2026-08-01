@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--diff-mode",
+    "--base-ref",
+    "421b7477",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref 421b7477 --strict",
+  "cwd": ".",
+  "duration_ms": 33,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T08:30:48Z",
+  "label": "docs-sync-review-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T08:30:48Z",
+  "stderr_path": "tasks/evidence/RUNTIME-139/commands/docs-sync-review-fix.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-139/commands/docs-sync-review-fix.stdout.log",
+  "stdout_sha256": "252795bac911f95d953553b13a9b4bf686379a0ac23d58e8c17cb9a2440018f8",
+  "task_id": "RUNTIME-139"
+}

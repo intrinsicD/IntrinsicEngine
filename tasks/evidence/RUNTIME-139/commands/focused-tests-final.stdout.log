@@ -1,0 +1,228 @@
+Internal ctest changing into directory: /tmp/intrinsic-runtime-cleanup.ae4UkC/build/ci
+Test project /tmp/intrinsic-runtime-cleanup.ae4UkC/build/ci
+        Start   88: GraphicsGpuWorld.Smoke_AllocateUploadSyncShutdown
+  1/108 Test   #88: GraphicsGpuWorld.Smoke_AllocateUploadSyncShutdown .......................................................   Passed    0.00 sec
+        Start   89: GraphicsGpuWorld.GeometryRebindSubmitsUploadBarriersBeforeNextConsumers
+  2/108 Test   #89: GraphicsGpuWorld.GeometryRebindSubmitsUploadBarriersBeforeNextConsumers .................................   Passed    0.00 sec
+        Start   90: GraphicsGpuWorld.GeometryUploadPublishesOptionalVertexColorStreamBda
+  3/108 Test   #90: GraphicsGpuWorld.GeometryUploadPublishesOptionalVertexColorStreamBda ....................................   Passed    0.00 sec
+        Start   91: GraphicsGpuWorld.GeometryUpload_UsesVertexUnitsForOffsets
+  4/108 Test   #91: GraphicsGpuWorld.GeometryUpload_UsesVertexUnitsForOffsets ...............................................   Passed    0.00 sec
+        Start   92: GraphicsGpuWorld.FreeGeometry_InvalidatesLiveInstanceGeometrySlots
+  5/108 Test   #92: GraphicsGpuWorld.FreeGeometry_InvalidatesLiveInstanceGeometrySlots ......................................   Passed    0.00 sec
+        Start  435: MeshGeometryExtraction.SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
+  6/108 Test  #435: MeshGeometryExtraction.SingleMeshEntityUploadsOnceAndBindsInstanceGeometry ..............................   Passed    0.07 sec
+        Start  436: MeshGeometryExtraction.MaterialTextureBindingsResolveOntoExtractionMaterialSidecar
+  7/108 Test  #436: MeshGeometryExtraction.MaterialTextureBindingsResolveOntoExtractionMaterialSidecar ......................   Passed    0.04 sec
+        Start  437: MeshGeometryExtraction.GeometryPresentationRecipeIsConsumedDuringExtraction
+  8/108 Test  #437: MeshGeometryExtraction.GeometryPresentationRecipeIsConsumedDuringExtraction .............................   Passed    0.03 sec
+        Start  438: MeshGeometryExtraction.GeneratedGeometryPresentationTexturesBindUniqueMaterialSlots
+  9/108 Test  #438: MeshGeometryExtraction.GeneratedGeometryPresentationTexturesBindUniqueMaterialSlots .....................   Passed    0.04 sec
+        Start  439: MeshGeometryExtraction.RepeatedExtractionReusesMeshHandleWithoutReupload
+ 10/108 Test  #439: MeshGeometryExtraction.RepeatedExtractionReusesMeshHandleWithoutReupload ................................   Passed    0.06 sec
+        Start  440: MeshGeometryExtraction.TwoMeshEntitiesAllocateIndependentMeshUploads
+ 11/108 Test  #440: MeshGeometryExtraction.TwoMeshEntitiesAllocateIndependentMeshUploads ....................................   Passed    0.06 sec
+        Start  441: MeshGeometryExtraction.EntityDestructionRetiresMeshGeometryAfterDeferredWindow
+ 12/108 Test  #441: MeshGeometryExtraction.EntityDestructionRetiresMeshGeometryAfterDeferredWindow ..........................   Passed    0.07 sec
+        Start  442: MeshGeometryExtraction.ShutdownReleasesPendingMeshResidency
+ 13/108 Test  #442: MeshGeometryExtraction.ShutdownReleasesPendingMeshResidency .............................................   Passed    0.07 sec
+        Start  443: MeshGeometryExtraction.ProceduralRefPreemptsMeshPathOnSameEntity
+ 14/108 Test  #443: MeshGeometryExtraction.ProceduralRefPreemptsMeshPathOnSameEntity ........................................   Passed    0.07 sec
+        Start  444: MeshGeometryExtraction.AssetSourcePresentPreemptsMeshPathOnSameEntity
+ 15/108 Test  #444: MeshGeometryExtraction.AssetSourcePresentPreemptsMeshPathOnSameEntity ...................................   Passed    0.08 sec
+        Start  445: MeshGeometryExtraction.MissingPositionsIncrementsMissingPositionsCounter
+ 16/108 Test  #445: MeshGeometryExtraction.MissingPositionsIncrementsMissingPositionsCounter ................................   Passed    0.06 sec
+        Start  446: MeshGeometryExtraction.MissingTexcoordsUploadsWithDefaultUvFallback
+ 17/108 Test  #446: MeshGeometryExtraction.MissingTexcoordsUploadsWithDefaultUvFallback .....................................   Passed    0.07 sec
+        Start  447: MeshGeometryExtraction.NonFiniteTexcoordsUploadWithDefaultUvFallback
+ 18/108 Test  #447: MeshGeometryExtraction.NonFiniteTexcoordsUploadWithDefaultUvFallback ....................................   Passed    0.07 sec
+        Start  448: MeshGeometryExtraction.InvalidTopologyIncrementsInvalidTopologyCounter
+ 19/108 Test  #448: MeshGeometryExtraction.InvalidTopologyIncrementsInvalidTopologyCounter ..................................   Passed    0.07 sec
+        Start  449: MeshGeometryExtraction.DegenerateAllFacesIncrementsFailedPackCounter
+ 20/108 Test  #449: MeshGeometryExtraction.DegenerateAllFacesIncrementsFailedPackCounter ....................................   Passed    0.07 sec
+        Start  450: MeshGeometryExtraction.AddingProceduralRefAfterMeshUploadReleasesMeshResidency
+ 21/108 Test  #450: MeshGeometryExtraction.AddingProceduralRefAfterMeshUploadReleasesMeshResidency ..........................   Passed    0.07 sec
+        Start  451: MeshGeometryExtraction.AddingAssetSourceAfterMeshUploadReleasesMeshResidency
+ 22/108 Test  #451: MeshGeometryExtraction.AddingAssetSourceAfterMeshUploadReleasesMeshResidency ............................   Passed    0.07 sec
+        Start  452: MeshGeometryExtraction.LosingMeshDomainTopologyReleasesMeshResidency
+ 23/108 Test  #452: MeshGeometryExtraction.LosingMeshDomainTopologyReleasesMeshResidency ....................................   Passed    0.06 sec
+        Start  453: MeshGeometryExtraction.NonMeshDomainEntityIsIgnoredByMeshPath
+ 24/108 Test  #453: MeshGeometryExtraction.NonMeshDomainEntityIsIgnoredByMeshPath ...........................................   Passed    0.07 sec
+        Start  454: MeshGeometryExtraction.MultipleDirtyTagsCoalesceIntoSingleReupload
+ 25/108 Test  #454: MeshGeometryExtraction.MultipleDirtyTagsCoalesceIntoSingleReupload ......................................   Passed    0.08 sec
+        Start  455: MeshGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag
+ 26/108 Test  #455: MeshGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag ........................   Passed    0.07 sec
+        Start  510: GraphGeometryExtraction.LineGraphUploadsOnceAndBindsInstanceGeometry
+ 27/108 Test  #510: GraphGeometryExtraction.LineGraphUploadsOnceAndBindsInstanceGeometry ....................................   Passed    0.07 sec
+        Start  511: GraphGeometryExtraction.PointGraphUploadsOnceAndBindsInstanceGeometry
+ 28/108 Test  #511: GraphGeometryExtraction.PointGraphUploadsOnceAndBindsInstanceGeometry ...................................   Passed    0.07 sec
+        Start  512: GraphGeometryExtraction.LineAndPointGraphUploadsSingleHandleForBothLanes
+ 29/108 Test  #512: GraphGeometryExtraction.LineAndPointGraphUploadsSingleHandleForBothLanes ................................   Passed    0.08 sec
+        Start  513: GraphGeometryExtraction.LaneOverridesColorLineAndPointLanesIndependently
+ 30/108 Test  #513: GraphGeometryExtraction.LaneOverridesColorLineAndPointLanesIndependently ................................   Passed    0.08 sec
+        Start  514: GraphGeometryExtraction.RepeatedExtractionReusesGraphHandleWithoutReupload
+ 31/108 Test  #514: GraphGeometryExtraction.RepeatedExtractionReusesGraphHandleWithoutReupload ..............................   Passed    0.08 sec
+        Start  515: GraphGeometryExtraction.TwoGraphEntitiesAllocateIndependentUploads
+ 32/108 Test  #515: GraphGeometryExtraction.TwoGraphEntitiesAllocateIndependentUploads ......................................   Passed    0.07 sec
+        Start  516: GraphGeometryExtraction.EntityDestructionRetiresGraphGeometryAfterDeferredWindow
+ 33/108 Test  #516: GraphGeometryExtraction.EntityDestructionRetiresGraphGeometryAfterDeferredWindow ........................   Passed    0.07 sec
+        Start  517: GraphGeometryExtraction.ShutdownReleasesPendingGraphResidency
+ 34/108 Test  #517: GraphGeometryExtraction.ShutdownReleasesPendingGraphResidency ...........................................   Passed    0.08 sec
+        Start  518: GraphGeometryExtraction.ProceduralRefPreemptsGraphPathOnSameEntity
+ 35/108 Test  #518: GraphGeometryExtraction.ProceduralRefPreemptsGraphPathOnSameEntity ......................................   Passed    0.06 sec
+        Start  519: GraphGeometryExtraction.MissingNodePositionsIncrementsMissingNodesCounter
+ 36/108 Test  #519: GraphGeometryExtraction.MissingNodePositionsIncrementsMissingNodesCounter ...............................   Passed    0.08 sec
+        Start  520: GraphGeometryExtraction.OutOfRangeEdgeIncrementsInvalidEdgesCounter
+ 37/108 Test  #520: GraphGeometryExtraction.OutOfRangeEdgeIncrementsInvalidEdgesCounter .....................................   Passed    0.08 sec
+        Start  521: GraphGeometryExtraction.SurfaceOnlyGraphEntityFailsClosedAsFailedPack
+ 38/108 Test  #521: GraphGeometryExtraction.SurfaceOnlyGraphEntityFailsClosedAsFailedPack ...................................   Passed    0.08 sec
+        Start  522: GraphGeometryExtraction.AddingProceduralRefAfterGraphUploadReleasesGraphResidency
+ 39/108 Test  #522: GraphGeometryExtraction.AddingProceduralRefAfterGraphUploadReleasesGraphResidency .......................   Passed    0.08 sec
+        Start  523: GraphGeometryExtraction.LosingGraphHintReleasesGraphResidency
+ 40/108 Test  #523: GraphGeometryExtraction.LosingGraphHintReleasesGraphResidency ...........................................   Passed    0.08 sec
+        Start  524: GraphGeometryExtraction.GainingLineHintRepacksGraphWithoutDirtyTag
+ 41/108 Test  #524: GraphGeometryExtraction.GainingLineHintRepacksGraphWithoutDirtyTag ......................................   Passed    0.07 sec
+        Start  525: GraphGeometryExtraction.LosingLineHintRepacksGraphWithoutDirtyTag
+ 42/108 Test  #525: GraphGeometryExtraction.LosingLineHintRepacksGraphWithoutDirtyTag .......................................   Passed    0.08 sec
+        Start  526: GraphGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag
+ 43/108 Test  #526: GraphGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag .......................   Passed    0.08 sec
+        Start  544: PointCloudGeometryExtraction.CloudUploadsOnceAndBindsInstanceGeometry
+ 44/108 Test  #544: PointCloudGeometryExtraction.CloudUploadsOnceAndBindsInstanceGeometry ...................................   Passed    0.07 sec
+        Start  545: PointCloudGeometryExtraction.PopulateFromCloudResolvesPointCloudDomainAndUploads
+ 45/108 Test  #545: PointCloudGeometryExtraction.PopulateFromCloudResolvesPointCloudDomainAndUploads ........................   Passed    0.09 sec
+        Start  546: PointCloudGeometryExtraction.RepeatedExtractionReusesPointCloudHandleWithoutReupload
+ 46/108 Test  #546: PointCloudGeometryExtraction.RepeatedExtractionReusesPointCloudHandleWithoutReupload ....................   Passed    0.08 sec
+        Start  547: PointCloudGeometryExtraction.TwoCloudEntitiesAllocateIndependentUploads
+ 47/108 Test  #547: PointCloudGeometryExtraction.TwoCloudEntitiesAllocateIndependentUploads .................................   Passed    0.08 sec
+        Start  548: PointCloudGeometryExtraction.EntityDestructionRetiresPointCloudGeometryAfterDeferredWindow
+ 48/108 Test  #548: PointCloudGeometryExtraction.EntityDestructionRetiresPointCloudGeometryAfterDeferredWindow ..............   Passed    0.09 sec
+        Start  549: PointCloudGeometryExtraction.CacheDestructionToleratesPendingDeferredRetireState
+ 49/108 Test  #549: PointCloudGeometryExtraction.CacheDestructionToleratesPendingDeferredRetireState ........................   Passed    0.08 sec
+        Start  550: PointCloudGeometryExtraction.ShutdownReleasesPendingPointCloudResidency
+ 50/108 Test  #550: PointCloudGeometryExtraction.ShutdownReleasesPendingPointCloudResidency .................................   Passed    0.12 sec
+        Start  551: PointCloudGeometryExtraction.ProceduralRefPreemptsPointCloudPathOnSameEntity
+ 51/108 Test  #551: PointCloudGeometryExtraction.ProceduralRefPreemptsPointCloudPathOnSameEntity ............................   Passed    0.08 sec
+        Start  552: PointCloudGeometryExtraction.MissingPositionsIncrementsMissingPositionsCounter
+ 52/108 Test  #552: PointCloudGeometryExtraction.MissingPositionsIncrementsMissingPositionsCounter ..........................   Passed    0.07 sec
+        Start  553: PointCloudGeometryExtraction.NonFinitePositionIncrementsInvalidPointsCounter
+ 53/108 Test  #553: PointCloudGeometryExtraction.NonFinitePositionIncrementsInvalidPointsCounter ............................   Passed    0.08 sec
+        Start  554: PointCloudGeometryExtraction.PerPointSizeSourceFailsClosedAsFailedPack
+ 54/108 Test  #554: PointCloudGeometryExtraction.PerPointSizeSourceFailsClosedAsFailedPack ..................................   Passed    0.09 sec
+        Start  555: PointCloudGeometryExtraction.AddingProceduralRefAfterUploadReleasesPointCloudResidency
+ 55/108 Test  #555: PointCloudGeometryExtraction.AddingProceduralRefAfterUploadReleasesPointCloudResidency ..................   Passed    0.06 sec
+        Start  556: PointCloudGeometryExtraction.LosingPointHintReleasesPointCloudResidency
+ 56/108 Test  #556: PointCloudGeometryExtraction.LosingPointHintReleasesPointCloudResidency .................................   Passed    0.09 sec
+        Start  557: PointCloudGeometryExtraction.UnsupportedSurfaceAndEdgeHintsFailClosed
+ 57/108 Test  #557: PointCloudGeometryExtraction.UnsupportedSurfaceAndEdgeHintsFailClosed ...................................   Passed    0.09 sec
+        Start  558: PointCloudGeometryExtraction.UnsupportedSurfaceAndEdgeHintsReleasePriorResidency
+ 58/108 Test  #558: PointCloudGeometryExtraction.UnsupportedSurfaceAndEdgeHintsReleasePriorResidency ........................   Passed    0.08 sec
+        Start  559: PointCloudGeometryExtraction.VertexCountChangeFallsBackToFullUpload
+ 59/108 Test  #559: PointCloudGeometryExtraction.VertexCountChangeFallsBackToFullUpload .....................................   Passed    0.08 sec
+        Start  560: PointCloudGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag
+ 60/108 Test  #560: PointCloudGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag ..................   Passed    0.08 sec
+        Start  561: PointCloudGeometryExtraction.SwitchingToUnsupportedSizeSourceReleasesResidency
+ 61/108 Test  #561: PointCloudGeometryExtraction.SwitchingToUnsupportedSizeSourceReleasesResidency ..........................   Passed    0.09 sec
+        Start  629: ProceduralGeometryExtraction.SingleRenderableProducesOneInstanceAndOneGeometry
+ 62/108 Test  #629: ProceduralGeometryExtraction.SingleRenderableProducesOneInstanceAndOneGeometry ..........................   Passed    0.08 sec
+        Start  630: ProceduralGeometryExtraction.TwoRenderablesSharingKeyShareGeometryAndDedup
+ 63/108 Test  #630: ProceduralGeometryExtraction.TwoRenderablesSharingKeyShareGeometryAndDedup ..............................   Passed    0.09 sec
+        Start  631: ProceduralGeometryExtraction.GpuWorldReportsBoundGeometryForProceduralInstance
+ 64/108 Test  #631: ProceduralGeometryExtraction.GpuWorldReportsBoundGeometryForProceduralInstance ..........................   Passed    0.08 sec
+        Start  632: ProceduralGeometryExtraction.AssetAndProceduralSourcesOnSameEntityIncrementConflict
+ 65/108 Test  #632: ProceduralGeometryExtraction.AssetAndProceduralSourcesOnSameEntityIncrementConflict .....................   Passed    0.09 sec
+        Start  633: ProceduralGeometryExtraction.ProceduralSourceClearsSlotSourceAssetSentinel
+ 66/108 Test  #633: ProceduralGeometryExtraction.ProceduralSourceClearsSlotSourceAssetSentinel ..............................   Passed    0.08 sec
+        Start  634: ProceduralGeometryExtraction.EntityDestructionRetiresGeometryAfterDeferredWindow
+ 67/108 Test  #634: ProceduralGeometryExtraction.EntityDestructionRetiresGeometryAfterDeferredWindow ........................   Passed    0.08 sec
+        Start  635: ProceduralGeometryExtraction.RecreateProceduralEntityCancelsRetireAndKeepsHandle
+ 68/108 Test  #635: ProceduralGeometryExtraction.RecreateProceduralEntityCancelsRetireAndKeepsHandle ........................   Passed    0.09 sec
+        Start 1144: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty"
+ 69/108 Test #1144: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty" ......................   Passed    0.09 sec
+        Start 1145: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions"
+ 70/108 Test #1145: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions" ..........   Passed    0.07 sec
+        Start 1146: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes"
+ 71/108 Test #1146: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes" .........   Passed    0.08 sec
+        Start 1147: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords"
+ 72/108 Test #1147: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords" ..........   Passed    0.08 sec
+        Start 1148: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals"
+ 73/108 Test #1148: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals" ............   Passed    0.10 sec
+        Start 1149: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors"
+ 74/108 Test #1149: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors" .............   Passed    0.10 sec
+        Start 1150: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyFaceTopology"
+ 75/108 Test #1150: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyFaceTopology" .............   Passed    0.09 sec
+        Start 1151: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyEdgeTopology"
+ 76/108 Test #1151: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyEdgeTopology" .............   Passed    0.08 sec
+        Start 1152: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty"
+ 77/108 Test #1152: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty" .....................   Passed    0.10 sec
+        Start 1153: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions"
+ 78/108 Test #1153: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions" .........   Passed    0.09 sec
+        Start 1154: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes"
+ 79/108 Test #1154: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes" ........   Passed    0.08 sec
+        Start 1155: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords"
+ 80/108 Test #1155: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords" .........   Passed    0.08 sec
+        Start 1156: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals"
+ 81/108 Test #1156: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals" ...........   Passed    0.09 sec
+        Start 1157: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors"
+ 82/108 Test #1157: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors" ............   Passed    0.09 sec
+        Start 1158: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyEdgeTopology"
+ 83/108 Test #1158: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyEdgeTopology" ............   Passed    0.07 sec
+        Start 1159: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty"
+ 84/108 Test #1159: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty" ................   Passed    0.09 sec
+        Start 1160: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions"
+ 85/108 Test #1160: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions" ....   Passed    0.07 sec
+        Start 1161: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes"
+ 86/108 Test #1161: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes" ...   Passed    0.10 sec
+        Start 1162: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords"
+ 87/108 Test #1162: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords" ....   Passed    0.07 sec
+        Start 1163: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals"
+ 88/108 Test #1163: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals" ......   Passed    0.08 sec
+        Start 1164: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors"
+ 89/108 Test #1164: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors" .......   Passed    0.08 sec
+        Start 3637: GeometryResidencyContract.ValidationFailsClosedWithDeterministicReasons
+ 90/108 Test #3637: GeometryResidencyContract.ValidationFailsClosedWithDeterministicReasons .................................   Passed    0.00 sec
+        Start 3638: GeometryResidencyContract.ReconcileCoversReuseStalePartialAndFullReplacement
+ 91/108 Test #3638: GeometryResidencyContract.ReconcileCoversReuseStalePartialAndFullReplacement ............................   Passed    0.00 sec
+        Start 3639: GeometryResidencyContract.SharedAcquireReleaseAndResurrectionUseOneRetirePath
+ 92/108 Test #3639: GeometryResidencyContract.SharedAcquireReleaseAndResurrectionUseOneRetirePath ...........................   Passed    0.00 sec
+        Start 3640: GeometryResidencyContract.AcquireReportsSaturationWithoutDroppingResidentHandle
+ 93/108 Test #3640: GeometryResidencyContract.AcquireReportsSaturationWithoutDroppingResidentHandle .........................   Passed    0.00 sec
+        Start 3641: GeometryResidencyContract.CopiedPlanDoesNotBorrowSubmissionStorage
+ 94/108 Test #3641: GeometryResidencyContract.CopiedPlanDoesNotBorrowSubmissionStorage ......................................   Passed    0.00 sec
+        Start 3642: GpuWorldCompactionContract.PlanReportsFragmentationAndBlocksWhileFreesArePending
+ 95/108 Test #3642: GpuWorldCompactionContract.PlanReportsFragmentationAndBlocksWhileFreesArePending ........................   Passed    0.00 sec
+        Start 3643: GpuWorldCompactionContract.ApplyRelocationCompactsManagedBufferDiagnostics
+ 96/108 Test #3643: GpuWorldCompactionContract.ApplyRelocationCompactsManagedBufferDiagnostics ..............................   Passed    0.00 sec
+        Start 3644: GpuWorldCompactionContract.DisabledOrBelowThresholdCompactionIsSkipped
+ 97/108 Test #3644: GpuWorldCompactionContract.DisabledOrBelowThresholdCompactionIsSkipped ..................................   Passed    0.00 sec
+        Start 3645: GpuWorldCompactionContract.StaleRelocationPlanIsRejectedWithoutMutation
+ 98/108 Test #3645: GpuWorldCompactionContract.StaleRelocationPlanIsRejectedWithoutMutation .................................   Passed    0.00 sec
+        Start 3646: GpuWorldLifetimeContract.InstanceFreeIsGenerationCheckedAndDeferred
+ 99/108 Test #3646: GpuWorldLifetimeContract.InstanceFreeIsGenerationCheckedAndDeferred .....................................   Passed    0.00 sec
+        Start 3647: GpuWorldLifetimeContract.GeometryOverflowAndStaleHandlesAreDiagnostic
+100/108 Test #3647: GpuWorldLifetimeContract.GeometryOverflowAndStaleHandlesAreDiagnostic ...................................   Passed    0.00 sec
+        Start 3648: GpuWorldLifetimeContract.MixedVertexStridesAreAlignedForChannelBlocks
+101/108 Test #3648: GpuWorldLifetimeContract.MixedVertexStridesAreAlignedForChannelBlocks ...................................   Passed    0.00 sec
+        Start 3649: GpuWorldLifetimeContract.UpdatingSingleVertexChannelWritesOnlyThatChannel
+102/108 Test #3649: GpuWorldLifetimeContract.UpdatingSingleVertexChannelWritesOnlyThatChannel ...............................   Passed    0.00 sec
+        Start 3650: GpuWorldLifetimeContract.ResidencyViewTracksCanonicalSoaContentAndSharedIndexSlice
+103/108 Test #3650: GpuWorldLifetimeContract.ResidencyViewTracksCanonicalSoaContentAndSharedIndexSlice ......................   Passed    0.00 sec
+        Start 3651: GpuWorldLifetimeContract.RejectedUpdatesPreserveResidencyAndStaleViewsClear
+104/108 Test #3651: GpuWorldLifetimeContract.RejectedUpdatesPreserveResidencyAndStaleViewsClear .............................   Passed    0.00 sec
+        Start 3652: GpuWorldLifetimeContract.VertexCountChangeRequiresFullGeometryUpload
+105/108 Test #3652: GpuWorldLifetimeContract.VertexCountChangeRequiresFullGeometryUpload ....................................   Passed    0.00 sec
+        Start 3653: GpuWorldLifetimeContract.NullDeviceModeKeepsCpuLifetimeDiagnosticsObservable
+106/108 Test #3653: GpuWorldLifetimeContract.NullDeviceModeKeepsCpuLifetimeDiagnosticsObservable ............................   Passed    0.00 sec
+        Start 3654: GpuWorldUniformSoAContract.DormantAlternateStoragePlanningSurfaceIsAbsent
+107/108 Test #3654: GpuWorldUniformSoAContract.DormantAlternateStoragePlanningSurfaceIsAbsent ...............................   Passed    0.01 sec
+        Start 3655: GpuWorldUniformSoAContract.VertexFetchProbeRemainsNonAdoptionEvidence
+108/108 Test #3655: GpuWorldUniformSoAContract.VertexFetchProbeRemainsNonAdoptionEvidence ...................................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 108
+
+Label Time Summary:
+contract       =   6.52 sec*proc (103 tests)
+graphics       =   0.06 sec*proc (24 tests)
+integration    =   0.01 sec*proc (5 tests)
+runtime        =   6.46 sec*proc (84 tests)
+
+Total Test time (real) =   6.94 sec
