@@ -3,12 +3,12 @@ task_id: GEOM-062
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T12:41:35Z'
+generated_at: '2026-08-01T12:45:42Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: fb494cfc7cdc319fcb050a73b2e291ff73cc6d1d
-  head_revision: 40c11f49091f475b9ac9a07b435f5de66bd5c837
+  head_revision: 11366d9a772d7312022e55845fda2792dcf6540a
   branch: feature/lop-consolidation-e2e
   worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
   dirty: false
@@ -42,7 +42,7 @@ source:
   - path: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
     sha256: 043ecf83e9d1776b37ab03f7474ce6e4e394e0666db14d6942a7086c8e062740
   - path: tasks/done/GEOM-062-point-set-projection-weighting-kernels.md
-    sha256: 4e7959e54e3b5610970497814c629cc03649fe781aecb3c5f1436e0ef25092b8
+    sha256: 3bfa0d6d2966022b8fd1623a648bb7a736318d99de04798df30f89fb7e443dad
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: da772a41580c231a1becb73ef9b70ecc36d30235bfba41bfcbadbc0a2c3a40de
   - path: tasks/evidence/GEOM-058/commands/aggregate-geometry-review3.json
@@ -201,7 +201,7 @@ source:
     sha256: 72ee70a9241b8bb7397044f7159bbe9d3ecd3cbe3a506b0b1ee3aead36de61f4
   - path: tests/unit/geometry/Test.PointCloudKernels.cpp
     sha256: faa97e2eb36cd027b9136f9b97071c1c615238336c3061bb194a874f3c3d3526
-  content_digest: 54175239e3b8b4d89205117d319738df1c01e067d1728d9c7ddcb644de97c738
+  content_digest: 9cde354428abb1d922c9619cf3ac916d72f9576f0022db60f4d9083f9635c4f0
 touched:
   paths:
   - docs/api/generated/module_inventory.md
@@ -377,7 +377,7 @@ artifacts:
   sha256: 12af3735071129039d3436438bafb35f303b883765500a2c1e271d36cdaa86c8
   kind: file
 - path: tasks/done/GEOM-062-point-set-projection-weighting-kernels.md
-  sha256: 4e7959e54e3b5610970497814c629cc03649fe781aecb3c5f1436e0ef25092b8
+  sha256: 3bfa0d6d2966022b8fd1623a648bb7a736318d99de04798df30f89fb7e443dad
   kind: file
 self_review:
   completed: true
