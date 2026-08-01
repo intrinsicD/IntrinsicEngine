@@ -1,0 +1,38 @@
+schema_version: 1
+task_id: METHOD-018
+run_id: run-001
+attempt_id: attempt-001
+status: initialized
+initialized_at: '2026-08-01T17:14:03Z'
+claim_eligible: true
+protocol_path: tasks/evidence/METHOD-018/experiment/protocol.yaml
+protocol_digest: e71d6ce1bb2315e4d8a4a37b9f9fd9c44874a88da866fc678f4a6249201760b3
+task_path: tasks/done/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md
+task_sha256: 5ff5b05c4892e82ae68ae6144d7cd34bfb2e0ddb6c2d89645fc918da486d1b9a
+source:
+  revision: 840afb7abb1dcf6bad1590d626fb4da8bdc5d329
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml
+  sha256: bca8fdbe4b9782fb9b391321129d52e2aa76633a2c74541d4fb44bd2f2b88e80
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+datasets:
+- id: ear-screening-v1
+  path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: 6d0f83e40de1a51601bd72b3aca0504b11fa417dc90def17a735b6e10de1d5d9
+  split: screening
+- id: ear-confirmation-v1
+  path: benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp
+  sha256: 436f2f7bd95863e3a0f453d24bf2aa293db8ce9798324425db9b9e503ddff60a
+  split: confirmation
+implementation_digest: 126200e42f3d0f6b05250a97c6003ccb2667e8c37154b2303e6c3979d291f143
+command:
+- env
+- GIT_COMMIT=840afb7abb1dcf6bad1590d626fb4da8bdc5d329
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- build/ci/custody/METHOD-018/confirmation-raw
+cell_journal: tasks/evidence/METHOD-018/experiment/runs/run-001/cells.jsonl
+bundle: tasks/evidence/METHOD-018/experiment/runs/run-001/bundle.yaml
+audit: tasks/evidence/METHOD-018/experiment/runs/run-001/audit.json

@@ -509,9 +509,10 @@
   normal contract, preserves the declared dihedral feature contrast, and
   returns the requested progressive-insertion count with explicit fail-closed
   states.
-- **Status**: hypothesis — Clang 23 CPU correctness and serial ASan/UBSan
-  geometry groups pass; frozen claim-grade confirmation and independent audit
-  are pending
+- **Status**: supported — Clang 23 CPU correctness, serial ASan/UBSan geometry
+  groups, and independently accepted schema-v2 claim-grade confirmation
+  evidence; no later-method equivalence, scanner-data generalization,
+  runtime/UI, GPU, optimized-backend, or performance claim
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: The directional-weight or signed bilateral-normal
@@ -524,7 +525,10 @@
   src/geometry/Geometry.PointCloud.Consolidation.cpp,
   src/geometry/Geometry.PointCloud.Kernels.cpp,
   tests/unit/geometry/Test.PointCloudConsolidation.cpp,
-  benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml]
+  benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml,
+  tasks/evidence/METHOD-018/experiment/inputs/benchmark_result.json,
+  tasks/evidence/METHOD-018/experiment/runs/run-001/bundle.yaml,
+  tasks/evidence/METHOD-018/experiment/runs/run-001/audit.json]
 - **Dependencies**: [C17]
 - **Tags**: geometry, point cloud, EAR, anisotropic WLOP, CPU reference,
   deterministic

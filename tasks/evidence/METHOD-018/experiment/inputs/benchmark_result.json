@@ -1,0 +1,93 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.edge_aware_resampling.reference.smoke",
+  "claim_eligible": true,
+  "commit": "840afb7abb1dcf6bad1590d626fb4da8bdc5d329",
+  "config_digest": "c94a728a4f6e1f6dd255ad40db8379a3cb1497cac278f4e29dedcb0f25120ebc",
+  "dataset": "builtin.noisy_dihedral.ear.confirmation.v1",
+  "diagnostics": {
+    "anisotropic_expected_plane_error": 0.007731229,
+    "anisotropic_iterations": 3,
+    "deterministic": true,
+    "edge_priority_evaluations": 21224,
+    "edge_sharpness_preservation": 0.170329368,
+    "failure_status": "normals_required",
+    "input_point_count": 72,
+    "inserted_near_feature_count": 8,
+    "inserted_point_count": 8,
+    "isotropic_expected_plane_error": 0.009318431,
+    "measured_iterations": 4,
+    "mode": "correctness_smoke",
+    "normal_angular_error_radians": 8e-09,
+    "normal_refinement_iterations": 3,
+    "normal_source": "authored",
+    "output_point_count": 80,
+    "raw_expected_plane_error": 0.009319444,
+    "runner": "IntrinsicBenchmarkSmoke",
+    "strategies": [
+      "wlop_isotropic",
+      "wlop_anisotropic",
+      "ear"
+    ],
+    "uniformity_min_pairwise_distance": 0.006970663,
+    "used_authored_normals": true,
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml",
+    "sha256": "bca8fdbe4b9782fb9b391321129d52e2aa76633a2c74541d4fb44bd2f2b88e80"
+  },
+  "method": "geometry.edge_aware_resampling",
+  "metrics": {
+    "quality_error_l2": 0.007731229,
+    "runtime_ms": 299.2982525
+  },
+  "resolved_params": {
+    "edge_sensitivity": 5,
+    "intent": "correctness",
+    "isotropic_contrast_strategy": "wlop",
+    "measured_iterations": 4,
+    "normal_angle_degrees": 15,
+    "normal_source": "authored",
+    "seed": 53,
+    "strategy": "ear",
+    "support_radius": 0.62,
+    "target_insertions": 8,
+    "warmup_iterations": 1
+  },
+  "run_id": "run-001",
+  "schema_version": 2,
+  "source": {
+    "revision": "840afb7abb1dcf6bad1590d626fb4da8bdc5d329",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 1000,
+      "metric": "runtime_ms",
+      "observed": 299.2982525,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 0.03,
+      "metric": "quality_error_l2",
+      "observed": 0.007731229,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 0.03,
+    "smoke_runtime_ms_max": 1000
+  },
+  "warmup_policy": {
+    "measured_iterations": 4,
+    "warmup_iterations": 1
+  }
+}

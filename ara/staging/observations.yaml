@@ -1399,10 +1399,10 @@ observations:
       oriented-normal policy, bilateral refinement, anisotropic projection,
       progressive insertion, and explicit failure diagnostics.
     context: >
-      Unit screening and the raw disjoint confirmation preflight pass the
-      frozen edge, flat-region, exact-count, uniformity, normal-source, and
-      failure gates. Promotion from hypothesis to supported remains contingent
-      on the claim-grade sealed run and independent custody audit.
+      Unit screening and the independently accepted disjoint confirmation run
+      pass the frozen edge, flat-region, exact-count, uniformity,
+      normal-source, and failure gates. The audit recomputes quality-error L2
+      `0.007731229 <= 0.03` at the exact clean source revision.
     potential_type: claim
     bound_to: [N312, N313]
     promoted: true
