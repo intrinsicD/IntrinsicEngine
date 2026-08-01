@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 911,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T05:12:20Z",
+  "label": "corrected-doc-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T05:12:19Z",
+  "stderr_path": "tasks/evidence/RUNTIME-202/commands/corrected-doc-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-202/commands/corrected-doc-links.stdout.log",
+  "stdout_sha256": "0d799864814c743a52cd0be7fd4dce3b8db2e788acd76aa028894724b8f8596e",
+  "task_id": "RUNTIME-202"
+}

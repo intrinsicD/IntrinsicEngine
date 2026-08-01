@@ -63,8 +63,10 @@ rejects the engine-config hot apply without clearing a previously active recipe
 override. Applying an empty path clears the active override and returns to the
 derived default frame recipe.
 
-`Extrinsic.Runtime.SandboxConfigSections` owns the typed codecs for the current
-two Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
+`Extrinsic.Runtime.ClusteringConfig`,
+`Extrinsic.Runtime.ProgressivePoissonConfig`, and
+`Extrinsic.Runtime.ParameterizationConfig` own the typed codecs for the current
+three Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
 registrations in the application before config boot. The
 `sandbox.progressive_poisson` payload carries the interactive playground's
 reference-sampler knobs, prefix/color-channel selection, mesh surface-sampling
@@ -111,11 +113,13 @@ unchanged.
 ## UI And Agent Parity
 
 `Extrinsic.Sandbox.Editor.Shell` keeps the ImGui widget and draft-buffer
-state. Its `Runtime::SandboxEditorSession` prepares an attachment-guarded
-`SandboxEditorContext` through
-`Extrinsic.Runtime.SandboxEditorFacades`; the shell's preview and
-activation handlers call the same callbacks carried by that context after the
-session resolves `EngineConfigControl` from `Engine::Services()`:
+state. Its `Runtime::EditorWorkspaceAttachment` carries the opaque attachment
+epoch. `PrepareEditorWorkspaceSnapshotFrame(...)` and the four feature-owned
+preparation functions produce attachment-guarded command/query handles and
+copied snapshots; the shell composes them into its private `SandboxPreparedFrame`.
+Its preview and activation handlers call the same typed runtime operations
+after feature preparation resolves `EngineConfigControl` from
+`Engine::Services()`:
 
 - preview routes to
   `EngineConfigControl::PreviewRenderRecipeConfigDocument`;
@@ -125,13 +129,13 @@ session resolves `EngineConfigControl` from `Engine::Services()`:
 - progressive-Poisson knob edits route to
   `EngineConfigControl::PreviewEngineConfigControlDocument` and
   `EngineConfigControl::ApplyEngineConfigHotSubset` with
-  `RuntimeConfigControlSource::Editor`; the facade updates the typed draft
+  `RuntimeConfigControlSource::Editor`; the geometry operation updates the typed draft
   through `SetProgressivePoissonPlaygroundConfig`.
 - The parameterization panel delivered by retired `UI-036` routes strategy,
   value, render-mode, background, and heatmap edits through those same
   engine-config preview/apply methods with
   `RuntimeConfigControlSource::Editor` after
-  `SetParameterizationConfig`; the configured parameterization facade and
+  `SetParameterizationConfig`; the configured parameterization operation and
   UV-view request path consume the resulting live config.
 - The existing `view.frame_graph` panel reads
   `render.enable_gpu_profiling` from the control state and routes its toggle
@@ -143,15 +147,15 @@ session resolves `EngineConfigControl` from `Engine::Services()`:
 
 Agent/CLI callers use the same `EngineConfigControl` methods with
 `RuntimeConfigControlSource::AgentCli` or
-`RuntimeRenderRecipeActivationSource::AgentCli`. The facade is CPU/headless and
+`RuntimeRenderRecipeActivationSource::AgentCli`. The operation lane is CPU/headless and
 does not require any ImGui frame. If the module is omitted, editor recipe and
 engine-config states are null, their command callbacks remain empty, and both
 availability flags are false. Boot or programmatic profiling config remains
 effective without composing the editor UI.
 
-## Parameterization Editor Facade
+## Parameterization Editor Operation
 
-`Extrinsic.Runtime.SandboxEditorFacades` exposes the CPU parameterization
+`Extrinsic.Runtime.GeometryProcessingOperations` exposes the CPU parameterization
 operation through the existing editor/session context. The direct command
 accepts a typed `Runtime::ParameterizationConfig` and fails closed on
 invalid values; the configured command reads

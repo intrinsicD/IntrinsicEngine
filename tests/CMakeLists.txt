@@ -231,19 +231,6 @@ intrinsic_test_object_lib(EcsContractTestObjs
 # so they live in a dedicated CPU-only contract executable rather than the
     # broader runtime/graphics integration targets.
 if(TARGET ExtrinsicRuntime)
-    set(_runtime_unit_test_files
-        Test.RegistrationAlignment.cpp
-    )
-    intrinsic_resolve_test_sources(_runtime_unit_test_sources
-        SEARCH_DIRS unit/runtime
-        FILES ${_runtime_unit_test_files}
-    )
-    intrinsic_test_object_lib(RuntimeUnitTestObjs
-        SOURCES
-            ${_runtime_unit_test_sources}
-        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json glm::glm
-    )
-
     set(_runtime_contract_test_files
         Test.CoreGraphInterfaces.cpp
         Test.GpuAssetCacheFallbackBootstrap.cpp
@@ -270,13 +257,13 @@ if(TARGET ExtrinsicRuntime)
         Test.GeometryAvailability.cpp
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
-        Test.ParameterizationFacade.cpp
+        Test.ParameterizationOperations.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
         Test.ProceduralGeometryExtraction.cpp
         Test.CameraModule.cpp
         Test.RuntimeCameraControllers.cpp
-        Test.RuntimeConfigControlFacade.cpp
+        Test.RuntimeConfigControl.cpp
         Test.RuntimeEngineConfigBoot.cpp
         Test.RuntimeEngineLayering.cpp
         Test.RuntimeEnginePrivateGlue.cpp
@@ -1484,6 +1471,9 @@ set(_intrinsic_multiworker_test_budgets
     "IntrinsicRuntimeIntegrationTests|FrameGraphParallel.MainThreadOnlyPassRunsOnCallerThread|4"
     "IntrinsicRuntimeIntegrationTests|FrameGraphParallel.GraphLocalCompletionDoesNotWaitForUnrelatedSchedulerWork|4"
     "IntrinsicRuntimeIntegrationTests|CoreTaskGraphStress.WideGraphExecutesAcrossWorkerThreads|4"
+    "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply|3"
+    "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.QueuedImportRejectsAwayAndBackBindingEpoch|3"
+    "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.RetiredWorldImportTerminalizesQueueState|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication|3"

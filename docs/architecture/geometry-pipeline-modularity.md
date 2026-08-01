@@ -42,12 +42,12 @@ is even imported but only supplies a shared *result* struct
 (`Geometry.MeshOperator.cppm:25`), not an operator abstraction — a signal of an
 abandoned operator migration.)
 
-ARCH-006 has since moved ImGui state, widgets, and registration into
-`Extrinsic.Sandbox.Editor.Shell` and the app-owned panel modules. The
-algorithm catalog, deterministic panel models, and typed command execution
-remain runtime-owned in `Extrinsic.Runtime.SandboxEditorFacades`. The
-remaining modularity concern is therefore the breadth of that runtime facade,
-not runtime ownership of Sandbox presentation.
+ARCH-006 moved ImGui state, widgets, and registration into
+`Extrinsic.Sandbox.Editor.Shell` and the app-owned panel modules. RUNTIME-202
+then split the runtime side into `EditorWorkspaceSnapshots` plus focused
+`GeometryProcessingOperations` and sibling feature modules. The app owns the
+Sandbox context/frame composition; runtime continues to own deterministic
+snapshots, validation, and typed execution.
 
 **Registration is monolithic.** `Geometry::Registration::AlignICP`
 (`Geometry.Registration.cppm:145`) is a single rigid-only free function whose
@@ -155,7 +155,7 @@ family*, not a universal DAG engine.
 | Data-driven **param schema** (key/type/default/label/range) | **geometry-local** initially; promote to `core` on a second consumer | new `Geometry.Registration` descriptor types |
 | GPU-capable overloads + `IDevice::IsOperational()` fallback | **runtime** | `Runtime.RegistrationBackend`; a feature-owned typed service with private backend state should follow the `ClusteringModule` pattern when registration gains a durable runtime owner |
 | Heavy/async execution (large clouds, coarse RANSAC, BVH builds) | **runtime** | `Runtime.JobService` (do not invent another graph system) |
-| Runtime panel model + typed command facade | **runtime** | `Extrinsic.Runtime.SandboxEditorFacades`; split focused private implementation units as families grow |
+| Runtime geometry snapshot + typed operation | **runtime** | `Extrinsic.Runtime.GeometryProcessingOperations`; attachment lifetime comes from `Extrinsic.Runtime.EditorWorkspaceAttachment`, while copied workspace snapshots/queries come from `Extrinsic.Runtime.EditorWorkspaceSnapshots` |
 | UI (thin schema-reflecting adapter) | **app** | `Extrinsic.Sandbox.Editor.MeshProcessingPanels`, registered through `Extrinsic.Sandbox.Editor.Shell` |
 | Serializable pipeline config (files/CLI/agent lane) | **runtime** | route through the `Engine` preview→apply facade with `RuntimeConfigControlSource` |
 | Named papers (TEASER, FGR, CPD, non-rigid) | **methods** | `methods/geometry/…` + `method.yaml`, under the method contract |
@@ -320,11 +320,11 @@ represent the deformation — there the trace gains a deformed-positions span
 (pointing at the buffer the deformation solve already fills), still with no extra
 compute when observing.
 
-The runtime-side consumer is `Extrinsic.Runtime.RegistrationAlignment`
-(`runtime -> geometry`): `AlignPointClouds(...)` runs `AlignICP` with a
-trace-collecting observer and returns the final result plus the full
-per-iteration trajectory, and `TrajectoryPose(outcome, index)` yields the
-renderer-facing `glm::mat4` to preview at each step (identity at step 0). The
+The runtime-side consumer is the typed `ApplyEditorRegistrationCommand` path in
+`Extrinsic.Runtime.GeometryProcessingOperations` (`runtime -> geometry`). Its
+private implementation runs `AlignICP` with a trace-collecting observer and
+selects the requested trajectory pose; no standalone runtime alignment module,
+result vocabulary, or direct helper test remains. The
 Sandbox editor panel that lets a user select two point clouds, run registration,
 and scrub the convergence with a slider is tracked by
 [`UI-029`](../../tasks/archive/UI-029-editor-registration-convergence-visualization.md).
@@ -476,17 +476,15 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
    Mitigation: concrete-first (§3.1); Slice 0 changes zero behavior; the shared
    contract is extracted only on the second family's demonstrated need (Slice 7).
 2. **Layering.** Keep the driver + kernels `geometry -> core`; ECS/`Dirty` and
-   GPU wiring stay in `runtime`, while Sandbox UI consumes runtime facade data
+   GPU wiring stay in `runtime`, while Sandbox UI consumes runtime snapshot data
    from `app`; `check_layering.py --strict` gates it. The
    `ParamSchema` must use `core`-or-geometry-local types only — no runtime/UI
    types leaking downward.
-3. **Facade re-concentration.** ARCH-006 retired the runtime-owned presentation
-   god-file, but the current `Runtime.SandboxEditorFacades.cpp` still carries
-   a broad catalog/model/command implementation. Mitigation: keep
-   `DrawParamSchema` and controller state in the app panel, keep the typed
-   model/command contract in runtime, and split runtime implementation units by
-   result-consumer family as they grow. The clean-workshop review gate catches
-   renewed god-file accumulation.
+3. **Feature re-concentration.** RUNTIME-202 removed the public all-feature
+   facade and split public imports by feature owner. Keep app composition in the
+   Sandbox panel modules, keep typed geometry operations in
+   `GeometryProcessingOperations`, and prevent app imports of the shared runtime
+   detail BMI. The clean-workshop review gate catches renewed concentration.
 4. **Determinism / reproducibility.** Coarse RANSAC and subsampling introduce
    randomness; geometry-api-style and `AGENTS.md` §7 require seeded,
    platform-documented, order-stable results. `Features::CoarseAlignmentParams`
@@ -518,9 +516,15 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
 - `Geometry.Registration.cppm:73` / `:145` — `RegistrationParams`/`AlignICP` to extend.
 - `Geometry.PointCloud.Features.cppm:184` — the coarse-align seam to glue in.
 - `Geometry.KMeans.cppm` + [algorithm-variant-dispatch.md](algorithm-variant-dispatch.md) — the Strategy×Backend telemetry to adopt.
-- `src/runtime/Runtime.SandboxEditorFacades.cppm` and
-  `src/runtime/Runtime.SandboxEditorFacades.cpp` — the current runtime-owned
-  algorithm catalog, capability model, and typed command facade.
+- `src/runtime/Runtime.GeometryProcessingOperations.cppm` and
+  `src/runtime/Runtime.GeometryProcessingOperations.cpp` — the runtime-owned
+  algorithm catalog, capability snapshots, and typed operations.
+- `src/runtime/Runtime.GeometryProcessingOperations.cpp` and
+  `src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp` — typed geometry
+  operations, including the ICP observer and mesh-processing executors.
+- `src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp` and
+  `src/runtime/internal/Runtime.EditorWorkspaceSession.cpp` — presentation-free
+  workspace model assembly and the bounded attachment/job-result lifecycle.
 - `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp` — the current
   app-owned registration presentation/controller.
 - Historical pre-ARCH-006 anchor: the retired

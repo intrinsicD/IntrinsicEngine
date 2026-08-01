@@ -7446,3 +7446,43 @@ tree:
       adversarial reproductions now fail closed. Independent acceptance and
       BUG-120 remain separate open gates.
     status: resolved
+  - id: N312
+    type: question
+    title: "Reconcile the remaining runtime backlog"
+    provenance: user
+    timestamp: "2026-08-01T01:15+02:00"
+    description: >
+      Determine whether active and backlog runtime tasks still form one
+      coherent architecture sequence, contradict current evidence or ownership,
+      or should be narrowed, replaced, or retired as obsolete work.
+    status: open
+  - id: N313
+    type: experiment
+    title: "Audit remaining runtime tasks against current source and evidence"
+    provenance: ai-executed
+    timestamp: "2026-08-01T01:15+02:00"
+    also_depends_on: [N312]
+    evidence:
+      - "tasks/active/RUNTIME-202-retire-sandbox-runtime-facade.md"
+      - "tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md"
+      - "tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md"
+      - "tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md"
+      - "tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md"
+      - "tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md"
+      - "docs/reports/2026-07-05-ui-030-frame-pacing-diagnostics.md"
+      - "docs/adr/0022-vertex-storage-soa-per-channel-streaming.md"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict: 178 tasks, 0 findings"
+      - "python3 tools/agents/check_task_policy.py --root . --strict: 0 findings"
+      - "python3 tools/agents/generate_session_brief.py --check: current"
+      - "python3 tools/repo/check_layering.py --root src --strict: 735 files, 0 violations"
+    result: >
+      The formal DAG, task policy, generated session brief, and layer graph are
+      valid, but the semantic audit found stale or circular scope: RUNTIME-138's
+      broad async umbrella lacks a measured bottleneck; RUNTIME-139 lacks its
+      required GPU/profile adoption gate; RUNTIME-175 assigns its config value
+      to the wrong layer and makes UI parity circular; RUNTIME-189 predates the
+      method's positive killing result and concrete result contract; and
+      RUNTIME-203 includes shared or volatile modules that fail its own
+      one-consumer premise. RUNTIME-202 remains the necessary convergence task
+      but its in-progress surface still requires a deletion/locality check.
+    status: resolved

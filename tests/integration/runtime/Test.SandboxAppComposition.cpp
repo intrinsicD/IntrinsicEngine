@@ -723,12 +723,12 @@ TEST(SandboxAppComposition, DefaultFocusLifecycleIsPrivateAndTransactional)
     const std::string appCMake =
         WithoutWhitespace(
             ReadRepositoryTextFile("src/app/Sandbox/CMakeLists.txt"));
-    const std::string policy =
+    const std::string focusContract =
         WithoutWhitespace(ReadRepositoryTextFile(
-            "src/runtime/Runtime.SandboxDefaultPolicies.cpp"));
-    const std::string facade =
+            "src/runtime/Cameras/Runtime.CameraFocusCommand.cppm"));
+    const std::string focusImplementation =
         WithoutWhitespace(ReadRepositoryTextFile(
-            "src/runtime/Runtime.SandboxEditorFacades.cppm"));
+            "src/runtime/Cameras/Runtime.CameraFocusCommand.cpp"));
     const std::string app =
         WithoutWhitespace(
             ReadRepositoryTextFile("src/app/Sandbox/Sandbox.cpp"));
@@ -736,43 +736,24 @@ TEST(SandboxAppComposition, DefaultFocusLifecycleIsPrivateAndTransactional)
     EXPECT_FALSE(std::filesystem::exists(
         std::filesystem::path{ENGINE_ROOT_DIR} /
         "src/runtime/Runtime.SandboxDefaultPolicies.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        std::filesystem::path{ENGINE_ROOT_DIR} /
+        "src/runtime/Runtime.SandboxDefaultPolicies.cpp"));
     EXPECT_EQ(
         runtimeCMake.find("Runtime.SandboxDefaultPolicies.cppm"),
         std::string::npos);
-    const auto runtimePrivate =
-        runtimeCMake.find(
-            "PRIVATEFILE_SETrender_extraction_impl");
-    const auto retainedPolicy =
-        runtimeCMake.find("Runtime.SandboxDefaultPolicies.cpp");
-    ASSERT_NE(runtimePrivate, std::string::npos);
-    ASSERT_NE(retainedPolicy, std::string::npos);
-    EXPECT_GT(retainedPolicy, runtimePrivate);
+    EXPECT_EQ(
+        runtimeCMake.find("Runtime.SandboxDefaultPolicies.cpp"),
+        std::string::npos);
     EXPECT_NE(
-        policy.find(
-            "moduleExtrinsic.Runtime.SandboxEditorFacades;"),
+        focusContract.find("MakeFocusCameraOnSelectionInputAction("),
+        std::string::npos);
+    EXPECT_NE(
+        focusImplementation.find("MakeFocusCameraOnSelectionInputAction("),
         std::string::npos);
     EXPECT_EQ(
-        policy.find("Extrinsic.Runtime.SandboxDefaultPolicies"),
+        focusContract.find("MakeSandboxDefaultFocusInputAction"),
         std::string::npos);
-    EXPECT_EQ(policy.find("Engine&"), std::string::npos);
-    EXPECT_EQ(
-        policy.find("importExtrinsic.Runtime.Engine"),
-        std::string::npos);
-
-    EXPECT_EQ(
-        facade.find("MakeSandboxDefaultImportAuthoringPolicies"),
-        std::string::npos);
-    EXPECT_EQ(
-        facade.find("MakeSandboxDefaultImportCompletedHandler"),
-        std::string::npos);
-    EXPECT_EQ(
-        facade.find("MakeSandboxDefaultDirectMeshPostProcessor"),
-        std::string::npos);
-    EXPECT_EQ(
-        CountOccurrences(
-            facade,
-            "MakeSandboxDefaultFocusInputAction"),
-        1u);
 
     EXPECT_EQ(
         app.find("RuntimeSandboxDefaultPolicyRegistration"),
@@ -783,6 +764,13 @@ TEST(SandboxAppComposition, DefaultFocusLifecycleIsPrivateAndTransactional)
     EXPECT_NE(
         app.find("structSandboxDefaultPolicyHandles"),
         std::string::npos);
+    EXPECT_NE(
+        app.find("MakeFocusCameraOnSelectionInputAction("),
+        std::string::npos);
+    EXPECT_NE(
+        app.find("Sandbox.DefaultFocusCameraOnSelection"),
+        std::string::npos);
+    EXPECT_NE(app.find(".KeyCode='F'"), std::string::npos);
     EXPECT_EQ(
         app.find("RegisterImportEntityAuthoringPolicy"),
         std::string::npos);

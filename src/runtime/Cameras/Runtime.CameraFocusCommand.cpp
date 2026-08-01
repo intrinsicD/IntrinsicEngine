@@ -6,6 +6,8 @@ module;
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -14,10 +16,13 @@ module;
 
 module Extrinsic.Runtime.CameraFocusCommand;
 
+import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Sphere;
 
@@ -139,5 +144,52 @@ namespace Extrinsic::Runtime
             entities.push_back(SelectionController::ToEntityHandle(stableId));
 
         return FocusCameraOnEntities(cameras, scene, entities, slot);
+    }
+
+    RuntimeInputActionDesc MakeFocusCameraOnSelectionInputAction(
+        CameraControllerRegistry& cameras,
+        SelectionController& selection,
+        std::string debugName,
+        const RuntimeInputActionBinding binding)
+    {
+        return RuntimeInputActionDesc{
+            .DebugName = std::move(debugName),
+            .Binding = binding,
+            .Execute =
+                [camera = &cameras, selected = &selection](
+                    const RuntimeInputActionContext& context,
+                    RuntimeInputActionServices& services)
+                {
+                    if (services.Scene == nullptr ||
+                        services.RenderInput == nullptr ||
+                        services.Config == nullptr)
+                    {
+                        return Core::Err(Core::ErrorCode::InvalidState);
+                    }
+
+                    if (!services.Config->Camera.Enabled)
+                        return Core::Ok();
+
+                    if (!FocusCameraOnSelection(
+                            *camera,
+                            *selected,
+                            *services.Scene,
+                            CameraControllerSlot::Main))
+                    {
+                        return Core::Ok();
+                    }
+
+                    if (ICameraController* focused =
+                            camera->ResolveOrNull(CameraControllerSlot::Main))
+                    {
+                        services.RenderInput->Camera =
+                            focused->GetView(context.Viewport);
+                        services.RenderInput->Camera.ExplicitCameraTransition =
+                            camera->ConsumeCameraTransition(
+                                CameraControllerSlot::Main);
+                    }
+                    return Core::Ok();
+                },
+        };
     }
 } // namespace Extrinsic::Runtime

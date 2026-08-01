@@ -26,7 +26,13 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderArtifactPublication;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.TextureBakeModule;
 
 namespace Extrinsic::Sandbox::Editor
@@ -51,9 +57,9 @@ namespace Extrinsic::Sandbox::Editor
         using namespace Extrinsic::Runtime;
 
         using VisualizationColorSource =
-            decltype(SandboxEditorVisualizationConfigModel{}.Source);
+            decltype(EditorVisualizationConfigModel{}.Source);
         using ColormapType =
-            decltype(SandboxEditorVisualizationConfigModel{}.ScalarColormap);
+            decltype(EditorVisualizationConfigModel{}.ScalarColormap);
         inline constexpr VisualizationColorSource kUniformColorSource =
             static_cast<VisualizationColorSource>(1);
         inline constexpr VisualizationColorSource kScalarFieldSource =
@@ -119,7 +125,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct TextureBakeUiState
         {
-            std::optional<SandboxEditorUvRegenerationCommandResult>*
+            std::optional<EditorUvRegenerationCommandResult>*
                 LastUvRegenerationResult{nullptr};
             std::int32_t* SourceIndex{nullptr};
             std::int32_t* TargetSemanticIndex{nullptr};
@@ -137,15 +143,15 @@ namespace Extrinsic::Sandbox::Editor
             bool* UvPreserveAuthored{nullptr};
         };
 
-        [[nodiscard]] std::span<const SandboxEditorTextureBakeTarget>
+        [[nodiscard]] std::span<const EditorTextureBakeTarget>
         TextureBakeTargetsFor(
-                const SandboxEditorTextureBakeControlsModel& model,
+                const EditorTextureBakeControlsModel& model,
                 const std::string_view outputName)
         {
             const auto found = std::ranges::find(
                 model.TextureBakeTargets,
                 outputName,
-                &SandboxEditorTextureBakeTargetSnapshot::OutputName);
+                &EditorTextureBakeTargetSnapshot::OutputName);
             if (found == model.TextureBakeTargets.end())
                 return {};
             return found->Targets;
@@ -189,11 +195,11 @@ namespace Extrinsic::Sandbox::Editor
         using BuiltinWindowHandles =
             std::array<EditorWindowHandle, kBuiltinWindows.size()>;
 
-        [[nodiscard]] SandboxEditorModelBuildRequest BuildModelRequest(
+        [[nodiscard]] EditorWorkspaceSnapshotRequest BuildModelRequest(
             const EditorWindowRegistry& registry,
             const BuiltinWindowHandles& builtinHandles)
         {
-            SandboxEditorModelBuildRequest request{};
+            EditorWorkspaceSnapshotRequest request{};
             request.Hierarchy = registry.IsOpen(builtinHandles[1u]);
             request.Inspector = registry.IsOpen(builtinHandles[2u]);
             request.Selection = registry.IsOpen(builtinHandles[3u]);
@@ -201,14 +207,14 @@ namespace Extrinsic::Sandbox::Editor
             return request;
         }
 
-        [[nodiscard]] SandboxEditorVisualizationConfigCommand
+        [[nodiscard]] EditorVisualizationConfigCommand
         MakeUniformVisualizationConfigCommandFromModel(
             const std::uint32_t stableEntityId,
-            const SandboxEditorVisualizationConfigModel& model,
-            const SandboxEditorVisualizationTarget target,
+            const EditorVisualizationConfigModel& model,
+            const EditorVisualizationTarget target,
             const glm::vec4 color)
         {
-            return SandboxEditorVisualizationConfigCommand{
+            return EditorVisualizationConfigCommand{
                 .StableEntityId = stableEntityId,
                 .Target = target,
                 .EnableConfig = true,
@@ -230,13 +236,13 @@ namespace Extrinsic::Sandbox::Editor
             };
         }
 
-        [[nodiscard]] SandboxEditorVisualizationConfigCommand
+        [[nodiscard]] EditorVisualizationConfigCommand
         MakeScalarVisualizationConfigCommandFromModel(
             const std::uint32_t stableEntityId,
-            const SandboxEditorVisualizationConfigModel& model,
-            const SandboxEditorVisualizationTarget target)
+            const EditorVisualizationConfigModel& model,
+            const EditorVisualizationTarget target)
         {
-            return SandboxEditorVisualizationConfigCommand{
+            return EditorVisualizationConfigCommand{
                 .StableEntityId = stableEntityId,
                 .Target = target,
                 .EnableConfig = true,
@@ -258,18 +264,18 @@ namespace Extrinsic::Sandbox::Editor
             };
         }
 
-        void DrawDiagnostics(const std::vector<SandboxEditorDiagnostic>& diagnostics)
+        void DrawDiagnostics(const std::vector<EditorDiagnostic>& diagnostics)
         {
-            for (const SandboxEditorDiagnostic& diagnostic : diagnostics)
+            for (const EditorDiagnostic& diagnostic : diagnostics)
             {
                 ImGui::TextDisabled("%s: %s",
-                                    DebugNameForSandboxEditorDiagnosticCode(diagnostic.Code),
+                                    DebugNameForEditorDiagnosticCode(diagnostic.Code),
                                     diagnostic.Message.c_str());
             }
         }
 
         [[nodiscard]] std::string ProgressOverlayText(
-            const SandboxEditorAssetImportQueueRow& row)
+            const EditorAssetImportQueueRow& row)
         {
             if (!row.ProgressDeterminate)
             {
@@ -281,7 +287,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawAssetImportQueue(
-            const SandboxEditorAssetImportQueueModel& model,
+            const EditorAssetImportQueueModel& model,
             const SandboxEditorContext* context)
         {
             ImGui::SeparatorText("AssetIO Queue");
@@ -336,7 +342,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TableSetupColumn("Cancel");
                 ImGui::TableHeadersRow();
 
-                for (const SandboxEditorAssetImportQueueRow& row : model.Rows)
+                for (const EditorAssetImportQueueRow& row : model.Rows)
                 {
                     ImGui::PushID(static_cast<int>(row.Sequence));
                     ImGui::TableNextRow();
@@ -347,7 +353,7 @@ namespace Extrinsic::Sandbox::Editor
 
                     ImGui::TableSetColumnIndex(1);
                     ImGui::TextUnformatted(
-                        DebugNameForSandboxEditorAssetPayloadKind(row.PayloadKind));
+                        DebugNameForEditorAssetPayloadKind(row.PayloadKind));
 
                     ImGui::TableSetColumnIndex(2);
                     ImGui::TextUnformatted(row.PathBasename.c_str());
@@ -500,17 +506,17 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawDomainMenu(
-            const SandboxEditorDomainWindowKind kind,
+            const EditorDomainWindowKind kind,
             EditorWindowRegistry* windowRegistry,
             const std::vector<EditorWindowMenuEntry>* registeredEntries)
         {
-            if (!ImGui::BeginMenu(DebugNameForSandboxEditorDomainWindowKind(kind)))
+            if (!ImGui::BeginMenu(DebugNameForEditorDomainWindowKind(kind)))
                 return;
 
             if (windowRegistry != nullptr && registeredEntries != nullptr)
             {
                 std::vector<std::string> registeredPath{
-                    DebugNameForSandboxEditorDomainWindowKind(kind)};
+                    DebugNameForEditorDomainWindowKind(kind)};
                 DrawRegisteredWindowMenuTree(
                     *windowRegistry,
                     *registeredEntries,
@@ -555,15 +561,15 @@ namespace Extrinsic::Sandbox::Editor
                 windowRegistry != nullptr ? &registeredEntries : nullptr;
             DrawPanelWindowMenu(windowRegistry, registeredEntriesPtr);
             DrawDomainMenu(
-                SandboxEditorDomainWindowKind::PointCloud,
+                EditorDomainWindowKind::PointCloud,
                 windowRegistry,
                 registeredEntriesPtr);
             DrawDomainMenu(
-                SandboxEditorDomainWindowKind::Graph,
+                EditorDomainWindowKind::Graph,
                 windowRegistry,
                 registeredEntriesPtr);
             DrawDomainMenu(
-                SandboxEditorDomainWindowKind::Mesh,
+                EditorDomainWindowKind::Mesh,
                 windowRegistry,
                 registeredEntriesPtr);
             if (windowRegistry != nullptr)
@@ -585,7 +591,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawBoundRenderStateRows(
-            const SandboxEditorBoundRenderStateModel& bound)
+            const EditorBoundRenderStateModel& bound)
         {
             ImGui::SeparatorText("Bound render state");
             ImGui::Text("Rows: %zu generation=%llu",
@@ -616,7 +622,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TableSetupColumn("Diagnostic");
                 ImGui::TableHeadersRow();
 
-                for (const SandboxEditorBoundRenderStateRow& row :
+                for (const EditorBoundRenderStateRow& row :
                      bound.Rows)
                 {
                     const std::string laneText{ToString(row.Lane)};
@@ -628,7 +634,7 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
                     ImGui::TextUnformatted(
-                        DebugNameForSandboxEditorBoundRenderStateRowKind(row.Kind));
+                        DebugNameForEditorBoundRenderStateRowKind(row.Kind));
                     ImGui::TableSetColumnIndex(1);
                     ImGui::TextUnformatted(laneText.c_str());
                     ImGui::TableSetColumnIndex(2);
@@ -649,7 +655,7 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::TextDisabled("-");
                     }
                     ImGui::TableSetColumnIndex(6);
-                    if (row.Kind == SandboxEditorBoundRenderStateRowKind::DerivedJob)
+                    if (row.Kind == EditorBoundRenderStateRowKind::DerivedJob)
                     {
                         ImGui::Text("%s %.2f",
                                     std::string(ToString(row.JobStatus)).c_str(),
@@ -679,13 +685,13 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawUvRegenerationStatus(
-            const SandboxEditorUvDiagnosticsModel& uv,
-            const std::optional<SandboxEditorUvRegenerationCommandResult>&
+            const EditorUvDiagnosticsModel& uv,
+            const std::optional<EditorUvRegenerationCommandResult>&
                 lastResult)
         {
             if (uv.UvRegenerationJob.has_value())
             {
-                const SandboxEditorJobModel& job =
+                const EditorJobModel& job =
                     *uv.UvRegenerationJob;
                 ImGui::Text("UV job: %s %.0f%%",
                             std::string(ToString(job.Status)).c_str(),
@@ -700,13 +706,13 @@ namespace Extrinsic::Sandbox::Editor
                 return;
             }
 
-            const SandboxEditorUvRegenerationCommandResult& result =
+            const EditorUvRegenerationCommandResult& result =
                 *lastResult;
             ImGui::Text("Last UV regeneration: %s",
-                        DebugNameForSandboxEditorCommandStatus(result.Status));
+                        DebugNameForEditorCommandStatus(result.Status));
             ImGui::Text("Atlas: %s / %s  %ux%u  charts=%u  splits=%zu",
-                        DebugNameForSandboxEditorUvAtlasStatus(result.UvStatus),
-                        DebugNameForSandboxEditorUvAtlasProvenance(result.Provenance),
+                        DebugNameForEditorUvAtlasStatus(result.UvStatus),
+                        DebugNameForEditorUvAtlasProvenance(result.Provenance),
                         result.AtlasWidth,
                         result.AtlasHeight,
                         result.ChartCount,
@@ -716,11 +722,11 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawTextureBakeControls(
-            const SandboxEditorTextureBakeControlsModel& model,
+            const EditorTextureBakeControlsModel& model,
             const SandboxEditorContext* context,
             TextureBakeUiState* state)
         {
-            std::optional<SandboxEditorUvRegenerationCommandResult>
+            std::optional<EditorUvRegenerationCommandResult>
                 fallbackUvRegenerationResult{};
             std::int32_t fallbackSourceIndex{0};
             std::int32_t fallbackSemanticIndex{0};
@@ -861,9 +867,9 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::Button("Regenerate UVs") && canRegenerateUvs)
             {
                 *lastUvRegenerationResult =
-                    ApplySandboxEditorUvRegenerationCommand(
-                    *context,
-                    SandboxEditorUvRegenerationCommand{
+                    ApplyEditorUvRegenerationCommand(
+                    context->GeometryCommands,
+                    EditorUvRegenerationCommand{
                         .StableEntityId = model.SelectedStableId,
                         .PreserveValidAuthoredUvs = uvPreserveAuthored,
                         .ForceRegenerate = uvForceRegenerate,
@@ -891,7 +897,7 @@ namespace Extrinsic::Sandbox::Editor
                     0,
                     static_cast<std::int32_t>(bakeableIndices.size() - 1u));
 
-            const SandboxEditorTextureBakeSourceRow* selectedSource =
+            const EditorTextureBakeSourceRow* selectedSource =
                 bakeableIndices.empty()
                     ? nullptr
                     : &model.Sources[bakeableIndices[static_cast<std::size_t>(sourceIndex)]];
@@ -903,7 +909,7 @@ namespace Extrinsic::Sandbox::Editor
             {
                 for (std::size_t i = 0u; i < bakeableIndices.size(); ++i)
                 {
-                    const SandboxEditorTextureBakeSourceRow& row =
+                    const EditorTextureBakeSourceRow& row =
                         model.Sources[bakeableIndices[i]];
                     const bool selected = sourceIndex == static_cast<std::int32_t>(i);
                     if (ImGui::Selectable(row.Name.c_str(), selected))
@@ -920,22 +926,22 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     if (selectedSource == nullptr)
                         return false;
-                    const std::array<SandboxEditorTextureBakeTarget, 1> target{{
-                    SandboxEditorTextureBakeTarget{
+                    const std::array<EditorTextureBakeTarget, 1> target{{
+                    EditorTextureBakeTarget{
                             .PresentationKey = "mesh.surface",
                             .Semantic = semantic,
                             .Colormap = static_cast<ColormapType>(colormapIndex),
                         },
                     }};
                     const PropertyTextureBakeRepresentation representation =
-                    ResolveSandboxEditorTextureBakeTargetRepresentation(
+                    ResolveEditorTextureBakeTargetRepresentation(
                             selectedSource->ResolvedExpectedValueKind(),
                             kTextureBakeStorageModes[
                                 static_cast<std::size_t>(storageIndex)],
                             kTextureBakeEncoders[
                                 static_cast<std::size_t>(encoderIndex)],
                         target);
-                    return IsSandboxEditorTextureBakeTargetCompatible(
+                    return IsEditorTextureBakeTargetCompatible(
                     target.front(),
                         selectedSource->ResolvedExpectedValueKind(),
                         representation.Storage,
@@ -999,7 +1005,7 @@ namespace Extrinsic::Sandbox::Editor
             const auto makeTarget =
                 [colormapIndex](const GeometryPresentationSlotSemantic semantic)
                 {
-                    return SandboxEditorTextureBakeTarget{
+                    return EditorTextureBakeTarget{
                         .PresentationKey = "mesh.surface",
                         .Semantic = semantic,
                         .Colormap = static_cast<ColormapType>(colormapIndex),
@@ -1007,12 +1013,12 @@ namespace Extrinsic::Sandbox::Editor
                 };
             const auto targetsCompatible =
                 [selectedSource, storageIndex, encoderIndex](
-                    const std::vector<SandboxEditorTextureBakeTarget>& values)
+                    const std::vector<EditorTextureBakeTarget>& values)
                 {
                     if (selectedSource == nullptr)
                         return false;
                     const PropertyTextureBakeRepresentation representation =
-                    ResolveSandboxEditorTextureBakeTargetRepresentation(
+                    ResolveEditorTextureBakeTargetRepresentation(
                             selectedSource->ResolvedExpectedValueKind(),
                             kTextureBakeStorageModes[
                                 static_cast<std::size_t>(storageIndex)],
@@ -1021,9 +1027,9 @@ namespace Extrinsic::Sandbox::Editor
                             values);
                     return std::ranges::all_of(
                         values,
-                        [&](const SandboxEditorTextureBakeTarget& target)
+                        [&](const EditorTextureBakeTarget& target)
                         {
-                            return IsSandboxEditorTextureBakeTargetCompatible(
+                            return IsEditorTextureBakeTargetCompatible(
                             target,
                                 selectedSource->ResolvedExpectedValueKind(),
                                 representation.Storage,
@@ -1031,7 +1037,7 @@ namespace Extrinsic::Sandbox::Editor
                         });
                 };
 
-            std::vector<SandboxEditorTextureBakeTarget> consumers{
+            std::vector<EditorTextureBakeTarget> consumers{
                 makeTarget(kTextureBakeTargetSemantics[
                     static_cast<std::size_t>(semanticIndex)])};
             for (std::size_t i = 0u;
@@ -1059,7 +1065,7 @@ namespace Extrinsic::Sandbox::Editor
                 const std::uint32_t bit =
                     1u << static_cast<std::uint32_t>(i);
                 bool selected = (additionalConsumerMask & bit) != 0u;
-                std::vector<SandboxEditorTextureBakeTarget> candidate = consumers;
+                std::vector<EditorTextureBakeTarget> candidate = consumers;
                 if (!selected)
                     candidate.push_back(makeTarget(semantic));
                 const bool compatible = targetsCompatible(candidate);
@@ -1068,7 +1074,7 @@ namespace Extrinsic::Sandbox::Editor
                     additionalConsumerMask &= ~bit;
                     std::erase_if(
                         consumers,
-                        [semantic](const SandboxEditorTextureBakeTarget& consumer)
+                        [semantic](const EditorTextureBakeTarget& consumer)
                         {
                             return consumer.Semantic == semantic;
                         });
@@ -1091,7 +1097,7 @@ namespace Extrinsic::Sandbox::Editor
                         std::erase_if(
                             consumers,
                             [semantic](
-                                const SandboxEditorTextureBakeTarget& consumer)
+                                const EditorTextureBakeTarget& consumer)
                             {
                                 return consumer.Semantic == semantic;
                             });
@@ -1103,7 +1109,7 @@ namespace Extrinsic::Sandbox::Editor
 
             const bool hasNormalConsumer = std::ranges::any_of(
                 consumers,
-                [](const SandboxEditorTextureBakeTarget& consumer)
+                [](const EditorTextureBakeTarget& consumer)
                 {
                     return consumer.Semantic == GeometryPresentationSlotSemantic::Normal;
                 });
@@ -1129,9 +1135,9 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::BeginDisabled();
             if (ImGui::Button("Bake") && canBake)
             {
-                (void)ApplySandboxEditorTextureBakeCommand(
-                    *context,
-                    SandboxEditorTextureBakeCommand{
+                (void)ApplyEditorTextureBakeCommand(
+                    context->VisualizationCommands,
+                    EditorTextureBakeCommand{
                         .StableEntityId = model.SelectedStableId,
                         .TargetSemantic =
                             kTextureBakeTargetSemantics[
@@ -1213,7 +1219,7 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::Text("Baked colormap: %s",
                                     kColormapNames[mapIndex]);
                     }
-                    const std::span<const SandboxEditorTextureBakeTarget>
+                    const std::span<const EditorTextureBakeTarget>
                         existingConsumers =
                             TextureBakeTargetsFor(
                                 model,
@@ -1224,7 +1230,7 @@ namespace Extrinsic::Sandbox::Editor
                         const auto normalConsumer = std::ranges::find(
                             existingConsumers,
                             GeometryPresentationSlotSemantic::Normal,
-                            &SandboxEditorTextureBakeTarget::Semantic);
+                            &EditorTextureBakeTarget::Semantic);
                         ImGui::Text(
                             "Normal space: %s",
                             normalConsumer != existingConsumers.end() &&
@@ -1255,8 +1261,8 @@ namespace Extrinsic::Sandbox::Editor
                         if (ImGui::Button("Apply"))
                         {
                             const TextureBakeMutationResult result =
-                                RenameSandboxEditorBakedTexture(
-                                    *context,
+                                RenameEditorBakedTexture(
+                                    context->VisualizationCommands,
                                     model.SelectedStableId,
                                     record.OutputName,
                                     std::string_view{renameBuffer.data()});
@@ -1270,14 +1276,14 @@ namespace Extrinsic::Sandbox::Editor
                     if (context != nullptr && ImGui::SmallButton("Remove"))
                     {
                         const TextureBakeMutationResult result =
-                            RemoveSandboxEditorBakedTexture(
-                                *context,
+                            RemoveEditorBakedTexture(
+                                context->VisualizationCommands,
                                 model.SelectedStableId,
                                 record.OutputName);
                         mutationDiagnostic = result.Diagnostic;
                     }
 
-                    std::vector<SandboxEditorTextureBakeTarget> nextConsumers{
+                    std::vector<EditorTextureBakeTarget> nextConsumers{
                         existingConsumers.begin(),
                         existingConsumers.end()};
                     bool consumersChanged = false;
@@ -1291,14 +1297,14 @@ namespace Extrinsic::Sandbox::Editor
                             nextConsumers.begin(),
                             nextConsumers.end(),
                             [semantic](
-                                const SandboxEditorTextureBakeTarget& consumer)
+                                const EditorTextureBakeTarget& consumer)
                             {
                                 return consumer.Semantic == semantic;
                             });
                         bool enabled = found != nextConsumers.end();
                         const bool compatible =
-                            IsSandboxEditorTextureBakeTargetCompatible(
-                                SandboxEditorTextureBakeTarget{
+                            IsEditorTextureBakeTargetCompatible(
+                                EditorTextureBakeTarget{
                                     .PresentationKey = "mesh.surface",
                                     .Semantic = semantic,
                                 },
@@ -1316,7 +1322,7 @@ namespace Extrinsic::Sandbox::Editor
                             if (enabled)
                             {
                                 nextConsumers.push_back(
-                                    SandboxEditorTextureBakeTarget{
+                                    EditorTextureBakeTarget{
                                         .PresentationKey = "mesh.surface",
                                         .Semantic = semantic,
                                         .Colormap = static_cast<ColormapType>(
@@ -1328,7 +1334,7 @@ namespace Extrinsic::Sandbox::Editor
                                 std::erase_if(
                                     nextConsumers,
                                     [semantic](
-                                        const SandboxEditorTextureBakeTarget&
+                                        const EditorTextureBakeTarget&
                                             consumer)
                                     {
                                         return consumer.Semantic == semantic;
@@ -1349,7 +1355,7 @@ namespace Extrinsic::Sandbox::Editor
                     if (rawScalar)
                     {
                         int recordColormap = 0;
-                        for (const SandboxEditorTextureBakeTarget& consumer :
+                        for (const EditorTextureBakeTarget& consumer :
                              nextConsumers)
                         {
                             if (consumer.Semantic ==
@@ -1373,7 +1379,7 @@ namespace Extrinsic::Sandbox::Editor
                                 static_cast<int>(kColormapNames.size())))
                         {
                             consumersChanged = true;
-                            for (SandboxEditorTextureBakeTarget& consumer :
+                            for (EditorTextureBakeTarget& consumer :
                                  nextConsumers)
                             {
                                 if (consumer.Semantic ==
@@ -1391,9 +1397,9 @@ namespace Extrinsic::Sandbox::Editor
                     if (context != nullptr && consumersChanged)
                     {
                         const TextureBakeMutationResult result =
-                            SetSandboxEditorBakedTextureTargets(
-                                *context,
-                                SandboxEditorTextureBakeTargetUpdateRequest{
+                            SetEditorBakedTextureTargets(
+                                context->VisualizationCommands,
+                                EditorTextureBakeTargetUpdateRequest{
                                     .StableEntityId = model.SelectedStableId,
                                     .OutputName = record.OutputName,
                                     .Targets = std::move(nextConsumers),
@@ -1423,14 +1429,14 @@ namespace Extrinsic::Sandbox::Editor
                     std::min<std::size_t>(model.Sources.size(), 12u);
                 for (std::size_t i = 0u; i < limit; ++i)
                 {
-                    const SandboxEditorTextureBakeSourceRow& row =
+                    const EditorTextureBakeSourceRow& row =
                         model.Sources[i];
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
                     ImGui::TextUnformatted(row.Name.c_str());
                     ImGui::TableSetColumnIndex(1);
                     ImGui::TextUnformatted(
-                        DebugNameForSandboxEditorPropertyCatalogDomain(
+                        DebugNameForEditorPropertyCatalogDomain(
                             row.CatalogDomain));
                     ImGui::TableSetColumnIndex(2);
                     ImGui::TextUnformatted(
@@ -1450,11 +1456,11 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawVisualizationPropertyPresets(
-            const std::vector<SandboxEditorVisualizationPropertyInfo>& properties,
-            const SandboxEditorVisualizationConfigModel& visualization,
+            const std::vector<EditorVisualizationPropertyInfo>& properties,
+            const EditorVisualizationConfigModel& visualization,
             const SandboxEditorContext& context,
             const std::uint32_t selectedStableId,
-            const SandboxEditorVisualizationTarget target,
+            const EditorVisualizationTarget target,
             const bool canEditVisualization)
         {
             ImGui::SeparatorText("Properties");
@@ -1480,12 +1486,12 @@ namespace Extrinsic::Sandbox::Editor
 
             for (std::size_t i = 0u; i < properties.size(); ++i)
             {
-                const SandboxEditorVisualizationPropertyInfo& property =
+                const EditorVisualizationPropertyInfo& property =
                     properties[i];
                 ImGui::PushID(static_cast<int>(i));
                 ImGui::Text("%s  [%s, %s, %llu]",
                             property.Name.c_str(),
-                            DebugNameForSandboxEditorVisualizationPropertyDomain(
+                            DebugNameForEditorVisualizationPropertyDomain(
                                 property.Domain),
                             DebugNameForGeometryPropertyValueKind(
                                 property.ValueKind),
@@ -1497,14 +1503,14 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     if (ImGui::SmallButton("Scalar") && canEditVisualization)
                     {
-                        (void)ApplySandboxEditorVisualizationPropertyCommand(
-                            context,
-                            SandboxEditorVisualizationPropertyCommand{
+                        (void)ApplyEditorVisualizationPropertyCommand(
+                            context.VisualizationCommands,
+                            EditorVisualizationPropertyCommand{
                                 .StableEntityId = selectedStableId,
                                 .Target = target,
                                 .Domain = property.Domain,
                                 .Preset =
-                                    SandboxEditorVisualizationPropertyPreset::Scalar,
+                                    EditorVisualizationPropertyPreset::Scalar,
                                 .PropertyName = property.Name,
                                 .ScalarAutoRange = scalarAutoRange,
                                 .ScalarRangeMin = scalarRangeMin,
@@ -1520,14 +1526,14 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::SameLine();
                     if (ImGui::SmallButton("Isolines") && canEditVisualization)
                     {
-                        (void)ApplySandboxEditorVisualizationPropertyCommand(
-                            context,
-                            SandboxEditorVisualizationPropertyCommand{
+                        (void)ApplyEditorVisualizationPropertyCommand(
+                            context.VisualizationCommands,
+                            EditorVisualizationPropertyCommand{
                                 .StableEntityId = selectedStableId,
                                 .Target = target,
                                 .Domain = property.Domain,
                                 .Preset =
-                                    SandboxEditorVisualizationPropertyPreset::Isoline,
+                                    EditorVisualizationPropertyPreset::Isoline,
                                 .PropertyName = property.Name,
                                 .ScalarAutoRange = scalarAutoRange,
                                 .ScalarRangeMin = scalarRangeMin,
@@ -1545,14 +1551,14 @@ namespace Extrinsic::Sandbox::Editor
                     if (ImGui::SmallButton("Color buffer") &&
                         canEditVisualization)
                     {
-                        (void)ApplySandboxEditorVisualizationPropertyCommand(
-                            context,
-                            SandboxEditorVisualizationPropertyCommand{
+                        (void)ApplyEditorVisualizationPropertyCommand(
+                            context.VisualizationCommands,
+                            EditorVisualizationPropertyCommand{
                                 .StableEntityId = selectedStableId,
                                 .Target = target,
                                 .Domain = property.Domain,
                                 .Preset =
-                                    SandboxEditorVisualizationPropertyPreset::ColorBuffer,
+                                    EditorVisualizationPropertyPreset::ColorBuffer,
                                 .PropertyName = property.Name,
                             });
                     }
@@ -1571,10 +1577,10 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawUniformVisualizationColorEdit(
-            const SandboxEditorVisualizationConfigModel& visualization,
+            const EditorVisualizationConfigModel& visualization,
             const SandboxEditorContext& context,
             const std::uint32_t selectedStableId,
-            const SandboxEditorVisualizationTarget target,
+            const EditorVisualizationTarget target,
             const bool canEditVisualization)
         {
             if (!visualization.HasConfig ||
@@ -1588,8 +1594,8 @@ namespace Extrinsic::Sandbox::Editor
                                   &color.x) &&
                 canEditVisualization)
             {
-                (void)ApplySandboxEditorVisualizationConfigCommand(
-                    context,
+                (void)ApplyEditorVisualizationConfigCommand(
+                    context.VisualizationCommands,
                     MakeUniformVisualizationConfigCommandFromModel(
                         selectedStableId,
                         visualization,
@@ -1603,10 +1609,10 @@ namespace Extrinsic::Sandbox::Editor
         // isovalues. Every edit reissues the full config command built from
         // the current model so unrelated fields never reset.
         void DrawScalarVisualizationControls(
-            const SandboxEditorVisualizationConfigModel& visualization,
+            const EditorVisualizationConfigModel& visualization,
             const SandboxEditorContext& context,
             const std::uint32_t selectedStableId,
-            const SandboxEditorVisualizationTarget target,
+            const EditorVisualizationTarget target,
             const bool canEditVisualization)
         {
             if (!visualization.HasConfig ||
@@ -1623,12 +1629,12 @@ namespace Extrinsic::Sandbox::Editor
                             : visualization.ScalarFieldName.c_str());
 
             const auto submit =
-                [&](const SandboxEditorVisualizationConfigModel& next)
+                [&](const EditorVisualizationConfigModel& next)
             {
                 if (canEditVisualization)
                 {
-                    (void)ApplySandboxEditorVisualizationConfigCommand(
-                        context,
+                    (void)ApplyEditorVisualizationConfigCommand(
+                        context.VisualizationCommands,
                         MakeScalarVisualizationConfigCommandFromModel(
                             selectedStableId,
                             next,
@@ -1649,7 +1655,7 @@ namespace Extrinsic::Sandbox::Editor
                              kColormapNames.data(),
                              static_cast<int>(kColormapNames.size())))
             {
-                SandboxEditorVisualizationConfigModel next = visualization;
+                EditorVisualizationConfigModel next = visualization;
                 next.ScalarColormap =
                     static_cast<ColormapType>(colormapIndex);
                 submit(next);
@@ -1658,7 +1664,7 @@ namespace Extrinsic::Sandbox::Editor
             bool autoRange = visualization.ScalarAutoRange;
             if (ImGui::Checkbox("Auto range", &autoRange))
             {
-                SandboxEditorVisualizationConfigModel next = visualization;
+                EditorVisualizationConfigModel next = visualization;
                 next.ScalarAutoRange = autoRange;
                 submit(next);
             }
@@ -1674,7 +1680,7 @@ namespace Extrinsic::Sandbox::Editor
                                       "%.5f") &&
                     rangeMinMax[0] < rangeMinMax[1])
                 {
-                    SandboxEditorVisualizationConfigModel next = visualization;
+                    EditorVisualizationConfigModel next = visualization;
                     next.ScalarRangeMin = rangeMinMax[0];
                     next.ScalarRangeMax = rangeMinMax[1];
                     submit(next);
@@ -1685,7 +1691,7 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::DragInt("Bins (0 = continuous)", &binCount, 0.25f, 0, 64) &&
                 binCount >= 0)
             {
-                SandboxEditorVisualizationConfigModel next = visualization;
+                EditorVisualizationConfigModel next = visualization;
                 next.ScalarBinCount = static_cast<std::uint32_t>(binCount);
                 submit(next);
             }
@@ -1695,7 +1701,7 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::DragInt("Count##isolines", &isolineCount, 0.25f, 0, 256) &&
                 isolineCount >= 0)
             {
-                SandboxEditorVisualizationConfigModel next = visualization;
+                EditorVisualizationConfigModel next = visualization;
                 next.IsolineCount = static_cast<std::uint32_t>(isolineCount);
                 submit(next);
             }
@@ -1703,14 +1709,14 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::DragFloat("Width##isolines", &isolineWidth, 0.05f, 0.1f, 16.0f) &&
                 isolineWidth > 0.0f)
             {
-                SandboxEditorVisualizationConfigModel next = visualization;
+                EditorVisualizationConfigModel next = visualization;
                 next.IsolineWidth = isolineWidth;
                 submit(next);
             }
             glm::vec4 isolineColor = visualization.IsolineColor;
             if (ImGui::ColorEdit4("Color##isolines", &isolineColor.x))
             {
-                SandboxEditorVisualizationConfigModel next = visualization;
+                EditorVisualizationConfigModel next = visualization;
                 next.IsolineColor = isolineColor;
                 submit(next);
             }
@@ -1722,14 +1728,14 @@ namespace Extrinsic::Sandbox::Editor
                 float value = visualization.IsolineValues[i];
                 if (ImGui::DragFloat("##isovalue", &value, 0.001f, 0.0f, 0.0f, "%.5f"))
                 {
-                    SandboxEditorVisualizationConfigModel next = visualization;
+                    EditorVisualizationConfigModel next = visualization;
                     next.IsolineValues[i] = value;
                     submit(next);
                 }
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Remove"))
                 {
-                    SandboxEditorVisualizationConfigModel next = visualization;
+                    EditorVisualizationConfigModel next = visualization;
                     for (std::uint32_t j = i; j + 1u < next.IsolineValueCount; ++j)
                     {
                         next.IsolineValues[j] = next.IsolineValues[j + 1u];
@@ -1744,7 +1750,7 @@ namespace Extrinsic::Sandbox::Editor
             {
                 if (ImGui::SmallButton("Add isovalue"))
                 {
-                    SandboxEditorVisualizationConfigModel next = visualization;
+                    EditorVisualizationConfigModel next = visualization;
                     const float seed = visualization.ScalarAutoRange
                         ? 0.0f
                         : 0.5f * (visualization.ScalarRangeMin +
@@ -1757,7 +1763,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawRenderRecipeEditor(
-            const SandboxEditorRenderRecipeEditorModel& model,
+            const EditorRenderRecipeEditorModel& model,
             const SandboxEditorContext* context,
             std::array<char, 8192>* draftBuffer)
         {
@@ -1775,25 +1781,23 @@ namespace Extrinsic::Sandbox::Editor
                         model.ViewKind.c_str(),
                         model.OutputTarget.c_str());
             ImGui::Text("Draft: %s revision=%llu active=%llu",
-                        DebugNameForSandboxEditorRenderRecipeDraftState(
+                        DebugNameForEditorRenderRecipeDraftState(
                             model.DraftState),
                         static_cast<unsigned long long>(model.DraftRevision),
                         static_cast<unsigned long long>(model.ActiveRevision));
             ImGui::Text("Validation: %s parsed slots=%u bindings=%u",
-                        std::string(DebugNameForSandboxEditorRenderRecipeConfigState(model.ValidationState)).c_str(),
+                        std::string(DebugNameForEditorRenderRecipeConfigState(model.ValidationState)).c_str(),
                         model.ParsedSlotCount,
                         model.ParsedBindingOverrideCount);
 
             const bool commandsAvailable =
                 context != nullptr &&
-                context->RenderRecipeContext != nullptr &&
-                context->RenderRecipeEditorState != nullptr &&
                 context->RenderRecipeCommandsAvailable;
 
             if (draftBuffer != nullptr)
             {
-                SandboxEditorRenderRecipeEditorState* state =
-                    context != nullptr ? context->RenderRecipeEditorState : nullptr;
+                const EditorRenderRecipeDraftSnapshot* state =
+                    context != nullptr ? &context->RenderRecipeDraft : nullptr;
                 if (state != nullptr &&
                     !state->DraftDocument.empty() &&
                     draftBuffer->front() == '\0')
@@ -1809,7 +1813,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (state != nullptr &&
                     state->DraftDocument.empty() &&
                     state->DraftState ==
-                        SandboxEditorRenderRecipeDraftState::Canceled)
+                        EditorRenderRecipeDraftState::Canceled)
                 {
                     draftBuffer->fill('\0');
                 }
@@ -1836,10 +1840,10 @@ namespace Extrinsic::Sandbox::Editor
 
             if (ImGui::Button("Update Draft"))
             {
-                (void)ApplySandboxEditorRenderRecipeCommand(
-                    *context,
-                    SandboxEditorRenderRecipeCommand{
-                        .Kind = SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+                (void)ApplyEditorRenderRecipeCommand(
+                    context->RenderRecipeCommands,
+                    EditorRenderRecipeCommand{
+                        .Kind = EditorRenderRecipeCommandKind::UpdateDraft,
                         .Document = draftText(),
                         .SourceId = "sandbox-editor",
                     });
@@ -1847,10 +1851,10 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::SameLine();
             if (ImGui::Button("Debounce"))
             {
-                (void)ApplySandboxEditorRenderRecipeCommand(
-                    *context,
-                    SandboxEditorRenderRecipeCommand{
-                        .Kind = SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+                (void)ApplyEditorRenderRecipeCommand(
+                    context->RenderRecipeCommands,
+                    EditorRenderRecipeCommand{
+                        .Kind = EditorRenderRecipeCommandKind::UpdateDraft,
                         .Document = draftText(),
                         .SourceId = "sandbox-editor",
                         .Debounced = true,
@@ -1861,10 +1865,10 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::BeginDisabled();
             if (ImGui::Button("Validate"))
             {
-                (void)ApplySandboxEditorRenderRecipeCommand(
-                    *context,
-                    SandboxEditorRenderRecipeCommand{
-                        .Kind = SandboxEditorRenderRecipeCommandKind::ValidateDraft,
+                (void)ApplyEditorRenderRecipeCommand(
+                    context->RenderRecipeCommands,
+                    EditorRenderRecipeCommand{
+                        .Kind = EditorRenderRecipeCommandKind::ValidateDraft,
                         .Document = draftText(),
                         .SourceId = "sandbox-editor",
                     });
@@ -1877,10 +1881,10 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::BeginDisabled();
             if (ImGui::Button("Preview"))
             {
-                (void)ApplySandboxEditorRenderRecipeCommand(
-                    *context,
-                    SandboxEditorRenderRecipeCommand{
-                        .Kind = SandboxEditorRenderRecipeCommandKind::PreviewDraft,
+                (void)ApplyEditorRenderRecipeCommand(
+                    context->RenderRecipeCommands,
+                    EditorRenderRecipeCommand{
+                        .Kind = EditorRenderRecipeCommandKind::PreviewDraft,
                         .Document = draftText(),
                         .SourceId = "sandbox-editor",
                     });
@@ -1893,10 +1897,10 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::BeginDisabled();
             if (ImGui::Button("Activate Preview"))
             {
-                (void)ApplySandboxEditorRenderRecipeCommand(
-                    *context,
-                    SandboxEditorRenderRecipeCommand{
-                        .Kind = SandboxEditorRenderRecipeCommandKind::ActivatePreview,
+                (void)ApplyEditorRenderRecipeCommand(
+                    context->RenderRecipeCommands,
+                    EditorRenderRecipeCommand{
+                        .Kind = EditorRenderRecipeCommandKind::ActivatePreview,
                     });
             }
             if (!model.CanActivate)
@@ -1907,10 +1911,10 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::BeginDisabled();
             if (ImGui::Button("Cancel"))
             {
-                (void)ApplySandboxEditorRenderRecipeCommand(
-                    *context,
-                    SandboxEditorRenderRecipeCommand{
-                        .Kind = SandboxEditorRenderRecipeCommandKind::CancelDraft,
+                (void)ApplyEditorRenderRecipeCommand(
+                    context->RenderRecipeCommands,
+                    EditorRenderRecipeCommand{
+                        .Kind = EditorRenderRecipeCommandKind::CancelDraft,
                     });
             }
             if (!model.CanCancel)
@@ -1928,13 +1932,13 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::CollapsingHeader("Recipe Slots",
                                         ImGuiTreeNodeFlags_DefaultOpen))
             {
-                const auto slotKindName = [](const SandboxEditorRecipeSlotKind kind)
+                const auto slotKindName = [](const EditorRecipeSlotKind kind)
                 {
                     switch (kind)
                     {
-                    case SandboxEditorRecipeSlotKind::FixedCore:
+                    case EditorRecipeSlotKind::FixedCore:
                         return "FixedCore";
-                    case SandboxEditorRecipeSlotKind::Extension:
+                    case EditorRecipeSlotKind::Extension:
                         return "Extension";
                     }
                     return "Unknown";
@@ -1947,7 +1951,7 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::TableSetupColumn("Editable");
                     ImGui::TableSetupColumn("Reason");
                     ImGui::TableHeadersRow();
-                    for (const SandboxEditorRenderRecipeSlotModel& slot :
+                    for (const EditorRenderRecipeSlotModel& slot :
                          model.Slots)
                     {
                         ImGui::TableNextRow();
@@ -1981,7 +1985,7 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::TableSetupColumn("Editable");
                     ImGui::TableSetupColumn("Reason");
                     ImGui::TableHeadersRow();
-                    for (const SandboxEditorRenderRecipeBindingOverrideModel& binding :
+                    for (const EditorRenderRecipeBindingOverrideModel& binding :
                          model.BindingOverrides)
                     {
                         ImGui::TableNextRow();
@@ -2016,7 +2020,7 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::TableSetupColumn("Format");
                     ImGui::TableSetupColumn("Required");
                     ImGui::TableHeadersRow();
-                    for (const SandboxEditorRenderRecipeOutputModel& output :
+                    for (const EditorRenderRecipeOutputModel& output :
                          model.Outputs)
                     {
                         ImGui::TableNextRow();
@@ -2049,7 +2053,7 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::TableSetupColumn("Publish");
                     ImGui::TableSetupColumn("Apply");
                     ImGui::TableHeadersRow();
-                    for (const SandboxEditorRenderArtifactRow& artifact :
+                    for (const EditorRenderArtifactRow& artifact :
                          model.Artifacts)
                     {
                         ImGui::PushID(artifact.ArtifactId.c_str());
@@ -2069,16 +2073,16 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::TableSetColumnIndex(5);
                         const bool publishAvailable =
                             commandsAvailable &&
-                            context->RenderArtifacts != nullptr &&
+                            context->RenderArtifactCommandsAvailable &&
                             artifact.CanPublish;
                         if (!publishAvailable)
                             ImGui::BeginDisabled();
                         if (ImGui::Button("Publish"))
                         {
-                            (void)ApplySandboxEditorRenderRecipeCommand(
-                                *context,
-                                SandboxEditorRenderRecipeCommand{
-                                    .Kind = SandboxEditorRenderRecipeCommandKind::PublishArtifact,
+                            (void)ApplyEditorRenderRecipeCommand(
+                                context->RenderRecipeCommands,
+                                EditorRenderRecipeCommand{
+                                    .Kind = EditorRenderRecipeCommandKind::PublishArtifact,
                                     .ArtifactId = artifact.ArtifactId,
                                     .Provenance = "sandbox-editor",
                                 });
@@ -2088,16 +2092,16 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::TableSetColumnIndex(6);
                         const bool applyAvailable =
                             commandsAvailable &&
-                            context->RenderArtifacts != nullptr &&
+                            context->RenderArtifactCommandsAvailable &&
                             artifact.CanApply;
                         if (!applyAvailable)
                             ImGui::BeginDisabled();
                         if (ImGui::Button("Apply"))
                         {
-                            (void)ApplySandboxEditorRenderRecipeCommand(
-                                *context,
-                                SandboxEditorRenderRecipeCommand{
-                                    .Kind = SandboxEditorRenderRecipeCommandKind::ApplyArtifact,
+                            (void)ApplyEditorRenderRecipeCommand(
+                                context->RenderRecipeCommands,
+                                EditorRenderRecipeCommand{
+                                    .Kind = EditorRenderRecipeCommandKind::ApplyArtifact,
                                     .ArtifactId = artifact.ArtifactId,
                                     .Provenance = "sandbox-editor",
                                     .ProjectTarget = "sandbox-render-recipe-artifact",
@@ -2116,9 +2120,9 @@ namespace Extrinsic::Sandbox::Editor
                  model.RecipeDiagnostics)
             {
                 ImGui::TextDisabled("%s/%s: %s",
-                                    std::string(DebugNameForSandboxEditorRenderRecipeConfigState(
+                                    std::string(DebugNameForEditorRenderRecipeConfigState(
                                         diagnostic.State)).c_str(),
-                                    std::string(DebugNameForSandboxEditorRenderRecipeConfigDiagnosticCode(
+                                    std::string(DebugNameForEditorRenderRecipeConfigDiagnosticCode(
                                         diagnostic.Code)).c_str(),
                                     diagnostic.Message.c_str());
             }
@@ -2127,14 +2131,14 @@ namespace Extrinsic::Sandbox::Editor
         void DrawFixedWindow(
             const std::string_view windowId,
             bool& open,
-            const SandboxEditorPanelFrame& frame,
+            const EditorWorkspaceSnapshot& frame,
             const SandboxEditorContext* context,
             std::array<char, 1024>* importPathBuffer,
             std::array<char, 1024>* scenePathBuffer,
             std::array<char, 8192>* renderRecipeDraftBuffer,
-            SandboxEditorAssetPayloadKind* importPayloadKind,
-            std::optional<SandboxEditorFileImportResult>* lastImportResult,
-            std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
+            EditorAssetPayloadKind* importPayloadKind,
+            std::optional<EditorFileImportResult>* lastImportResult,
+            std::optional<EditorSceneFileResult>* lastSceneFileResult,
             TextureBakeUiState* textureBakeState)
         {
             if (windowId == "sandbox.shell" &&
@@ -2152,14 +2156,14 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     ImGui::TextDisabled("No live scene entities.");
                 }
-                for (const SandboxEditorEntityRow& row : frame.Hierarchy)
+                for (const EditorEntityRow& row : frame.Hierarchy)
                 {
                     ImGui::PushID(static_cast<int>(row.StableEntityId));
                     const bool clicked =
                         ImGui::Selectable(row.Name.c_str(), row.Selected);
                     ImGui::PopID();
                     if (clicked && context != nullptr)
-                        (void)SelectSandboxEditorEntity(*context, row.StableEntityId);
+                        (void)SelectEditorEntity(context->SceneCommands, row.StableEntityId);
                     if (row.Hovered)
                     {
                         ImGui::SameLine();
@@ -2178,7 +2182,7 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 else
                 {
-                    const SandboxEditorInspectorModel& inspector = frame.Inspector;
+                    const EditorInspectorModel& inspector = frame.Inspector;
                     ImGui::Text("Entity: %s", inspector.Entity.Name.c_str());
                     ImGui::Text("Render id: %u", inspector.Entity.StableEntityId);
                     ImGui::Text("Durable StableId: %s",
@@ -2192,9 +2196,9 @@ namespace Extrinsic::Sandbox::Editor
                                                   &localPosition.x,
                                                   0.01f))
                             {
-                                (void)ApplySandboxEditorTransformEdit(
-                                    *context,
-                                    SandboxEditorTransformEditCommand{
+                                (void)ApplyEditorTransformEdit(
+                                    context->SceneCommands,
+                                    EditorTransformEditCommand{
                                         .StableEntityId = inspector.Entity.StableEntityId,
                                         .SetPosition = true,
                                         .Position = localPosition,
@@ -2206,9 +2210,9 @@ namespace Extrinsic::Sandbox::Editor
                                                   &localScale.x,
                                                   0.01f))
                             {
-                                (void)ApplySandboxEditorTransformEdit(
-                                    *context,
-                                    SandboxEditorTransformEditCommand{
+                                (void)ApplyEditorTransformEdit(
+                                    context->SceneCommands,
+                                    EditorTransformEditCommand{
                                         .StableEntityId = inspector.Entity.StableEntityId,
                                         .SetScale = true,
                                         .Scale = localScale,
@@ -2254,7 +2258,7 @@ namespace Extrinsic::Sandbox::Editor
                                         inspector.RenderHints.PointSizeName.c_str());
                     }
                     ImGui::Text("Geometry domain: %s",
-                                DebugNameForSandboxEditorGeometryDomain(
+                                DebugNameForEditorGeometryDomain(
                                     inspector.Geometry.Domain));
                     ImGui::Text("Counts: v=%zu e=%zu h=%zu f=%zu n=%zu",
                                 inspector.Geometry.VertexCount,
@@ -2271,16 +2275,16 @@ namespace Extrinsic::Sandbox::Editor
                          propertyIndex < 8u;
                          ++propertyIndex)
                     {
-                        const SandboxEditorPropertyCatalogRow& row =
+                        const EditorPropertyCatalogRow& row =
                             inspector.PropertyCatalog.Rows[propertyIndex];
                         ImGui::BulletText("%s / %s / %s",
-                                          DebugNameForSandboxEditorPropertyCatalogDomain(
+                                          DebugNameForEditorPropertyCatalogDomain(
                                               row.Domain),
                                           row.Name.c_str(),
                                           DebugNameForGeometryPropertyValueKind(
                                               row.ValueKind));
                     }
-                    const SandboxEditorGeometryPresentationModel& presentation =
+                    const EditorGeometryPresentationModel& presentation =
                         inspector.GeometryPresentation;
                     DrawBoundRenderStateRows(inspector.BoundState);
                     DrawTextureBakeControls(inspector.TextureBake, context, textureBakeState);
@@ -2311,7 +2315,7 @@ namespace Extrinsic::Sandbox::Editor
                              slotIndex < presentation.Slots.size();
                              ++slotIndex)
                         {
-                            const SandboxEditorGeometryPresentationSlotModel& slot =
+                            const EditorGeometryPresentationSlotModel& slot =
                                 presentation.Slots[slotIndex];
                             ImGui::PushID(static_cast<int>(slotIndex));
                             ImGui::Text("%s / %s / %s / %s",
@@ -2339,9 +2343,9 @@ namespace Extrinsic::Sandbox::Editor
                                         slot.UniformDefault;
                                     value.Kind = Geometry::PropertyValueKind::Vec4;
                                     value.Vector = color;
-                                    (void)ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
-                                        *context,
-                                        SandboxEditorGeometryPresentationSlotDefaultCommand{
+                                    (void)ApplyEditorGeometryPresentationSlotDefaultCommand(
+                                        context->VisualizationCommands,
+                                        EditorGeometryPresentationSlotDefaultCommand{
                                             .StableEntityId =
                                                 inspector.Entity.StableEntityId,
                                             .PresentationKey =
@@ -2363,7 +2367,7 @@ namespace Extrinsic::Sandbox::Editor
                                 if (ImGui::BeginCombo("Source property",
                                                       currentProperty))
                                 {
-                                    for (const SandboxEditorGeometryPresentationPropertyOptionModel&
+                                    for (const EditorGeometryPresentationPropertyOptionModel&
                                              option : slot.PropertyOptions)
                                     {
                                         if (!option.Compatible)
@@ -2376,9 +2380,9 @@ namespace Extrinsic::Sandbox::Editor
                                                 selected) &&
                                             option.Compatible)
                                         {
-                                            (void)ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
-                                                *context,
-                                                SandboxEditorGeometryPresentationSlotPropertyCommand{
+                                            (void)ApplyEditorGeometryPresentationSlotPropertyCommand(
+                                                context->VisualizationCommands,
+                                                EditorGeometryPresentationSlotPropertyCommand{
                                                     .StableEntityId =
                                                         inspector.Entity.StableEntityId,
                                                     .PresentationKey =
@@ -2414,7 +2418,7 @@ namespace Extrinsic::Sandbox::Editor
                     if (!presentation.Jobs.empty())
                     {
                         ImGui::Text("Derived jobs: %zu", presentation.Jobs.size());
-                        for (const SandboxEditorJobModel& job :
+                        for (const EditorJobModel& job :
                              presentation.Jobs)
                         {
                             ImGui::BulletText("%s %s %.0f%% deps=%zu %s",
@@ -2435,7 +2439,7 @@ namespace Extrinsic::Sandbox::Editor
                 BeginFixedWindow("Selection Details", open, ImVec2(0.0f, 0.0f)))
             {
                 ImGui::Text("Selected entities: %zu", frame.Selection.SelectedStableIds.size());
-                for (const SandboxEditorEntityRow& row : frame.Selection.SelectedEntities)
+                for (const EditorEntityRow& row : frame.Selection.SelectedEntities)
                     ImGui::BulletText("%s (%u)", row.Name.c_str(), row.StableEntityId);
                 if (frame.Selection.HasHovered)
                 {
@@ -2451,8 +2455,8 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::Text("Primitive status: %s",
                                 DebugNameForPrimitiveRefineStatus(primitive.Status));
                     ImGui::Text("Primitive domain/kind: %s / %s",
-                                DebugNameForSandboxEditorGeometryDomain(primitive.Domain),
-                                DebugNameForSandboxEditorPrimitiveKind(primitive.Kind));
+                                DebugNameForEditorGeometryDomain(primitive.Domain),
+                                DebugNameForEditorPrimitiveKind(primitive.Kind));
                     if (frame.Selection.Primitive.HasFaceId)
                         ImGui::Text("Face id: %u", primitive.FaceId);
                     if (frame.Selection.Primitive.HasEdgeId)
@@ -2484,18 +2488,19 @@ namespace Extrinsic::Sandbox::Editor
                             static_cast<unsigned long long>(frame.Document.Revision),
                             static_cast<unsigned long long>(frame.Document.SavedRevision));
                 const bool historyControlsAvailable =
-                    context != nullptr && context->CommandHistory != nullptr;
+                    context != nullptr &&
+                    context->DocumentCommands.Available();
                 if (!historyControlsAvailable || !frame.Document.CanUndo)
                     ImGui::BeginDisabled();
                 if (ImGui::Button("Undo") && historyControlsAvailable)
-                    (void)context->CommandHistory->Undo();
+                    (void)context->DocumentCommands.Undo();
                 if (!historyControlsAvailable || !frame.Document.CanUndo)
                     ImGui::EndDisabled();
                 ImGui::SameLine();
                 if (!historyControlsAvailable || !frame.Document.CanRedo)
                     ImGui::BeginDisabled();
                 if (ImGui::Button("Redo") && historyControlsAvailable)
-                    (void)context->CommandHistory->Redo();
+                    (void)context->DocumentCommands.Redo();
                 if (!historyControlsAvailable || !frame.Document.CanRedo)
                     ImGui::EndDisabled();
                 if (!frame.Document.UndoLabel.empty())
@@ -2518,7 +2523,7 @@ namespace Extrinsic::Sandbox::Editor
                     lastSceneFileResult != nullptr)
                 {
                     *lastSceneFileResult =
-                        ApplySandboxEditorNewSceneCommand(*context);
+                        ApplyEditorNewSceneCommand(context->SceneCommands);
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Close scene") &&
@@ -2527,7 +2532,7 @@ namespace Extrinsic::Sandbox::Editor
                     lastSceneFileResult != nullptr)
                 {
                     *lastSceneFileResult =
-                        ApplySandboxEditorCloseSceneCommand(*context);
+                        ApplyEditorCloseSceneCommand(context->SceneCommands);
                 }
                 if (!frame.SceneFile.LifecycleEnabled ||
                     context == nullptr ||
@@ -2556,25 +2561,25 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 if (ImGui::Button("Save / Save As") && sceneControlsAvailable)
                 {
-                    *lastSceneFileResult = ApplySandboxEditorSceneSaveCommand(
-                        *context,
-                        SandboxEditorSceneFileCommand{
+                    *lastSceneFileResult = ApplyEditorSceneSaveCommand(
+                        context->SceneCommands,
+                        EditorSceneFileCommand{
                             .Path = std::string(scenePathBuffer->data()),
                         });
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Open path") && sceneControlsAvailable)
                 {
-                    *lastSceneFileResult = ApplySandboxEditorSceneLoadCommand(
-                        *context,
-                        SandboxEditorSceneFileCommand{
+                    *lastSceneFileResult = ApplyEditorSceneLoadCommand(
+                        context->SceneCommands,
+                        EditorSceneFileCommand{
                             .Path = std::string(scenePathBuffer->data()),
                         });
                 }
                 if (!sceneControlsAvailable)
                     ImGui::EndDisabled();
                 ImGui::TextWrapped("%s", frame.SceneFile.StatusText.c_str());
-                const SandboxEditorSceneFileResult* result =
+                const EditorSceneFileResult* result =
                     lastSceneFileResult != nullptr && lastSceneFileResult->has_value()
                         ? &**lastSceneFileResult
                         : frame.SceneFile.LastResult.has_value()
@@ -2583,7 +2588,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (result != nullptr)
                 {
                     ImGui::Text("Last scene command: %s",
-                                DebugNameForSandboxEditorCommandStatus(
+                                DebugNameForEditorCommandStatus(
                                     result->Status));
                     ImGui::Text("Stats: entities=%u mesh=%u graph=%u pointCloud=%u",
                                 result->Stats.Entities,
@@ -2616,9 +2621,9 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::BeginDisabled();
                     if (ImGui::BeginCombo(
                             "Payload hint",
-                            DebugNameForSandboxEditorAssetPayloadKind(*importPayloadKind)))
+                            DebugNameForEditorAssetPayloadKind(*importPayloadKind)))
                     {
-                        for (const SandboxEditorFileImportPayloadOption& option :
+                        for (const EditorFileImportPayloadOption& option :
                              frame.FileImport.PayloadOptions)
                         {
                             const bool selected =
@@ -2626,7 +2631,7 @@ namespace Extrinsic::Sandbox::Editor
                             if (!option.Enabled)
                                 ImGui::BeginDisabled();
                             if (ImGui::Selectable(
-                                    DebugNameForSandboxEditorAssetPayloadKind(
+                                    DebugNameForEditorAssetPayloadKind(
                                         option.Kind),
                                     selected))
                             {
@@ -2665,9 +2670,9 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::BeginDisabled();
                 if (ImGui::Button("Import asset") && importAvailable)
                 {
-                    *lastImportResult = ApplySandboxEditorFileImportCommand(
-                        *context,
-                        SandboxEditorFileImportCommand{
+                    *lastImportResult = ApplyEditorFileImportCommand(
+                        context->SceneCommands,
+                        EditorFileImportCommand{
                             .Path = std::string(importPathBuffer->data()),
                             .PayloadKind = *importPayloadKind,
                         });
@@ -2679,7 +2684,7 @@ namespace Extrinsic::Sandbox::Editor
                         frame.FileImport.ImportDisabledReason);
                 }
                 ImGui::TextWrapped("%s", frame.FileImport.StatusText.c_str());
-                const SandboxEditorFileImportResult* result =
+                const EditorFileImportResult* result =
                     lastImportResult != nullptr && lastImportResult->has_value()
                         ? &**lastImportResult
                         : frame.FileImport.LastResult.has_value()
@@ -2688,10 +2693,10 @@ namespace Extrinsic::Sandbox::Editor
                 if (result != nullptr)
                 {
                     ImGui::Text("Last import: %s",
-                                DebugNameForSandboxEditorCommandStatus(
+                                DebugNameForEditorCommandStatus(
                                     result->Status));
                     ImGui::Text("Payload: %s",
-                                DebugNameForSandboxEditorAssetPayloadKind(
+                                DebugNameForEditorAssetPayloadKind(
                                     result->PayloadKind));
                     if (result->Asset.IsValid())
                     {
@@ -2731,7 +2736,7 @@ namespace Extrinsic::Sandbox::Editor
                 const bool gpuProfilingToggleAvailable =
                     context != nullptr &&
                     frame.RenderGraph.GpuProfilingToggleAvailable;
-                std::optional<SandboxEditorGpuProfilingConfigResult>
+                std::optional<EditorGpuProfilingConfigResult>
                     gpuProfilingConfigResult{};
                 if (!gpuProfilingToggleAvailable)
                     ImGui::BeginDisabled();
@@ -2740,8 +2745,8 @@ namespace Extrinsic::Sandbox::Editor
                     gpuProfilingToggleAvailable)
                 {
                     gpuProfilingConfigResult =
-                        ApplySandboxEditorGpuProfilingConfigCommand(
-                            *context, gpuProfilingEnabled);
+                        ApplyEditorGpuProfilingConfigCommand(
+                            context->RenderRecipeCommands, gpuProfilingEnabled);
                 }
                 if (!gpuProfilingToggleAvailable)
                 {
@@ -2841,7 +2846,7 @@ namespace Extrinsic::Sandbox::Editor
                     if (ImGui::CollapsingHeader("GPU Profile",
                                                 ImGuiTreeNodeFlags_DefaultOpen))
                     {
-                        const SandboxEditorGpuProfileModel& profile =
+                        const EditorGpuProfileModel& profile =
                             frame.RenderGraph.GpuProfile;
                         ImGui::Text("Status: %s, source=%s, fresh=%s, stale=%s",
                                     profile.Status.c_str(),
@@ -2874,7 +2879,7 @@ namespace Extrinsic::Sandbox::Editor
                         {
                             ImGui::TextDisabled("No queue envelope samples.");
                         }
-                        for (const SandboxEditorGpuProfileQueueModel& queue :
+                        for (const EditorGpuProfileQueueModel& queue :
                              profile.QueueEnvelopes)
                         {
                             if (queue.DurationNs.has_value())
@@ -2899,7 +2904,7 @@ namespace Extrinsic::Sandbox::Editor
                         {
                             ImGui::TextDisabled("No pass samples.");
                         }
-                        for (const SandboxEditorGpuProfilePassModel& pass :
+                        for (const EditorGpuProfilePassModel& pass :
                              profile.Passes)
                         {
                             const std::string typedId =
@@ -2950,7 +2955,7 @@ namespace Extrinsic::Sandbox::Editor
                         {
                             ImGui::TextDisabled("No command pass records.");
                         }
-                        for (const SandboxEditorRenderGraphPassModel& pass :
+                        for (const EditorRenderGraphPassModel& pass :
                              frame.RenderGraph.CommandPasses)
                         {
                             if (pass.HasTypedId)
@@ -3006,7 +3011,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (frame.CameraRender.HasMainCameraController)
                 {
                     ImGui::Text("Main camera: %s",
-                                DebugNameForSandboxEditorCameraControllerKind(
+                                DebugNameForEditorCameraControllerKind(
                                     frame.CameraRender.MainCameraControllerKind));
                 }
                 else
@@ -3021,37 +3026,37 @@ namespace Extrinsic::Sandbox::Editor
                                         "pans/moves; Shift accelerates; scroll zooms.");
                     if (ImGui::Button("Orbit"))
                     {
-                        (void)ApplySandboxEditorCameraControllerCommand(
-                            *context,
-                            SandboxEditorCameraControllerCommand{
-                                .Kind = SandboxEditorCameraControllerKind::Orbit,
+                        (void)ApplyEditorCameraControllerCommand(
+                            context->SceneCommands,
+                            EditorCameraControllerCommand{
+                                .Kind = EditorCameraControllerKind::Orbit,
                             });
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Fly"))
                     {
-                        (void)ApplySandboxEditorCameraControllerCommand(
-                            *context,
-                            SandboxEditorCameraControllerCommand{
-                                .Kind = SandboxEditorCameraControllerKind::Fly,
+                        (void)ApplyEditorCameraControllerCommand(
+                            context->SceneCommands,
+                            EditorCameraControllerCommand{
+                                .Kind = EditorCameraControllerKind::Fly,
                             });
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Free look"))
                     {
-                        (void)ApplySandboxEditorCameraControllerCommand(
-                            *context,
-                            SandboxEditorCameraControllerCommand{
-                                .Kind = SandboxEditorCameraControllerKind::FreeLook,
+                        (void)ApplyEditorCameraControllerCommand(
+                            context->SceneCommands,
+                            EditorCameraControllerCommand{
+                                .Kind = EditorCameraControllerKind::FreeLook,
                             });
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Top down"))
                     {
-                        (void)ApplySandboxEditorCameraControllerCommand(
-                            *context,
-                            SandboxEditorCameraControllerCommand{
-                                .Kind = SandboxEditorCameraControllerKind::TopDown,
+                        (void)ApplyEditorCameraControllerCommand(
+                            context->SceneCommands,
+                            EditorCameraControllerCommand{
+                                .Kind = EditorCameraControllerKind::TopDown,
                             });
                     }
                 }
@@ -3068,7 +3073,7 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::Text("Selected render id: %u",
                                 frame.Visualization.SelectedStableId);
                     ImGui::Text("Geometry domain: %s",
-                                DebugNameForSandboxEditorGeometryDomain(
+                                DebugNameForEditorGeometryDomain(
                                     frame.Visualization.SelectedDomain));
 
                     if (context != nullptr &&
@@ -3077,7 +3082,7 @@ namespace Extrinsic::Sandbox::Editor
                         if (frame.Visualization.Visualization.HasConfig)
                         {
                             ImGui::Text("Visualization: %s",
-                                        DebugNameForSandboxEditorVisualizationColorSource(
+                                        DebugNameForEditorVisualizationColorSource(
                                             frame.Visualization.Visualization.Source));
                         }
                         else
@@ -3090,7 +3095,7 @@ namespace Extrinsic::Sandbox::Editor
                             {
                                 ImGui::Text(
                                     "Recipe: %s",
-                                    DebugNameForSandboxEditorVisualizationRecipeKind(
+                                    DebugNameForEditorVisualizationRecipeKind(
                                         frame.Visualization.Recipe.Kind));
                             }
                             else
@@ -3101,24 +3106,24 @@ namespace Extrinsic::Sandbox::Editor
 
                         if (ImGui::Button("Uniform color"))
                         {
-                            (void)ApplySandboxEditorVisualizationConfigCommand(
-                                *context,
+                            (void)ApplyEditorVisualizationConfigCommand(
+                                context->VisualizationCommands,
                                 MakeUniformVisualizationConfigCommandFromModel(
                                     frame.Visualization.SelectedStableId,
                                     frame.Visualization.Visualization,
-                                    SandboxEditorVisualizationTarget::Entity,
+                                    EditorVisualizationTarget::Entity,
                                     frame.Visualization.Visualization.Color));
                         }
                         ImGui::SameLine();
                         if (ImGui::Button("Clear vis"))
                         {
-                            (void)ApplySandboxEditorVisualizationConfigCommand(
-                                *context,
-                                SandboxEditorVisualizationConfigCommand{
+                            (void)ApplyEditorVisualizationConfigCommand(
+                                context->VisualizationCommands,
+                                EditorVisualizationConfigCommand{
                                     .StableEntityId =
                                         frame.Visualization.SelectedStableId,
                                     .Target =
-                                        SandboxEditorVisualizationTarget::Entity,
+                                        EditorVisualizationTarget::Entity,
                                     .EnableConfig = false,
                                 });
                         }
@@ -3126,20 +3131,20 @@ namespace Extrinsic::Sandbox::Editor
                             frame.Visualization.Visualization,
                             *context,
                             frame.Visualization.SelectedStableId,
-                            SandboxEditorVisualizationTarget::Entity,
+                            EditorVisualizationTarget::Entity,
                             true);
                         DrawScalarVisualizationControls(
                             frame.Visualization.Visualization,
                             *context,
                             frame.Visualization.SelectedStableId,
-                            SandboxEditorVisualizationTarget::Entity,
+                            EditorVisualizationTarget::Entity,
                             true);
                         DrawVisualizationPropertyPresets(
                             frame.Visualization.Properties,
                             frame.Visualization.Visualization,
                             *context,
                             frame.Visualization.SelectedStableId,
-                            SandboxEditorVisualizationTarget::Entity,
+                            EditorVisualizationTarget::Entity,
                             true);
                     }
                 }
@@ -3151,15 +3156,24 @@ namespace Extrinsic::Sandbox::Editor
 
     struct EditorShell::Impl
     {
-        Runtime::SandboxEditorSession Session{};
+        struct SandboxPreparedFrame final
+        {
+            Runtime::EditorWorkspaceSnapshotPreparedFrame Workspace{};
+            Runtime::EditorSceneEditingPreparedFrame Scene{};
+            Runtime::EditorGeometryProcessingPreparedFrame Geometry{};
+            Runtime::EditorVisualizationEditingPreparedFrame Visualization{};
+            Runtime::EditorRenderRecipeEditingPreparedFrame RenderRecipe{};
+        };
+
+        Runtime::EditorWorkspaceAttachment Attachment{};
         Runtime::EditorUiHost* Host{nullptr};
         Runtime::EditorUiFrameContributionHandle FrameContribution{};
         BuiltinWindowHandles BuiltinHandles{};
         std::vector<Runtime::EditorWindowHandle> RegisteredWindows{};
         std::array<char, 1024> ImportPathBuffer{};
         std::array<char, 1024> ScenePathBuffer{};
-        Runtime::SandboxEditorAssetPayloadKind ImportPayloadKind{
-            Runtime::SandboxEditorAssetPayloadKind::Unknown};
+        Runtime::EditorAssetPayloadKind ImportPayloadKind{
+            Runtime::EditorAssetPayloadKind::Unknown};
         std::array<char, 8192> RenderRecipeDraftBuffer{};
         std::int32_t TextureBakeSourceIndex{0};
         std::int32_t TextureBakeTargetSemanticIndex{0};
@@ -3175,8 +3189,9 @@ namespace Extrinsic::Sandbox::Editor
         float UvAtlasTexelsPerUnit{0.0f};
         bool UvAtlasForceRegenerate{true};
         bool UvAtlasPreserveAuthored{false};
-        const Runtime::SandboxEditorPreparedFrameView* ActivePreparedFrame{
-            nullptr};
+        SandboxEditorFrame LastFrame{};
+        std::optional<SandboxEditorContext> ActiveContext{};
+        std::optional<SandboxPreparedFrame> ActivePreparedFrame{};
 
         void RegisterBuiltinWindows()
         {
@@ -3224,12 +3239,12 @@ namespace Extrinsic::Sandbox::Editor
             const std::string_view id,
             bool& open)
         {
-            if (ActivePreparedFrame == nullptr)
+            if (!ActivePreparedFrame.has_value() || !ActiveContext.has_value())
                 return;
 
             TextureBakeUiState textureBakeState{
                 .LastUvRegenerationResult =
-                    &ActivePreparedFrame->LastUvRegenerationResult,
+                    &ActivePreparedFrame->Geometry.Results.LastUvRegenerationResult,
                 .SourceIndex = &TextureBakeSourceIndex,
                 .TargetSemanticIndex = &TextureBakeTargetSemanticIndex,
                 .EncoderIndex = &TextureBakeEncoderIndex,
@@ -3249,39 +3264,57 @@ namespace Extrinsic::Sandbox::Editor
             DrawFixedWindow(
                 id,
                 open,
-                ActivePreparedFrame->Frame,
-                &ActivePreparedFrame->Context,
+                LastFrame,
+                &*ActiveContext,
                 &ImportPathBuffer,
                 &ScenePathBuffer,
                 &RenderRecipeDraftBuffer,
                 &ImportPayloadKind,
-                &ActivePreparedFrame->LastAssetImportResult,
-                &ActivePreparedFrame->LastSceneFileResult,
+                &ActivePreparedFrame->Scene.LastAssetImportResult,
+                &ActivePreparedFrame->Scene.LastSceneFileResult,
                 &textureBakeState);
         }
 
         void DrawFrame()
         {
-            if (!Session.IsAttached() || Host == nullptr)
+            if (!Attachment.IsAttached() || Host == nullptr)
                 return;
 
-            if (!Session.PrepareFrame(
+            std::optional<Runtime::EditorWorkspaceSnapshotPreparedFrame>
+                workspace = Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                    Attachment,
                     BuildModelRequest(Host->Windows(), BuiltinHandles),
                     std::string{ImportPathBuffer.data()},
                     ImportPayloadKind,
-                    std::string{ScenePathBuffer.data()}))
+                    std::string{ScenePathBuffer.data()});
+            if (!workspace.has_value())
             {
                 return;
             }
 
-            (void)Session.VisitPreparedFrame(
-                [this](Runtime::SandboxEditorPreparedFrameView frame)
-                {
-                    ActivePreparedFrame = &frame;
-                    DrawMainMenuBar(&Host->Windows());
-                    (void)Host->Windows().DrawOpenWindows();
-                    ActivePreparedFrame = nullptr;
-                });
+            ActivePreparedFrame.emplace(SandboxPreparedFrame{
+                .Workspace = std::move(*workspace),
+                .Scene = Runtime::PrepareEditorSceneEditingFrame(Attachment),
+                .Geometry =
+                    Runtime::PrepareEditorGeometryProcessingFrame(Attachment),
+                .Visualization =
+                    Runtime::PrepareEditorVisualizationEditingFrame(Attachment),
+                .RenderRecipe =
+                    Runtime::PrepareEditorRenderRecipeEditingFrame(Attachment),
+            });
+            SandboxPreparedFrame& prepared = *ActivePreparedFrame;
+            LastFrame = SandboxEditorFrame{prepared.Workspace.Frame};
+            ActiveContext.emplace(
+                prepared.Workspace,
+                prepared.Scene,
+                prepared.Geometry,
+                prepared.Visualization,
+                prepared.RenderRecipe,
+                LastFrame);
+            DrawMainMenuBar(&Host->Windows());
+            (void)Host->Windows().DrawOpenWindows();
+            ActivePreparedFrame.reset();
+            ActiveContext.reset();
         }
 
         Runtime::EditorWindowHandle RegisterEditorWindow(
@@ -3300,9 +3333,9 @@ namespace Extrinsic::Sandbox::Editor
                     .Draw =
                         [this, draw = std::move(draw)](bool& open)
                         {
-                            if (draw && ActivePreparedFrame != nullptr)
+                            if (draw && ActiveContext.has_value())
                             {
-                                draw(open, ActivePreparedFrame->Context);
+                                draw(open, *ActiveContext);
                             }
                         },
                     .OpenStateChanged =
@@ -3324,8 +3357,8 @@ namespace Extrinsic::Sandbox::Editor
             }
 
             RegisterBuiltinWindows();
-            Session.Attach(worlds, services);
-            if (!Session.IsAttached())
+            Attachment.Attach(worlds, services);
+            if (!Attachment.IsAttached())
             {
                 Detach();
                 return;
@@ -3341,13 +3374,15 @@ namespace Extrinsic::Sandbox::Editor
 
         void Detach()
         {
-            ActivePreparedFrame = nullptr;
+            ActivePreparedFrame.reset();
+            ActiveContext.reset();
+            LastFrame = {};
             if (Host != nullptr && FrameContribution.IsValid())
                 (void)Host->UnregisterFrameContribution(FrameContribution);
             FrameContribution = {};
             UnregisterAllWindows();
             Host = nullptr;
-            Session.Detach();
+            Attachment.Detach();
         }
     };
 
@@ -3425,12 +3460,12 @@ namespace Extrinsic::Sandbox::Editor
         return m_Impl->Host != nullptr &&
                m_Impl->FrameContribution.IsValid() &&
                m_Impl->Host->IsOperational() &&
-               m_Impl->Session.IsAttached();
+               m_Impl->Attachment.IsAttached();
     }
 
-    const Runtime::SandboxEditorPanelFrame&
+    const SandboxEditorFrame&
     EditorShell::GetLastFrame() const noexcept
     {
-        return m_Impl->Session.LastFrame();
+        return m_Impl->LastFrame;
     }
 }

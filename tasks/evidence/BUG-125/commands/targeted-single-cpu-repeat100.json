@@ -1,0 +1,31 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "0",
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "RuntimeAssetImportFormatCoverage\\.(QueuedImportsRejectActiveWorldSwitchBeforeApply|ManualModelSceneAndTextureImportQueueCompletesThroughStreaming)$",
+    "--repeat",
+    "until-fail:100",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "taskset -c 0 ctest --test-dir build/ci --output-on-failure -R 'RuntimeAssetImportFormatCoverage\\.(QueuedImportsRejectActiveWorldSwitchBeforeApply|ManualModelSceneAndTextureImportQueueCompletesThroughStreaming)$' --repeat until-fail:100 --timeout 60",
+  "cwd": ".",
+  "duration_ms": 9739,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T01:14:23Z",
+  "label": "targeted-single-cpu-repeat100",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T01:14:13Z",
+  "stderr_path": "tasks/evidence/BUG-125/commands/targeted-single-cpu-repeat100.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-125/commands/targeted-single-cpu-repeat100.stdout.log",
+  "stdout_sha256": "17a03f78dd7a15ad82543bb50aad2e2748b4ba5d2a959a33b836fd876e5637e3",
+  "task_id": "BUG-125"
+}

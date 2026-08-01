@@ -11,6 +11,8 @@
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.ECS.Scene.Bootstrap;
@@ -38,7 +40,12 @@ import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -489,18 +496,18 @@ TEST(RuntimeRenderExtraction, UiTransformEditModelReachesRenderWorldAfterPreRend
 
     // Post-fixed-step editor command (the Inspector "Local position" edit).
     Runtime::SelectionController selection;
-    const Runtime::SandboxEditorContext context{
+    const Intrinsic::Tests::EditorFeatureTestContext context{
         .Scene = &scene,
         .Selection = &selection,
     };
-    const auto status = Runtime::ApplySandboxEditorTransformEdit(
+    const auto status = Runtime::ApplyEditorTransformEdit(
         context,
-        Runtime::SandboxEditorTransformEditCommand{
+        Runtime::EditorTransformEditCommand{
             .StableEntityId = Runtime::SelectionController::ToStableEntityId(entity),
             .SetPosition = true,
             .Position = glm::vec3{7.f, 8.f, 9.f},
         });
-    ASSERT_EQ(status, Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_EQ(status, Runtime::EditorCommandStatus::Applied);
 
     // Without the pre-render flush the snapshot stays at the stale
     // translation — the BUG-024 failure mode.
@@ -975,7 +982,7 @@ TEST(RuntimeRenderExtraction, MeshSurfaceLaneOverrideDoubleCurvatureReachesPrepa
     vertexProperties.GetOrAdd<double>("v:mean_curvature", 0.0).Vector() =
         {-0.02, 0.004, 0.05};
 
-    // Exactly what ApplySandboxEditorVisualizationPropertyCommand builds for
+    // Exactly what ApplyEditorVisualizationPropertyCommand builds for
     // the Scalar preset via ToVisualizationConfig: a default config with only
     // the command fields assigned (colormap stays the ScalarFieldConfig
     // default), stored on the surface lane.

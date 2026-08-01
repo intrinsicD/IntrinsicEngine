@@ -140,15 +140,18 @@
   tasks/archive/BUG-075-worldregistry-activate-while-destroy-pending.md]
 - **From staging**: O23
 
-## K13: Sandbox Editor Attachments Invalidate Copied Callback Surfaces
-- **Constraint**: Detaching a `SandboxEditorSession` invalidates every copied
-  command/result callback through an attachment epoch and clears all
-  attachment-scoped frame, cache, result, queue, and recipe state before a
-  different `Engine` may attach. Stale copied surfaces fail closed instead of
-  touching the prior engine or publishing into the new attachment.
+## K13: Editor Workspace Attachments Invalidate Copied Feature Surfaces
+- **Constraint**: Detaching an `EditorWorkspaceAttachment` invalidates every
+  copied feature command/query/result callback through its attachment epoch
+  and clears all attachment-scoped frame, cache, result, queue, and recipe
+  state before a different `Engine` may attach. Stale copied surfaces fail
+  closed instead of touching the prior engine or publishing into the new
+  attachment.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.SandboxEditorFacades.cpp,
+- **Evidence**: [src/runtime/internal/Runtime.EditorWorkspaceSession.cpp,
+  src/runtime/Runtime.EditorWorkspaceAttachment.cppm,
+  src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp,
   tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
@@ -189,8 +192,8 @@
   cache is invalidated synchronously when the command is applied.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.SandboxParameterizationFacade.cpp,
-  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+- **Evidence**: [src/runtime/Runtime.ParameterizationOperations.cpp,
+  tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N214, N215]
 - **From staging**: O33
@@ -202,8 +205,8 @@
   disk that is valid in the source representation.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.SandboxParameterizationFacade.cpp,
-  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+- **Evidence**: [src/runtime/Runtime.ParameterizationOperations.cpp,
+  tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N214, N215]
 - **From staging**: O34
@@ -249,10 +252,10 @@
   matches canonical topology-to-face indices, vertex positions, and UV values.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.SandboxEditorFacades.Internal.hpp,
-  src/runtime/Runtime.SandboxEditorFacades.cpp,
-  src/runtime/Runtime.SandboxParameterizationFacade.cpp,
-  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+- **Evidence**: [src/runtime/Runtime.GeometryProcessingOperations.Internal.hpp,
+  src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp,
+  src/runtime/Runtime.ParameterizationOperations.cpp,
+  tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/GRAPHICS-122-uv-view-offscreen-render-target.md,
   N221]
 - **From staging**: O46

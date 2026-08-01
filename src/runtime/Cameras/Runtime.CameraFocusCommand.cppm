@@ -2,12 +2,14 @@ module;
 
 #include <optional>
 #include <span>
+#include <string>
 
 export module Extrinsic.Runtime.CameraFocusCommand;
 
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Sphere;
 
@@ -61,4 +63,13 @@ export namespace Extrinsic::Runtime
                                 const SelectionController& selection,
                                 const ECS::Scene::Registry& scene,
                                 CameraControllerSlot slot = CameraControllerSlot::Main) noexcept;
+
+    // Builds the reusable input-action body for selection focus. Application
+    // composition owns the action name and binding (for example the Sandbox
+    // `F` shortcut); runtime owns scene/config validation and camera mutation.
+    [[nodiscard]] RuntimeInputActionDesc MakeFocusCameraOnSelectionInputAction(
+        CameraControllerRegistry& cameras,
+        SelectionController& selection,
+        std::string debugName,
+        RuntimeInputActionBinding binding);
 }

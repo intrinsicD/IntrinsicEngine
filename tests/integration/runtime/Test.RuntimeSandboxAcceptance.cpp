@@ -23,6 +23,8 @@
 #include <gtest/gtest.h>
 #include "RuntimeTestModule.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Dag.TaskGraph;
@@ -55,7 +57,12 @@ import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
@@ -354,7 +361,7 @@ TEST(RuntimeSandboxAcceptance, SelectionControllerSelectsEntityOfEachFamily)
 
 // The sandbox editor panel frame enumerates the full acceptance scene and
 // reports selection state without owning engine state.
-TEST(RuntimeSandboxAcceptance, EditorPanelFrameEnumeratesAcceptanceScene)
+TEST(RuntimeSandboxAcceptance, EditorWorkspaceSnapshotEnumeratesAcceptanceScene)
 {
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
@@ -369,16 +376,16 @@ TEST(RuntimeSandboxAcceptance, EditorPanelFrameEnumeratesAcceptanceScene)
         *engine.Services().Find<Runtime::SelectionController>();
     ASSERT_TRUE(selection.SetSelectedEntity(scene, mesh));
 
-    const Runtime::SandboxEditorContext context{
+    const Intrinsic::Tests::EditorFeatureTestContext context{
         .Scene = &scene,
         .Selection = &selection,
         .ImGuiAdapterAvailable = true,
     };
-    const Runtime::SandboxEditorPanelFrame frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot frame = Runtime::BuildEditorWorkspaceSnapshot(context);
 
     EXPECT_EQ(frame.Hierarchy.size(), 3u);
     const auto meshRow = std::find_if(frame.Hierarchy.begin(), frame.Hierarchy.end(),
-        [mesh](const Runtime::SandboxEditorEntityRow& row) { return row.Entity == mesh; });
+        [mesh](const Runtime::EditorEntityRow& row) { return row.Entity == mesh; });
     ASSERT_NE(meshRow, frame.Hierarchy.end());
     EXPECT_EQ(meshRow->Name, "AcceptanceMesh");
     EXPECT_TRUE(meshRow->Selectable);
@@ -563,14 +570,14 @@ namespace
         void Frame(double, double) override
         {
             auto& engine = Kernel();
-            const Runtime::SandboxEditorContext context{
+            const Intrinsic::Tests::EditorFeatureTestContext context{
                 .Scene          = &*engine.Worlds().Get(engine.ActiveWorld()),
                 .Selection      = engine.Services().Find<Runtime::SelectionController>(),
                 .CommandHistory = &*engine.Services().Find<Runtime::EditorCommandHistory>(),
             };
-            LastStatus = Runtime::ApplySandboxEditorTransformEdit(
+            LastStatus = Runtime::ApplyEditorTransformEdit(
                 context,
-                Runtime::SandboxEditorTransformEditCommand{
+                Runtime::EditorTransformEditCommand{
                     .StableEntityId =
                         Runtime::SelectionController::ToStableEntityId(Entity),
                     .SetPosition = true,
@@ -581,8 +588,8 @@ namespace
         void Shutdown() override {}
 
         EntityHandle Entity{};
-        Runtime::SandboxEditorCommandStatus LastStatus{
-            Runtime::SandboxEditorCommandStatus::NoChange};
+        Runtime::EditorCommandStatus LastStatus{
+            Runtime::EditorCommandStatus::NoChange};
     };
 }
 
@@ -607,7 +614,7 @@ TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFra
 
     engine.Run();
 
-    ASSERT_EQ(appPtr->LastStatus, Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_EQ(appPtr->LastStatus, Runtime::EditorCommandStatus::Applied);
     const EntityHandle entity = appPtr->Entity;
     auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
 

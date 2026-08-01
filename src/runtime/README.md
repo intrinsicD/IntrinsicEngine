@@ -6,6 +6,9 @@ startup/shutdown.
 
 ## Public module surface
 
+The retired Sandbox facade export ledger and current owner map are recorded in
+[Sandbox editor feature boundaries](../../docs/architecture/sandbox-editor-feature-boundaries.md).
+
 | Module | Responsibility |
 |---|---|
 | `Extrinsic.Runtime.CommandBus` | Domain-free kernel command bus from ADR-0024 D5. Commands are plain-data payloads with correlation ids, thread-safe enqueue from any phase/thread, and exactly one Engine-owned pre-simulation drain point. Missing handlers and failed handlers are reported loudly; handlers receive `CommandContext` narrow capabilities rather than `Engine&`. |
@@ -21,7 +24,9 @@ startup/shutdown.
 | `Extrinsic.Runtime.EngineConfigBoot` | Free-standing boot-time config helper from `RUNTIME-146`, extended by `CORE-009`. Exports `CreateReferenceEngineConfig()`, registry-aware overloads, `EngineConfigBoot*` records, and `ResolveEngineConfigForBoot(...)`, preserving sandbox startup precedence (`--engine-config` → `INTRINSIC_ENGINE_CONFIG` → `config/engine.json` → reference defaults) without importing the full `Engine` interface. |
 | `Extrinsic.Runtime.EngineConfigControl` | App-composed live config-control module from `RUNTIME-181`, building on the `RUNTIME-149`/`CORE-009` facade. The `final IRuntimeModule` owns the application-section registry, exposes it before boot, and publishes/withdraws its exact instance through `ServiceRegistry`. It exports render-recipe preview/load/activate/apply/clear APIs and state, engine-config hot-subset preview/load/apply APIs and state, deterministic changed-section reporting, and the DTOs used by editor/agent callers. During registration it copies the Engine's already-applied startup recipe state, retargets the narrow borrowed activation capability to its persistent state, and fully binds before publication. It mutates only the borrowed Engine-owned `EngineConfig`, rejects boot-only differences, synchronously commits the default recipe path, default-off GPU-profiling bit, and registered application sections, dispatches section callbacks only after commit, and clears all live bindings on shutdown so stale references fail closed. |
 | `Extrinsic.Runtime.RenderRecipeActivation` | Plain shared recipe-activation kernel and free functions from `RUNTIME-181`. The capability contains only a borrowed active config/state plus framebuffer-extent and frame-recipe-override callbacks; it owns no window or renderer. `Engine::Initialize()` uses it for unconditional reset and optional boot-file activation even when live control is omitted, while `EngineConfigControl` uses the same preview/load/apply/clear functions for synchronous UI and agent control. |
-| `Extrinsic.Runtime.SandboxConfigSections` | Presentation-free typed DTO, canonical JSON codec/validator, lookup/update helper, and registration-factory surface for the `sandbox.clustering`, `sandbox.progressive_poisson`, and `sandbox.parameterization` application sections. `ClusteringConfig` maps exactly to the canonical `RunKMeans` parameters/backend through `MakeConfiguredKMeansRequest`, so config files, agent/CLI hot apply, and the UI share one validated command shape. It owns the Sandbox field vocabulary while Core sees only generic records; `app/Sandbox` composes the registrations before boot. |
+| `Extrinsic.Runtime.ClusteringConfig` | Clustering-owned schema, canonical JSON codec/validator, lookup/update helper, and registration factory for `sandbox.clustering`. `ClusteringConfig` maps exactly to the canonical `RunKMeans` request, so config files, agent/CLI hot apply, and UI use one validated shape. |
+| `Extrinsic.Runtime.ProgressivePoissonConfig` | Progressive-Poisson-owned schema, codec/validator, lookup/update helper, and registration factory for `sandbox.progressive_poisson`. |
+| `Extrinsic.Runtime.ParameterizationConfig` | Parameterization-owned schema, codec/validator, lookup/update helper, and registration factory for `sandbox.parameterization`. Core sees only generic section records; `app/Sandbox` owns registration/default aggregation for all three feature modules before boot. |
 | `Extrinsic.Runtime.InputActions` | Runtime-owned input-action registry from `RUNTIME-155`, finalized by `RUNTIME-186`. Exports the action binding/handle/context/service/descriptor API plus `RuntimeInputActionRegistry`, which owns handle allocation, registration/unregistration state, key-edge trigger checks, ImGui keyboard-capture suppression, callback failure logging, and per-frame dispatch after the pre-render transform flush. Its generic service aggregate carries config, scene, and mutable render input; camera- and selection-aware actions capture their exact optional services when app policy registers them. Engine publishes the registry as a built-in service and dispatches it, but no longer re-exports its records or forwards registration/unregistration. App owners import this module and retain their exact registry handles directly. |
 | `Extrinsic.Runtime.AsyncWorkModule` | App-composed `JobService` lifecycle owner finalized by `RUNTIME-194`. Registration publishes the Engine kernel's exact borrowed `JobService` through `ServiceRegistry`; it creates no worker pool, scheduler, registry, frame hook, or feature facade. Shutdown first withdraws that exact service so later modules cannot discover a stale publication, then requests cancellation for every surviving job; Engine owns scheduler quiescence after reverse module teardown. World-scoped cancellation remains in `WorldRegistry`. Sandbox and tests that need app-side job discovery compose the module explicitly; omitting it leaves the kernel service and bounded Engine drain operational but publishes no editor/module lookup surface. `Runtime.Engine` never imports or names the concrete module. |
 | `Extrinsic.Runtime.Engine` | Domain-free composition root and frame-loop owner. Its interface owns no application callback object and no asset/import/residency/bake, scene-document/history, scene-interaction, camera, async, config-control, editor-UI, reference-scene, selection, lookup, readback, gizmo, or mesh primitive-view capability. Optional owners publish exact services and contribute typed hooks through the module schedule. Before module registration Engine publishes the exact live `RHI::IDevice`, `Platform::IWindow`, `Graphics::IRenderer`, `RenderExtractionCache`, and `RuntimeInputActionRegistry` built-ins; `AsyncWorkModule` separately publishes the kernel-owned `JobService`. Reinitialization republishes fresh borrowed instances. `BeginShutdown()` publishes and pumps the announcement after command discard, drains GPU participants, stops the loop, and waits for device idle while worlds/services remain live so concrete app state can detach. `Shutdown()` invokes that boundary when needed, then performs ordinary reverse module and subsystem teardown. Render-extraction cache/pool/frame-index ownership remains in the Engine-private `RenderExtractionService`; callers read extraction or visualization state from the published cache rather than Engine forwarders. `RUNTIME-187` puts every private field behind `Engine::Impl`. The exact final surface is `12/0/0/5`: twelve declaration-required plain imports, zero domain imports, zero re-exports, and only `GetDevice`, `GetEngineConfig`, `GetLastFramePacingDiagnostics`, `GetRenderer`, and `GetWindow`, each ratcheted with its return/owning type and owning import. |
@@ -33,7 +38,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.AssetIngestStateMachine` | Runtime-owned ingest request/result state machine (`RUNTIME-101`). Exports request sources for manual import, dropped files, and reimport; phases from `Queued` through route resolution, decode scheduling/execution, main-thread apply, `Complete`, `Failed`, and `Cancelled`; and a diagnostic taxonomy for missing path/file, route failures, invalid reimport target, duplicate active request, decode failure, materialization failure, cancellation, stale completion, invalid transition, and unknown handles. The state machine is backend-neutral and owns no decoders, ECS mutation, `AssetService`, graphics, RHI, or worker threads. `AssetWorkflowModule::ImportAssetFromPath(...)`, `QueueAssetImport(...)`, `QueueGeometryImport(...)`, `QueueModelTextureImport(...)`, `ReimportAsset(...)`, and dropped imports submit records through this contract; deferred file reads and decodes run as `Runtime.JobService` jobs and complete/fail only from its main-thread completion drain, with unpublished termination reconciling the visible queue record through `JobDesc::FinalizeUnpublishedOnMainThread`. Direct and queued reimport preserve the requested existing asset identity, reload the same `AssetId` transactionally, and let the workflow's private residency/materialization state consume `Reloaded`/`Ready` events without reviving ECS `AssetSourceRef` coupling; standalone geometry scene entities remain authoring snapshots and are not duplicated. |
 | `Extrinsic.Runtime.GeometryPresentation` | Sole neutral geometry-presentation contract after `RUNTIME-193`. `GeometryPresentationRecipe` contains authored shape/lane/presentation/slot choices, stable asset ids, canonical `GeometryPropertyRef` identities, uniform defaults, generated-output names, texture colormap/normal-space interpretation, and generated-output policy. `GeometryPresentationRuntimeState` separately carries runtime-only readiness, generated assets, diagnostics, and exact recipe/source/output generations. The free `BuildGeometryPresentationSnapshot(...)` projection returns copied effective state with explicit uniform/previous-output fallback and no ECS entity, borrowed property view, job token, graphics/RHI handle, or live service pointer. Scene documents persist only the recipe, accept the retired `progressiveRenderData` wire key on read, and initialize a fresh runtime sidecar. Render extraction, asset/model handoff, caller-owned texture-bake reconciliation, and Sandbox models/commands all use this one recipe/state/snapshot path for mesh, graph, point-cloud, composition, and procedural geometry. |
 | `Extrinsic.Runtime.RenderArtifactPublication` | Runtime-owned render artifact publication contract (`RUNTIME-127`). Exports an artifact registry keyed by renderer id, snapshot id, view/output recipe id, source revisions, and output purpose; lifecycle kinds for transient frames, cached frames, saved files, preview-only outputs, dataset/batch outputs, readback/metric outputs, and candidate project results; UI-facing states for unpublished, stale, canceled, failed, superseded, published, and applied artifacts; explicit provenance-carrying publish/apply/undo commands; and an audit log. Registration never mutates project data. Applying a candidate artifact authorizes a project mutation for the caller-owned command path and records undo/audit metadata, but the registry itself does not import UI, renderer backends, ECS mutation callbacks, or project persistence. |
-| `Extrinsic.Runtime.GeometryAvailability` | Runtime-owned geometry availability resolver (`RUNTIME-117`). Exports CPU source/provenance queries, property-domain support, element counts, and `Surface`/`Edges`/`Points` render-lane readiness from ECS `GeometrySources` plus promoted `RenderSurface`, `RenderEdges`, and `RenderPoints` components. Runtime extraction, progressive property resolution, and Sandbox editor facade command preflight consume this resolver so mesh vertices, graph nodes, and point-cloud points can satisfy point-lane consumers without using exact `GeometrySources::ActiveDomain()` as the common capability gate. It is additionally the single owner of the canonical geometry-property vocabulary (`RUNTIME-192`): `GeometryPropertyRef` (element domain + name + value kind and nothing else, so it is safe inside a desired-state authoring recipe), the pointer-free `GeometryPropertyCatalogSnapshot` (deterministically ordered by domain then name, carrying source identity and generations so callers revalidate by comparing generations rather than dereferencing), `GeometryPropertyValueKindFilter` (`std::optional<Geometry::PropertyValueKind>`, where `std::nullopt` means unconstrained), and the shared name/domain/value-kind/count/finite-value resolution queries. Every runtime feature that names a geometry property -- bake, presentation, visualization, selected analysis, vertex-channel binding -- resolves through this module. |
+| `Extrinsic.Runtime.GeometryAvailability` | Runtime-owned geometry availability resolver (`RUNTIME-117`). Exports CPU source/provenance queries, property-domain support, element counts, and `Surface`/`Edges`/`Points` render-lane readiness from ECS `GeometrySources` plus promoted `RenderSurface`, `RenderEdges`, and `RenderPoints` components. Runtime extraction, progressive property resolution, and focused editor-operation preflight consume this resolver so mesh vertices, graph nodes, and point-cloud points can satisfy point-lane consumers without using exact `GeometrySources::ActiveDomain()` as the common capability gate. It is additionally the single owner of the canonical geometry-property vocabulary (`RUNTIME-192`): `GeometryPropertyRef` (element domain + name + value kind and nothing else, so it is safe inside a desired-state authoring recipe), the pointer-free `GeometryPropertyCatalogSnapshot` (deterministically ordered by domain then name, carrying source identity and generations so callers revalidate by comparing generations rather than dereferencing), `GeometryPropertyValueKindFilter` (`std::optional<Geometry::PropertyValueKind>`, where `std::nullopt` means unconstrained), and the shared name/domain/value-kind/count/finite-value resolution queries. Every runtime feature that names a geometry property -- bake, presentation, visualization, selected analysis, vertex-channel binding -- resolves through this module. |
 | `Extrinsic.Runtime.SceneSerialization` | Backend-neutral scene document seam (`RUNTIME-098`, hardened by `RUNTIME-100` and `RUNTIME-193`). Exports JSON save/load helpers over `ECS::Scene::Registry` plus `Core::IO::IIOBackend`, result/stat records, and fail-closed diagnostics. The current promoted document persists metadata names, durable stable ids, local transforms, hierarchy parent links, selectable tags, render geometry hints, visualization configs and lane overrides, authored `GeometryPresentationRecipe` values, and mesh/graph/point-cloud `GeometrySources` property data for sandbox-authored entities, including mesh-domain `v:position`, `v:normal`, and `v:texcoord` where present. It accepts the legacy `progressiveRenderData` key on read but always writes `geometryPresentation`. Unsupported persistence families are counted deterministically in `SceneSerializationStats` (`Unsupported*Entities`) instead of being silently treated as supported. It deliberately omits `GeometryPresentationRuntimeState`, renderer/RHI caches, GPU handles, dirty-tracker UX, file dialogs, transient job/readiness/diagnostic/generated-output observations, borrowed property views, arbitrary legacy asset source reimport, transient per-entity visualization recipes, and arbitrary component persistence. |
 | `Extrinsic.Runtime.EcsSystemBundle` | Runtime-owned activation helper for the complete promoted fixed-step ECS bundle. Exports `PromotedEcsSystemBundleStats` and `RegisterPromotedEcsSystemBundle(FrameGraph&, ECS::Scene::Registry&)`, which adds `Extrinsic.ECS.System.TransformHierarchy`, `Extrinsic.ECS.System.BoundsPropagation`, and `Extrinsic.ECS.System.RenderSync` as FrameGraph passes. Each fixed substep registers this bundle, then runs `Compile` → `Execute` → `ResetForReplay`; exact descriptors retain topology while callbacks bind the current scene. Dirty world matrices and bounds are therefore refreshed every substep before render extraction observes them (`RUNTIME-091`, `CORE-008`). Also exports `PreRenderTransformFlushStats` and `FlushPreRenderTransformState(ECS::Scene::Registry&)` (BUG-024): a direct `TransformHierarchy` → `BoundsPropagation` → `RenderSync` pass that `Engine::RunFrame()` gates on pending `Transform::IsDirtyTag` / `WorldUpdatedTag` work after the variable tick, ImGui editor hook, and gizmo-interaction drive — and before transform-gizmo packet build and render extraction — so post-fixed-step UI/editor/gizmo transform edits reach the rendered model matrix in the same frame while idle frames skip the redundant sweep. |
 | `Extrinsic.Runtime.EditorCommandHistory` | Runtime/editor-owned undo/redo and document dirty-state seam (`RUNTIME-102`, unified by retired `RUNTIME-201`). Exports `EditorCommandHistory`, deterministic result/status/snapshot DTOs, generic command records, the retained single-selection compatibility adapter, compound commands with rollback, and a hierarchy delete/orphan planning helper. Undoable entity edits keep typed state capture/apply policy with their transform, visualization/presentation, render-hint, geometry, method, or gizmo owner and enter history through the runtime-internal generation-validated mutation transaction; the retired public transform/visualization/primitive-view adapter DTOs no longer make this module import their component types. Delete planning consumes the guarded ECS descendant-preorder query; hierarchy corruption returns `CommandFailed` with empty delete/orphan lists before any command or entity mutation can be published. The history stores labels, capacity-bounds undo/redo stacks, active scene path, revision/saved-revision dirty tracking, and fail-closed stale/missing dependency statuses. ECS remains data-authoritative; the service lives in runtime because editor command policy, sidecars, dirty-state UX, and recursive hierarchy policy are above ECS. |
@@ -55,7 +60,12 @@ startup/shutdown.
 | `Extrinsic.Runtime.StableEntityLookup` | Runtime-owned scene-local lookup sidecar (`RUNTIME-092`, event-driven wiring from `RUNTIME-145`), owned in production by `SceneInteractionModule`. It maps durable ECS `StableId` values to live entities and separately decodes/validates transient render ids, with deterministic duplicate winners and stale/missing diagnostics. `StableEntityLookupSceneBinding` maintains construct/update/destroy hooks for the one bound registry. The interaction module disconnects and clears it before replacement or rebind, rebuilds it afterward, and exposes stable-id resolution plus read-only diagnostics without publishing the raw mutable binding. |
 | `Extrinsic.Runtime.VisualizationRecipes` | Runtime-owned, data-driven translation from canonical geometry properties to data-only `Extrinsic.Graphics.VisualizationPackets`. Exports a closed `VisualizationRecipe` variant for scalar, color, label, vector-field, isoline, Htex-preview, and fragment-bake metadata; `EncodeVisualizationRecipe(...)` resolves `GeometryPropertyRef` values and returns an owning `VisualizationEncodingBatch` plus deterministic `VisualizationEncodingDiagnostics`. Missing BDAs emit copied property-buffer upload descriptors for common graphics residency. Encoding is side-effect free; `ScheduleVisualizationHtexRecreate(...)` is a separate typed `JobService` operation. `RenderExtractionCache` stores copied per-entity recipes, projects `VisualizationConfig` and ready `GeometryPresentationRecipe` property slots into the same encoder, scopes upload keys by stable entity id, and exposes recipe-prefixed extraction counters. No adapter object, registry, opaque key, borrowed property view, or material-source overloading remains. |
 | `Extrinsic.Runtime.ImGuiAdapter` | Runtime-side Dear ImGui platform/renderer adapter (`RUNTIME-090`, `RUNTIME-159`, `UI-034`). It owns paired ImGui 1.92.8 and ImPlot 1.0 contexts, translates drained platform events, opens a frame through `BeginFrame()`, invokes the configured visible contribution through `BuildEditorFrame()`, and copies `ImDrawData` into `Graphics::ImGuiOverlaySystem` during `EndFrame()`. `EndFrame()` records the data-only `EditorInputCaptureSnapshot` defined by `Runtime.Module` from `WantCaptureKeyboard`, `WantCaptureMouse`, and active-widget state before rendering; `EditorUiModule` copies it into the frame-owned value after end. `SetEditorVisible(false)` clears stored capture immediately and suppresses contribution work while preserving adapter lifecycle. The adapter remains backend-agnostic and exposes diagnostics without exporting ImGui headers; `imgui_core_lib` and `implot::implot` are linked **PRIVATE** to runtime. ImGui dynamic texture requests remain disabled because the promoted renderer consumes the copied legacy CPU font atlas. |
-| `Extrinsic.Runtime.SandboxEditorFacades` | Presentation-free Sandbox editor runtime contract. Exports frame-local `SandboxEditorContext`, panel/domain models, selected-model cache/session wiring, and the file, scene, transform, camera, visualization, texture/UV, geometry-processing, method, render-recipe, and artifact facade functions consumed by `app/Sandbox`. The context borrows the canonical `ClusteringService` and last typed K-Means completion; it exports no backend-specific K-Means request, queue, submission, or result family. Geometry-composition summaries consume the guarded ECS immediate-child query; corrupt links emit a `CorruptHierarchy` diagnostic and leave the summary empty instead of presenting a partial child count. The file-import model keeps command-surface availability distinct from form readiness: it reports path/hint/import prerequisites, the concretely resolved payload, stable per-payload option availability, and deterministic disabled reasons. One private route/capability evaluator builds that model and revalidates immediately before dispatch, so empty, unsupported, unavailable-decoder, ambiguous, and incompatible requests fail closed without reaching an import callback. This is extension/capability preflight only; source and companion-file reads remain deferred to `ASSETIO-010`. Runtime owns ECS/asset/graphics/method execution, history, jobs, stale-result rejection, and result sinks; it owns no Sandbox windows, menu state, ImGui drawing, or clustering backend lifecycle. The former `Extrinsic.Runtime.SandboxEditorUi` module is retired. Generic host/registry/property widgets remain under `src/runtime/Editor`; app-owned `Extrinsic.Sandbox.Editor.Shell`, `MethodPanels`, `MeshProcessingPanels`, and `DomainPanels` own presentation. Progressive Poisson and render-recipe/artifact bodies compile in separate private implementation units. |
+| `Extrinsic.Runtime.EditorWorkspaceSnapshots` | Presentation-free workspace snapshot surface. Public `EditorWorkspaceAttachment` carries only the opaque attachment lifecycle; `PrepareEditorWorkspaceSnapshotFrame(...)` prepares copied `EditorWorkspaceSnapshot` data and snapshot queries, while the four feature operation modules prepare their own callback-scoped command/query handles. App-private `SandboxPreparedFrame` composes those five records and decides panel/window composition. Each handle carries the attachment epoch, reports unbound after detach, and fails closed before reaching copied service pointers; operation-specific callback diagnostics remain available. Feature mutation contexts receive only an epoch-guarded selected-model-cache invalidation callback, not the workspace cache object. Workspace model assembly and the bounded private attachment/job-result session compile separately; the private binding/context adapters do not implement feature operations or cross the runtime boundary. The module owns no Sandbox names, menus, widgets, or ImGui state. |
+| `Extrinsic.Runtime.EditorJobProjection` | Read-only job identity, dependency, progress, and queue projections over the canonical `JobService`; submission identity remains with the editor workspace session. |
+| `Extrinsic.Runtime.SceneEditingOperations` | Typed selection, import, scene-file, transform, camera, primitive-view, and document operations plus their copied scene snapshots. Validation and mutation stay in runtime owners. |
+| `Extrinsic.Runtime.GeometryProcessingOperations` | Typed clustering, texture/UV, parameterization, Progressive Poisson, normals, denoise, curvature, remesh, subdivide, simplify, outlier-removal, and ICP registration operations/results. ICP trajectory collection is private to this operation path and calls `Geometry.Registration::AlignICP`; there is no standalone runtime registration wrapper. |
+| `Extrinsic.Runtime.VisualizationEditingOperations` | Typed property, binding, geometry-presentation, spatial-debug, visualization-config, and visualization-recipe snapshots/operations. |
+| `Extrinsic.Runtime.RenderRecipeEditingOperations` | Typed render-graph, recipe draft/apply, profiling, and artifact publication snapshots/operations. |
 | `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor transform-gizmo interaction (`RUNTIME-084`, history convergence in `RUNTIME-201`). It performs screen-space handle hit testing and axis-constrained translate/rotate/scale preview edits, stamps transform dirtiness, and coalesces every moved entity from one drag into one generation-validated `EditorCommandHistory` transaction. Undo/redo revalidates the exact expected batch before restoring it atomically; the retired `GizmoUndoStack` has no replacement stack. In production the interaction is owned by `SceneInteractionModule` through `GizmoFrameService`; graphics receives only frozen copied `TransformGizmoRenderPacket` values in the interaction render snapshot. |
 | `Extrinsic.Runtime.GizmoFrameService` | Runtime composition helper from `RUNTIME-162`, privately owned by `SceneInteractionModule`. It owns one interaction, packet builder, and reusable selected-entity scratch; drives input only after completed editor capture and only when the exact document `EditorCommandHistory` is available; submits selection clicks only when no gizmo drag owns the pointer; and builds copied packets. `ClearSceneState(scene)` cancels an active drag while the registry is live, restores the authored transform, clears scratch/packets, and preserves app-global gizmo config, mode, and orientation. Engine has no gizmo state or facade. |
 
@@ -163,11 +173,11 @@ primitive and focus once only after every renderable/selectable leaf exists.
 
 ### Sandbox Editor Async Method Jobs
 
-Editor buttons that run heavyweight geometry or method work must submit copied
-main-thread input snapshots through `SandboxEditorContext::JobCommands`, then
-return a pending result to the ImGui frame. Its `Submit` callback queues a
-`JobDesc` on `Runtime.JobService` together with the editor-owned entity/output
-identity used by deduplication and queue-row queries.
+Editor buttons that run heavyweight geometry or method work submit typed
+commands through `SandboxEditorContext::GeometryCommands`, then return a
+pending result to the ImGui frame. Runtime snapshots the main-thread input and
+queues a `JobDesc` on `Runtime.JobService` together with the editor-owned
+entity/output identity used by deduplication and queue-row queries.
 Workers never access live ECS or renderer state. The Engine's pre-pump-B
 completion gate drains at most eight completed jobs per frame, revalidates the
 selected target before mutation, and publishes results only from the
@@ -213,14 +223,16 @@ register through `EditorShell::RegisterEditorWindow(...)` with stable ids and
 structured menu paths, then remove the returned handle through
 `UnregisterEditorWindow(...)`; closed windows receive no draw callback, and
 global hide preserves their individual open states. All Sandbox windows are
-app-owned registry contributions. Mesh / Appearance forwards the facade's
+app-owned registry contributions. Mesh / Appearance forwards the workspace's
 callback-scoped borrowed selected-mesh vertex-property view to the
 runtime-owned generic scalar-property widget and never retains the view.
-Callbacks receive a frame-local `SandboxEditorContext` without `Engine&`.
-Runtime retains models, commands, config validation, jobs, history, stale-result
-checks, and result sinks through `Extrinsic.Runtime.SandboxEditorFacades`.
-Method and render-recipe/artifact facade bodies compile in separate private
-implementation units.
+Callbacks receive the app-owned, frame-local `SandboxEditorContext` without
+`Engine&`. The shell copies the `EditorWorkspaceSnapshot`, feature result
+snapshots, and focused scene, geometry, visualization, render-recipe, and
+workspace-query handles; the private runtime attachment binding never crosses
+into app code. Runtime retains validation, jobs, history, stale-result checks,
+and mutations behind those feature-owned modules. Their implementation bodies
+compile separately from the app shell.
 
 `EditorUiModule` routes the unsuppressed `G` input action through the same
 `EditorUiVisibilityCommand` path used by programmatic callers. The frame loop
@@ -236,13 +248,13 @@ the prior frame. Direct ImGui capture reads remain confined to
 
 `RUNTIME-138` makes the first selected-entity responsiveness slice
 visibility-gated: the attached `EditorShell` derives a
-`SandboxEditorModelBuildRequest` from currently open panel windows, so closed
+`EditorWorkspaceSnapshotRequest` from currently open panel windows, so closed
 Scene Hierarchy, Inspector, Selection Details, and Geometry Visualization panels
 skip their selected-entity model sections. Cheap document/import/menu/status
 models are still built so command/status continuity is preserved. Open domain
-windows build their `SandboxEditorDomainWindowModel` only after `ImGui::Begin()`
+windows build their `EditorDomainWindowModel` only after `ImGui::Begin()`
 confirms the window is visible, and all sections for the same domain share one
-per-frame domain-window model cache. `SandboxEditorPanelFrame::ModelBuildStats`
+per-frame domain-window model cache. `EditorWorkspaceSnapshot::ModelBuildStats`
 reports per-frame model-build and cache-hit counters plus nanosecond timing
 diagnostics for selected panel, inspector, selected-analysis, property-catalog,
 vertex-channel validation, UV diagnostics, texture-bake, visualization, and
@@ -317,7 +329,7 @@ core slots are shown as non-editable; declared extension slots and optional
 binding overrides are the only rows marked editable.
 
 Draft updates, validation, preview, activation, cancellation, artifact publish,
-and artifact apply use `ApplySandboxEditorRenderRecipeCommand(...)`. Validation
+and artifact apply use `ApplyEditorRenderRecipeCommand(...)`. Validation
 and preview call the resolved `EngineConfigControl` service callback
 (`PreviewRenderRecipeConfigDocument(...)`) without mutating graphics state.
 Activation calls `ApplyRenderRecipeConfigPreview(...)` on that same service,
@@ -337,12 +349,12 @@ and canceled outcomes, so stale or invalid recipes fail closed in the UI model.
 `UI-022` adds normal-recompute editor commands at
 `Mesh > Processing > Vertices > Normals`,
 `Graph > Processing > Vertices > Normals`, and
-`PointCloud > Processing > Vertices > Normals`. The Sandbox EditorUI surface
-exports per-domain command/result pairs:
-`SandboxEditorMeshVertexNormalsCommand`,
-`SandboxEditorGraphVertexNormalsCommand`, and
-`SandboxEditorPointCloudVertexNormalsCommand`, with matching
-`ApplySandboxEditor*VertexNormalsCommand(...)` helpers. The commands validate a
+`PointCloud > Processing > Vertices > Normals`. The focused geometry-operation
+surface exports per-domain command/result pairs:
+`EditorMeshVertexNormalsCommand`,
+`EditorGraphVertexNormalsCommand`, and
+`EditorPointCloudVertexNormalsCommand`, with matching
+`ApplyEditor*VertexNormalsCommand(...)` operations. The commands validate a
 live selected `GeometrySources` entity, snapshot the domain-owned source data
 when a `JobService` command surface is available, call the domain-owned geometry modules
 from `GEOM-026` (`Geometry.HalfedgeMesh.Vertices.Normals`,
@@ -367,19 +379,20 @@ editor-authored normals remain the CPU authority.
 ### Sandbox Editor Mesh Denoise
 
 `UI-024` adds a mesh-only denoise editor command at
-`Mesh > Processing > Denoise`. The Sandbox EditorUI surface exports
-`SandboxEditorMeshDenoiseCommand`,
-`SandboxEditorMeshDenoiseResult`, and
-`ApplySandboxEditorMeshDenoiseCommand(...)`. Runtime validates the selected
+`Mesh > Processing > Denoise`. The focused geometry-operation surface exports
+`EditorMeshDenoiseCommand`,
+`EditorMeshDenoiseResult`, and
+`ApplyEditorMeshDenoiseCommand(...)`. Runtime validates the selected
 mesh `GeometrySources`, converts the current CPU data to a scratch halfedge
 mesh, calls the geometry-owned `Geometry.Smoothing::DenoiseBilateral` kernel
 from `GEOM-042`, and publishes count-matched finite positions back to canonical
 `v:position` only after the geometry result succeeds. The UI exposes the
 full-bilateral stage, normal/vertex iteration counts, auto-or-explicit spatial
 and range sigma values, and boundary preservation, with a single `Denoise`
-action. `SandboxEditorContext::MeshDenoiseKernelAvailable` provides the
-deterministic unavailable-kernel diagnostic lane used by headless/editor
-contract tests.
+action. `EditorGeometryProcessingContext::MeshDenoiseKernelAvailable` is the
+runtime-owned capability input used to produce deterministic unavailable-kernel
+diagnostics in headless/editor contract tests; app code reaches it only through
+the prepared geometry command handle.
 
 Successful publication is undoable through the shared editor mutation
 transaction: undo restores the exact prior `v:position` array and redo
@@ -394,11 +407,11 @@ the denoising algorithm.
 ### Sandbox Editor Point-Cloud Outlier Removal
 
 `UI-027` adds a point-cloud-only outlier-removal editor command at
-`PointCloud > Processing > Remove Outliers`. The Sandbox EditorUI surface
-exports `SandboxEditorPointCloudOutlierMethod` (statistical or radius),
-`SandboxEditorPointCloudOutlierRemovalCommand`,
-`SandboxEditorPointCloudOutlierRemovalResult`, and
-`ApplySandboxEditorPointCloudOutlierRemovalCommand(...)`. Runtime validates the
+`PointCloud > Processing > Remove Outliers`. The focused geometry-operation
+surface exports `EditorPointCloudOutlierMethod` (statistical or radius),
+`EditorPointCloudOutlierRemovalCommand`,
+`EditorPointCloudOutlierRemovalResult`, and
+`ApplyEditorPointCloudOutlierRemovalCommand(...)`. Runtime validates the
 selected point-cloud `GeometrySources`, snapshots the full original point source
 for undo plus a live-only worker cloud, and queues the GEOM-016 removal through
 `JobService` when an engine job surface is available. The worker calls
@@ -444,12 +457,12 @@ history seam; `GEOM-016` owns the removal algorithm and its diagnostics.
 `RUNTIME-134` Slices A-D.1 add a progressive Poisson sampling playground at
 `PointCloud > Processing > Progressive Poisson Sampling` and
 `Mesh > Processing > Progressive Poisson Sampling`. The
-Sandbox Editor UI surface exports
-`SandboxEditorProgressivePoissonChannel`,
-`SandboxEditorProgressivePoissonConfig`,
-`SandboxEditorProgressivePoissonCommand`,
-`SandboxEditorProgressivePoissonResult`, and
-`ApplySandboxEditorProgressivePoissonCommand(...)`. Runtime validates selected
+focused geometry-operation surface exports
+`EditorProgressivePoissonChannel`,
+`EditorProgressivePoissonConfig`,
+`EditorProgressivePoissonCommand`,
+`EditorProgressivePoissonResult`, and
+`ApplyEditorProgressivePoissonCommand(...)`. Runtime validates selected
 point-cloud `GeometrySources`, or reconstructs a selected editable mesh and
 samples its triangle surface through `Geometry.PointCloud.SurfaceSampling`
 before calling the METHOD-012 CPU reference backend. The command publishes
@@ -468,7 +481,7 @@ Mesh selections also expose surface sample count, surface seed, minimum triangle
 area, and vertex-normal interpolation controls. Successful mesh runs publish the
 sampled cloud back onto the selected entity via `GeometrySources::PopulateFromCloud`,
 remove the stale surface render hint, enable point rendering, and report the
-surface-sampling diagnostics in `SandboxEditorProgressivePoissonResult`.
+surface-sampling diagnostics in `EditorProgressivePoissonResult`.
 Successful point-cloud and mesh runs also report requested method backend,
 actual method backend, CPU fallback reason when present, and accepted-point
 counts per progressive level, so the UI can show backend identity and
@@ -516,10 +529,10 @@ backend readout.
 ### Sandbox Editor Mesh Curvature
 
 `UI-026` adds a mesh-only curvature analysis editor command at
-`Mesh > Processing > Curvature`. The Sandbox EditorUI surface exports
-`SandboxEditorMeshCurvatureCommand`,
-`SandboxEditorMeshCurvatureResult`, and
-`ApplySandboxEditorMeshCurvatureCommand(...)`. Runtime validates the selected
+`Mesh > Processing > Curvature`. The focused geometry-operation surface exports
+`EditorMeshCurvatureCommand`,
+`EditorMeshCurvatureResult`, and
+`ApplyEditorMeshCurvatureCommand(...)`. Runtime validates the selected
 mesh `GeometrySources`, converts the current CPU data to a scratch halfedge
 mesh, calls the geometry-owned `Geometry::Curvature::ComputeCurvature` backend
 from `GEOM-040`, and publishes count-matched finite vertex properties only
@@ -551,11 +564,11 @@ or fallback dispatch path exists.
 ### Sandbox Editor Mesh Remesh And Subdivide
 
 `UI-025` adds mesh topology replacement commands at
-`Mesh > Processing > Remesh` and `Mesh > Processing > Subdivide`. The Sandbox
-EditorUI surface exports `SandboxEditorMeshRemeshCommand`,
-`SandboxEditorMeshRemeshResult`, `ApplySandboxEditorMeshRemeshCommand(...)`,
-`SandboxEditorMeshSubdivideCommand`, `SandboxEditorMeshSubdivideResult`, and
-`ApplySandboxEditorMeshSubdivideCommand(...)`. Runtime validates a live selected
+`Mesh > Processing > Remesh` and `Mesh > Processing > Subdivide`. The focused
+geometry-operation surface exports `EditorMeshRemeshCommand`,
+`EditorMeshRemeshResult`, `ApplyEditorMeshRemeshCommand(...)`,
+`EditorMeshSubdivideCommand`, `EditorMeshSubdivideResult`, and
+`ApplyEditorMeshSubdivideCommand(...)`. Runtime validates a live selected
 mesh `GeometrySources` entity, builds a scratch halfedge mesh, calls the
 geometry-owned `GEOM-043`/`GEOM-044` kernels, and publishes the resulting
 topology back through `GeometrySourcesPopulate` only after the geometry result
@@ -584,9 +597,9 @@ extraction opportunity.
 ### Sandbox Editor Mesh Simplify
 
 `UI-028` adds a mesh decimation command at `Mesh > Processing > Simplify`. The
-Sandbox EditorUI surface exports `SandboxEditorMeshSimplifyMetric`,
-`SandboxEditorMeshSimplifyCommand`, `SandboxEditorMeshSimplifyResult`, and
-`ApplySandboxEditorMeshSimplifyCommand(...)`. Runtime validates a live selected
+focused geometry-operation surface exports `EditorMeshSimplifyMetric`,
+`EditorMeshSimplifyCommand`, `EditorMeshSimplifyResult`, and
+`ApplyEditorMeshSimplifyCommand(...)`. Runtime validates a live selected
 mesh `GeometrySources` entity, builds a scratch halfedge mesh, calls the
 geometry-owned `GEOM-014` `Geometry::Simplification::Simplify` kernel in place,
 and republishes the collapsed topology through the shared mesh
@@ -600,9 +613,10 @@ rejections, and pinned sharp-feature/UV-seam counts. Commits use the same
 generation-validated topology transaction as remesh/subdivide and stamp the same
 `DirtyVertexPositions`/`DirtyVertexAttributes`/`DirtyEdgeTopology`/
 `DirtyFaceTopology` tags as remesh/subdivide, without renderer/RHI upload calls
-or broad `GpuDirty`. `SandboxEditorContext::MeshSimplifyKernelAvailable` gates
+or broad `GpuDirty`. The runtime-owned
+`EditorGeometryProcessingContext::MeshSimplifyKernelAvailable` capability gates
 the executor so an unavailable kernel returns deterministic diagnostics without
-mutating `GeometrySources`.
+mutating `GeometrySources`; it is not app-owned Sandbox state.
 
 ### Sandbox Editor Mesh Parameterization
 
@@ -624,15 +638,14 @@ no selected-model cache or other session-owned state.
 `UI-029` adds an `ICP Registration` panel reachable from the `View` menu.
 `ARCH-006` Slice 3 preserves that path through the app-owned stable registration
 `view.registration` rather than a fixed runtime window-kind slot. The Sandbox
-EditorUI surface exports `SandboxEditorICPVariant`,
-`SandboxEditorRegistrationCommand`, `SandboxEditorRegistrationResult`, and
-`ApplySandboxEditorRegistrationCommand(...)`. The command reads the source and
+geometry-operation surface exports `EditorICPVariant`,
+`EditorRegistrationCommand`, `EditorRegistrationResult`, and
+`ApplyEditorRegistrationCommand(...)`. The command reads the source and
 target point positions from two selected point-cloud entities, requires both to
-resolve to `GeometrySources` `Domain::PointCloud`, runs the runtime-owned
-`Extrinsic::Runtime::AlignPointClouds` ICP controller (which forwards to
-`Geometry::Registration::AlignICP` and captures the per-iteration convergence
-trajectory), and drives the source entity's `Transform::Component` with
-`Extrinsic::Runtime::TrajectoryPose(outcome, step)` through the same internal
+resolve to `GeometrySources` `Domain::PointCloud`, invokes
+`Geometry::Registration::AlignICP` through the operation's private trajectory
+collector, selects the requested preview pose, and drives the source entity's
+`Transform::Component` through the same internal
 generation-validated transaction used by direct transform edits. Each history
 transition revalidates the captured world/registry/entity identity and exact
 expected transform before atomically replacing the component and stamping
@@ -676,8 +689,10 @@ method execution cannot silently run on a richer or incompatible domain.
 
 ### Sandbox Editor Vertex Channel Bindings
 
-`RUNTIME-123` extends `Extrinsic.Runtime.SandboxEditorFacades` with normal/color
-vertex-channel binding controls for mesh, graph, and point-cloud entities. The
+`RUNTIME-123` provides normal/color vertex-channel binding controls through
+`Extrinsic.Runtime.VisualizationEditingOperations`, with their copied model
+assembly included in `EditorWorkspaceSnapshots`, for mesh, graph, and
+point-cloud entities. The
 property catalog exposes one target each for `VertexChannel::Normal` and
 `VertexChannel::Color`, lists only the selected entity's structural vertex
 domain (mesh vertices, graph nodes, or point-cloud points), and evaluates each
@@ -686,7 +701,7 @@ candidate through `VertexAttributeBinding`. Normals accept count-matched
 through `ResolveColorChannelPackedUnorm8`. Resolver status, source/fallback
 counts, and non-finite repair counts remain visible in the data-only model.
 
-`ApplySandboxEditorVertexChannelBindingCommand(...)` mutates only the runtime
+`ApplyEditorVertexChannelBindingCommand(...)` mutates only the runtime
 ECS descriptor `VertexChannelBindingSet`. Under `RUNTIME-201`, the complete
 optional descriptor enters the shared editor mutation transaction: undo/redo
 restore the exact binding set, each transition rejects an intervening binding
@@ -700,9 +715,9 @@ channel byte spans through public `GpuWorld` upload descriptors.
 ### Visualization UI Controls
 
 `UI-019` keeps mesh, graph, and point-cloud visualization color editing in
-`Extrinsic.Runtime.SandboxEditorFacades`; app-owned domain visualization windows and the
+`Extrinsic.Runtime.VisualizationEditingOperations`; app-owned domain visualization windows and the
 top-level `Geometry Visualization` panel route the existing uniform-color
-source through `ApplySandboxEditorVisualizationConfigCommand(...)`; when
+source through `ApplyEditorVisualizationConfigCommand(...)`; when
 `VisualizationConfig::ColorSource::UniformColor` is active they expose an
 ImGui color edit widget for the config's `glm::vec4 Color`. The UI does not
 own renderer state, property-buffer residency, or graphics resource uploads.
@@ -734,8 +749,10 @@ lane they need while preserving mesh, graph, or point-cloud provenance labels.
 ### Geometry Presentation Editor Inspector
 
 `UI-015`, migrated by `RUNTIME-193`, extends
-`Extrinsic.Runtime.SandboxEditorFacades` with data-only geometry-presentation
-inspector models and ImGui rows. The selected-entity model reports
+`Extrinsic.Runtime.VisualizationEditingOperations` with data-only
+geometry-presentation operations; presentation-free copied inspector models
+are assembled in `EditorWorkspaceSnapshots`, and the app owns the ImGui rows.
+The selected-entity model reports
 composition, mesh, graph, and point-cloud shapes; lane/presentation slots;
 uniform default colors; compatible-first property choices with incompatible
 entries disabled and explained; readiness and diagnostics; per-entity
@@ -755,8 +772,10 @@ properties.
 
 ### Geometry Property And Bake Inspector
 
-`UI-016`, `UI-017`, and `UI-014` extend `Extrinsic.Runtime.SandboxEditorFacades`
-with framework24-style property and render-state inspection without importing
+`UI-016`, `UI-017`, and `UI-014` use
+`Extrinsic.Runtime.VisualizationEditingOperations` plus copied
+`EditorWorkspaceSnapshots` models for framework24-style property and
+render-state inspection without importing
 framework24 ownership patterns. The selected-entity property catalog enumerates
 mesh vertex/edge/halfedge/face, graph node/edge, and point-cloud point
 properties, including canonical topology/internal rows that visualization
@@ -1266,17 +1285,16 @@ served by the generic, read-only `JobService::SnapshotAll()`; job identity
 (which entity, which output) stays with the submitting consumer rather than the
 execution service.
 
-The Sandbox editor migration window is closed. `SandboxEditorJobCommandSurface`
+The Sandbox editor migration window is closed. `EditorJobCommandSurface`
 contains one `JobService` submit path plus active-output and per-entity row
-queries. `SandboxEditorSession` keeps editor job identity — entity id,
-`SandboxEditorJobScope`, output semantic, output name — in its
+queries. The private `EditorWorkspaceSession` keeps editor job identity — entity id,
+`EditorJobScope`, output semantic, output name — in its
 `JobToken -> identity` table, prunes it against `JobService::SnapshotAll()` each
 frame, and joins it only when either query runs. The editor no longer owns a raw
-queue snapshot or a registry adapter. `SandboxEditorJobScope` is the
+queue snapshot or a registry adapter. `EditorJobScope` is the
 editor-local successor to `DerivedJobScope` and must not be promoted to a
-general vocabulary. `Runtime.SandboxMethodFacade` and all five
-`Runtime.SandboxEditorFacades` descriptor factories submit through this single
-surface.
+general vocabulary. Focused geometry operations submit through this single
+surface; the workspace session owns only the token-to-identity projection.
 `AssetWorkflowModule::GetAssetImportQueueSnapshot()` computes import-row
 cancellation from per-token `JobService::GetState` queries; a decode is
 cancellable until its result reaches the main-thread apply gate
@@ -1292,8 +1310,9 @@ world-scoped job or accepts Vulkan work into its one private `JobService`
 gate. The Engine bridge invokes the private participant inside the renderer's
 open frame command context, shared transfer readback completes without an
 extra swapchain present, and the module commits labels/colors and publishes
-`KMeansRunCompleted` plus `ClusterLabelsChanged`. Sandbox session/facade code
-does not own a second queue or backend-specific result path.
+`KMeansRunCompleted` plus `ClusterLabelsChanged`. The editor workspace session
+and focused geometry-operation path do not own a second queue or
+backend-specific result path.
 `Extrinsic.Runtime.AssetIngestStateMachine` is the promoted ingest-state
 contract for manual, dropped-file, and reimport requests. `AssetWorkflowModule`
 submits ingest records before route/decode/apply work, completes deferred
@@ -1649,8 +1668,8 @@ right- or middle-mouse drag rotates orbit/fly/free-look cameras, `WASD` moves or
 pans according to the active controller, `Shift` accelerates movement, and mouse
 wheel zooms orbit/top-down cameras. The sandbox `Camera / Render` window mirrors
 these bindings so controller replacement buttons are not the only visible UI.
-The sandbox default `F` focus-on-selection binding is installed from the
-`SandboxEditorFacades` descriptor factory only when Sandbox resolves both the
+The sandbox default `F` focus-on-selection binding is app-owned and constructed
+with the generic camera feature factory only when Sandbox resolves both the
 exact camera registry and exact selection controller; generic input actions
 remain operational when either optional service is omitted.
 Viewport left-click selection is routed by `SceneInteractionModule` from the

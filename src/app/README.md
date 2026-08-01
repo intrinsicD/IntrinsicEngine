@@ -7,7 +7,8 @@ engine runtime. The canonical entry point is `Sandbox`.
 
 - `Sandbox/` — reference integration target. Links to `Runtime`, opens a window,
   drives the frame loop with the runtime-owned reference configuration, and owns
-  Sandbox-specific editor presentation registered through runtime facades. Its
+  Sandbox-specific editor presentation registered through focused runtime
+  snapshots and operations. Its
   default composition explicitly adds the optional runtime camera module and
   owns initial-world reference-content bootstrap/teardown policy.
   Method command/config/result implementations remain private runtime units, so
@@ -45,16 +46,17 @@ and must not expose types back to the engine. No other engine layer may import
 an application module.
 
 `ExtrinsicSandboxEditor` is the app-owned editor composition library. Its
-`Sandbox.ConfigSections` module composes the two current runtime-owned Sandbox
-config codecs into a pre-boot registry. `main.cpp` passes that registry to
+`Sandbox.ConfigSections` module composes the three feature-owned runtime config
+codecs into a pre-boot registry. `main.cpp` passes that registry to
 `ResolveEngineConfigForBoot(...)` and then moves it into `Engine`, so file,
 agent/CLI, and UI applies share one validated lane without adding Sandbox types
 to Core. The same library's
 `Sandbox.Editor.Controller` module owns the app-side `EditorShell` and the
 Method, Mesh Processing, and Domain panel lifetimes behind one idempotent
 attach/detach interface. `EditorShell` owns the ten core Sandbox windows,
-menus, ImGui state, and frame presentation; runtime exposes only generic editor
-hosting plus data/model/command facades. The Sandbox executable no longer
+menus, ImGui state, copied `SandboxEditorContext`/`SandboxEditorFrame`
+composition, and presentation; runtime exposes only generic editor hosting plus
+focused feature snapshots and typed operations. The Sandbox executable no longer
 composes those panel families individually.
 
 The concrete Sandbox application resolves the exact optional

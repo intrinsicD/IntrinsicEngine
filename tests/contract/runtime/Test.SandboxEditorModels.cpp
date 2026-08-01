@@ -24,6 +24,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include "ProgressivePoissonReference.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
@@ -77,7 +79,12 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexAttributeBinding;
@@ -120,10 +127,10 @@ constexpr std::uint32_t kInvalidIndex =
         std::numeric_limits<std::uint32_t>::max();
 
 [[nodiscard]] bool HasDiagnostic(
-        const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
-        const Runtime::SandboxEditorDiagnosticCode code)
+        const std::vector<Runtime::EditorDiagnostic>& diagnostics,
+        const Runtime::EditorDiagnosticCode code)
     {
-        for (const Runtime::SandboxEditorDiagnostic& diagnostic : diagnostics)
+        for (const Runtime::EditorDiagnostic& diagnostic : diagnostics)
         {
             if (diagnostic.Code == code)
                 return true;
@@ -146,13 +153,13 @@ constexpr std::uint32_t kInvalidIndex =
         };
     }
 
-[[nodiscard]] Runtime::SandboxEditorContext MakeRenderRecipeEditorContext(
+[[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeRenderRecipeEditorContext(
         Graphics::RenderRecipeConfigContext& recipeContext,
-        Runtime::SandboxEditorRenderRecipeEditorState& editorState,
+        Runtime::EditorRenderRecipeEditorState& editorState,
         Runtime::RenderArtifactRegistry* artifacts = nullptr,
         const bool commandsAvailable = true)
     {
-        return Runtime::SandboxEditorContext{
+        return Intrinsic::Tests::EditorFeatureTestContext{
             .RenderRecipeContext = &recipeContext,
             .RenderRecipeEditorState = &editorState,
             .PreviewRenderRecipeDocument =
@@ -196,31 +203,31 @@ constexpr std::uint32_t kInvalidIndex =
         };
     }
 
-[[nodiscard]] const Runtime::SandboxEditorRenderRecipeSlotModel*
+[[nodiscard]] const Runtime::EditorRenderRecipeSlotModel*
     FindRecipeSlotRow(
-        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const Runtime::EditorRenderRecipeEditorModel& model,
         const std::string_view name)
     {
         const auto it = std::find_if(
             model.Slots.begin(),
             model.Slots.end(),
-            [name](const Runtime::SandboxEditorRenderRecipeSlotModel& slot)
+            [name](const Runtime::EditorRenderRecipeSlotModel& slot)
             {
                 return slot.StableName == name;
             });
         return it == model.Slots.end() ? nullptr : &*it;
     }
 
-[[nodiscard]] const Runtime::SandboxEditorRenderRecipeBindingOverrideModel*
+[[nodiscard]] const Runtime::EditorRenderRecipeBindingOverrideModel*
     FindRecipeBindingRow(
-        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const Runtime::EditorRenderRecipeEditorModel& model,
         const std::string_view name)
     {
         const auto it = std::find_if(
             model.BindingOverrides.begin(),
             model.BindingOverrides.end(),
             [name](
-                const Runtime::SandboxEditorRenderRecipeBindingOverrideModel&
+                const Runtime::EditorRenderRecipeBindingOverrideModel&
                     binding)
             {
                 return binding.SemanticName == name;
@@ -228,30 +235,30 @@ constexpr std::uint32_t kInvalidIndex =
         return it == model.BindingOverrides.end() ? nullptr : &*it;
     }
 
-[[nodiscard]] const Runtime::SandboxEditorRenderRecipeOutputModel*
+[[nodiscard]] const Runtime::EditorRenderRecipeOutputModel*
     FindRecipeOutputRow(
-        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const Runtime::EditorRenderRecipeEditorModel& model,
         const std::string_view name)
     {
         const auto it = std::find_if(
             model.Outputs.begin(),
             model.Outputs.end(),
-            [name](const Runtime::SandboxEditorRenderRecipeOutputModel& output)
+            [name](const Runtime::EditorRenderRecipeOutputModel& output)
             {
                 return output.Name == name;
             });
         return it == model.Outputs.end() ? nullptr : &*it;
     }
 
-[[nodiscard]] const Runtime::SandboxEditorRenderArtifactRow*
+[[nodiscard]] const Runtime::EditorRenderArtifactRow*
     FindRenderArtifactRow(
-        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const Runtime::EditorRenderRecipeEditorModel& model,
         const std::string_view artifactId)
     {
         const auto it = std::find_if(
             model.Artifacts.begin(),
             model.Artifacts.end(),
-            [artifactId](const Runtime::SandboxEditorRenderArtifactRow& row)
+            [artifactId](const Runtime::EditorRenderArtifactRow& row)
             {
                 return row.ArtifactId == artifactId;
             });
@@ -312,13 +319,13 @@ void SetTexcoords(GS::Vertices& vertices,
     // A small deterministic, asymmetric point lattice — distinct extents per axis
     // give ICP a well-conditioned correspondence problem (UI-029).
 
-[[nodiscard]] const Runtime::SandboxEditorVisualizationPropertyInfo*
+[[nodiscard]] const Runtime::EditorVisualizationPropertyInfo*
     FindVisualizationProperty(
-        const std::vector<Runtime::SandboxEditorVisualizationPropertyInfo>& properties,
-        const Runtime::SandboxEditorVisualizationPropertyDomain domain,
+        const std::vector<Runtime::EditorVisualizationPropertyInfo>& properties,
+        const Runtime::EditorVisualizationPropertyDomain domain,
         const std::string& name)
     {
-        for (const Runtime::SandboxEditorVisualizationPropertyInfo& property :
+        for (const Runtime::EditorVisualizationPropertyInfo& property :
              properties)
         {
             if (property.Domain == domain && property.Name == name)
@@ -327,13 +334,13 @@ void SetTexcoords(GS::Vertices& vertices,
         return nullptr;
     }
 
-[[nodiscard]] const Runtime::SandboxEditorPropertyCatalogRow*
+[[nodiscard]] const Runtime::EditorPropertyCatalogRow*
     FindCatalogProperty(
-        const Runtime::SandboxEditorPropertyCatalogModel& catalog,
-        const Runtime::SandboxEditorPropertyCatalogDomain domain,
+        const Runtime::EditorPropertyCatalogModel& catalog,
+        const Runtime::EditorPropertyCatalogDomain domain,
         const std::string& name)
     {
-        for (const Runtime::SandboxEditorPropertyCatalogRow& row :
+        for (const Runtime::EditorPropertyCatalogRow& row :
              catalog.Rows)
         {
             if (row.Domain == domain && row.Name == name)
@@ -342,12 +349,12 @@ void SetTexcoords(GS::Vertices& vertices,
         return nullptr;
     }
 
-[[nodiscard]] const Runtime::SandboxEditorBoundRenderStateRow* FindBoundRow(
-        const Runtime::SandboxEditorBoundRenderStateModel& bound,
-        const Runtime::SandboxEditorBoundRenderStateRowKind kind,
+[[nodiscard]] const Runtime::EditorBoundRenderStateRow* FindBoundRow(
+        const Runtime::EditorBoundRenderStateModel& bound,
+        const Runtime::EditorBoundRenderStateRowKind kind,
         const Runtime::GeometryPresentationSlotSemantic semantic)
     {
-        for (const Runtime::SandboxEditorBoundRenderStateRow& row :
+        for (const Runtime::EditorBoundRenderStateRow& row :
              bound.Rows)
         {
             if (row.Kind == kind && row.Semantic == semantic)
@@ -356,12 +363,12 @@ void SetTexcoords(GS::Vertices& vertices,
         return nullptr;
     }
 
-[[nodiscard]] const Runtime::SandboxEditorBoundRenderStateRow* FindBoundRowLabel(
-        const Runtime::SandboxEditorBoundRenderStateModel& bound,
-        const Runtime::SandboxEditorBoundRenderStateRowKind kind,
+[[nodiscard]] const Runtime::EditorBoundRenderStateRow* FindBoundRowLabel(
+        const Runtime::EditorBoundRenderStateModel& bound,
+        const Runtime::EditorBoundRenderStateRowKind kind,
         const std::string& label)
     {
-        for (const Runtime::SandboxEditorBoundRenderStateRow& row :
+        for (const Runtime::EditorBoundRenderStateRow& row :
              bound.Rows)
         {
             if (row.Kind == kind && row.Label == label)
@@ -514,12 +521,12 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
             MakeGeometryPresentationRuntimeState());
     }
 
-[[nodiscard]] const Runtime::SandboxEditorGeometryPresentationSlotModel*
+[[nodiscard]] const Runtime::EditorGeometryPresentationSlotModel*
     FindGeometryPresentationSlot(
-        const Runtime::SandboxEditorGeometryPresentationModel& model,
+        const Runtime::EditorGeometryPresentationModel& model,
         const Runtime::GeometryPresentationSlotSemantic semantic)
     {
-        for (const Runtime::SandboxEditorGeometryPresentationSlotModel& slot :
+        for (const Runtime::EditorGeometryPresentationSlotModel& slot :
              model.Slots)
         {
             if (slot.Semantic == semantic)
@@ -546,14 +553,14 @@ void AddGraphSource(ECS::Scene::Registry& registry,
         raw.emplace<G::RenderPoints>(entity);
     }
 
-[[nodiscard]] Runtime::SandboxEditorContext MakeContext(
+[[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
         ECS::Scene::Registry& registry,
         Runtime::SelectionController& selection,
         const bool imguiAvailable = true,
         const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
         Extrinsic::RHI::IDevice* device = nullptr)
     {
-        return Runtime::SandboxEditorContext{
+        return Intrinsic::Tests::EditorFeatureTestContext{
             .Scene = &registry,
             .Selection = &selection,
             .LastRefinedPrimitive = lastPrimitive,
@@ -566,17 +573,17 @@ void AddGraphSource(ECS::Scene::Registry& registry,
     }
 
     void AttachJobSnapshot(
-        Runtime::SandboxEditorContext& context,
-        const Runtime::SandboxEditorJobQueueSnapshot& snapshot)
+        Intrinsic::Tests::EditorFeatureTestContext& context,
+        const Runtime::EditorJobQueueSnapshot& snapshot)
     {
         context.JobCommands.FindActive =
-            [&snapshot](const Runtime::SandboxEditorJobIdentity& requested)
-                -> std::optional<Runtime::SandboxEditorJobRecord>
+            [&snapshot](const Runtime::EditorJobIdentity& requested)
+                -> std::optional<Runtime::EditorJobRecord>
         {
-            for (const Runtime::SandboxEditorJobRecord& job : snapshot.Entries)
+            for (const Runtime::EditorJobRecord& job : snapshot.Entries)
             {
-                if (Runtime::IsActiveSandboxEditorJobState(job.State) &&
-                    Runtime::SameSandboxEditorJobOutput(
+                if (Runtime::IsActiveEditorJobState(job.State) &&
+                    Runtime::SameEditorJobOutput(
                         job.Identity,
                         requested))
                 {
@@ -588,8 +595,8 @@ void AddGraphSource(ECS::Scene::Registry& registry,
         context.JobCommands.SnapshotEntity =
             [&snapshot](const std::uint32_t stableEntityId)
         {
-            std::vector<Runtime::SandboxEditorJobRecord> rows{};
-            for (const Runtime::SandboxEditorJobRecord& job : snapshot.Entries)
+            std::vector<Runtime::EditorJobRecord> rows{};
+            for (const Runtime::EditorJobRecord& job : snapshot.Entries)
             {
                 if (job.Identity.EntityId == stableEntityId)
                     rows.push_back(job);
@@ -598,10 +605,10 @@ void AddGraphSource(ECS::Scene::Registry& registry,
         };
     }
 
-[[nodiscard]] Runtime::SandboxEditorModelBuildRequest
-    MakeNoSandboxEditorModelBuildRequest()
+[[nodiscard]] Runtime::EditorWorkspaceSnapshotRequest
+    MakeNoEditorModelBuildRequest()
     {
-        Runtime::SandboxEditorModelBuildRequest request{};
+        Runtime::EditorWorkspaceSnapshotRequest request{};
         request.Hierarchy = false;
         request.Inspector = false;
         request.Selection = false;
@@ -616,53 +623,53 @@ void AddGraphSource(ECS::Scene::Registry& registry,
         return request;
     }
 
-[[nodiscard]] Runtime::SandboxEditorModelBuildRequest
+[[nodiscard]] Runtime::EditorWorkspaceSnapshotRequest
     MakeOnlyInspectorModelBuildRequest()
     {
-        Runtime::SandboxEditorModelBuildRequest request =
-            MakeNoSandboxEditorModelBuildRequest();
+        Runtime::EditorWorkspaceSnapshotRequest request =
+            MakeNoEditorModelBuildRequest();
         request.Inspector = true;
         return request;
     }
 
-[[nodiscard]] Runtime::SandboxEditorModelBuildRequest
+[[nodiscard]] Runtime::EditorWorkspaceSnapshotRequest
     MakeOnlyVisualizationModelBuildRequest()
     {
-        Runtime::SandboxEditorModelBuildRequest request =
-            MakeNoSandboxEditorModelBuildRequest();
+        Runtime::EditorWorkspaceSnapshotRequest request =
+            MakeNoEditorModelBuildRequest();
         request.Visualization = true;
         return request;
     }
 }
 TEST(SandboxEditorUi, EmptyContextProducesDeterministicDisabledDiagnostics)
 {
-    const Runtime::SandboxEditorContext context{};
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Intrinsic::Tests::EditorFeatureTestContext context{};
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
 
     EXPECT_TRUE(HasDiagnostic(frame.Diagnostics,
-                              Runtime::SandboxEditorDiagnosticCode::MissingScene));
+                              Runtime::EditorDiagnosticCode::MissingScene));
     EXPECT_TRUE(HasDiagnostic(frame.Diagnostics,
-                              Runtime::SandboxEditorDiagnosticCode::MissingSelectionController));
+                              Runtime::EditorDiagnosticCode::MissingSelectionController));
     EXPECT_TRUE(HasDiagnostic(frame.Diagnostics,
-                              Runtime::SandboxEditorDiagnosticCode::MissingImGuiAdapter));
+                              Runtime::EditorDiagnosticCode::MissingImGuiAdapter));
     EXPECT_FALSE(frame.SceneFile.Enabled);
     EXPECT_TRUE(HasDiagnostic(frame.SceneFile.Diagnostics,
-                              Runtime::SandboxEditorDiagnosticCode::SceneFileUnavailable));
+                              Runtime::EditorDiagnosticCode::SceneFileUnavailable));
     EXPECT_FALSE(frame.FileImport.Enabled);
     EXPECT_TRUE(HasDiagnostic(frame.FileImport.Diagnostics,
-                              Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+                              Runtime::EditorDiagnosticCode::AssetImportUnavailable));
     EXPECT_FALSE(frame.RenderGraph.Enabled);
     EXPECT_TRUE(HasDiagnostic(frame.RenderGraph.Diagnostics,
-                              Runtime::SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable));
+                              Runtime::EditorDiagnosticCode::RenderGraphStatsUnavailable));
     EXPECT_TRUE(HasDiagnostic(frame.Inspector.Diagnostics,
-                              Runtime::SandboxEditorDiagnosticCode::MissingScene));
+                              Runtime::EditorDiagnosticCode::MissingScene));
 }
 TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     Runtime::RuntimeEngineConfigControlState configControlState{};
     configControlState.ActiveConfig.Render.EnableGpuProfiling = true;
     context.EngineConfigControlState = &configControlState;
@@ -756,8 +763,8 @@ TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
     stats.LifecycleDiagnostic = "Renderer lifecycle diagnostic.";
     context.RenderGraphStats = &stats;
 
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
 
     EXPECT_TRUE(frame.RenderGraph.Enabled);
     EXPECT_TRUE(frame.RenderGraph.GpuProfilingEnabled);
@@ -852,7 +859,7 @@ TEST(SandboxEditorUi,
      GpuProfilingToggleUsesConfigPreviewApplyAndPreservesRejectedState)
 {
     Runtime::RuntimeEngineConfigControlState state{};
-    Runtime::SandboxEditorContext context{};
+    Intrinsic::Tests::EditorFeatureTestContext context{};
     context.EngineConfigControlState = &state;
     context.EngineConfigCommandsAvailable = true;
     context.PreviewEngineConfigDocument =
@@ -882,14 +889,14 @@ TEST(SandboxEditorUi,
             };
         };
 
-    const Runtime::SandboxEditorGpuProfilingConfigResult applied =
-        Runtime::ApplySandboxEditorGpuProfilingConfigCommand(
+    const Runtime::EditorGpuProfilingConfigResult applied =
+        Runtime::ApplyEditorGpuProfilingConfigCommand(
             context,
             true);
     ASSERT_TRUE(applied.Succeeded());
     EXPECT_EQ(
         applied.Status,
-        Runtime::SandboxEditorGpuProfilingConfigStatus::Applied);
+        Runtime::EditorGpuProfilingConfigStatus::Applied);
     EXPECT_EQ(applyCalls, 1u);
     EXPECT_TRUE(state.ActiveConfig.Render.EnableGpuProfiling);
     EXPECT_EQ(applied.Preview.SourceId,
@@ -912,13 +919,13 @@ TEST(SandboxEditorUi,
                 },
             };
         };
-    const Runtime::SandboxEditorGpuProfilingConfigResult previewRejected =
-        Runtime::ApplySandboxEditorGpuProfilingConfigCommand(
+    const Runtime::EditorGpuProfilingConfigResult previewRejected =
+        Runtime::ApplyEditorGpuProfilingConfigCommand(
             context,
             false);
     EXPECT_EQ(
         previewRejected.Status,
-        Runtime::SandboxEditorGpuProfilingConfigStatus::PreviewRejected);
+        Runtime::EditorGpuProfilingConfigStatus::PreviewRejected);
     EXPECT_EQ(applyCalls, 1u);
     EXPECT_TRUE(state.ActiveConfig.Render.EnableGpuProfiling);
     ASSERT_EQ(previewRejected.Preview.Diagnostics.size(), 1u);
@@ -944,29 +951,29 @@ TEST(SandboxEditorUi,
                 .LoadResult = preview,
             };
         };
-    const Runtime::SandboxEditorGpuProfilingConfigResult rejected =
-        Runtime::ApplySandboxEditorGpuProfilingConfigCommand(
+    const Runtime::EditorGpuProfilingConfigResult rejected =
+        Runtime::ApplyEditorGpuProfilingConfigCommand(
             context,
             false);
     EXPECT_FALSE(rejected.Succeeded());
     EXPECT_EQ(
         rejected.Status,
-        Runtime::SandboxEditorGpuProfilingConfigStatus::ApplyRejected);
+        Runtime::EditorGpuProfilingConfigStatus::ApplyRejected);
     EXPECT_EQ(applyCalls, 2u);
     EXPECT_TRUE(state.ActiveConfig.Render.EnableGpuProfiling);
 
     context.EngineConfigCommandsAvailable = false;
-    const Runtime::SandboxEditorGpuProfilingConfigResult unavailable =
-        Runtime::ApplySandboxEditorGpuProfilingConfigCommand(
+    const Runtime::EditorGpuProfilingConfigResult unavailable =
+        Runtime::ApplyEditorGpuProfilingConfigCommand(
             context,
             false);
     EXPECT_EQ(
         unavailable.Status,
-        Runtime::SandboxEditorGpuProfilingConfigStatus::
-            MissingConfigFacade);
+        Runtime::EditorGpuProfilingConfigStatus::
+            MissingConfigControl);
     EXPECT_EQ(applyCalls, 2u);
-    const Runtime::SandboxEditorPanelFrame unavailableFrame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot unavailableFrame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     EXPECT_FALSE(
         unavailableFrame.RenderGraph.GpuProfilingToggleAvailable);
     EXPECT_FALSE(
@@ -977,8 +984,8 @@ TEST(SandboxEditorUi,
     state.LastApply = rejected.Apply;
     state.LastApply.RejectedBootOnlyFields = {"window.width"};
     context.EngineConfigCommandsAvailable = true;
-    const Runtime::SandboxEditorPanelFrame rejectedFrame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot rejectedFrame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     EXPECT_TRUE(rejectedFrame.RenderGraph.GpuProfilingEnabled);
     EXPECT_EQ(
         rejectedFrame.RenderGraph.GpuProfilingControlStatusText,
@@ -994,7 +1001,7 @@ TEST(SandboxEditorUi, AssetImportQueueModelCopiesRowsProgressAndCommands)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     const auto now = std::chrono::steady_clock::now();
     const Runtime::RuntimeAssetIngestHandle activeHandle{3u, 1u};
@@ -1050,7 +1057,7 @@ TEST(SandboxEditorUi, AssetImportQueueModelCopiesRowsProgressAndCommands)
     std::size_t clearObserved = 0u;
     Runtime::RuntimeAssetIngestHandle cancelled{};
     context.AssetImportQueueCommands =
-        Runtime::SandboxEditorAssetImportQueueCommandSurface{
+        Runtime::EditorAssetImportQueueCommandSurface{
             .ClearCompleted =
                 [&clearObserved]()
                 {
@@ -1065,8 +1072,8 @@ TEST(SandboxEditorUi, AssetImportQueueModelCopiesRowsProgressAndCommands)
                 },
         };
 
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     EXPECT_EQ(frame.AssetImportQueue.ActiveCount, 1u);
     EXPECT_EQ(frame.AssetImportQueue.TerminalCount, 1u);
     EXPECT_TRUE(frame.AssetImportQueue.CanClearCompleted);
@@ -1085,7 +1092,7 @@ TEST(SandboxEditorUi, AssetImportQueueModelCopiesRowsProgressAndCommands)
     EXPECT_FALSE(frame.AssetImportQueue.Rows[1].CanCancel);
     EXPECT_FALSE(HasDiagnostic(
         frame.AssetImportQueue.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+        Runtime::EditorDiagnosticCode::AssetImportUnavailable));
 
     ASSERT_TRUE(context.AssetImportQueueCommands.CancelAvailable());
     EXPECT_TRUE(context.AssetImportQueueCommands.Cancel(activeHandle).has_value());
@@ -1116,10 +1123,10 @@ TEST(SandboxEditorUi, DocumentModelReportsRuntimeHistoryDirtyState)
             },
         }).Succeeded());
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
 
     EXPECT_TRUE(frame.Document.HistoryAvailable);
     EXPECT_TRUE(frame.Document.Dirty);
@@ -1130,7 +1137,7 @@ TEST(SandboxEditorUi, DocumentModelReportsRuntimeHistoryDirtyState)
     EXPECT_TRUE(frame.Document.Diagnostics.empty());
 
     history.MarkSaved("scene.extrinsic.json");
-    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
     EXPECT_FALSE(frame.Document.Dirty);
     EXPECT_TRUE(frame.Document.HasActivePath);
     EXPECT_EQ(frame.Document.ActivePath, "scene.extrinsic.json");
@@ -1165,14 +1172,14 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, first));
 
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(MakeContext(registry, selection));
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(MakeContext(registry, selection));
 
     ASSERT_EQ(frame.Hierarchy.size(), 2u);
     const auto selected = std::find_if(
         frame.Hierarchy.begin(),
         frame.Hierarchy.end(),
-        [first](const Runtime::SandboxEditorEntityRow& row)
+        [first](const Runtime::EditorEntityRow& row)
         {
             return row.Entity == first;
         });
@@ -1210,9 +1217,9 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
     EXPECT_EQ(frame.Inspector.Geometry.Domain, GS::Domain::PointCloud);
     EXPECT_TRUE(frame.Inspector.Geometry.Valid);
     EXPECT_EQ(frame.Inspector.Geometry.VertexCount, 3u);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         frame.Inspector.Processing.Domains,
-        Runtime::SandboxEditorGeometryProcessingDomain::PointCloudPoints));
+        Runtime::EditorGeometryProcessingDomain::PointCloudPoints));
     EXPECT_FALSE(frame.Inspector.Processing.HasEditableSurfaceMesh);
 
     ASSERT_EQ(frame.Selection.SelectedStableIds.size(), 1u);
@@ -1231,18 +1238,18 @@ TEST(SandboxEditorUi, HiddenPanelBuildRequestSkipsSelectedEntityModels)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
-            MakeNoSandboxEditorModelBuildRequest());
+            MakeNoEditorModelBuildRequest());
 
     EXPECT_TRUE(frame.Hierarchy.empty());
     EXPECT_FALSE(frame.Inspector.HasEntity);
     EXPECT_TRUE(frame.Selection.SelectedStableIds.empty());
     EXPECT_TRUE(frame.Visualization.Properties.empty());
 
-    const Runtime::SandboxEditorModelBuildStats& stats =
+    const Runtime::EditorWorkspaceSnapshotStats& stats =
         frame.ModelBuildStats;
     EXPECT_EQ(stats.HierarchyModelBuilds, 0u);
     EXPECT_EQ(stats.InspectorModelBuilds, 0u);
@@ -1277,9 +1284,9 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
 
@@ -1288,7 +1295,7 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_TRUE(frame.Selection.SelectedStableIds.empty());
     EXPECT_TRUE(frame.Visualization.Properties.empty());
 
-    const Runtime::SandboxEditorModelBuildStats& stats =
+    const Runtime::EditorWorkspaceSnapshotStats& stats =
         frame.ModelBuildStats;
     EXPECT_EQ(stats.HierarchyModelBuilds, 0u);
     EXPECT_EQ(stats.InspectorModelBuilds, 1u);
@@ -1305,7 +1312,7 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_EQ(stats.TextureBakeModelBuilds, 1u);
     EXPECT_GT(stats.TextureBakeSourceRowsEnumerated, 0u);
     EXPECT_EQ(stats.VisualizationModelBuilds, 0u);
-    EXPECT_GT(stats.PanelFrameModelBuildTimeNs, 0u);
+    EXPECT_GT(stats.WorkspaceSnapshotBuildTimeNs, 0u);
     EXPECT_GT(stats.InspectorModelBuildTimeNs, 0u);
     EXPECT_GT(stats.SelectedAnalysisModelBuildTimeNs, 0u);
     EXPECT_GT(stats.PropertyCatalogModelBuildTimeNs, 0u);
@@ -1324,15 +1331,15 @@ TEST(SandboxEditorUi, DomainWindowBuildReportsTimingDiagnostics)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorModelBuildStats stats{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorWorkspaceSnapshotStats stats{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.ModelBuildStats = &stats;
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorDomainWindowModel model =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel model =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
 
     ASSERT_TRUE(model.HasSelectedEntity);
     EXPECT_EQ(stats.DomainWindowModelBuilds, 1u);
@@ -1352,12 +1359,12 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
 
@@ -1383,8 +1390,8 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_GT(first.ModelBuildStats.UvDiagnosticsModelBuildTimeNs, 0u);
     EXPECT_GT(first.ModelBuildStats.TextureBakeModelBuildTimeNs, 0u);
 
-    const Runtime::SandboxEditorPanelFrame second =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot second =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
 
@@ -1412,7 +1419,7 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(second.Inspector.PropertyCatalog.Rows.size(),
               first.Inspector.PropertyCatalog.Rows.size());
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
@@ -1427,12 +1434,12 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
 
-    const Runtime::SandboxEditorPanelFrame inspector =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot inspector =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(inspector.Inspector.HasEntity);
@@ -1440,17 +1447,17 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(inspector.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
 
     auto buildDomain =
-        [&](const Runtime::SandboxEditorDomainWindowKind kind,
-            Runtime::SandboxEditorModelBuildStats& stats)
+        [&](const Runtime::EditorDomainWindowKind kind,
+            Runtime::EditorWorkspaceSnapshotStats& stats)
     {
-        stats = Runtime::SandboxEditorModelBuildStats{};
+        stats = Runtime::EditorWorkspaceSnapshotStats{};
         context.ModelBuildStats = &stats;
-        return Runtime::BuildSandboxEditorDomainWindowModel(context, kind);
+        return Runtime::BuildEditorDomainWindowModel(context, kind);
     };
 
-    Runtime::SandboxEditorModelBuildStats meshStats{};
-    const Runtime::SandboxEditorDomainWindowModel meshModel =
-        buildDomain(Runtime::SandboxEditorDomainWindowKind::Mesh, meshStats);
+    Runtime::EditorWorkspaceSnapshotStats meshStats{};
+    const Runtime::EditorDomainWindowModel meshModel =
+        buildDomain(Runtime::EditorDomainWindowKind::Mesh, meshStats);
     ASSERT_TRUE(meshModel.HasSelectedEntity);
     EXPECT_TRUE(meshModel.DomainMatches);
     EXPECT_EQ(meshStats.SelectedAnalysisCacheMisses, 1u);
@@ -1458,9 +1465,9 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(meshStats.PropertyCatalogModelBuilds, 1u);
     EXPECT_GT(meshStats.SelectedAnalysisModelBuildTimeNs, 0u);
 
-    Runtime::SandboxEditorModelBuildStats cachedMeshStats{};
-    const Runtime::SandboxEditorDomainWindowModel cachedMesh =
-        buildDomain(Runtime::SandboxEditorDomainWindowKind::Mesh,
+    Runtime::EditorWorkspaceSnapshotStats cachedMeshStats{};
+    const Runtime::EditorDomainWindowModel cachedMesh =
+        buildDomain(Runtime::EditorDomainWindowKind::Mesh,
                     cachedMeshStats);
     ASSERT_TRUE(cachedMesh.HasSelectedEntity);
     EXPECT_TRUE(cachedMesh.DomainMatches);
@@ -1471,18 +1478,18 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(cachedMeshStats.TextureBakeModelBuilds, 0u);
     EXPECT_EQ(cachedMeshStats.SelectedAnalysisModelBuildTimeNs, 0u);
 
-    Runtime::SandboxEditorModelBuildStats graphStats{};
-    const Runtime::SandboxEditorDomainWindowModel graphModel =
-        buildDomain(Runtime::SandboxEditorDomainWindowKind::Graph, graphStats);
+    Runtime::EditorWorkspaceSnapshotStats graphStats{};
+    const Runtime::EditorDomainWindowModel graphModel =
+        buildDomain(Runtime::EditorDomainWindowKind::Graph, graphStats);
     ASSERT_TRUE(graphModel.HasSelectedEntity);
     EXPECT_FALSE(graphModel.DomainMatches);
     EXPECT_EQ(graphStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(graphStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(graphStats.PropertyCatalogModelBuilds, 1u);
 
-    Runtime::SandboxEditorModelBuildStats cachedGraphStats{};
-    const Runtime::SandboxEditorDomainWindowModel cachedGraph =
-        buildDomain(Runtime::SandboxEditorDomainWindowKind::Graph,
+    Runtime::EditorWorkspaceSnapshotStats cachedGraphStats{};
+    const Runtime::EditorDomainWindowModel cachedGraph =
+        buildDomain(Runtime::EditorDomainWindowKind::Graph,
                     cachedGraphStats);
     ASSERT_TRUE(cachedGraph.HasSelectedEntity);
     EXPECT_FALSE(cachedGraph.DomainMatches);
@@ -1491,9 +1498,9 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(cachedGraphStats.PropertyCatalogModelBuilds, 0u);
     EXPECT_EQ(cachedGraphStats.SelectedAnalysisModelBuildTimeNs, 0u);
 
-    Runtime::SandboxEditorModelBuildStats pointStats{};
-    const Runtime::SandboxEditorDomainWindowModel pointModel =
-        buildDomain(Runtime::SandboxEditorDomainWindowKind::PointCloud,
+    Runtime::EditorWorkspaceSnapshotStats pointStats{};
+    const Runtime::EditorDomainWindowModel pointModel =
+        buildDomain(Runtime::EditorDomainWindowKind::PointCloud,
                     pointStats);
     ASSERT_TRUE(pointModel.HasSelectedEntity);
     EXPECT_FALSE(pointModel.DomainMatches);
@@ -1501,9 +1508,9 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(pointStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(pointStats.PropertyCatalogModelBuilds, 1u);
 
-    Runtime::SandboxEditorModelBuildStats cachedPointStats{};
-    const Runtime::SandboxEditorDomainWindowModel cachedPoint =
-        buildDomain(Runtime::SandboxEditorDomainWindowKind::PointCloud,
+    Runtime::EditorWorkspaceSnapshotStats cachedPointStats{};
+    const Runtime::EditorDomainWindowModel cachedPoint =
+        buildDomain(Runtime::EditorDomainWindowKind::PointCloud,
                     cachedPointStats);
     ASSERT_TRUE(cachedPoint.HasSelectedEntity);
     EXPECT_FALSE(cachedPoint.DomainMatches);
@@ -1513,7 +1520,7 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(cachedPointStats.SelectedAnalysisModelBuildTimeNs, 0u);
 
     context.ModelBuildStats = nullptr;
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 4u);
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 3u);
@@ -1528,19 +1535,19 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnSelectionGeneration)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(first.Inspector.HasEntity);
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
 
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot cached =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(cached.Inspector.HasEntity);
@@ -1550,8 +1557,8 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnSelectionGeneration)
     selection.ClearSelection(registry);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    const Runtime::SandboxEditorPanelFrame reselected =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot reselected =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(reselected.Inspector.HasEntity);
@@ -1559,7 +1566,7 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnSelectionGeneration)
     EXPECT_EQ(reselected.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(reselected.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
@@ -1588,21 +1595,21 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnPrimitiveGeneration)
         }};
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
     context.LastRefinedPrimitive = &primitive;
     context.LastRefinedPrimitiveGeneration = 1u;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(first.Inspector.HasEntity);
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
 
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot cached =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(cached.Inspector.HasEntity);
@@ -1612,8 +1619,8 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnPrimitiveGeneration)
     primitive->VertexId = 1u;
     context.LastRefinedPrimitiveGeneration = 2u;
 
-    const Runtime::SandboxEditorPanelFrame refined =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot refined =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(refined.Inspector.HasEntity);
@@ -1621,7 +1628,7 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnPrimitiveGeneration)
     EXPECT_EQ(refined.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(refined.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
@@ -1637,12 +1644,12 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryPresentationRecipeG
     AttachGeometryPresentation(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(first.Inspector.HasEntity);
@@ -1651,8 +1658,8 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryPresentationRecipeG
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(first.ModelBuildStats.GeometryPresentationModelBuilds, 1u);
 
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot cached =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(cached.Inspector.HasEntity);
@@ -1668,8 +1675,8 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryPresentationRecipeG
         Runtime::GeometryPresentationReadiness::Failed;
     runtimeState.Slots.front().Diagnostic = "binding generation changed";
 
-    const Runtime::SandboxEditorPanelFrame changed =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot changed =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(changed.Inspector.HasEntity);
@@ -1679,7 +1686,7 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryPresentationRecipeG
     EXPECT_EQ(changed.ModelBuildStats.GeometryPresentationModelBuilds, 1u);
     EXPECT_EQ(changed.Inspector.GeometryPresentation.RecipeGeneration, 8u);
 
-    const Runtime::SandboxEditorGeometryPresentationSlotModel* normal =
+    const Runtime::EditorGeometryPresentationSlotModel* normal =
         FindGeometryPresentationSlot(changed.Inspector.GeometryPresentation,
                             Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
@@ -1687,7 +1694,7 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryPresentationRecipeG
     EXPECT_NE(normal->Diagnostic.find("binding generation changed"),
               std::string::npos);
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
@@ -1702,25 +1709,25 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryMetadataSignature)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(first.Inspector.HasEntity);
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(first.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
     EXPECT_EQ(FindCatalogProperty(first.Inspector.PropertyCatalog,
-                                  Runtime::SandboxEditorPropertyCatalogDomain::
+                                  Runtime::EditorPropertyCatalogDomain::
                                       MeshVertices,
                                   "v:temperature"),
               nullptr);
 
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot cached =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(cached.Inspector.HasEntity);
@@ -1733,8 +1740,8 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryMetadataSignature)
     ASSERT_EQ(temperature.Vector().size(), 3u);
     temperature.Vector()[1] = 42.0f;
 
-    const Runtime::SandboxEditorPanelFrame changed =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot changed =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(changed.Inspector.HasEntity);
@@ -1742,12 +1749,12 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryMetadataSignature)
     EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(changed.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
     EXPECT_NE(FindCatalogProperty(changed.Inspector.PropertyCatalog,
-                                  Runtime::SandboxEditorPropertyCatalogDomain::
+                                  Runtime::EditorPropertyCatalogDomain::
                                       MeshVertices,
                                   "v:temperature"),
               nullptr);
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
@@ -1765,20 +1772,20 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnRenderHintSignature)
     edges.WidthSource = 1.0f;
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(first.Inspector.HasEntity);
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(first.ModelBuildStats.BoundStateModelBuilds, 1u);
 
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot cached =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(cached.Inspector.HasEntity);
@@ -1787,24 +1794,24 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnRenderHintSignature)
 
     registry.Raw().get<G::RenderEdges>(mesh).WidthSource = 3.5f;
 
-    const Runtime::SandboxEditorPanelFrame changed =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot changed =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(changed.Inspector.HasEntity);
     EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(changed.ModelBuildStats.BoundStateModelBuilds, 1u);
-    const Runtime::SandboxEditorBoundRenderStateRow* edgeHint =
+    const Runtime::EditorBoundRenderStateRow* edgeHint =
         FindBoundRowLabel(
             changed.Inspector.BoundState,
-            Runtime::SandboxEditorBoundRenderStateRowKind::RenderHint,
+            Runtime::EditorBoundRenderStateRowKind::RenderHint,
             "Edge render hint");
     ASSERT_NE(edgeHint, nullptr);
     EXPECT_TRUE(edgeHint->Enabled);
     EXPECT_EQ(edgeHint->SourceDescription, "uniform:3.500000");
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheMisses, 2u);
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
@@ -1819,13 +1826,13 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
 
@@ -1833,11 +1840,11 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheHits, 0u);
-    EXPECT_GT(first.ModelBuildStats.PanelFrameModelBuildTimeNs, 0u);
+    EXPECT_GT(first.ModelBuildStats.WorkspaceSnapshotBuildTimeNs, 0u);
     EXPECT_GT(first.ModelBuildStats.VisualizationModelBuildTimeNs, 0u);
 
-    const Runtime::SandboxEditorPanelFrame second =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot second =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
 
@@ -1845,12 +1852,12 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
     EXPECT_EQ(second.ModelBuildStats.VisualizationModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.VisualizationModelCacheMisses, 0u);
     EXPECT_EQ(second.ModelBuildStats.VisualizationModelCacheHits, 1u);
-    EXPECT_GT(second.ModelBuildStats.PanelFrameModelBuildTimeNs, 0u);
+    EXPECT_GT(second.ModelBuildStats.WorkspaceSnapshotBuildTimeNs, 0u);
     EXPECT_EQ(second.ModelBuildStats.VisualizationModelBuildTimeNs, 0u);
     EXPECT_EQ(second.Visualization.Properties.size(),
               first.Visualization.Properties.size());
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 1u);
     EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
@@ -1858,7 +1865,7 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesVisualizationModel)
 }
 TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnGeometryMetadataSignature)
 {
-    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
+    using Domain = Runtime::EditorVisualizationPropertyDomain;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -1867,13 +1874,13 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnGeometryMetadataSignat
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(first.Visualization.HasSelectedEntity);
@@ -1884,8 +1891,8 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnGeometryMetadataSignat
                                         "v:temperature"),
               nullptr);
 
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot cached =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(cached.Visualization.HasSelectedEntity);
@@ -1898,8 +1905,8 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnGeometryMetadataSignat
     ASSERT_EQ(temperature.Vector().size(), 3u);
     temperature.Vector()[2] = 7.0f;
 
-    const Runtime::SandboxEditorPanelFrame changed =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot changed =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(changed.Visualization.HasSelectedEntity);
@@ -1911,7 +1918,7 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnGeometryMetadataSignat
                                         "v:temperature"),
               nullptr);
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
     EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
@@ -1926,13 +1933,13 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnConfigSignature)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(first.Visualization.HasSelectedEntity);
@@ -1940,8 +1947,8 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnConfigSignature)
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
 
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot cached =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(cached.Visualization.HasSelectedEntity);
@@ -1961,8 +1968,8 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnConfigSignature)
     config.Scalar.Isolines.Width = 2.25f;
     registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, config);
 
-    const Runtime::SandboxEditorPanelFrame changed =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot changed =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(changed.Visualization.HasSelectedEntity);
@@ -1987,7 +1994,7 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnConfigSignature)
     EXPECT_EQ(changed.Visualization.Visualization.ScalarBinCount, 7u);
     EXPECT_EQ(changed.Visualization.Visualization.IsolineCount, 5u);
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
     EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
@@ -2003,28 +2010,28 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnLaneOverrideSignature)
     registry.Raw().emplace<G::RenderSurface>(mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorDomainWindowModel first =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel first =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     ASSERT_TRUE(first.HasSelectedEntity);
     EXPECT_EQ(first.Visualization.Target,
-              Runtime::SandboxEditorVisualizationTarget::Surface);
+              Runtime::EditorVisualizationTarget::Surface);
     EXPECT_FALSE(first.Visualization.Visualization.HasConfig);
 
-    Runtime::SandboxEditorSelectedModelCacheStats cacheStats = cache.Stats();
+    Runtime::EditorSelectedModelCacheStats cacheStats = cache.Stats();
     EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 1u);
     EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 0u);
 
-    const Runtime::SandboxEditorDomainWindowModel cached =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel cached =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     ASSERT_TRUE(cached.HasSelectedEntity);
     EXPECT_FALSE(cached.Visualization.Visualization.HasConfig);
     cacheStats = cache.Stats();
@@ -2040,10 +2047,10 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnLaneOverrideSignature)
         mesh,
         overrides);
 
-    const Runtime::SandboxEditorDomainWindowModel changed =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel changed =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     ASSERT_TRUE(changed.HasSelectedEntity);
     ASSERT_TRUE(changed.Visualization.Visualization.HasConfig);
     EXPECT_EQ(changed.Visualization.Visualization.Source,
@@ -2068,12 +2075,12 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnRecipeRevision)
         Runtime::SelectionController::ToStableEntityId(mesh);
 
     std::optional<Runtime::VisualizationRecipe> storedRecipe{};
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
     context.VisualizationCommandsAvailable = true;
     context.VisualizationRecipes =
-        Runtime::SandboxEditorVisualizationRecipeCommandSurface{
+        Runtime::EditorVisualizationRecipeCommandSurface{
             .GetRecipe =
                 [&](const std::uint32_t queriedStableId)
                     -> std::optional<Runtime::VisualizationRecipe>
@@ -2095,16 +2102,16 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnRecipeRevision)
         };
     context.VisualizationRecipeRevision = 1u;
 
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot first =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(first.Visualization.HasSelectedEntity);
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
     EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
 
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot cached =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(cached.Visualization.HasSelectedEntity);
@@ -2130,8 +2137,8 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnRecipeRevision)
     };
     context.VisualizationRecipeRevision = 2u;
 
-    const Runtime::SandboxEditorPanelFrame changed =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot changed =
+        Runtime::BuildEditorWorkspaceSnapshot(
             context,
             MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(changed.Visualization.HasSelectedEntity);
@@ -2145,122 +2152,122 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnRecipeRevision)
                   changed.Visualization.Recipe.Recipe.Data).OutputName,
               "velocity_glyphs");
 
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
+    const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
     EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
     EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
 }
 TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContract)
 {
-    using Algorithm = Runtime::SandboxEditorGeometryProcessingAlgorithm;
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+    using Algorithm = Runtime::EditorGeometryProcessingAlgorithm;
+    using Domain = Runtime::EditorGeometryProcessingDomain;
 
     const Domain kmeans =
-        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+        Runtime::GetEditorSupportedGeometryProcessingDomains(
             Algorithm::KMeans);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         kmeans,
         Domain::MeshVertices));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         kmeans,
         Domain::GraphVertices));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         kmeans,
         Domain::PointCloudPoints));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         kmeans,
         Domain::MeshEdges));
 
     const Domain normals =
-        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+        Runtime::GetEditorSupportedGeometryProcessingDomains(
             Algorithm::NormalEstimation);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         normals,
         Domain::MeshVertices));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         normals,
         Domain::GraphVertices));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         normals,
         Domain::PointCloudPoints));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         normals,
         Domain::MeshEdges));
 
     const Domain denoise =
-        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+        Runtime::GetEditorSupportedGeometryProcessingDomains(
             Algorithm::MeshDenoise);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         denoise,
         Domain::MeshVertices));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         denoise,
         Domain::MeshEdges));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         denoise,
         Domain::GraphVertices));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         denoise,
         Domain::PointCloudPoints));
 
     const Domain curvature =
-        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+        Runtime::GetEditorSupportedGeometryProcessingDomains(
             Algorithm::Curvature);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         curvature,
         Domain::MeshVertices));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         curvature,
         Domain::MeshEdges));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         curvature,
         Domain::GraphVertices));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         curvature,
         Domain::PointCloudPoints));
 
     const Domain smoothing =
-        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+        Runtime::GetEditorSupportedGeometryProcessingDomains(
             Algorithm::Smoothing);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         smoothing,
         Domain::MeshVertices));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         smoothing,
         Domain::MeshEdges));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         smoothing,
         Domain::MeshHalfedges));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         smoothing,
         Domain::MeshFaces));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         smoothing,
         Domain::GraphVertices));
 
-    EXPECT_TRUE(Runtime::SupportsSandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::SupportsEditorGeometryProcessingDomain(
         Algorithm::ShortestPath,
         Domain::GraphVertices));
-    EXPECT_FALSE(Runtime::SupportsSandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::SupportsEditorGeometryProcessingDomain(
         Algorithm::ShortestPath,
         Domain::PointCloudPoints));
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingDomain(
+    EXPECT_STREQ(Runtime::DebugNameForEditorGeometryProcessingDomain(
                      Domain::GraphVertices),
                  "Graph Nodes");
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+    EXPECT_STREQ(Runtime::DebugNameForEditorGeometryProcessingAlgorithm(
                      Algorithm::VectorHeat),
                  "Vector Heat Method");
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+    EXPECT_STREQ(Runtime::DebugNameForEditorGeometryProcessingAlgorithm(
                      Algorithm::MeshDenoise),
                  "Mesh Denoise");
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+    EXPECT_STREQ(Runtime::DebugNameForEditorGeometryProcessingAlgorithm(
                      Algorithm::Curvature),
                  "Curvature");
 }
 TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntries)
 {
-    using Algorithm = Runtime::SandboxEditorGeometryProcessingAlgorithm;
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+    using Algorithm = Runtime::EditorGeometryProcessingAlgorithm;
+    using Domain = Runtime::EditorGeometryProcessingDomain;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -2268,27 +2275,27 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
     AddTriangleMeshSource(registry, mesh);
 
-    const Runtime::SandboxEditorGeometryProcessingCapabilities meshCaps =
-        Runtime::GetSandboxEditorGeometryProcessingCapabilities(registry, mesh);
+    const Runtime::EditorGeometryProcessingCapabilities meshCaps =
+        Runtime::GetEditorGeometryProcessingCapabilities(registry, mesh);
     EXPECT_TRUE(meshCaps.HasEditableSurfaceMesh);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         meshCaps.Domains,
         Domain::MeshVertices));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         meshCaps.Domains,
         Domain::MeshEdges));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         meshCaps.Domains,
         Domain::MeshHalfedges));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         meshCaps.Domains,
         Domain::MeshFaces));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         meshCaps.Domains,
         Domain::GraphVertices));
 
-    const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> meshEntries =
-        Runtime::ResolveSandboxEditorGeometryProcessingEntries(meshCaps);
+    const std::vector<Runtime::EditorGeometryProcessingEntry> meshEntries =
+        Runtime::ResolveEditorGeometryProcessingEntries(meshCaps);
     ASSERT_EQ(meshEntries.size(), 15u);
     EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
@@ -2304,15 +2311,15 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_EQ(meshEntries[14].Algorithm, Algorithm::Repair);
 
     const std::vector<Domain> meshKMeans =
-        Runtime::GetAvailableSandboxEditorKMeansDomains(registry, mesh);
+        Runtime::GetAvailableEditorKMeansDomains(registry, mesh);
     ASSERT_EQ(meshKMeans.size(), 1u);
     EXPECT_EQ(meshKMeans[0], Domain::MeshVertices);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    const Runtime::SandboxEditorDomainWindowModel meshModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    const Runtime::EditorDomainWindowModel meshModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(meshModel.Processing.MeshDenoiseAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshCurvatureAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshCurvatureDirectionsAvailable);
@@ -2334,36 +2341,36 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
     AddGraphSource(registry, graph);
-    const Runtime::SandboxEditorGeometryProcessingCapabilities graphCaps =
-        Runtime::GetSandboxEditorGeometryProcessingCapabilities(registry, graph);
+    const Runtime::EditorGeometryProcessingCapabilities graphCaps =
+        Runtime::GetEditorGeometryProcessingCapabilities(registry, graph);
     EXPECT_FALSE(graphCaps.HasEditableSurfaceMesh);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         graphCaps.Domains,
         Domain::GraphVertices));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         graphCaps.Domains,
         Domain::GraphEdges));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         graphCaps.Domains,
         Domain::GraphHalfedges));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         graphCaps.Domains,
         Domain::MeshVertices));
-    const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> graphEntries =
-        Runtime::ResolveSandboxEditorGeometryProcessingEntries(registry, graph);
+    const std::vector<Runtime::EditorGeometryProcessingEntry> graphEntries =
+        Runtime::ResolveEditorGeometryProcessingEntries(registry, graph);
     ASSERT_EQ(graphEntries.size(), 3u);
     EXPECT_EQ(graphEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(graphEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(graphEntries[2].Algorithm, Algorithm::ShortestPath);
     const std::vector<Domain> graphKMeans =
-        Runtime::GetAvailableSandboxEditorKMeansDomains(registry, graph);
+        Runtime::GetAvailableEditorKMeansDomains(registry, graph);
     ASSERT_EQ(graphKMeans.size(), 1u);
     EXPECT_EQ(graphKMeans[0], Domain::GraphVertices);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    const Runtime::SandboxEditorDomainWindowModel graphModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel graphModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Graph);
+            Runtime::EditorDomainWindowKind::Graph);
     EXPECT_FALSE(graphModel.Processing.MeshDenoiseAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureDirectionsAvailable);
@@ -2374,17 +2381,17 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
     AddPointCloudSource(registry, cloud, 5u);
-    const Runtime::SandboxEditorGeometryProcessingCapabilities cloudCaps =
-        Runtime::GetSandboxEditorGeometryProcessingCapabilities(registry, cloud);
+    const Runtime::EditorGeometryProcessingCapabilities cloudCaps =
+        Runtime::GetEditorGeometryProcessingCapabilities(registry, cloud);
     EXPECT_FALSE(cloudCaps.HasEditableSurfaceMesh);
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
         cloudCaps.Domains,
         Domain::PointCloudPoints));
-    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
         cloudCaps.Domains,
         Domain::MeshVertices));
-    const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> cloudEntries =
-        Runtime::ResolveSandboxEditorGeometryProcessingEntries(registry, cloud);
+    const std::vector<Runtime::EditorGeometryProcessingEntry> cloudEntries =
+        Runtime::ResolveEditorGeometryProcessingEntries(registry, cloud);
     ASSERT_EQ(cloudEntries.size(), 11u);
     EXPECT_EQ(cloudEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(cloudEntries[1].Algorithm, Algorithm::NormalEstimation);
@@ -2392,14 +2399,14 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_EQ(cloudEntries[6].Algorithm, Algorithm::ProgressivePoissonSampling);
     EXPECT_EQ(cloudEntries[10].Algorithm, Algorithm::SurfaceReconstruction);
     const std::vector<Domain> cloudKMeans =
-        Runtime::GetAvailableSandboxEditorKMeansDomains(registry, cloud);
+        Runtime::GetAvailableEditorKMeansDomains(registry, cloud);
     ASSERT_EQ(cloudKMeans.size(), 1u);
     EXPECT_EQ(cloudKMeans[0], Domain::PointCloudPoints);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const Runtime::SandboxEditorDomainWindowModel cloudModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel cloudModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+            Runtime::EditorDomainWindowKind::PointCloud);
     EXPECT_FALSE(cloudModel.Processing.MeshDenoiseAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshCurvatureDirectionsAvailable);
@@ -2410,17 +2417,17 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_TRUE(cloudModel.Processing.PointCloudProgressivePoissonAvailable);
 
     const ECS::EntityHandle empty = MakeSelectable(registry, "Empty");
-    const Runtime::SandboxEditorGeometryProcessingCapabilities emptyCaps =
-        Runtime::GetSandboxEditorGeometryProcessingCapabilities(registry, empty);
+    const Runtime::EditorGeometryProcessingCapabilities emptyCaps =
+        Runtime::GetEditorGeometryProcessingCapabilities(registry, empty);
     EXPECT_FALSE(emptyCaps.HasAny());
-    EXPECT_TRUE(Runtime::ResolveSandboxEditorGeometryProcessingEntries(
+    EXPECT_TRUE(Runtime::ResolveEditorGeometryProcessingEntries(
                     registry,
                     empty)
                     .empty());
 }
 TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
 {
-    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
+    using Domain = Runtime::EditorVisualizationPropertyDomain;
     using Kind = Geometry::PropertyValueKind;
 
     ECS::Scene::Registry registry;
@@ -2450,11 +2457,11 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
         .Vector() = {0.25f};
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorPanelFrame meshFrame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot meshFrame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     const auto& properties = meshFrame.Visualization.Properties;
 
     EXPECT_EQ(FindVisualizationProperty(properties, Domain::MeshVertices, "v:position"),
@@ -2513,8 +2520,8 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
     graphNodes.Properties.GetOrAdd<float>("v:centrality", 0.0f)
         .Vector() = {0.0f, 1.0f, 2.0f};
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    const Runtime::SandboxEditorPanelFrame graphFrame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot graphFrame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     EXPECT_NE(FindVisualizationProperty(graphFrame.Visualization.Properties,
                                         Domain::GraphVertices,
                                         "v:centrality"),
@@ -2530,16 +2537,16 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
     cloudVertices.Properties.GetOrAdd<glm::vec4>("p:kmeans_color", glm::vec4{1.0f})
         .Vector() = {glm::vec4{1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const Runtime::SandboxEditorDomainWindowModel cloudModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel cloudModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+            Runtime::EditorDomainWindowKind::PointCloud);
     EXPECT_NE(FindVisualizationProperty(cloudModel.Visualization.Properties,
                                         Domain::PointCloudPoints,
                                         "p:kmeans_color"),
               nullptr);
 
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationPropertyDomain(
+    EXPECT_STREQ(Runtime::DebugNameForEditorVisualizationPropertyDomain(
                      Domain::PointCloudPoints),
                  "PointCloudPoints");
     EXPECT_STREQ(Runtime::DebugNameForGeometryPropertyValueKind(Kind::Vec4),
@@ -2547,7 +2554,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
 }
 TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
 {
-    using Domain = Runtime::SandboxEditorPropertyCatalogDomain;
+    using Domain = Runtime::EditorPropertyCatalogDomain;
     using Kind = Geometry::PropertyValueKind;
 
     ECS::Scene::Registry registry;
@@ -2588,13 +2595,13 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     const std::optional<Runtime::PrimitiveSelectionResult> lastPrimitive{primitive};
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    Runtime::SandboxEditorContext context =
+    Intrinsic::Tests::EditorFeatureTestContext context =
         MakeContext(registry, selection, true, &lastPrimitive);
 
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Inspector.HasEntity);
-    const Runtime::SandboxEditorPropertyCatalogModel& catalog =
+    const Runtime::EditorPropertyCatalogModel& catalog =
         frame.Inspector.PropertyCatalog;
     EXPECT_TRUE(catalog.HasSelectedEntity);
     EXPECT_EQ(catalog.SelectedDomain, GS::Domain::Mesh);
@@ -2654,7 +2661,7 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     const auto normalTarget = std::find_if(
         catalog.BindingTargets.begin(),
         catalog.BindingTargets.end(),
-        [](const Runtime::SandboxEditorPropertyBindingTargetModel& target)
+        [](const Runtime::EditorPropertyBindingTargetModel& target)
         {
             return target.Semantic == Runtime::GeometryPresentationSlotSemantic::Normal;
         });
@@ -2666,18 +2673,18 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     ASSERT_FALSE(normalTarget->Options.empty());
     EXPECT_TRUE(normalTarget->Options.front().Compatible);
 
-    const Runtime::SandboxEditorDomainWindowModel meshWindow =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel meshWindow =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_EQ(meshWindow.PropertyCatalog.Rows.size(), catalog.Rows.size());
     EXPECT_FALSE(meshWindow.BoundState.Rows.empty());
     EXPECT_NE(FindBoundRow(meshWindow.BoundState,
-                           Runtime::SandboxEditorBoundRenderStateRowKind::GeometryPresentationSlot,
+                           Runtime::EditorBoundRenderStateRowKind::GeometryPresentationSlot,
                            Runtime::GeometryPresentationSlotSemantic::Normal),
               nullptr);
 
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorPropertyCatalogDomain(
+    EXPECT_STREQ(Runtime::DebugNameForEditorPropertyCatalogDomain(
                      Domain::MeshHalfedges),
                  "MeshHalfedges");
     EXPECT_STREQ(Runtime::DebugNameForGeometryPropertyValueKind(
@@ -2686,12 +2693,12 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
 }
 TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
 {
-    using Domain = Runtime::SandboxEditorPropertyCatalogDomain;
+    using Domain = Runtime::EditorPropertyCatalogDomain;
     using Kind = Geometry::PropertyValueKind;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     const ECS::EntityHandle graph = MakeSelectable(registry, "CatalogGraph");
     AddGraphSource(registry, graph);
@@ -2703,9 +2710,9 @@ TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
         .Vector() = {glm::vec4{1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
-    const Runtime::SandboxEditorPropertyCatalogModel& graphCatalog =
+    Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    const Runtime::EditorPropertyCatalogModel& graphCatalog =
         frame.Inspector.PropertyCatalog;
     EXPECT_NE(FindCatalogProperty(graphCatalog, Domain::GraphVertices, "v:centrality"),
               nullptr);
@@ -2727,8 +2734,8 @@ TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
         .Vector() = {7u, 9u};
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    frame = Runtime::BuildSandboxEditorPanelFrame(context);
-    const Runtime::SandboxEditorPropertyCatalogModel& cloudCatalog =
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
+    const Runtime::EditorPropertyCatalogModel& cloudCatalog =
         frame.Inspector.PropertyCatalog;
     const auto* pointColor =
         FindCatalogProperty(cloudCatalog,
@@ -2744,9 +2751,9 @@ TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
 }
 TEST(SandboxEditorUi, VisualizationPresetPreservesConfiguredScalarStyling)
 {
-    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
-    using Preset = Runtime::SandboxEditorVisualizationPropertyPreset;
-    using Target = Runtime::SandboxEditorVisualizationTarget;
+    using Domain = Runtime::EditorVisualizationPropertyDomain;
+    using Preset = Runtime::EditorVisualizationPropertyPreset;
+    using Target = Runtime::EditorVisualizationTarget;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -2761,11 +2768,11 @@ TEST(SandboxEditorUi, VisualizationPresetPreservesConfiguredScalarStyling)
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
 
     // Configure a styled scalar field on the surface lane.
-    Runtime::SandboxEditorVisualizationConfigCommand styled{
+    Runtime::EditorVisualizationConfigCommand styled{
         .StableEntityId = stableId,
         .Target = Target::Surface,
         .EnableConfig = true,
@@ -2781,10 +2788,10 @@ TEST(SandboxEditorUi, VisualizationPresetPreservesConfiguredScalarStyling)
     styled.IsolineValues[0] = 0.25f;
     styled.IsolineValues[1] = 0.75f;
     styled.IsolineValueCount = 2u;
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
                   styled),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
 
     {
         ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
@@ -2799,16 +2806,16 @@ TEST(SandboxEditorUi, VisualizationPresetPreservesConfiguredScalarStyling)
     }
 
     // Switching the property through the Scalar preset must keep the styling.
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Target = Target::Surface,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
                       .PropertyName = "v:mean_curvature",
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
 
     ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
     const auto& overrides =
@@ -2846,7 +2853,7 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
 
     const std::uint32_t meshStableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
 
     std::optional<Runtime::PrimitiveSelectionResult> primitive{
@@ -2864,11 +2871,11 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     context.LastRefinedPrimitive = &primitive;
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    Runtime::SandboxEditorDomainWindowModel meshModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    Runtime::EditorDomainWindowModel meshModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDomainWindowKind(
+            Runtime::EditorDomainWindowKind::Mesh);
+    EXPECT_STREQ(Runtime::DebugNameForEditorDomainWindowKind(
                      meshModel.Kind),
                  "Mesh");
     EXPECT_EQ(meshModel.ExpectedDomain, GS::Domain::Mesh);
@@ -2889,21 +2896,21 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     ASSERT_TRUE(meshModel.Processing.HasSelectedEntity);
     ASSERT_EQ(meshModel.Processing.KMeansDomains.size(), 1u);
     EXPECT_EQ(meshModel.Processing.KMeansDomains[0],
-              Runtime::SandboxEditorGeometryProcessingDomain::MeshVertices);
+              Runtime::EditorGeometryProcessingDomain::MeshVertices);
     ASSERT_FALSE(meshModel.Processing.Entries.empty());
     EXPECT_EQ(meshModel.Processing.Entries[0].Algorithm,
-              Runtime::SandboxEditorGeometryProcessingAlgorithm::KMeans);
+              Runtime::EditorGeometryProcessingAlgorithm::KMeans);
 
-    const Runtime::SandboxEditorDomainWindowModel graphWhileMeshSelected =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel graphWhileMeshSelected =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Graph);
+            Runtime::EditorDomainWindowKind::Graph);
     EXPECT_FALSE(graphWhileMeshSelected.DomainMatches);
     EXPECT_FALSE(graphWhileMeshSelected.Processing.HasSelectedEntity);
     EXPECT_TRUE(graphWhileMeshSelected.Processing.Entries.empty());
     EXPECT_TRUE(HasDiagnostic(
         graphWhileMeshSelected.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::UnsupportedGeometryDomain));
+        Runtime::EditorDiagnosticCode::UnsupportedGeometryDomain));
 
     const std::uint32_t graphStableId =
         Runtime::SelectionController::ToStableEntityId(graph);
@@ -2919,11 +2926,11 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
         .PointId = Runtime::kInvalidPrimitiveIndex,
     };
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    const Runtime::SandboxEditorDomainWindowModel graphModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel graphModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Graph);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDomainWindowKind(
+            Runtime::EditorDomainWindowKind::Graph);
+    EXPECT_STREQ(Runtime::DebugNameForEditorDomainWindowKind(
                      graphModel.Kind),
                  "Graph");
     EXPECT_EQ(graphModel.SelectedDomain, GS::Domain::Graph);
@@ -2937,7 +2944,7 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     ASSERT_TRUE(graphModel.Processing.HasSelectedEntity);
     ASSERT_EQ(graphModel.Processing.KMeansDomains.size(), 1u);
     EXPECT_EQ(graphModel.Processing.KMeansDomains[0],
-              Runtime::SandboxEditorGeometryProcessingDomain::GraphVertices);
+              Runtime::EditorGeometryProcessingDomain::GraphVertices);
 
     const std::uint32_t cloudStableId =
         Runtime::SelectionController::ToStableEntityId(cloud);
@@ -2953,11 +2960,11 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
         .PointId = 3u,
     };
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const Runtime::SandboxEditorDomainWindowModel cloudModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel cloudModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDomainWindowKind(
+            Runtime::EditorDomainWindowKind::PointCloud);
+    EXPECT_STREQ(Runtime::DebugNameForEditorDomainWindowKind(
                      cloudModel.Kind),
                  "PointCloud");
     EXPECT_EQ(cloudModel.SelectedDomain, GS::Domain::PointCloud);
@@ -2968,12 +2975,12 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     ASSERT_TRUE(cloudModel.Processing.HasSelectedEntity);
     ASSERT_EQ(cloudModel.Processing.KMeansDomains.size(), 1u);
     EXPECT_EQ(cloudModel.Processing.KMeansDomains[0],
-              Runtime::SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+              Runtime::EditorGeometryProcessingDomain::PointCloudPoints);
 }
 TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
 {
-    using Target = Runtime::SandboxEditorVisualizationTarget;
-    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
+    using Target = Runtime::EditorVisualizationTarget;
+    using Domain = Runtime::EditorVisualizationPropertyDomain;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -2991,14 +2998,14 @@ TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
     graphNodes.Properties.GetOrAdd<float>("v:weight", 0.0f)
         .Vector() = {1.0f, 2.0f, 3.0f};
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    const Runtime::SandboxEditorDomainWindowModel meshPointModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel meshPointModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+            Runtime::EditorDomainWindowKind::PointCloud);
     EXPECT_EQ(meshPointModel.SelectedDomain, GS::Domain::Mesh);
     EXPECT_FALSE(meshPointModel.DomainMatches);
     EXPECT_TRUE(meshPointModel.VisualizationTargetAvailable);
@@ -3019,20 +3026,20 @@ TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
         .Vector() = {1.0f};
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, wireMesh));
-    const Runtime::SandboxEditorDomainWindowModel wireMeshEdgeModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel wireMeshEdgeModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Graph);
+            Runtime::EditorDomainWindowKind::Graph);
     EXPECT_EQ(wireMeshEdgeModel.SelectedDomain, GS::Domain::Unknown);
     EXPECT_FALSE(wireMeshEdgeModel.DomainMatches);
     EXPECT_TRUE(wireMeshEdgeModel.VisualizationTargetAvailable);
     EXPECT_EQ(wireMeshEdgeModel.VisualizationTarget, Target::Edges);
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    const Runtime::SandboxEditorDomainWindowModel graphPointModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel graphPointModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+            Runtime::EditorDomainWindowKind::PointCloud);
     EXPECT_EQ(graphPointModel.SelectedDomain, GS::Domain::Graph);
     EXPECT_FALSE(graphPointModel.DomainMatches);
     EXPECT_TRUE(graphPointModel.VisualizationTargetAvailable);
@@ -3043,79 +3050,79 @@ TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
                                         "v:weight"),
               nullptr);
 
-    const Runtime::SandboxEditorDomainWindowModel graphEdgeModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel graphEdgeModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Graph);
+            Runtime::EditorDomainWindowKind::Graph);
     EXPECT_TRUE(graphEdgeModel.DomainMatches);
     EXPECT_TRUE(graphEdgeModel.VisualizationTargetAvailable);
     EXPECT_EQ(graphEdgeModel.VisualizationTarget, Target::Edges);
     EXPECT_EQ(graphEdgeModel.Visualization.Target, Target::Edges);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationTarget(
+    EXPECT_STREQ(Runtime::DebugNameForEditorVisualizationTarget(
                      graphEdgeModel.VisualizationTarget),
                  "Edges");
 }
 TEST(SandboxEditorUi, DomainWindowModelsReportNoSelectionStaleAndWrongDomain)
 {
-    const Runtime::SandboxEditorDomainWindowModel missingScene =
-        Runtime::BuildSandboxEditorDomainWindowModel(
-            Runtime::SandboxEditorContext{},
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    const Runtime::EditorDomainWindowModel missingScene =
+        Runtime::BuildEditorDomainWindowModel(
+            Intrinsic::Tests::EditorFeatureTestContext{},
+            Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(HasDiagnostic(
         missingScene.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::MissingScene));
+        Runtime::EditorDiagnosticCode::MissingScene));
     EXPECT_FALSE(missingScene.HasSelectedEntity);
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
 
-    Runtime::SandboxEditorContext missingSelection = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext missingSelection = MakeContext(registry, selection);
     missingSelection.Selection = nullptr;
-    const Runtime::SandboxEditorDomainWindowModel missingSelectionModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel missingSelectionModel =
+        Runtime::BuildEditorDomainWindowModel(
             missingSelection,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(HasDiagnostic(
         missingSelectionModel.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::MissingSelectionController));
+        Runtime::EditorDiagnosticCode::MissingSelectionController));
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    const Runtime::SandboxEditorDomainWindowModel noSelection =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    const Runtime::EditorDomainWindowModel noSelection =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(HasDiagnostic(
         noSelection.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::NoSelectedEntity));
+        Runtime::EditorDiagnosticCode::NoSelectedEntity));
     EXPECT_FALSE(noSelection.DomainMatches);
 
     const ECS::EntityHandle stale = MakeSelectable(registry, "Stale");
     ASSERT_TRUE(selection.SetSelectedEntity(registry, stale));
     registry.Raw().destroy(stale);
-    const Runtime::SandboxEditorDomainWindowModel staleSelection =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel staleSelection =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(HasDiagnostic(
         staleSelection.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::NoSelectedEntity));
+        Runtime::EditorDiagnosticCode::NoSelectedEntity));
     EXPECT_FALSE(staleSelection.HasSelectedEntity);
 
     selection.ClearSelection(registry);
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
     AddPointCloudSource(registry, cloud, 2u);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const Runtime::SandboxEditorDomainWindowModel wrongDomain =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel wrongDomain =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
+            Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(wrongDomain.HasSelectedEntity);
     EXPECT_EQ(wrongDomain.ExpectedDomain, GS::Domain::Mesh);
     EXPECT_EQ(wrongDomain.SelectedDomain, GS::Domain::PointCloud);
     EXPECT_FALSE(wrongDomain.DomainMatches);
     EXPECT_TRUE(HasDiagnostic(
         wrongDomain.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::UnsupportedGeometryDomain));
+        Runtime::EditorDiagnosticCode::UnsupportedGeometryDomain));
 }
 TEST(SandboxEditorUi, SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds)
 {
@@ -3149,8 +3156,8 @@ TEST(SandboxEditorUi, SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds)
             .WorldHit = glm::vec3{4.0f, 5.0f, 6.0f},
         }};
 
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(
             MakeContext(registry, selection, true, &primitive));
 
     ASSERT_EQ(frame.Selection.SelectedEntities.size(), 1u);
@@ -3167,7 +3174,7 @@ TEST(SandboxEditorUi, SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds)
               Runtime::RefinedPrimitiveKind::Face);
     EXPECT_EQ(frame.Selection.Primitive.Primitive.FaceId, 12u);
     EXPECT_FLOAT_EQ(frame.Selection.Primitive.Primitive.WorldHit.z, 6.0f);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorPrimitiveKind(
+    EXPECT_STREQ(Runtime::DebugNameForEditorPrimitiveKind(
                      frame.Selection.Primitive.Primitive.Kind),
                  "Face");
 }
@@ -3199,7 +3206,7 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
         Runtime::SelectionController::ToStableEntityId(mesh);
 
     const Runtime::JobToken dependencyHandle{99u, 1u};
-    Runtime::SandboxEditorJobQueueSnapshot jobs{};
+    Runtime::EditorJobQueueSnapshot jobs{};
     const std::vector<Runtime::JobState> statuses{
         Runtime::JobState::AwaitingDependencies,
         Runtime::JobState::Queued,
@@ -3212,20 +3219,20 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
     };
     for (std::size_t i = 0u; i < statuses.size(); ++i)
     {
-        jobs.Entries.push_back(Runtime::SandboxEditorJobRecord{
+        jobs.Entries.push_back(Runtime::EditorJobRecord{
             .Token = Runtime::JobToken{
                 static_cast<std::uint32_t>(10u + i),
                 1u},
-            .Identity = Runtime::SandboxEditorJobIdentity{
+            .Identity = Runtime::EditorJobIdentity{
                 .EntityId = stableId,
-                .Scope = Runtime::SandboxEditorJobScope::MeshVertex,
+                .Scope = Runtime::EditorJobScope::MeshVertex,
                 .OutputSemantic = Runtime::GeometryPresentationSlotSemantic::Normal,
                 .OutputName = "normal",
             },
             .Name = "presentation job",
             .State = statuses[i],
             .Dependencies = {
-                Runtime::SandboxEditorJobDependency{
+                Runtime::EditorJobDependency{
                     .Job = dependencyHandle,
                     .Reason = "normal requires uv",
                 },
@@ -3236,14 +3243,14 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
         });
     }
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     AttachJobSnapshot(context, jobs);
 
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
 
     ASSERT_TRUE(frame.Inspector.HasEntity);
-    const Runtime::SandboxEditorGeometryPresentationModel& presentation =
+    const Runtime::EditorGeometryPresentationModel& presentation =
         frame.Inspector.GeometryPresentation;
     ASSERT_TRUE(presentation.HasRecipe);
     EXPECT_EQ(presentation.Shape, Runtime::GeometryPresentationShape::Mesh);
@@ -3255,7 +3262,7 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
     EXPECT_EQ(presentation.Jobs[0].Dependencies[0].Reason, "normal requires uv");
     EXPECT_EQ(presentation.Jobs[5].Diagnostic, "failed bake");
 
-    const Runtime::SandboxEditorGeometryPresentationSlotModel* normal =
+    const Runtime::EditorGeometryPresentationSlotModel* normal =
         FindGeometryPresentationSlot(presentation, Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
     EXPECT_EQ(normal->Readiness, Runtime::GeometryPresentationReadiness::Pending);
@@ -3266,7 +3273,7 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
     const auto disabled = std::find_if(
         normal->PropertyOptions.begin(),
         normal->PropertyOptions.end(),
-        [](const Runtime::SandboxEditorGeometryPresentationPropertyOptionModel& option)
+        [](const Runtime::EditorGeometryPresentationPropertyOptionModel& option)
         {
             return option.Descriptor.Name == "v:temperature";
         });
@@ -3274,16 +3281,16 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
     EXPECT_FALSE(disabled->Compatible);
     EXPECT_FALSE(disabled->DisabledReason.empty());
 
-    const Runtime::SandboxEditorBoundRenderStateModel& bound =
+    const Runtime::EditorBoundRenderStateModel& bound =
         frame.Inspector.BoundState;
     EXPECT_TRUE(bound.HasSelectedEntity);
     EXPECT_EQ(bound.SelectedStableId, stableId);
     EXPECT_EQ(bound.RecipeGeneration, presentation.RecipeGeneration);
     EXPECT_GE(bound.Rows.size(), presentation.Slots.size() + presentation.Jobs.size());
 
-    const Runtime::SandboxEditorBoundRenderStateRow* normalBound =
+    const Runtime::EditorBoundRenderStateRow* normalBound =
         FindBoundRow(bound,
-                     Runtime::SandboxEditorBoundRenderStateRowKind::GeometryPresentationSlot,
+                     Runtime::EditorBoundRenderStateRowKind::GeometryPresentationSlot,
                      Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normalBound, nullptr);
     EXPECT_EQ(normalBound->SourceKind,
@@ -3298,16 +3305,16 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
     const auto failedJob = std::find_if(
         bound.Rows.begin(),
         bound.Rows.end(),
-        [](const Runtime::SandboxEditorBoundRenderStateRow& row)
+        [](const Runtime::EditorBoundRenderStateRow& row)
         {
             return row.Kind ==
-                       Runtime::SandboxEditorBoundRenderStateRowKind::DerivedJob &&
+                       Runtime::EditorBoundRenderStateRowKind::DerivedJob &&
                    row.JobStatus == Runtime::JobState::Rejected;
         });
     ASSERT_NE(failedJob, bound.Rows.end());
     EXPECT_EQ(failedJob->Diagnostic, "failed bake");
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorBoundRenderStateRowKind(
-                     Runtime::SandboxEditorBoundRenderStateRowKind::DerivedJob),
+    EXPECT_STREQ(Runtime::DebugNameForEditorBoundRenderStateRowKind(
+                     Runtime::EditorBoundRenderStateRowKind::DerivedJob),
                  "DerivedJob");
 }
 TEST(SandboxEditorUi, GeometryPresentationInspectorInfersGraphPointCloudAndComposition)
@@ -3318,15 +3325,15 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorInfersGraphPointCloudAndCompo
     const ECS::EntityHandle graph = MakeSelectable(registry, "GeometryPresentationGraph");
     AddGraphSource(registry, graph);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     EXPECT_EQ(frame.Inspector.GeometryPresentation.Shape,
               Runtime::GeometryPresentationShape::Graph);
-    const Runtime::SandboxEditorBoundRenderStateRow* graphBake =
+    const Runtime::EditorBoundRenderStateRow* graphBake =
         FindBoundRowLabel(
             frame.Inspector.BoundState,
-            Runtime::SandboxEditorBoundRenderStateRowKind::DisabledCommand,
+            Runtime::EditorBoundRenderStateRowKind::DisabledCommand,
             "Texture bake");
     ASSERT_NE(graphBake, nullptr);
     EXPECT_FALSE(graphBake->Enabled);
@@ -3335,13 +3342,13 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorInfersGraphPointCloudAndCompo
     const ECS::EntityHandle cloud = MakeSelectable(registry, "GeometryPresentationCloud");
     AddPointCloudSource(registry, cloud, 3u);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
     EXPECT_EQ(frame.Inspector.GeometryPresentation.Shape,
               Runtime::GeometryPresentationShape::PointCloud);
-    const Runtime::SandboxEditorBoundRenderStateRow* cloudBake =
+    const Runtime::EditorBoundRenderStateRow* cloudBake =
         FindBoundRowLabel(
             frame.Inspector.BoundState,
-            Runtime::SandboxEditorBoundRenderStateRowKind::DisabledCommand,
+            Runtime::EditorBoundRenderStateRowKind::DisabledCommand,
             "Texture bake");
     ASSERT_NE(cloudBake, nullptr);
     EXPECT_FALSE(cloudBake->Enabled);
@@ -3365,12 +3372,12 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorInfersGraphPointCloudAndCompo
     ECS::Hierarchy::Attach(registry.Raw(), secondChild, parent);
     ECS::Hierarchy::Attach(registry.Raw(), grandchild, child);
 
-    Runtime::SandboxEditorJobQueueSnapshot jobs{};
-    jobs.Entries.push_back(Runtime::SandboxEditorJobRecord{
+    Runtime::EditorJobQueueSnapshot jobs{};
+    jobs.Entries.push_back(Runtime::EditorJobRecord{
         .Token = Runtime::JobToken{77u, 1u},
-        .Identity = Runtime::SandboxEditorJobIdentity{
+        .Identity = Runtime::EditorJobIdentity{
             .EntityId = Runtime::SelectionController::ToStableEntityId(child),
-            .Scope = Runtime::SandboxEditorJobScope::MeshVertex,
+            .Scope = Runtime::EditorJobScope::MeshVertex,
             .OutputSemantic = Runtime::GeometryPresentationSlotSemantic::Normal,
             .OutputName = "normal",
         },
@@ -3379,7 +3386,7 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorInfersGraphPointCloudAndCompo
     });
     AttachJobSnapshot(context, jobs);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, parent));
-    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
 
     EXPECT_EQ(frame.Inspector.GeometryPresentation.Shape,
               Runtime::GeometryPresentationShape::Composition);
@@ -3389,10 +3396,10 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorInfersGraphPointCloudAndCompo
     EXPECT_EQ(frame.Inspector.GeometryPresentation.Composition.ChildPendingSlotCount, 1u);
     EXPECT_EQ(frame.Inspector.GeometryPresentation.Composition.ChildJobCount, 1u);
     EXPECT_EQ(frame.Inspector.GeometryPresentation.Composition.ChildActiveJobCount, 1u);
-    const Runtime::SandboxEditorBoundRenderStateRow* composition =
+    const Runtime::EditorBoundRenderStateRow* composition =
         FindBoundRowLabel(
             frame.Inspector.BoundState,
-            Runtime::SandboxEditorBoundRenderStateRowKind::CompositionSummary,
+            Runtime::EditorBoundRenderStateRowKind::CompositionSummary,
             "Composition summary");
     ASSERT_NE(composition, nullptr);
     EXPECT_EQ(composition->Readiness,
@@ -3422,10 +3429,10 @@ TEST(SandboxEditorUi, GeometryPresentationCompositionReportsCorruptHierarchyWith
     childHierarchy.NextSibling = danglingSibling;
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, parent));
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
-    const Runtime::SandboxEditorGeometryPresentationModel& presentation =
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    const Runtime::EditorGeometryPresentationModel& presentation =
         frame.Inspector.GeometryPresentation;
 
     EXPECT_FALSE(presentation.Composition.HasChildren);
@@ -3434,33 +3441,33 @@ TEST(SandboxEditorUi, GeometryPresentationCompositionReportsCorruptHierarchyWith
     EXPECT_EQ(presentation.Composition.ChildSlotCount, 0u);
     EXPECT_TRUE(HasDiagnostic(
         presentation.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::CorruptHierarchy));
+        Runtime::EditorDiagnosticCode::CorruptHierarchy));
     ASSERT_EQ(presentation.Diagnostics.size(), 1u);
     EXPECT_NE(
         presentation.Diagnostics.front().Message.find("DanglingLink"),
         std::string::npos);
     EXPECT_STREQ(
-        Runtime::DebugNameForSandboxEditorDiagnosticCode(
-            Runtime::SandboxEditorDiagnosticCode::CorruptHierarchy),
+        Runtime::DebugNameForEditorDiagnosticCode(
+            Runtime::EditorDiagnosticCode::CorruptHierarchy),
         "CorruptHierarchy");
 }
 TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
 {
     Graphics::RenderRecipeConfigContext recipeContext =
         MakeRenderRecipeConfigContext();
-    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
+    Runtime::EditorRenderRecipeEditorState editorState{};
     Runtime::RenderArtifactRegistry artifacts;
     ASSERT_TRUE(artifacts.RegisterArtifact(
                             MakeSandboxRenderArtifact("sandbox-artifact"))
                     .Succeeded());
 
-    Runtime::SandboxEditorContext context = MakeRenderRecipeEditorContext(
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeRenderRecipeEditorContext(
         recipeContext,
         editorState,
         &artifacts);
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
-    const Runtime::SandboxEditorRenderRecipeEditorModel& model =
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    const Runtime::EditorRenderRecipeEditorModel& model =
         frame.RenderRecipe;
 
     ASSERT_TRUE(model.Available);
@@ -3470,27 +3477,27 @@ TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
     EXPECT_FALSE(model.CanPreview);
     EXPECT_FALSE(model.CanActivate);
 
-    const Runtime::SandboxEditorRenderRecipeSlotModel* fixedCore =
+    const Runtime::EditorRenderRecipeSlotModel* fixedCore =
         FindRecipeSlotRow(model, "default-frame-core");
     ASSERT_NE(fixedCore, nullptr);
     EXPECT_TRUE(fixedCore->DeclaredByRenderer);
     EXPECT_FALSE(fixedCore->Editable);
     EXPECT_EQ(fixedCore->Kind, Graphics::RecipeSlotKind::FixedCore);
 
-    const Runtime::SandboxEditorRenderRecipeSlotModel* lighting =
+    const Runtime::EditorRenderRecipeSlotModel* lighting =
         FindRecipeSlotRow(model, "lighting");
     ASSERT_NE(lighting, nullptr);
     EXPECT_TRUE(lighting->DeclaredByRenderer);
     EXPECT_TRUE(lighting->Editable);
     EXPECT_EQ(lighting->Kind, Graphics::RecipeSlotKind::Extension);
 
-    const Runtime::SandboxEditorRenderRecipeBindingOverrideModel* material =
+    const Runtime::EditorRenderRecipeBindingOverrideModel* material =
         FindRecipeBindingRow(model, "material-table");
     ASSERT_NE(material, nullptr);
     EXPECT_TRUE(material->Required);
     EXPECT_FALSE(material->Editable);
 
-    const Runtime::SandboxEditorRenderRecipeBindingOverrideModel* lights =
+    const Runtime::EditorRenderRecipeBindingOverrideModel* lights =
         FindRecipeBindingRow(model, "light-snapshots");
     ASSERT_NE(lights, nullptr);
     EXPECT_FALSE(lights->Required);
@@ -3499,7 +3506,7 @@ TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
 
     ASSERT_NE(FindRecipeOutputRow(model, "color"), nullptr);
 
-    const Runtime::SandboxEditorRenderArtifactRow* artifact =
+    const Runtime::EditorRenderArtifactRow* artifact =
         FindRenderArtifactRow(model, "sandbox-artifact");
     ASSERT_NE(artifact, nullptr);
     EXPECT_TRUE(artifact->CanPublish);

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_layering.py",
+    "--root",
+    "src",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_layering.py --root src --strict",
+  "cwd": ".",
+  "duration_ms": 188,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T05:39:14Z",
+  "label": "corrected-review2-layering",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T05:39:13Z",
+  "stderr_path": "tasks/evidence/RUNTIME-202/commands/corrected-review2-layering.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-202/commands/corrected-review2-layering.stdout.log",
+  "stdout_sha256": "1bfa321752a4b966d28666d0ec9e578563ac089ebb53d8470245fa277a4f4e9c",
+  "task_id": "RUNTIME-202"
+}

@@ -2,16 +2,6 @@
   "max_regression_ms": 0,
   "targets": [
     {
-      "edge_id": "68913ab259a16cbe41cbca3ad32b211492a9189e7905fabe8ed16a4a6fde9503",
-      "source": "src/runtime/Runtime.SandboxEditorFacades.cppm",
-      "edge_kind": "module-interface",
-      "outputs": [
-        "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.SandboxEditorFacades.pcm",
-        "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SandboxEditorFacades.cppm.o"
-      ],
-      "max_duration_ms": 283000
-    },
-    {
       "edge_id": "58ec1170b599cb974764ce6459b83c3f8090403d6455d5555f162baf402ac970",
       "source": "src/runtime/Runtime.Engine.cppm",
       "edge_kind": "module-interface",

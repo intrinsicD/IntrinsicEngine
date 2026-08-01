@@ -1016,6 +1016,12 @@ matched across all five samples, with canonical SHA-256
 `5d832f6bb35910c9952766f63cf87f9e66dc096864a4c9a63e4d92436abc0efc`;
 that stronger post-declaration audit did not alter ranking or thresholds.
 
+RUNTIME-202 later deleted the first-ranked Sandbox facade module. Its row below
+remains as historical hosted evidence, but the impossible edge was removed from
+`compile_hotspot_baseline.json` without substituting an unmeasured target. The
+remaining measured edges retain their original identities and budgets until a
+new comparable hosted refresh replaces the cohort.
+
 | Rank | Source | Durations, samples 1-5 (ms) | Median (ms) | Max / nearest-rank p95 (ms) | Budget (ms) |
 | ---: | --- | --- | ---: | ---: | ---: |
 | 1 | `src/runtime/Runtime.SandboxEditorFacades.cppm` | 172263, 190304, 226226, 168445, 193698 | 190304 | 226226 | 283000 |

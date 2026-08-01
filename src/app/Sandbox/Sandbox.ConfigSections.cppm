@@ -2,18 +2,21 @@ module;
 
 export module Extrinsic.Sandbox.ConfigSections;
 
-import Extrinsic.Runtime.SandboxConfigSections;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.ProgressivePoissonConfig;
 
 export namespace Extrinsic::Sandbox
 {
     struct SandboxConfigSectionCallbacks
     {
-        Runtime::EngineConfigSectionChangedCallback Clustering{};
-        Runtime::EngineConfigSectionChangedCallback ProgressivePoisson{};
-        Runtime::EngineConfigSectionChangedCallback Parameterization{};
+        Runtime::RuntimeEngineConfigSectionChangedCallback Clustering{};
+        Runtime::RuntimeEngineConfigSectionChangedCallback ProgressivePoisson{};
+        Runtime::RuntimeEngineConfigSectionChangedCallback Parameterization{};
     };
 
-    [[nodiscard]] Runtime::EngineConfigSectionRegistry
+    [[nodiscard]] Runtime::RuntimeEngineConfigSectionRegistry
     CreateSandboxConfigSectionRegistry(
         SandboxConfigSectionCallbacks callbacks = {});
 }

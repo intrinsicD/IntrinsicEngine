@@ -8,6 +8,8 @@
 #include <gtest/gtest.h>
 #include "RuntimeTestModule.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Component.Hierarchy;
@@ -32,7 +34,12 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
@@ -423,7 +430,7 @@ TEST(ReferenceSceneOwnership,
 }
 
 TEST(ReferenceSceneOwnership,
-     AppOwnedTriangleRemainsVisibleToSandboxEditorModels)
+     AppOwnedTriangleRemainsVisibleToEditorModels)
 {
     auto app = std::make_unique<AppOwnedReferenceApplication>();
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(true), std::move(app));
@@ -447,7 +454,7 @@ TEST(ReferenceSceneOwnership,
     ASSERT_TRUE(selection.SetSelectedEntity(
         *engine.Worlds().Get(engine.ActiveWorld()), entity));
 
-    const Runtime::SandboxEditorContext context{
+    const Intrinsic::Tests::EditorFeatureTestContext context{
         .Scene = &*engine.Worlds().Get(engine.ActiveWorld()),
         .Selection = &selection,
         .ImGuiAdapterAvailable = true,
@@ -455,8 +462,8 @@ TEST(ReferenceSceneOwnership,
         .CameraRenderCommandsAvailable = false,
         .VisualizationCommandsAvailable = true,
     };
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
 
     ASSERT_EQ(frame.Hierarchy.size(), 1u);
     EXPECT_EQ(frame.Hierarchy[0].Name, "ReferenceTriangle");

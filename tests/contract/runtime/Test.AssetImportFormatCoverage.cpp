@@ -56,13 +56,19 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
@@ -407,6 +413,98 @@ namespace
     private:
         std::shared_ptr<BlockingReadBackendState> m_State;
         Core::IO::FileIOBackend m_File{};
+    };
+
+    class ActiveWorldSwitchImportApplication final
+        : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        void Arm(
+            const Runtime::WorldHandle replacementWorld,
+            std::atomic<bool>& releaseGeometryWorker,
+            std::shared_ptr<BlockingReadBackendState> modelReadState) noexcept
+        {
+            m_ReplacementWorld = replacementWorld;
+            m_ReleaseGeometryWorker = &releaseGeometryWorker;
+            m_ModelReadState = std::move(modelReadState);
+            m_Armed = true;
+        }
+
+        void Resolve() override {}
+
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++m_ObservedFrames;
+            if (!m_Armed)
+                return;
+
+            if (!m_WorkersReleased &&
+                engine.ActiveWorld() == m_ReplacementWorld)
+            {
+                m_ReleaseGeometryWorker->store(
+                    true,
+                    std::memory_order_release);
+                m_ModelReadState->ReleaseRead.store(
+                    true,
+                    std::memory_order_release);
+                m_WorkersReleased = true;
+            }
+
+            const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+                    .GetAssetImportQueueSnapshot();
+            if (m_WorkersReleased &&
+                queue.Entries.size() == 2u &&
+                queue.ActiveCount == 0u &&
+                queue.TerminalCount == 2u)
+            {
+                m_Satisfied = true;
+                engine.RequestExit();
+                return;
+            }
+
+            if (m_ObservedFrames >= 512u)
+            {
+                ReleaseWorkers();
+                m_TimedOut = true;
+                engine.RequestExit();
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        void Shutdown() override { ReleaseWorkers(); }
+
+        [[nodiscard]] bool Satisfied() const noexcept { return m_Satisfied; }
+        [[nodiscard]] bool TimedOut() const noexcept { return m_TimedOut; }
+
+    private:
+        void ReleaseWorkers() noexcept
+        {
+            if (m_ReleaseGeometryWorker != nullptr)
+            {
+                m_ReleaseGeometryWorker->store(
+                    true,
+                    std::memory_order_release);
+            }
+            if (m_ModelReadState != nullptr)
+            {
+                m_ModelReadState->ReleaseRead.store(
+                    true,
+                    std::memory_order_release);
+            }
+            m_WorkersReleased = true;
+        }
+
+        Runtime::WorldHandle m_ReplacementWorld{};
+        std::atomic<bool>* m_ReleaseGeometryWorker{nullptr};
+        std::shared_ptr<BlockingReadBackendState> m_ModelReadState{};
+        std::uint32_t m_ObservedFrames{0u};
+        bool m_Armed{false};
+        bool m_WorkersReleased{false};
+        bool m_Satisfied{false};
+        bool m_TimedOut{false};
     };
 
     class SlowImportProbeApplication final : public Intrinsic::Tests::RuntimeTestModule
@@ -1360,9 +1458,11 @@ TEST(RuntimeAssetImportFormatCoverage,
     Runtime::CameraControllerRegistry cameras{};
     Runtime::SelectionController selection{};
     const Runtime::RuntimeInputActionDesc focus =
-        Runtime::MakeSandboxDefaultFocusInputAction(
+        Runtime::MakeFocusCameraOnSelectionInputAction(
             cameras,
-            selection);
+            selection,
+            "Sandbox.DefaultFocusCameraOnSelection",
+            Runtime::RuntimeInputActionBinding{.KeyCode = 'F'});
     EXPECT_EQ(
         focus.DebugName,
         "Sandbox.DefaultFocusCameraOnSelection");
@@ -2387,19 +2487,16 @@ TEST(RuntimeAssetImportFormatCoverage, QueuedImportsRejectActiveWorldSwitchBefor
         "runtime179_world_scoped_import.gltf",
         TriangleGltfJson(modelBinName));
 
+    auto application =
+        std::make_unique<ActiveWorldSwitchImportApplication>();
+    ActiveWorldSwitchImportApplication* const app = application.get();
+    Core::Config::EngineConfig config = HeadlessConfig();
+    // Two import workers remain blocked until the frame-maintenance world
+    // switch commits. Keep a third worker available for the frame graph.
+    config.Simulation.WorkerThreadCount = 3u;
     Intrinsic::Tests::RuntimeTestKernel engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForConditionApplication>(
-            [](Runtime::Engine& runningEngine)
-            {
-                const Runtime::RuntimeAssetImportQueueSnapshot queue =
-                    RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(runningEngine)
-                        .GetAssetImportQueueSnapshot();
-                return queue.Entries.size() == 2u &&
-                    queue.ActiveCount == 0u &&
-                    queue.TerminalCount == 2u;
-            },
-            512u));
+        config,
+        std::move(application));
     InitializeAssetImportEngine(engine);
 
     const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
@@ -2411,6 +2508,25 @@ TEST(RuntimeAssetImportFormatCoverage, QueuedImportsRejectActiveWorldSwitchBefor
     ECS::Scene::Registry* const replacementScene =
         engine.Worlds().Get(replacementWorld);
     ASSERT_NE(replacementScene, nullptr);
+
+    std::atomic<bool> geometryWorkerEntered{false};
+    std::atomic<bool> releaseGeometryWorker{false};
+    auto modelReadState = std::make_shared<BlockingReadBackendState>();
+    RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+        .SetQueuedGeometryImportBeforeDecodeHookForTest(
+            [&geometryWorkerEntered, &releaseGeometryWorker](
+                const Runtime::RuntimeAssetImportRequest&)
+            {
+                geometryWorkerEntered.store(true, std::memory_order_release);
+                while (!releaseGeometryWorker.load(std::memory_order_acquire))
+                    std::this_thread::yield();
+            });
+    RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+        .SetModelTextureImportIOBackendFactoryForTest(
+            [modelReadState]()
+            {
+                return std::make_unique<BlockingReadIOBackend>(modelReadState);
+            });
 
     auto geometryQueued =
         RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).QueueGeometryImport(
@@ -2428,11 +2544,19 @@ TEST(RuntimeAssetImportFormatCoverage, QueuedImportsRejectActiveWorldSwitchBefor
             });
     ASSERT_TRUE(modelQueued.has_value())
         << static_cast<int>(modelQueued.error());
+    app->Arm(
+        replacementWorld,
+        releaseGeometryWorker,
+        modelReadState);
     ASSERT_TRUE(
         engine.Worlds().RequestSetActiveWorld(replacementWorld).has_value());
 
     engine.Run();
 
+    EXPECT_TRUE(geometryWorkerEntered.load(std::memory_order_acquire));
+    EXPECT_TRUE(modelReadState->ReadStarted.load(std::memory_order_acquire));
+    EXPECT_TRUE(app->Satisfied());
+    EXPECT_FALSE(app->TimedOut());
     EXPECT_EQ(engine.ActiveWorld(), replacementWorld);
     ASSERT_EQ(engine.Worlds().Get(submissionWorld), submissionScene);
     ASSERT_EQ(engine.Worlds().Get(replacementWorld), replacementScene);
@@ -2814,6 +2938,14 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
             256u));
     InitializeAssetImportEngine(engine);
 
+    auto readState = std::make_shared<BlockingReadBackendState>();
+    RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+        .SetModelTextureImportIOBackendFactoryForTest(
+            [readState]()
+            {
+                return std::make_unique<BlockingReadIOBackend>(readState);
+            });
+
     auto modelQueued = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).QueueModelTextureImport(
         Runtime::RuntimeAssetImportRequest{
             .Path = modelFile.Path.string(),
@@ -2853,6 +2985,8 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
     EXPECT_EQ(queue.Entries[1].Stage,
               Runtime::RuntimeAssetImportQueueStage::Decoding);
     EXPECT_TRUE(queue.Entries[1].CanCancel);
+
+    readState->ReleaseRead.store(true, std::memory_order_release);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on "

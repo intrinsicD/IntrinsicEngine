@@ -1,0 +1,63 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  338: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesVertexNormalsInGeometrySources
+ 1/26 Test  #338: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesVertexNormalsInGeometrySources ......................   Passed    0.04 sec
+      Start  339: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid
+ 2/26 Test  #339: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid ...........................   Passed    0.08 sec
+      Start  340: RuntimeAssetImportFormatCoverage.DirectObjImportDefaultsToMaterialDrivenShading
+ 3/26 Test  #340: RuntimeAssetImportFormatCoverage.DirectObjImportDefaultsToMaterialDrivenShading ..............................   Passed    0.04 sec
+      Start  341: RuntimeAssetImportFormatCoverage.AssetImportRecipeDefaultsDescribeCanonicalPolicies
+ 4/26 Test  #341: RuntimeAssetImportFormatCoverage.AssetImportRecipeDefaultsDescribeCanonicalPolicies ..........................   Passed    0.00 sec
+      Start  342: RuntimeAssetImportFormatCoverage.DefaultImportPoliciesApplyAuthoringUxAndPostProcess
+ 5/26 Test  #342: RuntimeAssetImportFormatCoverage.DefaultImportPoliciesApplyAuthoringUxAndPostProcess .........................   Passed    0.04 sec
+      Start  343: RuntimeAssetImportFormatCoverage.DefaultImportSelectionDoesNotRequireCameraModule
+ 6/26 Test  #343: RuntimeAssetImportFormatCoverage.DefaultImportSelectionDoesNotRequireCameraModule ............................   Passed    0.04 sec
+      Start  344: RuntimeAssetImportFormatCoverage.DirectImportCompletesIngestStateMachineRecord
+ 7/26 Test  #344: RuntimeAssetImportFormatCoverage.DirectImportCompletesIngestStateMachineRecord ...............................   Passed    0.04 sec
+      Start  345: RuntimeAssetImportFormatCoverage.AssetWorkflowModuleAccessorExposesQueueAndEventState
+ 8/26 Test  #345: RuntimeAssetImportFormatCoverage.AssetWorkflowModuleAccessorExposesQueueAndEventState ........................   Passed    0.04 sec
+      Start  346: RuntimeAssetImportFormatCoverage.ExplicitCancelPublishesOneTerminalEvent
+ 9/26 Test  #346: RuntimeAssetImportFormatCoverage.ExplicitCancelPublishesOneTerminalEvent .....................................   Passed    0.04 sec
+      Start  347: RuntimeAssetImportFormatCoverage.AssetWorkflowModulePreservesImportDirtyState
+10/26 Test  #347: RuntimeAssetImportFormatCoverage.AssetWorkflowModulePreservesImportDirtyState ................................   Passed    0.04 sec
+      Start  348: RuntimeAssetImportFormatCoverage.ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities
+11/26 Test  #348: RuntimeAssetImportFormatCoverage.ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities .............   Passed    0.04 sec
+      Start  349: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities
+12/26 Test  #349: RuntimeAssetImportFormatCoverage.QueuedGeometryReimportReloadsAssetWithoutDuplicatingSceneEntities ...........   Passed    0.05 sec
+      Start  350: RuntimeAssetImportFormatCoverage.ImportAssetFromPathDoesNotWaitForUnrelatedSchedulerWork
+13/26 Test  #350: RuntimeAssetImportFormatCoverage.ImportAssetFromPathDoesNotWaitForUnrelatedSchedulerWork .....................   Passed    0.30 sec
+      Start  351: RuntimeAssetImportFormatCoverage.ReimportInvalidAssetReportsDeterministicIngestDiagnostic
+14/26 Test  #351: RuntimeAssetImportFormatCoverage.ReimportInvalidAssetReportsDeterministicIngestDiagnostic ....................   Passed    0.05 sec
+      Start  352: RuntimeAssetImportFormatCoverage.DirectObjImportQueuesGeneratedNormalBakeFromAuthoredVertexNormals
+15/26 Test  #352: RuntimeAssetImportFormatCoverage.DirectObjImportQueuesGeneratedNormalBakeFromAuthoredVertexNormals ...........   Passed    0.04 sec
+      Start  353: RuntimeAssetImportFormatCoverage.DirectObjImportComputesVertexNormalsWhenMissing
+16/26 Test  #353: RuntimeAssetImportFormatCoverage.DirectObjImportComputesVertexNormalsWhenMissing .............................   Passed    0.04 sec
+      Start  354: RuntimeAssetImportFormatCoverage.DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake
+17/26 Test  #354: RuntimeAssetImportFormatCoverage.DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake ..................   Passed    0.04 sec
+      Start  355: RuntimeAssetImportFormatCoverage.RepresentativePromotedFormatsMaterializeDeterministically
+18/26 Test  #355: RuntimeAssetImportFormatCoverage.RepresentativePromotedFormatsMaterializeDeterministically ...................   Passed    0.04 sec
+      Start  356: RuntimeAssetImportFormatCoverage.ModelSceneCompletionSelectsAndFramesCreatedPrimitives
+19/26 Test  #356: RuntimeAssetImportFormatCoverage.ModelSceneCompletionSelectsAndFramesCreatedPrimitives .......................   Passed    0.08 sec
+      Start  357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply
+20/26 Test  #357: RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply .............................   Passed    0.04 sec
+      Start  358: RuntimeAssetImportFormatCoverage.QueuedImportRejectsAwayAndBackBindingEpoch
+21/26 Test  #358: RuntimeAssetImportFormatCoverage.QueuedImportRejectsAwayAndBackBindingEpoch ..................................   Passed    0.04 sec
+      Start  359: RuntimeAssetImportFormatCoverage.RetiredWorldImportTerminalizesQueueState
+22/26 Test  #359: RuntimeAssetImportFormatCoverage.RetiredWorldImportTerminalizesQueueState ....................................   Passed    0.04 sec
+      Start  360: RuntimeAssetImportFormatCoverage.DroppedModelSceneAndTextureImportThroughStreamingQueue
+23/26 Test  #360: RuntimeAssetImportFormatCoverage.DroppedModelSceneAndTextureImportThroughStreamingQueue ......................   Passed    0.04 sec
+      Start  361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming
+24/26 Test  #361: RuntimeAssetImportFormatCoverage.ManualModelSceneAndTextureImportQueueCompletesThroughStreaming ..............   Passed    0.04 sec
+      Start  362: RuntimeAssetImportFormatCoverage.SlowQueuedTextureReadDoesNotBlockRunFrame
+25/26 Test  #362: RuntimeAssetImportFormatCoverage.SlowQueuedTextureReadDoesNotBlockRunFrame ...................................   Passed    0.04 sec
+      Start 1165: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically
+26/26 Test #1165: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically ...   Passed    0.39 sec
+
+100% tests passed, 0 tests failed out of 26
+
+Label Time Summary:
+contract    =   1.98 sec*proc (26 tests)
+runtime     =   1.98 sec*proc (26 tests)
+slow        =   0.39 sec*proc (1 test)
+
+Total Test time (real) =   2.43 sec

@@ -1047,13 +1047,19 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
                  "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp");
     const auto modelHandoff =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp");
-    const auto methodFacade =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxMethodFacade.cpp");
+    const auto geometryOperations =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.cpp");
+    const auto geometryMeshOperations =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp");
     const auto clusteringModule = ReadFile(
         RepoRoot() /
         "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp");
-    const auto editorFacades =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp");
+    const auto workspaceSession =
+        ReadFile(RepoRoot() /
+                 "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
+    const auto editorContextAdapters =
+        ReadFile(RepoRoot() /
+                 "src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp");
     const auto assetWorkflow =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModule.cpp");
 
@@ -1074,8 +1080,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
 
     EXPECT_EQ(CountOccurrences(modelHandoff, "JobDesc "), 3u);
     EXPECT_EQ(CountOccurrences(modelHandoff, ".Scope = "), 3u);
-    EXPECT_EQ(CountOccurrences(methodFacade, "JobDesc desc{"), 1u);
-    EXPECT_EQ(CountOccurrences(methodFacade, ".Scope = context.World"), 1u);
+    EXPECT_EQ(CountOccurrences(geometryOperations, "JobDesc desc{"), 1u);
+    EXPECT_EQ(CountOccurrences(geometryOperations, ".Scope = context.World"), 1u);
     EXPECT_EQ(
         CountOccurrences(
             clusteringModule,
@@ -1093,14 +1099,14 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     // RUNTIME-194 Slice B5d moved all five desc factories to JobService. The
     // invariant under test is unchanged — every production async submission
     // carries its owning world scope.
-    EXPECT_EQ(CountOccurrences(editorFacades, "return DerivedJobDesc{"), 0u);
-    EXPECT_EQ(CountOccurrences(editorFacades, "return JobDesc{"), 5u);
-    EXPECT_EQ(CountOccurrences(editorFacades, ".Scope = context.World"), 5u);
+    EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return DerivedJobDesc{"), 0u);
+    EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return JobDesc{"), 5u);
+    EXPECT_EQ(CountOccurrences(geometryMeshOperations, ".Scope = context.World"), 5u);
     EXPECT_EQ(CountOccurrences(
-                  editorFacades,
+                  workspaceSession,
                   "desc.Scope = m_Worlds->ActiveWorld()"),
               1u);
-    EXPECT_NE(WithoutWhitespace(editorFacades).find(".World=activeWorld"),
+    EXPECT_NE(WithoutWhitespace(editorContextAdapters).find(".World=activeWorld"),
               std::string::npos);
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".World = BoundWorld"), 2u);
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".Worlds = Worlds"), 1u);
@@ -1108,14 +1114,19 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
 
 TEST(RuntimeEngineLayering, SandboxEditorJobsUseSingleJobServiceSurface)
 {
-    const auto editorInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cppm");
+    const auto editorDetailInterface =
+        ReadFile(RepoRoot() /
+                 "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
+    const auto jobProjectionInterface =
+        ReadFile(RepoRoot() /
+                 "src/runtime/Runtime.EditorJobProjection.cppm");
     const auto editorImplementation =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp");
+        ReadFile(RepoRoot() /
+                 "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
     const auto methodImplementation =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxMethodFacade.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.cpp");
 
-    EXPECT_EQ(editorInterface.find(
+    EXPECT_EQ(editorDetailInterface.find(
                   "import Extrinsic.Runtime.DerivedJobGraph"),
               std::string::npos);
     EXPECT_EQ(editorImplementation.find(
@@ -1128,16 +1139,18 @@ TEST(RuntimeEngineLayering, SandboxEditorJobsUseSingleJobServiceSurface)
                   "import Extrinsic.Runtime.StreamingExecutor"),
               std::string::npos);
 
-    EXPECT_NE(editorInterface.find("struct SandboxEditorJobCommandSurface"),
+    EXPECT_NE(jobProjectionInterface.find("struct EditorJobCommandSurface"),
               std::string::npos);
-    EXPECT_NE(editorInterface.find("SandboxEditorJobCommandSurface JobCommands"),
+    EXPECT_NE(editorDetailInterface.find("EditorJobCommandSurface JobCommands"),
               std::string::npos);
-    EXPECT_NE(editorInterface.find("FindActive{}"), std::string::npos);
-    EXPECT_NE(editorInterface.find("SnapshotEntity{}"), std::string::npos);
-    EXPECT_EQ(editorInterface.find("SandboxEditorDerivedJobCommandSurface"),
+    EXPECT_NE(jobProjectionInterface.find("FindActive{}"), std::string::npos);
+    EXPECT_NE(jobProjectionInterface.find("SnapshotEntity{}"),
               std::string::npos);
-    EXPECT_EQ(editorInterface.find("DerivedJobCommands"), std::string::npos);
-    EXPECT_EQ(editorInterface.find("ToSandboxEditorJobQueueSnapshot"),
+    EXPECT_EQ(jobProjectionInterface.find("EditorDerivedJobCommandSurface"),
+              std::string::npos);
+    EXPECT_EQ(jobProjectionInterface.find("DerivedJobCommands"),
+              std::string::npos);
+    EXPECT_EQ(jobProjectionInterface.find("ToEditorJobQueueSnapshot"),
               std::string::npos);
     EXPECT_EQ(editorImplementation.find("DerivedJobRegistry"),
               std::string::npos);
@@ -1926,8 +1939,9 @@ TEST(RuntimeEngineLayering, RetiredSpatialDebugRegistryHasNoProductionSurface)
         ReadFile(RepoRoot() / "src/runtime/Runtime.RenderExtraction.cppm");
     const auto editorHistoryInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.EditorCommandHistory.cppm");
-    const auto sandboxFacadeInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cppm");
+    const auto editorFeatureInterface =
+        ReadFile(RepoRoot() /
+                 "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
 
     // No retired module is published.
     EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.SpatialDebugAdapters"),
@@ -1952,7 +1966,7 @@ TEST(RuntimeEngineLayering, RetiredSpatialDebugRegistryHasNoProductionSurface)
 
     // No opaque binding survives in the editor command/model surfaces.
     EXPECT_EQ(editorHistoryInterface.find("SpatialDebug"), std::string::npos);
-    EXPECT_EQ(sandboxFacadeInterface.find("SpatialDebug"), std::string::npos);
+    EXPECT_EQ(editorFeatureInterface.find("SpatialDebug"), std::string::npos);
 
     // The graphics packet contract that RUNTIME-199 preserved is still present.
     const auto rendererInterface =
@@ -2028,11 +2042,13 @@ TEST(RuntimeEngineLayering,
 // cannot reappear.
 TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
 {
-    const std::array<std::filesystem::path, 5> sources{
+    const std::array<std::filesystem::path, 7> sources{
         RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cppm",
         RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cpp",
-        RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cppm",
-        RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp",
+        RepoRoot() / "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm",
+        RepoRoot() / "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp",
+        RepoRoot() / "src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+        RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp",
         RepoRoot() / "src/runtime/Runtime.TextureBakeModule.cpp",
     };
 
@@ -2043,10 +2059,10 @@ TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
             << path.string();
         EXPECT_EQ(content.find("ProgressivePropertyValueKind"), std::string::npos)
             << path.string();
-        EXPECT_EQ(content.find("SandboxEditorVisualizationPropertyValueKind"),
+        EXPECT_EQ(content.find("EditorVisualizationPropertyValueKind"),
                   std::string::npos)
             << path.string();
-        EXPECT_EQ(content.find("SandboxEditorPropertyCatalogValueKind"),
+        EXPECT_EQ(content.find("EditorPropertyCatalogValueKind"),
                   std::string::npos)
             << path.string();
     }

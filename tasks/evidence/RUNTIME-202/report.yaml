@@ -1,0 +1,664 @@
+schema_version: 1
+task_id: RUNTIME-202
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T05:49:33Z'
+claim_eligible: false
+source:
+  base_ref: af381c0e
+  base_revision: af381c0e1043ea2a0c31e9e4017aa1bdea513ca4
+  head_revision: 641b18ea593661d7e425e5c90a016ce481cef3ef
+  branch: codex/runtime-202-retire-sandbox-facade
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: b1dbefc118253a5a91c7a7564d1ac508920e5bb68cddd2187d59b3f9f65d0474
+  - path: ara/logic/solution/architecture.md
+    sha256: feed6d2833e8d0ed05627085f4da8de893fe9ca76008f93b9b34581e124e548a
+  - path: ara/logic/solution/constraints.md
+    sha256: 5604b972217625ea02a8ba650402f354f670cced7ce9cbc4b3279dea0c42a6e7
+  - path: ara/logic/solution/heuristics.md
+    sha256: 0760f5dc8568bf969e97cfd5bcb35a2cdac79865ab3a194a59977daf923907d8
+  - path: ara/staging/observations.yaml
+    sha256: 5b8f64a157cecbc08bdb23298731a409df936fe0a963971e767793ff499c1d7b
+  - path: ara/trace/exploration_tree.yaml
+    sha256: a6098f70eb62d579800b5365b3f44a787b8c2d004965ac54493747c4fd151eb7
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: 5bdfdf55528411832294ca5a251abf0e96e8fb360785d873ec39ccc961865723
+  - path: ara/trace/sessions/2026-08-01_001.yaml
+    sha256: 7d3511b6375e3563bb8e583a46910e11e4f6d44fbc602b83d1b8fb8757a171d1
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: ae46f753cf7ca5b65ce0422dda5ec0731982daa3e93b3a36f8f42c188656eb9f
+  - path: docs/adr/0027-right-sized-runtime-composition.md
+    sha256: 13de45175dae3d661a4a475d38bfd6592c4f8b4e46f23663a1fbe6dcd5046b17
+  - path: docs/api/generated/module_inventory.md
+    sha256: cfa4c2d6960c4e65fe860b5ad296b34c6ef8b07560649c902772d203cdba5aa9
+  - path: docs/architecture/engine-config.md
+    sha256: 665862bb6a04fdffba8eb3c9523cfa8471ed2b7a30e08e3c6ffeae57858576eb
+  - path: docs/architecture/feature-module-playbook.md
+    sha256: 4db205d73eeab83e5b4ae9f36d2e85d78b80a21add73e232ea2191c6e4a206d3
+  - path: docs/architecture/geometry-pipeline-modularity.md
+    sha256: 0b93bfd5f18fad0897c6d31d82bebc6e9511d6dbdaf92cda9c2b0e6b8bae3b01
+  - path: docs/architecture/index.md
+    sha256: 7f15d83d07b76cfc700d7ebc1ff3019db8e1c5e23a356ea21db248119eead750
+  - path: docs/architecture/runtime-config-control.md
+    sha256: d26ef46638aad0612d16c50eb90cc7b52e97662c0516e5f464efc0bbe9fce53c
+  - path: docs/architecture/runtime.md
+    sha256: fd0739a726de62ab6e48943f4149d9a002d72600c6198ab9072fb7aec7ab7439
+  - path: docs/architecture/sandbox-editor-feature-boundaries.md
+    sha256: b3251b0553847fc6167beff52f2d397b9df856dc917b67a64b63014aa18fe17f
+  - path: docs/benchmarking/ci-policy.md
+    sha256: 23f49bedb8a9b65e954e3836513c0f7c8f49f68ffea405dabafa730441e625c4
+  - path: docs/migration/nonlegacy-parity-matrix.md
+    sha256: b968137c18193ff3abb5732f91342724e6400fab406c3fc129f508df0b440c31
+  - path: docs/roadmap.md
+    sha256: 5dd9e4efe967e6af397aaadb85449f82dc1f8f9bbe3469d6dd2a1a95bec5c08e
+  - path: src/app/README.md
+    sha256: 11e38f3f823b6634af1dc4964a4abb2572c941d27bf0186f4e374d7a923a8d46
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+    sha256: f40652060898c73448505d76aa2921c97573e17084e10f04fb76e21ca15de706
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+    sha256: ad8813063f0a8cebb1f9d8d5cc2f860b92684146cebdc38c5116e760c3416fe3
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+    sha256: 53bfcbbac805e5ede8022370881e93bc2bf6c9fc88dde7c315ec98a4d448588f
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 57708528d16907124b436420007349b66d07540f99014aa440e0f2745483868c
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 9ee00c85e006cb2d586d440f31373f5b88f6894b37f1a209252ea4ed3134a7c5
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: b303eac9ceae3cfd3eb34c27e711d9f30e36dcc657febaff1834662d3b03f3cf
+  - path: src/app/Sandbox/README.md
+    sha256: a6d1422c97230bf8f921c2308907c42478d7a84e0d2dfd4d789aa05e9f1911bd
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cpp
+    sha256: fbdd4e6ce729c473a6f572f6790ea5ed67c330dcc971d7eb60485420294b8135
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cppm
+    sha256: b01f3a4e303bb1e1e83c664f02fc809af18892ea22b8f32ee6615ef535c31f68
+  - path: src/app/Sandbox/Sandbox.cpp
+    sha256: 1bf22897b20b2e4c43062f83d68ec2f566c2a66ea74bfc667271c24b98e2d520
+  - path: src/runtime/CMakeLists.txt
+    sha256: 7813ba52fd4ee13e0d5db516ae3195f9b77e1cf0a03888170a5202a9a224be05
+  - path: src/runtime/Cameras/Runtime.CameraFocusCommand.cpp
+    sha256: 596b52f542c2952aeafe912cf319f9506fd9642bce7c1b85e4d5985534ae5f44
+  - path: src/runtime/Cameras/Runtime.CameraFocusCommand.cppm
+    sha256: f29d0864a0b078f23d10bff8793d967eeeff20b47ca9353a68deb0e2d328a761
+  - path: src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp
+    sha256: b2a02d0d35d4abbb9f1969ef214ccd40923307ee4303f1ed7f43a7ac1871a9a8
+  - path: src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm
+    sha256: 3e4b09b7086ac95dd9507a71994010ac77cd64737c537220c0956492ecd02c5a
+  - path: src/runtime/README.md
+    sha256: 8a7452dfcecf8b4bd3826b5000c0dee2f8a1d2a1c9ff5ae1fe2b2cadbb39f19d
+  - path: src/runtime/Runtime.EditorCommon.Public.cpp
+    sha256: 5dc7d4069e858965de1cf8a418498c6436f0e05127e26468c4e61ac6fc4df2c5
+  - path: src/runtime/Runtime.EditorCommon.cppm
+    sha256: 3d979f4ffd49ff2c4da7d21edbb0051a34516b7e9c3d9d38051512cac3fc447e
+  - path: src/runtime/Runtime.EditorJobProjection.Public.cpp
+    sha256: 4bdfc53e10321cafb418e5b86236958b0ed4b3b1cf4b890171fcd04078af27e7
+  - path: src/runtime/Runtime.EditorJobProjection.cppm
+    sha256: 5f71a565782bbb8140a9a336f7e23b8f1661b7627774c8e5bf43b428f5ba83e4
+  - path: src/runtime/Runtime.EditorWorkspaceAttachment.cpp
+    sha256: f8836dcace2107a1b28aaf4f52a0e79c778b82d7c65ea94b854688579d7218f6
+  - path: src/runtime/Runtime.EditorWorkspaceAttachment.cppm
+    sha256: bc89ee5e875be9fc2ca7390e14169b17f3924cf125901fe9b151748743609a3b
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 2342378aa3b239eb602cc9c8de53df11db371b5c0cc02680a786aab608a01dc6
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.Public.cpp
+    sha256: a102a020da521acf3eb24b69e2455f2aaa5a817089dec7e67c83283002a18c78
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.cppm
+    sha256: 193b0ea8788fa58859e27a375c9a32aa1fa958b864e4eaf00163cc3a62d642f5
+  - path: src/runtime/Runtime.EngineConfigControl.cppm
+    sha256: ba3922a805f80196dcba984438802199f7a778cffbcd02c377f3257a390e145b
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Internal.hpp
+    sha256: 64ed24132325e61ffec41eff34d6178e5035906d47a7f6b8efd8c02b83751989
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: ad5ce6cb5333da307ddeee155e4ae9669ea605ddd155e350d79084a51f1ffc1e
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: 25e2cdf344b6c6103b810805f5eea6a90e4f2a7ebd69d759c21e776704c33226
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cpp
+    sha256: 057645fa610414e5ae8b990da0e935c671eecd08bf9335bbecf1ece38bebc326
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cppm
+    sha256: 3d2af3dabfe65d15d0ef4b0c9cc36d11102566688144be2c380c18583ba2a04d
+  - path: src/runtime/Runtime.ParameterizationConfig.cpp
+    sha256: 0d84129b7605866daf2405679b8195ecd85e4e7c83b88c3012259efb85d9e5b1
+  - path: src/runtime/Runtime.ParameterizationConfig.cppm
+    sha256: 56cc699eb13d84dafe371a5421a611bfe7b7428a3225e214995acc6b410015b9
+  - path: src/runtime/Runtime.ParameterizationOperations.cpp
+    sha256: e82d3cd8569870f47f1fd49dec6903848b5eec587cbce4fa2904212e889684ac
+  - path: src/runtime/Runtime.ProgressivePoissonConfig.cpp
+    sha256: 15ead74add047a0f75e751fb1883f169fe6b56237472c496be7bbdcd72023bf2
+  - path: src/runtime/Runtime.ProgressivePoissonConfig.cppm
+    sha256: 1448ac51f3d0aeaaf693e80a49a425d0753ce7789e7a1946adf93c0e50497df9
+  - path: src/runtime/Runtime.RegistrationAlignment.cpp
+    sha256: null
+  - path: src/runtime/Runtime.RegistrationAlignment.cppm
+    sha256: null
+  - path: src/runtime/Runtime.RenderRecipeEditingOperations.Debug.cpp
+    sha256: 789c87be63b3d84c944c1b8331cae5926fda7e0b3e6d424928204db7eab95305
+  - path: src/runtime/Runtime.RenderRecipeEditingOperations.Public.cpp
+    sha256: 6fb8185d27839d477251fe154cead45810ddb4e96edd20506b14000106f50ff0
+  - path: src/runtime/Runtime.RenderRecipeEditingOperations.cpp
+    sha256: 51e77ef092b0f05e8b1b6347f1da3a11d921fc57fa45fed08069ad160f3e05d3
+  - path: src/runtime/Runtime.RenderRecipeEditingOperations.cppm
+    sha256: 1be27bf1e1ab2bfd87ae3abf7f07126dc024a66833738ead2a9d3c9fc4a1f3ba
+  - path: src/runtime/Runtime.SandboxConfigSections.cppm
+    sha256: null
+  - path: src/runtime/Runtime.SandboxDefaultPolicies.cpp
+    sha256: null
+  - path: src/runtime/Runtime.SandboxEditorFacades.Internal.hpp
+    sha256: null
+  - path: src/runtime/Runtime.SandboxEditorFacades.cpp
+    sha256: null
+  - path: src/runtime/Runtime.SandboxEditorFacades.cppm
+    sha256: null
+  - path: src/runtime/Runtime.SceneEditingOperations.Actions.cpp
+    sha256: 8751842a0d3d30985cf1ffdb7a75f91ac966e168c2ceef9f0062fc1fff97fba5
+  - path: src/runtime/Runtime.SceneEditingOperations.Debug.cpp
+    sha256: 0be65ae5067813dbeed063c1093f0a3a2a3dc20a32ab99be131db5597da2c824
+  - path: src/runtime/Runtime.SceneEditingOperations.Public.cpp
+    sha256: 1b87d11bb291d955911969c3588d9890ce8eace62d20e59970b2fa9501ca09ca
+  - path: src/runtime/Runtime.SceneEditingOperations.cppm
+    sha256: 5aad934dee4473c43459fc75c955ce7bc85d970151c2f66f455da2ea0ec0e4ff
+  - path: src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp
+    sha256: f57a003872418bd74452019413045e467317e5f663c091c621f5ba395c368652
+  - path: src/runtime/Runtime.VisualizationEditingOperations.Debug.cpp
+    sha256: d03d155eda66e520db29772c19d31e87e5361b337f8f565cf985ff4ce6fc217d
+  - path: src/runtime/Runtime.VisualizationEditingOperations.Public.cpp
+    sha256: 494a245783d9e25d0de168c5989c1f7f098992d0e292e1c2afd884e0100ae5db
+  - path: src/runtime/Runtime.VisualizationEditingOperations.cppm
+    sha256: 0be1f972b0e991b218914b34520852c6073057024cde5d31203a1a4af3c2c6a4
+  - path: src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: 932f1212b5616fcff2a2bb67f1bb9f2120fff4f25e57935155c289c724135058
+  - path: src/runtime/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: b400fcbcb0c45427c0631538634202cf9d62bd9e7c0d743aa91d0738dcc16629
+  - path: src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
+    sha256: a7ad565bbc64931800cd128a49e3ae44ac2b4e5ac62aa6d2b665f293d9234e8d
+  - path: src/runtime/internal/Runtime.EditorWorkspaceSession.cpp
+    sha256: bb6cd9e28a704a1854ca83c977ccedc8d90cf82cda2148978e86a7c8cdef7af3
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: 973427abdea9c0a99f32dd9668ad3aaba43c048dbb97a327193c7a57777c68e0
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+    sha256: 6031e3f0f7678f09f3eadac12a1f03c609135048abeed5cfb2dc0b56b416ebd4
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 4cb0d5b4ccf9da28482bcf39debbb5f59eea057aea05d0a34a24b4d6eaeea470
+  - path: tasks/active/README.md
+    sha256: 21086954992e59188d218ea0846e82b5f40f61219e116e842695ba98b0b82a5b
+  - path: tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md
+    sha256: 000e708d24b13fe5e1e8eedc73f8298cec217114fbbf207748714f5aac8505e0
+  - path: tasks/backlog/bugs/index.md
+    sha256: d67938cd536c4e8a587bc9ef11afe42ec4a36186fc84a1f5798be8b8e1e9a9a8
+  - path: tasks/backlog/runtime/README.md
+    sha256: 99a6a2bd59880b24fe2a3567bbb80d5dff553a9a7a1b70aa2a8e65dfad16d1fb
+  - path: tasks/backlog/ui/README.md
+    sha256: 81f802db1c1db091b87253ed3949a1bbae216bec8309f53745523b461d8287d0
+  - path: tasks/done/BUG-125-queued-import-contract-state-observation-races.md
+    sha256: 75a77571ff4d1545a67c000fed9a64ee30a39936fb5ead28643f055eef7f2ff5
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 1b787e9328a83a3514074eef136c5c71dc07ae14a19526639f8244d7c629a073
+  - path: tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md
+    sha256: 752e9dd6571a8d152298c2887cdb893657fdfa7cce4760ccb907f0ae1ac4a380
+  - path: tasks/evidence/BUG-125/commands/ci-build.json
+    sha256: 2edd39e6dce07ee11535c8e2f3c46ea4b8e5954a4afa18802f3081f49a30bd7b
+  - path: tasks/evidence/BUG-125/commands/ci-build.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/ci-build.stdout.log
+    sha256: 85fec695a5e6f52d882a2658cda8ea475bfc1f58a0b02b31ba6f4f402c8c23d0
+  - path: tasks/evidence/BUG-125/commands/ci-full-cpu.json
+    sha256: c7c805daa7dab8a1da1df7162d8f6eda2d885677548030ad7b7f282b0cc0b459
+  - path: tasks/evidence/BUG-125/commands/ci-full-cpu.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/ci-full-cpu.stdout.log
+    sha256: bcc5506293e6015523fbbf8d0c11d73c8a28e7cccf032423424548aa082027f3
+  - path: tasks/evidence/BUG-125/commands/diff-check.json
+    sha256: 360416a7023aedd530205b19149ad6ac60bb6cbf6bc378dc92c65e40ce77bb4a
+  - path: tasks/evidence/BUG-125/commands/diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/final-ci-build.json
+    sha256: 488b0b11f688916b093bf368c5d0481c700c63da38501c6e1505168ab48a9322
+  - path: tasks/evidence/BUG-125/commands/final-ci-build.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/final-ci-build.stdout.log
+    sha256: 644f6835d38fdd63dfd219e0a2b0340dabebf773c1e506590c5191e7593fca2f
+  - path: tasks/evidence/BUG-125/commands/final-ci-full-cpu.json
+    sha256: e3c5ca9ed9dee73c6732c8f9c59f3eae4a54a2d870fa89da6963f08d6dd92c7f
+  - path: tasks/evidence/BUG-125/commands/final-ci-full-cpu.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/final-ci-full-cpu.stdout.log
+    sha256: 6d21c54eae2bfc5cadc5cf86705acc618e65e5ea129f7226789e2fd36070f1dd
+  - path: tasks/evidence/BUG-125/commands/final-format-coverage.json
+    sha256: fafe5111a5d8e115848a7c60f7335d7f78fd0db45b3fc78876080d80f8b639fd
+  - path: tasks/evidence/BUG-125/commands/final-format-coverage.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/final-format-coverage.stdout.log
+    sha256: b2f3c35fd84b9ce35393452df01d4767fdf12fd0bf420105b96f71639799f87e
+  - path: tasks/evidence/BUG-125/commands/final-workflow-concurrency.json
+    sha256: 091dd4794109306efb2d5a540c5b9df5de956d45b3e0f3af72bb47a291298e0b
+  - path: tasks/evidence/BUG-125/commands/final-workflow-concurrency.stderr.log
+    sha256: 45554837de19fa901dd3a5dd32776b57003db3289a26aa89d07a0c1b40768bb4
+  - path: tasks/evidence/BUG-125/commands/final-workflow-concurrency.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/format-coverage.json
+    sha256: 169440fb3bf608e9b7d313288bf83e8b0fa55f0c3d3149f302507718d8a7fb0d
+  - path: tasks/evidence/BUG-125/commands/format-coverage.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/format-coverage.stdout.log
+    sha256: 15bed717611618a04c86a7422a0455f058d161555f60feb0597e2b9d46688ac6
+  - path: tasks/evidence/BUG-125/commands/session-brief-refresh.json
+    sha256: e3e5ba3c8763a63ea85556606db8320e89fb1ebe9d2c55f7d273622d4fc7d33f
+  - path: tasks/evidence/BUG-125/commands/session-brief-refresh.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/session-brief-refresh.stdout.log
+    sha256: a9616b744781128ea08d821108b88659a7e891e32211ae285587be4a54f102a9
+  - path: tasks/evidence/BUG-125/commands/strict-doc-links.json
+    sha256: fa55c54a68d0d48efcfec861db32a89b59295cd6cc582828e61b7603816edcd9
+  - path: tasks/evidence/BUG-125/commands/strict-doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/strict-doc-links.stdout.log
+    sha256: 0d799864814c743a52cd0be7fd4dce3b8db2e788acd76aa028894724b8f8596e
+  - path: tasks/evidence/BUG-125/commands/strict-root-hygiene.json
+    sha256: cefcac77bc937dae142b6c39b5146631a346c18d19526d3627103921537b7994
+  - path: tasks/evidence/BUG-125/commands/strict-root-hygiene.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/strict-root-hygiene.stdout.log
+    sha256: 8d38b04848c739fcc11692324b26c83f7a27c97b696acaf5f269ad4c2e13dcb2
+  - path: tasks/evidence/BUG-125/commands/strict-task-policy-fixed.json
+    sha256: 0e709de938e260cff2ded1ec05a0c7b181ff6265309bbfc2f946dd372268c48e
+  - path: tasks/evidence/BUG-125/commands/strict-task-policy-fixed.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/strict-task-policy-fixed.stdout.log
+    sha256: 0795400070d0b775c6df1bb6439756d6f7a4bb1f66d17991adbba972ddff9060
+  - path: tasks/evidence/BUG-125/commands/strict-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/strict-task-policy.stdout.log
+    sha256: bd6de55ffd6cd308a189effb36523a286d5bf1e4fdbb909203ac13c92570d06b
+  - path: tasks/evidence/BUG-125/commands/strict-task-state-links.json
+    sha256: 1c9a535442cc0924c9712264c3f599b26a79b456eaabbb98e055c8d793da4287
+  - path: tasks/evidence/BUG-125/commands/strict-task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/strict-task-state-links.stdout.log
+    sha256: c400ac0887ec3898dd5963a939165aff82da227a6636f9ca59740616fa36f180
+  - path: tasks/evidence/BUG-125/commands/strict-test-layout.json
+    sha256: 899f4c384113679eb08c1b53c59495ed6753bb075fad7d6ff1b7a9273b1fa300
+  - path: tasks/evidence/BUG-125/commands/strict-test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/strict-test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/BUG-125/commands/targeted-repeat100.json
+    sha256: a1da1283a6d64efb0e7444ec4bbbcad1e474d97b778cb41d4ce039912a104156
+  - path: tasks/evidence/BUG-125/commands/targeted-repeat100.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/targeted-repeat100.stdout.log
+    sha256: cf7d31bd77e7d5c77f4ac115ba328b3c1912e86a0e18543c11679c91220f6e32
+  - path: tasks/evidence/BUG-125/commands/targeted-single-cpu-repeat100.json
+    sha256: d06eefe64c76cba3086bf615e1eaee2d3224b6db7b23f2be07cb5a7a57679ec5
+  - path: tasks/evidence/BUG-125/commands/targeted-single-cpu-repeat100.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-125/commands/targeted-single-cpu-repeat100.stdout.log
+    sha256: 17a03f78dd7a15ad82543bb50aad2e2748b4ba5d2a959a33b836fd876e5637e3
+  - path: tasks/evidence/BUG-125/observations/README.md
+    sha256: 811b30efbc6f9b2ac9194dc9b2154cf398f44b8d90247a075002438e99e4fe10
+  - path: tasks/evidence/BUG-125/observations/strict-task-policy.json
+    sha256: ebf3ebdc329affeb4a17ff4d3977855972f1c78df6b7b3cfb11d0d0426d89a65
+  - path: tasks/evidence/BUG-125/report.yaml
+    sha256: 8e6f7000c2ce0eb2315b116f8fb5d083ff358e8b5fd03caaf6f2724ed17b6ef0
+  - path: tests/CMakeLists.txt
+    sha256: a9e788c3893ba7ae70d337fb34f3b40cbcbff8e960c606ec853961651b48daa4
+  - path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+    sha256: f45f51c0bf5bfbf16fc9e1aae707d0f638fc4440cd47830ad990e1019a6d2718
+  - path: tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp
+    sha256: 2a1354bc0c760634be410e36064f38a78533ecbd91314ae09b64b501d85449ff
+  - path: tests/contract/runtime/Test.ParameterizationOperations.cpp
+    sha256: f45c9641e0b1844b0bf5c27e22953b417b7173e3d8acdb3cbc7a875a381a4071
+  - path: tests/contract/runtime/Test.RuntimeConfigControl.cpp
+    sha256: cfa995a9f3a96a820f5acc125ef8312c44df40887e76e4f5101e02e8c5aee69e
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: d8472e1ba8f58e7a74eddf8ae2080f5f6c028b85c3dd3d1bea790a94fc14fe11
+  - path: tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+    sha256: a4e46def7b46a4cebcf652d98c72ec08e4e7c1bdb82163a91749e83046407e28
+  - path: tests/contract/runtime/Test.RuntimeInputActions.cpp
+    sha256: 29b8dec7155557b13c41eec301ec0806a6bf2c6f4df6c3234e0bdda29c4201f8
+  - path: tests/contract/runtime/Test.RuntimeReferenceScene.cpp
+    sha256: 65f72bf8b2e5f8e8d832a66f0745b4bcd45ea89f147fb41079d80df33404869d
+  - path: tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp
+    sha256: c33c019a9e326dcdb4f8c7094170694d0513e9b1e0a0c8358fece964d43e663e
+  - path: tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    sha256: 79ef3392c119cbc5d286f05b54263e823dcae5e7ea9f56d7229d2617678e9d19
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: dee45291cb078f6b24e474f0de56eed9c9ae354ce9f6202553ee1eabf700100f
+  - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    sha256: 4b3b129d063423a0c9383234a1112bce3b1e3b95260ce63f2488fcd538d0de10
+  - path: tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+    sha256: d8961592d1aa62f6628b03cc23b5695a32deef40bcc770645fa08ec5972a7e90
+  - path: tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+    sha256: 633190d678bd5c26aeff824c0734b778210ffe53a509fa30dbaad56c60d6db58
+  - path: tests/contract/runtime/Test.SandboxEditorVisualization.cpp
+    sha256: acbf950a1dde7d89b0f9efa4443d1cbdedb1c2e8c23c80e92a647d6e375a313d
+  - path: tests/contract/runtime/Test.TextureBakeModule.cpp
+    sha256: a9614fdd6849cbe18a65a16c5a1f1146d6b2dcc2da4fd9bbf53709fb1c9c8a34
+  - path: tests/integration/runtime/Test.RuntimeRenderExtraction.cpp
+    sha256: bc700559d36385fe9c2913bb2b7fe1f422db71879a07d293874452931ec30793
+  - path: tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp
+    sha256: 3ef699412cb89efecf84ac35c639b49cf3553f3eb066f33a8073e31bc446458a
+  - path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    sha256: 8ff7998cd36b4c3216ab39a06b2f872748f8b79a45414a6c00645fb5ca293bcc
+  - path: tests/integration/runtime/Test.SandboxAppComposition.cpp
+    sha256: 0dba86bb9320f7d69c789d156b561b119f0be53693b6007d222036c287610c49
+  - path: tests/integration/runtime/Test.SandboxConfigSections.cpp
+    sha256: a7a326d13953c47a801480895a75274d9f61c25c0764e3350c5850939bf19024
+  - path: tests/integration/runtime/Test.SandboxDomainPanels.cpp
+    sha256: cc1666574a4a8a887dab28a588cab9c079309f053227580573f951bd16cd03b4
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: b73c918c70b5e4f6c70782d6f055335d3e0748151f97a5471c98513714e2c788
+  - path: tests/integration/runtime/Test.SandboxParameterizationPanel.cpp
+    sha256: 5af6fda091431a7d0c702e7784c4929c1e3a4841f47fd47a27a84d8305125659
+  - path: tests/regression/tooling/Test.WorkflowConcurrency.py
+    sha256: 29dee3ddde0baaa38ac3d5e7bb2d3c320134c96a81423ad70ad908d93f0c8afb
+  - path: tests/support/EditorFeatureTestContext.hpp
+    sha256: c16287591cc0748e69d6df1d6231d1d5a2f5de31efc890f2a39a0a75761ac6f7
+  - path: tests/support/SandboxEditorJobHarness.hpp
+    sha256: f2c025aab14306d8ee56b126c7151883673701664c6cb90bafb87fb15e586a69
+  - path: tests/unit/runtime/Test.RegistrationAlignment.cpp
+    sha256: null
+  - path: tools/analysis/README.md
+    sha256: 9182c152c1f290d46d5d93b1aeda2c0da027988e6ce338d81d846904857cce18
+  - path: tools/analysis/compile_hotspot_baseline.json
+    sha256: 1f3efa3c440a147fed13951e7f0c1ca78669da2fe0296000b3335d6f948a0b84
+  content_digest: e550047b77ad4e2cd9605c3da1b736e63025e2450cdfb9d869ed066085b7ab03
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/logic/solution/architecture.md
+  - ara/logic/solution/constraints.md
+  - ara/logic/solution/heuristics.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-01_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/adr/0027-right-sized-runtime-composition.md
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/engine-config.md
+  - docs/architecture/feature-module-playbook.md
+  - docs/architecture/geometry-pipeline-modularity.md
+  - docs/architecture/index.md
+  - docs/architecture/runtime-config-control.md
+  - docs/architecture/runtime.md
+  - docs/architecture/sandbox-editor-feature-boundaries.md
+  - docs/benchmarking/ci-policy.md
+  - docs/migration/nonlegacy-parity-matrix.md
+  - docs/roadmap.md
+  - src/app/README.md
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/README.md
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cppm
+  - src/app/Sandbox/Sandbox.cpp
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Cameras/Runtime.CameraFocusCommand.cpp
+  - src/runtime/Cameras/Runtime.CameraFocusCommand.cppm
+  - src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp
+  - src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm
+  - src/runtime/README.md
+  - src/runtime/Runtime.EditorCommon.Public.cpp
+  - src/runtime/Runtime.EditorCommon.cppm
+  - src/runtime/Runtime.EditorJobProjection.Public.cpp
+  - src/runtime/Runtime.EditorJobProjection.cppm
+  - src/runtime/Runtime.EditorWorkspaceAttachment.cpp
+  - src/runtime/Runtime.EditorWorkspaceAttachment.cppm
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.Public.cpp
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.cppm
+  - src/runtime/Runtime.EngineConfigControl.cppm
+  - src/runtime/Runtime.GeometryProcessingOperations.Internal.hpp
+  - src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Runtime.ParameterizationConfig.cpp
+  - src/runtime/Runtime.ParameterizationConfig.cppm
+  - src/runtime/Runtime.ParameterizationOperations.cpp
+  - src/runtime/Runtime.ProgressivePoissonConfig.cpp
+  - src/runtime/Runtime.ProgressivePoissonConfig.cppm
+  - src/runtime/Runtime.RegistrationAlignment.cpp
+  - src/runtime/Runtime.RegistrationAlignment.cppm
+  - src/runtime/Runtime.RenderRecipeEditingOperations.Debug.cpp
+  - src/runtime/Runtime.RenderRecipeEditingOperations.Public.cpp
+  - src/runtime/Runtime.RenderRecipeEditingOperations.cpp
+  - src/runtime/Runtime.RenderRecipeEditingOperations.cppm
+  - src/runtime/Runtime.SandboxConfigSections.cppm
+  - src/runtime/Runtime.SandboxDefaultPolicies.cpp
+  - src/runtime/Runtime.SandboxEditorFacades.Internal.hpp
+  - src/runtime/Runtime.SandboxEditorFacades.cpp
+  - src/runtime/Runtime.SandboxEditorFacades.cppm
+  - src/runtime/Runtime.SceneEditingOperations.Actions.cpp
+  - src/runtime/Runtime.SceneEditingOperations.Debug.cpp
+  - src/runtime/Runtime.SceneEditingOperations.Public.cpp
+  - src/runtime/Runtime.SceneEditingOperations.cppm
+  - src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp
+  - src/runtime/Runtime.VisualizationEditingOperations.Debug.cpp
+  - src/runtime/Runtime.VisualizationEditingOperations.Public.cpp
+  - src/runtime/Runtime.VisualizationEditingOperations.cppm
+  - src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
+  - src/runtime/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/ui/README.md
+  - tasks/done/BUG-125-queued-import-contract-state-observation-races.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md
+  - tasks/evidence/BUG-125/commands/ci-build.json
+  - tasks/evidence/BUG-125/commands/ci-build.stderr.log
+  - tasks/evidence/BUG-125/commands/ci-build.stdout.log
+  - tasks/evidence/BUG-125/commands/ci-full-cpu.json
+  - tasks/evidence/BUG-125/commands/ci-full-cpu.stderr.log
+  - tasks/evidence/BUG-125/commands/ci-full-cpu.stdout.log
+  - tasks/evidence/BUG-125/commands/diff-check.json
+  - tasks/evidence/BUG-125/commands/diff-check.stderr.log
+  - tasks/evidence/BUG-125/commands/diff-check.stdout.log
+  - tasks/evidence/BUG-125/commands/final-ci-build.json
+  - tasks/evidence/BUG-125/commands/final-ci-build.stderr.log
+  - tasks/evidence/BUG-125/commands/final-ci-build.stdout.log
+  - tasks/evidence/BUG-125/commands/final-ci-full-cpu.json
+  - tasks/evidence/BUG-125/commands/final-ci-full-cpu.stderr.log
+  - tasks/evidence/BUG-125/commands/final-ci-full-cpu.stdout.log
+  - tasks/evidence/BUG-125/commands/final-format-coverage.json
+  - tasks/evidence/BUG-125/commands/final-format-coverage.stderr.log
+  - tasks/evidence/BUG-125/commands/final-format-coverage.stdout.log
+  - tasks/evidence/BUG-125/commands/final-workflow-concurrency.json
+  - tasks/evidence/BUG-125/commands/final-workflow-concurrency.stderr.log
+  - tasks/evidence/BUG-125/commands/final-workflow-concurrency.stdout.log
+  - tasks/evidence/BUG-125/commands/format-coverage.json
+  - tasks/evidence/BUG-125/commands/format-coverage.stderr.log
+  - tasks/evidence/BUG-125/commands/format-coverage.stdout.log
+  - tasks/evidence/BUG-125/commands/session-brief-refresh.json
+  - tasks/evidence/BUG-125/commands/session-brief-refresh.stderr.log
+  - tasks/evidence/BUG-125/commands/session-brief-refresh.stdout.log
+  - tasks/evidence/BUG-125/commands/strict-doc-links.json
+  - tasks/evidence/BUG-125/commands/strict-doc-links.stderr.log
+  - tasks/evidence/BUG-125/commands/strict-doc-links.stdout.log
+  - tasks/evidence/BUG-125/commands/strict-root-hygiene.json
+  - tasks/evidence/BUG-125/commands/strict-root-hygiene.stderr.log
+  - tasks/evidence/BUG-125/commands/strict-root-hygiene.stdout.log
+  - tasks/evidence/BUG-125/commands/strict-task-policy-fixed.json
+  - tasks/evidence/BUG-125/commands/strict-task-policy-fixed.stderr.log
+  - tasks/evidence/BUG-125/commands/strict-task-policy-fixed.stdout.log
+  - tasks/evidence/BUG-125/commands/strict-task-policy.stderr.log
+  - tasks/evidence/BUG-125/commands/strict-task-policy.stdout.log
+  - tasks/evidence/BUG-125/commands/strict-task-state-links.json
+  - tasks/evidence/BUG-125/commands/strict-task-state-links.stderr.log
+  - tasks/evidence/BUG-125/commands/strict-task-state-links.stdout.log
+  - tasks/evidence/BUG-125/commands/strict-test-layout.json
+  - tasks/evidence/BUG-125/commands/strict-test-layout.stderr.log
+  - tasks/evidence/BUG-125/commands/strict-test-layout.stdout.log
+  - tasks/evidence/BUG-125/commands/targeted-repeat100.json
+  - tasks/evidence/BUG-125/commands/targeted-repeat100.stderr.log
+  - tasks/evidence/BUG-125/commands/targeted-repeat100.stdout.log
+  - tasks/evidence/BUG-125/commands/targeted-single-cpu-repeat100.json
+  - tasks/evidence/BUG-125/commands/targeted-single-cpu-repeat100.stderr.log
+  - tasks/evidence/BUG-125/commands/targeted-single-cpu-repeat100.stdout.log
+  - tasks/evidence/BUG-125/observations/README.md
+  - tasks/evidence/BUG-125/observations/strict-task-policy.json
+  - tasks/evidence/BUG-125/report.yaml
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+  - tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp
+  - tests/contract/runtime/Test.ParameterizationOperations.cpp
+  - tests/contract/runtime/Test.RuntimeConfigControl.cpp
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  - tests/contract/runtime/Test.RuntimeInputActions.cpp
+  - tests/contract/runtime/Test.RuntimeReferenceScene.cpp
+  - tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp
+  - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+  - tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+  - tests/contract/runtime/Test.SandboxEditorVisualization.cpp
+  - tests/contract/runtime/Test.TextureBakeModule.cpp
+  - tests/integration/runtime/Test.RuntimeRenderExtraction.cpp
+  - tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp
+  - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+  - tests/integration/runtime/Test.SandboxAppComposition.cpp
+  - tests/integration/runtime/Test.SandboxConfigSections.cpp
+  - tests/integration/runtime/Test.SandboxDomainPanels.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/integration/runtime/Test.SandboxParameterizationPanel.cpp
+  - tests/regression/tooling/Test.WorkflowConcurrency.py
+  - tests/support/EditorFeatureTestContext.hpp
+  - tests/support/SandboxEditorJobHarness.hpp
+  - tests/unit/runtime/Test.RegistrationAlignment.cpp
+  - tools/analysis/README.md
+  - tools/analysis/compile_hotspot_baseline.json
+  layers:
+  - app
+  - runtime
+  - tests
+  modules:
+  - Runtime feature operations and Sandbox app composition
+extension_seam: Feature-owned typed operations and copied prepared records composed by the app-private
+  SandboxPreparedFrame
+future_change_plan: Add future editor workflows beside their owning runtime feature and expose only the
+  narrow operation or snapshot the app actually consumes
+acceptance:
+- criterion: No production panel, agent command, config application, or runtime test
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Runtime exposes only feature-owned operations/services/snapshots; app
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The facade/config modules and all compatibility routes are deleted after
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-202/commands/ci-build.json
+- receipt: tasks/evidence/RUNTIME-202/commands/ci-focused.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ara-claims-rerun.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-asan-build-final.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-asan-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-build.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-ubsan-build-final.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-ubsan-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-doc-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-diff-check.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-doc-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-strict-layering.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-task-policy.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-test-layout.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-module-inventory.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-diff-check.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-doc-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-layering.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-session-brief.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-task-maturity.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-task-policy.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-test-layout.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-diff-check.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-doc-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-task-policy.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-strict-layering.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-task-maturity.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-task-policy.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-test-layout.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-compile-hotspots-tooling.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-diff-check.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-doc-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-merged-ci-build.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-merged-ci-focused.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-merged-ci-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-module-inventory.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-session-brief.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-strict-layering.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-task-policy.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/final-test-layout.json
+changed_public_contracts:
+- Removed Runtime.SandboxEditorFacades, Runtime.SandboxConfigSections, Runtime.SandboxDefaultPolicies,
+  Runtime.SandboxMethodFacade, Runtime.SandboxParameterizationFacade, and Runtime.SandboxEditorRenderRecipeFacade
+- Added feature-owned config, operation, snapshot, and lifetime-guarded handle modules used directly by
+  Sandbox
+diagnostics_and_previews:
+- BUG-125 retains the diagnosed queued-import race fixes and stress evidence that preceded the final clean
+  gate
+- The corrected fixed surface passed 4,010 default CPU tests plus 2,664 ASan and 2,664 UBSan tests
+- An initial ASan sweep reproduced the already-tracked BUG-123 scene-save terminal-event race once; its
+  exact test passed 20/20 and the complete ASan selector passed on rerun
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- The review surface is broad because it maps and deletes 174 facade exports; feature-by-feature ownership
+  ratchets guard against a replacement facade
+- GPU/Vulkan execution was not run because the corrected changes affect backend-neutral ownership, snapshot
+  accounting, and attachment lifetime contracts
+skipped_checks:
+- check: gpu-vulkan
+  reason: No Vulkan backend behavior, RHI contract, shader, or promoted-device composition changed.
+artifacts:
+- path: docs/architecture/sandbox-editor-feature-boundaries.md
+  sha256: b3251b0553847fc6167beff52f2d397b9df856dc917b67a64b63014aa18fe17f
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-202/handoff.jsonl
+review: tasks/evidence/RUNTIME-202/reviews.jsonl

@@ -16,17 +16,17 @@ cleanup slice:
 
 #### Open tasks
 
-- [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](RUNTIME-202-retire-sandbox-runtime-facade.md)
-  is the final feature-workflow migration/removal task: app owns Sandbox view
-  aggregation while runtime exposes narrow feature operations/snapshots. It
-  preserves existing selected-model cache behavior but no longer waits on
-  `RUNTIME-138` or introduces a replacement selected-analysis service.
 - [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
   removes public BMIs for Engine/SceneInteraction/config/device helpers after
   their owner-level behavior tests are in place.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](../../done/RUNTIME-202-retire-sandbox-runtime-facade.md)
+  deleted the public all-feature facade/config/default-policy family, moved
+  presentation composition into the Sandbox app, and localized commands,
+  snapshots, models, config, and implementation bodies with their runtime
+  feature owners behind an opaque attachment lifecycle.
 - [`RUNTIME-200` — Staged asset-import and materialization recipe](../../done/RUNTIME-200-staged-asset-import-materialization-recipe.md)
   converged every production route on the seven-stage recipe behind the sole
   published `AssetWorkflowModule`, made recipe policy and executors private,
@@ -431,8 +431,9 @@ owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
 
 - [`RUNTIME-168`](../../done/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
   retired the one-consumer public policy module at `Operational` while
-  retaining its callback bodies under the existing `SandboxEditorFacades`
-  surface. Sandbox privately owns exact provider borrows and typed handles,
+  retaining its callback bodies under the then-current Sandbox editor surface.
+  RUNTIME-202 later moved the reusable focus action factory beside the camera
+  feature and the aggregation into Sandbox. Sandbox privately owns exact provider borrows and typed handles,
   and real CPU plus Vulkan acceptance paths exercise the composition without
   another runtime lifecycle owner.
 - [`RUNTIME-188`](../../done/RUNTIME-188-extract-scene-interaction-module.md)
@@ -453,9 +454,10 @@ owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
   imports / 21 domain imports / 31 getter names with no temporary debt while
   preserving the operational UV-view and private-service behavior.
 - [`RUNTIME-173`](../../done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
-  retired the Sandbox-session-only K-Means GPU queue into private facade-module
-  glue at `CPUContracted`, retaining the request/submission/result DTO contract
-  on `SandboxEditorFacades` while removing one standalone module/BMI surface.
+  retired the Sandbox-session-only K-Means GPU queue into private editor glue at
+  `CPUContracted`, retaining the request/submission/result DTO contract while
+  removing one standalone module/BMI surface. RUNTIME-202 later moved the
+  remaining projection to the focused editor job/geometry modules.
 - [`RUNTIME-171`](../../done/RUNTIME-171-privatize-asset-residency-service-surface.md)
   retired the Engine-only asset residency service into private Engine module
   glue at `Operational`, preserving cache/listener/model-handoff ownership,
@@ -799,8 +801,9 @@ split; narratives live in the retirement log.
   processor, import-authoring, import-completed, and input-action dispatch
   registries only; Sandbox installs the default direct-mesh generated-normal
   processor, authoring defaults, focus/auto-select import UX, and `F` focus
-  action from four plain `SandboxEditorFacades` descriptor factories through
-  app-private transactional handles.
+  action from four plain descriptor factories through app-private transactional
+  handles. RUNTIME-200 retired the import registries, and RUNTIME-202 reduced
+  the remaining focus path to one camera-owned factory plus app-owned policy.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../archive/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an

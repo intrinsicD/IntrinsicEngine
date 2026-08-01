@@ -21,6 +21,8 @@
 
 #include "RuntimeTestModule.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -33,8 +35,12 @@ import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
-import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Sandbox.Editor.DomainPanels;
@@ -45,7 +51,7 @@ import Extrinsic.Sandbox.Editor.Shell;
 namespace Core = Extrinsic::Core;
 namespace Plat = Extrinsic::Platform;
 namespace Runtime = Extrinsic::Runtime;
-namespace SandboxEditor = Extrinsic::Sandbox::Editor;
+namespace Editor = Extrinsic::Sandbox::Editor;
 
 namespace
 {
@@ -268,12 +274,12 @@ namespace
     }
 
     [[nodiscard]] bool HasDiagnostic(
-        const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
-        const Runtime::SandboxEditorDiagnosticCode code)
+        const std::vector<Runtime::EditorDiagnostic>& diagnostics,
+        const Runtime::EditorDiagnosticCode code)
     {
         return std::ranges::any_of(
             diagnostics,
-            [code](const Runtime::SandboxEditorDiagnostic& diagnostic)
+            [code](const Runtime::EditorDiagnostic& diagnostic)
             {
                 return diagnostic.Code == code;
             });
@@ -293,16 +299,16 @@ namespace
     }
 
     void RegisterAllAppPanels(
-        SandboxEditor::EditorShell& shell,
-        SandboxEditor::MethodPanels& methodPanels,
-        SandboxEditor::MeshProcessingPanels& meshProcessingPanels,
-        SandboxEditor::DomainPanels& domainPanels)
+        Editor::EditorShell& shell,
+        Editor::MethodPanels& methodPanels,
+        Editor::MeshProcessingPanels& meshProcessingPanels,
+        Editor::DomainPanels& domainPanels)
     {
         methodPanels.Register(shell);
         meshProcessingPanels.Register(shell);
         domainPanels.Register(shell);
     }
-}
+} // namespace
 
 TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 {
@@ -310,11 +316,11 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
                                                std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
 
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
-    SandboxEditor::MethodPanels methodPanels;
-    SandboxEditor::MeshProcessingPanels meshProcessingPanels;
-    SandboxEditor::DomainPanels domainPanels;
+    Editor::MethodPanels methodPanels;
+    Editor::MeshProcessingPanels meshProcessingPanels;
+    Editor::DomainPanels domainPanels;
     RegisterAllAppPanels(shell, methodPanels, meshProcessingPanels, domainPanels);
 
     engine.Run();
@@ -370,11 +376,11 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
                                                std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
-    SandboxEditor::MethodPanels methodPanels;
-    SandboxEditor::MeshProcessingPanels meshProcessingPanels;
-    SandboxEditor::DomainPanels domainPanels;
+    Editor::MethodPanels methodPanels;
+    Editor::MeshProcessingPanels meshProcessingPanels;
+    Editor::DomainPanels domainPanels;
     RegisterAllAppPanels(shell, methodPanels, meshProcessingPanels, domainPanels);
 
     const auto menu = shell.BuildEditorWindowMenuModel();
@@ -410,9 +416,9 @@ TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublic
           "CachedModelFrame != frame",
           "CachedDomainModels",
           "DomainWindowModelCacheHits",
-          "ApplySandboxEditorPointCloudOutlierRemovalCommand",
-          "ApplySandboxEditorUvRegenerationCommand",
-          "context.LastUvRegenerationResult",
+        "ApplyEditorPointCloudOutlierRemovalCommand",
+        "ApplyEditorUvRegenerationCommand",
+        "context.GeometryResults.LastUvRegenerationResult",
           "LastPointCloudOutlierRemovalResult.reset();",
           "LastUvRegenerationResult.reset();",
           "MeshPropertyPlotState.SelectedProperty.clear();",
@@ -429,15 +435,15 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
     ASSERT_FALSE(source.empty());
 
     constexpr std::array<std::string_view, 9> commands{{
-        "ApplySandboxEditorMeshDenoiseCommand",
-        "ApplySandboxEditorMeshCurvatureCommand",
-        "ApplySandboxEditorMeshRemeshCommand",
-        "ApplySandboxEditorMeshSubdivideCommand",
-        "ApplySandboxEditorMeshSimplifyCommand",
-        "ApplySandboxEditorMeshVertexNormalsCommand",
-        "ApplySandboxEditorGraphVertexNormalsCommand",
-        "ApplySandboxEditorPointCloudVertexNormalsCommand",
-        "ApplySandboxEditorRegistrationCommand",
+      "ApplyEditorMeshDenoiseCommand",
+      "ApplyEditorMeshCurvatureCommand",
+      "ApplyEditorMeshRemeshCommand",
+      "ApplyEditorMeshSubdivideCommand",
+      "ApplyEditorMeshSimplifyCommand",
+      "ApplyEditorMeshVertexNormalsCommand",
+      "ApplyEditorGraphVertexNormalsCommand",
+      "ApplyEditorPointCloudVertexNormalsCommand",
+      "ApplyEditorRegistrationCommand",
     }};
     constexpr std::array<std::string_view, 9> sinks{{
         "context.MethodResultSinks.MeshDenoise",
@@ -492,7 +498,7 @@ TEST(SandboxEditorPresentation, ExtrinsicSandboxAppStaysRuntimeOnly)
               "import Extrinsic.Graphics",
               "import Extrinsic.Platform",
               "import Extrinsic.RHI",
-              "import Extrinsic.Backends",
+              "import Extrinsic.Backends", "import Extrinsic.Runtime.Private.",
               "import Geometry."})
         {
             EXPECT_EQ(source.find(forbidden), std::string::npos)
@@ -508,11 +514,20 @@ TEST(SandboxEditorPresentation, ExtrinsicSandboxAppStaysRuntimeOnly)
         ReadRepositoryTextFile("src/app/Sandbox/CMakeLists.txt");
     EXPECT_NE(controller.find("import Extrinsic.Sandbox.Editor.Shell;"),
               std::string::npos);
-    EXPECT_EQ(controller.find("import Extrinsic.Runtime.SandboxEditorFacades;"),
-              std::string::npos);
-    EXPECT_NE(shell.find("import Extrinsic.Runtime.SandboxEditorFacades;"),
-              std::string::npos);
-    EXPECT_NE(cmake.find("target_link_libraries(ExtrinsicSandboxEditor"),
+  constexpr std::array<std::string_view, 6> featureImports{{
+      "import Extrinsic.Runtime.EditorWorkspaceSnapshots;",
+      "import Extrinsic.Runtime.EditorJobProjection;",
+      "import Extrinsic.Runtime.SceneEditingOperations;",
+      "import Extrinsic.Runtime.GeometryProcessingOperations;",
+      "import Extrinsic.Runtime.VisualizationEditingOperations;",
+      "import Extrinsic.Runtime.RenderRecipeEditingOperations;",
+  }};
+  for (const std::string_view featureImport : featureImports) {
+    EXPECT_EQ(controller.find(featureImport), std::string::npos)
+        << featureImport;
+    EXPECT_NE(shell.find(featureImport), std::string::npos) << featureImport;
+  }
+  EXPECT_NE(cmake.find("target_link_libraries(ExtrinsicSandboxEditor"),
               std::string::npos);
     EXPECT_NE(cmake.find("ExtrinsicRuntime"), std::string::npos);
     EXPECT_EQ(cmake.find("ExtrinsicGraphics"), std::string::npos);
@@ -520,67 +535,209 @@ TEST(SandboxEditorPresentation, ExtrinsicSandboxAppStaysRuntimeOnly)
     EXPECT_EQ(cmake.find("ExtrinsicRHI"), std::string::npos);
 }
 
-TEST(SandboxEditorPresentation, RuntimeFacadesCompileSeparatelyFromEditorShell)
+TEST(SandboxEditorPresentation,
+     RuntimeFeatureModulesCompileSeparatelyFromEditorShell)
 {
-    const std::string appShell = ReadRepositoryTextFile(
-        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
-    const std::string runtimeFacade = ReadRepositoryTextFile(
-        "src/runtime/Runtime.SandboxEditorFacades.cpp");
-    const std::string methodFacade = ReadRepositoryTextFile(
-        "src/runtime/Runtime.SandboxMethodFacade.cpp");
-    const std::string renderRecipeFacade = ReadRepositoryTextFile(
-        "src/runtime/Runtime.SandboxEditorRenderRecipeFacade.cpp");
-    const std::string runtimeCMake =
-        ReadRepositoryTextFile("src/runtime/CMakeLists.txt");
+    const std::string appShell =
+        ReadRepositoryTextFile("src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
+    const std::string appShellContract =
+        ReadRepositoryTextFile("src/app/Sandbox/Editor/Sandbox.EditorShell.cppm");
+    const std::string detailContract =
+        ReadRepositoryTextFile("src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
+    const std::string workspaceSession =
+        ReadRepositoryTextFile("src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
+    const std::string workspaceModels =
+        ReadRepositoryTextFile("src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp");
+    const std::string sceneActions =
+        ReadRepositoryTextFile("src/runtime/Runtime.SceneEditingOperations.Actions.cpp");
+    const std::string geometryOperations =
+        ReadRepositoryTextFile("src/runtime/Runtime.GeometryProcessingOperations.cpp");
+    const std::string geometryMeshOperations =
+        ReadRepositoryTextFile("src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp");
+    const std::string visualizationActions =
+        ReadRepositoryTextFile("src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp");
+    const std::string renderRecipeOperations =
+        ReadRepositoryTextFile("src/runtime/Runtime.RenderRecipeEditingOperations.cpp");
+    const std::string runtimeCMake = ReadRepositoryTextFile("src/runtime/CMakeLists.txt");
     ASSERT_FALSE(appShell.empty());
-    ASSERT_FALSE(runtimeFacade.empty());
-    ASSERT_FALSE(methodFacade.empty());
-    ASSERT_FALSE(renderRecipeFacade.empty());
+    ASSERT_FALSE(appShellContract.empty());
+    ASSERT_FALSE(detailContract.empty());
+    ASSERT_FALSE(workspaceSession.empty());
+    ASSERT_FALSE(workspaceModels.empty());
+    ASSERT_FALSE(sceneActions.empty());
+    ASSERT_FALSE(geometryOperations.empty());
+    ASSERT_FALSE(geometryMeshOperations.empty());
+    ASSERT_FALSE(visualizationActions.empty());
+    ASSERT_FALSE(renderRecipeOperations.empty());
 
-    constexpr std::string_view kMeansDefinition = "ApplySandboxEditorKMeansCommand(";
     constexpr std::string_view clusteringConfigDefinition =
-        "ApplySandboxEditorClusteringConfig(";
+        "ApplyEditorClusteringConfig(";
     constexpr std::string_view poissonDefinition =
-        "ApplySandboxEditorProgressivePoissonCommand(";
+        "ApplyEditorProgressivePoissonCommand(";
+    constexpr std::string_view meshDenoiseDefinition =
+        "ApplyEditorMeshDenoiseCommand(";
     constexpr std::string_view renderRecipeDefinition =
-        "SandboxEditorRenderRecipeEditorModel\n"
-        "    BuildSandboxEditorRenderRecipeEditorModel(";
-    constexpr std::string_view renderRecipeCommand =
-        "SandboxEditorRenderRecipeCommandResult\n"
-        "    ApplySandboxEditorRenderRecipeCommand(";
+        "EditorRenderRecipeEditorModel\n"
+        "    BuildEditorRenderRecipeEditorModel(";
+    constexpr std::string_view renderRecipeCommand = "EditorRenderRecipeCommandResult\n"
+                                                     "    ApplyEditorRenderRecipeCommand(";
     EXPECT_NE(appShell.find("#include <imgui.h>"), std::string::npos);
     EXPECT_NE(appShell.find("DrawMainMenuBar("), std::string::npos);
-    EXPECT_EQ(runtimeFacade.find("#include <imgui.h>"), std::string::npos);
-    EXPECT_EQ(runtimeFacade.find("ImGui::"), std::string::npos);
-    EXPECT_EQ(runtimeFacade.find(kMeansDefinition), std::string::npos);
-    EXPECT_EQ(runtimeFacade.find(renderRecipeDefinition), std::string::npos);
-    EXPECT_EQ(runtimeFacade.find(renderRecipeCommand), std::string::npos);
-    EXPECT_EQ(methodFacade.find(kMeansDefinition), std::string::npos);
-    EXPECT_NE(methodFacade.find(clusteringConfigDefinition), std::string::npos);
-    EXPECT_NE(methodFacade.find(poissonDefinition), std::string::npos);
-    EXPECT_NE(renderRecipeFacade.find(renderRecipeDefinition), std::string::npos);
-    EXPECT_NE(renderRecipeFacade.find(renderRecipeCommand), std::string::npos);
-    EXPECT_NE(runtimeCMake.find("Runtime.SandboxMethodFacade.cpp"),
+    EXPECT_NE(appShellContract.find("struct SandboxEditorContext final"), std::string::npos);
+    for (const std::string_view capability :
+         {"Runtime::EditorSceneEditingCommands SceneCommands{};",
+          "Runtime::EditorGeometryProcessingCommands GeometryCommands{};",
+          "Runtime::EditorVisualizationEditingCommands VisualizationCommands{};",
+          "Runtime::EditorRenderRecipeEditingCommands RenderRecipeCommands{};",
+          "Runtime::EditorWorkspaceSnapshotQueries SnapshotQueries{};"})
+    {
+        EXPECT_NE(appShellContract.find(capability), std::string::npos) << capability;
+    }
+    EXPECT_EQ(appShellContract.find("EditorFeatureTestContext"), std::string::npos);
+    EXPECT_EQ(appShellContract.find("EditorFeatureBindings"), std::string::npos);
+    EXPECT_NE(
+        appShellContract.find("struct SandboxEditorFrame final : Runtime::EditorWorkspaceSnapshot"),
+        std::string::npos);
+    EXPECT_NE(appShell.find(
+                  "LastFrame = SandboxEditorFrame{prepared.Workspace.Frame}"),
               std::string::npos);
-    EXPECT_NE(runtimeCMake.find("Runtime.ClusteringModule.cpp"),
+    EXPECT_EQ(detailContract.find("#include <imgui.h>"), std::string::npos);
+    EXPECT_EQ(workspaceSession.find("ImGui::"), std::string::npos);
+    for (const std::string_view forbidden :
+         {"import Geometry.",
+          "import Extrinsic.RHI.CommandContext;",
+          "import Extrinsic.RHI.Device;",
+          "import Extrinsic.Runtime.TextureBakeModule;"})
+    {
+        EXPECT_EQ(workspaceSession.find(forbidden), std::string::npos)
+            << forbidden;
+    }
+    for (const std::string_view privateOperationPrefix :
+         {"ApplyEditor", "BuildEditor", "GetEditor", "SubmitEditor",
+          "ResolveEditor", "RenameEditor", "RemoveEditor",
+          "DebugNameForEditor"})
+    {
+        EXPECT_EQ(detailContract.find(privateOperationPrefix), std::string::npos)
+            << privateOperationPrefix;
+    }
+    EXPECT_LT(std::ranges::count(workspaceSession, '\n'), 1'000);
+    EXPECT_NE(workspaceModels.find("BuildEditorWorkspaceSnapshotFromBindings("),
               std::string::npos);
-    EXPECT_NE(runtimeCMake.find("Runtime.SandboxEditorRenderRecipeFacade.cpp"),
+    EXPECT_NE(sceneActions.find("ApplyEditorFileImportCommand("),
               std::string::npos);
-    EXPECT_NE(runtimeFacade.find("SubscribeRunCompleted("), std::string::npos);
-    EXPECT_NE(runtimeFacade.find("AttachmentEpochIsActive(epoch)"),
+    EXPECT_NE(geometryOperations.find(clusteringConfigDefinition), std::string::npos);
+    EXPECT_NE(geometryOperations.find(poissonDefinition), std::string::npos);
+    EXPECT_NE(geometryMeshOperations.find(meshDenoiseDefinition),
               std::string::npos);
-    EXPECT_NE(runtimeFacade.find("m_LastKMeansResult.reset()"),
+    EXPECT_NE(visualizationActions.find("ApplyEditorTextureBakeCommand("),
               std::string::npos);
-    EXPECT_EQ(methodFacade.find("HasInFlightJob()"), std::string::npos);
-    EXPECT_EQ(methodFacade.find("m_KMeansGpuJobs"), std::string::npos);
+    EXPECT_NE(renderRecipeOperations.find(renderRecipeDefinition), std::string::npos);
+    EXPECT_NE(renderRecipeOperations.find(renderRecipeCommand), std::string::npos);
+    EXPECT_EQ(runtimeCMake.find("Runtime.SandboxMethodFacade.cpp"), std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Modules/Clustering/Runtime.ClusteringModule.cpp"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.RenderRecipeEditingOperations.cpp"), std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.EditorWorkspaceSnapshots.Models.cpp"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("internal/Runtime.EditorWorkspaceSession.cpp"),
+              std::string::npos);
+    const auto firstPrivateSourceSet = runtimeCMake.find("\n        PRIVATE\n");
+    ASSERT_NE(firstPrivateSourceSet, std::string::npos);
+    const std::string_view publicRuntimeSources{runtimeCMake.data(), firstPrivateSourceSet};
+    for (const std::string_view privateModule : {"internal/Runtime.FeatureConfigCodecs.Detail.cppm",
+                                                 "internal/Runtime.EditorFeatures.Detail.cppm"})
+    {
+        EXPECT_EQ(publicRuntimeSources.find(privateModule), std::string_view::npos)
+            << privateModule;
+        EXPECT_NE(runtimeCMake.find(privateModule), std::string::npos) << privateModule;
+    }
+    EXPECT_NE(runtimeCMake.find("PRIVATE\n        FILE_SET feature_config_impl TYPE CXX_MODULES"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("PRIVATE\n        FILE_SET editor_feature_impl TYPE CXX_MODULES"),
+              std::string::npos);
+    EXPECT_NE(workspaceSession.find("SubscribeRunCompleted("), std::string::npos);
+    EXPECT_NE(workspaceSession.find("AttachmentEpochIsActive(epoch)"), std::string::npos);
+    EXPECT_NE(workspaceSession.find("m_LastKMeansResult.reset()"), std::string::npos);
+    EXPECT_EQ(geometryOperations.find("HasInFlightJob()"), std::string::npos);
+    EXPECT_EQ(geometryOperations.find("m_KMeansGpuJobs"), std::string::npos);
+
+    constexpr std::array<std::string_view, 14> retiredFiles{{
+        "src/runtime/Runtime.SandboxEditorFacades.cppm",
+        "src/runtime/Runtime.SandboxEditorFacades.cpp",
+        "src/runtime/Runtime.SandboxEditorFacades.Internal.hpp",
+        "src/runtime/Runtime.SandboxMethodFacade.cpp",
+        "src/runtime/Runtime.SandboxParameterizationFacade.cpp",
+        "src/runtime/Runtime.SandboxEditorRenderRecipeFacade.cpp",
+        "src/runtime/Runtime.SandboxConfigSections.cppm",
+        "src/runtime/Runtime.SandboxConfigSections.cpp",
+        "src/runtime/Runtime.SandboxDefaultPolicies.cppm",
+        "src/runtime/Runtime.SandboxDefaultPolicies.cpp",
+        "src/runtime/Runtime.RegistrationAlignment.cppm",
+        "src/runtime/Runtime.RegistrationAlignment.cpp",
+        "src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp",
+        "src/runtime/internal/Runtime.EditorFeatures.Detail.hpp",
+    }};
+    for (const std::string_view retiredFile : retiredFiles)
+    {
+        EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} / retiredFile))
+            << retiredFile;
+        const std::string retiredCMakeEntry =
+            "\n        " + std::filesystem::path{retiredFile}.filename().string() + "\n";
+        EXPECT_EQ(runtimeCMake.find(retiredCMakeEntry), std::string::npos)
+            << retiredFile;
+    }
+    EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} /
+                                         "tests/unit/runtime/Test.RegistrationAlignment.cpp"));
+
+    constexpr std::array<std::string_view, 13> allowedPrivateImporters{{
+        "Runtime.EditorCommon.Public.cpp",
+        "Runtime.EditorJobProjection.Public.cpp",
+        "Runtime.EditorWorkspaceSnapshots.Public.cpp",
+        "Runtime.EditorWorkspaceSnapshots.Models.cpp",
+        "Runtime.SceneEditingOperations.Public.cpp",
+        "Runtime.GeometryProcessingOperations.Public.cpp",
+        "Runtime.VisualizationEditingOperations.Public.cpp",
+        "Runtime.RenderRecipeEditingOperations.Public.cpp",
+        "Runtime.ProgressivePoissonConfig.cpp",
+        "Runtime.ParameterizationConfig.cpp",
+        "Runtime.ClusteringConfig.cpp",
+        "Runtime.EditorWorkspaceAttachment.Detail.cppm",
+        "Runtime.EditorWorkspaceAttachment.cpp",
+    }};
+    const std::filesystem::path runtimeRoot =
+        std::filesystem::path{ENGINE_ROOT_DIR} / "src/runtime";
+    for (const auto& entry : std::filesystem::recursive_directory_iterator{runtimeRoot})
+    {
+        if (!entry.is_regular_file())
+            continue;
+        const auto extension = entry.path().extension();
+        if (extension != ".cpp" && extension != ".cppm" && extension != ".hpp" && extension != ".h")
+            continue;
+
+        const std::string source = ReadRepositoryTextFile(
+            std::filesystem::relative(entry.path(), ENGINE_ROOT_DIR).string());
+        for (const std::string_view retiredPrefix :
+             {"SandboxEditor", "SandboxMethod", "SandboxConfig", "SandboxDefault",
+              "SandboxParameterization"})
+        {
+            EXPECT_EQ(source.find(retiredPrefix), std::string::npos)
+                << entry.path() << ": " << retiredPrefix;
+        }
+
+        if (source.find("import Extrinsic.Runtime.Private.") == std::string::npos)
+            continue;
+        EXPECT_NE(std::ranges::find(allowedPrivateImporters, entry.path().filename().string()),
+                  allowedPrivateImporters.end())
+            << entry.path();
+    }
 }
 
 TEST(SandboxEditorPresentation, GeometryProcessingMenusExposeDomainElementSubmenus)
 {
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+    using Domain = Runtime::EditorGeometryProcessingDomain;
 
-    const auto mesh = Runtime::GetSandboxEditorGeometryProcessingMenuItems(
-        Runtime::SandboxEditorDomainWindowKind::Mesh);
+    const auto mesh = Runtime::GetEditorGeometryProcessingMenuItems(
+        Runtime::EditorDomainWindowKind::Mesh);
     ASSERT_EQ(mesh.size(), 3u);
     EXPECT_EQ(mesh[0].Domain, Domain::MeshVertices);
     EXPECT_STREQ(mesh[0].Label, "Vertices");
@@ -597,8 +754,8 @@ TEST(SandboxEditorPresentation, GeometryProcessingMenusExposeDomainElementSubmen
     EXPECT_STREQ(mesh[2].Label, "Faces");
     EXPECT_FALSE(mesh[2].HasNormalsMethod);
 
-    const auto graph = Runtime::GetSandboxEditorGeometryProcessingMenuItems(
-        Runtime::SandboxEditorDomainWindowKind::Graph);
+    const auto graph = Runtime::GetEditorGeometryProcessingMenuItems(
+        Runtime::EditorDomainWindowKind::Graph);
     ASSERT_EQ(graph.size(), 3u);
     EXPECT_EQ(graph[0].Domain, Domain::GraphVertices);
     EXPECT_STREQ(graph[0].Label, "Vertices");
@@ -608,8 +765,8 @@ TEST(SandboxEditorPresentation, GeometryProcessingMenusExposeDomainElementSubmen
     EXPECT_EQ(graph[2].Domain, Domain::GraphHalfedges);
     EXPECT_STREQ(graph[2].Label, "Halfedges");
 
-    const auto cloud = Runtime::GetSandboxEditorGeometryProcessingMenuItems(
-        Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    const auto cloud = Runtime::GetEditorGeometryProcessingMenuItems(
+        Runtime::EditorDomainWindowKind::PointCloud);
     ASSERT_EQ(cloud.size(), 1u);
     EXPECT_EQ(cloud[0].Domain, Domain::PointCloudPoints);
     EXPECT_STREQ(cloud[0].Label, "Vertices");
@@ -621,7 +778,7 @@ TEST(SandboxEditorPresentation, AdapterCallbackDrawsDeterministicMenuOnlyFrame)
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
                                                std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
 
     engine.Run();
@@ -647,7 +804,7 @@ TEST(SandboxEditorPresentation,
                                                std::make_unique<TooltipDelayApplication>());
     ComposeEditorUiAndInitialize(engine);
 
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(shell.SetEditorWindowOpen("file.import", true));
 
@@ -658,13 +815,13 @@ TEST(SandboxEditorPresentation,
     ImVec2 observedMousePosition{};
     std::string hoveredWindowName{};
     const Runtime::EditorWindowHandle observer = shell.RegisterEditorWindow(
-        SandboxEditor::EditorWindowDescriptor{
+        Editor::EditorWindowDescriptor{
             .Id = "test.file_import_hover_observer",
             .MenuPath = {"View"},
             .Title = "File import hover observer",
             .OpenByDefault = true,
             .Draw =
-                [&](bool&, const Runtime::SandboxEditorContext&)
+                [&](bool&, const Editor::SandboxEditorContext&)
                 {
                     ++observerFrames;
                     ImGuiWindow* importWindow =
@@ -791,14 +948,14 @@ TEST(SandboxEditorPresentation, RuntimeImportEventIsReflectedByAppFilePanel)
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     ComposeEditorUiAndInitialize(engine);
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
 
     const auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = "/tmp/intrinsic-arch-006-missing.ply",
             .PayloadKind =
-                Runtime::SandboxEditorAssetPayloadKind::PointCloud,
+                Runtime::EditorAssetPayloadKind::PointCloud,
         });
     ASSERT_FALSE(imported.has_value());
     EXPECT_EQ(imported.error(), Core::ErrorCode::FileNotFound);
@@ -808,16 +965,16 @@ TEST(SandboxEditorPresentation, RuntimeImportEventIsReflectedByAppFilePanel)
     ASSERT_TRUE(shell.GetLastFrame().FileImport.LastResult.has_value());
     EXPECT_FALSE(shell.GetLastFrame().FileImport.LastResult->Succeeded());
     EXPECT_EQ(shell.GetLastFrame().FileImport.LastResult->PayloadKind,
-              Runtime::SandboxEditorAssetPayloadKind::PointCloud);
+              Runtime::EditorAssetPayloadKind::PointCloud);
     EXPECT_TRUE(HasDiagnostic(
         shell.GetLastFrame().FileImport.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+        Runtime::EditorDiagnosticCode::AssetImportFailed));
 
     shell.Detach();
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacade)
+TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow)
 {
     TmpFile cloudFile(
         "runtime_dragdrop_event_cloud.ply",
@@ -844,7 +1001,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     auto& pipeline =
         RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
 
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
 
     const std::vector<std::string> droppedPaths{cloudFile.Path.string()};
@@ -860,16 +1017,16 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
     EXPECT_EQ(lastEvent->Result->PayloadKind,
-              Runtime::SandboxEditorAssetPayloadKind::PointCloud);
+              Runtime::EditorAssetPayloadKind::PointCloud);
     EXPECT_EQ(lastEvent->Result->PrimitiveEntitiesCreated, 1u);
 
     ASSERT_TRUE(shell.GetLastFrame().FileImport.LastResult.has_value());
     EXPECT_TRUE(shell.GetLastFrame().FileImport.LastResult->Succeeded());
     EXPECT_EQ(shell.GetLastFrame().FileImport.LastResult->PayloadKind,
-              Runtime::SandboxEditorAssetPayloadKind::PointCloud);
+              Runtime::EditorAssetPayloadKind::PointCloud);
     EXPECT_FALSE(HasDiagnostic(
         shell.GetLastFrame().FileImport.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+        Runtime::EditorDiagnosticCode::AssetImportFailed));
 
     shell.Detach();
     engine.Shutdown();
@@ -880,7 +1037,7 @@ TEST(SandboxEditorPresentation, EngineAttachmentRegistersEditorCallback)
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
                                                std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
     EXPECT_TRUE(shell.IsAttached());
 
@@ -893,7 +1050,7 @@ TEST(SandboxEditorPresentation, EngineAttachmentRegistersEditorCallback)
     EXPECT_TRUE(shell.GetLastFrame().FileImport.Enabled);
     EXPECT_FALSE(HasDiagnostic(
         shell.GetLastFrame().FileImport.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+        Runtime::EditorDiagnosticCode::AssetImportUnavailable));
 
     shell.Detach();
     engine.Shutdown();
@@ -901,7 +1058,7 @@ TEST(SandboxEditorPresentation, EngineAttachmentRegistersEditorCallback)
 
 TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy)
 {
-    SandboxEditor::SandboxEditorController controller;
+    Editor::SandboxEditorController controller;
 
     Intrinsic::Tests::RuntimeTestKernel firstEngine(HeadlessConfig(),
                                                     std::make_unique<OneFrameApplication>());
@@ -974,7 +1131,7 @@ TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
                                                std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
     const auto menu = shell.BuildEditorWindowMenuModel();
     ASSERT_EQ(menu.size(), 10u);
@@ -1023,8 +1180,9 @@ TEST(SandboxEditorPresentation,
         std::string_view::npos);
     EXPECT_NE(frameGraphPanel.find("\"GPU Profile\""),
               std::string_view::npos);
-    EXPECT_NE(compactPanel.find("ApplySandboxEditorGpuProfilingConfigCommand(*"
-                                "context,gpuProfilingEnabled)"),
+    EXPECT_NE(compactPanel.find("ApplyEditorGpuProfilingConfigCommand("
+                              "context->RenderRecipeCommands,"
+                              "gpuProfilingEnabled)"),
               std::string::npos);
     EXPECT_NE(frameGraphPanel.find("Queue envelopes:"),
               std::string_view::npos);
@@ -1037,17 +1195,17 @@ TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEnt
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
                                                std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
     int drawCalls = 0;
     const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
-        SandboxEditor::EditorWindowDescriptor{
+        Editor::EditorWindowDescriptor{
             .Id = "graph.analysis.curvature",
             .MenuPath = {"Graph", "Analysis"},
             .Title = "Curvature",
             .OpenByDefault = false,
             .Draw =
-                [&drawCalls](bool&, const Runtime::SandboxEditorContext&)
+                [&drawCalls](bool&, const Editor::SandboxEditorContext&)
                 {
                     ++drawCalls;
                 },
@@ -1069,18 +1227,19 @@ TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEnt
     engine.Shutdown();
 }
 
-TEST(SandboxEditorPresentation, ContextWindowContributionReceivesRuntimeFacade)
+TEST(SandboxEditorPresentation,
+     ContextWindowContributionReceivesAppOwnedContext)
 {
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
                                                std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
 
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
     int drawCalls = 0;
     bool receivedScene = false;
     const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
-        SandboxEditor::EditorWindowDescriptor{
+        Editor::EditorWindowDescriptor{
             .Id = "test.context_window",
             .MenuPath = {"View"},
             .Title = "Context Window",
@@ -1088,10 +1247,10 @@ TEST(SandboxEditorPresentation, ContextWindowContributionReceivesRuntimeFacade)
             .Draw =
                 [&drawCalls, &receivedScene](
                     bool&,
-                    const Runtime::SandboxEditorContext& context)
+                    const Editor::SandboxEditorContext& context)
                 {
                     ++drawCalls;
-                    receivedScene = context.Scene != nullptr;
+                    receivedScene = context.SceneAvailable;
                 },
         });
     ASSERT_TRUE(handle.IsValid());
@@ -1111,7 +1270,7 @@ TEST(SandboxEditorPresentation, GlobalVisibilityHotkeyUsesTheVisibilityCommandPa
         HeadlessConfig(), std::make_unique<ToggleEditorVisibilityApplication>());
     ComposeEditorUiAndInitialize(engine);
 
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(shell.IsEditorVisible());
 

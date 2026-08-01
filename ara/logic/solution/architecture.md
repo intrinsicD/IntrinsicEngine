@@ -45,7 +45,8 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp,
-  src/runtime/Runtime.SandboxEditorFacades.cpp,
+  src/runtime/Runtime.GeometryProcessingOperations.cpp,
+  src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp,
   tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
   docs/architecture/runtime.md,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
@@ -55,13 +56,15 @@
 - **Decision**: Sandbox-specific windows, menus, ImGui state, and draw
   controllers live in app-owned `EditorShell`, method, mesh-processing, and
   domain-panel modules. Runtime owns only generic editor host/registry/widgets
-  and presentation-free Sandbox engine contexts, commands, models, jobs,
-  result records, and attachment/session wiring.
+  plus the opaque editor-workspace attachment lifecycle and presentation-free,
+  feature-owned commands, queries, models, jobs, and result records. The app
+  owns the Sandbox contexts and prepared-frame composition.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.EditorShell.cpp,
   src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp,
-  src/runtime/Runtime.SandboxEditorFacades.cppm,
+  src/runtime/Runtime.EditorWorkspaceAttachment.cppm,
+  src/runtime/Runtime.EditorWorkspaceSnapshots.cppm,
   docs/architecture/runtime.md,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp]
@@ -91,8 +94,8 @@
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/core/Core.Config.Engine.cppm,
   src/core/Core.Config.EngineLoad.cpp,
-  src/runtime/Runtime.SandboxParameterizationFacade.cpp,
-  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+  src/runtime/Runtime.ParameterizationOperations.cpp,
+  tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N213, N215]
 - **From staging**: O32

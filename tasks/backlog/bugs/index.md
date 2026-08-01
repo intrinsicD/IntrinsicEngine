@@ -66,6 +66,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-08-01: [`BUG-125` — Queued-import contracts raced asynchronous state transitions](../../done/BUG-125-queued-import-contract-state-observation-races.md).
+  Test-only decode/read interlocks now order the active-world transition and
+  initial cancellability snapshot explicitly. Both cases passed 100/100
+  normally and 100/100 pinned to one CPU; all 26 format-coverage cases, the
+  19 concurrency-policy checks, and the 4,010-case CPU gate pass. Three exact
+  multi-worker cases now carry source-audited CTest reservations.
+
 - Closed 2026-07-31: [`BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry](../../done/BUG-095-direct-mesh-postprocess-stale-overwrite.md).
   Deferred enrichment now validates the exact live mesh-source content and
   binding signature, asset-workflow binding epoch, and entity-sidecar job token

@@ -20,7 +20,7 @@ import Extrinsic.Sandbox.Editor.Shell;
 
 namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;
-namespace SandboxEditor = Extrinsic::Sandbox::Editor;
+namespace Editor = Extrinsic::Sandbox::Editor;
 
 namespace
 {
@@ -50,7 +50,7 @@ namespace
     {
         Intrinsic::Tests::RuntimeTestKernel Kernel{HeadlessConfig(),
                                                    std::make_unique<OneFrameApplication>()};
-        SandboxEditor::EditorShell Shell{};
+        Editor::EditorShell Shell{};
 
         EditorUiShellHarness()
         {
@@ -104,7 +104,7 @@ TEST(SandboxDomainPanels, RegistersTheTenAppOwnedWindowsWithStableMenuMetadata)
     }};
 
     EditorUiShellHarness harness;
-    SandboxEditor::DomainPanels panels;
+    Editor::DomainPanels panels;
     panels.Register(harness.Shell);
 
     const auto menu = harness.Shell.BuildEditorWindowMenuModel();
@@ -126,7 +126,7 @@ TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWin
     EditorUiShellHarness second;
 
     {
-        SandboxEditor::DomainPanels panels;
+        Editor::DomainPanels panels;
         panels.Register(first.Shell);
         ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
@@ -151,7 +151,7 @@ TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWin
 TEST(SandboxDomainPanels, ClosedRegisteredWindowsBuildNoDomainModels)
 {
     EditorUiShellHarness harness;
-    SandboxEditor::DomainPanels panels;
+    Editor::DomainPanels panels;
     panels.Register(harness.Shell);
     harness.Kernel.Run();
 
@@ -166,7 +166,7 @@ TEST(SandboxDomainPanels, ClosedRegisteredWindowsBuildNoDomainModels)
 TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
 {
     EditorUiShellHarness harness;
-    SandboxEditor::DomainPanels panels;
+    Editor::DomainPanels panels;
     panels.Register(harness.Shell);
     for (const std::string_view id :
          {"pointcloud.appearance",

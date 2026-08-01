@@ -8,9 +8,9 @@ module Extrinsic.Sandbox;
 
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.ReferenceScene;
-import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 
@@ -47,9 +47,16 @@ void UninstallSandboxDefaultPolicies(
   handles.InputActions = inputActions;
 
   if (cameraControllers != nullptr && selection != nullptr) {
-    const Runtime::RuntimeInputActionHandle focusAction =
-        inputActions->Register(Runtime::MakeSandboxDefaultFocusInputAction(
-            *cameraControllers, *selection));
+    const Runtime::RuntimeInputActionHandle focusAction = inputActions->Register(
+        Runtime::MakeFocusCameraOnSelectionInputAction(
+            *cameraControllers,
+            *selection,
+            "Sandbox.DefaultFocusCameraOnSelection",
+            Runtime::RuntimeInputActionBinding{
+                .KeyCode = 'F',
+                .Trigger = Runtime::RuntimeInputActionTrigger::KeyJustPressed,
+                .SuppressWhenImGuiCapturesKeyboard = true,
+            }));
     if (!focusAction.IsValid()) {
       UninstallSandboxDefaultPolicies(handles);
       return false;

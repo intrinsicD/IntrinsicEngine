@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_layering.py",
+    "--root",
+    "src",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_layering.py --root src --strict",
+  "cwd": ".",
+  "duration_ms": 171,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T01:30:58Z",
+  "label": "final-strict-layering",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T01:30:58Z",
+  "stderr_path": "tasks/evidence/RUNTIME-202/commands/final-strict-layering.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-202/commands/final-strict-layering.stdout.log",
+  "stdout_sha256": "e7cbe498f6d92e1e08ee992119be64a842eda9e165bfaaf6953498ac4f46cbef",
+  "task_id": "RUNTIME-202"
+}

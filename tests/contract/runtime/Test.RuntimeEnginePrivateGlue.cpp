@@ -879,9 +879,11 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
 {
     const auto root = RepoRoot();
     const auto facadeInterface = ReadFile(
-        root / "src/runtime/Runtime.SandboxEditorFacades.cppm");
+        root / "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
     const auto panelImpl = ReadFile(
         root / "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
+    const auto operationImpl = ReadFile(
+        root / "src/runtime/Runtime.GeometryProcessingOperations.Public.cpp");
     const auto moduleInterface = ReadFile(
         root / "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm");
     const auto gpuPartition = ReadFile(
@@ -898,8 +900,9 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
               std::string::npos);
     EXPECT_NE(facadeInterface.find("ClusteringService* Clustering"),
               std::string::npos);
-    EXPECT_NE(panelImpl.find("context.Clustering->RunKMeans("),
+    EXPECT_NE(operationImpl.find("context.Clustering->RunKMeans("),
               std::string::npos);
+    EXPECT_EQ(panelImpl.find("Clustering->RunKMeans("), std::string::npos);
 
     EXPECT_NE(gpuPartition.find(
                   "module Extrinsic.Runtime.ClusteringModule:GpuBackend;"),
@@ -918,17 +921,19 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
         "Extrinsic.Runtime.KMeansGpuBackend",
         "RuntimeKMeansGpuJobQueue",
         "RuntimeKMeansGpuJobRequest",
-        "SandboxEditorKMeansBackend",
-        "SandboxEditorKMeansCommand",
-        "SandboxEditorKMeansResult",
+        "EditorKMeansBackend",
+        "EditorKMeansCommand",
+        "EditorKMeansResult",
         "KMeansGpuCommands",
-        "ApplySandboxEditorKMeansCommand",
+        "ApplyEditorKMeansCommand",
     };
     for (const std::string_view forbidden : forbiddenNames)
     {
         EXPECT_EQ(facadeInterface.find(forbidden), std::string::npos)
             << forbidden;
         EXPECT_EQ(panelImpl.find(forbidden), std::string::npos) << forbidden;
+        EXPECT_EQ(operationImpl.find(forbidden), std::string::npos)
+            << forbidden;
         EXPECT_EQ(runtimeCMake.find(forbidden), std::string::npos)
             << forbidden;
         EXPECT_EQ(moduleInventory.find(forbidden), std::string::npos)

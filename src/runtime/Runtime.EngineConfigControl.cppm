@@ -19,6 +19,10 @@ namespace Extrinsic::Runtime
 {
     export using RuntimeEngineConfigSectionRegistry =
         Core::Config::EngineConfigSectionRegistry;
+    export using RuntimeEngineConfigSectionRegistration =
+        Core::Config::EngineConfigSectionRegistration;
+    export using RuntimeEngineConfigSectionChangedCallback =
+        Core::Config::EngineConfigSectionChangedCallback;
 
     export enum class RuntimeConfigControlSource : std::uint8_t
     {

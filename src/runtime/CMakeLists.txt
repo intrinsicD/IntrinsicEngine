@@ -20,9 +20,19 @@ target_sources(${target_name}
         Runtime.GeometryPresentation.cppm
         Runtime.ProgressivePoissonGpuBackend.cppm
         Runtime.RenderArtifactPublication.cppm
-        Runtime.SandboxConfigSections.cppm
+        Modules/Clustering/Runtime.ClusteringConfig.cppm
+        Runtime.ProgressivePoissonConfig.cppm
+        Runtime.ParameterizationConfig.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
+        Runtime.EditorCommon.cppm
+        Runtime.EditorWorkspaceAttachment.cppm
+        Runtime.EditorWorkspaceSnapshots.cppm
+        Runtime.EditorJobProjection.cppm
+        Runtime.SceneEditingOperations.cppm
+        Runtime.GeometryProcessingOperations.cppm
+        Runtime.VisualizationEditingOperations.cppm
+        Runtime.RenderRecipeEditingOperations.cppm
         Editor/Runtime.EditorPropertyWidgets.cppm
         Editor/Runtime.EditorUiHost.cppm
         Editor/Runtime.EditorUiModule.cppm
@@ -39,7 +49,6 @@ target_sources(${target_name}
         Runtime.WorldHandle.cppm
         Runtime.WorldRegistry.cppm
         Runtime.GeometryAvailability.cppm
-        Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
         Scene/Runtime.SceneDocumentModule.cppm
         Scene/Runtime.SceneInteractionModule.cppm
@@ -47,7 +56,6 @@ target_sources(${target_name}
         Cameras/Runtime.CameraModule.cppm
         Cameras/Runtime.CameraControllers.cppm
         Cameras/Runtime.CameraFocusCommand.cppm
-        Runtime.SandboxEditorFacades.cppm
         Gizmos/Runtime.GizmoFrameService.cppm
         Gizmos/Runtime.GizmoInteraction.cppm
         ImGui/Runtime.ImGuiAdapter.cppm
@@ -66,6 +74,13 @@ target_sources(${target_name}
         Runtime.VertexChannelBindings.cppm
         Runtime.VertexChannelStreams.cppm
         Visualization/Runtime.VisualizationRecipes.cppm
+        PRIVATE
+        FILE_SET feature_config_impl TYPE CXX_MODULES FILES
+        internal/Runtime.FeatureConfigCodecs.Detail.cppm
+        PRIVATE
+        FILE_SET editor_feature_impl TYPE CXX_MODULES FILES
+        internal/Runtime.EditorFeatures.Detail.cppm
+        internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
         PRIVATE
         FILE_SET asset_workflow_impl TYPE CXX_MODULES FILES
         Runtime.AssetWorkflowImportExecutor.cppm
@@ -98,10 +113,32 @@ target_sources(${target_name}
         Runtime.GeometryPresentation.cpp
         Runtime.ProgressivePoissonGpuBackend.cpp
         Runtime.RenderArtifactPublication.cpp
-        Runtime.SandboxDefaultPolicies.cpp
-        Runtime.SandboxConfigSections.cpp
+        Modules/Clustering/Runtime.ClusteringConfig.cpp
+        Runtime.ProgressivePoissonConfig.cpp
+        Runtime.ParameterizationConfig.cpp
+        internal/Runtime.FeatureConfigCodecs.Detail.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
+        Runtime.EditorCommon.Public.cpp
+        Runtime.EditorWorkspaceAttachment.cpp
+        Runtime.EditorJobProjection.Public.cpp
+        Runtime.SceneEditingOperations.Public.cpp
+        Runtime.SceneEditingOperations.Actions.cpp
+        Runtime.SceneEditingOperations.Debug.cpp
+        Runtime.GeometryProcessingOperations.Public.cpp
+        Runtime.VisualizationEditingOperations.Public.cpp
+        Runtime.VisualizationEditingOperations.Actions.cpp
+        Runtime.VisualizationEditingOperations.Debug.cpp
+        Runtime.RenderRecipeEditingOperations.Public.cpp
+        Runtime.EditorWorkspaceSnapshots.Public.cpp
+        Runtime.EditorWorkspaceSnapshots.Models.cpp
+        internal/Runtime.EditorFeatureContextAdapters.cpp
+        internal/Runtime.EditorWorkspaceSession.cpp
+        Runtime.GeometryProcessingOperations.cpp
+        Runtime.GeometryProcessingOperations.Mesh.cpp
+        Runtime.ParameterizationOperations.cpp
+        Runtime.RenderRecipeEditingOperations.cpp
+        Runtime.RenderRecipeEditingOperations.Debug.cpp
         Editor/Runtime.EditorPropertyWidgets.cpp
         Editor/Runtime.EditorUiHost.cpp
         Editor/Runtime.EditorUiModule.cpp
@@ -116,7 +153,6 @@ target_sources(${target_name}
         Runtime.ServiceRegistry.cpp
         Runtime.WorldRegistry.cpp
         Runtime.GeometryAvailability.cpp
-        Runtime.RegistrationAlignment.cpp
         Runtime.PhysicsBridge.cpp
         Scene/Runtime.SceneDocumentModule.cpp
         Scene/Runtime.SceneInteractionModule.cpp
@@ -124,10 +160,6 @@ target_sources(${target_name}
         Cameras/Runtime.CameraModule.cpp
         Cameras/Runtime.CameraControllers.cpp
         Cameras/Runtime.CameraFocusCommand.cpp
-        Runtime.SandboxMethodFacade.cpp
-        Runtime.SandboxParameterizationFacade.cpp
-        Runtime.SandboxEditorRenderRecipeFacade.cpp
-        Runtime.SandboxEditorFacades.cpp
         Gizmos/Runtime.GizmoFrameService.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp
