@@ -59,3 +59,8 @@ Select `ear` (or anisotropic `wlop`) in
 authored-or-estimated normal policy, runs the CPU reference asynchronously,
 and publishes the pointer-free normal/refinement diagnostics with the undoable
 point-cloud mutation.
+The interactive surface is
+`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` in the Sandbox;
+its EAR controls expose the shared normal-source, angle, refinement, and edge
+sensitivity values through the registered config lane and report authored or
+estimated normal use plus feature-directed insertions.

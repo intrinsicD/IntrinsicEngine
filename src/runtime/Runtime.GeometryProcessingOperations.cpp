@@ -2279,6 +2279,18 @@ namespace Extrinsic::Runtime
         return context.ApplyEngineConfigHotSubset(result.LoadResult);
     }
 
+    bool IsValidEditorPointCloudConsolidationConfig(
+        const PointCloudConsolidationConfig& config)
+    {
+        const Core::Config::EngineConfigSectionValidationResult validation =
+            ValidatePointCloudConsolidationConfigSection(
+                SerializePointCloudConsolidationConfig(config),
+                SerializePointCloudConsolidationConfig(
+                    PointCloudConsolidationConfig{}),
+                "editor.point_cloud_consolidation");
+        return validation.State == Core::Config::EngineConfigState::Valid;
+    }
+
     std::optional<PointCloudConsolidationConfig>
     GetEditorPointCloudConsolidationConfig(
         const EditorGeometryProcessingContext& context) noexcept

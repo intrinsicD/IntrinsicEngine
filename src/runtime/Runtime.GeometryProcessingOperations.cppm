@@ -1203,6 +1203,9 @@ export namespace Extrinsic::Runtime
         const PointCloudConsolidationConfig& config,
         std::string sourceId = "sandbox.point_cloud_consolidation");
 
+    [[nodiscard]] bool IsValidEditorPointCloudConsolidationConfig(
+        const PointCloudConsolidationConfig& config);
+
     [[nodiscard]] std::optional<PointCloudConsolidationConfig>
     GetEditorPointCloudConsolidationConfig(
         const EditorGeometryProcessingContext& context) noexcept;

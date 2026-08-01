@@ -2,9 +2,31 @@
 id: UI-035
 theme: I
 depends_on: [RUNTIME-175]
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner: "Codex-GeometryE2E"
+branch: "feature/lop-consolidation-e2e"
+worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
+claimed_at: "2026-08-01T18:36:41Z"
 maturity_target: Operational
 ---
 # UI-035 — Sandbox point-cloud consolidation editor panel
+
+## Status
+- Completed on 2026-08-01. The app-owned registered window exposes the four
+  promoted CPU-reference strategies, validates and hot-applies the shared
+  config record, submits the typed async runtime operation, projects exact
+  implementation/convergence/normal diagnostics, and uses the shared
+  document-history undo/redo path.
+- The canonical `ci` editor target and all 22 focused consolidation/presentation
+  cases pass. On the Vulkan-capable host, the combined-sanitizer `ci-vulkan`
+  Sandbox built, launched on the RTX 3050, and rendered its GLFW/ImGui window.
+  The host session was screen-locked, so synthetic menu clicks were correctly
+  intercepted by GNOME rather than bypassing the lock; the model-level
+  prepared-workspace test supplies the deterministic dispatch, ECS mutation,
+  result-publication, and undo proof.
+- Commit: pending this retirement checkpoint.
 
 ## Goal
 - Add the Sandbox editor window that lets a user pick a CPU-reference
@@ -14,9 +36,11 @@ maturity_target: Operational
   convergence feedback.
 
 ## Non-goals
-- No algorithm, runtime, or config code — the panel is presentation only and
-  calls the post-`RUNTIME-202` `RUNTIME-175` typed operation/config surface; it
-  never receives `Engine&` or owns geometry/runtime/asset state.
+- No algorithm, service, or config-schema implementation — the panel is
+  presentation only and calls the post-`RUNTIME-202` `RUNTIME-175` typed
+  operation/config surface. A narrow runtime editor-operation validator keeps
+  Core config result types out of the app layer; the panel never receives
+  `Engine&` or owns geometry/runtime/asset state.
 - No new control path that bypasses the config lane — the panel drives the same validated apply path an agent/config file uses.
 - No visualization/colormap changes beyond selecting the consolidated point cloud for display.
 
@@ -44,39 +68,39 @@ maturity_target: Operational
   `Editor` source, so config files and agents remain co-equal drivers.
 
 ## Required changes
-- [ ] Add a registered consolidation window in `src/app/Sandbox/Editor/` (mirroring `Sandbox.MethodPanels.cpp`), receiving `SandboxEditorContext`, not `Engine&`.
-- [ ] Strategy selector (LOP/WLOP/CLOP/EAR) reflecting the strategies the `Geometry.PointCloud.Consolidation` module implements; disable/annotate strategies not yet available so the UI never offers an unimplemented variant.
-- [ ] Parameter widgets for the shared and per-strategy knobs (`h`, `mu`,
+- [x] Add a registered consolidation window in `src/app/Sandbox/Editor/` (mirroring `Sandbox.MethodPanels.cpp`), receiving `SandboxEditorContext`, not `Engine&`.
+- [x] Strategy selector (LOP/WLOP/CLOP/EAR) reflecting the strategies the `Geometry.PointCloud.Consolidation` module implements; disable/annotate strategies not yet available so the UI never offers an unimplemented variant.
+- [x] Parameter widgets for the shared and per-strategy knobs (`h`, `mu`,
       iterations, CLOP component count, EAR edge sensitivity and normal-source
       policy, seed), edited into the editor mirror of
       `PointCloudConsolidationConfig` and applied through the `RUNTIME-175`
       config-routed typed operation (preview → submit → apply), not a private
       call.
-- [ ] Render the actual `cpu_reference` implementation identity, selected
+- [x] Render the actual `cpu_reference` implementation identity, selected
       strategy, and convergence diagnostics (iterations, converged flag, moved
       distance) from `PointCloudConsolidationResult`.
-- [ ] Apply/undo affordances routed through the typed runtime operation so
+- [x] Apply/undo affordances routed through the typed runtime operation so
       edits use the common `EditorCommandHistory` transaction.
 
 ## Tests
-- [ ] Extend the app/editor panel registration coverage (or a headless panel-model test where one exists) to assert the consolidation window registers through the `UI-034` registry and produces a valid apply request from a param set without ImGui frame state.
-- [ ] Strategy gating: the panel does not emit a request for an unimplemented
+- [x] Extend the app/editor panel registration coverage (or a headless panel-model test where one exists) to assert the consolidation window registers through the `UI-034` registry and produces a valid apply request from a param set without ImGui frame state.
+- [x] Strategy gating: the panel does not emit a request for an unimplemented
       strategy; it annotates the unavailable choice instead.
-- [ ] Result rendering: a model-level assertion covers strategy identity and
+- [x] Result rendering: a model-level assertion covers strategy identity and
       convergence/failure diagnostics without ImGui frame state.
 
 ## Docs
-- [ ] Update the Sandbox editor UI inventory / user-facing sandbox docs with the consolidation window and its config-lane parity note.
-- [ ] Cross-link the three method-package READMEs to the editor window as the interactive surface.
+- [x] Update the Sandbox editor UI inventory / user-facing sandbox docs with the consolidation window and its config-lane parity note.
+- [x] Cross-link the three method-package READMEs to the editor window as the interactive surface.
 
 ## Acceptance criteria
-- [ ] Selecting a point cloud, choosing a strategy, and applying consolidates
+- [x] Selecting a point cloud, choosing a strategy, and applying consolidates
       the cloud and updates the viewport, undoably.
-- [ ] The panel drives the `RUNTIME-175` validated typed operation (no private
+- [x] The panel drives the `RUNTIME-175` validated typed operation (no private
       subsystem poke); config-file and agent drivers stay co-equal.
-- [ ] Strategy/implementation identity and convergence feedback are shown;
+- [x] Strategy/implementation identity and convergence feedback are shown;
       unavailable strategies are annotated, not offered.
-- [ ] `app -> runtime` only; the panel owns no engine state.
+- [x] `app -> runtime` only; the panel owns no engine state.
 
 ## Verification
 ```bash

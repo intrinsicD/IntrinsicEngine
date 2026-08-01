@@ -42,3 +42,7 @@ Select `clop` in the registered `sandbox.point_cloud_consolidation` section and
 submit through `Extrinsic.Runtime.PointCloudConsolidationService`. Runtime uses
 the same CPU-reference strategy, async snapshot/stale-result contract, and
 undoable `GeometrySources` publication as the LOP-family paths.
+The Sandbox exposes the identical path at
+`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)`, including the
+mixture component, iteration, tolerance, and covariance-floor controls plus
+the returned implementation and convergence diagnostics.

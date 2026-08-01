@@ -31,6 +31,8 @@ import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SceneEditingOperations;
 
@@ -262,6 +264,22 @@ namespace Extrinsic::Sandbox::Editor
                 });
         }
 
+        [[nodiscard]] bool IsSupportedPointCloudConsolidationStrategy(
+            const Runtime::PointCloudConsolidationStrategy strategy) noexcept
+        {
+            const auto options =
+                SandboxPointCloudConsolidationStrategyOptions();
+            return std::any_of(
+                options.begin(),
+                options.end(),
+                [strategy](
+                    const SandboxPointCloudConsolidationStrategyOption& option)
+                {
+                    return option.Strategy == strategy && option.Available &&
+                           !option.StableToken.empty();
+                });
+        }
+
         [[nodiscard]] const char* ParameterizationSolverStatusLabel(
             const ParameterizationSolverStatus status) noexcept
         {
@@ -362,6 +380,118 @@ namespace Extrinsic::Sandbox::Editor
                     request->Execute);
         }
         return result;
+    }
+
+    std::array<SandboxPointCloudConsolidationStrategyOption, 4u>
+    SandboxPointCloudConsolidationStrategyOptions() noexcept
+    {
+        using Strategy = Runtime::PointCloudConsolidationStrategy;
+        return {
+            SandboxPointCloudConsolidationStrategyOption{
+                .Strategy = Strategy::Lop,
+                .Label = "LOP",
+                .StableToken = Runtime::StableToken(Strategy::Lop),
+                .Available = true,
+            },
+            SandboxPointCloudConsolidationStrategyOption{
+                .Strategy = Strategy::Wlop,
+                .Label = "WLOP",
+                .StableToken = Runtime::StableToken(Strategy::Wlop),
+                .Available = true,
+            },
+            SandboxPointCloudConsolidationStrategyOption{
+                .Strategy = Strategy::Clop,
+                .Label = "CLOP",
+                .StableToken = Runtime::StableToken(Strategy::Clop),
+                .Available = true,
+            },
+            SandboxPointCloudConsolidationStrategyOption{
+                .Strategy = Strategy::Ear,
+                .Label = "EAR",
+                .StableToken = Runtime::StableToken(Strategy::Ear),
+                .Available = true,
+            },
+        };
+    }
+
+    std::optional<SandboxPointCloudConsolidationPanelApplyRequest>
+    BuildSandboxPointCloudConsolidationPanelApplyRequest(
+        const std::uint32_t stableEntityId,
+        const SandboxPointCloudConsolidationPanelConfig& config)
+    {
+        if (stableEntityId == 0u ||
+            !IsSupportedPointCloudConsolidationStrategy(config.Strategy) ||
+            Runtime::StableToken(config.Strategy).empty())
+        {
+            return std::nullopt;
+        }
+
+        if (!Runtime::IsValidEditorPointCloudConsolidationConfig(config))
+            return std::nullopt;
+
+        return SandboxPointCloudConsolidationPanelApplyRequest{
+            .Config = config,
+            .Execute = Runtime::PointCloudConsolidationRequest{
+                .StableEntityId = stableEntityId,
+                .Config = config,
+            },
+        };
+    }
+
+    SandboxPointCloudConsolidationPanelActionResult
+    ApplySandboxPointCloudConsolidationPanelAction(
+        const SandboxEditorContext& context,
+        const std::uint32_t stableEntityId,
+        const SandboxPointCloudConsolidationPanelConfig& config)
+    {
+        SandboxPointCloudConsolidationPanelActionResult result{};
+        result.Config.Status =
+            Runtime::RuntimeEngineConfigApplyStatus::Rejected;
+        result.Config.Source = Runtime::RuntimeConfigControlSource::Editor;
+        const auto request =
+            BuildSandboxPointCloudConsolidationPanelApplyRequest(
+                stableEntityId, config);
+        if (!request.has_value())
+            return result;
+
+        result.Config = Runtime::ApplyEditorPointCloudConsolidationConfig(
+            context.GeometryCommands,
+            request->Config,
+            request->SourceId);
+        if (result.Config.Succeeded())
+        {
+            result.Submission =
+                Runtime::SubmitEditorPointCloudConsolidation(
+                    context.GeometryCommands,
+                    request->Execute);
+        }
+        return result;
+    }
+
+    SandboxPointCloudConsolidationResultSummary
+    BuildSandboxPointCloudConsolidationResultSummary(
+        const Runtime::PointCloudConsolidationResult& result)
+    {
+        return SandboxPointCloudConsolidationResultSummary{
+            .Succeeded = result.Succeeded(),
+            .Queued = result.Status ==
+                Runtime::PointCloudConsolidationRunStatus::Queued,
+            .Status = std::string{Runtime::ToString(result.Status)},
+            .ImplementationId = result.ImplementationId,
+            .StrategyToken = result.StrategyToken,
+            .Message = result.Message,
+            .InputPointCount = result.InputPointCount,
+            .OutputPointCount = result.OutputPointCount,
+            .Iterations = result.Iterations,
+            .Converged = result.Converged,
+            .AverageDisplacement = result.AverageDisplacement,
+            .MaxDisplacement = result.MaxDisplacement,
+            .UsedAuthoredNormals = result.UsedAuthoredNormals,
+            .EstimatedNormals = result.EstimatedNormals,
+            .NormalRefinementIterations =
+                result.NormalRefinementIterations,
+            .InsertedPointCount = result.InsertedPointCount,
+        };
     }
 
     glm::vec2 ProjectSandboxParameterizationUvPoint(
@@ -570,6 +700,17 @@ namespace Extrinsic::Sandbox::Editor
             std::uint32_t PendingStableEntityId{0u};
         };
 
+        struct PointCloudConsolidationState
+        {
+            SandboxPointCloudConsolidationPanelConfig Draft{};
+            bool Initialized{false};
+            bool Dirty{false};
+            std::optional<Runtime::RuntimeEngineConfigApplyResult>
+                LastConfigApply{};
+            std::optional<Runtime::PointCloudConsolidationResult>
+                LastResult{};
+        };
+
         struct ParameterizationState
         {
             SandboxParameterizationPanelConfig Draft{};
@@ -596,6 +737,7 @@ namespace Extrinsic::Sandbox::Editor
             CachedDomainModels{};
         KMeansState KMeans{};
         ProgressivePoissonState ProgressivePoisson{};
+        PointCloudConsolidationState PointCloudConsolidation{};
         ParameterizationState Parameterization{};
 
         void Register(EditorShell& editorShell)
@@ -628,6 +770,7 @@ namespace Extrinsic::Sandbox::Editor
                 "mesh.processing.progressive_poisson",
                 {"Mesh", "Processing"},
                 "Mesh / Processing / Progressive Poisson");
+            RegisterPointCloudConsolidationWindow();
             RegisterParameterizationWindow();
         }
 
@@ -649,6 +792,8 @@ namespace Extrinsic::Sandbox::Editor
             ProgressivePoisson.AutoRunPending = false;
             ProgressivePoisson.LastEditTime = 0.0;
             ProgressivePoisson.PendingStableEntityId = 0u;
+            PointCloudConsolidation =
+                PointCloudConsolidationState{};
             Parameterization = ParameterizationState{};
         }
 
@@ -746,6 +891,424 @@ namespace Extrinsic::Sandbox::Editor
                             DrawParameterizationWindow(open, context);
                         },
                 }));
+        }
+
+        void RegisterPointCloudConsolidationWindow()
+        {
+            Handles.push_back(Shell->RegisterEditorWindow(
+                EditorWindowDescriptor{
+                    .Id = "pointcloud.processing.consolidation",
+                    .MenuPath = {"PointCloud", "Processing"},
+                    .Title = "Consolidate (LOP/WLOP/CLOP/EAR)",
+                    .OpenByDefault = false,
+                    .Draw =
+                        [this](
+                            bool& open,
+                            const SandboxEditorContext& context)
+                        {
+                            DrawPointCloudConsolidationWindow(open, context);
+                        },
+                }));
+        }
+
+        static bool DrawPointCloudConsolidationStrategy(
+            SandboxPointCloudConsolidationPanelConfig& config)
+        {
+            const auto options =
+                SandboxPointCloudConsolidationStrategyOptions();
+            const auto current = std::find_if(
+                options.begin(),
+                options.end(),
+                [&config](
+                    const SandboxPointCloudConsolidationStrategyOption& option)
+                {
+                    return option.Strategy == config.Strategy;
+                });
+            const char* preview = current != options.end()
+                ? current->Label.data()
+                : "Unsupported";
+            bool changed = false;
+            if (ImGui::BeginCombo(
+                    "Strategy##PointCloudConsolidation", preview))
+            {
+                for (const auto& option : options)
+                {
+                    const bool selected = option.Strategy == config.Strategy;
+                    if (!option.Available)
+                        ImGui::BeginDisabled();
+                    if (ImGui::Selectable(
+                            option.Label.data(), selected) &&
+                        option.Available)
+                    {
+                        config.Strategy = option.Strategy;
+                        changed = true;
+                    }
+                    if (!option.Available)
+                    {
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("unavailable");
+                        ImGui::EndDisabled();
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            return changed;
+        }
+
+        static bool DrawPointCloudConsolidationNormalControls(
+            SandboxPointCloudConsolidationPanelConfig& config)
+        {
+            bool changed = false;
+            const bool requireAuthored =
+                config.NormalSource ==
+                Runtime::PointCloudConsolidationNormalSource::
+                    RequireAuthored;
+            if (ImGui::BeginCombo(
+                    "Normal source##PointCloudConsolidation",
+                    requireAuthored
+                        ? "Require authored"
+                        : "Authored or estimate"))
+            {
+                if (ImGui::Selectable(
+                        "Authored or estimate##PointCloudConsolidation",
+                        !requireAuthored))
+                {
+                    config.NormalSource =
+                        Runtime::PointCloudConsolidationNormalSource::
+                            AuthoredOrEstimate;
+                    changed = true;
+                }
+                if (!requireAuthored)
+                    ImGui::SetItemDefaultFocus();
+                if (ImGui::Selectable(
+                        "Require authored##PointCloudConsolidation",
+                        requireAuthored))
+                {
+                    config.NormalSource =
+                        Runtime::PointCloudConsolidationNormalSource::
+                            RequireAuthored;
+                    changed = true;
+                }
+                if (requireAuthored)
+                    ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
+            }
+            changed |= ImGui::InputDouble(
+                "Normal angle (radians)##PointCloudConsolidation",
+                &config.NormalAngleRadians,
+                0.0,
+                0.0,
+                "%.6g");
+            changed |= ImGui::InputScalar(
+                "Normal refinement rounds##PointCloudConsolidation",
+                ImGuiDataType_U32,
+                &config.NormalRefinementRounds);
+            return changed;
+        }
+
+        static bool DrawPointCloudConsolidationControls(
+            SandboxPointCloudConsolidationPanelConfig& config)
+        {
+            bool changed = DrawPointCloudConsolidationStrategy(config);
+            ImGui::SeparatorText("Shared parameters");
+            changed |= ImGui::InputDouble(
+                "Support radius (h)##PointCloudConsolidation",
+                &config.SupportRadius,
+                0.0,
+                0.0,
+                "%.6g");
+            changed |= ImGui::InputDouble(
+                "Repulsion weight (mu)##PointCloudConsolidation",
+                &config.RepulsionWeight,
+                0.0,
+                0.0,
+                "%.6g");
+            changed |= ImGui::InputScalar(
+                "Max iterations##PointCloudConsolidation",
+                ImGuiDataType_U32,
+                &config.MaxIterations);
+            changed |= ImGui::InputDouble(
+                "Convergence tolerance##PointCloudConsolidation",
+                &config.ConvergenceTolerance,
+                0.0,
+                0.0,
+                "%.3e");
+            changed |= ImGui::InputScalar(
+                "Target point count (0 keeps input)##PointCloudConsolidation",
+                ImGuiDataType_U32,
+                &config.TargetPointCount);
+            changed |= ImGui::InputScalar(
+                "Seed##PointCloudConsolidation",
+                ImGuiDataType_U32,
+                &config.Seed);
+
+            ImGui::SeparatorText("Strategy parameters");
+            using Strategy = Runtime::PointCloudConsolidationStrategy;
+            switch (config.Strategy)
+            {
+            case Strategy::Lop:
+                ImGui::TextDisabled(
+                    "LOP uses unit density weights and the shared parameters.");
+                break;
+            case Strategy::Wlop:
+                changed |= ImGui::Checkbox(
+                    "Anisotropic weighting##PointCloudConsolidation",
+                    &config.WlopAnisotropic);
+                if (config.WlopAnisotropic)
+                {
+                    changed |=
+                        DrawPointCloudConsolidationNormalControls(config);
+                }
+                break;
+            case Strategy::Clop:
+                changed |= ImGui::InputScalar(
+                    "Mixture components##PointCloudConsolidation",
+                    ImGuiDataType_U32,
+                    &config.ClopMixtureComponentCount);
+                changed |= ImGui::InputScalar(
+                    "Mixture max iterations##PointCloudConsolidation",
+                    ImGuiDataType_U32,
+                    &config.ClopMixtureMaxIterations);
+                changed |= ImGui::InputDouble(
+                    "Mixture relative tolerance##PointCloudConsolidation",
+                    &config.ClopMixtureRelativeTolerance,
+                    0.0,
+                    0.0,
+                    "%.3e");
+                changed |= ImGui::InputDouble(
+                    "Covariance floor##PointCloudConsolidation",
+                    &config.ClopCovarianceFloor,
+                    0.0,
+                    0.0,
+                    "%.3e");
+                break;
+            case Strategy::Ear:
+                changed |=
+                    DrawPointCloudConsolidationNormalControls(config);
+                changed |= ImGui::InputDouble(
+                    "Edge sensitivity##PointCloudConsolidation",
+                    &config.EarEdgeSensitivity,
+                    0.0,
+                    0.0,
+                    "%.6g");
+                break;
+            }
+            return changed;
+        }
+
+        static void DrawPointCloudConsolidationResult(
+            const std::optional<Runtime::PointCloudConsolidationResult>& result)
+        {
+            ImGui::SeparatorText("Last run diagnostics");
+            if (!result.has_value())
+            {
+                ImGui::TextDisabled(
+                    "No point-cloud consolidation has run this session.");
+                return;
+            }
+
+            const SandboxPointCloudConsolidationResultSummary summary =
+                BuildSandboxPointCloudConsolidationResultSummary(*result);
+            ImGui::Text("Status: %s", summary.Status.c_str());
+            ImGui::Text(
+                "Strategy: %s  implementation: %s",
+                summary.StrategyToken.c_str(),
+                summary.ImplementationId.c_str());
+            if (!summary.Queued)
+            {
+                ImGui::Text(
+                    "Points: %u -> %u  iterations: %u",
+                    summary.InputPointCount,
+                    summary.OutputPointCount,
+                    summary.Iterations);
+                ImGui::Text(
+                    "Converged: %s  displacement avg %.6g  max %.6g",
+                    summary.Converged ? "yes" : "no",
+                    summary.AverageDisplacement,
+                    summary.MaxDisplacement);
+                if (summary.UsedAuthoredNormals ||
+                    summary.EstimatedNormals ||
+                    summary.NormalRefinementIterations != 0u)
+                {
+                    const char* normalSource =
+                        summary.UsedAuthoredNormals && summary.EstimatedNormals
+                        ? "authored + estimated"
+                        : summary.UsedAuthoredNormals
+                            ? "authored"
+                            : summary.EstimatedNormals
+                                ? "estimated"
+                                : "none";
+                    ImGui::Text(
+                        "Normals: %s  refinement rounds: %u",
+                        normalSource,
+                        summary.NormalRefinementIterations);
+                }
+                if (summary.InsertedPointCount != 0u)
+                {
+                    ImGui::Text(
+                        "Inserted points: %u",
+                        summary.InsertedPointCount);
+                }
+            }
+            if (!summary.Message.empty())
+                ImGui::TextWrapped("%s", summary.Message.c_str());
+        }
+
+        void DrawPointCloudConsolidationWindow(
+            bool& open,
+            const SandboxEditorContext& context)
+        {
+            ImGui::SetNextWindowSize(
+                ImVec2(440.0f, 660.0f),
+                ImGuiCond_FirstUseEver);
+            if (ImGui::Begin(
+                    "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)",
+                    &open))
+            {
+                const Runtime::EditorDomainWindowModel& model =
+                    GetDomainWindowModel(
+                        context,
+                        Runtime::EditorDomainWindowKind::PointCloud);
+                DrawDomainWindowHeader(model);
+                DrawDiagnostics(model.Processing.Diagnostics);
+
+                if (!PointCloudConsolidation.Initialized ||
+                    !PointCloudConsolidation.Dirty)
+                {
+                    const auto active =
+                        Runtime::GetEditorPointCloudConsolidationConfig(
+                            context.GeometryCommands);
+                    if (active.has_value())
+                    {
+                        PointCloudConsolidation.Draft = *active;
+                        PointCloudConsolidation.Initialized = true;
+                    }
+                }
+                if (context.GeometryResults
+                        .LastPointCloudConsolidationResult.has_value())
+                {
+                    PointCloudConsolidation.LastResult =
+                        *context.GeometryResults
+                             .LastPointCloudConsolidationResult;
+                }
+
+                PointCloudConsolidation.Dirty |=
+                    DrawPointCloudConsolidationControls(
+                        PointCloudConsolidation.Draft);
+                const std::uint32_t stableEntityId =
+                    DomainWindowReady(model)
+                    ? model.SelectedStableId
+                    : 0u;
+                const bool draftValid =
+                    BuildSandboxPointCloudConsolidationPanelApplyRequest(
+                        stableEntityId == 0u ? 1u : stableEntityId,
+                        PointCloudConsolidation.Draft)
+                        .has_value();
+                if (!draftValid)
+                    ImGui::TextDisabled(
+                        "Draft contains an unsupported or out-of-range value.");
+                else if (PointCloudConsolidation.Dirty)
+                    ImGui::TextDisabled("Draft has unapplied changes.");
+
+                const bool configAvailable =
+                    context.GeometryConfigCommandsAvailable;
+                ImGui::BeginDisabled(!configAvailable || !draftValid);
+                if (ImGui::Button(
+                        "Apply configuration##PointCloudConsolidation"))
+                {
+                    PointCloudConsolidation.LastConfigApply =
+                        Runtime::ApplyEditorPointCloudConsolidationConfig(
+                            context.GeometryCommands,
+                            PointCloudConsolidation.Draft,
+                            "sandbox.point_cloud_consolidation.panel");
+                    if (PointCloudConsolidation.LastConfigApply->Succeeded())
+                        PointCloudConsolidation.Dirty = false;
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                ImGui::BeginDisabled(!configAvailable);
+                if (ImGui::Button(
+                        "Reload active##PointCloudConsolidation"))
+                {
+                    PointCloudConsolidation.Initialized = false;
+                    PointCloudConsolidation.Dirty = false;
+                }
+                ImGui::EndDisabled();
+
+                const bool canRun = configAvailable && draftValid &&
+                    stableEntityId != 0u &&
+                    context.PointCloudConsolidationAvailable;
+                ImGui::BeginDisabled(!canRun);
+                if (ImGui::Button(
+                        "Consolidate selected point cloud##PointCloudConsolidation"))
+                {
+                    SandboxPointCloudConsolidationPanelActionResult action =
+                        ApplySandboxPointCloudConsolidationPanelAction(
+                            context,
+                            stableEntityId,
+                            PointCloudConsolidation.Draft);
+                    PointCloudConsolidation.LastConfigApply =
+                        std::move(action.Config);
+                    if (action.Submission.has_value())
+                    {
+                        PointCloudConsolidation.LastResult =
+                            std::move(action.Submission);
+                    }
+                    if (PointCloudConsolidation.LastConfigApply->Succeeded())
+                        PointCloudConsolidation.Dirty = false;
+                }
+                ImGui::EndDisabled();
+                if (!context.PointCloudConsolidationAvailable)
+                {
+                    ImGui::TextDisabled(
+                        "Point-cloud consolidation service is unavailable.");
+                }
+                if (!configAvailable)
+                {
+                    ImGui::TextDisabled(
+                        "Point-cloud consolidation config control is unavailable.");
+                }
+                if (stableEntityId == 0u)
+                    ImGui::TextDisabled("Select a point-cloud entity to run.");
+
+                const Runtime::EditorDocumentModel history =
+                    context.Document != nullptr
+                    ? *context.Document
+                    : Runtime::EditorDocumentModel{};
+                const bool historyAvailable =
+                    context.DocumentCommands.Available();
+                const bool canUndo = history.CanUndo &&
+                    history.UndoLabel == "Consolidate point cloud";
+                const bool canRedo = history.CanRedo &&
+                    history.RedoLabel == "Consolidate point cloud";
+                ImGui::BeginDisabled(!canUndo || !historyAvailable);
+                if (ImGui::Button(
+                        "Undo consolidation##PointCloudConsolidation"))
+                {
+                    (void)context.DocumentCommands.Undo();
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                ImGui::BeginDisabled(!canRedo || !historyAvailable);
+                if (ImGui::Button(
+                        "Redo consolidation##PointCloudConsolidation"))
+                {
+                    (void)context.DocumentCommands.Redo();
+                }
+                ImGui::EndDisabled();
+
+                if (PointCloudConsolidation.LastConfigApply.has_value() &&
+                    !PointCloudConsolidation.LastConfigApply->Succeeded())
+                {
+                    ImGui::TextDisabled(
+                        "Configuration preview/apply was rejected.");
+                }
+                DrawPointCloudConsolidationResult(
+                    PointCloudConsolidation.LastResult);
+            }
+            ImGui::End();
         }
 
         void DrawKMeansWindow(

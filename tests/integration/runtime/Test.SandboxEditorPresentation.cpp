@@ -327,7 +327,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 35u);
+    ASSERT_EQ(menu.size(), 36u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -345,7 +345,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 25> expected{{
+    const std::array<ExpectedWindow, 26> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -360,6 +360,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"graph.processing.kmeans", {"Graph", "Processing"}},
         {"mesh.processing.kmeans", {"Mesh", "Processing"}},
         {"pointcloud.processing.progressive_poisson", {"PointCloud", "Processing"}},
+        {"pointcloud.processing.consolidation", {"PointCloud", "Processing"}},
         {"mesh.processing.progressive_poisson", {"Mesh", "Processing"}},
         {"mesh.processing.parameterize_uv", {"Mesh", "Processing"}},
         {"mesh.processing.denoise", {"Mesh", "Processing"}},
@@ -689,7 +690,7 @@ TEST(SandboxEditorPresentation,
     EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} /
                                          "tests/unit/runtime/Test.RegistrationAlignment.cpp"));
 
-    constexpr std::array<std::string_view, 13> allowedPrivateImporters{{
+    constexpr std::array<std::string_view, 14> allowedPrivateImporters{{
         "Runtime.EditorCommon.Public.cpp",
         "Runtime.EditorJobProjection.Public.cpp",
         "Runtime.EditorWorkspaceSnapshots.Public.cpp",
@@ -701,6 +702,7 @@ TEST(SandboxEditorPresentation,
         "Runtime.ProgressivePoissonConfig.cpp",
         "Runtime.ParameterizationConfig.cpp",
         "Runtime.ClusteringConfig.cpp",
+        "Runtime.PointCloudConsolidationConfig.cpp",
         "Runtime.EditorWorkspaceAttachment.Detail.cppm",
         "Runtime.EditorWorkspaceAttachment.cpp",
     }};

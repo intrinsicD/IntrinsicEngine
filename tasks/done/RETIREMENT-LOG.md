@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`UI-035`](UI-035-sandbox-pointcloud-consolidation-editor-panel.md) — the
+Sandbox point-cloud consolidation panel completed on 2026-08-01 at
+`Operational`. The decentralized editor registry now exposes
+`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` with shared and
+strategy-specific typed controls, canonical config preview/hot apply, async
+service submission, exact `cpu_reference` identity and convergence/normal/
+insertion diagnostics, and document-history undo/redo. The app remains a
+runtime-only consumer; a narrow runtime validator owns the Core config result
+types. The canonical editor target passes all 40 integration cases, including
+the prepared-workspace config-to-service-to-ECS-to-undo proof and the source
+boundary ratchets. The combined-sanitizer promoted-Vulkan Sandbox built and
+launched on an NVIDIA GeForce RTX 3050; its GLFW/ImGui window rendered while
+the locked desktop correctly prevented synthetic interactive input. No GPU
+method backend or performance claim is made.
+
 [`METHOD-018`](METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md) —
 Edge-Aware Resampling completed on 2026-08-01 at `CPUContracted`.
 `Geometry.PointCloud.Consolidation` now exposes anisotropic WLOP and the

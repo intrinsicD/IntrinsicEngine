@@ -50,3 +50,7 @@ source/projected density weights.
 the asynchronous typed operation. The shared validated configuration is the
 `sandbox.point_cloud_consolidation` application section; successful results
 replace the selected point cloud through `GeometrySources` with undo/redo.
+The interactive surface is
+`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` in the Sandbox;
+its LOP and WLOP controls apply through that same registered config lane and
+display the returned CPU-reference identity and convergence diagnostics.

@@ -151,9 +151,11 @@ after feature preparation resolves `EngineConfigControl` from
 - The point-cloud consolidation editor operation surface routes a complete
   typed draft through `SetPointCloudConsolidationConfig`, preview, and hot
   apply before submitting the same value to
-  `PointCloudConsolidationService`. `UI-035` owns its app presentation; file,
-  editor-operation, agent/CLI, and programmatic callers already share
-  validation and execution semantics.
+  `PointCloudConsolidationService`. The app-owned
+  `PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` window drives
+  that surface and reports its pointer-free completion diagnostics; file,
+  editor-operation, agent/CLI, and programmatic callers share validation and
+  execution semantics.
 - The existing `view.frame_graph` panel reads
   `render.enable_gpu_profiling` from the control state and routes its toggle
   through `PreviewEngineConfigControlDocument` followed by

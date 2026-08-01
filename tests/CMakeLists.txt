@@ -334,6 +334,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxAppComposition.cpp
             Test.SandboxEditorPresentation.cpp
             Test.SandboxParameterizationPanel.cpp
+            Test.SandboxPointCloudConsolidationPanel.cpp
     )
     intrinsic_test_object_lib(SandboxEditorIntegrationTestObjs
         SOURCES

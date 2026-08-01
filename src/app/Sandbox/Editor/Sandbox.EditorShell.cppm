@@ -59,6 +59,8 @@ export namespace Extrinsic::Sandbox::Editor
               GeometryConfigCommandsAvailable(
                   geometry.ConfigCommandsAvailable),
               ClusteringAvailable(geometry.ClusteringAvailable),
+              PointCloudConsolidationAvailable(
+                  geometry.PointCloudConsolidationAvailable),
               RenderRecipeCommandsAvailable(
                   renderRecipe.CommandsAvailable),
               RenderArtifactCommandsAvailable(
@@ -83,6 +85,7 @@ export namespace Extrinsic::Sandbox::Editor
         bool SceneAvailable{false};
         bool GeometryConfigCommandsAvailable{false};
         bool ClusteringAvailable{false};
+        bool PointCloudConsolidationAvailable{false};
         bool RenderRecipeCommandsAvailable{false};
         bool RenderArtifactCommandsAvailable{false};
         const Runtime::EditorSelectionModel* Selection{nullptr};
