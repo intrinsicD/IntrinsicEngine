@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `BUG-127` — Task claim corrupts multiline dependency front matter (tasks/active/BUG-127-task-claim-multiline-dependency-front-matter.md)
 
 ## Theme B — Rendering modernization
 
