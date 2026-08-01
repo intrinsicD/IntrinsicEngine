@@ -3,15 +3,15 @@ task_id: RUNTIME-175
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T20:14:27Z'
+generated_at: '2026-08-01T20:15:32Z'
 claim_eligible: false
 source:
   base_ref: 09134369
   base_revision: 09134369dc4d9a162f779b328755ee6f0c984b6a
-  head_revision: 7b8d2bc227a753e21f0954597bc140fab43cb23b
+  head_revision: 056170525d1e58de24b7cf583227d24e3a9b7329
   branch: feature/lop-consolidation-e2e
   worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
-  dirty: true
+  dirty: false
   surface:
   - path: docs/api/generated/module_inventory.md
     sha256: 1ef3391c830cfcf2b99101d0763e4f7d374fa2ab3d3729ada9ffd3c412b8b906
