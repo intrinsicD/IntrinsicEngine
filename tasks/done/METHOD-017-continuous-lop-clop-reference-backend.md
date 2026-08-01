@@ -47,7 +47,7 @@ maturity_target: CPUContracted
   includes deterministic CLOP backed by `Geometry.GaussianMixture::FitEM`, the
   original paper's closed-form Gaussian-product attraction, shared repulsion,
   explicit mixture/projection diagnostics, and fail-closed states.
-- Implementation commit: `cd7bba69`; completion-evidence commit: `f3babc07`.
+- Implementation commit: `cd7bba69`; completion-evidence commit: pending.
 - The literature review covers the original LOP/WLOP/CLOP lineage, bilateral
   FLOP, and the 2024 incomplete-gamma improvement. The governing reference
   remains original CLOP; improved kernels require a separately named strategy
