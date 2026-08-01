@@ -24,6 +24,18 @@ is deleted: the typed registration operation privately invokes
 `Geometry::Registration::AlignICP` and retains the observer trajectory only for
 that operation.
 
+Physical implementation ownership follows the same feature split. Scene,
+geometry, visualization, and render-recipe operation bodies compile in their
+respective operation units; they are not forwarded through the private editor
+BMI. `Runtime.EditorWorkspaceSnapshots.Models.cpp` owns presentation-free
+workspace model assembly, while the bounded
+`internal/Runtime.EditorWorkspaceSession.cpp` owns only attachment epochs, job
+identity/result retention, and prepared-frame lifecycle. The private detail BMI
+contains the attachment binding and session declaration, and
+`Runtime.EditorFeatureContextAdapters.cpp` projects composed runtime services
+into feature contexts. Neither private surface is an all-feature operation
+facade.
+
 ## Public ownership map
 
 | Area | Current owner |

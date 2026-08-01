@@ -60,7 +60,7 @@ The retired Sandbox facade export ledger and current owner map are recorded in
 | `Extrinsic.Runtime.StableEntityLookup` | Runtime-owned scene-local lookup sidecar (`RUNTIME-092`, event-driven wiring from `RUNTIME-145`), owned in production by `SceneInteractionModule`. It maps durable ECS `StableId` values to live entities and separately decodes/validates transient render ids, with deterministic duplicate winners and stale/missing diagnostics. `StableEntityLookupSceneBinding` maintains construct/update/destroy hooks for the one bound registry. The interaction module disconnects and clears it before replacement or rebind, rebuilds it afterward, and exposes stable-id resolution plus read-only diagnostics without publishing the raw mutable binding. |
 | `Extrinsic.Runtime.VisualizationRecipes` | Runtime-owned, data-driven translation from canonical geometry properties to data-only `Extrinsic.Graphics.VisualizationPackets`. Exports a closed `VisualizationRecipe` variant for scalar, color, label, vector-field, isoline, Htex-preview, and fragment-bake metadata; `EncodeVisualizationRecipe(...)` resolves `GeometryPropertyRef` values and returns an owning `VisualizationEncodingBatch` plus deterministic `VisualizationEncodingDiagnostics`. Missing BDAs emit copied property-buffer upload descriptors for common graphics residency. Encoding is side-effect free; `ScheduleVisualizationHtexRecreate(...)` is a separate typed `JobService` operation. `RenderExtractionCache` stores copied per-entity recipes, projects `VisualizationConfig` and ready `GeometryPresentationRecipe` property slots into the same encoder, scopes upload keys by stable entity id, and exposes recipe-prefixed extraction counters. No adapter object, registry, opaque key, borrowed property view, or material-source overloading remains. |
 | `Extrinsic.Runtime.ImGuiAdapter` | Runtime-side Dear ImGui platform/renderer adapter (`RUNTIME-090`, `RUNTIME-159`, `UI-034`). It owns paired ImGui 1.92.8 and ImPlot 1.0 contexts, translates drained platform events, opens a frame through `BeginFrame()`, invokes the configured visible contribution through `BuildEditorFrame()`, and copies `ImDrawData` into `Graphics::ImGuiOverlaySystem` during `EndFrame()`. `EndFrame()` records the data-only `EditorInputCaptureSnapshot` defined by `Runtime.Module` from `WantCaptureKeyboard`, `WantCaptureMouse`, and active-widget state before rendering; `EditorUiModule` copies it into the frame-owned value after end. `SetEditorVisible(false)` clears stored capture immediately and suppresses contribution work while preserving adapter lifecycle. The adapter remains backend-agnostic and exposes diagnostics without exporting ImGui headers; `imgui_core_lib` and `implot::implot` are linked **PRIVATE** to runtime. ImGui dynamic texture requests remain disabled because the promoted renderer consumes the copied legacy CPU font atlas. |
-| `Extrinsic.Runtime.EditorWorkspaceSnapshots` | Presentation-free workspace snapshot and attachment lifecycle. `EditorWorkspaceSession` prepares copied `EditorWorkspaceSnapshot` data plus callback-scoped, feature-named command/query handles; app-owned `SandboxEditorContext` and `SandboxEditorFrame` copy those records and decide panel/window composition. Each handle carries the attachment epoch, reports unbound after detach, and fails closed before reaching copied service pointers; operation-specific callback diagnostics remain available. Feature mutation contexts receive only an epoch-guarded selected-model-cache invalidation callback, not the workspace cache object. The private all-feature attachment binding does not cross the runtime boundary. The module owns no Sandbox names, menus, widgets, or ImGui state. |
+| `Extrinsic.Runtime.EditorWorkspaceSnapshots` | Presentation-free workspace snapshot and attachment lifecycle. `EditorWorkspaceSession` prepares copied `EditorWorkspaceSnapshot` data plus callback-scoped, feature-named command/query handles; app-owned `SandboxEditorContext` and `SandboxEditorFrame` copy those records and decide panel/window composition. Each handle carries the attachment epoch, reports unbound after detach, and fails closed before reaching copied service pointers; operation-specific callback diagnostics remain available. Feature mutation contexts receive only an epoch-guarded selected-model-cache invalidation callback, not the workspace cache object. Workspace model assembly and the bounded attachment/job-result session compile separately; the private binding/context adapters do not implement feature operations or cross the runtime boundary. The module owns no Sandbox names, menus, widgets, or ImGui state. |
 | `Extrinsic.Runtime.EditorJobProjection` | Read-only job identity, dependency, progress, and queue projections over the canonical `JobService`; submission identity remains with the editor workspace session. |
 | `Extrinsic.Runtime.SceneEditingOperations` | Typed selection, import, scene-file, transform, camera, primitive-view, and document operations plus their copied scene snapshots. Validation and mutation stay in runtime owners. |
 | `Extrinsic.Runtime.GeometryProcessingOperations` | Typed clustering, texture/UV, parameterization, Progressive Poisson, normals, denoise, curvature, remesh, subdivide, simplify, outlier-removal, and ICP registration operations/results. ICP trajectory collection is private to this operation path and calls `Geometry.Registration::AlignICP`; there is no standalone runtime registration wrapper. |
@@ -389,9 +389,10 @@ from `GEOM-042`, and publishes count-matched finite positions back to canonical
 `v:position` only after the geometry result succeeds. The UI exposes the
 full-bilateral stage, normal/vertex iteration counts, auto-or-explicit spatial
 and range sigma values, and boundary preservation, with a single `Denoise`
-action. `SandboxEditorContext::MeshDenoiseKernelAvailable` provides the
-deterministic unavailable-kernel diagnostic lane used by headless/editor
-contract tests.
+action. `EditorGeometryProcessingContext::MeshDenoiseKernelAvailable` is the
+runtime-owned capability input used to produce deterministic unavailable-kernel
+diagnostics in headless/editor contract tests; app code reaches it only through
+the prepared geometry command handle.
 
 Successful publication is undoable through the shared editor mutation
 transaction: undo restores the exact prior `v:position` array and redo
@@ -612,9 +613,10 @@ rejections, and pinned sharp-feature/UV-seam counts. Commits use the same
 generation-validated topology transaction as remesh/subdivide and stamp the same
 `DirtyVertexPositions`/`DirtyVertexAttributes`/`DirtyEdgeTopology`/
 `DirtyFaceTopology` tags as remesh/subdivide, without renderer/RHI upload calls
-or broad `GpuDirty`. `SandboxEditorContext::MeshSimplifyKernelAvailable` gates
+or broad `GpuDirty`. The runtime-owned
+`EditorGeometryProcessingContext::MeshSimplifyKernelAvailable` capability gates
 the executor so an unavailable kernel returns deterministic diagnostics without
-mutating `GeometrySources`.
+mutating `GeometrySources`; it is not app-owned Sandbox state.
 
 ### Sandbox Editor Mesh Parameterization
 
@@ -687,8 +689,10 @@ method execution cannot silently run on a richer or incompatible domain.
 
 ### Sandbox Editor Vertex Channel Bindings
 
-`RUNTIME-123` extends `Extrinsic.Runtime.EditorWorkspaceSnapshots` with normal/color
-vertex-channel binding controls for mesh, graph, and point-cloud entities. The
+`RUNTIME-123` provides normal/color vertex-channel binding controls through
+`Extrinsic.Runtime.VisualizationEditingOperations`, with their copied model
+assembly included in `EditorWorkspaceSnapshots`, for mesh, graph, and
+point-cloud entities. The
 property catalog exposes one target each for `VertexChannel::Normal` and
 `VertexChannel::Color`, lists only the selected entity's structural vertex
 domain (mesh vertices, graph nodes, or point-cloud points), and evaluates each
@@ -711,7 +715,7 @@ channel byte spans through public `GpuWorld` upload descriptors.
 ### Visualization UI Controls
 
 `UI-019` keeps mesh, graph, and point-cloud visualization color editing in
-`Extrinsic.Runtime.EditorWorkspaceSnapshots`; app-owned domain visualization windows and the
+`Extrinsic.Runtime.VisualizationEditingOperations`; app-owned domain visualization windows and the
 top-level `Geometry Visualization` panel route the existing uniform-color
 source through `ApplyEditorVisualizationConfigCommand(...)`; when
 `VisualizationConfig::ColorSource::UniformColor` is active they expose an
@@ -745,8 +749,10 @@ lane they need while preserving mesh, graph, or point-cloud provenance labels.
 ### Geometry Presentation Editor Inspector
 
 `UI-015`, migrated by `RUNTIME-193`, extends
-`Extrinsic.Runtime.EditorWorkspaceSnapshots` with data-only geometry-presentation
-inspector models and ImGui rows. The selected-entity model reports
+`Extrinsic.Runtime.VisualizationEditingOperations` with data-only
+geometry-presentation operations; presentation-free copied inspector models
+are assembled in `EditorWorkspaceSnapshots`, and the app owns the ImGui rows.
+The selected-entity model reports
 composition, mesh, graph, and point-cloud shapes; lane/presentation slots;
 uniform default colors; compatible-first property choices with incompatible
 entries disabled and explained; readiness and diagnostics; per-entity
@@ -766,8 +772,10 @@ properties.
 
 ### Geometry Property And Bake Inspector
 
-`UI-016`, `UI-017`, and `UI-014` extend `Extrinsic.Runtime.EditorWorkspaceSnapshots`
-with framework24-style property and render-state inspection without importing
+`UI-016`, `UI-017`, and `UI-014` use
+`Extrinsic.Runtime.VisualizationEditingOperations` plus copied
+`EditorWorkspaceSnapshots` models for framework24-style property and
+render-state inspection without importing
 framework24 ownership patterns. The selected-entity property catalog enumerates
 mesh vertex/edge/halfedge/face, graph node/edge, and point-cloud point
 properties, including canonical topology/internal rows that visualization

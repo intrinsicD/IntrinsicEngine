@@ -25,7 +25,7 @@ module;
 
 #include "ProgressivePoissonReference.hpp"
 
-module Extrinsic.Runtime.Private.EditorFeatures;
+module Extrinsic.Runtime.GeometryProcessingOperations;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
@@ -102,9 +102,9 @@ import Geometry.UvAtlas;
 
 
 #include "Runtime.EditorMutation.Internal.hpp"
-#include "internal/Runtime.EditorFeatures.Detail.hpp"
+#include "Runtime.GeometryProcessingOperations.Internal.hpp"
 
-namespace Extrinsic::Runtime::EditorFeatureDetail
+namespace Extrinsic::Runtime
 {
     namespace
     {
@@ -132,27 +132,30 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             const entt::registry& raw,
             const std::uint32_t stableId)
         {
-            return Detail::ResolveEditorStableEntity(raw, stableId);
+            return GeometryProcessingDetail::ResolveEditorStableEntity(raw, stableId);
         }
 
-        void InvalidateSelectedModelCache(const EditorFeatureBindings& context)
+        void InvalidateSelectedModelCache(const EditorGeometryProcessingContext& context)
         {
-            Detail::InvalidateEditorSelectedModelCache(context);
+            if (context.InvalidateWorkspaceSnapshotCache)
+                context.InvalidateWorkspaceSnapshotCache();
         }
 
         [[nodiscard]] std::optional<EditorJobRecord>
         FindActiveEditorJob(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             const EditorJobIdentity& identity)
         {
-            return Detail::FindActiveEditorGeometryJob(context, identity);
+            if (!context.JobCommands.FindActive)
+                return std::nullopt;
+            return context.JobCommands.FindActive(identity);
         }
 
         [[nodiscard]] std::string BuildActiveDerivedJobMessage(
             const std::string_view label,
             const EditorJobRecord& job)
         {
-            return Detail::BuildActiveEditorGeometryJobMessage(
+            return GeometryProcessingDetail::BuildActiveEditorGeometryJobMessage(
                 label,
                 job);
         }
@@ -160,7 +163,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
             const EditorCommandHistoryStatus status) noexcept
         {
-            return Detail::ToEditorMethodCommandStatus(status);
+            return GeometryProcessingDetail::ToEditorMethodCommandStatus(status);
         }
 
         [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
@@ -622,7 +625,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 " levels; prefix=" +
                 std::to_string(result.PrefixCount) +
                 ", channel=" +
-                DebugNameForEditorProgressivePoissonChannelImpl(
+                DebugNameForEditorProgressivePoissonChannel(
                     result.Channel);
             if (!result.LevelAcceptedCounts.empty())
             {
@@ -1180,7 +1183,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
         [[nodiscard]] EditorCommandStatus
         CommitProgressivePoissonMutation(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             const std::uint32_t stableEntityId,
             const ProgressivePoissonMutationScope scope,
             ProgressivePoissonEntityState before,
@@ -1420,7 +1423,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
 
         void PublishProgressivePoissonResultSink(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             EditorProgressivePoissonResult result)
         {
             if (context.MethodResultSinks.ProgressivePoisson)
@@ -1443,7 +1446,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
         [[nodiscard]] JobApplyValidation
         ValidateProgressivePoissonApply(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             const EditorProgressivePoissonCpuJobState& job)
         {
             if (context.Scene == nullptr)
@@ -1483,7 +1486,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
 
         [[nodiscard]] Core::Result PublishProgressivePoissonPointCloudCpuJob(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             const EditorProgressivePoissonCpuJobState& job)
         {
             if (!job.Method.has_value())
@@ -1542,7 +1545,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
 
         [[nodiscard]] Core::Result PublishProgressivePoissonMeshSurfaceCpuJob(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             const EditorProgressivePoissonCpuJobState& job)
         {
             if (!job.Result.Succeeded())
@@ -1656,7 +1659,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
         [[nodiscard]] EditorProgressivePoissonResult
         SubmitProgressivePoissonCpuDerivedJob(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             const EditorProgressivePoissonCommand& command,
             const EditorProgressivePoissonCpuJobSource source,
             std::vector<glm::vec3> snapshotPositions,
@@ -1767,14 +1770,14 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     std::vector<EditorGeometryProcessingDomain>
-    GetAvailableEditorKMeansDomainsImpl(const ECS::Scene::Registry& registry,
+    GetAvailableEditorKMeansDomains(const ECS::Scene::Registry& registry,
                                            const ECS::EntityHandle entity)
     {
         using Domain = EditorGeometryProcessingDomain;
         const Domain domains =
-            GetEditorGeometryProcessingCapabilitiesImpl(registry, entity)
+            GetEditorGeometryProcessingCapabilities(registry, entity)
                 .Domains &
-            GetEditorSupportedGeometryProcessingDomainsImpl(
+            GetEditorSupportedGeometryProcessingDomains(
                 EditorGeometryProcessingAlgorithm::KMeans);
 
         std::vector<Domain> result{};
@@ -1800,7 +1803,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return result;
     }
 
-    const char* DebugNameForEditorProgressivePoissonChannelImpl(
+    const char* DebugNameForEditorProgressivePoissonChannel(
         const EditorProgressivePoissonChannel channel) noexcept
     {
         switch (channel)
@@ -1817,7 +1820,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return "Unknown";
     }
 
-    const char* DebugNameForEditorProgressivePoissonBackendImpl(
+    const char* DebugNameForEditorProgressivePoissonBackend(
         const EditorProgressivePoissonBackend backend) noexcept
     {
         switch (backend)
@@ -1830,7 +1833,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return "Unknown";
     }
 
-    EditorProgressivePoissonChannel MakeEditorProgressivePoissonChannelImpl(
+    EditorProgressivePoissonChannel MakeEditorProgressivePoissonChannel(
         const ProgressivePoissonPlaygroundChannel channel) noexcept
     {
         switch (channel)
@@ -1865,7 +1868,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return ProgressivePoissonPlaygroundChannel::Level;
     }
 
-    EditorProgressivePoissonBackend MakeEditorProgressivePoissonBackendImpl(
+    EditorProgressivePoissonBackend MakeEditorProgressivePoissonBackend(
         const ProgressivePoissonPlaygroundBackend backend) noexcept
     {
         switch (backend)
@@ -1892,7 +1895,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return ProgressivePoissonPlaygroundBackend::CpuReference;
     }
 
-    EditorProgressivePoissonConfig MakeEditorProgressivePoissonConfigImpl(
+    EditorProgressivePoissonConfig MakeEditorProgressivePoissonConfig(
         const ProgressivePoissonPlaygroundConfig& config) noexcept
     {
         return EditorProgressivePoissonConfig{
@@ -1906,8 +1909,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             .ShuffleWithinLevels = config.ShuffleWithinLevels,
             .ShuffleSeed = config.ShuffleSeed,
             .PrefixCount = config.PrefixCount,
-            .Channel = MakeEditorProgressivePoissonChannelImpl(config.Channel),
-            .Backend = MakeEditorProgressivePoissonBackendImpl(config.Backend),
+            .Channel = MakeEditorProgressivePoissonChannel(config.Channel),
+            .Backend = MakeEditorProgressivePoissonBackend(config.Backend),
             .MeshSurfaceSampleCount = config.MeshSurfaceSampleCount,
             .MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed,
             .MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea,
@@ -1946,8 +1949,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
 
     EditorProgressivePoissonResult
-    ApplyEditorProgressivePoissonCommandImpl(
-        const EditorFeatureBindings& context,
+    ApplyEditorProgressivePoissonCommand(
+        const EditorGeometryProcessingContext& context,
         const EditorProgressivePoissonCommand& command)
     {
         if (context.Scene == nullptr)
@@ -2092,8 +2095,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
         const GS::ConstSourceView constView =
             GS::BuildConstView(raw, *entity);
-        Detail::EditorMeshSourceSnapshot source =
-            Detail::BuildEditorMeshSourceSnapshot(constView);
+        GeometryProcessingDetail::EditorMeshSourceSnapshot source =
+            GeometryProcessingDetail::BuildEditorMeshSourceSnapshot(constView);
         if (source.Status != EditorCommandStatus::Applied)
         {
             return MakeProgressivePoissonResult(source.Status, command.Config.Channel, source.Error,
@@ -2205,8 +2208,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return result;
     }
 
-    RuntimeEngineConfigApplyResult ApplyEditorClusteringConfigImpl(
-        const EditorFeatureBindings& context,
+    RuntimeEngineConfigApplyResult ApplyEditorClusteringConfig(
+        const EditorGeometryProcessingContext& context,
         const ClusteringConfig& config,
         std::string sourceId)
     {
@@ -2235,8 +2238,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return context.ApplyEngineConfigHotSubset(result.LoadResult);
     }
 
-    std::optional<ClusteringConfig> GetEditorClusteringConfigImpl(
-        const EditorFeatureBindings& context) noexcept
+    std::optional<ClusteringConfig> GetEditorClusteringConfig(
+        const EditorGeometryProcessingContext& context) noexcept
     {
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
@@ -2245,8 +2248,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     EditorProgressivePoissonConfigResult
-    ApplyEditorProgressivePoissonConfigCommandImpl(
-        const EditorFeatureBindings& context,
+    ApplyEditorProgressivePoissonConfigCommand(
+        const EditorGeometryProcessingContext& context,
         const EditorProgressivePoissonConfigCommand& command)
     {
         EditorProgressivePoissonConfigResult result{};
@@ -2308,8 +2311,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     std::optional<EditorProgressivePoissonConfig>
-    GetEditorProgressivePoissonConfigImpl(
-        const EditorFeatureBindings& context) noexcept
+    GetEditorProgressivePoissonConfig(
+        const EditorGeometryProcessingContext& context) noexcept
     {
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
@@ -2317,7 +2320,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             context.EngineConfigControlState->ActiveConfig);
         if (!config.has_value())
             return std::nullopt;
-        return MakeEditorProgressivePoissonConfigImpl(*config);
+        return MakeEditorProgressivePoissonConfig(*config);
     }
 
 }

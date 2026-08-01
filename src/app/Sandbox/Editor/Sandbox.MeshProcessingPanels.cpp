@@ -489,7 +489,10 @@ namespace Extrinsic::Sandbox::Editor
         auto& model = CachedDomainModels[static_cast<std::size_t>(kind)];
         if (!model.has_value())
         {
-            model = Runtime::BuildEditorDomainWindowModel(context.SnapshotQueries, kind);
+            model = Runtime::BuildEditorDomainWindowModel(
+                context.SnapshotQueries,
+                kind,
+                context.ModelBuildStats);
         }
         else if (context.ModelBuildStats != nullptr)
         {

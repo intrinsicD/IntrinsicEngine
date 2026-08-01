@@ -6,14 +6,14 @@ module;
 #include <utility>
 #include <vector>
 
-module Extrinsic.Runtime.Private.EditorFeatures;
+module Extrinsic.Runtime.RenderRecipeEditingOperations;
 
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.RenderArtifactPublication;
 
-namespace Extrinsic::Runtime::EditorFeatureDetail
+namespace Extrinsic::Runtime
 {
     namespace
     {
@@ -270,7 +270,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     EditorRenderRecipeEditorModel
-    BuildEditorRenderRecipeEditorModelImpl(const EditorFeatureBindings& context)
+    BuildEditorRenderRecipeEditorModel(const EditorRenderRecipeEditingContext& context)
     {
         EditorRenderRecipeEditorModel model{};
         if (context.RenderRecipeContext == nullptr)
@@ -424,8 +424,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     EditorRenderRecipeCommandResult
-    ApplyEditorRenderRecipeCommandImpl(
-        const EditorFeatureBindings& context,
+    ApplyEditorRenderRecipeCommand(
+        const EditorRenderRecipeEditingContext& context,
         const EditorRenderRecipeCommand& command)
     {
         EditorRenderRecipeEditorState* state =

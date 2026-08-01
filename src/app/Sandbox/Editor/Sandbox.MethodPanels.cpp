@@ -670,7 +670,8 @@ namespace Extrinsic::Sandbox::Editor
             {
                 model = Runtime::BuildEditorDomainWindowModel(
                     context.SnapshotQueries,
-                    kind);
+                    kind,
+                    context.ModelBuildStats);
             }
             else if (context.ModelBuildStats != nullptr)
             {

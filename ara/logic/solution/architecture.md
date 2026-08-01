@@ -45,7 +45,8 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp,
-  src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp,
+  src/runtime/Runtime.GeometryProcessingOperations.cpp,
+  src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp,
   tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
   docs/architecture/runtime.md,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]

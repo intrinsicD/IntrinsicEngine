@@ -11,11 +11,22 @@ import Extrinsic.Runtime.Private.EditorFeatures;
 import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 
 namespace Extrinsic::Runtime {
+namespace {
+EditorSceneEditingContext
+MakeExpiredSceneEditingContext(EditorSceneEditingContext context) {
+  context.AttachmentActive = [] { return false; };
+  return EditorFeatureDetail::MakeEditorSceneEditingContext(
+      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
+}
+} // namespace
+
 struct EditorSceneEditingCommands::State {
   explicit State(EditorSceneEditingContext context)
-      : Context(std::move(context)) {}
+      : Context(std::move(context)),
+        ExpiredContext(MakeExpiredSceneEditingContext(Context)) {}
 
   EditorSceneEditingContext Context{};
+  EditorSceneEditingContext ExpiredContext{};
 };
 
 EditorSceneEditingCommands::EditorSceneEditingCommands(
@@ -29,9 +40,10 @@ bool EditorSceneEditingCommands::IsBound() const noexcept {
 
 const EditorSceneEditingContext *EditorSceneEditingCommandsAccess::Resolve(
     const EditorSceneEditingCommands &commands) noexcept {
-  return commands.IsBound() && commands.m_State != nullptr
-             ? &commands.m_State->Context
-             : nullptr;
+  if (commands.m_State == nullptr)
+    return nullptr;
+  return commands.IsBound() ? &commands.m_State->Context
+                            : &commands.m_State->ExpiredContext;
 }
 
 namespace {
@@ -89,82 +101,6 @@ EditorSceneEditingPreparedFrame PrepareEditorSceneEditingFrame(
         }
       });
   return prepared;
-}
-
-const char *
-DebugNameForEditorAssetPayloadKind(EditorAssetPayloadKind kind) noexcept {
-  return EditorFeatureDetail::DebugNameForEditorAssetPayloadKindImpl(kind);
-}
-
-const char *
-DebugNameForEditorPrimitiveKind(RefinedPrimitiveKind kind) noexcept {
-  return EditorFeatureDetail::DebugNameForEditorPrimitiveKindImpl(kind);
-}
-
-const char *DebugNameForEditorCameraControllerKind(
-    Core::Config::CameraControllerKind kind) noexcept {
-  return EditorFeatureDetail::DebugNameForEditorCameraControllerKindImpl(kind);
-}
-
-bool SelectEditorEntity(const EditorSceneEditingContext &context,
-                        std::uint32_t stableEntityId) {
-  return EditorFeatureDetail::SelectEditorEntityImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context),
-      stableEntityId);
-}
-
-EditorFileImportResult
-ApplyEditorFileImportCommand(const EditorSceneEditingContext &context,
-                             const EditorFileImportCommand &command) {
-  return EditorFeatureDetail::ApplyEditorFileImportCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), command);
-}
-
-EditorSceneFileResult
-ApplyEditorSceneSaveCommand(const EditorSceneEditingContext &context,
-                            const EditorSceneFileCommand &command) {
-  return EditorFeatureDetail::ApplyEditorSceneSaveCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), command);
-}
-
-EditorSceneFileResult
-ApplyEditorSceneLoadCommand(const EditorSceneEditingContext &context,
-                            const EditorSceneFileCommand &command) {
-  return EditorFeatureDetail::ApplyEditorSceneLoadCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), command);
-}
-
-EditorSceneFileResult
-ApplyEditorNewSceneCommand(const EditorSceneEditingContext &context) {
-  return EditorFeatureDetail::ApplyEditorNewSceneCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
-}
-
-EditorSceneFileResult
-ApplyEditorCloseSceneCommand(const EditorSceneEditingContext &context) {
-  return EditorFeatureDetail::ApplyEditorCloseSceneCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
-}
-
-EditorCommandStatus
-ApplyEditorTransformEdit(const EditorSceneEditingContext &context,
-                         const EditorTransformEditCommand &command) {
-  return EditorFeatureDetail::ApplyEditorTransformEditImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), command);
-}
-
-EditorCommandStatus ApplyEditorCameraControllerCommand(
-    const EditorSceneEditingContext &context,
-    const EditorCameraControllerCommand &command) {
-  return EditorFeatureDetail::ApplyEditorCameraControllerCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), command);
-}
-
-EditorCommandStatus
-ApplyEditorPrimitiveViewCommand(const EditorSceneEditingContext &context,
-                                const EditorPrimitiveViewCommand &command) {
-  return EditorFeatureDetail::ApplyEditorPrimitiveViewCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), command);
 }
 
 bool SelectEditorEntity(const EditorSceneEditingCommands &commands,

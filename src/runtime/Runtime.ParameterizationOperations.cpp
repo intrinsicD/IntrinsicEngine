@@ -21,7 +21,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.Private.EditorFeatures;
+module Extrinsic.Runtime.GeometryProcessingOperations;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -37,9 +37,9 @@ import Geometry.Parameterization;
 import Geometry.Properties;
 
 #include "Runtime.EditorMutation.Internal.hpp"
-#include "internal/Runtime.EditorFeatures.Detail.hpp"
+#include "Runtime.GeometryProcessingOperations.Internal.hpp"
 
-namespace Extrinsic::Runtime::EditorFeatureDetail
+namespace Extrinsic::Runtime
 {
     namespace
     {
@@ -336,7 +336,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         [[nodiscard]] bool IsSerializableParameterizationConfigValid(
             const ParameterizationConfig& config)
         {
-            if (StableTokenForEditorParameterizationStrategyImpl(
+            if (StableTokenForEditorParameterizationStrategy(
                     config.Strategy).empty())
             {
                 return false;
@@ -678,7 +678,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
 
         [[nodiscard]] bool RestoreDeletedVertexSlots(
-            Detail::EditorMeshSourceSnapshot& source,
+            GeometryProcessingDetail::EditorMeshSourceSnapshot& source,
             std::string& diagnostic)
         {
             if (source.DeletedVertices.size() != source.Mesh.VerticesSize())
@@ -713,7 +713,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 return EditorCommandHistoryStatus::MissingScene;
             entt::registry& raw = scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
-                Detail::ResolveEditorStableEntity(raw, stableEntityId);
+                GeometryProcessingDetail::ResolveEditorStableEntity(raw, stableEntityId);
             if (!entity.has_value())
                 return EditorCommandHistoryStatus::StaleEntity;
 
@@ -765,7 +765,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         {
             entt::registry& raw = scene.Raw();
             const std::optional<ECS::EntityHandle> entity =
-                Detail::ResolveEditorStableEntity(
+                GeometryProcessingDetail::ResolveEditorStableEntity(
                     raw,
                     stableEntityId);
             if (!entity.has_value())
@@ -775,7 +775,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
 
         [[nodiscard]] EditorCommandStatus CommitUvState(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             const std::uint32_t stableEntityId,
             const std::uint64_t expectedGeometryMetadataSignature,
             ParameterizationSourceSnapshot expectedSource,
@@ -785,7 +785,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             if (context.CommandHistory == nullptr)
             {
                 const EditorCommandStatus status =
-                    Detail::ToEditorMethodCommandStatus(
+                    GeometryProcessingDetail::ToEditorMethodCommandStatus(
                         ApplyUvState(
                             context.Scene,
                             stableEntityId,
@@ -795,7 +795,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     StampUvStateDirty(
                         *context.Scene,
                         stableEntityId);
-                    Detail::InvalidateEditorSelectedModelCache(context);
+                    if (context.InvalidateWorkspaceSnapshotCache)
+                        context.InvalidateWorkspaceSnapshotCache();
                 }
                 return status;
             }
@@ -835,7 +836,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
                         entt::registry& raw = identity.Scene->Raw();
                         const std::optional<ECS::EntityHandle> entity =
-                            Detail::ResolveEditorStableEntity(
+                            GeometryProcessingDetail::ResolveEditorStableEntity(
                                 raw,
                                 identity.StableEntityId);
                         if (!entity.has_value())
@@ -851,7 +852,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                         }
                         if (expected.Source == nullptr || target == nullptr)
                             return EditorCommandHistoryStatus::CommandFailed;
-                        if (Detail::
+                        if (GeometryProcessingDetail::
                                 EditorGeometryMetadataSignatureForEntity(
                                     raw,
                                     *entity) !=
@@ -892,13 +893,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                             identity.StableEntityId);
                         entt::registry& raw = identity.Scene->Raw();
                         const std::optional<ECS::EntityHandle> entity =
-                            Detail::ResolveEditorStableEntity(
+                            GeometryProcessingDetail::ResolveEditorStableEntity(
                                 raw,
                                 identity.StableEntityId);
                         return ParameterizationMutationGeneration{
                             .GeometryMetadataSignature =
                                 entity.has_value()
-                                    ? Detail::
+                                    ? GeometryProcessingDetail::
                                           EditorGeometryMetadataSignatureForEntity(
                                               raw,
                                               *entity)
@@ -913,9 +914,10 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                         };
                     });
             const EditorCommandStatus status =
-                Detail::ToEditorMethodCommandStatus(history.Status);
+                GeometryProcessingDetail::ToEditorMethodCommandStatus(history.Status);
             if (status == EditorCommandStatus::Applied)
-                Detail::InvalidateEditorSelectedModelCache(context);
+                if (context.InvalidateWorkspaceSnapshotCache)
+                    context.InvalidateWorkspaceSnapshotCache();
             return status;
         }
 
@@ -930,7 +932,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 .StableEntityId = command.StableEntityId,
                 .Strategy = command.Config.Strategy,
                 .StrategyToken = std::string{
-                    StableTokenForEditorParameterizationStrategyImpl(
+                    StableTokenForEditorParameterizationStrategy(
                         command.Config.Strategy)},
                 .ParameterizationStatus = parameterizationStatus,
                 .Message = std::move(message),
@@ -938,7 +940,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
 
         [[nodiscard]] EditorParameterizationResult PublishResult(
-            const EditorFeatureBindings& context,
+            const EditorGeometryProcessingContext& context,
             EditorParameterizationResult result)
         {
             if (context.MethodResultSinks.Parameterization)
@@ -947,7 +949,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
     }
 
-    std::string_view StableTokenForEditorParameterizationStrategyImpl(
+    std::string_view StableTokenForEditorParameterizationStrategy(
         const EditorParameterizationStrategy strategy) noexcept
     {
         switch (strategy)
@@ -965,8 +967,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     EditorParameterizationResult
-    ApplyEditorParameterizationCommandImpl(
-        const EditorFeatureBindings& context,
+    ApplyEditorParameterizationCommand(
+        const EditorGeometryProcessingContext& context,
         const EditorParameterizationCommand& command)
     {
         const auto finish = [&context](EditorParameterizationResult result)
@@ -984,7 +986,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
         const auto strategy = ToGeometryStrategy(command.Config);
         if (!strategy.has_value() ||
-            StableTokenForEditorParameterizationStrategyImpl(
+            StableTokenForEditorParameterizationStrategy(
                 command.Config.Strategy).empty())
         {
             return finish(MakeResult(
@@ -996,7 +998,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
         entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
-            Detail::ResolveEditorStableEntity(
+            GeometryProcessingDetail::ResolveEditorStableEntity(
                 raw, command.StableEntityId);
         if (!entity.has_value())
         {
@@ -1044,12 +1046,12 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 "valid triangle topology."));
         }
         const std::uint64_t geometryMetadataSignature =
-            Detail::EditorGeometryMetadataSignatureForEntity(
+            GeometryProcessingDetail::EditorGeometryMetadataSignatureForEntity(
                 raw,
                 *entity);
 
-        Detail::EditorMeshSourceSnapshot source =
-            Detail::BuildEditorMeshSourceSnapshot(view);
+        GeometryProcessingDetail::EditorMeshSourceSnapshot source =
+            GeometryProcessingDetail::BuildEditorMeshSourceSnapshot(view);
         if (source.Status != EditorCommandStatus::Applied)
         {
             return finish(MakeResult(
@@ -1153,8 +1155,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     EditorParameterizationResult
-    ApplyEditorConfiguredParameterizationCommandImpl(
-        const EditorFeatureBindings& context,
+    ApplyEditorConfiguredParameterizationCommand(
+        const EditorGeometryProcessingContext& context,
         const EditorConfiguredParameterizationCommand& command)
     {
         if (context.EngineConfigControlState == nullptr)
@@ -1186,7 +1188,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     Parameterization::ParameterizationStatus::InvalidInput,
                     "Configured parameterization is missing its registered config section."));
         }
-        return ApplyEditorParameterizationCommandImpl(
+        return ApplyEditorParameterizationCommand(
             context,
             EditorParameterizationCommand{
                 .StableEntityId = command.StableEntityId,
@@ -1195,8 +1197,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     EditorParameterizationConfigResult
-    ApplyEditorParameterizationConfigCommandImpl(
-        const EditorFeatureBindings& context,
+    ApplyEditorParameterizationConfigCommand(
+        const EditorGeometryProcessingContext& context,
         const EditorParameterizationConfigCommand& command)
     {
         EditorParameterizationConfigResult result{};
@@ -1256,8 +1258,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     std::optional<ParameterizationConfig>
-    GetEditorParameterizationConfigImpl(
-        const EditorFeatureBindings& context) noexcept
+    GetEditorParameterizationConfig(
+        const EditorGeometryProcessingContext& context) noexcept
     {
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
@@ -1266,8 +1268,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     EditorParameterizationViewModel
-    BuildEditorParameterizationViewModelImpl(
-        const EditorFeatureBindings& context)
+    BuildEditorParameterizationViewModel(
+        const EditorGeometryProcessingContext& context)
     {
         EditorParameterizationViewModel model{};
         if (context.EngineConfigControlState != nullptr)
@@ -1297,7 +1299,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
         const entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
-            Detail::ResolveEditorStableEntity(
+            GeometryProcessingDetail::ResolveEditorStableEntity(
                 raw, model.SelectedStableEntityId);
         if (!entity.has_value())
         {
@@ -1437,8 +1439,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     }
 
     EditorParameterizationUvViewState
-    SubmitEditorParameterizationUvViewImpl(
-        const EditorFeatureBindings& context,
+    SubmitEditorParameterizationUvView(
+        const EditorGeometryProcessingContext& context,
         const EditorParameterizationViewModel& model,
         const std::uint32_t width,
         const std::uint32_t height)
@@ -1534,8 +1536,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             std::move(request));
     }
 
-    void DisableEditorParameterizationUvViewImpl(
-        const EditorFeatureBindings& context)
+    void DisableEditorParameterizationUvView(
+        const EditorGeometryProcessingContext& context)
     {
         if (!context.ParameterizationUvViewCommands.Available())
             return;
@@ -1543,7 +1545,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             EditorParameterizationUvViewRequest{});
     }
 
-    const char* DebugNameForEditorParameterizationUvViewStatusImpl(
+    const char* DebugNameForEditorParameterizationUvViewStatus(
         const EditorParameterizationUvViewStatus status) noexcept
     {
         switch (status)

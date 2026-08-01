@@ -24,13 +24,19 @@ maturity_target: Retired
 ## Status
 
 - Implementation and final verification are complete on 2026-08-01.
-  `BUG-125` retired the two diagnosed queued-import scheduling races. On the
-  merged source, the aggregate `IntrinsicTests` build, 194/194 focused
-  Sandbox/runtime/config tests, 4,010/4,010 default CPU tests, compile-hotspot
-  tooling tests, and all structural checks pass. The policy-defined GLFW/LSan
-  process test is skipped by the CPU selector. The task remains claimed on
-  `codex/runtime-202-retire-sandbox-facade` for independent fixed-surface
-  review and retirement bookkeeping.
+  `BUG-125` retired the two diagnosed queued-import scheduling races. The
+  corrected implementation physically owns scene, geometry, visualization,
+  render-recipe, and workspace-model bodies in their feature units; the
+  private session is limited to attachment epochs, retained job results, and
+  prepared-frame lifecycle. The aggregate `IntrinsicTests` build and all
+  4,010 default CPU tests pass, as do 2,664/2,664 ASan and 2,664/2,664 UBSan
+  tests and every strict structural check. The default CPU and UBSan selectors
+  contain the policy-defined GLFW/LSan self-skip; ASan executes that control.
+  An initial ASan pass reproduced the already-tracked `BUG-123` terminal-event
+  race once on an untouched scene-document path; the exact test then passed
+  20/20 and the complete ASan selector passed on rerun. The task remains
+  claimed on `codex/runtime-202-retire-sandbox-facade` for independent
+  fixed-surface review and retirement bookkeeping.
 - Re-gated on 2026-07-30: `RUNTIME-138` is no longer a prerequisite. Facade
   retirement must preserve the current selected-model cache and diagnostic
   behavior, migrate existing selection/property behavior to its feature
@@ -151,6 +157,12 @@ maturity_target: Retired
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'SandboxEditor|RuntimeContract|EngineConfig' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-asan --target IntrinsicCpuTests
+ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
+cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-ubsan --target IntrinsicCpuTests
+ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/docs/check_doc_links.py --root .

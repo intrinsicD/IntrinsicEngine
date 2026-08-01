@@ -11,11 +11,22 @@ import Extrinsic.Runtime.Private.EditorFeatures;
 import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 
 namespace Extrinsic::Runtime {
+namespace {
+EditorRenderRecipeEditingContext MakeExpiredRenderRecipeEditingContext(
+    EditorRenderRecipeEditingContext context) {
+  context.AttachmentActive = [] { return false; };
+  return EditorFeatureDetail::MakeEditorRenderRecipeEditingContext(
+      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
+}
+} // namespace
+
 struct EditorRenderRecipeEditingCommands::State {
   explicit State(EditorRenderRecipeEditingContext context)
-      : Context(std::move(context)) {}
+      : Context(std::move(context)),
+        ExpiredContext(MakeExpiredRenderRecipeEditingContext(Context)) {}
 
   EditorRenderRecipeEditingContext Context{};
+  EditorRenderRecipeEditingContext ExpiredContext{};
 };
 
 EditorRenderRecipeEditingCommands::EditorRenderRecipeEditingCommands(
@@ -30,9 +41,10 @@ bool EditorRenderRecipeEditingCommands::IsBound() const noexcept {
 const EditorRenderRecipeEditingContext *
 EditorRenderRecipeEditingCommandsAccess::Resolve(
     const EditorRenderRecipeEditingCommands &commands) noexcept {
-  return commands.IsBound() && commands.m_State != nullptr
-             ? &commands.m_State->Context
-             : nullptr;
+  if (commands.m_State == nullptr)
+    return nullptr;
+  return commands.IsBound() ? &commands.m_State->Context
+                            : &commands.m_State->ExpiredContext;
 }
 
 namespace {
@@ -82,58 +94,6 @@ EditorRenderRecipeEditingPreparedFrame PrepareEditorRenderRecipeEditingFrame(
             context.RenderRecipeCommandsAvailable;
       });
   return prepared;
-}
-
-std::string_view DebugNameForEditorRenderRecipeConfigState(
-    EditorRenderRecipeConfigState state) noexcept {
-  return EditorFeatureDetail::DebugNameForEditorRenderRecipeConfigStateImpl(
-      state);
-}
-
-std::string_view DebugNameForEditorRenderRecipeConfigDiagnosticCode(
-    EditorRenderRecipeConfigDiagnosticCode code) noexcept {
-  return EditorFeatureDetail::
-      DebugNameForEditorRenderRecipeConfigDiagnosticCodeImpl(code);
-}
-
-const char *DebugNameForEditorRenderRecipeDraftState(
-    EditorRenderRecipeDraftState state) noexcept {
-  return EditorFeatureDetail::DebugNameForEditorRenderRecipeDraftStateImpl(
-      state);
-}
-
-const char *DebugNameForEditorRenderRecipeCommandKind(
-    EditorRenderRecipeCommandKind kind) noexcept {
-  return EditorFeatureDetail::DebugNameForEditorRenderRecipeCommandKindImpl(
-      kind);
-}
-
-const char *DebugNameForEditorRenderRecipeCommandStatus(
-    EditorRenderRecipeCommandStatus status) noexcept {
-  return EditorFeatureDetail::DebugNameForEditorRenderRecipeCommandStatusImpl(
-      status);
-}
-
-EditorGpuProfilingConfigResult ApplyEditorGpuProfilingConfigCommand(
-    const EditorRenderRecipeEditingContext &context, bool enabled,
-
-    std::string sourceId) {
-  return EditorFeatureDetail::ApplyEditorGpuProfilingConfigCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), enabled,
-      sourceId);
-}
-
-EditorRenderRecipeEditorModel BuildEditorRenderRecipeEditorModel(
-    const EditorRenderRecipeEditingContext &context) {
-  return EditorFeatureDetail::BuildEditorRenderRecipeEditorModelImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
-}
-
-EditorRenderRecipeCommandResult
-ApplyEditorRenderRecipeCommand(const EditorRenderRecipeEditingContext &context,
-                               const EditorRenderRecipeCommand &command) {
-  return EditorFeatureDetail::ApplyEditorRenderRecipeCommandImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), command);
 }
 
 EditorGpuProfilingConfigResult ApplyEditorGpuProfilingConfigCommand(

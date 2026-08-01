@@ -3313,12 +3313,6 @@ namespace Extrinsic::Sandbox::Editor
                 LastFrame);
             DrawMainMenuBar(&Host->Windows());
             (void)Host->Windows().DrawOpenWindows();
-            const std::uint32_t domainWindowModelCacheHits =
-                LastFrame.ModelBuildStats.DomainWindowModelCacheHits;
-            LastFrame.ModelBuildStats =
-                prepared.Workspace.Frame.ModelBuildStats;
-            LastFrame.ModelBuildStats.DomainWindowModelCacheHits =
-                domainWindowModelCacheHits;
             ActivePreparedFrame.reset();
             ActiveContext.reset();
         }

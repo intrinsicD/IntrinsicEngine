@@ -123,15 +123,22 @@ target_sources(${target_name}
         Runtime.EditorWorkspaceAttachment.cpp
         Runtime.EditorJobProjection.Public.cpp
         Runtime.SceneEditingOperations.Public.cpp
+        Runtime.SceneEditingOperations.Actions.cpp
+        Runtime.SceneEditingOperations.Debug.cpp
         Runtime.GeometryProcessingOperations.Public.cpp
         Runtime.VisualizationEditingOperations.Public.cpp
+        Runtime.VisualizationEditingOperations.Actions.cpp
+        Runtime.VisualizationEditingOperations.Debug.cpp
         Runtime.RenderRecipeEditingOperations.Public.cpp
         Runtime.EditorWorkspaceSnapshots.Public.cpp
+        Runtime.EditorWorkspaceSnapshots.Models.cpp
         internal/Runtime.EditorFeatureContextAdapters.cpp
-        internal/Runtime.EditorWorkspaceSnapshots.cpp
+        internal/Runtime.EditorWorkspaceSession.cpp
         Runtime.GeometryProcessingOperations.cpp
+        Runtime.GeometryProcessingOperations.Mesh.cpp
         Runtime.ParameterizationOperations.cpp
         Runtime.RenderRecipeEditingOperations.cpp
+        Runtime.RenderRecipeEditingOperations.Debug.cpp
         Editor/Runtime.EditorPropertyWidgets.cpp
         Editor/Runtime.EditorUiHost.cpp
         Editor/Runtime.EditorUiModule.cpp

@@ -519,9 +519,12 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
 - `src/runtime/Runtime.GeometryProcessingOperations.cppm` and
   `src/runtime/Runtime.GeometryProcessingOperations.cpp` — the runtime-owned
   algorithm catalog, capability snapshots, and typed operations.
-- `src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp` — private
-  attachment/snapshot assembly and the ICP observer implementation used by the
-  typed registration operation.
+- `src/runtime/Runtime.GeometryProcessingOperations.cpp` and
+  `src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp` — typed geometry
+  operations, including the ICP observer and mesh-processing executors.
+- `src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp` and
+  `src/runtime/internal/Runtime.EditorWorkspaceSession.cpp` — presentation-free
+  workspace model assembly and the bounded attachment/job-result lifecycle.
 - `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp` — the current
   app-owned registration presentation/controller.
 - Historical pre-ARCH-006 anchor: the retired

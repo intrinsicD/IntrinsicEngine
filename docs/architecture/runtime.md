@@ -395,6 +395,13 @@ contracts. Their shared detail BMI is implementation-only and direct app
 imports are source-ratcheted. The app copies the prepared bindings/snapshot
 into `SandboxEditorContext` and `SandboxEditorFrame`, so Sandbox window and
 frame composition remain app-owned.
+Operation bodies compile with their owning feature modules. The private editor
+detail BMI contains only attachment bindings and the workspace-session
+declaration; its session implementation is limited to attachment epochs, job
+identity/result retention, and prepared-frame lifecycle. Presentation-free
+workspace model construction is a separate workspace implementation unit, and
+neutral service-to-feature-context projection remains an internal runtime
+composition adapter.
 
 `Extrinsic.Sandbox.Editor.Shell` owns hierarchy, inspector, selection,
 file/import, frame-graph, render-recipe/artifact, camera, and visualization

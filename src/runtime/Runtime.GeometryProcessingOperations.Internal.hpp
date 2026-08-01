@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Extrinsic::Runtime::EditorFeatureDetail::Detail
+namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
     struct EditorMeshSourceSnapshot
     {
@@ -11,8 +11,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail::Detail
         // Preserve the source slot for each resulting mesh face so callers
         // can project face diagnostics back onto the authoritative storage.
         std::vector<std::uint32_t> SourceFaceForMeshFace{};
-        EditorCommandStatus Status{
-            EditorCommandStatus::NoChange};
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Diagnostic{};
     };
@@ -29,17 +28,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail::Detail
 
     [[nodiscard]] EditorMeshSourceSnapshot
     BuildEditorMeshSourceSnapshot(
-        const Extrinsic::ECS::Components::GeometrySources::ConstSourceView& view);
-
-    void InvalidateEditorSelectedModelCache(
-        const EditorFeatureBindings& context);
-
-    // Geometry-processing operations share the workspace session's JobService-backed dedup
-    // query with the workspace job projection.
-    [[nodiscard]] std::optional<EditorJobRecord>
-    FindActiveEditorGeometryJob(
-        const EditorFeatureBindings& context,
-        const EditorJobIdentity& identity);
+        const ECS::Components::GeometrySources::ConstSourceView& view);
 
     [[nodiscard]] std::string BuildActiveEditorGeometryJobMessage(
         std::string_view label,
@@ -47,5 +36,4 @@ namespace Extrinsic::Runtime::EditorFeatureDetail::Detail
 
     [[nodiscard]] EditorCommandStatus
     ToEditorMethodCommandStatus(EditorCommandHistoryStatus status) noexcept;
-
 }

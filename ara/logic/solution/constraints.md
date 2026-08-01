@@ -148,7 +148,8 @@
   touching the prior engine or publishing into the new attachment.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp,
+- **Evidence**: [src/runtime/internal/Runtime.EditorWorkspaceSession.cpp,
+  src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp,
   tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
@@ -249,8 +250,8 @@
   matches canonical topology-to-face indices, vertex positions, and UV values.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/internal/Runtime.EditorFeatures.Detail.hpp,
-  src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp,
+- **Evidence**: [src/runtime/Runtime.GeometryProcessingOperations.Internal.hpp,
+  src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp,
   src/runtime/Runtime.ParameterizationOperations.cpp,
   tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/GRAPHICS-122-uv-view-offscreen-render-target.md,

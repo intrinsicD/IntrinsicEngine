@@ -51,26 +51,6 @@ BindEditorWorkspaceSnapshotQueries(EditorWorkspaceSnapshotContext context) {
           std::move(context))};
 }
 
-EditorWorkspaceSnapshot
-BuildEditorWorkspaceSnapshot(const EditorWorkspaceSnapshotContext &context) {
-  return EditorFeatureDetail::BuildEditorWorkspaceSnapshotImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
-}
-
-EditorWorkspaceSnapshot
-BuildEditorWorkspaceSnapshot(const EditorWorkspaceSnapshotContext &context,
-                             const EditorWorkspaceSnapshotRequest &request) {
-  return EditorFeatureDetail::BuildEditorWorkspaceSnapshotImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), request);
-}
-
-EditorDomainWindowModel
-BuildEditorDomainWindowModel(const EditorWorkspaceSnapshotContext &context,
-                             EditorDomainWindowKind kind) {
-  return EditorFeatureDetail::BuildEditorDomainWindowModelImpl(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), kind);
-}
-
 EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
     const EditorWorkspaceSnapshotQueries &queries) {
   return BuildEditorWorkspaceSnapshot(ContextOrEmpty(queries));
@@ -84,8 +64,12 @@ EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
 
 EditorDomainWindowModel BuildEditorDomainWindowModel(
     const EditorWorkspaceSnapshotQueries &queries,
-    EditorDomainWindowKind kind) {
-  return BuildEditorDomainWindowModel(ContextOrEmpty(queries), kind);
+    EditorDomainWindowKind kind,
+    EditorWorkspaceSnapshotStats *modelBuildStats) {
+  EditorWorkspaceSnapshotContext context = ContextOrEmpty(queries);
+  if (modelBuildStats != nullptr)
+    context.Visualization.ModelBuildStats = modelBuildStats;
+  return BuildEditorDomainWindowModel(context, kind);
 }
 
 std::optional<EditorWorkspaceSnapshotPreparedFrame>

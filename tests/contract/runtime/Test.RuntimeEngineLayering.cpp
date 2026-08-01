@@ -1049,12 +1049,17 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp");
     const auto geometryOperations =
         ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.cpp");
+    const auto geometryMeshOperations =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp");
     const auto clusteringModule = ReadFile(
         RepoRoot() /
         "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp");
-    const auto workspaceOperations =
+    const auto workspaceSession =
         ReadFile(RepoRoot() /
-                 "src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp");
+                 "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
+    const auto editorContextAdapters =
+        ReadFile(RepoRoot() /
+                 "src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp");
     const auto assetWorkflow =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModule.cpp");
 
@@ -1094,14 +1099,14 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     // RUNTIME-194 Slice B5d moved all five desc factories to JobService. The
     // invariant under test is unchanged — every production async submission
     // carries its owning world scope.
-    EXPECT_EQ(CountOccurrences(workspaceOperations, "return DerivedJobDesc{"), 0u);
-    EXPECT_EQ(CountOccurrences(workspaceOperations, "return JobDesc{"), 5u);
-    EXPECT_EQ(CountOccurrences(workspaceOperations, ".Scope = context.World"), 5u);
+    EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return DerivedJobDesc{"), 0u);
+    EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return JobDesc{"), 5u);
+    EXPECT_EQ(CountOccurrences(geometryMeshOperations, ".Scope = context.World"), 5u);
     EXPECT_EQ(CountOccurrences(
-                  workspaceOperations,
+                  workspaceSession,
                   "desc.Scope = m_Worlds->ActiveWorld()"),
               1u);
-    EXPECT_NE(WithoutWhitespace(workspaceOperations).find(".World=activeWorld"),
+    EXPECT_NE(WithoutWhitespace(editorContextAdapters).find(".World=activeWorld"),
               std::string::npos);
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".World = BoundWorld"), 2u);
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".Worlds = Worlds"), 1u);
@@ -1117,7 +1122,7 @@ TEST(RuntimeEngineLayering, SandboxEditorJobsUseSingleJobServiceSurface)
                  "src/runtime/Runtime.EditorJobProjection.cppm");
     const auto editorImplementation =
         ReadFile(RepoRoot() /
-                 "src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp");
+                 "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
     const auto methodImplementation =
         ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.cpp");
 
@@ -2037,11 +2042,13 @@ TEST(RuntimeEngineLayering,
 // cannot reappear.
 TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
 {
-    const std::array<std::filesystem::path, 5> sources{
+    const std::array<std::filesystem::path, 7> sources{
         RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cppm",
         RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cpp",
         RepoRoot() / "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm",
-        RepoRoot() / "src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp",
+        RepoRoot() / "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp",
+        RepoRoot() / "src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+        RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp",
         RepoRoot() / "src/runtime/Runtime.TextureBakeModule.cpp",
     };
 

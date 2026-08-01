@@ -597,6 +597,7 @@ export namespace Extrinsic::Runtime
         EditorWorkspaceSnapshotStats* ModelBuildStats{nullptr};
         std::function<bool()> AttachmentActive{};
         std::function<void()> InvalidateWorkspaceSnapshotCache{};
+        bool OperationalGpuAvailable{false};
         bool VisualizationCommandsAvailable{false};
     };
 
@@ -632,6 +633,13 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] bool
     IsEditorTextureBakeServiceAttached(const EditorVisualizationEditingContext& context) noexcept;
+
+    [[nodiscard]] EditorTextureBakeControlsModel
+    BuildEditorTextureBakeControlsModel(
+        const EditorVisualizationEditingContext& context,
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const EditorPropertyCatalogModel& catalog,
+        std::uint32_t stableEntityId);
 
     EditorCommandStatus
     ApplyEditorRenderHintCommand(const EditorVisualizationEditingContext& context,

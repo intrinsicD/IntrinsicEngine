@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 73 |
+| `runtime` | 75 |
 
 ## Modules
 
@@ -360,6 +360,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommon` | `src/runtime/Runtime.EditorCommon.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorJobProjection` | `src/runtime/Runtime.EditorJobProjection.cppm` | `runtime` |
+| `Extrinsic.Runtime.EditorWorkspaceAttachment` | `src/runtime/Runtime.EditorWorkspaceAttachment.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWorkspaceSnapshots` | `src/runtime/Runtime.EditorWorkspaceSnapshots.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
 | `Extrinsic.Runtime.EngineConfigBoot` | `src/runtime/Runtime.EngineConfigBoot.cppm` | `runtime` |
@@ -405,6 +406,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.EditorFeatures` | `src/runtime/internal/Runtime.EditorFeatures.Detail.cppm` | `runtime` |
+| `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **380**
+Total modules: **382**

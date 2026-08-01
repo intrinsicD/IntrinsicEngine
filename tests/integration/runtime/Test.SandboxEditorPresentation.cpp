@@ -544,28 +544,43 @@ TEST(SandboxEditorPresentation,
         ReadRepositoryTextFile("src/app/Sandbox/Editor/Sandbox.EditorShell.cppm");
     const std::string detailContract =
         ReadRepositoryTextFile("src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
-    const std::string workspaceImplementation =
-        ReadRepositoryTextFile("src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp");
+    const std::string workspaceSession =
+        ReadRepositoryTextFile("src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
+    const std::string workspaceModels =
+        ReadRepositoryTextFile("src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp");
+    const std::string sceneActions =
+        ReadRepositoryTextFile("src/runtime/Runtime.SceneEditingOperations.Actions.cpp");
     const std::string geometryOperations =
         ReadRepositoryTextFile("src/runtime/Runtime.GeometryProcessingOperations.cpp");
+    const std::string geometryMeshOperations =
+        ReadRepositoryTextFile("src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp");
+    const std::string visualizationActions =
+        ReadRepositoryTextFile("src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp");
     const std::string renderRecipeOperations =
         ReadRepositoryTextFile("src/runtime/Runtime.RenderRecipeEditingOperations.cpp");
     const std::string runtimeCMake = ReadRepositoryTextFile("src/runtime/CMakeLists.txt");
     ASSERT_FALSE(appShell.empty());
     ASSERT_FALSE(appShellContract.empty());
     ASSERT_FALSE(detailContract.empty());
-    ASSERT_FALSE(workspaceImplementation.empty());
+    ASSERT_FALSE(workspaceSession.empty());
+    ASSERT_FALSE(workspaceModels.empty());
+    ASSERT_FALSE(sceneActions.empty());
     ASSERT_FALSE(geometryOperations.empty());
+    ASSERT_FALSE(geometryMeshOperations.empty());
+    ASSERT_FALSE(visualizationActions.empty());
     ASSERT_FALSE(renderRecipeOperations.empty());
 
-    constexpr std::string_view kMeansDefinition = "ApplyEditorKMeansCommand(";
-    constexpr std::string_view clusteringConfigDefinition = "ApplyEditorClusteringConfigImpl(";
-    constexpr std::string_view poissonDefinition = "ApplyEditorProgressivePoissonCommandImpl(";
+    constexpr std::string_view clusteringConfigDefinition =
+        "ApplyEditorClusteringConfig(";
+    constexpr std::string_view poissonDefinition =
+        "ApplyEditorProgressivePoissonCommand(";
+    constexpr std::string_view meshDenoiseDefinition =
+        "ApplyEditorMeshDenoiseCommand(";
     constexpr std::string_view renderRecipeDefinition =
         "EditorRenderRecipeEditorModel\n"
-        "    BuildEditorRenderRecipeEditorModelImpl(";
+        "    BuildEditorRenderRecipeEditorModel(";
     constexpr std::string_view renderRecipeCommand = "EditorRenderRecipeCommandResult\n"
-                                                     "    ApplyEditorRenderRecipeCommandImpl(";
+                                                     "    ApplyEditorRenderRecipeCommand(";
     EXPECT_NE(appShell.find("#include <imgui.h>"), std::string::npos);
     EXPECT_NE(appShell.find("DrawMainMenuBar("), std::string::npos);
     EXPECT_NE(appShellContract.find("struct SandboxEditorContext final"), std::string::npos);
@@ -583,21 +598,49 @@ TEST(SandboxEditorPresentation,
     EXPECT_NE(
         appShellContract.find("struct SandboxEditorFrame final : Runtime::EditorWorkspaceSnapshot"),
         std::string::npos);
-    EXPECT_NE(appShell.find("LastFrame = SandboxEditorFrame{frame.Frame}"), std::string::npos);
+    EXPECT_NE(appShell.find(
+                  "LastFrame = SandboxEditorFrame{prepared.Workspace.Frame}"),
+              std::string::npos);
     EXPECT_EQ(detailContract.find("#include <imgui.h>"), std::string::npos);
-    EXPECT_EQ(workspaceImplementation.find("ImGui::"), std::string::npos);
-    EXPECT_EQ(workspaceImplementation.find(kMeansDefinition), std::string::npos);
-    EXPECT_EQ(workspaceImplementation.find(renderRecipeDefinition), std::string::npos);
-    EXPECT_EQ(workspaceImplementation.find(renderRecipeCommand), std::string::npos);
-    EXPECT_EQ(geometryOperations.find(kMeansDefinition), std::string::npos);
+    EXPECT_EQ(workspaceSession.find("ImGui::"), std::string::npos);
+    for (const std::string_view forbidden :
+         {"import Geometry.",
+          "import Extrinsic.RHI.CommandContext;",
+          "import Extrinsic.RHI.Device;",
+          "import Extrinsic.Runtime.TextureBakeModule;"})
+    {
+        EXPECT_EQ(workspaceSession.find(forbidden), std::string::npos)
+            << forbidden;
+    }
+    for (const std::string_view privateOperationPrefix :
+         {"ApplyEditor", "BuildEditor", "GetEditor", "SubmitEditor",
+          "ResolveEditor", "RenameEditor", "RemoveEditor",
+          "DebugNameForEditor"})
+    {
+        EXPECT_EQ(detailContract.find(privateOperationPrefix), std::string::npos)
+            << privateOperationPrefix;
+    }
+    EXPECT_LT(std::ranges::count(workspaceSession, '\n'), 1'000);
+    EXPECT_NE(workspaceModels.find("BuildEditorWorkspaceSnapshotFromBindings("),
+              std::string::npos);
+    EXPECT_NE(sceneActions.find("ApplyEditorFileImportCommand("),
+              std::string::npos);
     EXPECT_NE(geometryOperations.find(clusteringConfigDefinition), std::string::npos);
     EXPECT_NE(geometryOperations.find(poissonDefinition), std::string::npos);
+    EXPECT_NE(geometryMeshOperations.find(meshDenoiseDefinition),
+              std::string::npos);
+    EXPECT_NE(visualizationActions.find("ApplyEditorTextureBakeCommand("),
+              std::string::npos);
     EXPECT_NE(renderRecipeOperations.find(renderRecipeDefinition), std::string::npos);
     EXPECT_NE(renderRecipeOperations.find(renderRecipeCommand), std::string::npos);
     EXPECT_EQ(runtimeCMake.find("Runtime.SandboxMethodFacade.cpp"), std::string::npos);
     EXPECT_NE(runtimeCMake.find("Modules/Clustering/Runtime.ClusteringModule.cpp"),
               std::string::npos);
     EXPECT_NE(runtimeCMake.find("Runtime.RenderRecipeEditingOperations.cpp"), std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.EditorWorkspaceSnapshots.Models.cpp"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("internal/Runtime.EditorWorkspaceSession.cpp"),
+              std::string::npos);
     const auto firstPrivateSourceSet = runtimeCMake.find("\n        PRIVATE\n");
     ASSERT_NE(firstPrivateSourceSet, std::string::npos);
     const std::string_view publicRuntimeSources{runtimeCMake.data(), firstPrivateSourceSet};
@@ -612,13 +655,13 @@ TEST(SandboxEditorPresentation,
               std::string::npos);
     EXPECT_NE(runtimeCMake.find("PRIVATE\n        FILE_SET editor_feature_impl TYPE CXX_MODULES"),
               std::string::npos);
-    EXPECT_NE(workspaceImplementation.find("SubscribeRunCompleted("), std::string::npos);
-    EXPECT_NE(workspaceImplementation.find("AttachmentEpochIsActive(epoch)"), std::string::npos);
-    EXPECT_NE(workspaceImplementation.find("m_LastKMeansResult.reset()"), std::string::npos);
+    EXPECT_NE(workspaceSession.find("SubscribeRunCompleted("), std::string::npos);
+    EXPECT_NE(workspaceSession.find("AttachmentEpochIsActive(epoch)"), std::string::npos);
+    EXPECT_NE(workspaceSession.find("m_LastKMeansResult.reset()"), std::string::npos);
     EXPECT_EQ(geometryOperations.find("HasInFlightJob()"), std::string::npos);
     EXPECT_EQ(geometryOperations.find("m_KMeansGpuJobs"), std::string::npos);
 
-    constexpr std::array<std::string_view, 12> retiredFiles{{
+    constexpr std::array<std::string_view, 14> retiredFiles{{
         "src/runtime/Runtime.SandboxEditorFacades.cppm",
         "src/runtime/Runtime.SandboxEditorFacades.cpp",
         "src/runtime/Runtime.SandboxEditorFacades.Internal.hpp",
@@ -631,22 +674,26 @@ TEST(SandboxEditorPresentation,
         "src/runtime/Runtime.SandboxDefaultPolicies.cpp",
         "src/runtime/Runtime.RegistrationAlignment.cppm",
         "src/runtime/Runtime.RegistrationAlignment.cpp",
+        "src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp",
+        "src/runtime/internal/Runtime.EditorFeatures.Detail.hpp",
     }};
     for (const std::string_view retiredFile : retiredFiles)
     {
         EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} / retiredFile))
             << retiredFile;
-        EXPECT_EQ(runtimeCMake.find(std::filesystem::path{retiredFile}.filename().string()),
-                  std::string::npos)
+        const std::string retiredCMakeEntry =
+            "\n        " + std::filesystem::path{retiredFile}.filename().string() + "\n";
+        EXPECT_EQ(runtimeCMake.find(retiredCMakeEntry), std::string::npos)
             << retiredFile;
     }
     EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} /
                                          "tests/unit/runtime/Test.RegistrationAlignment.cpp"));
 
-    constexpr std::array<std::string_view, 10> allowedPrivateImporters{{
+    constexpr std::array<std::string_view, 13> allowedPrivateImporters{{
         "Runtime.EditorCommon.Public.cpp",
         "Runtime.EditorJobProjection.Public.cpp",
         "Runtime.EditorWorkspaceSnapshots.Public.cpp",
+        "Runtime.EditorWorkspaceSnapshots.Models.cpp",
         "Runtime.SceneEditingOperations.Public.cpp",
         "Runtime.GeometryProcessingOperations.Public.cpp",
         "Runtime.VisualizationEditingOperations.Public.cpp",
@@ -654,6 +701,8 @@ TEST(SandboxEditorPresentation,
         "Runtime.ProgressivePoissonConfig.cpp",
         "Runtime.ParameterizationConfig.cpp",
         "Runtime.ClusteringConfig.cpp",
+        "Runtime.EditorWorkspaceAttachment.Detail.cppm",
+        "Runtime.EditorWorkspaceAttachment.cpp",
     }};
     const std::filesystem::path runtimeRoot =
         std::filesystem::path{ENGINE_ROOT_DIR} / "src/runtime";

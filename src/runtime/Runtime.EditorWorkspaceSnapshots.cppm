@@ -276,7 +276,8 @@ export namespace Extrinsic::Runtime
         const EditorWorkspaceSnapshotRequest& request);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotQueries& queries,
-        EditorDomainWindowKind kind);
+        EditorDomainWindowKind kind,
+        EditorWorkspaceSnapshotStats* modelBuildStats = nullptr);
 
     struct EditorWorkspaceSnapshotPreparedFrame
     {
