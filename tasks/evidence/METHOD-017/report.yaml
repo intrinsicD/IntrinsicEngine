@@ -1,0 +1,161 @@
+schema_version: 1
+task_id: METHOD-017
+workflow_profile: claim-grade
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T15:20:13Z'
+claim_eligible: true
+source:
+  base_ref: f2ba8242
+  base_revision: f2ba8242dc7a80378cd53cfa3a622294eff7d538
+  head_revision: f3babc0749599fc345b0b39ece33c956fc26b543
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: bc7719a4a77c236bbf5db30e081c0594c1aadb4f742b4a6746813977dcc5a511
+  - path: ara/staging/observations.yaml
+    sha256: 21d622039eeb5db85d1eef232868d92c041a69f7bc23f3a64f33954ad9dba3cc
+  - path: benchmarks/CMakeLists.txt
+    sha256: 51ab46c1e479e9942c993283aac24631b0b3c8755f34f885cd2db073d3dea8db
+  - path: benchmarks/geometry/Bench.ContinuousLopReferenceSmoke.hpp
+    sha256: 67bc7a28cd7a28d6e7bfbdc4f805d778b56d5440671861126234dc20b393aaa4
+  - path: benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp
+    sha256: 1c3b50b35a5f7e6c154414fd2c0dcb4f0d9b25f74967c4fdde3c7654d47da289
+  - path: benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml
+    sha256: 9e0c41a9efb44df2a07869610a2a8ea468308d3c7d92ea7c32231fa3f10047d4
+  - path: benchmarks/runners/BenchmarkSmokeRunner.cpp
+    sha256: 02071039a59171578be846387b7b946d6b568afdce5c91f45691e7d054587625
+  - path: docs/architecture/geometry.md
+    sha256: 9e806e27e4086f447d43e47b610e2fc4baf3f6eb72bb168af9fa2ea3dab171ea
+  - path: methods/geometry/continuous_lop/README.md
+    sha256: 10d88c5271aa05773aebb3621f83119d512038e6aaff4c1638e9f43d3c66d391
+  - path: methods/geometry/continuous_lop/benchmarks/README.md
+    sha256: 1d2726591a51df58e8afbcd52859e543494c13b781bb89b0c01d53664931bf21
+  - path: methods/geometry/continuous_lop/include/README.md
+    sha256: 836696267f59f77d631da93168b578a6befc2c00b9cfe709572cbc170e4d6de6
+  - path: methods/geometry/continuous_lop/method.yaml
+    sha256: f98eb3bd704eab13c60f786363ee5ed4e1fdf3be42532f9896d364614e5c67ab
+  - path: methods/geometry/continuous_lop/paper.md
+    sha256: b9823663df00e605460fec58607eedd360a7467fbe6335afdd8b4f6ff9b107e8
+  - path: methods/geometry/continuous_lop/reports/README.md
+    sha256: c736d06444ffb0963177bd42f9dc49dc253f44c96795c132d04868df86dba1eb
+  - path: methods/geometry/continuous_lop/src/README.md
+    sha256: 03cbd46f100bfdc5b9436f23772de7356abb3f3668c3a01063691cc235c3311a
+  - path: methods/geometry/continuous_lop/tests/README.md
+    sha256: 22e56e0e4f6500012479c7f49c4225c078fcca3941077542986767c693296ce9
+  - path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+    sha256: afb4485672f7fb2c88ced7e0104d6a02bc72ab0b4a7488e577da5f60b72dbec2
+  - path: src/geometry/Geometry.PointCloud.Consolidation.cppm
+    sha256: 1e9bafd3cfd519c949b37b5de237715f8c46f94d0932143da74f71f3ebcd5a62
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 6652e524246bfc381c4c23dd0f62ef9881361c3137cf83165b85127c4ec862a1
+  - path: tasks/backlog/methods/README.md
+    sha256: c41e87cff1d7baecb29d95509bb399cf94cf4d4aede7ad6387da9d7c9b8e146f
+  - path: tasks/done/METHOD-017-continuous-lop-clop-reference-backend.md
+    sha256: 694bf66bf1383ace12c9015414a59d3883ff9d05fb36fae586caa638a6212aa5
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: e7d46d1ebe3a61737c464d125087869ccee3a87a5f5fd1534fc54bb3aa6b7817
+  - path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: c83ca9f02295b681d885244b3460f68d243fd858b23a75f1b491c5832e06d490
+  content_digest: f8b878426e50fa567a3b110128c963c49fc030faef3e505b977594407d7c4045
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - benchmarks/CMakeLists.txt
+  - benchmarks/geometry/Bench.ContinuousLopReferenceSmoke.hpp
+  - benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp
+  - benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml
+  - benchmarks/runners/BenchmarkSmokeRunner.cpp
+  - docs/architecture/geometry.md
+  - methods/geometry/continuous_lop/README.md
+  - methods/geometry/continuous_lop/benchmarks/README.md
+  - methods/geometry/continuous_lop/include/README.md
+  - methods/geometry/continuous_lop/method.yaml
+  - methods/geometry/continuous_lop/paper.md
+  - methods/geometry/continuous_lop/reports/README.md
+  - methods/geometry/continuous_lop/src/README.md
+  - methods/geometry/continuous_lop/tests/README.md
+  - src/geometry/Geometry.PointCloud.Consolidation.cpp
+  - src/geometry/Geometry.PointCloud.Consolidation.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/methods/README.md
+  - tasks/done/METHOD-017-continuous-lop-clop-reference-backend.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  layers:
+  - geometry
+  modules:
+  - Geometry.PointCloud.Consolidation
+extension_seam: Typed ClopStrategy in the existing Consolidate API; no backend registry or second result
+  type.
+future_change_plan: METHOD-018 adds the literature-bounded EAR strategy; RUNTIME-175 composes all strategies
+  through one runtime/config operation.
+acceptance:
+- criterion: '`Clop` is selectable on the shared `ConsolidationParams::Strategy` axis alongside `Wlop`/`Lop`.'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: All correctness tests (including WLOP parity) pass in the default CPU gate.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Benchmark smoke manifest validates and runs.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Emitted smoke result validates and reports quality/convergence
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Public API exposes only `std`/`glm`/scalar types; the `GEOM-058` mixture backs the density
+    model (no private Gaussian/EM code).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/METHOD-017/commands/custody-replay.json
+changed_public_contracts:
+- Deterministic fail-closed cpu_reference ClopStrategy with explicit Gaussian-mixture parameters and pointer-free
+  diagnostics.
+diagnostics_and_previews:
+- Status, strategy, contribution counts, fitted component count, convergence, displacement, resource limit,
+  and implementation identity remain explicit.
+benchmark_or_parity_evidence:
+- 'tasks/evidence/METHOD-017/experiment/runs/run-001/bundle.yaml: independently accepted quality_error_l2
+  0.015830867 <= 0.03 with all declared parity/work/failure gates passing.'
+docs_sync:
+  task_file: tasks/done/METHOD-017-continuous-lop-clop-reference-backend.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Analytic fixtures bound the original CLOP equation with ordinary EM only; no hierarchical-EM equivalence,
+  scanner-data, incomplete-gamma, performance, runtime/UI, optimized, or GPU generalization.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json
+  sha256: 769abc0800102aeb6d8d713811034f25823595a67f2635baca6788dfc407b444
+  kind: file
+- path: tasks/evidence/METHOD-017/experiment/runs/run-001/bundle.yaml
+  sha256: 9f45b7cef46a65d510f46537ffdb11bda7701fba5f660657cd5193d51d524941
+  kind: file
+- path: tasks/evidence/METHOD-017/experiment/runs/run-001/audit.json
+  sha256: e3d8c0466415b58ab0ba8eaeb8c7859bea66a5030d2ac222631ee2aaf1a656a7
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/METHOD-017/handoff.jsonl
+review: tasks/evidence/METHOD-017/reviews.jsonl
+experiment_root: tasks/evidence/METHOD-017/experiment
