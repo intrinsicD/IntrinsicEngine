@@ -51,3 +51,11 @@ The confirmation smoke uses a distinct built-in noisy dihedral cohort and
 records the isotropic WLOP contrast, expected-plane error, retained normal
 angle, output count, feature-directed insertions, spacing, normal source,
 determinism, and fail-closed identity. Its runtime is descriptive only.
+
+## Runtime integration
+
+Select `ear` (or anisotropic `wlop`) in
+`sandbox.point_cloud_consolidation`. The runtime operation honors the same
+authored-or-estimated normal policy, runs the CPU reference asynchronously,
+and publishes the pointer-free normal/refinement diagnostics with the undoable
+point-cloud mutation.

@@ -65,8 +65,9 @@ derived default frame recipe.
 
 `Extrinsic.Runtime.ClusteringConfig`,
 `Extrinsic.Runtime.ProgressivePoissonConfig`, and
-`Extrinsic.Runtime.ParameterizationConfig` own the typed codecs for the current
-three Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
+`Extrinsic.Runtime.ParameterizationConfig`, and
+`Extrinsic.Runtime.PointCloudConsolidationConfig` own the typed codecs for the current
+four Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
 registrations in the application before config boot. The
 `sandbox.progressive_poisson` payload carries the interactive playground's
 reference-sampler knobs, prefix/color-channel selection, mesh surface-sampling
@@ -88,6 +89,16 @@ state through `GetParameterizationConfig`; the parameterization editor reads
 the same view state when it submits the optional renderer request. There is no
 second UI-only parameter path, and the GPU view selector is not a
 parameterization solver-backend selector.
+
+The `sandbox.point_cloud_consolidation` payload carries the LOP/WLOP/CLOP/EAR
+strategy and the complete promoted CPU-reference parameter set, including the
+authored-or-estimated normal policy. Applying it mutates only the canonical
+generic section record. `PointCloudConsolidationService` snapshots the selected
+entity's `GeometrySources`, runs the chosen strategy on `JobService`, rejects a
+stale world/entity/source at main-thread completion, and commits a current
+result through one undoable geometry mutation. The pointer-free result reports
+the stable `cpu_reference` implementation identity and convergence diagnostics;
+there is no speculative backend selector.
 
 `render.enable_gpu_profiling` defaults to `false`. A changed value commits
 synchronously with the rest of the hot subset; it does not construct, destroy,
@@ -137,6 +148,12 @@ after feature preparation resolves `EngineConfigControl` from
   `RuntimeConfigControlSource::Editor` after
   `SetParameterizationConfig`; the configured parameterization operation and
   UV-view request path consume the resulting live config.
+- The point-cloud consolidation editor operation surface routes a complete
+  typed draft through `SetPointCloudConsolidationConfig`, preview, and hot
+  apply before submitting the same value to
+  `PointCloudConsolidationService`. `UI-035` owns its app presentation; file,
+  editor-operation, agent/CLI, and programmatic callers already share
+  validation and execution semantics.
 - The existing `view.frame_graph` panel reads
   `render.enable_gpu_profiling` from the control state and routes its toggle
   through `PreviewEngineConfigControlDocument` followed by

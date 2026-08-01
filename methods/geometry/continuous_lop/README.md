@@ -35,3 +35,10 @@ work; lowering it can blur thin sheets.
 
 - Correctness: `tests/unit/geometry/Test.PointCloudConsolidation.cpp`
 - Smoke: `benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml`
+
+## Runtime integration
+
+Select `clop` in the registered `sandbox.point_cloud_consolidation` section and
+submit through `Extrinsic.Runtime.PointCloudConsolidationService`. Runtime uses
+the same CPU-reference strategy, async snapshot/stale-result contract, and
+undoable `GeometrySources` publication as the LOP-family paths.

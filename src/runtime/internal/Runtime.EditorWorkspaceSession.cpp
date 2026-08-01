@@ -24,6 +24,7 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.ServiceRegistry;
@@ -331,6 +332,26 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         {
             m_ClusteringService = nullptr;
         }
+        m_PointCloudConsolidationService =
+            services.Find<PointCloudConsolidationService>();
+        if (m_PointCloudConsolidationService != nullptr &&
+            m_PointCloudConsolidationService->Available())
+        {
+            m_PointCloudConsolidationCompletionSubscription =
+                m_PointCloudConsolidationService->SubscribeCompleted(
+                    [epoch = m_AttachmentEpoch, this](
+                        const PointCloudConsolidationResult& completed)
+                    {
+                        if (!AttachmentEpochIsActive(epoch))
+                            return;
+                        m_LastPointCloudConsolidationResult = completed;
+                        m_SelectedModelCache.Clear();
+                    });
+        }
+        else
+        {
+            m_PointCloudConsolidationService = nullptr;
+        }
     }
 
     bool EditorWorkspaceSession::PrepareFrame(
@@ -429,6 +450,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 };
         }
         context.Clustering = m_ClusteringService;
+        context.PointCloudConsolidation =
+            m_PointCloudConsolidationService;
         context.MethodResultSinks.ProgressivePoisson =
             [epoch = m_AttachmentEpoch, this](
                 EditorProgressivePoissonResult result)
@@ -570,6 +593,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         if (m_LastParameterizationResult.has_value())
             context.LastParameterizationResult =
                 &*m_LastParameterizationResult;
+        if (m_LastPointCloudConsolidationResult.has_value())
+            context.LastPointCloudConsolidationResult =
+                &*m_LastPointCloudConsolidationResult;
         if (m_LastProgressivePoissonResult.has_value())
             context.LastProgressivePoissonResult =
                 &*m_LastProgressivePoissonResult;
@@ -686,6 +712,14 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             }
             m_KMeansCompletionSubscription = {};
             m_ClusteringService = nullptr;
+            if (m_PointCloudConsolidationService != nullptr &&
+                m_PointCloudConsolidationCompletionSubscription.IsValid())
+            {
+                m_PointCloudConsolidationService->Unsubscribe(
+                    m_PointCloudConsolidationCompletionSubscription);
+            }
+            m_PointCloudConsolidationCompletionSubscription = {};
+            m_PointCloudConsolidationService = nullptr;
             m_Jobs = nullptr;
             m_Worlds   = nullptr;
             m_Services = nullptr;
@@ -694,6 +728,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         {
             m_KMeansCompletionSubscription = {};
             m_ClusteringService = nullptr;
+            m_PointCloudConsolidationCompletionSubscription = {};
+            m_PointCloudConsolidationService = nullptr;
             m_Jobs = nullptr;
         }
         m_AttachmentEpoch.reset();
@@ -711,6 +747,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_LastImportResult.reset();
         m_LastSceneFileResult.reset();
         m_LastKMeansResult.reset();
+        m_LastPointCloudConsolidationResult.reset();
         m_LastMeshDenoiseResult.reset();
         m_LastMeshCurvatureResult.reset();
         m_LastMeshRemeshResult.reset();

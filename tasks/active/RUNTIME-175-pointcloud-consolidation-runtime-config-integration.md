@@ -77,7 +77,7 @@ maturity_target: Operational
   METHOD-019's optimized-CPU gates or METHOD-020's Vulkan parity gate.
 
 ## Required changes
-- [ ] Add a runtime-owned `PointCloudConsolidationConfig` value struct and let
+- [x] Add a runtime-owned `PointCloudConsolidationConfig` value struct and let
       Sandbox own only registration of its schema/default/validator through
       the generic CORE-009 section lane, matching the existing clustering,
       Progressive Poisson, and parameterization sections:
@@ -85,10 +85,10 @@ maturity_target: Operational
       shared/per-strategy parameters, including the EAR normal-source policy;
       deterministic defaults. Do not add the type or its fields to
       `Core.Config.Engine`.
-- [ ] Add the runtime-owned section codec/validator and app-owned registration;
+- [x] Add the runtime-owned section codec/validator and app-owned registration;
       let generic `Core.Config.EngineLoad` round-trip the opaque payload and
       generic `EngineConfigControl` report/dispatch the changed stable name.
-- [ ] Add feature-owned `PointCloudConsolidationRequest` /
+- [x] Add feature-owned `PointCloudConsolidationRequest` /
       `PointCloudConsolidationResult` records plus a narrow
       `PointCloudConsolidationService` / `PointCloudConsolidationModule` typed
       submit operation:
@@ -97,47 +97,57 @@ maturity_target: Operational
       back via `GeometrySources`/`PopulateFromCloud` +
       `MarkVertexPositionsDirty` through the common undoable mutation
       transaction.
-- [ ] Export a pointer-free
+- [x] Export a pointer-free
       `PointCloudConsolidationResult` record with stable
       `cpu_reference` implementation identity, the chosen strategy token, and
       convergence diagnostics (iterations, converged flag, moved distance).
-- [ ] Register the typed operation through `IRuntimeModule` bindings
+- [x] Register the typed operation through `IRuntimeModule` bindings
       (`CommandBus`, `KernelEventBus`, `JobService`, `WorldRegistry`, and the
       optional `EditorCommandHistory`) and compose the module/config handler in
       Sandbox so it is reachable from `Engine::Run()` without restoring a
       Sandbox facade.
 
 ## Tests
-- [ ] `tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp`
+- [x] `tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp`
       (`contract;runtime`): the runtime-owned section codec round-trips through
       the generic engine-config lane (parse → serialize → parse is stable) and
       rejects out-of-range values with explicit diagnostics.
-- [ ] `tests/contract/runtime/Test.PointCloudConsolidationModule.cpp`
+- [x] `tests/contract/runtime/Test.PointCloudConsolidationModule.cpp`
       (`contract;runtime`, Null device): the typed operation on a selected point
       cloud runs the selected CPU-reference strategy through `JobService`,
       updates positions, marks vertices dirty, rejects stale completion, and
       is undoable.
-- [ ] Apply-source parity: applying the same document via `Editor`, `AgentCli`, and `Programmatic` sources produces identical results (co-equal surfaces).
-- [ ] Determinism: identical config + input produce identical consolidated output.
+- [x] Apply-source parity: applying the same document via `Editor`, `AgentCli`, and `Programmatic` sources produces identical results (co-equal surfaces).
+- [x] Determinism: identical config + input produce identical consolidated output.
 
 ## Docs
-- [ ] Update `docs/architecture/engine-config.md` and `docs/architecture/runtime-config-control.md` with the new section and hot-apply entry.
-- [ ] Add a short runtime-integration note to the three method-package READMEs
+- [x] Update `docs/architecture/engine-config.md` and `docs/architecture/runtime-config-control.md` with the new section and hot-apply entry.
+- [x] Add a short runtime-integration note to the three method-package READMEs
       (`locally_optimal_projection`, `continuous_lop`,
       `edge_aware_resampling`) pointing at the typed runtime operation and
       config path.
-- [ ] Refresh `docs/api/generated/module_inventory.md` for the new runtime/app
+- [x] Refresh `docs/api/generated/module_inventory.md` for the new runtime/app
       module surfaces.
 
 ## Acceptance criteria
-- [ ] A selected point cloud is consolidated and visibly updated through the
+- [x] A selected point cloud is consolidated and visibly updated through the
       typed runtime operation with the CPU reference under the Null/default
       runtime.
 - [ ] The strategy and parameters are choosable from a config file, an
       agent/programmatic apply, and (via `UI-035`) the UI, all through one
       validated apply path with source tagging.
-- [ ] No requested-backend token or unavailable implementation is exposed.
-- [ ] Contract tests pass in the default CPU gate; layering holds (`runtime -> lower`, `core -> nothing`).
+- [x] No requested-backend token or unavailable implementation is exposed.
+- [x] Contract tests pass in the default CPU gate; layering holds (`runtime -> lower`, `core -> nothing`).
+
+## Implementation checkpoint (2026-08-01)
+
+- The runtime module, app-owned config registration, editor operation binding,
+  exact stale-source gate, undo/redo publication, source-parity coverage, and
+  deterministic runtime coverage are implemented.
+- Focused `ci-fast` runtime and Sandbox config suites pass. The remaining open
+  acceptance item is the app-owned presentation and headless panel contract in
+  `UI-035`; retirement evidence is intentionally deferred until that dependent
+  slice consumes this operation end to end.
 
 ## Verification
 ```bash

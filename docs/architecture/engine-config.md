@@ -110,6 +110,29 @@ imports the application DTO or field vocabulary.
             "degeneracy_tolerance": 1e-12
           }
         }
+      },
+      {
+        "name": "sandbox.point_cloud_consolidation",
+        "schema": "intrinsic.runtime.sandbox.point-cloud-consolidation",
+        "version": 1,
+        "payload": {
+          "strategy": "wlop",
+          "support_radius": 1.0,
+          "repulsion_weight": 0.45,
+          "max_iterations": 20,
+          "convergence_tolerance": 0.0001,
+          "target_point_count": 0,
+          "seed": 42,
+          "wlop_anisotropic": false,
+          "normal_source": "authored_or_estimate",
+          "normal_angle_radians": 0.2617993877991494,
+          "normal_refinement_rounds": 3,
+          "clop_mixture_component_count": 16,
+          "clop_mixture_max_iterations": 100,
+          "clop_mixture_relative_tolerance": 0.000001,
+          "clop_covariance_floor": 0.000001,
+          "ear_edge_sensitivity": 5.0
+        }
       }
     ]
   }
@@ -144,7 +167,9 @@ imports the application DTO or field vocabulary.
 The current Sandbox registrations validate the following payload fields. The
 table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 `poisson` and `app.sections[name=sandbox.parameterization].payload` as
-`parameterization`.
+`parameterization`, and
+`app.sections[name=sandbox.point_cloud_consolidation].payload` as
+`consolidation`.
 
 | Payload | Field | Values |
 |---|---|---|
@@ -177,6 +202,22 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `parameterization.bff` | `mode` | `automatic_conformal`, `target_lengths`, `target_angles` |
 | `parameterization.bff` | `boundary_data` | Finite number array interpreted as positive per-boundary-edge lengths or per-boundary-vertex exterior angles by `mode`; empty for `automatic_conformal`, non-empty for target modes, and target angles must sum to `2*pi` within `angle_sum_tolerance` |
 | `parameterization.bff` | `angle_sum_tolerance`, `degeneracy_tolerance` | Positive finite numbers no greater than `1e30` |
+| `consolidation` | `strategy` | `lop`, `wlop`, `clop`, `ear`; all select the promoted CPU-reference implementation |
+| `consolidation` | `support_radius` | Finite number in `[1e-12, 1e12]`, in input world units |
+| `consolidation` | `repulsion_weight` | Finite number in `[0, 0.499999999999]` |
+| `consolidation` | `max_iterations` | Integer in `[1, 4096]` |
+| `consolidation` | `convergence_tolerance` | Finite number in `[0, 1e12]` |
+| `consolidation` | `target_point_count` | `0` preserves input count; otherwise integer in `[2, 1000000]` |
+| `consolidation` | `seed` | Unsigned 32-bit integer used by deterministic initialization/subsampling |
+| `consolidation` | `wlop_anisotropic` | Boolean normal-aware WLOP weighting toggle |
+| `consolidation` | `normal_source` | `authored_or_estimate`, `require_authored` |
+| `consolidation` | `normal_angle_radians` | Finite number in `[1e-6, pi-1e-6]` |
+| `consolidation` | `normal_refinement_rounds` | Integer in `[1, 4096]`, no greater than `max_iterations` after validated fallback |
+| `consolidation` | `clop_mixture_component_count` | Integer in `[1, 1000000]` |
+| `consolidation` | `clop_mixture_max_iterations` | Integer in `[1, 4096]` |
+| `consolidation` | `clop_mixture_relative_tolerance` | Finite number in `[0, 1]` |
+| `consolidation` | `clop_covariance_floor` | Finite number in `[1e-18, 1e12]` |
+| `consolidation` | `ear_edge_sensitivity` | Finite number in `[1e-12, 1e6]` |
 
 Each application section is additive within engine schema version 1 and carries
 its own schema id/version. A document may omit a registered record and retain
@@ -196,9 +237,9 @@ solver selector while every implemented strategy is CPU-only.
 
 ### One-time Sandbox migration
 
-Files written before `CORE-009` placed the two payloads directly at
+Files written before `CORE-009` placed the earlier payloads directly at
 `sandbox.progressive_poisson` and `sandbox.parameterization`. Move those payload
-objects into the two `app.sections` records shown above and add each record's
+objects into their `app.sections` records shown above and add each record's
 name, schema, and version. Core intentionally has no legacy Sandbox parser: an
 old root-level `sandbox` field is diagnosed as unknown and the registered
 defaults remain authoritative.

@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 70 |
+| `runtime` | 72 |
 
 ## Modules
 
@@ -380,6 +380,8 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
 | `Extrinsic.Runtime.ParameterizationConfig` | `src/runtime/Runtime.ParameterizationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointCloudConsolidationConfig` | `src/runtime/Runtime.PointCloudConsolidationConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointCloudConsolidationModule` | `src/runtime/Runtime.PointCloudConsolidationModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
@@ -408,4 +410,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **381**
+Total modules: **383**

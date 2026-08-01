@@ -271,6 +271,8 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeRenderRecipeActivation.cpp
         Test.RuntimeCameraFocusCommand.cpp
         Test.ClusteringModule.cpp
+        Test.PointCloudConsolidationConfig.cpp
+        Test.PointCloudConsolidationModule.cpp
         Test.RuntimeCommandBus.cpp
         Test.RuntimeJobService.cpp
         Test.RuntimeKernelEvents.cpp

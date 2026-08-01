@@ -69,10 +69,13 @@ MakeEditorGeometryProcessingContext(const EditorFeatureBindings &bindings) {
       .CommandHistory = bindings.CommandHistory,
       .Device = bindings.Device,
       .Clustering = bindings.Clustering,
+      .PointCloudConsolidation = bindings.PointCloudConsolidation,
       .ParameterizationUvViewCommands = bindings.ParameterizationUvViewCommands,
       .JobCommands = bindings.JobCommands,
       .MethodResultSinks = bindings.MethodResultSinks,
       .LastKMeansResult = bindings.LastKMeansResult,
+      .LastPointCloudConsolidationResult =
+          bindings.LastPointCloudConsolidationResult,
       .LastMeshDenoiseResult = bindings.LastMeshDenoiseResult,
       .LastMeshCurvatureResult = bindings.LastMeshCurvatureResult,
       .LastMeshRemeshResult = bindings.LastMeshRemeshResult,
@@ -224,10 +227,13 @@ ToEditorFeatureBindingsImpl(const EditorGeometryProcessingContext &context) {
       .CommandHistory = context.CommandHistory,
       .Device = context.Device,
       .Clustering = context.Clustering,
+      .PointCloudConsolidation = context.PointCloudConsolidation,
       .ParameterizationUvViewCommands = context.ParameterizationUvViewCommands,
       .JobCommands = context.JobCommands,
       .MethodResultSinks = context.MethodResultSinks,
       .LastKMeansResult = context.LastKMeansResult,
+      .LastPointCloudConsolidationResult =
+          context.LastPointCloudConsolidationResult,
       .LastMeshDenoiseResult = context.LastMeshDenoiseResult,
       .LastMeshCurvatureResult = context.LastMeshCurvatureResult,
       .LastMeshRemeshResult = context.LastMeshRemeshResult,
@@ -351,11 +357,14 @@ ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
 
   bindings.Device = geometry.Device;
   bindings.Clustering = geometry.Clustering;
+  bindings.PointCloudConsolidation = geometry.PointCloudConsolidation;
   bindings.ParameterizationUvViewCommands =
       geometry.ParameterizationUvViewCommands;
   bindings.JobCommands = geometry.JobCommands;
   bindings.MethodResultSinks = geometry.MethodResultSinks;
   bindings.LastKMeansResult = geometry.LastKMeansResult;
+  bindings.LastPointCloudConsolidationResult =
+      geometry.LastPointCloudConsolidationResult;
   bindings.LastMeshDenoiseResult = geometry.LastMeshDenoiseResult;
   bindings.LastMeshCurvatureResult = geometry.LastMeshCurvatureResult;
   bindings.LastMeshRemeshResult = geometry.LastMeshRemeshResult;

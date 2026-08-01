@@ -515,6 +515,37 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<PointCloudConsolidationStrategy>
+        ParsePointCloudConsolidationStrategy(
+            const std::string_view value) noexcept
+        {
+            if (value == "lop")
+                return PointCloudConsolidationStrategy::Lop;
+            if (value == "wlop")
+                return PointCloudConsolidationStrategy::Wlop;
+            if (value == "clop")
+                return PointCloudConsolidationStrategy::Clop;
+            if (value == "ear")
+                return PointCloudConsolidationStrategy::Ear;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<PointCloudConsolidationNormalSource>
+        ParsePointCloudConsolidationNormalSource(
+            const std::string_view value) noexcept
+        {
+            if (value == "authored_or_estimate")
+            {
+                return PointCloudConsolidationNormalSource::
+                    AuthoredOrEstimate;
+            }
+            if (value == "require_authored")
+            {
+                return PointCloudConsolidationNormalSource::RequireAuthored;
+            }
+            return std::nullopt;
+        }
+
         [[nodiscard]] std::optional<KMeansInitialization>
         ParseKMeansInitialization(const std::string_view value) noexcept
         {
@@ -630,6 +661,18 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             case KMeansInitialization::Hierarchical: return "Hierarchical";
             }
             return "Hierarchical";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const PointCloudConsolidationStrategy value) noexcept
+        {
+            return StableToken(value);
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const PointCloudConsolidationNormalSource value) noexcept
+        {
+            return StableToken(value);
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -786,6 +829,205 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     config.Backend))
             {
                 CountParsed(context);
+            }
+            return config;
+        }
+
+        [[nodiscard]] PointCloudConsolidationConfig
+        ParsePointCloudConsolidation(
+            const std::string_view payload,
+            PointCloudConsolidationConfig config,
+            ValidationContext context)
+        {
+            const PointCloudConsolidationConfig reference = config;
+            const std::optional<json> object = ParseObject(context, payload);
+            if (!object.has_value())
+                return config;
+
+            AddUnknownFieldDiagnostics(
+                context,
+                *object,
+                {"strategy",
+                 "support_radius",
+                 "repulsion_weight",
+                 "max_iterations",
+                 "convergence_tolerance",
+                 "target_point_count",
+                 "seed",
+                 "wlop_anisotropic",
+                 "normal_source",
+                 "normal_angle_radians",
+                 "normal_refinement_rounds",
+                 "clop_mixture_component_count",
+                 "clop_mixture_max_iterations",
+                 "clop_mixture_relative_tolerance",
+                 "clop_covariance_floor",
+                 "ear_edge_sensitivity"});
+
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "strategy",
+                    ParsePointCloudConsolidationStrategy,
+                    config.Strategy))
+            {
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context, *object, "support_radius", 1.0e-12, 1.0e12))
+            {
+                config.SupportRadius = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context, *object, "repulsion_weight", 0.0, 0.499999999999))
+            {
+                config.RepulsionWeight = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context, *object, "max_iterations", 1, 4096))
+            {
+                config.MaxIterations = static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "convergence_tolerance",
+                    0.0,
+                    1.0e12))
+            {
+                config.ConvergenceTolerance = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context, *object, "target_point_count", 0, 1'000'000))
+            {
+                if (*value == 1)
+                {
+                    AddWarning(
+                        context,
+                        Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                        FieldSubject(context.Path, "target_point_count"),
+                        "Target count must be zero or at least two; reference default retained.");
+                }
+                else
+                {
+                    config.TargetPointCount =
+                        static_cast<std::uint32_t>(*value);
+                    CountParsed(context);
+                }
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "seed",
+                    0,
+                    std::numeric_limits<std::uint32_t>::max()))
+            {
+                config.Seed = static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadBool(
+                    context, *object, "wlop_anisotropic"))
+            {
+                config.WlopAnisotropic = *value;
+                CountParsed(context);
+            }
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "normal_source",
+                    ParsePointCloudConsolidationNormalSource,
+                    config.NormalSource))
+            {
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "normal_angle_radians",
+                    1.0e-6,
+                    std::numbers::pi_v<double> - 1.0e-6))
+            {
+                config.NormalAngleRadians = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "normal_refinement_rounds",
+                    1,
+                    4096))
+            {
+                config.NormalRefinementRounds =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "clop_mixture_component_count",
+                    1,
+                    1'000'000))
+            {
+                config.ClopMixtureComponentCount =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "clop_mixture_max_iterations",
+                    1,
+                    4096))
+            {
+                config.ClopMixtureMaxIterations =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "clop_mixture_relative_tolerance",
+                    0.0,
+                    1.0))
+            {
+                config.ClopMixtureRelativeTolerance = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "clop_covariance_floor",
+                    1.0e-18,
+                    1.0e12))
+            {
+                config.ClopCovarianceFloor = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "ear_edge_sensitivity",
+                    1.0e-12,
+                    1.0e6))
+            {
+                config.EarEdgeSensitivity = *value;
+                CountParsed(context);
+            }
+
+            if (config.NormalRefinementRounds > config.MaxIterations)
+            {
+                AddWarning(
+                    context,
+                    Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                    FieldSubject(context.Path, "normal_refinement_rounds"),
+                    "Normal refinement rounds exceed max_iterations; reference-compatible value retained.");
+                config.NormalRefinementRounds = std::min(
+                    config.MaxIterations,
+                    std::max(1u, reference.NormalRefinementRounds));
             }
             return config;
         }
@@ -1386,6 +1628,16 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 ParameterizationConfig{},
                 ValidationContext{});
         }
+
+        [[nodiscard]] PointCloudConsolidationConfig
+        DecodePointCloudConsolidationCanonical(
+            const std::string_view payload)
+        {
+            return ParsePointCloudConsolidation(
+                payload,
+                PointCloudConsolidationConfig{},
+                ValidationContext{});
+        }
     }
 
     RunKMeans MakeConfiguredKMeansRequestImpl(
@@ -1485,6 +1737,29 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         }).dump();
     }
 
+    std::string SerializePointCloudConsolidationConfigImpl(
+        const PointCloudConsolidationConfig& config)
+    {
+        return json::object({
+            {"strategy", std::string{ToConfigString(config.Strategy)}},
+            {"support_radius", config.SupportRadius},
+            {"repulsion_weight", config.RepulsionWeight},
+            {"max_iterations", config.MaxIterations},
+            {"convergence_tolerance", config.ConvergenceTolerance},
+            {"target_point_count", config.TargetPointCount},
+            {"seed", config.Seed},
+            {"wlop_anisotropic", config.WlopAnisotropic},
+            {"normal_source", std::string{ToConfigString(config.NormalSource)}},
+            {"normal_angle_radians", config.NormalAngleRadians},
+            {"normal_refinement_rounds", config.NormalRefinementRounds},
+            {"clop_mixture_component_count", config.ClopMixtureComponentCount},
+            {"clop_mixture_max_iterations", config.ClopMixtureMaxIterations},
+            {"clop_mixture_relative_tolerance", config.ClopMixtureRelativeTolerance},
+            {"clop_covariance_floor", config.ClopCovarianceFloor},
+            {"ear_edge_sensitivity", config.EarEdgeSensitivity},
+        }).dump();
+    }
+
     Core::Config::EngineConfigSectionValidationResult
     ValidateClusteringConfigSectionImpl(
         const std::string_view documentPayloadJson,
@@ -1557,6 +1832,33 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .Path = std::string{diagnosticSubject},
             });
         result.CanonicalPayloadJson = SerializeParameterizationConfigImpl(config);
+        return result;
+    }
+
+    Core::Config::EngineConfigSectionValidationResult
+    ValidatePointCloudConsolidationConfigSectionImpl(
+        const std::string_view documentPayloadJson,
+        const std::string_view referencePayloadJson,
+        const std::string_view diagnosticSubject)
+    {
+        const PointCloudConsolidationConfig reference =
+            ParsePointCloudConsolidation(
+                referencePayloadJson,
+                PointCloudConsolidationConfig{},
+                ValidationContext{});
+        Core::Config::EngineConfigSectionValidationResult result{
+            .State = Core::Config::EngineConfigState::Valid,
+        };
+        const PointCloudConsolidationConfig config =
+            ParsePointCloudConsolidation(
+                documentPayloadJson,
+                reference,
+                ValidationContext{
+                    .Result = &result,
+                    .Path = std::string{diagnosticSubject},
+                });
+        result.CanonicalPayloadJson =
+            SerializePointCloudConsolidationConfigImpl(config);
         return result;
     }
 
@@ -1681,6 +1983,52 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             });
     }
 
+    std::optional<PointCloudConsolidationConfig>
+    GetPointCloudConsolidationConfigImpl(
+        const Core::Config::EngineConfig& config)
+    {
+        const Core::Config::EngineConfigSection* section =
+            Core::Config::FindEngineConfigSection(
+                config.AppSections,
+                kPointCloudConsolidationConfigSectionName);
+        if (section == nullptr ||
+            section->SchemaId !=
+                kPointCloudConsolidationConfigSectionSchemaId ||
+            section->SchemaVersion !=
+                kPointCloudConsolidationConfigSectionSchemaVersion)
+        {
+            return std::nullopt;
+        }
+        const auto validated =
+            ValidatePointCloudConsolidationConfigSectionImpl(
+                section->PayloadJson,
+                SerializePointCloudConsolidationConfigImpl(
+                    PointCloudConsolidationConfig{}),
+                kPointCloudConsolidationConfigSectionName);
+        if (validated.State != Core::Config::EngineConfigState::Valid)
+            return std::nullopt;
+        return DecodePointCloudConsolidationCanonical(
+            validated.CanonicalPayloadJson);
+    }
+
+    void SetPointCloudConsolidationConfigImpl(
+        Core::Config::EngineConfig& config,
+        const PointCloudConsolidationConfig& value)
+    {
+        Core::Config::UpsertEngineConfigSection(
+            config.AppSections,
+            Core::Config::EngineConfigSection{
+                .Name = std::string{
+                    kPointCloudConsolidationConfigSectionName},
+                .SchemaId = std::string{
+                    kPointCloudConsolidationConfigSectionSchemaId},
+                .SchemaVersion =
+                    kPointCloudConsolidationConfigSectionSchemaVersion,
+                .PayloadJson =
+                    SerializePointCloudConsolidationConfigImpl(value),
+            });
+    }
+
     Core::Config::EngineConfigSectionRegistration
     MakeClusteringConfigSectionRegistrationImpl(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
@@ -1741,6 +2089,29 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                             ParameterizationConfig{}),
                 },
             .Validate = ValidateParameterizationConfigSectionImpl,
+            .OnChanged = std::move(onChanged),
+        };
+    }
+
+    Core::Config::EngineConfigSectionRegistration
+    MakePointCloudConsolidationConfigSectionRegistrationImpl(
+        Core::Config::EngineConfigSectionChangedCallback onChanged)
+    {
+        return Core::Config::EngineConfigSectionRegistration{
+            .DefaultSection =
+                Core::Config::EngineConfigSection{
+                    .Name = std::string{
+                        kPointCloudConsolidationConfigSectionName},
+                    .SchemaId = std::string{
+                        kPointCloudConsolidationConfigSectionSchemaId},
+                    .SchemaVersion =
+                        kPointCloudConsolidationConfigSectionSchemaVersion,
+                    .PayloadJson =
+                        SerializePointCloudConsolidationConfigImpl(
+                            PointCloudConsolidationConfig{}),
+                },
+            .Validate =
+                ValidatePointCloudConsolidationConfigSectionImpl,
             .OnChanged = std::move(onChanged),
         };
     }

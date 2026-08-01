@@ -20,6 +20,7 @@ import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Sandbox.ConfigSections;
 
@@ -68,6 +69,48 @@ namespace
     private:
         std::filesystem::path m_Path{};
     };
+
+    class ConfigControlHarness final
+    {
+    public:
+        ConfigControlHarness()
+        {
+            auto registry = Sandbox::CreateSandboxConfigSectionRegistry();
+            CoreConfig::EngineConfig config =
+                Runtime::CreateReferenceEngineConfig(registry);
+            config.Simulation.WorkerThreadCount = 1u;
+            config.ReferenceScene.Enabled = false;
+            config.Camera.Enabled = false;
+            config.Window.Backend = CoreConfig::WindowBackend::Null;
+            config.Render.EnablePromotedVulkanDevice = false;
+            config.Render.DefaultRecipeConfigPath.clear();
+            m_Engine =
+                std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
+                    std::move(config),
+                    std::make_unique<OneFrameApplication>());
+            m_Engine->EmplaceModule<Runtime::EngineConfigControl>(
+                std::move(registry));
+            m_Engine->Initialize();
+            m_Control =
+                m_Engine->Services().Find<Runtime::EngineConfigControl>();
+            EXPECT_NE(m_Control, nullptr);
+        }
+
+        ~ConfigControlHarness()
+        {
+            if (m_Engine != nullptr)
+                m_Engine->Shutdown();
+        }
+
+        [[nodiscard]] Runtime::EngineConfigControl& Control() const
+        {
+            return *m_Control;
+        }
+
+    private:
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> m_Engine{};
+        Runtime::EngineConfigControl* m_Control{};
+    };
 }
 
 TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun)
@@ -75,6 +118,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     std::uint32_t clusteringChanges = 0u;
     std::uint32_t progressivePoissonChanges = 0u;
     std::uint32_t parameterizationChanges = 0u;
+    std::uint32_t pointCloudConsolidationChanges = 0u;
     auto configControl = std::make_unique<Runtime::EngineConfigControl>(
         Sandbox::CreateSandboxConfigSectionRegistry(
             Sandbox::SandboxConfigSectionCallbacks{
@@ -92,6 +136,11 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
                     [&](const auto&, const auto&)
                     {
                         ++parameterizationChanges;
+                    },
+                .PointCloudConsolidation =
+                    [&](const auto&, const auto&)
+                    {
+                        ++pointCloudConsolidationChanges;
                     },
             }));
 
@@ -125,6 +174,16 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     parameterization.View.BackgroundMode =
         Runtime::ParameterizationUvBackgroundMode::Checker;
     Runtime::SetParameterizationConfig(fileConfig, parameterization);
+
+    Runtime::PointCloudConsolidationConfig pointCloudConsolidation{};
+    pointCloudConsolidation.Strategy =
+        Runtime::PointCloudConsolidationStrategy::Ear;
+    pointCloudConsolidation.SupportRadius = 0.25;
+    pointCloudConsolidation.TargetPointCount = 17u;
+    pointCloudConsolidation.EarEdgeSensitivity = 7.5;
+    Runtime::SetPointCloudConsolidationConfig(
+        fileConfig,
+        pointCloudConsolidation);
 
     const ScopedConfigFile file{CoreConfig::SerializeEngineConfig(fileConfig)};
     const std::string filePath = file.Path().string();
@@ -163,9 +222,21 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_EQ(
         bootParameterization->View.BackgroundMode,
         Runtime::ParameterizationUvBackgroundMode::Checker);
+    const auto bootPointCloudConsolidation =
+        Runtime::GetPointCloudConsolidationConfig(boot.Config);
+    ASSERT_TRUE(bootPointCloudConsolidation.has_value());
+    EXPECT_EQ(
+        bootPointCloudConsolidation->Strategy,
+        Runtime::PointCloudConsolidationStrategy::Ear);
+    EXPECT_DOUBLE_EQ(bootPointCloudConsolidation->SupportRadius, 0.25);
+    EXPECT_EQ(bootPointCloudConsolidation->TargetPointCount, 17u);
+    EXPECT_DOUBLE_EQ(
+        bootPointCloudConsolidation->EarEdgeSensitivity,
+        7.5);
     EXPECT_EQ(clusteringChanges, 0u);
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 0u);
+    EXPECT_EQ(pointCloudConsolidationChanges, 0u);
 
     Runtime::EngineConfigControl* const expectedConfigControl =
         configControl.get();
@@ -194,6 +265,17 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     liveParameterization->View.ShowDistortionHeatmap = true;
     Runtime::SetParameterizationConfig(candidate, *liveParameterization);
 
+    auto livePointCloudConsolidation =
+        Runtime::GetPointCloudConsolidationConfig(candidate);
+    ASSERT_TRUE(livePointCloudConsolidation.has_value());
+    livePointCloudConsolidation->Strategy =
+        Runtime::PointCloudConsolidationStrategy::Wlop;
+    livePointCloudConsolidation->MaxIterations = 31u;
+    livePointCloudConsolidation->Seed = 0xfedcba98u;
+    Runtime::SetPointCloudConsolidationConfig(
+        candidate,
+        *livePointCloudConsolidation);
+
     const CoreConfig::EngineConfigLoadResult preview =
         control->PreviewEngineConfigControlDocument(
             CoreConfig::SerializeEngineConfig(candidate),
@@ -208,11 +290,14 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         Runtime::kClusteringConfigSectionName));
     EXPECT_TRUE(apply.SectionChanged(
         Runtime::kParameterizationConfigSectionName));
+    EXPECT_TRUE(apply.SectionChanged(
+        Runtime::kPointCloudConsolidationConfigSectionName));
     EXPECT_FALSE(apply.SectionChanged(
         Runtime::kProgressivePoissonConfigSectionName));
     EXPECT_EQ(clusteringChanges, 1u);
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 1u);
+    EXPECT_EQ(pointCloudConsolidationChanges, 1u);
 
     const auto activeParameterization =
         Runtime::GetParameterizationConfig(engine.GetEngineConfig());
@@ -222,6 +307,14 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     const auto activeClustering =
         Runtime::GetClusteringConfig(engine.GetEngineConfig());
     ASSERT_TRUE(activeClustering.has_value());
+    const auto activePointCloudConsolidation =
+        Runtime::GetPointCloudConsolidationConfig(engine.GetEngineConfig());
+    ASSERT_TRUE(activePointCloudConsolidation.has_value());
+    EXPECT_EQ(
+        activePointCloudConsolidation->Strategy,
+        Runtime::PointCloudConsolidationStrategy::Wlop);
+    EXPECT_EQ(activePointCloudConsolidation->MaxIterations, 31u);
+    EXPECT_EQ(activePointCloudConsolidation->Seed, 0xfedcba98u);
     Runtime::KMeansPropertyRefs properties = Runtime::MakeKMeansPropertyRefs(
         Runtime::GeometryElementDomain::MeshVertex);
     properties.OutputLabels.Name = "v:configured_cluster";
@@ -242,4 +335,60 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
 
     engine.Run();
     engine.Shutdown();
+}
+
+TEST(SandboxConfigSections,
+     PointCloudConsolidationSourcesProduceIdenticalValidatedState)
+{
+    constexpr std::array sources{
+        Runtime::RuntimeConfigControlSource::Editor,
+        Runtime::RuntimeConfigControlSource::AgentCli,
+        Runtime::RuntimeConfigControlSource::Programmatic,
+    };
+    Runtime::PointCloudConsolidationConfig requested{};
+    requested.Strategy = Runtime::PointCloudConsolidationStrategy::Clop;
+    requested.SupportRadius = 0.375;
+    requested.TargetPointCount = 63u;
+    requested.Seed = 0x13579bdfu;
+    requested.ClopMixtureComponentCount = 11u;
+
+    std::optional<std::string> referenceSerialized{};
+    for (const Runtime::RuntimeConfigControlSource source : sources)
+    {
+        ConfigControlHarness harness{};
+        Runtime::EngineConfigControl& control = harness.Control();
+        CoreConfig::EngineConfig candidate =
+            control.GetEngineConfigControlState().ActiveConfig;
+        Runtime::SetPointCloudConsolidationConfig(candidate, requested);
+        const CoreConfig::EngineConfigLoadResult preview =
+            control.PreviewEngineConfigControlDocument(
+                CoreConfig::SerializeEngineConfig(candidate),
+                "point-cloud-consolidation-source-parity");
+        ASSERT_TRUE(CoreConfig::IsConfigUsable(preview));
+
+        const Runtime::RuntimeEngineConfigApplyResult applied =
+            control.ApplyEngineConfigHotSubset(preview, source);
+        ASSERT_TRUE(applied.Succeeded());
+        EXPECT_EQ(applied.Source, source);
+        EXPECT_TRUE(applied.SectionChanged(
+            Runtime::kPointCloudConsolidationConfigSectionName));
+
+        const auto active = Runtime::GetPointCloudConsolidationConfig(
+            control.GetEngineConfigControlState().ActiveConfig);
+        ASSERT_TRUE(active.has_value());
+        EXPECT_EQ(active->Strategy, requested.Strategy);
+        EXPECT_DOUBLE_EQ(active->SupportRadius, requested.SupportRadius);
+        EXPECT_EQ(active->TargetPointCount, requested.TargetPointCount);
+        EXPECT_EQ(active->Seed, requested.Seed);
+        EXPECT_EQ(
+            active->ClopMixtureComponentCount,
+            requested.ClopMixtureComponentCount);
+
+        const std::string serialized = CoreConfig::SerializeEngineConfig(
+            control.GetEngineConfigControlState().ActiveConfig);
+        if (!referenceSerialized.has_value())
+            referenceSerialized = serialized;
+        else
+            EXPECT_EQ(serialized, *referenceSerialized);
+    }
 }

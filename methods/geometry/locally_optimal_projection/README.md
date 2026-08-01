@@ -43,3 +43,10 @@ source/projected density weights.
 
 - Correctness: `tests/unit/geometry/Test.PointCloudConsolidation.cpp`
 - Smoke: `benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml`
+
+## Runtime integration
+
+`Extrinsic.Runtime.PointCloudConsolidationModule` exposes LOP and WLOP through
+the asynchronous typed operation. The shared validated configuration is the
+`sandbox.point_cloud_consolidation` application section; successful results
+replace the selected point cloud through `GeometrySources` with undo/redo.
