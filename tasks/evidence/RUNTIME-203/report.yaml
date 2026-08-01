@@ -3,15 +3,15 @@ task_id: RUNTIME-203
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T09:31:56Z'
+generated_at: '2026-08-01T09:35:11Z'
 claim_eligible: false
 source:
   base_ref: 8cb0985d
   base_revision: 8cb0985d812d08f81ec389869d26d027816b630d
-  head_revision: 9e9549180e6f6a644b7bab41dcc47c062801c025
+  head_revision: 95d6c6406148280678b63a84a4aaed1e84cdbf32
   branch: cleanup/runtime-139-203-205
   worktree: /tmp/intrinsic-runtime-cleanup.ae4UkC
-  dirty: true
+  dirty: false
   surface:
   - path: docs/api/generated/module_inventory.md
     sha256: 491805991f945b89d0f6c539ae7c5a5def7538973656703d077011901c3294ac
