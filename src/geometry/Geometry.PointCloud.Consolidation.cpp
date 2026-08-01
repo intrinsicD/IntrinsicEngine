@@ -32,15 +32,56 @@ namespace Geometry::PointCloud::Consolidation
         namespace PointNormals = Geometry::PointCloud::Normals;
         namespace GMM = Geometry::GaussianMixture;
 
-        struct ContinuousAttractionModel
-        {
-            GMM::Model Mixture{};
-        };
-
         struct ClopGaussianTerm
         {
             double Weight{0.0};
             double Sigma{0.0};
+        };
+
+        struct PreparedGaussianProduct
+        {
+            glm::dmat3 InverseCovarianceSum{1.0};
+            double Variance{0.0};
+            double Coefficient{0.0};
+            double ExactZeroRadiusSquared{0.0};
+        };
+
+        struct PreparedContinuousComponent
+        {
+            PreparedGaussianProduct Initialization{};
+            std::array<PreparedGaussianProduct, 3u> Attraction{};
+            double ExactZeroRadiusSquared{0.0};
+        };
+
+        struct ContinuousAttractionModel
+        {
+            GMM::Model Mixture{};
+            std::vector<PreparedContinuousComponent> Prepared{};
+        };
+
+        struct NeighborhoodCache
+        {
+            std::vector<std::size_t> Offsets{};
+            std::vector<Geometry::KDTree::ElementIndex> Indices{};
+
+            [[nodiscard]] std::span<const Geometry::KDTree::ElementIndex>
+            Neighbors(const std::size_t point) const noexcept
+            {
+                return std::span<const Geometry::KDTree::ElementIndex>{Indices}
+                    .subspan(
+                        Offsets[point],
+                        Offsets[point + 1u] - Offsets[point]);
+            }
+        };
+
+        struct OptimizedExecutionScratch
+        {
+            Geometry::KDTree::RadiusQueryScratch RadiusQuery{};
+            std::vector<Geometry::KDTree::ElementIndex> Neighbors{};
+            std::vector<Geometry::KDTree::ElementIndex> LocalNeighbors{};
+            NeighborhoodCache ProjectedNeighborhoods{};
+            std::vector<glm::dvec3> EarPoints{};
+            std::vector<glm::dvec3> EarNormals{};
         };
 
         // Figure 5 of Preiner et al. 2014. These normalized Gaussian terms
@@ -51,6 +92,8 @@ namespace Geometry::PointCloud::Consolidation
                 {29.886, 0.03287},
                 {97.761, 0.01010},
             }};
+        inline constexpr ClopGaussianTerm kClopInitializationTerm{
+            1.0, 0.1767766952966369}; // sqrt(1/32)
 
         [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
         {
@@ -340,11 +383,97 @@ namespace Geometry::PointCloud::Consolidation
             const Geometry::KDTree& index,
             const glm::vec3 point,
             const double supportRadius,
-            std::vector<Geometry::KDTree::ElementIndex>& neighbors) noexcept
+            std::vector<Geometry::KDTree::ElementIndex>& neighbors,
+            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr)
+            noexcept
         {
+            if (scratch != nullptr)
+            {
+                return index.QueryRadius(
+                    point, BroadPhaseRadius(supportRadius), neighbors,
+                    *scratch).has_value();
+            }
             return index.QueryRadius(
-                point, BroadPhaseRadius(supportRadius), neighbors)
-                .has_value();
+                point, BroadPhaseRadius(supportRadius), neighbors).has_value();
+        }
+
+        [[nodiscard]] bool BuildNeighborhoodCache(
+            const Geometry::KDTree& index,
+            const std::span<const glm::vec3> points,
+            const double supportRadius,
+            OptimizedExecutionScratch& scratch)
+        {
+            NeighborhoodCache& cache = scratch.ProjectedNeighborhoods;
+            cache.Offsets.assign(points.size() + 1u, 0u);
+            cache.Indices.clear();
+            for (std::size_t i = 0u; i < points.size(); ++i)
+            {
+                if (!QueryNeighbors(
+                        index, points[i], supportRadius, scratch.Neighbors,
+                        &scratch.RadiusQuery))
+                {
+                    cache.Offsets.clear();
+                    cache.Indices.clear();
+                    return false;
+                }
+                cache.Indices.insert(
+                    cache.Indices.end(),
+                    scratch.Neighbors.begin(), scratch.Neighbors.end());
+                cache.Offsets[i + 1u] = cache.Indices.size();
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool ComputeCachedDensityWeights(
+            const std::span<const glm::vec3> points,
+            const NeighborhoodCache& cache,
+            const double supportRadius,
+            std::vector<float>& weights,
+            Diagnostics& diagnostics,
+            Status& failure)
+        {
+            weights.assign(points.size(), 0.0f);
+            for (std::size_t i = 0u; i < points.size(); ++i)
+            {
+                double density = 1.0;
+                std::size_t contributionCount = 0u;
+                for (const auto neighbor : cache.Neighbors(i))
+                {
+                    if (neighbor == i || neighbor >= points.size())
+                        continue;
+                    const auto weight = Kernels::Weight(
+                        DistanceSquared(points[i], points[neighbor]),
+                        supportRadius,
+                        Kernels::KernelType::ThetaLop);
+                    if (!weight.has_value())
+                    {
+                        failure = Status::DensityEstimationFailed;
+                        return false;
+                    }
+                    if (!(*weight > 0.0))
+                        continue;
+                    density += *weight;
+                    ++contributionCount;
+                }
+                if (contributionCount == 0u)
+                {
+                    ++diagnostics.EmptyNeighborhoodCount;
+                    failure = Status::EmptyNeighborhood;
+                    weights.clear();
+                    return false;
+                }
+                if (!std::isfinite(density) ||
+                    density > static_cast<double>(
+                        std::numeric_limits<float>::max()))
+                {
+                    failure = Status::DensityEstimationFailed;
+                    weights.clear();
+                    return false;
+                }
+                weights[i] = static_cast<float>(density);
+                diagnostics.DensityContributionCount += contributionCount;
+            }
+            return true;
         }
 
         [[nodiscard]] bool InitializeProjected(
@@ -542,6 +671,111 @@ namespace Geometry::PointCloud::Consolidation
             return true;
         }
 
+        [[nodiscard]] bool PrepareGaussianProduct(
+            const GMM::MultivariateGaussian& gaussian,
+            const double mixtureWeight,
+            const double supportRadius,
+            const ClopGaussianTerm term,
+            PreparedGaussianProduct& out) noexcept
+        {
+            const double scaledSigma = term.Sigma * supportRadius;
+            const double variance = scaledSigma * scaledSigma;
+            if (!std::isfinite(variance) || !(variance > 0.0) ||
+                !std::isfinite(mixtureWeight) || !(mixtureWeight > 0.0))
+            {
+                return false;
+            }
+            const glm::dmat3 covarianceSum =
+                gaussian.Covariance + glm::dmat3{variance};
+            const double determinant = glm::determinant(covarianceSum);
+            if (!IsFinite(covarianceSum) || !std::isfinite(determinant) ||
+                !(determinant > 0.0))
+            {
+                return false;
+            }
+            const glm::dmat3 inverse = glm::inverse(covarianceSum);
+            if (!IsFinite(inverse))
+                return false;
+
+            const double coefficient = mixtureWeight * term.Weight *
+                scaledSigma * scaledSigma * scaledSigma /
+                std::sqrt(determinant);
+            if (!std::isfinite(coefficient) || !(coefficient > 0.0))
+                return false;
+
+            double eigenvalueUpperBound = 0.0;
+            for (std::size_t row = 0u; row < 3u; ++row)
+            {
+                double rowSum = 0.0;
+                for (std::size_t column = 0u; column < 3u; ++column)
+                    rowSum += std::abs(covarianceSum[column][row]);
+                eigenvalueUpperBound = std::max(
+                    eigenvalueUpperBound, rowSum);
+            }
+            if (!std::isfinite(eigenvalueUpperBound) ||
+                !(eigenvalueUpperBound > 0.0))
+            {
+                return false;
+            }
+
+            constexpr double underflowSafety = 2.0;
+            const double logDynamicRange = std::log(coefficient) -
+                std::log(std::numeric_limits<double>::denorm_min()) +
+                underflowSafety;
+            const double radiusSquared = logDynamicRange > 0.0
+                ? 2.0 * eigenvalueUpperBound * logDynamicRange
+                : 0.0;
+            if (!std::isfinite(radiusSquared) || radiusSquared < 0.0)
+                return false;
+
+            out.InverseCovarianceSum = inverse;
+            out.Variance = variance;
+            out.Coefficient = coefficient;
+            out.ExactZeroRadiusSquared = radiusSquared;
+            return true;
+        }
+
+        [[nodiscard]] bool PrepareContinuousAttractionModel(
+            ContinuousAttractionModel& model,
+            const double supportRadius)
+        {
+            model.Prepared.clear();
+            model.Prepared.resize(model.Mixture.Components.size());
+            for (std::size_t component = 0u;
+                 component < model.Mixture.Components.size(); ++component)
+            {
+                PreparedContinuousComponent& prepared =
+                    model.Prepared[component];
+                const auto& gaussian = model.Mixture.Components[component];
+                const double mixtureWeight = model.Mixture.Weights[component];
+                if (!PrepareGaussianProduct(
+                        gaussian, mixtureWeight, supportRadius,
+                        kClopInitializationTerm, prepared.Initialization))
+                {
+                    model.Prepared.clear();
+                    return false;
+                }
+                prepared.ExactZeroRadiusSquared =
+                    prepared.Initialization.ExactZeroRadiusSquared;
+                for (std::size_t term = 0u;
+                     term < kClopAttractionTerms.size(); ++term)
+                {
+                    if (!PrepareGaussianProduct(
+                            gaussian, mixtureWeight, supportRadius,
+                            kClopAttractionTerms[term],
+                            prepared.Attraction[term]))
+                    {
+                        model.Prepared.clear();
+                        return false;
+                    }
+                    prepared.ExactZeroRadiusSquared = std::max(
+                        prepared.ExactZeroRadiusSquared,
+                        prepared.Attraction[term].ExactZeroRadiusSquared);
+                }
+            }
+            return true;
+        }
+
         [[nodiscard]] bool AccumulateGaussianProduct(
             const GMM::MultivariateGaussian& gaussian,
             const double mixtureWeight,
@@ -600,6 +834,120 @@ namespace Geometry::PointCloud::Consolidation
             return IsFinite(weightedMeanSum) && std::isfinite(weightSum);
         }
 
+        [[nodiscard]] bool AccumulatePreparedGaussianProduct(
+            const GMM::MultivariateGaussian& gaussian,
+            const PreparedGaussianProduct& prepared,
+            const glm::dvec3 query,
+            glm::dvec3& weightedMeanSum,
+            double& weightSum,
+            std::size_t& contributionCount) noexcept
+        {
+            const glm::dvec3 delta = gaussian.Mean - query;
+            const double euclideanSquared = glm::dot(delta, delta);
+            if (!std::isfinite(euclideanSquared) || euclideanSquared < 0.0)
+                return false;
+            if (euclideanSquared > prepared.ExactZeroRadiusSquared)
+                return true;
+
+            double mahalanobisSquared = glm::dot(
+                delta, prepared.InverseCovarianceSum * delta);
+            if (!std::isfinite(mahalanobisSquared) ||
+                mahalanobisSquared < -1.0e-12)
+            {
+                return false;
+            }
+            mahalanobisSquared = std::max(0.0, mahalanobisSquared);
+            const double weight = prepared.Coefficient *
+                std::exp(-0.5 * mahalanobisSquared);
+            if (!std::isfinite(weight) || weight < 0.0)
+                return false;
+            if (!(weight > 0.0))
+                return true;
+
+            const glm::dvec3 productMean = query + prepared.Variance *
+                (prepared.InverseCovarianceSum * delta);
+            if (!IsFinite(productMean))
+                return false;
+            weightedMeanSum += weight * productMean;
+            weightSum += weight;
+            ++contributionCount;
+            return IsFinite(weightedMeanSum) && std::isfinite(weightSum);
+        }
+
+        [[nodiscard]] bool ContinuousAttractionOptimized(
+            const ContinuousAttractionModel& model,
+            const glm::vec3 query,
+            const bool initialization,
+            glm::vec3& out,
+            Diagnostics& diagnostics,
+            Status& failure) noexcept
+        {
+            if (model.Prepared.size() != model.Mixture.Components.size())
+            {
+                failure = Status::NumericalFailure;
+                return false;
+            }
+            glm::dvec3 weightedMeanSum{0.0};
+            double weightSum = 0.0;
+            std::size_t contributionCount = 0u;
+            for (std::size_t component = 0u;
+                 component < model.Mixture.Components.size(); ++component)
+            {
+                const glm::dvec3 delta =
+                    model.Mixture.Components[component].Mean -
+                    glm::dvec3(query);
+                const double euclideanSquared = glm::dot(delta, delta);
+                const PreparedContinuousComponent& prepared =
+                    model.Prepared[component];
+                if (!std::isfinite(euclideanSquared) ||
+                    euclideanSquared < 0.0)
+                {
+                    failure = Status::NumericalFailure;
+                    return false;
+                }
+                if (euclideanSquared > prepared.ExactZeroRadiusSquared)
+                    continue;
+
+                if (initialization)
+                {
+                    if (!AccumulatePreparedGaussianProduct(
+                            model.Mixture.Components[component],
+                            prepared.Initialization, glm::dvec3(query),
+                            weightedMeanSum, weightSum, contributionCount))
+                    {
+                        failure = Status::NumericalFailure;
+                        return false;
+                    }
+                    continue;
+                }
+                for (const PreparedGaussianProduct& term :
+                     prepared.Attraction)
+                {
+                    if (!AccumulatePreparedGaussianProduct(
+                            model.Mixture.Components[component], term,
+                            glm::dvec3(query), weightedMeanSum, weightSum,
+                            contributionCount))
+                    {
+                        failure = Status::NumericalFailure;
+                        return false;
+                    }
+                }
+            }
+            diagnostics.AttractionContributionCount += contributionCount;
+            if (!(weightSum > 0.0) || !std::isfinite(weightSum))
+            {
+                ++diagnostics.EmptyNeighborhoodCount;
+                failure = Status::EmptyContinuousAttraction;
+                return false;
+            }
+            if (!ToFiniteVec3(weightedMeanSum / weightSum, out))
+            {
+                failure = Status::NumericalFailure;
+                return false;
+            }
+            return true;
+        }
+
         [[nodiscard]] bool ContinuousAttraction(
             const ContinuousAttractionModel& model,
             const glm::vec3 query,
@@ -650,17 +998,22 @@ namespace Geometry::PointCloud::Consolidation
             const double supportRadius,
             std::vector<glm::vec3>& projected,
             Diagnostics& diagnostics,
-            Status& failure)
+            Status& failure,
+            const bool optimized)
         {
-            constexpr ClopGaussianTerm thetaTerm{
-                1.0, 0.1767766952966369}; // sqrt(1/32)
             std::vector<glm::vec3> initialized(projected.size());
             for (std::size_t i = 0u; i < projected.size(); ++i)
             {
-                if (!ContinuousAttraction(
+                const bool succeeded = optimized
+                    ? ContinuousAttractionOptimized(
+                        model, projected[i], true, initialized[i],
+                        diagnostics, failure)
+                    : ContinuousAttraction(
                         model, projected[i], supportRadius,
-                        std::span<const ClopGaussianTerm>{&thetaTerm, 1u},
-                        initialized[i], diagnostics, failure))
+                        std::span<const ClopGaussianTerm>{
+                            &kClopInitializationTerm, 1u},
+                        initialized[i], diagnostics, failure);
+                if (!succeeded)
                 {
                     return false;
                 }
@@ -676,14 +1029,16 @@ namespace Geometry::PointCloud::Consolidation
             const double supportRadius,
             std::vector<glm::vec3>& projected,
             Diagnostics& diagnostics,
-            Status& failure)
+            Status& failure,
+            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr)
         {
             std::vector<glm::vec3> initialized(projected.size());
             std::vector<Geometry::KDTree::ElementIndex> neighbors{};
             for (std::size_t i = 0u; i < projected.size(); ++i)
             {
                 if (!QueryNeighbors(
-                        sourceIndex, projected[i], supportRadius, neighbors))
+                        sourceIndex, projected[i], supportRadius, neighbors,
+                        scratch))
                 {
                     failure = Status::SpatialQueryFailed;
                     return false;
@@ -777,7 +1132,8 @@ namespace Geometry::PointCloud::Consolidation
             const double normalAngle,
             std::vector<glm::vec3>& normals,
             Diagnostics& diagnostics,
-            Status& failure)
+            Status& failure,
+            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr)
         {
             if (points.size() != normals.size())
             {
@@ -796,7 +1152,7 @@ namespace Geometry::PointCloud::Consolidation
             for (std::size_t i = 0u; i < points.size(); ++i)
             {
                 if (!QueryNeighbors(
-                        index, points[i], supportRadius, neighbors))
+                        index, points[i], supportRadius, neighbors, scratch))
                 {
                     failure = Status::SpatialQueryFailed;
                     return false;
@@ -851,7 +1207,8 @@ namespace Geometry::PointCloud::Consolidation
             const Params& params,
             std::vector<glm::vec3>& projected,
             Diagnostics& diagnostics,
-            Status& failure)
+            Status& failure,
+            OptimizedExecutionScratch* const optimizedScratch = nullptr)
         {
             Geometry::KDTree projectedIndex{};
             if (!BuildIndex(projected, projectedIndex))
@@ -863,25 +1220,46 @@ namespace Geometry::PointCloud::Consolidation
             std::vector<float> projectedWeights(projected.size(), 1.0f);
             if (diagnostics.UsedDensityWeighting)
             {
-                const auto density = Kernels::ComputeDensityWeights(
-                    projected,
-                    projectedIndex,
-                    params.SupportRadius,
-                    Kernels::KernelType::ThetaLop,
-                    Kernels::DensityWeightMode::Direct);
-                if (!density.Succeeded())
+                if (optimizedScratch != nullptr)
                 {
-                    failure = density.Status ==
-                            Kernels::DensityWeightStatus::EmptyNeighborhood
-                        ? Status::EmptyNeighborhood
-                        : Status::DensityEstimationFailed;
-                    diagnostics.EmptyNeighborhoodCount +=
-                        density.Diagnostics.EmptyNeighborhoodCount;
-                    return false;
+                    if (!BuildNeighborhoodCache(
+                            projectedIndex, projected, params.SupportRadius,
+                            *optimizedScratch))
+                    {
+                        failure = Status::SpatialQueryFailed;
+                        return false;
+                    }
+                    if (!ComputeCachedDensityWeights(
+                            projected,
+                            optimizedScratch->ProjectedNeighborhoods,
+                            params.SupportRadius, projectedWeights,
+                            diagnostics, failure))
+                    {
+                        return false;
+                    }
                 }
-                projectedWeights = density.Weights;
-                diagnostics.DensityContributionCount +=
-                    density.Diagnostics.NeighborContributionCount;
+                else
+                {
+                    const auto density = Kernels::ComputeDensityWeights(
+                        projected,
+                        projectedIndex,
+                        params.SupportRadius,
+                        Kernels::KernelType::ThetaLop,
+                        Kernels::DensityWeightMode::Direct);
+                    if (!density.Succeeded())
+                    {
+                        failure = density.Status ==
+                                Kernels::DensityWeightStatus::EmptyNeighborhood
+                            ? Status::EmptyNeighborhood
+                            : Status::DensityEstimationFailed;
+                        diagnostics.EmptyNeighborhoodCount +=
+                            density.Diagnostics.EmptyNeighborhoodCount;
+                        return false;
+                    }
+                    projectedWeights = density.Weights;
+                    diagnostics.DensityContributionCount +=
+                        density.Diagnostics.NeighborContributionCount;
+                }
             }
 
             const double distanceFloor = std::max(
@@ -899,12 +1277,17 @@ namespace Geometry::PointCloud::Consolidation
                 if (continuousModel != nullptr)
                 {
                     glm::vec3 continuousAttraction{0.0f};
-                    if (!ContinuousAttraction(
+                    const bool succeeded = optimizedScratch != nullptr
+                        ? ContinuousAttractionOptimized(
+                            *continuousModel, projected[i], false,
+                            continuousAttraction, diagnostics, failure)
+                        : ContinuousAttraction(
                             *continuousModel, projected[i],
                             params.SupportRadius,
                             std::span<const ClopGaussianTerm>{
                                 kClopAttractionTerms},
-                            continuousAttraction, diagnostics, failure))
+                            continuousAttraction, diagnostics, failure);
+                    if (!succeeded)
                     {
                         return false;
                     }
@@ -914,7 +1297,10 @@ namespace Geometry::PointCloud::Consolidation
                 else
                 {
                     if (!QueryNeighbors(sourceIndex, projected[i],
-                                        params.SupportRadius, neighbors))
+                                        params.SupportRadius, neighbors,
+                                        optimizedScratch != nullptr
+                                            ? &optimizedScratch->RadiusQuery
+                                            : nullptr))
                     {
                         failure = Status::SpatialQueryFailed;
                         return false;
@@ -961,15 +1347,31 @@ namespace Geometry::PointCloud::Consolidation
                     }
                 }
 
-                if (!QueryNeighbors(projectedIndex, projected[i],
-                                    params.SupportRadius, neighbors))
+                std::span<const Geometry::KDTree::ElementIndex>
+                    repulsionNeighbors{};
+                if (optimizedScratch != nullptr &&
+                    diagnostics.UsedDensityWeighting)
+                {
+                    repulsionNeighbors =
+                        optimizedScratch->ProjectedNeighborhoods.Neighbors(i);
+                }
+                else if (!QueryNeighbors(
+                             projectedIndex, projected[i],
+                             params.SupportRadius, neighbors,
+                             optimizedScratch != nullptr
+                                 ? &optimizedScratch->RadiusQuery
+                                 : nullptr))
                 {
                     failure = Status::SpatialQueryFailed;
                     return false;
                 }
+                else
+                {
+                    repulsionNeighbors = neighbors;
+                }
                 glm::dvec3 repulsion{0.0};
                 double repulsionWeight = 0.0;
-                for (const auto neighbor : neighbors)
+                for (const auto neighbor : repulsionNeighbors)
                 {
                     if (neighbor == i || neighbor >= projected.size())
                         continue;
@@ -1032,7 +1434,9 @@ namespace Geometry::PointCloud::Consolidation
             const double supportRadius,
             const double normalAngle,
             double& distance,
-            Status& failure)
+            Status& failure,
+            const Geometry::KDTree* const index = nullptr,
+            OptimizedExecutionScratch* const optimizedScratch = nullptr)
         {
             glm::dvec3 unitNormal{};
             glm::vec3 normalized{};
@@ -1045,7 +1449,7 @@ namespace Geometry::PointCloud::Consolidation
 
             double numerator = 0.0;
             double denominator = 0.0;
-            for (std::size_t i = 0u; i < points.size(); ++i)
+            const auto accumulate = [&](const std::size_t i)
             {
                 const auto spatial = EarSpatialWeight(
                     DistanceSquared(base, points[i]), supportRadius);
@@ -1058,11 +1462,36 @@ namespace Geometry::PointCloud::Consolidation
                 }
                 const double weight = *spatial * *directional;
                 if (!(weight > 0.0))
-                    continue;
+                    return true;
                 numerator += glm::dot(
                     unitNormal,
                     glm::dvec3(base) - glm::dvec3(points[i])) * weight;
                 denominator += weight;
+                return true;
+            };
+            if (index != nullptr && optimizedScratch != nullptr)
+            {
+                if (!QueryNeighbors(
+                        *index, base, supportRadius,
+                        optimizedScratch->LocalNeighbors,
+                        &optimizedScratch->RadiusQuery))
+                {
+                    failure = Status::SpatialQueryFailed;
+                    return false;
+                }
+                for (const auto neighbor : optimizedScratch->LocalNeighbors)
+                {
+                    if (neighbor >= points.size() || !accumulate(neighbor))
+                        return false;
+                }
+            }
+            else
+            {
+                for (std::size_t i = 0u; i < points.size(); ++i)
+                {
+                    if (!accumulate(i))
+                        return false;
+                }
             }
             if (!(denominator > 0.0) || !std::isfinite(denominator))
             {
@@ -1086,7 +1515,9 @@ namespace Geometry::PointCloud::Consolidation
             const double supportRadius,
             const double normalAngle,
             glm::vec3& refined,
-            Status& failure)
+            Status& failure,
+            const Geometry::KDTree* const index = nullptr,
+            OptimizedExecutionScratch* const optimizedScratch = nullptr)
         {
             glm::vec3 normalized{};
             if (!NormalizeNormal(fixedNormal, normalized))
@@ -1096,7 +1527,7 @@ namespace Geometry::PointCloud::Consolidation
             }
             glm::dvec3 sum{0.0};
             double denominator = 0.0;
-            for (std::size_t i = 0u; i < points.size(); ++i)
+            const auto accumulate = [&](const std::size_t i)
             {
                 const auto spatial = EarSpatialWeight(
                     DistanceSquared(base, points[i]), supportRadius);
@@ -1109,9 +1540,34 @@ namespace Geometry::PointCloud::Consolidation
                 }
                 const double weight = *spatial * *directional;
                 if (!(weight > 0.0))
-                    continue;
+                    return true;
                 sum += glm::dvec3(normals[i]) * weight;
                 denominator += weight;
+                return true;
+            };
+            if (index != nullptr && optimizedScratch != nullptr)
+            {
+                if (!QueryNeighbors(
+                        *index, base, supportRadius,
+                        optimizedScratch->LocalNeighbors,
+                        &optimizedScratch->RadiusQuery))
+                {
+                    failure = Status::SpatialQueryFailed;
+                    return false;
+                }
+                for (const auto neighbor : optimizedScratch->LocalNeighbors)
+                {
+                    if (neighbor >= points.size() || !accumulate(neighbor))
+                        return false;
+                }
+            }
+            else
+            {
+                for (std::size_t i = 0u; i < points.size(); ++i)
+                {
+                    if (!accumulate(i))
+                        return false;
+                }
             }
             glm::vec3 averaged{};
             if (!(denominator > 0.0) || !std::isfinite(denominator) ||
@@ -1130,16 +1586,18 @@ namespace Geometry::PointCloud::Consolidation
             const std::span<const glm::vec3> normals,
             const double supportRadius,
             double& clearance,
-            Status& failure)
+            Status& failure,
+            const Geometry::KDTree* const index = nullptr,
+            OptimizedExecutionScratch* const optimizedScratch = nullptr)
         {
             clearance = std::numeric_limits<double>::infinity();
             bool found = false;
-            for (std::size_t i = 0u; i < points.size(); ++i)
+            const auto accumulate = [&](const std::size_t i)
             {
                 const double distanceSquared =
                     DistanceSquared(base, points[i]);
                 if (!(distanceSquared < supportRadius * supportRadius))
-                    continue;
+                    return true;
                 const glm::dvec3 offset =
                     glm::dvec3(base) - glm::dvec3(points[i]);
                 const glm::dvec3 normal{normals[i]};
@@ -1154,10 +1612,91 @@ namespace Geometry::PointCloud::Consolidation
                 }
                 clearance = std::min(clearance, value);
                 found = true;
+                return true;
+            };
+            if (index != nullptr && optimizedScratch != nullptr)
+            {
+                if (!QueryNeighbors(
+                        *index, base, supportRadius,
+                        optimizedScratch->LocalNeighbors,
+                        &optimizedScratch->RadiusQuery))
+                {
+                    failure = Status::SpatialQueryFailed;
+                    return false;
+                }
+                for (const auto neighbor : optimizedScratch->LocalNeighbors)
+                {
+                    if (neighbor >= points.size() || !accumulate(neighbor))
+                        return false;
+                }
+            }
+            else
+            {
+                for (std::size_t i = 0u; i < points.size(); ++i)
+                {
+                    if (!accumulate(i))
+                        return false;
+                }
             }
             if (!found)
             {
                 failure = Status::EmptyNeighborhood;
+                return false;
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool PrepareEarPointCache(
+            const std::span<const glm::vec3> points,
+            const std::span<const glm::vec3> normals,
+            OptimizedExecutionScratch& scratch)
+        {
+            if (points.size() != normals.size())
+                return false;
+            scratch.EarPoints.assign(points.begin(), points.end());
+            scratch.EarNormals.assign(normals.begin(), normals.end());
+            return true;
+        }
+
+        [[nodiscard]] bool ClearanceOptimized(
+            const glm::vec3 base,
+            const double supportRadius,
+            const OptimizedExecutionScratch& scratch,
+            double& clearance,
+            Status& failure) noexcept
+        {
+            const glm::dvec3 query{base};
+            const double supportSquared = supportRadius * supportRadius;
+            double minimumSquared = std::numeric_limits<double>::infinity();
+            bool found = false;
+            for (std::size_t i = 0u; i < scratch.EarPoints.size(); ++i)
+            {
+                const glm::dvec3 offset = query - scratch.EarPoints[i];
+                const double distanceSquared = glm::dot(offset, offset);
+                if (!(distanceSquared < supportSquared))
+                    continue;
+                const glm::dvec3 tangential = offset -
+                    glm::dot(scratch.EarNormals[i], offset) *
+                        scratch.EarNormals[i];
+                const double valueSquared = glm::dot(
+                    tangential, tangential);
+                if (!std::isfinite(valueSquared) || valueSquared < 0.0)
+                {
+                    failure = Status::NumericalFailure;
+                    return false;
+                }
+                minimumSquared = std::min(minimumSquared, valueSquared);
+                found = true;
+            }
+            if (!found)
+            {
+                failure = Status::EmptyNeighborhood;
+                return false;
+            }
+            clearance = std::sqrt(minimumSquared);
+            if (!std::isfinite(clearance))
+            {
+                failure = Status::NumericalFailure;
                 return false;
             }
             return true;
@@ -1169,53 +1708,72 @@ namespace Geometry::PointCloud::Consolidation
             std::vector<glm::vec3>& points,
             std::vector<glm::vec3>& normals,
             Diagnostics& diagnostics,
-            Status& failure)
+            Status& failure,
+            OptimizedExecutionScratch* const optimizedScratch = nullptr)
         {
+            if (optimizedScratch != nullptr &&
+                !PrepareEarPointCache(points, normals, *optimizedScratch))
+            {
+                failure = Status::InvalidNormals;
+                return false;
+            }
+
             double bestPriority = -1.0;
             std::size_t bestFirst = 0u;
             std::size_t bestSecond = 0u;
             glm::vec3 bestBase{};
+            const auto considerPair = [&](const std::size_t i,
+                                          const std::size_t j)
+            {
+                const double pairDistanceSquared =
+                    DistanceSquared(points[i], points[j]);
+                if (!(pairDistanceSquared <
+                      params.SupportRadius * params.SupportRadius))
+                {
+                    return true;
+                }
+                const glm::vec3 base = 0.5f * (points[i] + points[j]);
+                double clearance = 0.0;
+                const bool clearanceSucceeded = optimizedScratch != nullptr
+                    ? ClearanceOptimized(
+                        base, params.SupportRadius, *optimizedScratch,
+                        clearance, failure)
+                    : Clearance(
+                        base, points, normals, params.SupportRadius,
+                        clearance, failure);
+                if (!clearanceSucceeded)
+                {
+                    return false;
+                }
+                const double alignment = std::clamp(
+                    glm::dot(
+                        glm::dvec3(normals[i]),
+                        glm::dvec3(normals[j])),
+                    -1.0, 1.0);
+                const double priority = std::pow(
+                    2.0 - alignment, strategy.EdgeSensitivity) * clearance;
+                ++diagnostics.EdgePriorityEvaluations;
+                if (!std::isfinite(priority))
+                {
+                    failure = Status::NumericalFailure;
+                    return false;
+                }
+                if (priority > bestPriority)
+                {
+                    bestPriority = priority;
+                    bestFirst = i;
+                    bestSecond = j;
+                    bestBase = base;
+                }
+                return true;
+            };
+
             for (std::size_t i = 0u; i < points.size(); ++i)
             {
                 for (std::size_t j = i + 1u; j < points.size(); ++j)
                 {
-                    const double pairDistanceSquared =
-                        DistanceSquared(points[i], points[j]);
-                    if (!(pairDistanceSquared <
-                          params.SupportRadius * params.SupportRadius))
-                    {
-                        continue;
-                    }
-                    const glm::vec3 base =
-                        0.5f * (points[i] + points[j]);
-                    double clearance = 0.0;
-                    if (!Clearance(
-                            base, points, normals, params.SupportRadius,
-                            clearance, failure))
-                    {
+                    if (!considerPair(i, j))
                         return false;
-                    }
-                    const double alignment = std::clamp(
-                        glm::dot(
-                            glm::dvec3(normals[i]),
-                            glm::dvec3(normals[j])),
-                        -1.0, 1.0);
-                    const double priority = std::pow(
-                        2.0 - alignment, strategy.EdgeSensitivity) *
-                        clearance;
-                    ++diagnostics.EdgePriorityEvaluations;
-                    if (!std::isfinite(priority))
-                    {
-                        failure = Status::NumericalFailure;
-                        return false;
-                    }
-                    if (priority > bestPriority)
-                    {
-                        bestPriority = priority;
-                        bestFirst = i;
-                        bestSecond = j;
-                        bestBase = base;
-                    }
                 }
             }
 
@@ -1285,13 +1843,14 @@ namespace Geometry::PointCloud::Consolidation
             std::vector<glm::vec3>& points,
             std::vector<glm::vec3>& normals,
             Diagnostics& diagnostics,
-            Status& failure)
+            Status& failure,
+            OptimizedExecutionScratch* const optimizedScratch = nullptr)
         {
             while (points.size() < target)
             {
                 if (!InsertEarPoint(
                         strategy, params, points, normals,
-                        diagnostics, failure))
+                        diagnostics, failure, optimizedScratch))
                 {
                     return false;
                 }
@@ -1400,14 +1959,23 @@ namespace Geometry::PointCloud::Consolidation
             positions, std::span<const glm::vec3>{}, params);
     }
 
-    Result Consolidate(
+    [[nodiscard]] Result ConsolidateImpl(
         const std::span<const glm::vec3> positions,
         const std::span<const glm::vec3> normals,
-        const Params& params)
+        const Params& params,
+        const bool optimized)
     {
         Result result = InvalidRequest(positions, normals, params);
+        result.Diagnostics.Implementation = optimized
+            ? Validation::kOptimizedCandidateImplementation
+            : kCpuReferenceImplementation;
         if (!result.Succeeded())
             return result;
+
+        OptimizedExecutionScratch optimizedScratchStorage{};
+        OptimizedExecutionScratch* const optimizedScratch = optimized
+            ? &optimizedScratchStorage
+            : nullptr;
 
         Status failure = Status::NumericalFailure;
         std::vector<glm::vec3> sourceNormals{};
@@ -1431,6 +1999,12 @@ namespace Geometry::PointCloud::Consolidation
                 result.State = failure;
                 return result;
             }
+            if (optimized && !PrepareContinuousAttractionModel(
+                    continuousModel, params.SupportRadius))
+            {
+                result.State = Status::NumericalFailure;
+                return result;
+            }
             continuousModelPtr = &continuousModel;
         }
 
@@ -1445,12 +2019,20 @@ namespace Geometry::PointCloud::Consolidation
         std::vector<float> sourceWeights(positions.size(), 1.0f);
         if (result.Diagnostics.UsedDensityWeighting)
         {
-            const auto density = Kernels::ComputeDensityWeights(
-                positions,
-                sourceIndex,
-                params.SupportRadius,
-                Kernels::KernelType::ThetaLop,
-                Kernels::DensityWeightMode::Reciprocal);
+            const auto density = optimizedScratch != nullptr
+                ? Kernels::ComputeDensityWeights(
+                    positions,
+                    sourceIndex,
+                    params.SupportRadius,
+                    Kernels::KernelType::ThetaLop,
+                    Kernels::DensityWeightMode::Reciprocal,
+                    optimizedScratch->RadiusQuery)
+                : Kernels::ComputeDensityWeights(
+                    positions,
+                    sourceIndex,
+                    params.SupportRadius,
+                    Kernels::KernelType::ThetaLop,
+                    Kernels::DensityWeightMode::Reciprocal);
             if (!density.Succeeded())
             {
                 result.State = density.Status ==
@@ -1500,11 +2082,14 @@ namespace Geometry::PointCloud::Consolidation
             const bool initialized = continuousModelPtr != nullptr
                 ? ContinuousL2Initialize(
                     *continuousModelPtr, params.SupportRadius, projected,
-                    result.Diagnostics, failure)
+                    result.Diagnostics, failure, optimized)
                 : L2Initialize(
                     positions, sourceIndex, sourceWeights,
                     params.SupportRadius, projected,
-                    result.Diagnostics, failure);
+                    result.Diagnostics, failure,
+                    optimizedScratch != nullptr
+                        ? &optimizedScratch->RadiusQuery
+                        : nullptr);
             if (!initialized)
             {
                 result.State = failure;
@@ -1526,7 +2111,10 @@ namespace Geometry::PointCloud::Consolidation
                 !RefineNormals(
                     projected, params.SupportRadius,
                     NormalAngle(params.Method), projectedNormals,
-                    result.Diagnostics, failure))
+                    result.Diagnostics, failure,
+                    optimizedScratch != nullptr
+                        ? &optimizedScratch->RadiusQuery
+                        : nullptr))
             {
                 result.State = failure;
                 return result;
@@ -1540,7 +2128,8 @@ namespace Geometry::PointCloud::Consolidation
                     params,
                     projected,
                     result.Diagnostics,
-                    failure))
+                    failure,
+                    optimizedScratch))
             {
                 result.State = failure;
                 return result;
@@ -1572,7 +2161,7 @@ namespace Geometry::PointCloud::Consolidation
             {
                 if (!ProgressiveInsert(
                         *ear, params, target, projected, projectedNormals,
-                        result.Diagnostics, failure))
+                        result.Diagnostics, failure, optimizedScratch))
                 {
                     result.State = failure;
                     return result;
@@ -1590,6 +2179,14 @@ namespace Geometry::PointCloud::Consolidation
         return result;
     }
 
+    Result Consolidate(
+        const std::span<const glm::vec3> positions,
+        const std::span<const glm::vec3> normals,
+        const Params& params)
+    {
+        return ConsolidateImpl(positions, normals, params, false);
+    }
+
     Result Consolidate(const Cloud& cloud, const Params& params)
     {
         if (!cloud.IsValid() || cloud.HasGarbage() || cloud.IsSubmeshView())
@@ -1603,5 +2200,24 @@ namespace Geometry::PointCloud::Consolidation
         if (cloud.HasNormals())
             return Consolidate(cloud.Positions(), cloud.Normals(), params);
         return Consolidate(cloud.Positions(), params);
+    }
+
+    namespace Validation
+    {
+        Result ConsolidateCpuOptimizedCandidate(
+            const std::span<const glm::vec3> positions,
+            const Params& params)
+        {
+            return ConsolidateCpuOptimizedCandidate(
+                positions, std::span<const glm::vec3>{}, params);
+        }
+
+        Result ConsolidateCpuOptimizedCandidate(
+            const std::span<const glm::vec3> positions,
+            const std::span<const glm::vec3> normals,
+            const Params& params)
+        {
+            return ConsolidateImpl(positions, normals, params, true);
+        }
     }
 }

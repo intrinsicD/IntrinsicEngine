@@ -37,6 +37,12 @@ namespace Geometry::GaussianMixture
             double L22{0.0};
         };
 
+        struct PreparedModel
+        {
+            double WeightSum{0.0};
+            std::vector<Cholesky3> Factors{};
+        };
+
         [[nodiscard]] bool IsFinite(
             const glm::dvec3& value) noexcept
         {
@@ -172,54 +178,70 @@ namespace Geometry::GaussianMixture
                 : std::nullopt;
         }
 
-        [[nodiscard]] bool ValidateModelShape(
-            const Model& model) noexcept
+        [[nodiscard]] std::optional<PreparedModel> PrepareModel(
+            const Model& model)
         {
             if (model.Components.empty() ||
                 model.Weights.size() !=
                     model.Components.size())
             {
-                return false;
+                return std::nullopt;
             }
-            double weightSum = 0.0;
+            PreparedModel prepared{};
+            prepared.Factors.reserve(model.Components.size());
             for (std::size_t i = 0u;
                  i < model.Components.size();
                  ++i)
             {
+                const auto factor = Factor(
+                    model.Components[i].Covariance);
                 if (!std::isfinite(model.Weights[i]) ||
                     !(model.Weights[i] > 0.0) ||
                     !IsFinite(model.Components[i].Mean) ||
-                    !Factor(model.Components[i].Covariance))
+                    !factor.has_value())
                 {
-                    return false;
+                    return std::nullopt;
                 }
-                weightSum += model.Weights[i];
+                prepared.WeightSum += model.Weights[i];
+                prepared.Factors.push_back(*factor);
             }
-            return std::isfinite(weightSum) && weightSum > 0.0;
+            if (!std::isfinite(prepared.WeightSum) ||
+                !(prepared.WeightSum > 0.0))
+            {
+                return std::nullopt;
+            }
+            return prepared;
+        }
+
+        [[nodiscard]] bool ValidateModelShape(
+            const Model& model)
+        {
+            return PrepareModel(model).has_value();
         }
 
         [[nodiscard]] std::optional<std::vector<double>>
-        LogWeightedDensities(
+        LogWeightedDensitiesPrepared(
             const Model& model,
-            const glm::dvec3& point)
+            const glm::dvec3& point,
+            const PreparedModel& prepared)
         {
-            if (!ValidateModelShape(model) || !IsFinite(point))
+            if (prepared.Factors.size() != model.Components.size() ||
+                !IsFinite(point))
+            {
                 return std::nullopt;
-            const double weightSum = std::accumulate(
-                model.Weights.begin(),
-                model.Weights.end(), 0.0);
+            }
             std::vector<double> values(
                 model.Components.size(), 0.0);
             for (std::size_t i = 0u;
                  i < model.Components.size();
                  ++i)
             {
-                const auto logPdf = LogPdf(
-                    model.Components[i], point);
+                const auto logPdf = LogPdfWithFactor(
+                    model.Components[i], point, prepared.Factors[i]);
                 if (!logPdf)
                     return std::nullopt;
                 values[i] =
-                    std::log(model.Weights[i] / weightSum) +
+                    std::log(model.Weights[i] / prepared.WeightSum) +
                     *logPdf;
             }
             return values;
@@ -234,6 +256,35 @@ namespace Geometry::GaussianMixture
             for (const double value : values)
                 sum += std::exp(value - maximum);
             return maximum + std::log(sum);
+        }
+
+        [[nodiscard]] std::optional<std::vector<double>>
+        ResponsibilitiesPrepared(
+            const Model& model,
+            const glm::dvec3& point,
+            const PreparedModel& prepared)
+        {
+            auto logDensities = LogWeightedDensitiesPrepared(
+                model, point, prepared);
+            if (!logDensities)
+                return std::nullopt;
+            const double normalization = LogSumExp(*logDensities);
+            if (!std::isfinite(normalization))
+                return std::nullopt;
+            std::vector<double> responsibilities(
+                logDensities->size(), 0.0);
+            double sum = 0.0;
+            for (std::size_t i = 0u; i < logDensities->size(); ++i)
+            {
+                responsibilities[i] =
+                    std::exp((*logDensities)[i] - normalization);
+                sum += responsibilities[i];
+            }
+            if (!(sum > 0.0) || !std::isfinite(sum))
+                return std::nullopt;
+            for (double& value : responsibilities)
+                value /= sum;
+            return responsibilities;
         }
 
         void AddOuterProduct(
@@ -353,6 +404,9 @@ namespace Geometry::GaussianMixture
         {
             const std::size_t componentCount =
                 current.Components.size();
+            const auto prepared = PrepareModel(current);
+            if (!prepared)
+                return std::nullopt;
             std::vector<double> memberships(
                 points.size() * componentCount, 0.0);
             std::vector<double> totals(componentCount, 0.0);
@@ -363,8 +417,8 @@ namespace Geometry::GaussianMixture
                  pointIndex < points.size();
                  ++pointIndex)
             {
-                const auto responsibilities = Responsibilities(
-                    current, glm::dvec3(points[pointIndex]));
+                const auto responsibilities = ResponsibilitiesPrepared(
+                    current, glm::dvec3(points[pointIndex]), *prepared);
                 if (!responsibilities)
                     return std::nullopt;
                 for (std::size_t component = 0u;
@@ -544,44 +598,28 @@ namespace Geometry::GaussianMixture
         const Model& mixture,
         const glm::dvec3& point)
     {
-        auto logDensities = LogWeightedDensities(
-            mixture, point);
-        if (!logDensities)
-            return std::nullopt;
-        const double normalization = LogSumExp(*logDensities);
-        if (!std::isfinite(normalization))
-            return std::nullopt;
-        std::vector<double> responsibilities(
-            logDensities->size(), 0.0);
-        double sum = 0.0;
-        for (std::size_t i = 0u;
-             i < logDensities->size();
-             ++i)
-        {
-            responsibilities[i] =
-                std::exp((*logDensities)[i] - normalization);
-            sum += responsibilities[i];
-        }
-        if (!(sum > 0.0) || !std::isfinite(sum))
-            return std::nullopt;
-        for (double& value : responsibilities)
-            value /= sum;
-        return responsibilities;
+        const auto prepared = PrepareModel(mixture);
+        return prepared
+            ? ResponsibilitiesPrepared(mixture, point, *prepared)
+            : std::nullopt;
     }
 
     std::optional<double> LogLikelihood(
         const Model& mixture,
         const std::span<const glm::vec3> points)
     {
-        if (points.empty() || !ValidateModelShape(mixture))
+        if (points.empty())
+            return std::nullopt;
+        const auto prepared = PrepareModel(mixture);
+        if (!prepared)
             return std::nullopt;
         double likelihood = 0.0;
         for (const glm::vec3& point : points)
         {
             if (!IsFinite(point))
                 return std::nullopt;
-            const auto logDensities = LogWeightedDensities(
-                mixture, glm::dvec3(point));
+            const auto logDensities = LogWeightedDensitiesPrepared(
+                mixture, glm::dvec3(point), *prepared);
             if (!logDensities)
                 return std::nullopt;
             likelihood += LogSumExp(*logDensities);

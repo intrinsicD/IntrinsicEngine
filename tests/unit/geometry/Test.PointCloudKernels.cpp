@@ -258,6 +258,45 @@ TEST(PointCloudKernels, SuppliedIndexAndRepeatedRunsAreBitwiseDeterministic)
     EXPECT_TRUE(supplied.Diagnostics.UsedSuppliedIndex);
 }
 
+TEST(PointCloudKernels, RadiusScratchPreservesDensityWeightsAcrossReuse)
+{
+    const std::vector<glm::vec3> points = UniformGrid();
+    Geometry::KDTree index{};
+    ASSERT_TRUE(index.BuildFromPoints(points).has_value());
+    Geometry::KDTree::RadiusQueryScratch scratch{};
+
+    const auto expected = Kernels::ComputeDensityWeights(
+        points,
+        index,
+        1.5,
+        Kernels::KernelType::ThetaLop,
+        Kernels::DensityWeightMode::Reciprocal);
+    const auto first = Kernels::ComputeDensityWeights(
+        points,
+        index,
+        1.5,
+        Kernels::KernelType::ThetaLop,
+        Kernels::DensityWeightMode::Reciprocal,
+        scratch);
+    const auto second = Kernels::ComputeDensityWeights(
+        points,
+        index,
+        1.5,
+        Kernels::KernelType::ThetaLop,
+        Kernels::DensityWeightMode::Reciprocal,
+        scratch);
+
+    ASSERT_TRUE(expected.Succeeded());
+    ASSERT_TRUE(first.Succeeded());
+    ASSERT_TRUE(second.Succeeded());
+    EXPECT_EQ(first.Weights, expected.Weights);
+    EXPECT_EQ(second.Weights, expected.Weights);
+    EXPECT_EQ(first.Diagnostics.NeighborContributionCount,
+              expected.Diagnostics.NeighborContributionCount);
+    EXPECT_EQ(second.Diagnostics.NeighborContributionCount,
+              expected.Diagnostics.NeighborContributionCount);
+}
+
 TEST(PointCloudKernels, DensityBroadPhaseIncludesDoubleSupportBoundary)
 {
     constexpr float x = 7.776026636602611e-19f;

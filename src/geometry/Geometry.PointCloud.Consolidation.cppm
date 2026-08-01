@@ -211,4 +211,21 @@ export namespace Geometry::PointCloud::Consolidation
     [[nodiscard]] Result Consolidate(
         const Cloud& cloud,
         const Params& params = {});
+
+    namespace Validation
+    {
+        inline constexpr std::string_view kOptimizedCandidateImplementation =
+            "cpu_optimized_candidate";
+
+        // Executes the frozen METHOD-019 candidate. No strategy met the
+        // preregistered acceleration gate, so this remains an explicit
+        // benchmark/parity seam and is not an ordinary selectable backend.
+        [[nodiscard]] Result ConsolidateCpuOptimizedCandidate(
+            std::span<const glm::vec3> positions,
+            const Params& params = {});
+        [[nodiscard]] Result ConsolidateCpuOptimizedCandidate(
+            std::span<const glm::vec3> positions,
+            std::span<const glm::vec3> normals,
+            const Params& params = {});
+    }
 }

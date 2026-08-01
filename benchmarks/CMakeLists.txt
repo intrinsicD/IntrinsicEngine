@@ -28,6 +28,7 @@ add_executable(IntrinsicBenchmarkSmoke
     geometry/Bench_ContinuousLopReferenceSmoke.cpp
     geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp
     geometry/Bench_ExampleSmoke.cpp
+    geometry/Bench_LopFamilyComparisonSmoke.cpp
     geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
     geometry/Bench_PointCloudFilteringSmoke.cpp
     geometry/Bench_ProgressivePoissonReferenceSmoke.cpp

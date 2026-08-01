@@ -122,4 +122,14 @@ export namespace Geometry::PointCloud::Kernels
         double supportRadius,
         KernelType kernel = KernelType::ThetaLop,
         DensityWeightMode mode = DensityWeightMode::Direct);
+
+    // Reuses KD-tree traversal storage across repeated radius queries while
+    // preserving the same sorted-neighbor accumulation order and result.
+    [[nodiscard]] DensityWeightResult ComputeDensityWeights(
+        std::span<const glm::vec3> points,
+        const Geometry::KDTree& index,
+        double supportRadius,
+        KernelType kernel,
+        DensityWeightMode mode,
+        Geometry::KDTree::RadiusQueryScratch& scratch);
 }

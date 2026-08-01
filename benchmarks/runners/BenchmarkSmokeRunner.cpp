@@ -19,6 +19,7 @@
 #include "../geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
 #include "../geometry/Bench.ContinuousLopReferenceSmoke.hpp"
 #include "../geometry/Bench.EdgeAwareResamplingReferenceSmoke.hpp"
+#include "../geometry/Bench.LopFamilyComparisonSmoke.hpp"
 #include "../geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp"
 #include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
@@ -648,6 +649,129 @@ auto EmitPointCloudConsolidationReferenceSmoke(const std::string &commit)
   return EmittedBenchmark{
       kPointCloudConsolidationReferenceSmokeBenchmarkId,
       out.str(), metrics.Succeeded};
+}
+
+auto EmitLopFamilyComparisonSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunLopFamilyComparisonSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kLopFamilyComparisonBenchmarkId) << "\",\n"
+      << "  \"method\": \"" << EscapeJson(kLopFamilyComparisonMethod)
+      << "\",\n"
+      << "  \"backend\": \"cpu_optimized\",\n"
+      << "  \"dataset\": \"" << EscapeJson(kLopFamilyComparisonDataset)
+      << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"paired_backend_comparison\",\n"
+      << "    \"baseline_backend\": \"cpu_reference\",\n"
+      << "    \"probe_backend\": \"cpu_optimized\",\n"
+      << "    \"warmup_pairs\": " << kLopFamilyComparisonWarmupPairs
+      << ",\n"
+      << "    \"measured_pairs\": " << kLopFamilyComparisonMeasuredPairs
+      << ",\n"
+      << "    \"timing_statistic\": \"median_paired_runtime_ratio\",\n"
+      << "    \"backend_runtime_statistic\": "
+         "\"median_individual_runtime_ms\",\n"
+      << "    \"measurement_order\": "
+         "\"alternating_reference_optimized_optimized_reference\",\n"
+      << "    \"useful_runtime_ratio_max\": "
+      << kLopFamilyUsefulRuntimeRatioMax << ",\n"
+      << "    \"position_rms_delta_max\": " << kLopFamilyRmsDeltaMax
+      << ",\n"
+      << "    \"position_linf_delta_max\": " << kLopFamilyLinfDeltaMax
+      << ",\n"
+      << "    \"normal_rms_delta_max\": " << kLopFamilyRmsDeltaMax
+      << ",\n"
+      << "    \"normal_linf_delta_max\": " << kLopFamilyLinfDeltaMax
+      << ",\n"
+      << "    \"supported_cpu_threads\": [1],\n"
+      << "    \"evaluated_strategy_count\": "
+      << metrics.EvaluatedStrategyCount << ",\n"
+      << "    \"adopted_strategy_count\": "
+      << metrics.AdoptedStrategyCount << ",\n"
+      << "    \"strategies\": [\n";
+
+  for (std::size_t i = 0u; i < metrics.Strategies.size(); ++i) {
+    const auto &strategy = metrics.Strategies[i];
+    out << "      {\n"
+        << "        \"strategy\": \"" << EscapeJson(strategy.Strategy)
+        << "\",\n"
+        << "        \"reference_backend\": \"cpu_reference\",\n"
+        << "        \"optimized_backend\": \"cpu_optimized\",\n"
+        << "        \"reference_status\": \""
+        << EscapeJson(strategy.ReferenceStatus) << "\",\n"
+        << "        \"optimized_status\": \""
+        << EscapeJson(strategy.OptimizedStatus) << "\",\n"
+        << "        \"input_point_count\": " << strategy.InputPointCount
+        << ",\n"
+        << "        \"output_point_count\": " << strategy.OutputPointCount
+        << ",\n"
+        << "        \"reference_median_runtime_ms\": "
+        << strategy.ReferenceMedianRuntimeMilliseconds << ",\n"
+        << "        \"optimized_median_runtime_ms\": "
+        << strategy.OptimizedMedianRuntimeMilliseconds << ",\n"
+        << "        \"median_runtime_ratio\": "
+        << strategy.MedianRuntimeRatio << ",\n"
+        << "        \"reference_runtime_samples_ms\": ";
+    EmitDoubleSamples(out, strategy.ReferenceRuntimeSamplesMilliseconds);
+    out << ",\n        \"optimized_runtime_samples_ms\": ";
+    EmitDoubleSamples(out, strategy.OptimizedRuntimeSamplesMilliseconds);
+    out << ",\n        \"paired_runtime_ratio_samples\": ";
+    EmitDoubleSamples(out, strategy.PairedRuntimeRatios);
+    out << ",\n"
+        << "        \"position_rms_delta\": " << strategy.PositionRmsDelta
+        << ",\n"
+        << "        \"position_linf_delta\": " << strategy.PositionLinfDelta
+        << ",\n"
+        << "        \"normal_rms_delta\": " << strategy.NormalRmsDelta
+        << ",\n"
+        << "        \"normal_linf_delta\": " << strategy.NormalLinfDelta
+        << ",\n"
+        << "        \"state_matched\": "
+        << (strategy.StateMatched ? "true" : "false") << ",\n"
+        << "        \"output_shape_matched\": "
+        << (strategy.OutputShapeMatched ? "true" : "false") << ",\n"
+        << "        \"reference_identity_matched\": "
+        << (strategy.ReferenceIdentityMatched ? "true" : "false") << ",\n"
+        << "        \"optimized_identity_matched\": "
+        << (strategy.OptimizedIdentityMatched ? "true" : "false") << ",\n"
+        << "        \"optimized_used_fallback\": "
+        << (strategy.OptimizedUsedFallback ? "true" : "false") << ",\n"
+        << "        \"reference_deterministic\": "
+        << (strategy.ReferenceDeterministic ? "true" : "false") << ",\n"
+        << "        \"optimized_deterministic\": "
+        << (strategy.OptimizedDeterministic ? "true" : "false") << ",\n"
+        << "        \"parity_passed\": "
+        << (strategy.ParityPassed ? "true" : "false") << ",\n"
+        << "        \"acceleration_passed\": "
+        << (strategy.AccelerationPassed ? "true" : "false") << ",\n"
+        << "        \"adopted\": "
+        << (strategy.Adopted ? "true" : "false") << "\n"
+        << "      }"
+        << (i + 1u == metrics.Strategies.size() ? "\n" : ",\n");
+  }
+
+  out << "    ]\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kLopFamilyComparisonBenchmarkId, out.str(),
+                          metrics.Succeeded};
 }
 
 auto EmitContinuousLopReferenceSmoke(const std::string &commit)
@@ -1714,6 +1838,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
   emitted.push_back(EmitPointCloudConsolidationReferenceSmoke(commit));
+  emitted.push_back(EmitLopFamilyComparisonSmoke(commit));
   emitted.push_back(EmitContinuousLopReferenceSmoke(commit));
   emitted.push_back(EmitEdgeAwareResamplingReferenceSmoke(commit));
   emitted.push_back(EmitBoundaryFirstFlatteningReferenceSmoke(commit));

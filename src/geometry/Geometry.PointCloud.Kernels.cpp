@@ -143,7 +143,8 @@ namespace Geometry::PointCloud::Kernels
             const double supportRadius,
             const KernelType kernel,
             const DensityWeightMode mode,
-            const bool suppliedIndex)
+            const bool suppliedIndex,
+            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr)
         {
             DensityWeightResult result = InvalidRequest(
                 points,
@@ -173,8 +174,11 @@ namespace Geometry::PointCloud::Kernels
                         queryRadius,
                         std::numeric_limits<float>::infinity());
                 }
-                const auto query = index.QueryRadius(
-                    points[i], queryRadius, neighbors);
+                const auto query = scratch != nullptr
+                    ? index.QueryRadius(
+                        points[i], queryRadius, neighbors, *scratch)
+                    : index.QueryRadius(
+                        points[i], queryRadius, neighbors);
                 ++result.Diagnostics.QueryCount;
                 if (!query.has_value())
                 {
@@ -446,5 +450,23 @@ namespace Geometry::PointCloud::Kernels
             kernel,
             mode,
             true);
+    }
+
+    DensityWeightResult ComputeDensityWeights(
+        const std::span<const glm::vec3> points,
+        const Geometry::KDTree& index,
+        const double supportRadius,
+        const KernelType kernel,
+        const DensityWeightMode mode,
+        Geometry::KDTree::RadiusQueryScratch& scratch)
+    {
+        return ComputeWithIndex(
+            points,
+            index,
+            supportRadius,
+            kernel,
+            mode,
+            true,
+            &scratch);
     }
 }

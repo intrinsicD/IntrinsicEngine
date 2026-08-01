@@ -287,6 +287,13 @@ namespace Geometry
     std::optional<KDTreeRadiusResult> KDTree::QueryRadius(const glm::vec3& query, const float radius,
         std::vector<ElementIndex>& outElementIndices) const
     {
+        RadiusQueryScratch scratch{};
+        return QueryRadius(query, radius, outElementIndices, scratch);
+    }
+
+    std::optional<KDTreeRadiusResult> KDTree::QueryRadius(const glm::vec3& query, const float radius,
+        std::vector<ElementIndex>& outElementIndices, RadiusQueryScratch& scratch) const
+    {
         outElementIndices.clear();
         if (m_Nodes.empty() || !std::isfinite(radius) || radius < 0.0f)
         {
@@ -295,16 +302,16 @@ namespace Geometry
 
         const float radius2 = radius * radius;
 
-        std::vector<NodeIndex> stack;
-        stack.push_back(0u);
+        scratch.NodeStack.clear();
+        scratch.NodeStack.push_back(0u);
 
         std::size_t visitedNodes = 0;
         std::size_t distanceEvaluations = 0;
 
-        while (!stack.empty())
+        while (!scratch.NodeStack.empty())
         {
-            const NodeIndex nodeIndex = stack.back();
-            stack.pop_back();
+            const NodeIndex nodeIndex = scratch.NodeStack.back();
+            scratch.NodeStack.pop_back();
             ++visitedNodes;
 
             const Node& node = m_Nodes[nodeIndex];
@@ -329,8 +336,8 @@ namespace Geometry
                 continue;
             }
 
-            stack.push_back(node.Left);
-            stack.push_back(node.Right);
+            scratch.NodeStack.push_back(node.Left);
+            scratch.NodeStack.push_back(node.Right);
         }
 
         std::sort(outElementIndices.begin(), outElementIndices.end());

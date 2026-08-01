@@ -270,6 +270,151 @@ namespace
             EXPECT_TRUE(std::isfinite(point.z));
         }
     }
+
+    struct VectorDelta
+    {
+        double Rms{0.0};
+        double Linf{0.0};
+    };
+
+    [[nodiscard]] VectorDelta MeasureDelta(
+        const std::span<const glm::vec3> reference,
+        const std::span<const glm::vec3> candidate)
+    {
+        EXPECT_EQ(reference.size(), candidate.size());
+        if (reference.size() != candidate.size() || reference.empty())
+            return {};
+        double squaredSum = 0.0;
+        double maximum = 0.0;
+        for (std::size_t i = 0u; i < reference.size(); ++i)
+        {
+            const glm::dvec3 delta =
+                glm::dvec3(reference[i]) - glm::dvec3(candidate[i]);
+            const double squared = glm::dot(delta, delta);
+            squaredSum += squared;
+            maximum = std::max(maximum, std::sqrt(squared));
+        }
+        return VectorDelta{
+            std::sqrt(squaredSum / static_cast<double>(reference.size())),
+            maximum,
+        };
+    }
+
+    void ExpectCandidateParity(
+        const std::span<const glm::vec3> positions,
+        const std::span<const glm::vec3> normals,
+        const Consolidation::Params& params)
+    {
+        const auto reference = normals.empty()
+            ? Consolidation::Consolidate(positions, params)
+            : Consolidation::Consolidate(positions, normals, params);
+        const auto candidate = normals.empty()
+            ? Consolidation::Validation::ConsolidateCpuOptimizedCandidate(
+                positions, params)
+            : Consolidation::Validation::ConsolidateCpuOptimizedCandidate(
+                positions, normals, params);
+        const auto repeated = normals.empty()
+            ? Consolidation::Validation::ConsolidateCpuOptimizedCandidate(
+                positions, params)
+            : Consolidation::Validation::ConsolidateCpuOptimizedCandidate(
+                positions, normals, params);
+
+        EXPECT_EQ(reference.Diagnostics.Implementation,
+                  Consolidation::kCpuReferenceImplementation);
+        EXPECT_EQ(candidate.Diagnostics.Implementation,
+                  Consolidation::Validation::
+                      kOptimizedCandidateImplementation);
+        ASSERT_EQ(candidate.State, reference.State)
+            << "reference=" << Consolidation::DebugName(reference.State)
+            << " candidate=" << Consolidation::DebugName(candidate.State);
+        EXPECT_EQ(repeated.State, candidate.State);
+        EXPECT_EQ(repeated.Positions, candidate.Positions);
+        EXPECT_EQ(repeated.Normals, candidate.Normals);
+        EXPECT_EQ(candidate.Positions.size(), reference.Positions.size());
+        EXPECT_EQ(candidate.Normals.size(), reference.Normals.size());
+
+        const VectorDelta positionsDelta = MeasureDelta(
+            reference.Positions, candidate.Positions);
+        const VectorDelta normalsDelta = MeasureDelta(
+            reference.Normals, candidate.Normals);
+        EXPECT_LE(positionsDelta.Rms, 1.0e-6);
+        EXPECT_LE(positionsDelta.Linf, 2.0e-6);
+        EXPECT_LE(normalsDelta.Rms, 1.0e-6);
+        EXPECT_LE(normalsDelta.Linf, 2.0e-6);
+    }
+}
+
+TEST(PointCloudConsolidation, OptimizedCandidatesMatchReferenceAndAreDeterministic)
+{
+    const auto plane = NoisyPlane(5);
+
+    {
+        auto lop = ReferenceParams();
+        lop.Method = Consolidation::LopStrategy{};
+        lop.MaxIterations = 2u;
+        lop.ConvergenceTolerance = 1.0;
+        lop.TargetPointCount = 16u;
+        SCOPED_TRACE("lop");
+        ExpectCandidateParity(plane, {}, lop);
+    }
+
+    {
+        auto wlop = ReferenceParams();
+        wlop.MaxIterations = 2u;
+        wlop.ConvergenceTolerance = 1.0;
+        wlop.TargetPointCount = 16u;
+        SCOPED_TRACE("wlop");
+        ExpectCandidateParity(plane, {}, wlop);
+    }
+
+    {
+        auto clop = ClopParams(5u);
+        clop.MaxIterations = 1u;
+        clop.ConvergenceTolerance = 1.0;
+        clop.TargetPointCount = 16u;
+        SCOPED_TRACE("clop");
+        ExpectCandidateParity(plane, {}, clop);
+    }
+
+    const DihedralFixture dihedral = NoisyDihedral(3, 3);
+    auto ear = ReferenceParams();
+    ear.Method = Consolidation::EarStrategy{
+        .NormalSource =
+            Consolidation::NormalSourcePolicy::RequireAuthored,
+        .NormalAngleRadians = 3.14159265358979323846 / 12.0,
+        .EdgeSensitivity = 5.0,
+        .NormalRefinementRounds = 2u,
+    };
+    ear.SupportRadius = 0.65;
+    ear.RepulsionWeight = 0.1;
+    ear.MaxIterations = 2u;
+    ear.ConvergenceTolerance = 1.0;
+    ear.TargetPointCount = dihedral.Positions.size() + 2u;
+    ear.MaxOutputPointCount = ear.TargetPointCount;
+    {
+        SCOPED_TRACE("ear");
+        ExpectCandidateParity(dihedral.Positions, dihedral.Normals, ear);
+    }
+}
+
+TEST(PointCloudConsolidation, OptimizedCandidateFailureMatchesReference)
+{
+    const std::vector<glm::vec3> sparse{
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+    };
+    auto params = ReferenceParams();
+    params.SupportRadius = 0.25;
+    const auto reference = Consolidation::Consolidate(sparse, params);
+    const auto candidate =
+        Consolidation::Validation::ConsolidateCpuOptimizedCandidate(
+            sparse, params);
+    EXPECT_EQ(reference.State, Consolidation::Status::EmptyNeighborhood);
+    EXPECT_EQ(candidate.State, reference.State);
+    EXPECT_TRUE(reference.Positions.empty());
+    EXPECT_TRUE(candidate.Positions.empty());
+    EXPECT_EQ(candidate.Diagnostics.Implementation,
+              Consolidation::Validation::kOptimizedCandidateImplementation);
 }
 
 TEST(PointCloudConsolidation, WlopDenoisesPlaneAndSphere)

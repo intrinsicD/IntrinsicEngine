@@ -102,6 +102,30 @@ TEST(KDTree, RadiusQueryMatchesBruteForceSetForPointAabbs)
     EXPECT_EQ(kdIndices, brute);
 }
 
+TEST(KDTree, RadiusQueryScratchPreservesOrderingAcrossReuse)
+{
+    const std::vector<glm::vec3> points{
+        {-2.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
+        {2.0f, 0.0f, 0.0f},
+    };
+    Geometry::KDTree tree{};
+    ASSERT_TRUE(tree.BuildFromPoints(points).has_value());
+
+    Geometry::KDTree::RadiusQueryScratch scratch{};
+    std::vector<Geometry::KDTree::ElementIndex> expected{};
+    std::vector<Geometry::KDTree::ElementIndex> actual{};
+    ASSERT_TRUE(tree.QueryRadius({0.0f, 0.0f, 0.0f}, 1.1f, expected));
+    ASSERT_TRUE(tree.QueryRadius(
+        {0.0f, 0.0f, 0.0f}, 1.1f, actual, scratch));
+    EXPECT_EQ(actual, expected);
+
+    ASSERT_TRUE(tree.QueryRadius({1.5f, 0.0f, 0.0f}, 0.6f, expected));
+    ASSERT_TRUE(tree.QueryRadius(
+        {1.5f, 0.0f, 0.0f}, 0.6f, actual, scratch));
+    EXPECT_EQ(actual, expected);
+}
+
 TEST(KDTree, SupportsVolumetricElementsThroughAabbInput)
 {
     std::vector<Geometry::AABB> boxes{
