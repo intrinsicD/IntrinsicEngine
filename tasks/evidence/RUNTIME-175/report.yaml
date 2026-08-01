@@ -1,0 +1,517 @@
+schema_version: 1
+task_id: RUNTIME-175
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T20:14:27Z'
+claim_eligible: false
+source:
+  base_ref: 09134369
+  base_revision: 09134369dc4d9a162f779b328755ee6f0c984b6a
+  head_revision: 7b8d2bc227a753e21f0954597bc140fab43cb23b
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: true
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: 1ef3391c830cfcf2b99101d0763e4f7d374fa2ab3d3729ada9ffd3c412b8b906
+  - path: docs/architecture/engine-config.md
+    sha256: 81ea17e32c645031142a1d01ad9b8f1c85fd7514481acfc038944484d6986ea9
+  - path: docs/architecture/runtime-config-control.md
+    sha256: 9f7023bd7eb5f78040e5d2456548aae5b49fb06bb846cf14a20cca440b929db2
+  - path: docs/architecture/sandbox-editor-feature-boundaries.md
+    sha256: 809fb1aa8e3e7af77b23b5a004819067fd0bcd1982e4f762bc154d30be9ae6fa
+  - path: methods/geometry/continuous_lop/README.md
+    sha256: c47979d032dfdee4ec8bf4bd70e8f9d95725df9d4b961043a12a483a7651ad8d
+  - path: methods/geometry/edge_aware_resampling/README.md
+    sha256: 542b3be9178a8d1423e22902f8dfb98e8071c0e33656b9c28eaae17ea88d7903
+  - path: methods/geometry/locally_optimal_projection/README.md
+    sha256: 0cd024c35059c5e5279537aa410f3861938db05b3d6d959d6671916a2222e626
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+    sha256: acecd883dcb02a71d1a3a14ebc628f49ca2091fcd6748f924cf148c597c8bc09
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: f7d8884094c98fe162f6253e69f2646e4ce25ec6092f27cffc2cabb09df4d87e
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: 3588d3c86701952ccd815cec905bef34e2cb99e8737f8edc8b2e3e3b75b1c713
+  - path: src/app/Sandbox/README.md
+    sha256: e4fb8dcf60025cb227a0e57a508492fe49192247d0677405e7e598ccab27dab4
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cpp
+    sha256: 16f74901e33817566316046ddbb2d8081fec547685b7adb3e81b38293b382442
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cppm
+    sha256: 5e03f99a1bc3c71fe4bd6e3fe0cb68f69b443832b63e39443ecd950527d27776
+  - path: src/app/Sandbox/main.cpp
+    sha256: c3463e458a9ee30f6257c843f11395f5406fde0c2650f6e054c903f0ba6fbf6e
+  - path: src/runtime/CMakeLists.txt
+    sha256: 14c118a54f4a4b097e914b0830e41adef531cf714c82c461938bc472aeb216f5
+  - path: src/runtime/README.md
+    sha256: 608e82991f2ad78b15ef083dea5c009d84e18cc380da8a5aff6aa02dc161036e
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: 0d4dce45828b8fa438c38efa6a496d9ab2c0ba1ac619212bacd335cd93d7da17
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cpp
+    sha256: 90ba1647e13b57225d8586397c60798410b807b526a5e3600311fd6c886309de
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cppm
+    sha256: a1653effbbe81c5c3d55a993bd65565a765bc632dd5e7f4fd4d3de47c8be4ab7
+  - path: src/runtime/Runtime.PointCloudConsolidationConfig.cpp
+    sha256: 29e34388efc36f328ff4f552625a1fcf629e75df66864c243c418e6cae6dbad2
+  - path: src/runtime/Runtime.PointCloudConsolidationConfig.cppm
+    sha256: 80181157b1dbabea89fe1921e5336aa2e31e4e80bcae06163e714aca8dfb326f
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
+    sha256: a59ac445340fa6739a50009321de8086c1c68fa4dec9d00105c1b735333ffeed
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
+    sha256: b62c74c9a3de9516c745d0553534782a08670c40cfbd6c9aacc85749c8117649
+  - path: src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: 9e6e5849e18dd339cfe2484bc12569b4cdc506f17b1b39e5799407b7a734e1d2
+  - path: src/runtime/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: bd9609e160752c233ca6b85d01f4f7d8f78524e1c65b2a38386d4c12e2a0d54b
+  - path: src/runtime/internal/Runtime.EditorWorkspaceSession.cpp
+    sha256: 148104862fa5101e901b542be329881874f3065d79ec668c805623a814b8cdef
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: 368203245364a8bee2cb6a26fefc0b85c8dc928ace6a171dd74253f4ebfb5302
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+    sha256: 281482f782c2e81eae40c21eb110809d32b588fc94b533a03c1b133ae08edbf8
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 8c22aef96a6c6b574444d35d297aada654316ba02a10ea4ee8e7289063aa8b29
+  - path: tasks/active/README.md
+    sha256: 21086954992e59188d218ea0846e82b5f40f61219e116e842695ba98b0b82a5b
+  - path: tasks/backlog/README.md
+    sha256: 33dd0b8795653fcc866801df1113cd404f8f017f03c8563b5785233966a7e81a
+  - path: tasks/backlog/runtime/README.md
+    sha256: 11d3b356c0bb37fa77c2686e06335e5324346ea7afbdd1cb5af5c83de1431899
+  - path: tasks/backlog/ui/README.md
+    sha256: 0213fb7b8ba9a50177519d322674277ce773217b1f5fc42bf6f21832c462e39a
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: cbf4a524292f7d449de9dd4f937bc2c5c185135a5ddfaead86a27693e5c20818
+  - path: tasks/done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md
+    sha256: 9a8c90f925c6cac908a3fc2c14d21b90d4edf4234d053a72c8ead9b6487e9bcf
+  - path: tasks/done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md
+    sha256: f6be56d7a8b398289297bf536a80b02a4a4f893899fb885f40994f992d280ed2
+  - path: tasks/evidence/UI-035/commands/canonical-editor-suite.json
+    sha256: fda0ef3e50b3dbb4f6780adada50830a6591693f9119e95e1a0a62eb21ef1102
+  - path: tasks/evidence/UI-035/commands/canonical-editor-suite.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/canonical-editor-suite.stdout.log
+    sha256: b3ee98ad583eedaf16b55624387bc8408a39c21fe538eb46427762908eb345fa
+  - path: tasks/evidence/UI-035/commands/canonical-panel-tests.json
+    sha256: b6bc0a83c19c547fcc35ce87cafb76f5613e8f62b18c705a57be96587721be8d
+  - path: tasks/evidence/UI-035/commands/canonical-panel-tests.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/canonical-panel-tests.stdout.log
+    sha256: 4f232ded3bfcae496546cbcec4868cdff12524ae6322d5cbb77362462bfd791c
+  - path: tasks/evidence/UI-035/commands/canonical-ui-build.json
+    sha256: 4584bdfe65d01dad737b6ee5aabcc3958f81fdbcf64383cd68bbf5471c19d0bf
+  - path: tasks/evidence/UI-035/commands/canonical-ui-build.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/canonical-ui-build.stdout.log
+    sha256: bab5ab44dafcdde0c50c80179eb8f2b35c7cea4267bdfd83061755c733be7eb0
+  - path: tasks/evidence/UI-035/commands/diff-check.json
+    sha256: 9dba7d8574a883862a0f3c57a6d227d2f5dc74627c33e205805ade595235bea5
+  - path: tasks/evidence/UI-035/commands/diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/doc-links.json
+    sha256: 5cd4d88dad2e57f7c89057d843905d5576ced93179a94f3865abf4909e6e303b
+  - path: tasks/evidence/UI-035/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/doc-links.stdout.log
+    sha256: 453d5152109b9a2bd2701c28c58d8914bd3663797ff33e4c6e7865ab240f5133
+  - path: tasks/evidence/UI-035/commands/final-canonical-editor-suite.json
+    sha256: b547e29f0ba8078e43a1e59e1f4e7eeac0407471d37fc1581e5025b21c9ce317
+  - path: tasks/evidence/UI-035/commands/final-canonical-editor-suite.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-canonical-editor-suite.stdout.log
+    sha256: 4c10a9acee5c6f7dde80e3a34ce6e243053b5031016b184957f39a26ae78fd29
+  - path: tasks/evidence/UI-035/commands/final-canonical-ui-build.json
+    sha256: 6076050fe54c12061fc52c6f054c812daa7918958fb3541bd2452b90111910b9
+  - path: tasks/evidence/UI-035/commands/final-canonical-ui-build.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-canonical-ui-build.stdout.log
+    sha256: 05491153cb4a21f1115cd191193f9ae4f1ca46a9bc22cdb4858bcda9fb88fec8
+  - path: tasks/evidence/UI-035/commands/final-diff-check.json
+    sha256: 0d3e80967b2dc5c916d6860e9a6e34e1d9229c38ea4e207fb88bd599abe1c358
+  - path: tasks/evidence/UI-035/commands/final-diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-doc-links.json
+    sha256: 8a5aa05f59d1f409bddea3141b45f9492030368f73596966611317406c29f9e5
+  - path: tasks/evidence/UI-035/commands/final-doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-doc-links.stdout.log
+    sha256: 453d5152109b9a2bd2701c28c58d8914bd3663797ff33e4c6e7865ab240f5133
+  - path: tasks/evidence/UI-035/commands/final-strict-layering.json
+    sha256: 51000e0ed471df443bd90925ec73d856c3d46b9683fe1b5d2a5af0df68fb1f01
+  - path: tasks/evidence/UI-035/commands/final-strict-layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-strict-layering.stdout.log
+    sha256: 7aa895ba9ce2969a7a497dd56e55011571fd04d09d313d35f136ae20736f94e0
+  - path: tasks/evidence/UI-035/commands/final-strict-test-layout.json
+    sha256: f280dc518200f5350e3060d434e233c37f598011e5c5682df689e7361b83b624
+  - path: tasks/evidence/UI-035/commands/final-strict-test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-strict-test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.json
+    sha256: a153e87d1b40714fc0d2f95b0aa22d7025dac4a68c979e1501cbdb63760ac664
+  - path: tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.stdout.log
+    sha256: eb18561922d649e9c0d1b8b5c12401d9f17339afd428c74efb790675b8aee8bb
+  - path: tasks/evidence/UI-035/commands/final-vulkan-sandbox-launch.json
+    sha256: 53b730e67e353f831303f984657190d59163186d8aa0e9f019602355257f9a1c
+  - path: tasks/evidence/UI-035/commands/final-vulkan-sandbox-launch.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/final-vulkan-sandbox-launch.stdout.log
+    sha256: c765c5a07e44a1550d303558f530db49f73f48d8a6c639cc798121a757a60632
+  - path: tasks/evidence/UI-035/commands/focused-app-build.json
+    sha256: d7aaded9ba69d9a7b39926f201360f6c14c56361070ce9c2f281d6c600d18098
+  - path: tasks/evidence/UI-035/commands/focused-app-build.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/focused-app-build.stdout.log
+    sha256: 1940a70b9aa30a43c863094af6d84f22b2973fafc6a7af475e64a6d5d9076dc4
+  - path: tasks/evidence/UI-035/commands/focused-panel-tests.json
+    sha256: ccf4f25f27848d193626e0a3e6829ebeef53b94068ffc15edb4da548f03740ff
+  - path: tasks/evidence/UI-035/commands/focused-panel-tests.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/focused-panel-tests.stdout.log
+    sha256: 947da45ba685b2a03683f82f3bfdcc1f6d0290b9e26cd002574bcd077575da88
+  - path: tasks/evidence/UI-035/commands/module-inventory-refresh.json
+    sha256: 138659dcfbc1dadf7227c21aa1223ba1be07e1e70da5cf74d591e598846d33ae
+  - path: tasks/evidence/UI-035/commands/module-inventory-refresh.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/module-inventory-refresh.stdout.log
+    sha256: dfda4a6fdbcadf55439600ae684cd3e02107b3dbfa1a797ceed19ac82830f195
+  - path: tasks/evidence/UI-035/commands/retired-diff-check.json
+    sha256: d7728becf8ffec36f6a4f569c49843c78df3a9f27f8b5bc9368980d262703a86
+  - path: tasks/evidence/UI-035/commands/retired-diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/retired-diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/retired-doc-links.json
+    sha256: fe2900aee047996c84821389bc571a670ccdeb4515cf34f0cb07b96f7686aabf
+  - path: tasks/evidence/UI-035/commands/retired-doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/retired-doc-links.stdout.log
+    sha256: b1429befcae783dc92a909c912a4f911f0e5a099570c931eeec6eaed345545fd
+  - path: tasks/evidence/UI-035/commands/retired-session-brief-refresh.json
+    sha256: 2f33587dd1e3bf8e9bc07bcb8158538e124b03d0b6affcb4c8a9841cfa92b372
+  - path: tasks/evidence/UI-035/commands/retired-session-brief-refresh.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/retired-session-brief-refresh.stdout.log
+    sha256: db96aae8dca2bca571766fb132a70850b9a0f27dfadf46c0890f828f8a51b4c3
+  - path: tasks/evidence/UI-035/commands/retired-task-policy.json
+    sha256: 905570d062e2d37240ffefee263f64af389fed7bb3be1f9965441a215f5870e3
+  - path: tasks/evidence/UI-035/commands/retired-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/retired-task-policy.stdout.log
+    sha256: 0fe6e96e49bd6160fa4df8c14e82585a151ebd72f2f625ce6f3f7e9a01c13507
+  - path: tasks/evidence/UI-035/commands/strict-layering.json
+    sha256: 99dabfcf393beac5d2e9a0506bbf604c554bec9ea5f36eb2b4a2e4ba1753afdf
+  - path: tasks/evidence/UI-035/commands/strict-layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/strict-layering.stdout.log
+    sha256: 7aa895ba9ce2969a7a497dd56e55011571fd04d09d313d35f136ae20736f94e0
+  - path: tasks/evidence/UI-035/commands/strict-task-policy-active.json
+    sha256: 01df67cbba2bcd10cba625e8b3d997239829fd4a17d6ccd69f5e20c7c4f6df2c
+  - path: tasks/evidence/UI-035/commands/strict-task-policy-active.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/strict-task-policy-active.stdout.log
+    sha256: d3ff9586a0bc49435f54e100ca51acbaefaa9d2952d49bc9642e8b47180f06e0
+  - path: tasks/evidence/UI-035/commands/strict-task-policy-final-active.json
+    sha256: e4457e0ab59c5ebae2c7bc59e3fd201ff2dcecd041dade59be76d4f6628c86e2
+  - path: tasks/evidence/UI-035/commands/strict-task-policy-final-active.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/strict-task-policy-final-active.stdout.log
+    sha256: d3ff9586a0bc49435f54e100ca51acbaefaa9d2952d49bc9642e8b47180f06e0
+  - path: tasks/evidence/UI-035/commands/strict-test-layout.json
+    sha256: 16d8f78f2f91d68073580f5fb0b64e55f5e88d9d66214191477a2869cd7d8249
+  - path: tasks/evidence/UI-035/commands/strict-test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/strict-test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/UI-035/commands/vulkan-configure.json
+    sha256: b75e544ec965fe95dce32d249fd3c21448a87e621a6c1e8c803b752bf5dff0c0
+  - path: tasks/evidence/UI-035/commands/vulkan-configure.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/vulkan-configure.stdout.log
+    sha256: 39957eed48dcf1ffb72cca3e306341c961084784f35ccdcff1c3aad91b4f6191
+  - path: tasks/evidence/UI-035/commands/vulkan-host-probe.json
+    sha256: a4e9a4881c822cf033fcebf39c17aa583a88f634324ceba948cfb6b476f256f4
+  - path: tasks/evidence/UI-035/commands/vulkan-host-probe.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/vulkan-host-probe.stdout.log
+    sha256: 20330c75028fee49142bb2cb1354bd075d119545c197a4c5f02e076d14c2161d
+  - path: tasks/evidence/UI-035/commands/vulkan-sandbox-build.json
+    sha256: c1be49130f5629e00f26b3a2ac8b9abc7be07be94a9d33ff8915396900e15156
+  - path: tasks/evidence/UI-035/commands/vulkan-sandbox-build.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/vulkan-sandbox-build.stdout.log
+    sha256: 3a007831646d59488f43072bc0058bfe3a139121bb567f1d92827eec3f649b51
+  - path: tasks/evidence/UI-035/commands/vulkan-sandbox-launch.json
+    sha256: e42a3c22e015ca525484012eb1cf500eeace3380c06582c8bca47209f2f81110
+  - path: tasks/evidence/UI-035/commands/vulkan-sandbox-launch.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/vulkan-sandbox-launch.stdout.log
+    sha256: c765c5a07e44a1550d303558f530db49f73f48d8a6c639cc798121a757a60632
+  - path: tasks/evidence/UI-035/commands/workflow-evidence-scan-active.json
+    sha256: f5a3970cfd92c83fe7d6de268343d802cd25eb8f4571f15b3b7a16095b58db87
+  - path: tasks/evidence/UI-035/commands/workflow-evidence-scan-active.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/UI-035/commands/workflow-evidence-scan-active.stdout.log
+    sha256: a65eff7ace6ee3a5eb9ffc2d0245c3bce1e22bcf2bb0ec9f12f80d3bb427df3f
+  - path: tasks/evidence/UI-035/report.yaml
+    sha256: 14d7280583abeac8a4d7c39cce87aac82f9d32b2f4921f030ade7b1399abfad2
+  - path: tests/CMakeLists.txt
+    sha256: 987cef08be65d50c9cf8b42dfeeaf3b5e450a0f99f6a621d233985fbfc7bab2e
+  - path: tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+    sha256: 0b3f27363d5b74720bd1cae121e3ee8d0f2423ef4312c7a9ca4a3ad7ca532308
+  - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+    sha256: 9cf5ddabfdbb18b83e485f4a10fc4928165e57eeadc1d3ad34aa9e211b2f20bc
+  - path: tests/integration/runtime/Test.SandboxConfigSections.cpp
+    sha256: 38c6330cd10b1b2c575ef8ce643b307aca953c0842d67f2a7549abe9090e7c67
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 913d8e8cc2ca3d307ff76b02c8aa9bbe8e2793198a6a10e6d53372bf624f9eca
+  - path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+    sha256: 909d18a5bd6ef9a610478f82ff368adbd3d11f61e1944ce0305439878530308f
+  content_digest: 16459fa2aac65b13740ae97192617a5ad0d970e5b76840dcc8dac94cf482da56
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/engine-config.md
+  - docs/architecture/runtime-config-control.md
+  - docs/architecture/sandbox-editor-feature-boundaries.md
+  - methods/geometry/continuous_lop/README.md
+  - methods/geometry/edge_aware_resampling/README.md
+  - methods/geometry/locally_optimal_projection/README.md
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/README.md
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cppm
+  - src/app/Sandbox/main.cpp
+  - src/runtime/CMakeLists.txt
+  - src/runtime/README.md
+  - src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Runtime.PointCloudConsolidationConfig.cpp
+  - src/runtime/Runtime.PointCloudConsolidationConfig.cppm
+  - src/runtime/Runtime.PointCloudConsolidationModule.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cppm
+  - src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/ui/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md
+  - tasks/done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md
+  - tasks/evidence/UI-035/commands/canonical-editor-suite.json
+  - tasks/evidence/UI-035/commands/canonical-editor-suite.stderr.log
+  - tasks/evidence/UI-035/commands/canonical-editor-suite.stdout.log
+  - tasks/evidence/UI-035/commands/canonical-panel-tests.json
+  - tasks/evidence/UI-035/commands/canonical-panel-tests.stderr.log
+  - tasks/evidence/UI-035/commands/canonical-panel-tests.stdout.log
+  - tasks/evidence/UI-035/commands/canonical-ui-build.json
+  - tasks/evidence/UI-035/commands/canonical-ui-build.stderr.log
+  - tasks/evidence/UI-035/commands/canonical-ui-build.stdout.log
+  - tasks/evidence/UI-035/commands/diff-check.json
+  - tasks/evidence/UI-035/commands/diff-check.stderr.log
+  - tasks/evidence/UI-035/commands/diff-check.stdout.log
+  - tasks/evidence/UI-035/commands/doc-links.json
+  - tasks/evidence/UI-035/commands/doc-links.stderr.log
+  - tasks/evidence/UI-035/commands/doc-links.stdout.log
+  - tasks/evidence/UI-035/commands/final-canonical-editor-suite.json
+  - tasks/evidence/UI-035/commands/final-canonical-editor-suite.stderr.log
+  - tasks/evidence/UI-035/commands/final-canonical-editor-suite.stdout.log
+  - tasks/evidence/UI-035/commands/final-canonical-ui-build.json
+  - tasks/evidence/UI-035/commands/final-canonical-ui-build.stderr.log
+  - tasks/evidence/UI-035/commands/final-canonical-ui-build.stdout.log
+  - tasks/evidence/UI-035/commands/final-diff-check.json
+  - tasks/evidence/UI-035/commands/final-diff-check.stderr.log
+  - tasks/evidence/UI-035/commands/final-diff-check.stdout.log
+  - tasks/evidence/UI-035/commands/final-doc-links.json
+  - tasks/evidence/UI-035/commands/final-doc-links.stderr.log
+  - tasks/evidence/UI-035/commands/final-doc-links.stdout.log
+  - tasks/evidence/UI-035/commands/final-strict-layering.json
+  - tasks/evidence/UI-035/commands/final-strict-layering.stderr.log
+  - tasks/evidence/UI-035/commands/final-strict-layering.stdout.log
+  - tasks/evidence/UI-035/commands/final-strict-test-layout.json
+  - tasks/evidence/UI-035/commands/final-strict-test-layout.stderr.log
+  - tasks/evidence/UI-035/commands/final-strict-test-layout.stdout.log
+  - tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.json
+  - tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.stderr.log
+  - tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.stdout.log
+  - tasks/evidence/UI-035/commands/final-vulkan-sandbox-launch.json
+  - tasks/evidence/UI-035/commands/final-vulkan-sandbox-launch.stderr.log
+  - tasks/evidence/UI-035/commands/final-vulkan-sandbox-launch.stdout.log
+  - tasks/evidence/UI-035/commands/focused-app-build.json
+  - tasks/evidence/UI-035/commands/focused-app-build.stderr.log
+  - tasks/evidence/UI-035/commands/focused-app-build.stdout.log
+  - tasks/evidence/UI-035/commands/focused-panel-tests.json
+  - tasks/evidence/UI-035/commands/focused-panel-tests.stderr.log
+  - tasks/evidence/UI-035/commands/focused-panel-tests.stdout.log
+  - tasks/evidence/UI-035/commands/module-inventory-refresh.json
+  - tasks/evidence/UI-035/commands/module-inventory-refresh.stderr.log
+  - tasks/evidence/UI-035/commands/module-inventory-refresh.stdout.log
+  - tasks/evidence/UI-035/commands/retired-diff-check.json
+  - tasks/evidence/UI-035/commands/retired-diff-check.stderr.log
+  - tasks/evidence/UI-035/commands/retired-diff-check.stdout.log
+  - tasks/evidence/UI-035/commands/retired-doc-links.json
+  - tasks/evidence/UI-035/commands/retired-doc-links.stderr.log
+  - tasks/evidence/UI-035/commands/retired-doc-links.stdout.log
+  - tasks/evidence/UI-035/commands/retired-session-brief-refresh.json
+  - tasks/evidence/UI-035/commands/retired-session-brief-refresh.stderr.log
+  - tasks/evidence/UI-035/commands/retired-session-brief-refresh.stdout.log
+  - tasks/evidence/UI-035/commands/retired-task-policy.json
+  - tasks/evidence/UI-035/commands/retired-task-policy.stderr.log
+  - tasks/evidence/UI-035/commands/retired-task-policy.stdout.log
+  - tasks/evidence/UI-035/commands/strict-layering.json
+  - tasks/evidence/UI-035/commands/strict-layering.stderr.log
+  - tasks/evidence/UI-035/commands/strict-layering.stdout.log
+  - tasks/evidence/UI-035/commands/strict-task-policy-active.json
+  - tasks/evidence/UI-035/commands/strict-task-policy-active.stderr.log
+  - tasks/evidence/UI-035/commands/strict-task-policy-active.stdout.log
+  - tasks/evidence/UI-035/commands/strict-task-policy-final-active.json
+  - tasks/evidence/UI-035/commands/strict-task-policy-final-active.stderr.log
+  - tasks/evidence/UI-035/commands/strict-task-policy-final-active.stdout.log
+  - tasks/evidence/UI-035/commands/strict-test-layout.json
+  - tasks/evidence/UI-035/commands/strict-test-layout.stderr.log
+  - tasks/evidence/UI-035/commands/strict-test-layout.stdout.log
+  - tasks/evidence/UI-035/commands/vulkan-configure.json
+  - tasks/evidence/UI-035/commands/vulkan-configure.stderr.log
+  - tasks/evidence/UI-035/commands/vulkan-configure.stdout.log
+  - tasks/evidence/UI-035/commands/vulkan-host-probe.json
+  - tasks/evidence/UI-035/commands/vulkan-host-probe.stderr.log
+  - tasks/evidence/UI-035/commands/vulkan-host-probe.stdout.log
+  - tasks/evidence/UI-035/commands/vulkan-sandbox-build.json
+  - tasks/evidence/UI-035/commands/vulkan-sandbox-build.stderr.log
+  - tasks/evidence/UI-035/commands/vulkan-sandbox-build.stdout.log
+  - tasks/evidence/UI-035/commands/vulkan-sandbox-launch.json
+  - tasks/evidence/UI-035/commands/vulkan-sandbox-launch.stderr.log
+  - tasks/evidence/UI-035/commands/vulkan-sandbox-launch.stdout.log
+  - tasks/evidence/UI-035/commands/workflow-evidence-scan-active.json
+  - tasks/evidence/UI-035/commands/workflow-evidence-scan-active.stderr.log
+  - tasks/evidence/UI-035/commands/workflow-evidence-scan-active.stdout.log
+  - tasks/evidence/UI-035/report.yaml
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+  - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+  - tests/integration/runtime/Test.SandboxConfigSections.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+  layers:
+  - app
+  - runtime
+  - tests
+  modules:
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Runtime.PointCloudConsolidationConfig
+  - Extrinsic.Runtime.PointCloudConsolidationModule
+  - Extrinsic.Sandbox.ConfigSections
+  - Extrinsic.Sandbox.Editor.MethodPanels
+extension_seam: One typed config/module/service/result path owns all four CPU-reference strategies; a
+  future backend extends this surface only after METHOD-019 or METHOD-020 supplies a passing concrete
+  implementation.
+future_change_plan: Add an implementation selector and requested/actual backend diagnostics only with
+  the first evidence-gated optimized backend, preserving the immutable snapshot, stale gate, config validation,
+  and single mutation transaction.
+acceptance:
+- criterion: A selected point cloud is consolidated and visibly updated through the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The strategy and parameters are choosable from a config file, an
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No requested-backend token or unavailable implementation is exposed.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Contract tests pass in the default CPU gate; layering holds (`runtime -> lower`, `core ->
+    nothing`).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-175/commands/canonical-intrinsic-tests-build.json
+- receipt: tasks/evidence/RUNTIME-175/commands/canonical-runtime-build.json
+- receipt: tasks/evidence/RUNTIME-175/commands/focused-config-ui-integration.json
+- receipt: tasks/evidence/RUNTIME-175/commands/focused-runtime-contracts.json
+- receipt: tasks/evidence/RUNTIME-175/commands/full-cpu-supported-ctest.json
+- receipt: tasks/evidence/RUNTIME-175/commands/promoted-sanitizer-focused-runtime.json
+- receipt: tasks/evidence/RUNTIME-175/commands/promoted-sanitizer-runtime-build.json
+- receipt: tasks/evidence/RUNTIME-175/commands/retired-diff-check.json
+- receipt: tasks/evidence/RUNTIME-175/commands/retired-doc-links.json
+- receipt: tasks/evidence/RUNTIME-175/commands/retired-layering.json
+- receipt: tasks/evidence/RUNTIME-175/commands/retired-module-inventory.json
+- receipt: tasks/evidence/RUNTIME-175/commands/retired-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-175/commands/retired-session-brief-refresh.json
+- receipt: tasks/evidence/RUNTIME-175/commands/retired-task-policy.json
+- receipt: tasks/evidence/RUNTIME-175/commands/retired-test-layout.json
+changed_public_contracts:
+- Extrinsic.Runtime.PointCloudConsolidationConfig owns the versioned sandbox.point_cloud_consolidation
+  schema, stable strategy/normal tokens, validator, serializer, and generic engine-config registration
+  factory.
+- PointCloudConsolidationService and PointCloudConsolidationModule expose queued CPU-reference submission,
+  completion subscription, and pointer-free results without an RHI or speculative backend axis.
+- EditorGeometryProcessingPreparedFrame and SandboxEditorContext carry exact config/service availability
+  and copied last-result state into the app-owned panel.
+diagnostics_and_previews:
+- Completion reports world/entity/source staleness, actual cpu_reference implementation and strategy identity,
+  counts, convergence/displacement, normal provenance/refinement, insertions, and failure text.
+- Focused contracts cover config round-trip/fallback, undo/redo publication, stale queued writeback, runtime
+  determinism, Editor/AgentCli/Programmatic source parity, and UI-prepared workspace execution.
+- The complete default CPU selector passed 4,044/4,044 with the expected GLFW/LSan self-skip; the four
+  focused runtime contracts also passed under ci-vulkan combined ASan/UBSan instrumentation.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- The shipped implementation is the deterministic serial CPU reference and retains its explicit input/work
+  guards; no optimized-throughput or GPU-method claim is made.
+- The promoted Sandbox build and launch are recorded by UI-035, but the locked desktop prevented pointer-driven
+  panel input without bypassing the user lock; the headless prepared-workspace test covers the exact command
+  and mutation path.
+skipped_checks:
+- check: optimized-or-gpu-method-backend
+  reason: 'Explicit task non-goal: METHOD-019 and METHOD-020 own evidence-gated optimized CPU and Vulkan
+    implementations; RUNTIME-175 intentionally exposes no placeholder selector or fallback telemetry.'
+artifacts:
+- path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
+  sha256: b62c74c9a3de9516c745d0553534782a08670c40cfbd6c9aacc85749c8117649
+  kind: file
+- path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+  sha256: 9cf5ddabfdbb18b83e485f4a10fc4928165e57eeadc1d3ad34aa9e211b2f20bc
+  kind: file
+- path: tasks/evidence/RUNTIME-175/commands/full-cpu-supported-ctest.json
+  sha256: c384bcfce5a18874a759e8076803ff6a322248a2d33f99b81de5498f020ac71e
+  kind: file
+- path: tasks/evidence/RUNTIME-175/commands/promoted-sanitizer-focused-runtime.json
+  sha256: 27018da321e4d090251a86bfc452aca25e19be5b80ced19a5a59d288172fb324
+  kind: file
+- path: tasks/evidence/UI-035/report.yaml
+  sha256: 14d7280583abeac8a4d7c39cce87aac82f9d32b2f4921f030ade7b1399abfad2
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-175/handoff.jsonl
+review: tasks/evidence/RUNTIME-175/reviews.jsonl
