@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 75 |
+| `runtime` | 72 |
 
 ## Modules
 
@@ -356,7 +356,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.AsyncWorkModule` | `src/runtime/Runtime.AsyncWorkModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.CommandBus` | `src/runtime/Runtime.CommandBus.cppm` | `runtime` |
 | `Extrinsic.Runtime.DeviceBootstrap` | `src/runtime/Runtime.DeviceBootstrap.cppm` | `runtime` |
-| `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommon` | `src/runtime/Runtime.EditorCommon.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorJobProjection` | `src/runtime/Runtime.EditorJobProjection.cppm` | `runtime` |
@@ -372,12 +371,10 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GeometryProcessingOperations` | `src/runtime/Runtime.GeometryProcessingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.InputActions` | `src/runtime/Runtime.InputActions.cppm` | `runtime` |
 | `Extrinsic.Runtime.JobService` | `src/runtime/Runtime.JobService.cppm` | `runtime` |
-| `Extrinsic.Runtime.JobServiceGpuQueueBridge` | `src/runtime/Runtime.JobServiceGpuQueueBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.KernelEvents` | `src/runtime/Runtime.KernelEvents.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveView` | `src/runtime/Runtime.MeshPrimitiveView.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshSurfaceTopology` | `src/runtime/Runtime.MeshSurfaceTopology.cppm` | `runtime` |
 | `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
-| `Extrinsic.Runtime.ModuleSchedule` | `src/runtime/Runtime.ModuleSchedule.cppm` | `runtime` |
 | `Extrinsic.Runtime.ParameterizationConfig` | `src/runtime/Runtime.ParameterizationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
@@ -409,4 +406,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **382**
+Total modules: **379**

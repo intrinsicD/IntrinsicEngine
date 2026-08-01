@@ -25,7 +25,6 @@ import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.ModuleSchedule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
@@ -66,9 +65,6 @@ static_assert(!HasPhaseMember<Runtime::RuntimeFrameHookContext>);
 static_assert(!HasStatsMethod<Runtime::ServiceRegistry>);
 static_assert(!HasBootErrorsList<Runtime::ServiceRegistry>);
 static_assert(!HasRegisterSimSystem<Runtime::EngineSetup>);
-static_assert(std::same_as<
-              decltype(std::declval<Runtime::RuntimeModuleSchedule&>().FinalizeForBoot()),
-              void>);
 
 namespace
 {
@@ -178,10 +174,17 @@ namespace
             {
                 return hook;
             }
-            return setup.RegisterFrameHook(
-                Runtime::FramePhase::Maintenance,
-                [this](Runtime::RuntimeFrameHookContext&)
-                { m_State.HookTrace.emplace_back("Z.Provider:Maintenance"); });
+            if (Core::Result hook = setup.RegisterFrameHook(
+                    Runtime::FramePhase::Maintenance,
+                    [this](Runtime::RuntimeFrameHookContext&)
+                    { m_State.HookTrace.emplace_back("Z.Provider:Maintenance"); });
+                !hook.has_value())
+            {
+                return hook;
+            }
+            return setup.RegisterViewportInputHook(
+                [this](Runtime::RuntimeViewportInputHookContext&)
+                { m_State.HookTrace.emplace_back("Z.Provider:Viewport"); });
         }
 
         void OnShutdown(Runtime::RuntimeModuleShutdownContext& context) override
@@ -228,10 +231,17 @@ namespace
                         m_State.InitializedState != nullptr && !*m_State.InitializedState;
                     m_State.ShutdownTrace.emplace_back("event:shutdown");
                 });
-            return setup.RegisterFrameHook(
-                Runtime::FramePhase::UiBuild,
-                [this](Runtime::RuntimeFrameHookContext&)
-                { m_State.HookTrace.emplace_back("A.Consumer:UiBuild"); });
+            if (Core::Result hook = setup.RegisterFrameHook(
+                    Runtime::FramePhase::UiBuild,
+                    [this](Runtime::RuntimeFrameHookContext&)
+                    { m_State.HookTrace.emplace_back("A.Consumer:UiBuild"); });
+                !hook.has_value())
+            {
+                return hook;
+            }
+            return setup.RegisterViewportInputHook(
+                [this](Runtime::RuntimeViewportInputHookContext&)
+                { m_State.HookTrace.emplace_back("A.Consumer:Viewport"); });
         }
 
         [[nodiscard]] Core::Result OnResolve(Runtime::EngineSetup& setup) override
@@ -259,10 +269,16 @@ namespace
             return Core::Ok();
         }
 
-        void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override
+        void OnShutdown(Runtime::RuntimeModuleShutdownContext& context) override
         {
             m_State.ConsumerShutdownSawAnnounce = m_State.ShutdownAnnounced;
             m_State.ShutdownTrace.emplace_back("shutdown:consumer");
+            if (m_ProbeSubscription.IsValid())
+                context.Events.Unsubscribe(m_ProbeSubscription);
+            if (m_ShutdownSubscription.IsValid())
+                context.Events.Unsubscribe(m_ShutdownSubscription);
+            m_ProbeSubscription = {};
+            m_ShutdownSubscription = {};
         }
 
     private:
@@ -352,6 +368,25 @@ namespace
             engine.Services().Find<SharedProbeService>() == nullptr;
         return state;
     }
+
+    [[nodiscard]] ModuleHarnessState RunReusableHarness()
+    {
+        ModuleHarnessState state{};
+        SharedProbeService service{};
+        auto app = std::make_unique<HarnessApp>(state);
+        Intrinsic::Tests::RuntimeTestKernel engine(
+            NullWindowHeadlessConfig(), std::move(app));
+        engine.AddModule(std::make_unique<ProviderModule>(service, state));
+        engine.AddModule(std::make_unique<ConsumerModule>(state));
+
+        for (int boot = 0; boot < 2; ++boot)
+        {
+            engine.Initialize();
+            engine.Run();
+            engine.Shutdown();
+        }
+        return state;
+    }
 }
 
 TEST(RuntimeModule, EngineComposesRetainedHooksServicesAndLifecycle)
@@ -382,6 +417,8 @@ TEST(RuntimeModule, EngineComposesRetainedHooksServicesAndLifecycle)
               (std::vector<std::string>{
                   "A.Consumer:UiBuild",
                   "Z.Provider:UiBuild",
+                  "A.Consumer:Viewport",
+                  "Z.Provider:Viewport",
                   "Z.Provider:Maintenance",
               }));
     EXPECT_EQ(state.ShutdownTrace,
@@ -399,6 +436,23 @@ TEST(RuntimeModule, RegistrationOrderDoesNotChangeRetainedHookOrder)
     const ModuleHarnessState consumerFirst = RunHarness(false);
     EXPECT_EQ(providerFirst.HookTrace, consumerFirst.HookTrace);
     EXPECT_EQ(providerFirst.ShutdownTrace, consumerFirst.ShutdownTrace);
+}
+
+TEST(RuntimeModule, ReinitializeRebuildsHookRecordsWithoutRetainingCallbacks)
+{
+    const ModuleHarnessState state = RunReusableHarness();
+    const std::vector<std::string> oneBoot{
+        "A.Consumer:UiBuild",
+        "Z.Provider:UiBuild",
+        "A.Consumer:Viewport",
+        "Z.Provider:Viewport",
+        "Z.Provider:Maintenance",
+    };
+    std::vector<std::string> expected = oneBoot;
+    expected.insert(expected.end(), oneBoot.begin(), oneBoot.end());
+    EXPECT_EQ(state.HookTrace, expected);
+    EXPECT_EQ(state.Frames, 2u);
+    EXPECT_EQ(state.CommandEventHits, 2);
 }
 
 TEST(RuntimeModule, MissingRequiredServiceTerminatesEngineBoot)
@@ -527,87 +581,4 @@ TEST(EngineSetup, RetainsOnlyRegistrationPhaseFrameAndViewportRegistrars)
                     .has_value());
     EXPECT_EQ(frameRegistrations, 1u);
     EXPECT_EQ(viewportRegistrations, 1u);
-}
-
-TEST(RuntimeModuleSchedule, SortsRetainedFrameHooksAndClearRemovesThem)
-{
-    Runtime::RuntimeModuleSchedule schedule;
-    std::vector<std::string> trace;
-    schedule.RegisterFrameHook(
-        "Z.Module", Runtime::FramePhase::UiBuild,
-        [&trace](Runtime::RuntimeFrameHookContext&) { trace.emplace_back("Z"); });
-    schedule.RegisterFrameHook(
-        "A.Module", Runtime::FramePhase::UiBuild,
-        [&trace](Runtime::RuntimeFrameHookContext&) { trace.emplace_back("A:first"); });
-    schedule.RegisterFrameHook(
-        "A.Module", Runtime::FramePhase::UiBuild,
-        [&trace](Runtime::RuntimeFrameHookContext&) { trace.emplace_back("A:second"); });
-    schedule.RegisterFrameHook(
-        "A.Module", Runtime::FramePhase::Maintenance,
-        [&trace](Runtime::RuntimeFrameHookContext&) { trace.emplace_back("maintenance"); });
-    schedule.FinalizeForBoot();
-
-    Extrinsic::ECS::Scene::Registry activeWorld;
-    Runtime::CommandBus commands;
-    Runtime::KernelEventBus events;
-    Runtime::JobService jobs;
-    Runtime::WorldRegistry worlds;
-    Runtime::ServiceRegistry services;
-    Runtime::EditorInputCaptureSnapshot capture{};
-    Runtime::RuntimeFramePacingDiagnostics pacing{};
-    const auto dispatch = [&](const Runtime::FramePhase phase)
-    {
-        schedule.RunFrameHooks(Runtime::RuntimeModuleFrameHookDispatchContext{
-            .Phase             = phase,
-            .ActiveWorld       = activeWorld,
-            .ActiveWorldHandle = Runtime::DefaultWorldHandle,
-            .Commands          = commands,
-            .Events            = events,
-            .Jobs              = jobs,
-            .Worlds            = worlds,
-            .Services          = services,
-            .EditorCapture     = capture,
-            .Pacing            = pacing,
-        });
-    };
-
-    dispatch(Runtime::FramePhase::UiBuild);
-    dispatch(Runtime::FramePhase::Maintenance);
-    EXPECT_EQ(trace,
-              (std::vector<std::string>{"A:first", "A:second", "Z", "maintenance"}));
-
-    schedule.Clear();
-    dispatch(Runtime::FramePhase::UiBuild);
-    EXPECT_EQ(trace.size(), 4u);
-}
-
-TEST(RuntimeModuleSchedule, SortsRetainedViewportHooksByModuleAndSequence)
-{
-    Runtime::RuntimeModuleSchedule schedule;
-    std::vector<std::string> trace;
-    schedule.RegisterViewportInputHook(
-        "Z.Module", [&trace](Runtime::RuntimeViewportInputHookContext&)
-        { trace.emplace_back("Z"); });
-    schedule.RegisterViewportInputHook(
-        "A.Module", [&trace](Runtime::RuntimeViewportInputHookContext&)
-        { trace.emplace_back("A:first"); });
-    schedule.RegisterViewportInputHook(
-        "A.Module", [&trace](Runtime::RuntimeViewportInputHookContext&)
-        { trace.emplace_back("A:second"); });
-    schedule.FinalizeForBoot();
-
-    CoreConfig::EngineConfig config = NullWindowHeadlessConfig();
-    Extrinsic::Platform::Input::Context input;
-    Runtime::EditorInputCaptureSnapshot capture{};
-    Extrinsic::Graphics::RenderFrameInput renderInput{};
-    schedule.RunViewportInputHooks(Runtime::RuntimeViewportInputHookContext{
-        .Config             = config,
-        .ActiveWorldHandle  = Runtime::DefaultWorldHandle,
-        .Input              = input,
-        .Viewport           = Core::Extent2D{640, 480},
-        .EditorCapture      = capture,
-        .RenderInput        = renderInput,
-        .FrameDeltaSeconds  = 1.0 / 60.0,
-    });
-    EXPECT_EQ(trace, (std::vector<std::string>{"A:first", "A:second", "Z"}));
 }

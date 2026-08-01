@@ -15,9 +15,6 @@ first and deletes only the shallow exported helper surface.
 
 #### Open tasks
 
-- [`RUNTIME-203` — Internalize Engine composition helpers](../../active/RUNTIME-203-internalize-engine-composition-helpers.md)
-  removes the one-consumer ModuleSchedule, EcsSystemBundle, and
-  JobServiceGpuQueueBridge BMIs after Engine-level behavior coverage exists.
 - [`RUNTIME-205` — Internalize SceneInteraction helpers](RUNTIME-205-internalize-scene-interaction-helpers.md)
   separately removes GizmoFrameService and SelectionReadback after interaction-
   owner behavior/lifetime coverage exists. RenderRecipeActivation and
@@ -26,6 +23,11 @@ first and deletes only the shallow exported helper surface.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-203` — Internalize Engine composition helpers](../../done/RUNTIME-203-internalize-engine-composition-helpers.md)
+  moved deterministic module-hook records, promoted ECS composition, and the
+  JobService renderer-hook lifecycle into Engine-private implementation state,
+  then deleted the three one-consumer helper BMIs and their direct tests after
+  owner-level CPU and sanitizer parity.
 - [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](../../done/RUNTIME-202-retire-sandbox-runtime-facade.md)
   deleted the public all-feature facade/config/default-policy family, moved
   presentation composition into the Sandbox app, and localized commands,

@@ -15,6 +15,25 @@ maturity_target: Retired
 ---
 # RUNTIME-203 — Internalize Engine composition helpers
 
+## Status
+
+- Completed and retired on 2026-08-01 at `Retired`. The production census
+  reconfirmed one owner for each removed helper: `Runtime.Engine`. Engine now
+  privately owns deterministic frame/viewport hook records, composes the three
+  promoted ECS systems in its fixed-step and pre-render phases, and owns the
+  renderer hook token plus JobService GPU-participant shutdown ordering. The
+  three exported BMIs, their implementation units, and helper-only tests are
+  deleted without a forwarding surface. Focused owner-level coverage passed
+  154/154, the default CPU selector passed 3,996/3,996 with its expected
+  environmental GLFW/LSan skip, and the grouped ASan and UBSan selectors each
+  passed 2,650/2,650 (UBSan carries the same policy-defined skip). The first
+  focused iteration exposed a stale generated inventory and a test harness
+  that retained event subscriptions across reinitialization; both were fixed
+  before the complete focused and broad reruns. No GPU/Vulkan, byte-layout,
+  or performance claim is made.
+- Commit: the implementation/retirement commit plus the generated completion
+  report and accepted revision-bound review provide the exact source binding.
+
 ## Goal
 
 - Remove the exported `ModuleSchedule`, `EcsSystemBundle`, and
@@ -64,58 +83,58 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Re-run the production/test consumer census and confirm the three named
+- [x] Re-run the production/test consumer census and confirm the three named
       modules still have exactly one production owner before changing them.
-- [ ] Internalize `RuntimeModuleSchedule` records/sorting/dispatch in Engine
+- [x] Internalize `RuntimeModuleSchedule` records/sorting/dispatch in Engine
       implementation detail while preserving deterministic module/sequence
       order and retained viewport/frame hook policy.
-- [ ] Internalize promoted ECS bundle registration and pre-render transform
+- [x] Internalize promoted ECS bundle registration and pre-render transform
       flush behind Engine's existing fixed-step/frame phases; keep ECS systems
       and `Core::FrameGraph` ownership unchanged.
-- [ ] Inline or privately relocate `JobServiceGpuQueueBridge` hook-token
+- [x] Inline or privately relocate `JobServiceGpuQueueBridge` hook-token
       lifecycle into Engine composition, preserving install-before-use,
       unregister-before-participant-shutdown, GPU-idle callback, and exact
       JobService ownership.
-- [ ] Delete the three exported `.cppm` surfaces, obsolete access points,
+- [x] Delete the three exported `.cppm` surfaces, obsolete access points,
       CMake entries, re-exports, and tests that exist only to instantiate the
       helpers directly.
 
 ## Tests
 
-- [ ] Engine/module lifecycle contracts prove deterministic frame/viewport
+- [x] Engine/module lifecycle contracts prove deterministic frame/viewport
       hook ordering, clear/reinitialize behavior, and no retained callbacks
       after shutdown without importing `ModuleSchedule`.
-- [ ] Real Engine fixed-step and pre-render contracts prove transform,
+- [x] Real Engine fixed-step and pre-render contracts prove transform,
       bounds, render-sync, and post-editor transform flush behavior without
       importing `EcsSystemBundle`.
-- [ ] Engine renderer/JobService lifecycle contracts prove GPU participant
+- [x] Engine renderer/JobService lifecycle contracts prove GPU participant
       frame-command recording and shutdown ordering without importing
       `JobServiceGpuQueueBridge`.
-- [ ] Structural ratchets prove all three public module names and direct test
+- [x] Structural ratchets prove all three public module names and direct test
       imports are absent while the owner-level behavior tests remain.
-- [ ] Default CPU and sanitizer-supported gates required by the high-risk
+- [x] Default CPU and sanitizer-supported gates required by the high-risk
       surface deletion pass.
 
 ## Docs
 
-- [ ] Update the runtime module/ownership inventory to name the surviving
+- [x] Update the runtime module/ownership inventory to name the surviving
       Engine-private implementation roles.
-- [ ] Record why `RenderRecipeActivation` and `DeviceBootstrap` remain public
+- [x] Record why `RenderRecipeActivation` and `DeviceBootstrap` remain public
       current contracts rather than silently carrying them as unfinished
       scope.
-- [ ] Regenerate the module inventory and refresh task/session/retirement
+- [x] Regenerate the module inventory and refresh task/session/retirement
       records.
 
 ## Acceptance criteria
 
-- [ ] Engine preserves identical hook ordering, ECS execution/flush, GPU
+- [x] Engine preserves identical hook ordering, ECS execution/flush, GPU
       participant recording, and shutdown behavior through public lifecycle
       tests.
-- [ ] Production and tests no longer import or name `ModuleSchedule`,
+- [x] Production and tests no longer import or name `ModuleSchedule`,
       `EcsSystemBundle`, or `JobServiceGpuQueueBridge` as exported modules.
-- [ ] No replacement wrapper, service, registry, schedule interface, or Engine
+- [x] No replacement wrapper, service, registry, schedule interface, or Engine
       compatibility accessor is introduced.
-- [ ] SceneInteraction, recipe activation, and device bootstrap are unchanged.
+- [x] SceneInteraction, recipe activation, and device bootstrap are unchanged.
 
 ## Verification
 

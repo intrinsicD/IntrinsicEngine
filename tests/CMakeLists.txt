@@ -276,7 +276,6 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeKernelEvents.cpp
         Test.RuntimeModule.cpp
         Test.RuntimeWorldRegistry.cpp
-        Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
         Test.RuntimeSceneLifecycle.cpp
         Test.SceneDocumentModule.cpp

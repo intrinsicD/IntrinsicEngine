@@ -29,10 +29,9 @@ pass named `"TransformUpdate"` declaring `StructuralWrite()`,
 `Read<Transform::Component>`,
 `Read<Hierarchy::Component>`, `Write<Transform::WorldMatrix>`,
 `Write<Transform::IsDirtyTag>`, `Write<Transform::WorldUpdatedTag>`, and
-`Signal("TransformUpdate")`. The runtime activates this pass every fixed-step
-substep through `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`
-(`RUNTIME-091`). The baseline bundle registers before app-composed module
-systems, then `Core::FrameGraph::Compile` resolves the declared dependencies;
+`Signal("TransformUpdate")`. The Engine composition root registers this pass
+directly on every fixed-step substep (`RUNTIME-091`) before
+`Core::FrameGraph::Compile` resolves the declared dependencies;
 passes that mutate transforms must therefore declare the ordering they need,
 and passes that `WaitFor("TransformUpdate")` run after the traversal.
 
@@ -68,10 +67,9 @@ counted and the entity's existing world bounds are left untouched.
 `StructuralWrite()`,
 `Read<Culling::Local::Bounds>`, `Read<Transform::WorldMatrix>`,
 `Read<Transform::WorldUpdatedTag>`, `Write<Culling::World::Bounds>`, and
-`Signal("WorldBoundsUpdate")`. The runtime activates this pass alongside
-`TransformHierarchy` through `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`
-(`RUNTIME-091`) so world bounds refresh on the same substep that recomputes
-the world matrix.
+`Signal("WorldBoundsUpdate")`. Engine registers this pass directly alongside
+`TransformHierarchy` on each fixed-step substep (`RUNTIME-091`) so world bounds
+refresh on the same substep that recomputes the world matrix.
 
 ## Render sync boundary
 
@@ -102,12 +100,10 @@ without logging or throwing.
 `WaitFor` edges guarantee `BoundsPropagation` reads `WorldUpdatedTag`
 before this pass clears it. Each promoted pass declares a structural write
 because it may add or remove components; this serializes EnTT registry-map
-mutation against runtime module systems' implicit structural reads. The
-runtime activates this pass alongside
-`TransformHierarchy` and `BoundsPropagation` through
-`Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`
-(`RUNTIME-091`) so the `DirtyTransform` hand-off lands every fixed-step
-substep.
+mutation against runtime module systems' implicit structural reads. Engine
+registers this pass directly alongside `TransformHierarchy` and
+`BoundsPropagation` on each fixed-step substep (`RUNTIME-091`) so the
+`DirtyTransform` hand-off lands every substep.
 
 Calls to `GpuWorld`, `GpuAssetCache`, RHI managers, or graphics-owned
 `GpuSceneSlot` storage remain runtime responsibilities owned by

@@ -112,8 +112,6 @@ TEST(RuntimeEnginePrivateGlue,
     const std::string cameraImpl = ReadFile(
         root /
         "src/runtime/Cameras/Runtime.CameraModule.cpp");
-    const std::string scheduleImpl = ReadFile(
-        root / "src/runtime/Runtime.ModuleSchedule.cpp");
 
     EXPECT_EQ(engineImpl.find("PopulateMainCameraForFrame"),
               std::string::npos);
@@ -125,9 +123,9 @@ TEST(RuntimeEnginePrivateGlue,
     const auto renderInputInitialization = engineImpl.find(
         "frameContext.RenderInput = Graphics::RenderFrameInput{");
     const auto viewportDispatch = engineImpl.find(
-        "m_Impl->m_RuntimeModuleSchedule.RunViewportInputHooks(");
+        "for (const Impl::ViewportInputHookRecord& record");
     const auto transformFlush = engineImpl.find(
-        "FlushPreRenderTransformState(*m_Impl->m_Scene)");
+        "ECS::Systems::TransformHierarchy::OnUpdate(");
     const auto inputActions = engineImpl.find(
         "m_Impl->m_InputActions.DispatchForFrame(");
     const auto beforeExtraction = engineImpl.find(
@@ -185,14 +183,14 @@ TEST(RuntimeEnginePrivateGlue,
             "return \"Runtime.SceneInteractionModule\";"),
         std::string::npos);
     EXPECT_NE(
-        scheduleImpl.find(
+        engineImpl.find(
             "return lhs.ModuleName < rhs.ModuleName;"),
         std::string::npos);
 
     std::size_t registrarWiringCount = 0u;
     std::size_t cursor = 0u;
     constexpr std::string_view registrarCall =
-        "m_Impl->m_RuntimeModuleSchedule.RegisterViewportInputHook(";
+        "m_Impl->m_ViewportInputHooks.push_back(";
     while ((cursor = engineImpl.find(registrarCall, cursor)) !=
            std::string::npos)
     {
@@ -601,7 +599,7 @@ TEST(RuntimeEnginePrivateGlue, EngineInterfaceCarriesOnlyOpaqueImplementationSta
     EXPECT_NE(engineImpl.find("struct Engine::Impl"), std::string::npos);
     EXPECT_NE(engineImpl.find("Core::FrameClock m_FrameClock"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("RuntimeModuleSchedule m_RuntimeModuleSchedule"),
+    EXPECT_NE(engineImpl.find("std::vector<FrameHookRecord> m_FrameHooks"),
               std::string::npos);
     EXPECT_NE(engineImpl.find("RenderExtractionService m_RenderExtractionService"),
               std::string::npos);
@@ -613,14 +611,13 @@ TEST(RuntimeEnginePrivateGlue, EngineInterfaceCarriesOnlyOpaqueImplementationSta
         "import Extrinsic.Core.Geometry2D;",
         "import Extrinsic.ECS.Scene.Registry;",
         "import Extrinsic.Runtime.InputActions;",
-        "import Extrinsic.Runtime.JobServiceGpuQueueBridge;",
-        "import Extrinsic.Runtime.ModuleSchedule;",
         "import Extrinsic.Runtime.RenderExtraction;",
         "import Extrinsic.Runtime.RenderWorldPool;",
         "m_Config",
         "m_RuntimeModules",
         "m_RenderExtractionService",
-        "m_RuntimeModuleSchedule",
+        "m_FrameHooks",
+        "m_ViewportInputHooks",
         "m_FrameClock",
         "m_ServiceRegistry",
     };

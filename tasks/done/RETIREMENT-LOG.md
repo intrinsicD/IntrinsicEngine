@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-203`](RUNTIME-203-internalize-engine-composition-helpers.md) — Engine
+composition-helper internalization completed on 2026-08-01 at `Retired`.
+Deterministic frame/viewport hook records and dispatch, promoted ECS fixed-step
+registration and pre-render transform flushing, and the JobService renderer
+hook token plus GPU-participant shutdown sequence now live directly in
+Engine-private implementation state. The one-consumer `ModuleSchedule`,
+`EcsSystemBundle`, and `JobServiceGpuQueueBridge` BMIs, implementations, CMake
+entries, and helper-only tests are deleted without a replacement wrapper.
+Focused Engine/runtime coverage passed 154/154; the default CPU selector passed
+3,996/3,996 with its expected environmental GLFW/LSan skip; grouped ASan and
+UBSan selectors each passed 2,650/2,650, with UBSan carrying the policy-defined
+skip. Strict structural and documentation gates plus an independent
+revision-bound review close the high-risk surface deletion. Shared
+`RenderRecipeActivation` and `DeviceBootstrap` contracts remain because their
+production census has multiple load-bearing consumers. No GPU/Vulkan or
+performance claim is made.
+
 [`RUNTIME-139`](RUNTIME-139-remove-speculative-aos-storage-planning.md) —
 speculative geometry-storage planning retired on 2026-08-01 at `Retired`. The
 public AoS hint, lane, plan, and promotion vocabulary plus copied runtime and

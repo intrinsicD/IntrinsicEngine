@@ -199,64 +199,52 @@ TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContrac
     EXPECT_LT(returnFromClose, renderContract);
 }
 
-TEST(RuntimeEngineLayering, EngineDelegatesGpuQueueLifecycleToJobService)
+TEST(RuntimeEngineLayering, EnginePrivatelyOwnsGpuQueueHookLifecycle)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto publicApi = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
-    const auto bridgeApi =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.JobServiceGpuQueueBridge.cppm");
-    const auto bridge =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.JobServiceGpuQueueBridge.cpp");
     const auto beginShutdown =
         SliceBetween(content, "void Engine::BeginShutdown()", "void Engine::Shutdown()");
     const auto shutdown      = SliceBetween(content, "void Engine::Shutdown()", "// ── Main loop");
-    const auto bridgeInstall = SliceBetween(
-        bridge,
-        "void JobServiceGpuQueueBridge::Install",
-        "void JobServiceGpuQueueBridge::Uninstall");
-    const auto bridgeShutdown = SliceBetween(
-        bridge,
-        "std::uint64_t JobServiceGpuQueueBridge::ShutdownParticipants",
-        "bool JobServiceGpuQueueBridge::IsInstalled");
 
     const auto participantShutdown =
-        beginShutdown.find("m_Impl->m_JobServiceGpuQueueBridge.ShutdownParticipants(");
+        beginShutdown.find("m_Impl->m_JobService.ShutdownGpuQueueParticipants(");
     const auto beginShutdownCall = shutdown.find("BeginShutdown();");
     const auto executeShutdown = shutdown.find("Core::ExecuteShutdownContract(hooks)");
-    const auto installBridge =
-        content.find("m_Impl->m_JobServiceGpuQueueBridge.Install("
-                     "*m_Impl->m_Renderer, m_Impl->m_JobService);");
     const auto installDirectHook =
-        bridgeInstall.find("renderer.RegisterRuntimeFrameCommandHook(");
+        content.find("m_Impl->m_Renderer->RegisterRuntimeFrameCommandHook(");
     const auto recordCommands =
-        bridgeInstall.find("jobs.RecordGpuQueueFrameCommands(commandContext);");
+        content.find("m_Impl->m_JobService.RecordGpuQueueFrameCommands(",
+                     installDirectHook);
     const auto detachHook =
-        bridgeShutdown.find("Uninstall(renderer);");
+        beginShutdown.find(
+            "m_Impl->m_Renderer->UnregisterRuntimeFrameCommandHook(");
+    const auto clearHook = beginShutdown.find(
+        "m_Impl->m_JobServiceGpuQueueHook = {};", detachHook);
     const auto serviceShutdown =
-        bridgeShutdown.find("jobs.ShutdownGpuQueueParticipants(", detachHook);
+        beginShutdown.find(
+            "m_Impl->m_JobService.ShutdownGpuQueueParticipants(", clearHook);
     const auto waitIdle = beginShutdown.find(
-        "m_Impl->m_Device->WaitIdle();", participantShutdown);
+        "m_Impl->m_Device->WaitIdle();", serviceShutdown);
 
     ASSERT_NE(participantShutdown, std::string::npos);
     ASSERT_NE(beginShutdownCall, std::string::npos);
     ASSERT_NE(executeShutdown, std::string::npos);
-    ASSERT_NE(installBridge, std::string::npos);
     ASSERT_NE(installDirectHook, std::string::npos);
     ASSERT_NE(recordCommands, std::string::npos);
     ASSERT_NE(detachHook, std::string::npos);
+    ASSERT_NE(clearHook, std::string::npos);
     ASSERT_NE(serviceShutdown, std::string::npos);
     ASSERT_NE(waitIdle, std::string::npos);
 
     EXPECT_LT(beginShutdownCall, executeShutdown);
     EXPECT_LT(installDirectHook, recordCommands);
+    EXPECT_LT(detachHook, clearHook);
+    EXPECT_LT(clearHook, serviceShutdown);
     EXPECT_LT(detachHook, serviceShutdown);
     EXPECT_LT(participantShutdown, waitIdle);
     EXPECT_EQ(publicApi.find("RuntimeFrameCommandHookHandle"), std::string::npos);
-    EXPECT_EQ(publicApi.find("m_JobServiceGpuQueueHook"), std::string::npos);
-    EXPECT_NE(bridgeApi.find("RuntimeFrameCommandHookHandle"), std::string::npos);
-    EXPECT_EQ(content.find("RegisterRuntimeFrameCommandHook"), std::string::npos);
-    EXPECT_EQ(content.find("UnregisterRuntimeFrameCommandHook"), std::string::npos);
-    EXPECT_EQ(content.find("RecordGpuQueueFrameCommands"), std::string::npos);
+    EXPECT_EQ(publicApi.find("JobServiceGpuQueueHook"), std::string::npos);
     EXPECT_EQ(publicApi.find("RuntimeGpuJobParticipant"), std::string::npos);
     EXPECT_EQ(content.find("RegisterRuntimeGpuJobParticipant"), std::string::npos);
 }
@@ -745,30 +733,44 @@ TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMainten
     EXPECT_EQ(content.find("streaming."), std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBeforeCompile)
+TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemsBeforeCompile)
 {
     const auto content =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
 
-    const auto bundleRegistration = content.find(
-        "RegisterPromotedEcsSystemBundle(frameGraph, scene)");
+    const auto transformRegistration = content.find(
+        "ECS::Systems::TransformHierarchy::RegisterSystem(");
+    const auto boundsRegistration = content.find(
+        "ECS::Systems::BoundsPropagation::RegisterSystem(");
+    const auto renderSyncRegistration = content.find(
+        "ECS::Systems::RenderSync::RegisterSystem(");
     const auto compile = content.find("frameGraph.Compile()");
     const auto execute = content.find("frameGraph.Execute()");
     const auto resetForReplay =
         content.find("frameGraph.ResetForReplay()");
-    const auto bundleImport =
-        engineImpl.find("import Extrinsic.Runtime.EcsSystemBundle");
+    const auto transformImport = engineImpl.find(
+        "import Extrinsic.ECS.System.TransformHierarchy;");
+    const auto boundsImport = engineImpl.find(
+        "import Extrinsic.ECS.System.BoundsPropagation;");
+    const auto renderSyncImport = engineImpl.find(
+        "import Extrinsic.ECS.System.RenderSync;");
 
-    ASSERT_NE(bundleRegistration, std::string::npos);
+    ASSERT_NE(transformRegistration, std::string::npos);
+    ASSERT_NE(boundsRegistration, std::string::npos);
+    ASSERT_NE(renderSyncRegistration, std::string::npos);
     ASSERT_NE(compile, std::string::npos);
     ASSERT_NE(execute, std::string::npos);
     ASSERT_NE(resetForReplay, std::string::npos);
-    ASSERT_NE(bundleImport, std::string::npos);
+    ASSERT_NE(transformImport, std::string::npos);
+    ASSERT_NE(boundsImport, std::string::npos);
+    ASSERT_NE(renderSyncImport, std::string::npos);
 
     // The promoted baseline is the complete fixed-step system bundle. BUG-069.
-    EXPECT_LT(bundleRegistration, compile);
+    EXPECT_LT(transformRegistration, boundsRegistration);
+    EXPECT_LT(boundsRegistration, renderSyncRegistration);
+    EXPECT_LT(renderSyncRegistration, compile);
     EXPECT_LT(compile, execute);
     EXPECT_LT(execute, resetForReplay);
     EXPECT_EQ(content.find("registerModuleSystems"), std::string::npos);
@@ -1452,49 +1454,69 @@ TEST(RuntimeEngineLayering, InputActionsKeepRegistryAndDispatchOutOfEngine)
     EXPECT_NE(inputImpl.find("Core::Log::Warn"), std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsRetainedHookPolicyOutOfEngine)
+TEST(RuntimeEngineLayering, RetiredEngineCompositionHelperBmisAreAbsent)
 {
+    const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
-    const auto scheduleInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.ModuleSchedule.cppm");
-    const auto scheduleImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.ModuleSchedule.cpp");
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto runtimeCMake =
+        ReadFile(root / "src/runtime/CMakeLists.txt");
+    const auto testsCMake = ReadFile(root / "tests/CMakeLists.txt");
+    const auto moduleInventory =
+        ReadFile(root / "docs/api/generated/module_inventory.md");
 
-    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.ModuleSchedule"),
+    constexpr std::array<std::string_view, 6> retiredFiles{{
+        "src/runtime/Runtime.Module" "Schedule.cppm",
+        "src/runtime/Runtime.Module" "Schedule.cpp",
+        "src/runtime/Runtime.EcsSystem" "Bundle.cppm",
+        "src/runtime/Runtime.EcsSystem" "Bundle.cpp",
+        "src/runtime/Runtime.JobServiceGpuQueue" "Bridge.cppm",
+        "src/runtime/Runtime.JobServiceGpuQueue" "Bridge.cpp",
+    }};
+    for (const std::string_view path : retiredFiles)
+    {
+        EXPECT_FALSE(std::filesystem::exists(root / path)) << path;
+        EXPECT_EQ(runtimeCMake.find(
+                      std::filesystem::path{path}.filename().string()),
+                  std::string::npos)
+            << path;
+    }
+    EXPECT_EQ(testsCMake.find("Test.RuntimeEcsSystem" "Bundle.cpp"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.ModuleSchedule"),
+    EXPECT_EQ(moduleInventory.find(
+                  "Extrinsic.Runtime.Module" "Schedule`"),
               std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_RuntimeModuleSchedule"),
+    EXPECT_EQ(moduleInventory.find(
+                  "Extrinsic.Runtime.EcsSystem" "Bundle`"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("RuntimeModuleSchedule m_RuntimeModuleSchedule"),
+    EXPECT_EQ(moduleInventory.find(
+                  "Extrinsic.Runtime.JobServiceGpuQueue" "Bridge`"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_Impl->m_RuntimeModuleSchedule.Clear()"),
+
+    EXPECT_EQ(engineInterface.find("FrameHookRecord"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("ViewportInputHookRecord"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_Impl->m_RuntimeModuleSchedule.FinalizeForBoot("),
+    EXPECT_EQ(engineInterface.find("RuntimeFrameCommandHookHandle"),
               std::string::npos);
-    EXPECT_EQ(engineImpl.find("RegisterSimSystemsForTick"),
+    EXPECT_NE(engineImpl.find("struct FrameHookRecord"), std::string::npos);
+    EXPECT_NE(engineImpl.find("struct ViewportInputHookRecord"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_Impl->m_RuntimeModuleSchedule.RunFrameHooks("),
+    EXPECT_NE(engineImpl.find("m_FrameHooks.clear()"), std::string::npos);
+    EXPECT_NE(engineImpl.find("m_ViewportInputHooks.clear()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_NextHookRegistrationSequence = 0u"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "m_Impl->m_RuntimeModuleSchedule.RunViewportInputHooks("),
+                  "for (const Impl::FrameHookRecord& record"),
               std::string::npos);
-
-    EXPECT_EQ(engineInterface.find("RuntimeModuleSimSystemRecord"),
+    EXPECT_NE(engineImpl.find(
+                  "for (const Impl::ViewportInputHookRecord& record"),
               std::string::npos);
-    EXPECT_EQ(engineInterface.find("RuntimeModuleFrameHookRecord"),
+    EXPECT_NE(engineImpl.find("return lhs.ModuleName < rhs.ModuleName;"),
               std::string::npos);
-    EXPECT_EQ(engineInterface.find(
-                  "RuntimeModuleViewportInputHookRecord"),
-              std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_RuntimeModuleSimSystems"),
-              std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_RuntimeModuleFrameHooks"),
-              std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_NextRuntimeModuleRegistrationSequence"),
+    EXPECT_EQ(engineImpl.find("RegisterSimSystemsForTick"),
               std::string::npos);
     EXPECT_EQ(engineImpl.find("std::vector<std::vector<std::size_t>> edges"),
               std::string::npos);
@@ -1503,35 +1525,6 @@ TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsRetainedHookPolicyOutOfEng
     EXPECT_EQ(engineImpl.find("Sim system dependency cycle detected"),
               std::string::npos);
     EXPECT_EQ(engineImpl.find("record.Desc.Options"), std::string::npos);
-    EXPECT_EQ(engineImpl.find("RuntimeFrameHookContext context{"),
-              std::string::npos);
-    EXPECT_EQ(engineImpl.find("for (const RuntimeModuleFrameHookRecord& hook"),
-              std::string::npos);
-
-    EXPECT_NE(scheduleInterface.find("export module Extrinsic.Runtime.ModuleSchedule"),
-              std::string::npos);
-    EXPECT_EQ(scheduleInterface.find("RuntimeModuleSimSystemRecord"),
-              std::string::npos);
-    EXPECT_NE(scheduleInterface.find("RuntimeModuleFrameHookRecord"),
-              std::string::npos);
-    EXPECT_NE(scheduleInterface.find(
-                  "RuntimeModuleViewportInputHookRecord"),
-              std::string::npos);
-    EXPECT_EQ(scheduleImpl.find("std::vector<std::vector<std::size_t>> edges"),
-              std::string::npos);
-    EXPECT_EQ(scheduleImpl.find("waits for unprovided signal"),
-              std::string::npos);
-    EXPECT_EQ(scheduleImpl.find("Sim system dependency cycle detected"),
-              std::string::npos);
-    EXPECT_EQ(scheduleImpl.find("context.Graph.AddPass("),
-              std::string::npos);
-    EXPECT_NE(scheduleImpl.find("RuntimeFrameHookContext hookContext"),
-              std::string::npos);
-    EXPECT_NE(scheduleImpl.find("for (const RuntimeModuleFrameHookRecord& hook"),
-              std::string::npos);
-    EXPECT_NE(scheduleImpl.find(
-                  "RuntimeModuleSchedule::RunViewportInputHooks("),
-              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngine)
@@ -1835,7 +1828,8 @@ TEST(RuntimeEngineLayering,
         beginShutdown.find("m_Impl->m_CommandBus.DiscardPending();");
     const auto invokeAnnouncement = beginShutdown.find("AnnounceRuntimeShutdown();");
     const auto quiesceParticipants =
-        beginShutdown.find("m_Impl->m_JobServiceGpuQueueBridge.ShutdownParticipants(");
+        beginShutdown.find(
+            "m_Impl->m_JobService.ShutdownGpuQueueParticipants(");
     const auto beginShutdownCall = shutdown.find("BeginShutdown();");
     const auto executeShutdown =
         shutdown.find("Core::ExecuteShutdownContract(hooks)");

@@ -14,7 +14,6 @@ target_sources(${target_name}
         Runtime.CommandBus.cppm
         Runtime.DeviceBootstrap.cppm
         Runtime.JobService.cppm
-        Runtime.JobServiceGpuQueueBridge.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
         Modules/Clustering/Runtime.ClusteringGpuBackend.cppm
         Runtime.GeometryPresentation.cppm
@@ -23,7 +22,6 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringConfig.cppm
         Runtime.ProgressivePoissonConfig.cppm
         Runtime.ParameterizationConfig.cppm
-        Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.EditorCommon.cppm
         Runtime.EditorWorkspaceAttachment.cppm
@@ -44,7 +42,6 @@ target_sources(${target_name}
         Runtime.InputActions.cppm
         Runtime.KernelEvents.cppm
         Runtime.Module.cppm
-        Runtime.ModuleSchedule.cppm
         Runtime.ServiceRegistry.cppm
         Runtime.WorldHandle.cppm
         Runtime.WorldRegistry.cppm
@@ -106,7 +103,6 @@ target_sources(${target_name}
         Runtime.CommandBus.cpp
         Runtime.DeviceBootstrap.cpp
         Runtime.JobService.cpp
-        Runtime.JobServiceGpuQueueBridge.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
         Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
@@ -117,7 +113,6 @@ target_sources(${target_name}
         Runtime.ProgressivePoissonConfig.cpp
         Runtime.ParameterizationConfig.cpp
         internal/Runtime.FeatureConfigCodecs.Detail.cpp
-        Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.EditorCommon.Public.cpp
         Runtime.EditorWorkspaceAttachment.cpp
@@ -149,7 +144,6 @@ target_sources(${target_name}
         Runtime.FramePacingDiagnostics.cpp
         Runtime.InputActions.cpp
         Runtime.KernelEvents.cpp
-        Runtime.ModuleSchedule.cpp
         Runtime.ServiceRegistry.cpp
         Runtime.WorldRegistry.cpp
         Runtime.GeometryAvailability.cpp
