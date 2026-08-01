@@ -1615,12 +1615,11 @@ releases stale residency and leaves the dirty signal available for recovery.
 The existing `*FailedPack` statistic field names remain compatibility
 observability only; they do not imply a public packer or a second lifecycle.
 
-`GeometryUploadPlan::StorageHint` is planning data, not an operational AoS
-switch. The coordinator records the proposed `PlanGeometryStorage(...)` result,
-but its upload executor remains `GpuWorld::UploadGeometry`, whose live
-`GpuGeometryResidencyView` is currently `UniformSoA`. Static procedural plans
-may therefore report a `StaticInterleavedAoS` preference while the actual
-allocation remains SoA; RUNTIME-197 intentionally does not change that policy.
+RUNTIME-139 removed the dormant alternate-layout hint and plan. Runtime plan
+builders now copy channel bytes, update class/mask, bounds, and identity
+directly into the sole implemented uniform-SoA residency contract. The live
+`GpuGeometryResidencyView` reports exact channel descriptors rather than a
+fixed storage-lane field.
 
 `FindRenderableSidecarForTest(stableId)` exposes handles and boolean residency
 facts for procedural, mesh, graph, point-cloud, mesh-edge, and mesh-vertex lanes

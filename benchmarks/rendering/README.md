@@ -33,9 +33,12 @@ workload measurements.
   executor recording against scheduler-backed parallel record/join on the same
   deterministic pass-heavy graph, reports checksum parity, and records
   `adoption_claim=false` until opt-in Vulkan smoke evidence exists.
-- `rendering.vertex_fetch_layout.smoke` is the `RUNTIME-125` benchmark gate for
-  the optional AoS static-geometry fast lane. It measures the current uniform
+- `rendering.vertex_fetch_layout.smoke` is the retained `RUNTIME-125`
+  non-adoption probe for a possible alternate static-geometry layout. It
+  measures the current uniform
   SoA vertex-fetch shape and an interleaved AoS probe over the same
   deterministic built-in static mesh. The smoke result is a baseline/probe only:
-  it records `adoption_claim=false`, and shader/storage variants remain blocked
-  until a comparable GPU/profile baseline proves vertex fetch is the bottleneck.
+  it records `adoption_claim=false`; RUNTIME-139 removed the unsupported
+  planning surface, and a new task may introduce shader/storage variants only
+  after claim-eligible GPU profiling proves vertex fetch is a material
+  bottleneck.

@@ -558,10 +558,10 @@ as normals/colors. This series fixes that incrementally.
 SoA-vs-interleaved probe benchmark and planning-only storage/promotion
 contracts without adopting an AoS lane. The probe still records
 `adoption_claim=false`; no qualifying result exists.
-[`RUNTIME-139`](RUNTIME-139-remove-speculative-aos-storage-planning.md)
-therefore removes the dormant AoS hint/plan/promotion API and preserves the
-implemented uniform SoA path. A future alternate layout requires a new task
-after claim-eligible GPU profiling proves a material vertex-fetch bottleneck.
+[`RUNTIME-139`](../../done/RUNTIME-139-remove-speculative-aos-storage-planning.md)
+retired the dormant AoS hint/plan/promotion API and preserved the implemented
+uniform SoA path. A future alternate layout requires a new task after
+claim-eligible GPU profiling proves a material vertex-fetch bottleneck.
 
 Storage model is fixed by
 [`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
@@ -814,9 +814,9 @@ split; narratives live in the retirement log.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../archive/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an
-  AoS GPU lane or selecting shader variants. Operational AoS storage/shaders,
-  promote-on-edit behavior, and Vulkan parity remain owned by open follow-up
-  `RUNTIME-139`.
+  AoS GPU lane or selecting shader variants. Retired `RUNTIME-139` subsequently
+  removed those unimplemented planning contracts; any future alternate layout
+  requires a new evidence-backed task.
 - [RUNTIME-136 — Sandbox method backend selectors](../../archive/RUNTIME-136-sandbox-method-backend-selectors.md)
   (done, 2026-07-02, `CPUContracted`): the Sandbox exposes CPU/GPU backend
   selectors for K-Means and Progressive Poisson, with requested-vs-actual

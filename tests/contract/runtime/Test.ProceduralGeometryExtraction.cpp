@@ -122,11 +122,6 @@ TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeom
                    0.0f, 0.0f, 1.0f}));
     EXPECT_EQ(residency.SurfaceIndexFingerprint,
               Extrinsic::Tests::GeometryUint32Fingerprint({0u, 1u, 2u}));
-    // RUNTIME-197 carries the static preference in the plan but does not alter
-    // GpuWorld's existing upload executor; the operational residency remains
-    // SoA until a separate storage-lane task promotes that planner decision.
-    EXPECT_EQ(residency.StorageLane,
-              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

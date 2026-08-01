@@ -194,58 +194,6 @@ export namespace Extrinsic::Graphics
             }
         };
 
-        enum class GeometryStorageLane : std::uint8_t
-        {
-            UniformSoA,
-            StaticInterleavedAoS,
-        };
-
-        enum class GeometryStorageHint : std::uint8_t
-        {
-            DynamicSoA,
-            StaticPreferInterleavedAoS,
-        };
-
-        enum class GeometryStoragePlanStatus : std::uint8_t
-        {
-            DynamicHint,
-            SelectedStaticInterleavedAoS,
-            MissingStaticSurfaceChannels,
-            InvalidInput,
-        };
-
-        struct GeometryStoragePlan
-        {
-            GeometryStorageLane Lane = GeometryStorageLane::UniformSoA;
-            GeometryStoragePlanStatus Status = GeometryStoragePlanStatus::DynamicHint;
-            bool EligibleForStaticAoS = false;
-            bool RequiresPromotionOnStreamingEdit = false;
-        };
-
-        enum class GeometryStoragePromotionStatus : std::uint8_t
-        {
-            NotRequired,
-            PromoteStreamingEditToSoA,
-        };
-
-        struct GeometryStoragePromotionPlan
-        {
-            GeometryStoragePromotionStatus Status = GeometryStoragePromotionStatus::NotRequired;
-            GeometryStorageLane TargetLane = GeometryStorageLane::UniformSoA;
-            GeometryChannelUpdateMask StreamingChannels{};
-            bool RequiresPromotion = false;
-            bool RequiresSoAConversion = false;
-            bool RequiresFullReupload = false;
-            bool RequiresInstanceRebind = false;
-        };
-
-        [[nodiscard]] static GeometryStoragePlan PlanGeometryStorage(
-            const GeometryUploadDesc& desc,
-            GeometryStorageHint hint) noexcept;
-        [[nodiscard]] static GeometryStoragePromotionPlan PlanGeometryStoragePromotion(
-            GeometryStorageLane currentLane,
-            GeometryChannelUpdateMask streamingChannels) noexcept;
-
         GpuWorld();
         ~GpuWorld();
 
@@ -350,8 +298,6 @@ export namespace Extrinsic::Graphics
         std::uint32_t VertexCount = 0u;
         std::uint32_t SurfaceIndexCount = 0u;
 
-        GpuWorld::GeometryStorageLane StorageLane =
-            GpuWorld::GeometryStorageLane::UniformSoA;
         RHI::Format PositionFormat = RHI::Format::Undefined;
         RHI::Format TexcoordFormat = RHI::Format::Undefined;
         RHI::Format NormalFormat = RHI::Format::Undefined;

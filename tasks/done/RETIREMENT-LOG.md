@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-139`](RUNTIME-139-remove-speculative-aos-storage-planning.md) —
+speculative geometry-storage planning retired on 2026-08-01 at `Retired`. The
+public AoS hint, lane, plan, and promotion vocabulary plus copied runtime and
+residency state are gone because no allocator, shader, pipeline, or live
+residency path implemented the alternative. Uniform SoA channel descriptors
+and update masks remain the sole live contract, with existing extraction,
+partial-update, residency, and normal-bake behavior unchanged. Focused coverage
+passed 103/103 and the full default CPU selector passed 4,006/4,006 with its
+expected environmental GLFW/LSan skip; strict benchmark validation confirms the
+retained layout probe remains explicitly non-adopting. No GPU/Vulkan,
+byte-layout, or performance claim is made. Any alternate layout now requires a
+new evidence-backed task and claim-eligible GPU profile.
+
 [`RUNTIME-202`](RUNTIME-202-retire-sandbox-runtime-facade.md) — Sandbox editor
 facade retirement completed on 2026-08-01 at `Retired`. The public all-feature
 facade, shared Sandbox config/default-policy modules, thin method wrappers,

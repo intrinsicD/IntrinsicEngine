@@ -8,13 +8,28 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-RuntimeCleanup"
+branch: "cleanup/runtime-139-203-205"
+worktree: "/tmp/intrinsic-runtime-cleanup.ae4UkC"
+claimed_at: "2026-08-01T07:32:40Z"
 maturity_target: Retired
 ---
 # RUNTIME-139 — Remove speculative AoS storage planning
+
+## Status
+
+Completed and retired on 2026-08-01 at `Retired`. The unimplemented AoS
+hint/plan/promotion vocabulary and its copied residency fields are gone; the
+existing per-channel uniform-SoA descriptors and update masks are now the sole
+live geometry-storage contract. Focused graphics/runtime coverage passed
+103/103, the full default CPU selector passed 4,006/4,006 with its expected
+environmental GLFW/LSan skip, and the retained non-adoption benchmark manifest
+validated strictly. No GPU/Vulkan, byte-layout, or performance claim is made.
+The completion report and accepted fixed-surface review live under
+`tasks/evidence/RUNTIME-139/`.
+
+- Commit: this retirement-state commit plus the generated completion report
+  provide the final exact task-state binding.
 
 ## Goal
 
@@ -66,55 +81,55 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Re-run the production/test consumer census and pin that no allocation,
+- [x] Re-run the production/test consumer census and pin that no allocation,
       shader, pipeline, or residency record implements interleaved AoS.
-- [ ] Remove `GeometryStorageLane`, `GeometryStorageHint`,
+- [x] Remove `GeometryStorageLane`, `GeometryStorageHint`,
       `GeometryStoragePlan*`, `GeometryStoragePromotion*`,
       `PlanGeometryStorage(...)`, and `PlanGeometryStoragePromotion(...)` from
       the public `GpuWorld` surface when the census confirms their only
       alternative is dormant AoS planning.
-- [ ] Remove storage hints/plans from `GeometryResidency` requests, results,
+- [x] Remove storage hints/plans from `GeometryResidency` requests, results,
       cache entries, and every runtime geometry-plan builder/extraction caller;
       upload directly through the uniform SoA contract.
-- [ ] Remove fixed `StorageLane` fields and unsupported-AoS branches from
+- [x] Remove fixed `StorageLane` fields and unsupported-AoS branches from
       copied residency views where channel descriptors already truthfully
       describe the only live layout.
-- [ ] Delete the planning-only AoS/promotion contract tests and replace them
+- [x] Delete the planning-only AoS/promotion contract tests and replace them
       with source/behavior ratchets proving the dormant symbols are absent and
       the existing SoA upload/update/residency contracts remain covered.
 
 ## Tests
 
-- [ ] Focused `GpuWorld` and geometry-residency contracts pass with uniform
+- [x] Focused `GpuWorld` and geometry-residency contracts pass with uniform
       SoA upload, partial channel updates, exact channel descriptors, and
       normal-bake residency unchanged.
-- [ ] Runtime mesh, mesh-primitive, graph, point-cloud, and procedural
+- [x] Runtime mesh, mesh-primitive, graph, point-cloud, and procedural
       extraction contracts pass without storage-hint propagation.
-- [ ] Structural coverage rejects reintroduction of the deleted AoS planning
+- [x] Structural coverage rejects reintroduction of the deleted AoS planning
       tokens without a new evidence-gated task.
-- [ ] The retained vertex-fetch benchmark manifest still validates and still
+- [x] The retained vertex-fetch benchmark manifest still validates and still
       carries no adoption claim.
-- [ ] Default CPU-supported correctness gate passes.
+- [x] Default CPU-supported correctness gate passes.
 
 ## Docs
 
-- [ ] Update ADR-0022 and renderer/runtime READMEs to describe uniform SoA as
+- [x] Update ADR-0022 and renderer/runtime READMEs to describe uniform SoA as
       the sole implemented and exposed geometry-storage contract.
-- [ ] Keep the benchmark README explicit that the layout probe is negative /
+- [x] Keep the benchmark README explicit that the layout probe is negative /
       non-adoption evidence, not a promised implementation lane.
-- [ ] Regenerate the module inventory after public module-surface deletion.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Regenerate the module inventory after public module-surface deletion.
+- [x] Refresh task indexes, session brief, and retirement records.
 
 ## Acceptance criteria
 
-- [ ] No production or test source names `StaticInterleavedAoS` or exposes a
+- [x] No production or test source names `StaticInterleavedAoS` or exposes a
       storage plan/promotion contract for an unimplemented lane.
-- [ ] All live geometry residency is described directly by its uniform SoA
+- [x] All live geometry residency is described directly by its uniform SoA
       channel descriptors, with existing rendering and partial-update behavior
       preserved.
-- [ ] The non-adoption benchmark remains reproducible and no performance or
+- [x] The non-adoption benchmark remains reproducible and no performance or
       adoption claim is added.
-- [ ] A future alternate layout requires a new, evidence-backed task rather
+- [x] A future alternate layout requires a new, evidence-backed task rather
       than reopening dormant public planning state.
 
 ## Verification
