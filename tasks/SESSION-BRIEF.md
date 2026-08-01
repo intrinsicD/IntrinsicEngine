@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `METHOD-017` — Continuous LOP (CLOP) reference backend (tasks/active/METHOD-017-continuous-lop-clop-reference-backend.md)
 
 ## Theme B — Rendering modernization
 
@@ -71,7 +71,6 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - unblocked: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
-- unblocked: `METHOD-017` — Continuous LOP (CLOP) reference backend (tasks/backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md)
 - unblocked: `METHOD-018` — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend (tasks/backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
 - blocked by `METHOD-017`: `METHOD-019` — LOP-family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md)
 - blocked by `METHOD-019`: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)

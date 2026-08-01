@@ -44,7 +44,7 @@ map.
   — retired at `CPUContracted`; WLOP is the default on the shared typed
   `Geometry.PointCloud.Consolidation` strategy surface. The first backend
   selector remains owned by `METHOD-019`.
-- [METHOD-017 — Continuous LOP (CLOP) reference backend](METHOD-017-continuous-lop-clop-reference-backend.md)
+- [METHOD-017 — Continuous LOP (CLOP) reference backend](../../active/METHOD-017-continuous-lop-clop-reference-backend.md)
   (adds the `Clop` strategy; gated on `METHOD-016`, `geometry/GEOM-058`
   Gaussian-mixture seam, and `geometry/GEOM-062` kernels).
 - [METHOD-018 — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend](METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)

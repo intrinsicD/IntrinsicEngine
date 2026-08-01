@@ -2,6 +2,13 @@
 id: METHOD-017
 theme: I
 depends_on: [METHOD-016, GEOM-058, GEOM-062]
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner: "Codex-GeometryE2E"
+branch: "feature/lop-consolidation-e2e"
+worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
+claimed_at: "2026-08-01T14:27:02Z"
 maturity_target: CPUContracted
 ---
 # METHOD-017 — Continuous LOP (CLOP) reference backend
