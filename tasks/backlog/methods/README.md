@@ -40,14 +40,6 @@ map.
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
   (rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
-- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](../../done/METHOD-016-locally-optimal-projection-reference-backend.md)
-  — retired at `CPUContracted`; WLOP is the default on the shared typed
-  `Geometry.PointCloud.Consolidation` strategy surface. The first backend
-  selector remains owned by `METHOD-019`.
-- [METHOD-017 — Continuous LOP (CLOP) reference backend](../../done/METHOD-017-continuous-lop-clop-reference-backend.md)
-  — retired at `CPUContracted`; the shared strategy now evaluates the original
-  CLOP Gaussian-product attraction through `Geometry.GaussianMixture::FitEM`
-  and reuses `geometry/GEOM-062` repulsion kernels.
 - [METHOD-018 — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend](METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
   (adds the `Ear`/anisotropic strategies; gated on `METHOD-016` and
   `geometry/GEOM-062`; consumes `Geometry.PointCloud.Normals`).
@@ -207,6 +199,15 @@ map.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](../../done/METHOD-016-locally-optimal-projection-reference-backend.md)
+  (done, 2026-08-01, `CPUContracted`): WLOP is the default on the shared typed
+  `Geometry.PointCloud.Consolidation` strategy surface. The first backend
+  selector remains owned by `METHOD-019`.
+- [METHOD-017 — Continuous LOP (CLOP) reference backend](../../done/METHOD-017-continuous-lop-clop-reference-backend.md)
+  (done, 2026-08-01, `CPUContracted`): the shared strategy evaluates the
+  original CLOP Gaussian-product attraction through
+  `Geometry.GaussianMixture::FitEM` and reuses `geometry/GEOM-062` repulsion
+  kernels.
 - [METHOD-002 — Signed Heat Method reference backend](../../archive/METHOD-002-signed-heat-method-reference-backend.md)
   (done, 2026-06-28, `CPUContracted`): pathfinder method package for
   `geometry.signed_heat`, with surface Variant A CPU reference, correctness
