@@ -1,0 +1,92 @@
+schema_version: 2
+task_id: METHOD-016
+protocol_id: lop-wlop-reference-confirmation-v2
+profile: claim-grade
+state: frozen
+question: Does the deterministic CPU-reference LOP/WLOP implementation satisfy its frozen correctness
+  bounds on a confirmation cohort disjoint from the unit-test screening fixtures?
+hypothesis: The confirmation smoke reports quality_error_l2 at or below 0.03 and passes its denoising,
+  uniformity, and in-support-outlier gates.
+claim_boundary: Checked-in analytic plane, sphere, nonuniform-sampling, and in-support-outlier fixtures
+  on the serial cpu_reference backend only; no scanner-data, performance, runtime, UI, optimized-CPU,
+  or GPU claim.
+evidence_phase: confirmation
+claim_eligible: true
+datasets:
+- id: lop-wlop-screening-v1
+  path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: b4051e975686affc19b38062853eded5fbddc7dd4634e1a48ec86041cb7841f8
+  split: screening
+- id: lop-wlop-confirmation-v2
+  path: benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
+  sha256: 78df47006a902e92e0efe4e9f6e68a796d7a8185a90a8e2c7173cb620c9a5263
+  split: confirmation
+disjoint_splits:
+- left: screening
+  right: confirmation
+  method: The confirmation cohort uses different plane-grid dimensions, sphere sample counts, spatial
+    scales, noise equations, seeds, nonuniformity geometry, and in-support-outlier locations from the
+    screening fixtures.
+seeds:
+- 17
+- 29
+input_policy: Use only the checked-in analytic fixtures declared above. Screening observations may not
+  tune the frozen confirmation fixtures, parameters, or thresholds after protocol freeze.
+comparators:
+- id: raw-analytic-surface-error
+  budget: matched-input-points
+- id: lop-zero-repulsion-uniformity
+  budget: matched-target-count-and-iterations
+primary_metrics:
+- name: quality_error_l2
+  direction: minimize
+  unit: world-units
+  statistical_unit: confirmation-cohort
+statistical_tests:
+- name: deterministic-descriptive-bound
+  alpha: null
+summaries:
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+killing_gates:
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.03
+screening_confirmation_policy: The unit-test fixtures establish contracts only. The benchmark confirmation
+  cohort is frozen before execution, and a failed confirmation gate refutes the hypothesis rather than
+  triggering retuning.
+resources:
+  cpu_threads: 1
+  gpu: false
+command:
+- env
+- GIT_COMMIT=89193bef887bac1d3876b9e8cb29cc43bd9ca9bf
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- build/ci/custody/METHOD-016/confirmation-raw
+expected_artifacts:
+- tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json
+- tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml
+blockers: []
+source:
+  revision: 89193bef887bac1d3876b9e8cb29cc43bd9ca9bf
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml
+  sha256: 2ff28bf453268a783f7795dc6190219c6243c26f50dda99a460d40f405725159
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+implementation:
+- path: src/geometry/Geometry.PointCloud.Consolidation.cppm
+  sha256: 6ae148fba96baff4edf082fd81d7baa79d00aa4757324a67fe8696c20d7181a6
+- path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+  sha256: 9d30680cd6040e0a976c3d53ff506ded8586b9dafc009c8dd903f9b777d6d5fd
+- path: src/geometry/Geometry.PointCloud.Kernels.cppm
+  sha256: ccfa9aa393e23dd3a26357a75a7f7e15b75f37e5edc53db3298fa8dbc5f7b19a
+- path: src/geometry/Geometry.PointCloud.Kernels.cpp
+  sha256: 12af3735071129039d3436438bafb35f303b883765500a2c1e271d36cdaa86c8
+- path: benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
+  sha256: 78df47006a902e92e0efe4e9f6e68a796d7a8185a90a8e2c7173cb620c9a5263
+frozen_at: '2026-08-01T14:11:46Z'
+protocol_digest: aa491b7b5b106374cfdee017759eaccb31220bea06108ef2690b7ca2883da704
