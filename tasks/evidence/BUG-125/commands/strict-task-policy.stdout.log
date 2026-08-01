@@ -1,0 +1,6 @@
+[ERROR] tasks/done/BUG-125-queued-import-contract-state-observation-races.md: done task must include PR/commit reference placeholder or value.
+Validated 179 task file(s); findings: 1; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 81
+[check_task_maturity_followups] No maturity follow-up findings.
+ERROR: validate_tasks.py strict mode reported task-format violations

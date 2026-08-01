@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^RuntimeAssetImportFormatCoverage\\.",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^RuntimeAssetImportFormatCoverage\\.' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 2585,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T01:14:26Z",
+  "label": "format-coverage",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T01:14:23Z",
+  "stderr_path": "tasks/evidence/BUG-125/commands/format-coverage.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-125/commands/format-coverage.stdout.log",
+  "stdout_sha256": "15bed717611618a04c86a7422a0455f058d161555f60feb0597e2b9d46688ac6",
+  "task_id": "BUG-125"
+}

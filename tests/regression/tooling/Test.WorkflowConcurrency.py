@@ -99,6 +99,9 @@ CPU_ENGINE_CONFIG_ROOTS = (
 )
 CPU_MULTIWORKER_SOURCE_TARGETS = {
     "tests/benchmark/slo/Test.ArchitectureSLO.cpp": "IntrinsicBenchmarkTests",
+    "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp": (
+        "IntrinsicRuntimeContractTests"
+    ),
     "tests/unit/core/Test.CoreTasks.cpp": "IntrinsicCoreWrapperUnitTests",
     "tests/unit/core/Test.CoreFrameGraph.cpp": "IntrinsicCoreWrapperUnitTests",
     "tests/unit/core/Test.Core.TaskGraphLegacy.cpp": "IntrinsicCoreWrapperUnitTests",
@@ -196,6 +199,9 @@ def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
             r"(?:SchedulerScope|SchedulerFixture)\s+[A-Za-z_][A-Za-z0-9_]*"
             r"\s*[\{\(]\s*([0-9]+)u?\s*[\}\)]"
         ),
+        re.compile(
+            r"\.Simulation\.WorkerThreadCount\s*=\s*([0-9]+)u?\s*;"
+        ),
     )
 
     for relative_path, target in CPU_MULTIWORKER_SOURCE_TARGETS.items():
@@ -291,7 +297,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         source_budgets = _source_multiworker_budgets()
 
         self.assertEqual(declared, source_budgets)
-        self.assertEqual(len(declared), 73)
+        self.assertEqual(len(declared), 76)
         self.assertEqual(
             {
                 budget: sum(
@@ -299,7 +305,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 )
                 for budget in (3, 4, 8)
             },
-            {3: 49, 4: 22, 8: 2},
+            {3: 52, 4: 22, 8: 2},
         )
         self.assertIn(
             "Declared multi-worker test "
