@@ -3,18 +3,26 @@ task_id: RUNTIME-203
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T09:35:11Z'
+generated_at: '2026-08-01T09:52:06Z'
 claim_eligible: false
 source:
   base_ref: 8cb0985d
   base_revision: 8cb0985d812d08f81ec389869d26d027816b630d
-  head_revision: 95d6c6406148280678b63a84a4aaed1e84cdbf32
+  head_revision: 54150ed463870e6012d8b3c2448f7f96bbf29e71
   branch: cleanup/runtime-139-203-205
   worktree: /tmp/intrinsic-runtime-cleanup.ae4UkC
   dirty: false
   surface:
+  - path: docs/adr/0027-right-sized-runtime-composition.md
+    sha256: d5fb31587e8c11a3bc2c84938399ad0beaf146353be40306b5821b4278c61232
   - path: docs/api/generated/module_inventory.md
     sha256: 491805991f945b89d0f6c539ae7c5a5def7538973656703d077011901c3294ac
+  - path: docs/architecture/ecs.md
+    sha256: 46d9be5b57431d48f4bf768df254414a9b1171a2cbca4710700f64b9d22cf993
+  - path: docs/architecture/runtime.md
+    sha256: 55568b930fd96f5082d4ab7cf262b09540d87279df3738d442be1a7f27496ee3
+  - path: docs/migration/nonlegacy-parity-matrix.md
+    sha256: b2b8805e0d30fdd292a44c2e242437f51ed58ed3fa29e418105ec8abe98adffb
   - path: src/ecs/Systems/README.md
     sha256: f4d2436d276ce8cbbdb59fdeaf87565a09ee5237bd3afc49d2a9c10f8dff567e
   - path: src/runtime/CMakeLists.txt
@@ -39,12 +47,16 @@ source:
     sha256: null
   - path: tasks/SESSION-BRIEF.md
     sha256: 799ef2e06e51f2c50f64604da5380aa87b82fef2c288e739988ffd0a4ae110ab
+  - path: tasks/backlog/architecture/README.md
+    sha256: ad80aa60ebba4dd85829ef4d99014086c8c71fb02bc9f0d1ab585e0a971c604a
+  - path: tasks/backlog/bugs/index.md
+    sha256: d8fd35f1e0017d38fe956d4afa3cb76815268cb506749e72b98966e1e0c4e314
   - path: tasks/backlog/runtime/README.md
-    sha256: 0d83d72e7a924331464d3f47ef5f20da50f521f05285810cb4104136af022477
+    sha256: 5c7524d1227df4ed32592d93934b2e091a387f07a8f493601782ce713aac418a
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: 5920c30a9dffcdc078d02bf75cbbd2fa2a6c6e24407982a1976aed636c7605e5
   - path: tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md
-    sha256: b4fca15061b3a52a99be2294a029e3bee4026114a6e7ca563b1baa9d8e19d885
+    sha256: ab9caab465d633abe5acbf1a3f276d74b7dccb7407d40dbf4c74d603a662509b
   - path: tests/CMakeLists.txt
     sha256: 6743aad0e98491393392e867a818bdc201a77ca68ffe83aff25dc506da8b4d82
   - path: tests/contract/runtime/Test.RuntimeEcsSystemBundle.cpp
@@ -59,10 +71,14 @@ source:
     sha256: 70e5178fd3ee54d1a57daa626d47b23454da868811cb8d4687963fc2c3c25126
   - path: tests/regression/tooling/Test.TestGateRouting.baseline.tsv
     sha256: 1f5e679bde1a488c94fe30f56385e0de3ddb134318f5b951decc9d3f176028ed
-  content_digest: db89014f23272a716ebf0e044758991428dfb15a865823fc807577151e44c7f4
+  content_digest: e53c376c884942ea3ca3976564ed6870818f5866b8b3eb75886f067f0e3a294d
 touched:
   paths:
+  - docs/adr/0027-right-sized-runtime-composition.md
   - docs/api/generated/module_inventory.md
+  - docs/architecture/ecs.md
+  - docs/architecture/runtime.md
+  - docs/migration/nonlegacy-parity-matrix.md
   - src/ecs/Systems/README.md
   - src/runtime/CMakeLists.txt
   - src/runtime/README.md
@@ -75,6 +91,8 @@ touched:
   - src/runtime/Runtime.ModuleSchedule.cpp
   - src/runtime/Runtime.ModuleSchedule.cppm
   - tasks/SESSION-BRIEF.md
+  - tasks/backlog/architecture/README.md
+  - tasks/backlog/bugs/index.md
   - tasks/backlog/runtime/README.md
   - tasks/done/RETIREMENT-LOG.md
   - tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md
@@ -121,22 +139,31 @@ acceptance:
   evidence: []
   reason: null
 commands:
+- receipt: tasks/evidence/RUNTIME-203/commands/ara-claims-review-fix.json
 - receipt: tasks/evidence/RUNTIME-203/commands/ara-claims.json
 - receipt: tasks/evidence/RUNTIME-203/commands/asan-build.json
 - receipt: tasks/evidence/RUNTIME-203/commands/asan-configure.json
 - receipt: tasks/evidence/RUNTIME-203/commands/asan-tests.json
 - receipt: tasks/evidence/RUNTIME-203/commands/ci-build.json
 - receipt: tasks/evidence/RUNTIME-203/commands/ci-configure.json
+- receipt: tasks/evidence/RUNTIME-203/commands/clean-workshop-review-fix.json
 - receipt: tasks/evidence/RUNTIME-203/commands/clean-workshop.json
 - receipt: tasks/evidence/RUNTIME-203/commands/cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-203/commands/diff-check-review-fix.json
+- receipt: tasks/evidence/RUNTIME-203/commands/doc-links-review-fix.json
 - receipt: tasks/evidence/RUNTIME-203/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-203/commands/docs-sync-review-fix.json
 - receipt: tasks/evidence/RUNTIME-203/commands/docs-sync.json
 - receipt: tasks/evidence/RUNTIME-203/commands/focused-tests.json
 - receipt: tasks/evidence/RUNTIME-203/commands/layering.json
 - receipt: tasks/evidence/RUNTIME-203/commands/module-inventory.json
+- receipt: tasks/evidence/RUNTIME-203/commands/session-brief-review-fix.json
 - receipt: tasks/evidence/RUNTIME-203/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-203/commands/task-policy-review-fix.json
 - receipt: tasks/evidence/RUNTIME-203/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-203/commands/task-state-links-review-fix.json
 - receipt: tasks/evidence/RUNTIME-203/commands/task-state-links.json
+- receipt: tasks/evidence/RUNTIME-203/commands/task-validation-review-fix.json
 - receipt: tasks/evidence/RUNTIME-203/commands/task-validation.json
 - receipt: tasks/evidence/RUNTIME-203/commands/test-layout.json
 - receipt: tasks/evidence/RUNTIME-203/commands/ubsan-build.json
@@ -172,7 +199,7 @@ artifacts:
   sha256: 70e5178fd3ee54d1a57daa626d47b23454da868811cb8d4687963fc2c3c25126
   kind: file
 - path: tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md
-  sha256: b4fca15061b3a52a99be2294a029e3bee4026114a6e7ca563b1baa9d8e19d885
+  sha256: ab9caab465d633abe5acbf1a3f276d74b7dccb7407d40dbf4c74d603a662509b
   kind: file
 self_review:
   completed: true
