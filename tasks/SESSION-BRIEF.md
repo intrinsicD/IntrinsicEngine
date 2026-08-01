@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GEOM-058` — Gaussian mixture models and Anderson-accelerated EM seam (tasks/active/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
 
 ## Theme B — Rendering modernization
 
@@ -53,7 +53,6 @@ the authoritative open/unblocked view.
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- unblocked: `GEOM-058` — Gaussian mixture models and Anderson-accelerated EM seam (tasks/backlog/geometry/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
 - unblocked: `GEOM-059` — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam (tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
 - unblocked: `GEOM-060` — Permutohedral lattice fast high-dimensional filtering seam (tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md)
 - blocked by `BUG-109`: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)

@@ -2,6 +2,13 @@
 id: GEOM-058
 theme: I
 depends_on: []
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner: "Codex-GeometryE2E"
+branch: "feature/lop-consolidation-e2e"
+worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
+claimed_at: "2026-08-01T10:59:50Z"
 maturity_target: CPUContracted
 ---
 # GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam

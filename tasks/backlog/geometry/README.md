@@ -13,7 +13,7 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam](GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
+- [GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam](../../active/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
   (gates `methods/METHOD-015`; framework24 port-gap follow-up).
 - [GEOM-059 — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam](GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
   (framework24 port-gap follow-up).
