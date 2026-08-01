@@ -1,0 +1,180 @@
+schema_version: 1
+task_id: RUNTIME-205
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T10:47:06Z'
+claim_eligible: false
+source:
+  base_ref: 8b2c4382
+  base_revision: 8b2c4382fca8b87ac65b3ecbb0baacd7032bbcfe
+  head_revision: 41c92908c016a50d5b8500f2918571d638e90740
+  branch: cleanup/runtime-139-203-205
+  worktree: /tmp/intrinsic-runtime-cleanup.ae4UkC
+  dirty: true
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: ea945abcf7f1594560ea7af72473c105a1fb1e7623c5b7da4b67d3b35bc8d757
+  - path: docs/architecture/graphics.md
+    sha256: 17406738c06449e5136308ded7dc4f328057f68d9e708da3d4ea2273f569970a
+  - path: docs/reviews/2026-08-01-runtime-205-clean-workshop-review.md
+    sha256: 828990d630c34be64cecd93e8d09d78214749d0eebd7cc7b01dad3b53d97d1a4
+  - path: src/graphics/renderer/README.md
+    sha256: 328184847f70ba1a6bdf5b10b0efcad9f8d8e53e7508336cf309a0c19a4ad0c6
+  - path: src/runtime/CMakeLists.txt
+    sha256: 0222c8bccc89f0e28e5b47181c6d0d70f04120d178c0041ed35dde5b39ab7b69
+  - path: src/runtime/Gizmos/Runtime.GizmoFrameService.cpp
+    sha256: null
+  - path: src/runtime/Gizmos/Runtime.GizmoFrameService.cppm
+    sha256: null
+  - path: src/runtime/README.md
+    sha256: e189611c60f3fe1275748ec3264e9679820d8daad3750a80dc9d993b96521421
+  - path: src/runtime/Runtime.SelectionReadback.cpp
+    sha256: null
+  - path: src/runtime/Runtime.SelectionReadback.cppm
+    sha256: null
+  - path: src/runtime/Scene/Runtime.SceneInteractionModule.cpp
+    sha256: 49eded9ee7946e9beccc27af0b4eff40ab4d33518002d1e7c844d775f0979ee3
+  - path: tasks/SESSION-BRIEF.md
+    sha256: a89d1438422103288cd978fe56a1a44a9108da7593de219e45a7867701b941e9
+  - path: tasks/backlog/runtime/README.md
+    sha256: e5832ee8dc00630c355df4d871f6173e7e0c048dffb0d3ea14b7944dbbb72ad4
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 8cdda4bb253b24f1c75a128b22ad816fb05f5db9b4667f037c861f2d966d04b1
+  - path: tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md
+    sha256: e3967c5c614db1a9a71ec5cbacfe4b94d76dbb487deed6f0f51c9fccf1d02af7
+  - path: tests/CMakeLists.txt
+    sha256: 236167f632852bfe8d46968ea3a7a72852b38af9f62ff3083bc5515da0b8af19
+  - path: tests/contract/runtime/Test.GizmoInteraction.cpp
+    sha256: f55b7bfcad49e7c0d387ddc6a518b053bf1027135f91503776e7102444438086
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: dbc49a4586ef3d69e9914c6f1c981153ae96c09bcd599f206b9cc56c2a8dc844
+  - path: tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+    sha256: 4bae386575a667c83addb52dc19e593067fa0cf696e6bf7495d5d9eda39782ad
+  - path: tests/contract/runtime/Test.SceneInteractionModule.cpp
+    sha256: 9ca752ef5a1f124d9e7fcd67df8691792d394aa58629af9bf5d9deac74110b16
+  - path: tests/contract/runtime/Test.SelectionReadbackCorrelation.cpp
+    sha256: null
+  - path: tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+    sha256: d7556c5d1e8e22cf5142e1d5bf15e2ca47b253f813684c38e54bb4fd05aa2aa2
+  content_digest: 279ee16e2fde96193fa9fdd071de1413e5eeafb6afabf9de38ea23a66edc4b36
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/graphics.md
+  - docs/reviews/2026-08-01-runtime-205-clean-workshop-review.md
+  - src/graphics/renderer/README.md
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Gizmos/Runtime.GizmoFrameService.cpp
+  - src/runtime/Gizmos/Runtime.GizmoFrameService.cppm
+  - src/runtime/README.md
+  - src/runtime/Runtime.SelectionReadback.cpp
+  - src/runtime/Runtime.SelectionReadback.cppm
+  - src/runtime/Scene/Runtime.SceneInteractionModule.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.GizmoInteraction.cpp
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  - tests/contract/runtime/Test.SceneInteractionModule.cpp
+  - tests/contract/runtime/Test.SelectionReadbackCorrelation.cpp
+  - tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.GizmoInteraction
+  - Extrinsic.Runtime.PrimitiveSelectionRefinement
+  - Extrinsic.Runtime.SceneInteractionModule
+  - Extrinsic.Runtime.SelectionController
+extension_seam: IRuntimeModule viewport/input, before-extraction, and maintenance hooks plus durable interaction
+  behavior contracts
+future_change_plan: Add an independently reusable helper only when a present second production caller
+  or test-double boundary requires it
+acceptance:
+- criterion: Gizmo and pick/readback behavior remains observable and covered through
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No production or test source imports the two helper modules, and their
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: SceneDocument ownership, graphics packet/readback ownership, and app
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No replacement helper service, registry, bridge, or Engine facade is
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-205/commands/ara-claims.json
+- receipt: tasks/evidence/RUNTIME-205/commands/asan-build.json
+- receipt: tasks/evidence/RUNTIME-205/commands/asan-configure.json
+- receipt: tasks/evidence/RUNTIME-205/commands/asan-tests.json
+- receipt: tasks/evidence/RUNTIME-205/commands/ci-build.json
+- receipt: tasks/evidence/RUNTIME-205/commands/ci-configure.json
+- receipt: tasks/evidence/RUNTIME-205/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-205/commands/cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-205/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-205/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-205/commands/docs-sync.json
+- receipt: tasks/evidence/RUNTIME-205/commands/focused-tests.json
+- receipt: tasks/evidence/RUNTIME-205/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-205/commands/module-inventory.json
+- receipt: tasks/evidence/RUNTIME-205/commands/root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-205/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-205/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-205/commands/task-state-links.json
+- receipt: tasks/evidence/RUNTIME-205/commands/task-validation.json
+- receipt: tasks/evidence/RUNTIME-205/commands/test-layout.json
+- receipt: tasks/evidence/RUNTIME-205/commands/ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-205/commands/ubsan-configure.json
+- receipt: tasks/evidence/RUNTIME-205/commands/ubsan-tests.json
+changed_public_contracts:
+- SceneInteractionModule preserves world/epoch-qualified selection correlation, copied interaction snapshots,
+  and document-scoped gizmo history behavior while the two one-consumer helper BMIs are deleted
+diagnostics_and_previews:
+- Owner-level and structural tests prove bounded correlation, stale rejection, capture/history gating,
+  live-registry drag cancellation, module deletion, and absence of replacement facades
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Promoted Vulkan picking command submission was not rerun; the relocation leaves graphics/RHI/backend
+  code and packet/readback contracts unchanged
+skipped_checks:
+- check: gpu-vulkan
+  reason: No graphics/RHI/backend/shader/byte-layout behavior changed; CPU and sanitizer owner-level tests
+    cover the relocated runtime policy
+artifacts:
+- path: tests/contract/runtime/Test.SceneInteractionModule.cpp
+  sha256: 9ca752ef5a1f124d9e7fcd67df8691792d394aa58629af9bf5d9deac74110b16
+  kind: file
+- path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  sha256: dbc49a4586ef3d69e9914c6f1c981153ae96c09bcd599f206b9cc56c2a8dc844
+  kind: file
+- path: docs/reviews/2026-08-01-runtime-205-clean-workshop-review.md
+  sha256: 828990d630c34be64cecd93e8d09d78214749d0eebd7cc7b01dad3b53d97d1a4
+  kind: file
+- path: tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md
+  sha256: e3967c5c614db1a9a71ec5cbacfe4b94d76dbb487deed6f0f51c9fccf1d02af7
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-205/handoff.jsonl
+review: tasks/evidence/RUNTIME-205/reviews.jsonl

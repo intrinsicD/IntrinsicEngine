@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 198,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T10:40:19Z",
+  "label": "task-policy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T10:40:19Z",
+  "stderr_path": "tasks/evidence/RUNTIME-205/commands/task-policy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-205/commands/task-policy.stdout.log",
+  "stdout_sha256": "0fbeb8bd16c61765e86f78c3b8b41aa09087f6cd66260182d6fe8bf131366604",
+  "task_id": "RUNTIME-205"
+}

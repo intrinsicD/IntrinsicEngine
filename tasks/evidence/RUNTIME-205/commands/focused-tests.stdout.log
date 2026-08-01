@@ -1,0 +1,150 @@
+Internal ctest changing into directory: /tmp/intrinsic-runtime-cleanup.ae4UkC/build/ci
+Test project /tmp/intrinsic-runtime-cleanup.ae4UkC/build/ci
+      Start  496: GizmoInteraction.HitTestResolvesXAxisAndRejectsOffAxisCursor
+ 1/70 Test  #496: GizmoInteraction.HitTestResolvesXAxisAndRejectsOffAxisCursor ......................................   Passed    0.00 sec
+      Start  497: GizmoInteraction.HitTestEmptySelectionIsNoHit
+ 2/70 Test  #497: GizmoInteraction.HitTestEmptySelectionIsNoHit .....................................................   Passed    0.00 sec
+      Start  498: GizmoInteraction.DragTickTranslatesAlongAxisAndCommitsHistory
+ 3/70 Test  #498: GizmoInteraction.DragTickTranslatesAlongAxisAndCommitsHistory .....................................   Passed    0.00 sec
+      Start  499: GizmoInteraction.DragCommitCoalescesMultiSelectionAndRejectsInterveningState
+ 4/70 Test  #499: GizmoInteraction.DragCommitCoalescesMultiSelectionAndRejectsInterveningState ......................   Passed    0.00 sec
+      Start  500: GizmoInteraction.DragCancelRestoresBeforeTransform
+ 5/70 Test  #500: GizmoInteraction.DragCancelRestoresBeforeTransform ................................................   Passed    0.00 sec
+      Start  501: GizmoInteraction.DragTickRotatesAroundAxisAndCommitsHistory
+ 6/70 Test  #501: GizmoInteraction.DragTickRotatesAroundAxisAndCommitsHistory .......................................   Passed    0.00 sec
+      Start  502: GizmoInteraction.DragTickScalesAlongAxisAndCommitsHistory
+ 7/70 Test  #502: GizmoInteraction.DragTickScalesAlongAxisAndCommitsHistory .........................................   Passed    0.00 sec
+      Start  503: GizmoInteraction.DragModeIsLatchedWhenToolbarModeChangesMidDrag
+ 8/70 Test  #503: GizmoInteraction.DragModeIsLatchedWhenToolbarModeChangesMidDrag ...................................   Passed    0.00 sec
+      Start  504: GizmoInteraction.SnapModifierRoundsTranslationToStep
+ 9/70 Test  #504: GizmoInteraction.SnapModifierRoundsTranslationToStep ..............................................   Passed    0.00 sec
+      Start  505: GizmoInteraction.RenderPacketBuilderMapsOnlyFrozenFields
+10/70 Test  #505: GizmoInteraction.RenderPacketBuilderMapsOnlyFrozenFields ..........................................   Passed    0.00 sec
+      Start  506: GizmoInteractionEngineWiring.ExtractionSubmitsTransformGizmoPackets
+11/70 Test  #506: GizmoInteractionEngineWiring.ExtractionSubmitsTransformGizmoPackets ...............................   Passed    0.05 sec
+      Start  507: GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket
+12/70 Test  #507: GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket ...........................   Passed    0.05 sec
+      Start  678: RuntimeEngineLayering.RunFrameDoesNotUseGpuResourceOrPassLevelDetails
+13/70 Test  #678: RuntimeEngineLayering.RunFrameDoesNotUseGpuResourceOrPassLevelDetails .............................   Passed    0.00 sec
+      Start  679: RuntimeEngineLayering.ProductionSourceHasNoApplicationCallbackLifecycle
+14/70 Test  #679: RuntimeEngineLayering.ProductionSourceHasNoApplicationCallbackLifecycle ...........................   Passed    0.01 sec
+      Start  680: RuntimeEngineLayering.RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder
+15/70 Test  #680: RuntimeEngineLayering.RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder .............   Passed    0.00 sec
+      Start  681: RuntimeEngineLayering.RunFrameAppliesJobCompletionsWithBoundedBudget
+16/70 Test  #681: RuntimeEngineLayering.RunFrameAppliesJobCompletionsWithBoundedBudget ..............................   Passed    0.00 sec
+      Start  682: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRendererContract
+17/70 Test  #682: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRendererContract .......................   Passed    0.00 sec
+      Start  683: RuntimeEngineLayering.EnginePrivatelyOwnsGpuQueueHookLifecycle
+18/70 Test  #683: RuntimeEngineLayering.EnginePrivatelyOwnsGpuQueueHookLifecycle ....................................   Passed    0.01 sec
+      Start  684: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition
+19/70 Test  #684: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition ......................   Passed    0.01 sec
+      Start  685: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsGizmoFrameState
+20/70 Test  #685: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsGizmoFrameState ................................   Passed    0.01 sec
+      Start  686: RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface
+21/70 Test  #686: RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface ..................   Passed    0.02 sec
+      Start  687: RuntimeEngineLayering.RunFrameCarriesDataOnlyFrameContext
+22/70 Test  #687: RuntimeEngineLayering.RunFrameCarriesDataOnlyFrameContext .........................................   Passed    0.00 sec
+      Start  688: RuntimeEngineLayering.GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction
+23/70 Test  #688: RuntimeEngineLayering.GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction ...............   Passed    0.00 sec
+      Start  689: RuntimeEngineLayering.PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder
+24/70 Test  #689: RuntimeEngineLayering.PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder ...............   Passed    0.01 sec
+      Start  690: RuntimeEngineLayering.RunFrameRegistersPromotedEcsSystemsBeforeCompile
+25/70 Test  #690: RuntimeEngineLayering.RunFrameRegistersPromotedEcsSystemsBeforeCompile ............................   Passed    0.01 sec
+      Start  691: RuntimeEngineLayering.SupersededWorkSurfacesAreRetiredFromBuild
+26/70 Test  #691: RuntimeEngineLayering.SupersededWorkSurfacesAreRetiredFromBuild ...................................   Passed    0.00 sec
+      Start  692: RuntimeEngineLayering.SupersededGpuResultReadbackSurfacesAreRetiredFromBuild
+27/70 Test  #692: RuntimeEngineLayering.SupersededGpuResultReadbackSurfacesAreRetiredFromBuild ......................   Passed    0.01 sec
+      Start  693: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService
+28/70 Test  #693: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService ................................   Passed    0.00 sec
+      Start  694: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine
+29/70 Test  #694: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine .......................   Passed    0.00 sec
+      Start  695: RuntimeEngineLayering.MaintenanceHasNoOptionalStreamingFacade
+30/70 Test  #695: RuntimeEngineLayering.MaintenanceHasNoOptionalStreamingFacade .....................................   Passed    0.00 sec
+      Start  696: RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope
+31/70 Test  #696: RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope .............................   Passed    0.01 sec
+      Start  697: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface
+32/70 Test  #697: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface .................................   Passed    0.01 sec
+      Start  698: RuntimeEngineLayering.FrameLoopContractDoesNotBecomeCompositionRoot
+33/70 Test  #698: RuntimeEngineLayering.FrameLoopContractDoesNotBecomeCompositionRoot ...............................   Passed    0.00 sec
+      Start  699: RuntimeEngineLayering.DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine
+34/70 Test  #699: RuntimeEngineLayering.DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine .....................   Passed    0.00 sec
+      Start  700: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted
+35/70 Test  #700: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted .................................   Passed    0.00 sec
+      Start  701: RuntimeEngineLayering.CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine
+36/70 Test  #701: RuntimeEngineLayering.CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine ....................   Passed    0.00 sec
+      Start  702: RuntimeEngineLayering.InputActionsKeepRegistryAndDispatchOutOfEngine
+37/70 Test  #702: RuntimeEngineLayering.InputActionsKeepRegistryAndDispatchOutOfEngine ..............................   Passed    0.01 sec
+      Start  703: RuntimeEngineLayering.RetiredEngineCompositionHelperBmisAreAbsent
+38/70 Test  #703: RuntimeEngineLayering.RetiredEngineCompositionHelperBmisAreAbsent .................................   Passed    0.01 sec
+      Start  704: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsPickCorrelationState
+39/70 Test  #704: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsPickCorrelationState ...........................   Passed    0.01 sec
+      Start  705: RuntimeEngineLayering.EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics
+40/70 Test  #705: RuntimeEngineLayering.EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics ...................   Passed    0.01 sec
+      Start  706: RuntimeEngineLayering.AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence
+41/70 Test  #706: RuntimeEngineLayering.AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence ......................   Passed    0.01 sec
+      Start  707: RuntimeEngineLayering.RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers
+42/70 Test  #707: RuntimeEngineLayering.RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers ........................   Passed    0.01 sec
+      Start  708: RuntimeEngineLayering.RetiredSpatialDebugRegistryHasNoProductionSurface
+43/70 Test  #708: RuntimeEngineLayering.RetiredSpatialDebugRegistryHasNoProductionSurface ...........................   Passed    0.01 sec
+      Start  709: RuntimeEngineLayering.RetiredProgressivePresentationModulesAndSymbolsStayDeleted
+44/70 Test  #709: RuntimeEngineLayering.RetiredProgressivePresentationModulesAndSymbolsStayDeleted ..................   Passed    0.02 sec
+      Start  710: RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains
+45/70 Test  #710: RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains ................................   Passed    0.00 sec
+      Start  711: RuntimeEngineLayering.RetiredGeometryPackerAndLifecycleSurfacesStayDeleted
+46/70 Test  #711: RuntimeEngineLayering.RetiredGeometryPackerAndLifecycleSurfacesStayDeleted ........................   Passed    0.01 sec
+      Start  839: SceneInteractionModule.PublishesExactServicesAndSupportsOptionalDocument
+47/70 Test  #839: SceneInteractionModule.PublishesExactServicesAndSupportsOptionalDocument ..........................   Passed    0.00 sec
+      Start  840: SceneInteractionModule.DuplicatePublicationFailsClosed
+48/70 Test  #840: SceneInteractionModule.DuplicatePublicationFailsClosed ............................................   Passed    0.00 sec
+      Start  841: SceneInteractionModule.PreexistingSelectionPublicationFailsClosed
+49/70 Test  #841: SceneInteractionModule.PreexistingSelectionPublicationFailsClosed .................................   Passed    0.00 sec
+      Start  842: SceneInteractionModule.PartialRegistrationAndResolveFailureRollBack
+50/70 Test  #842: SceneInteractionModule.PartialRegistrationAndResolveFailureRollBack ...............................   Passed    0.03 sec
+      Start  843: SceneInteractionModule.RegisteredHooksIssueCorrelateRefineAndResetSelection
+51/70 Test  #843: SceneInteractionModule.RegisteredHooksIssueCorrelateRefineAndResetSelection .......................   Passed    0.03 sec
+      Start  844: SceneInteractionModule.OwnerHooksCorrelateOutOfOrderAndMissingReadbacksBySequence
+52/70 Test  #844: SceneInteractionModule.OwnerHooksCorrelateOutOfOrderAndMissingReadbacksBySequence .................   Passed    0.03 sec
+      Start  845: SceneInteractionModule.OwnerBoundsCorrelationAndRejectsZeroUnknownAndStaleWorldResults
+53/70 Test  #845: SceneInteractionModule.OwnerBoundsCorrelationAndRejectsZeroUnknownAndStaleWorldResults ............   Passed    0.03 sec
+      Start  846: SceneInteractionModule.DocumentEpochResetRejectsLateCorrelatedReadback
+54/70 Test  #846: SceneInteractionModule.DocumentEpochResetRejectsLateCorrelatedReadback ............................   Passed    0.03 sec
+      Start  847: SceneInteractionModule.ViewportGizmoRequiresHistoryHonorsCaptureAndCommitsOneUndoableDrag
+55/70 Test  #847: SceneInteractionModule.ViewportGizmoRequiresHistoryHonorsCaptureAndCommitsOneUndoableDrag .........   Passed    0.00 sec
+      Start  848: SceneInteractionModule.WorldSwitchCancelsDragAndPreservesGizmoTuning
+56/70 Test  #848: SceneInteractionModule.WorldSwitchCancelsDragAndPreservesGizmoTuning ..............................   Passed    0.00 sec
+      Start  849: SceneInteractionModule.ShutdownAnnouncementReleasesDocumentParticipant
+57/70 Test  #849: SceneInteractionModule.ShutdownAnnouncementReleasesDocumentParticipant ............................   Passed    0.00 sec
+      Start  850: SceneInteractionModule.DocumentReplacementClearsExactlyOnceAndKeepsSequenceMonotonic
+58/70 Test  #850: SceneInteractionModule.DocumentReplacementClearsExactlyOnceAndKeepsSequenceMonotonic ..............   Passed    0.00 sec
+      Start  851: SceneInteractionModule.CloseAndLoadClearOneCohortAndRebuildLookup
+59/70 Test  #851: SceneInteractionModule.CloseAndLoadClearOneCohortAndRebuildLookup .................................   Passed    0.01 sec
+      Start  852: SceneInteractionModule.ActiveWorldMismatchClearsWithoutResurrectionAndIgnoresInactiveRetirement
+60/70 Test  #852: SceneInteractionModule.ActiveWorldMismatchClearsWithoutResurrectionAndIgnoresInactiveRetirement ...   Passed    0.01 sec
+      Start  853: SceneInteractionModule.OptionalOmissionAndComposedOperationalRun
+61/70 Test  #853: SceneInteractionModule.OptionalOmissionAndComposedOperationalRun ..................................   Passed    0.07 sec
+      Start  854: SceneInteractionModule.ShutdownReinitializeStartsEmptyWithRecycledBootHandle
+62/70 Test  #854: SceneInteractionModule.ShutdownReinitializeStartsEmptyWithRecycledBootHandle ......................   Passed    0.07 sec
+      Start 1059: SelectionSnapshotExtraction.SelectedEntityMirrorsIntoRenderWorldSelection
+63/70 Test #1059: SelectionSnapshotExtraction.SelectedEntityMirrorsIntoRenderWorldSelection .........................   Passed    0.05 sec
+      Start 1060: SelectionSnapshotExtraction.HoveredEntityMirrorsIntoRenderWorldSelection
+64/70 Test #1060: SelectionSnapshotExtraction.HoveredEntityMirrorsIntoRenderWorldSelection ..........................   Passed    0.05 sec
+      Start 1061: SelectionSnapshotExtraction.AdditiveSelectionMirrorsAllSelectedIds
+65/70 Test #1061: SelectionSnapshotExtraction.AdditiveSelectionMirrorsAllSelectedIds ................................   Passed    0.05 sec
+      Start 1062: SelectionSnapshotExtraction.OmittedInteractionSnapshotLeavesSelectionEmpty
+66/70 Test #1062: SelectionSnapshotExtraction.OmittedInteractionSnapshotLeavesSelectionEmpty ........................   Passed    0.05 sec
+      Start 1063: SelectionSnapshotExtraction.ClearedSelectionMirrorsEmptyOnNextExtraction
+67/70 Test #1063: SelectionSnapshotExtraction.ClearedSelectionMirrorsEmptyOnNextExtraction ..........................   Passed    0.05 sec
+      Start 1064: SelectionSnapshotExtraction.SubmissionCopiesCallerOwnedVectorsBeforeExtraction
+68/70 Test #1064: SelectionSnapshotExtraction.SubmissionCopiesCallerOwnedVectorsBeforeExtraction ....................   Passed    0.05 sec
+      Start 1065: SelectionSnapshotExtraction.MismatchedWorldSnapshotFailsClosed
+69/70 Test #1065: SelectionSnapshotExtraction.MismatchedWorldSnapshotFailsClosed ....................................   Passed    0.05 sec
+      Start 1066: SelectionSnapshotExtraction.EmptyWorldSnapshotClearsPriorSelectionHoverAndGizmoPackets
+70/70 Test #1066: SelectionSnapshotExtraction.EmptyWorldSnapshotClearsPriorSelectionHoverAndGizmoPackets ............   Passed    0.05 sec
+
+100% tests passed, 0 tests failed out of 70
+
+Label Time Summary:
+contract    =   1.10 sec*proc (70 tests)
+runtime     =   1.10 sec*proc (70 tests)
+
+Total Test time (real) =   1.81 sec
