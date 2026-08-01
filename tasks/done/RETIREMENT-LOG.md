@@ -20,7 +20,7 @@ accelerated proposal only after model and monotonic-likelihood validation.
 Focused two-/three-component recovery, monotonicity, acceleration,
 determinism, adversarial-state, extreme-value, covariance, and degenerate-input
 coverage passed 13/13 under the normal, ASan, and UBSan builds, and the full
-CPU-only geometry label gate passed 1,721/1,721. The aggregate `IntrinsicTests`
+CPU-only geometry label gate passed 1,609/1,609. The aggregate `IntrinsicTests`
 target and strict layering check pass. Both modules stay narrow imports with
 no public Eigen types or umbrella re-export. Optimized/GPU variants remain
 future method-workflow work only when a concrete consumer justifies them; no

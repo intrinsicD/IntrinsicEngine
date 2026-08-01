@@ -3,12 +3,12 @@ task_id: GEOM-058
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T11:37:25Z'
+generated_at: '2026-08-01T11:58:47Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: fb494cfc7cdc319fcb050a73b2e291ff73cc6d1d
-  head_revision: 79806d29098c0a5626383c1a802a9c6aabb392b8
+  head_revision: feffc6fe0fbc6ef0ece355e74a1fddcc928e03c3
   branch: feature/lop-consolidation-e2e
   worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
   dirty: false
@@ -20,11 +20,11 @@ source:
   - path: src/geometry/CMakeLists.txt
     sha256: 6592b3fbb31ed113f49da8cae8ba568a225ec0c325ff24b293ce2024887a6770
   - path: src/geometry/Geometry.FixedPoint.Anderson.cpp
-    sha256: 0e28664918113f7ad3fc7a0299b5d0b255fc263303d4bb580c5c74d272cf3568
+    sha256: 54199dfecfc7d3098a22d2d70a71a32ca14bb61690eb6b1d022e688f69ba5941
   - path: src/geometry/Geometry.FixedPoint.Anderson.cppm
-    sha256: 453cbf4d58bab0f0f36c1a70d46af50f051947b2a897759a3ca00b34b65efff5
+    sha256: c2a4f44c04a52c6746d80e7c07b462f349d9221102808d9808a7a6e1346434b2
   - path: src/geometry/Geometry.GaussianMixture.cpp
-    sha256: c1ab51dfb21a0ab5672f83c0394182eaa81f4cbb76d2a44bbbdd13d9ae1d0ce5
+    sha256: bde2d9084289e2cd0c67ec982bc46528a425fbe42f09dc00222579946702d0ae
   - path: src/geometry/Geometry.GaussianMixture.cppm
     sha256: 2ac493058efd783f8385664c80e3ee0dd91f326b3bfe58795030f1b21310f77c
   - path: src/geometry/Geometry.KMeans.cpp
@@ -36,14 +36,14 @@ source:
   - path: tasks/backlog/geometry/README.md
     sha256: 771ac279790f427b706d5139f40f7d9ebcbd25f343d0eff5e07a0cec57dcfe7b
   - path: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
-    sha256: 8adbf81c29be54e6aef053741ae56c26af14843b5674be6b2971c565d463cb80
+    sha256: 9697f58b02873f8256d76509a5d38ab160082a208a95357e8da9b7b3248bf1cf
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: a75aff5b9d58fe3f6f993091d0094d677982c47337fd2ffe61f7c9a2a19d483a
+    sha256: a3dc1faeec69a9461664d46dc5a8a683b9b54fe5c48bdb30a4068fe7a99c5b6e
   - path: tests/CMakeLists.txt
     sha256: f4ccb0a52df241b73ce5962a5fc93199fb7012c3dfb236db4df221da18725ce6
   - path: tests/unit/geometry/Test.GaussianMixture.cpp
-    sha256: 185d7c9656af34a6597a52d4a089a9488c5229036915a8554f90094f21bebb90
-  content_digest: bbb0934db0b771c8fc34fc2d716fefc2336ca76c56f782966e8221f0952953ca
+    sha256: b44b9db15af3ac747f792ee8aad7102eaa633266bec38c871d1d61114e8eff1c
+  content_digest: a25f73481e5fd3affc00b878b08806f0e92ddae7a7b754d3b8aca836d621bfde
 touched:
   paths:
   - docs/api/generated/module_inventory.md
@@ -93,15 +93,26 @@ acceptance:
   evidence: []
   reason: null
 commands:
+- receipt: tasks/evidence/GEOM-058/commands/asan-focused-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.json
+- receipt: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/build-intrinsic-tests.json
+- receipt: tasks/evidence/GEOM-058/commands/doc-links-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/doc-links.json
 - receipt: tasks/evidence/GEOM-058/commands/focused-numerics-final.json
+- receipt: tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.json
 - receipt: tasks/evidence/GEOM-058/commands/focused-numerics.json
 - receipt: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-final.json
+- receipt: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/geometry-cpu-gate.json
+- receipt: tasks/evidence/GEOM-058/commands/geometry-cpu-policy-gate-review2.json
+- receipt: tasks/evidence/GEOM-058/commands/layering-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/layering.json
+- receipt: tasks/evidence/GEOM-058/commands/module-inventory-review2.json
+- receipt: tasks/evidence/GEOM-058/commands/task-policy-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/task-policy.json
+- receipt: tasks/evidence/GEOM-058/commands/test-layout-review2.json
+- receipt: tasks/evidence/GEOM-058/commands/ubsan-focused-review2.json
 changed_public_contracts:
 - Deterministic 3D Gaussian evaluation, responsibilities, likelihood, regularized EM, seeded k-means++
   initialization, and residual-safeguarded Anderson proposals with structured diagnostics
@@ -120,18 +131,15 @@ residual_risks:
 skipped_checks:
 - check: gpu-vulkan
   reason: CPU-reference geometry numerics add no RHI, shader, device, or runtime behavior
-- check: task-local-sanitizers
-  reason: Final integrated LOP method/runtime/UI chain will run the repository ASan and UBSan gates; GEOM-058
-    itself passed the aggregate build and 1,604-test geometry CPU gate
 artifacts:
 - path: tests/unit/geometry/Test.GaussianMixture.cpp
-  sha256: 185d7c9656af34a6597a52d4a089a9488c5229036915a8554f90094f21bebb90
+  sha256: b44b9db15af3ac747f792ee8aad7102eaa633266bec38c871d1d61114e8eff1c
   kind: file
 - path: src/geometry/Geometry.GaussianMixture.cppm
   sha256: 2ac493058efd783f8385664c80e3ee0dd91f326b3bfe58795030f1b21310f77c
   kind: file
 - path: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
-  sha256: 8adbf81c29be54e6aef053741ae56c26af14843b5674be6b2971c565d463cb80
+  sha256: 9697f58b02873f8256d76509a5d38ab160082a208a95357e8da9b7b3248bf1cf
   kind: file
 self_review:
   completed: true

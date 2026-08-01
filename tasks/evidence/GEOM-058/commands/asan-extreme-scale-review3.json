@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "cmake --build --preset ci-asan --target IntrinsicGeometryTests && ctest --test-dir build/ci-asan --output-on-failure -R '^(AndersonAcceleration|GaussianMixture)\\.' --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "bash -lc 'cmake --build --preset ci-asan --target IntrinsicGeometryTests && ctest --test-dir build/ci-asan --output-on-failure -R '\"'\"'^(AndersonAcceleration|GaussianMixture)\\.'\"'\"' --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 7040,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:07:13Z",
+  "label": "asan-extreme-scale-review3",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:07:06Z",
+  "stderr_path": "tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.stdout.log",
+  "stdout_sha256": "1f293c7dd01bee53e83363e804a410e42b74da8bd9901fbce6e0a609d6e4ddad",
+  "task_id": "GEOM-058"
+}

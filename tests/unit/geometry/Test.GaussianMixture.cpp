@@ -301,6 +301,41 @@ TEST(GaussianMixture, CovarianceSymmetryCheckIsScaleAware)
     tinySpd.Covariance[0][1] = 1.0e-12;
     tinySpd.Covariance[1][0] = 1.0e-12;
     EXPECT_FALSE(Gmm::LogPdf(tinySpd, glm::dvec3{0.0}));
+
+    Gmm::MultivariateGaussian hugeAsymmetric{};
+    const double maximum = std::numeric_limits<double>::max();
+    hugeAsymmetric.Covariance = glm::dmat3{0.0};
+    hugeAsymmetric.Covariance[0][0] = maximum;
+    hugeAsymmetric.Covariance[1][1] = maximum;
+    hugeAsymmetric.Covariance[2][2] = maximum;
+    hugeAsymmetric.Covariance[0][1] = 0.0;
+    hugeAsymmetric.Covariance[1][0] = maximum / 2.0;
+    EXPECT_FALSE(
+        Gmm::LogPdf(hugeAsymmetric, glm::dvec3{0.0}));
+
+    Gmm::MultivariateGaussian hugeSymmetric{};
+    hugeSymmetric.Covariance = glm::dmat3{0.0};
+    hugeSymmetric.Covariance[0][0] = maximum;
+    hugeSymmetric.Covariance[1][1] = maximum;
+    hugeSymmetric.Covariance[2][2] = maximum;
+    hugeSymmetric.Covariance[0][1] = maximum / 4.0;
+    hugeSymmetric.Covariance[1][0] = maximum / 4.0;
+    const auto hugeLogPdf =
+        Gmm::LogPdf(hugeSymmetric, glm::dvec3{0.0});
+    ASSERT_TRUE(hugeLogPdf.has_value());
+    EXPECT_TRUE(std::isfinite(*hugeLogPdf));
+
+    Gmm::MultivariateGaussian subnormalAsymmetric{};
+    const double subnormal =
+        std::numeric_limits<double>::denorm_min();
+    subnormalAsymmetric.Covariance = glm::dmat3{0.0};
+    subnormalAsymmetric.Covariance[0][0] = 4.0 * subnormal;
+    subnormalAsymmetric.Covariance[1][1] = 4.0 * subnormal;
+    subnormalAsymmetric.Covariance[2][2] = 4.0 * subnormal;
+    subnormalAsymmetric.Covariance[0][1] = 0.0;
+    subnormalAsymmetric.Covariance[1][0] = subnormal;
+    EXPECT_FALSE(
+        Gmm::LogPdf(subnormalAsymmetric, glm::dvec3{0.0}));
 }
 
 TEST(GaussianMixture, RecoversSeparatedComponentsAndMonotonicLikelihood)

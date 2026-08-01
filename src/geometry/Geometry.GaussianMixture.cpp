@@ -75,13 +75,17 @@ namespace Geometry::GaussianMixture
             {
                 const double forward = covariance[lhs][rhs];
                 const double reverse = covariance[rhs][lhs];
+                const double lhsDiagonal =
+                    std::abs(covariance[lhs][lhs]);
+                const double rhsDiagonal =
+                    std::abs(covariance[rhs][rhs]);
+                const double geometricScale =
+                    std::sqrt(lhsDiagonal) *
+                    std::sqrt(rhsDiagonal);
                 const double scale = std::max({
                     std::abs(forward),
                     std::abs(reverse),
-                    std::sqrt(
-                        std::abs(covariance[lhs][lhs]) *
-                        std::abs(covariance[rhs][rhs])),
-                    std::numeric_limits<double>::min(),
+                    geometricScale,
                 });
                 constexpr double kRelativeTolerance =
                     64.0 * std::numeric_limits<double>::epsilon();
@@ -100,12 +104,12 @@ namespace Geometry::GaussianMixture
                 return std::nullopt;
             Cholesky3 result{};
             result.L00 = std::sqrt(a00);
-            const double a01 =
-                0.5 * (covariance[0][1] + covariance[1][0]);
-            const double a02 =
-                0.5 * (covariance[0][2] + covariance[2][0]);
-            const double a12 =
-                0.5 * (covariance[1][2] + covariance[2][1]);
+            const double a01 = std::midpoint(
+                covariance[0][1], covariance[1][0]);
+            const double a02 = std::midpoint(
+                covariance[0][2], covariance[2][0]);
+            const double a12 = std::midpoint(
+                covariance[1][2], covariance[2][1]);
             result.L10 = a01 / result.L00;
             result.L20 = a02 / result.L00;
 
