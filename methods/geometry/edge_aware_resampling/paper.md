@@ -10,6 +10,8 @@
 - **Original paper:** <https://doi.org/10.1145/2421636.2421645>
 - **Author-listed paper/code entry:**
   <https://www.cs.sfu.ca/~haoz/papers_list.html>
+- **Author-hosted manuscript:**
+  <https://www.math.tau.ac.il/~dcor/articles/2012/Edge-Aware.pdf>
 
 ## Frozen claim boundary
 
@@ -153,3 +155,19 @@ The 2013 paper reports sensitivity to fixed `h`/`sigma_n`, rough open
 boundaries, large holes, close sheets, severe noise/under-sampling, and bad
 initial normal orientation; outputs may over-smooth or over-sharpen. These are
 documented limitations and fail-closed boundaries, not hidden tuning claims.
+
+## METHOD-019 optimization review
+
+The original EAR construction is local: its refinement, clearance, bilateral
+projection distance, and candidate-pair tests all use the declared support;
+the paper additionally narrows inserted-normal selection to the winning
+endpoints. METHOD-019 applies KD-tree bounds to those exact scans, sorts every
+returned point set by source index, and preserves the global priority maximum
+and original tie rule. It does not approximate, truncate, or incrementally
+stale the priority computation.
+
+Later L0, graph-uniformity, intrinsic/isotropic, EC-Net, and cross-field work
+changes the objective, neighborhood meaning, or learned prior. Those papers
+inform limitations and future comparisons, but not this candidate backend.
+The exact parity and performance decision is preregistered in
+[`METHOD-019-protocol.md`](../locally_optimal_projection/reports/METHOD-019-protocol.md).

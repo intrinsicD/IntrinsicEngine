@@ -40,7 +40,7 @@ map.
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
   (rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
-- [METHOD-019 — LOP-family optimized CPU backend and comparison benchmark](METHOD-019-lop-family-optimized-cpu-backend.md)
+- [METHOD-019 — LOP-family optimized CPU backend and comparison benchmark](../../active/METHOD-019-lop-family-optimized-cpu-backend.md)
   (adds the first concrete backend selector plus `cpu_optimized` with paired
   parity/baseline evidence; gated on `METHOD-016`/`017`/`018` and the delivered
   `RUNTIME-175`/`UI-035` CPU control surfaces; deliberately excludes

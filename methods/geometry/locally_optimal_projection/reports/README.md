@@ -1,3 +1,6 @@
 # Reports
 
-No performance or parity claim is made by the reference-backend smoke.
+The reference-backend smoke makes no performance claim. METHOD-019's frozen
+optimized-CPU comparison is preregistered in
+[`METHOD-019-protocol.md`](METHOD-019-protocol.md); measured results will be
+added without revising that v1 protocol.

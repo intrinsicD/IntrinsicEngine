@@ -116,3 +116,20 @@ contract.
 EM code or mixture service. Matrix-product assembly is file-local inside
 `Geometry.PointCloud.Consolidation`. The reference evaluates components and
 the three Gaussian terms in fixed order and remains serial.
+
+## METHOD-019 optimization review
+
+The original CLOP paper reports grid-based neighbor queries and also proposes
+approximate repulsion shortcuts: a roughly half-support cutoff and reuse on
+alternating iterations. Those shortcuts reduce work but change the evaluated
+repulsion sequence, so METHOD-019 excludes them from reference parity. The
+paper's hierarchical mixture construction is likewise excluded because this
+repository's canonical mixture is the existing seeded ordinary-EM result.
+
+The exact candidate instead caches each Gaussian-product covariance sum,
+determinant, inverse, and scalar coefficient. A component may be omitted only
+when a conservative covariance bound proves all three floating-point weights
+underflow to zero; retained components and terms stay in their original index
+order. The later incomplete-gamma estimator remains a separately named
+accuracy variant. These choices and the negative-result rule are frozen in
+[`METHOD-019-protocol.md`](../locally_optimal_projection/reports/METHOD-019-protocol.md).

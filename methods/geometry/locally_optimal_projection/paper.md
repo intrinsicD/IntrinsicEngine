@@ -68,3 +68,24 @@ identified framework24's untested
 material; no framework24 code was copied and it is not a build dependency.
 The source revision used for that comparison was the repository state available
 at task intake; the papers remain the normative algorithm source.
+
+## METHOD-019 optimization review
+
+The original LOP and WLOP papers restrict attraction and repulsion to local
+support. METHOD-019 therefore treats sorted KD-tree neighborhood reuse as an
+exact execution change: it retains point-index accumulation order, the same
+theta/density/repulsion kernels, and the same seeded iterates. Huang et al.'s
+density estimate and projected repulsion consume the same local projected
+set, so caching that exact set is permitted; changing its support or weights
+is not.
+
+Liao, Xiao, and Jin's FLOP/KLOP work
+(DOI [10.2312/EG2011/short/013-016](https://doi.org/10.2312/EG2011/short.013-016)
+and [10.1016/j.cad.2013.02.003](https://doi.org/10.1016/j.cad.2013.02.003))
+adds bilateral feature weighting and stochastic KDE sampling. Stotko,
+Weinmann, and Klein's 2024 incomplete-gamma formulation changes WLOP density
+and CLOP approximation accuracy. Both are useful named extensions, but neither
+is an optimized implementation of the frozen LOP/WLOP oracle. The adopted
+candidate is consequently limited to exact neighborhood/scratch reuse under
+the preregistered comparison in
+[`reports/METHOD-019-protocol.md`](reports/METHOD-019-protocol.md).

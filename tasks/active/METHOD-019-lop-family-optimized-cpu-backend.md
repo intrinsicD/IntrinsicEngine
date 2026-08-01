@@ -68,6 +68,20 @@ maturity_target: ParityProven
 - `GEOM-060`/`061` adoption requires a separate measured follow-up rather than
   conditional branches in this task.
 
+## Frozen parity and comparison protocol
+- Frozen before optimized source changes in
+  `methods/geometry/locally_optimal_projection/reports/METHOD-019-protocol.md`
+  and executable manifest
+  `benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml`.
+- Output alignment is vector index with exact state/count/normal-presence;
+  position and normal RMS/L-infinity tolerances are `1e-6`/`2e-6`.
+- One warmup pair precedes five alternating measured pairs; each strategy uses
+  the median `optimized_ns/reference_ns` ratio and passes useful acceleration
+  only at `<= 0.80` with parity and no fallback.
+- All four candidates are retained as positive or negative evidence. Only a
+  passing strategy may enter ordinary runtime config/UI support; thresholds,
+  fixtures, and candidate scope are not retuned after observing results.
+
 ## Required changes
 - [ ] Add the first explicit `cpu_reference`/`cpu_optimized` selector and an
       optimized path for each strategy using only the concrete spatial
