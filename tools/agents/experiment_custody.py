@@ -175,38 +175,16 @@ def protocol_summary_declarations(protocol: dict[str, Any]) -> list[dict[str, An
     ]
 
 
-def _validate_claim_source_implementation(
-    repo_root: Path, protocol: dict[str, Any], errors: list[str]
-) -> None:
-    if protocol.get("claim_eligible") is not True:
-        return
-    source = protocol.get("source")
-    revision = source.get("revision") if isinstance(source, dict) else None
+def _claim_source_revision(record: dict[str, Any]) -> str | None:
+    if record.get("claim_eligible") is not True:
+        return None
+    source = record.get("source")
+    if not isinstance(source, dict) or source.get("clean") is not True:
+        return None
+    revision = source.get("revision")
     if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
-        return
-    implementation = protocol.get("implementation")
-    if not isinstance(implementation, list):
-        return
-    for index, entry in enumerate(implementation):
-        if not isinstance(entry, dict):
-            continue
-        path = entry.get("path")
-        expected = entry.get("sha256")
-        try:
-            actual = sha256_at_revision(repo_root, revision, path)
-        except ValueError as exc:
-            errors.append(f"implementation[{index}]: {exc}")
-            continue
-        if actual is None:
-            errors.append(
-                f"implementation[{index}]: {path} is missing from "
-                "claim-eligible source revision"
-            )
-        elif actual != expected:
-            errors.append(
-                f"implementation[{index}]: {path} hash differs from "
-                "claim-eligible source revision"
-            )
+        return None
+    return revision
 
 
 def _validate_sealed_file(
@@ -215,23 +193,41 @@ def _validate_sealed_file(
     location: str,
     errors: list[str],
     path_key: str = "path",
+    source_revision: str | None = None,
 ) -> None:
     if not isinstance(entry, dict):
         errors.append(f"{location} must be a mapping")
         return
+    value = entry.get(path_key)
+    expected = entry.get("sha256")
+    if source_revision is not None:
+        try:
+            actual = sha256_at_revision(repo_root, source_revision, value)
+        except ValueError as exc:
+            errors.append(f"{location}: {exc}")
+            return
+        if actual is None:
+            errors.append(
+                f"{location}: {value} is missing from claim-eligible source revision"
+            )
+        elif actual != expected:
+            errors.append(
+                f"{location}: {value} hash differs from claim-eligible source revision "
+                f"(expected {expected}, got {actual})"
+            )
+        return
     try:
-        path = resolve_repo_path(repo_root, entry.get(path_key))
+        path = resolve_repo_path(repo_root, value)
     except ValueError as exc:
         errors.append(f"{location}: {exc}")
         return
     if not path.is_file():
-        errors.append(f"{location}: sealed file is missing: {entry.get(path_key)}")
+        errors.append(f"{location}: sealed file is missing: {value}")
         return
-    expected = entry.get("sha256")
     actual = sha256_file(path)
     if expected != actual:
         errors.append(
-            f"{location}: hash mismatch for {entry.get(path_key)} "
+            f"{location}: hash mismatch for {value} "
             f"(expected {expected}, got {actual})"
         )
 
@@ -243,6 +239,7 @@ def validate_protocol_data(
     require_frozen: bool,
 ) -> list[str]:
     errors: list[str] = []
+    source_revision = _claim_source_revision(protocol)
     missing = sorted(PROTOCOL_REQUIRED - protocol.keys())
     if missing:
         errors.append(f"missing protocol fields: {', '.join(missing)}")
@@ -296,7 +293,13 @@ def validate_protocol_data(
         split = entry.get("split")
         if isinstance(split, str):
             split_names.add(split)
-        _validate_sealed_file(repo_root, entry, f"datasets[{index}]", errors)
+        _validate_sealed_file(
+            repo_root,
+            entry,
+            f"datasets[{index}]",
+            errors,
+            source_revision=source_revision,
+        )
 
     splits = _require_list(protocol, "disjoint_splits", errors)
     if phase in {"screening", "confirmation"} and not splits:
@@ -423,14 +426,25 @@ def validate_protocol_data(
     for key in ("config", "environment"):
         entry = protocol.get(key)
         if isinstance(entry, dict):
-            _validate_sealed_file(repo_root, entry, key, errors)
+            _validate_sealed_file(
+                repo_root,
+                entry,
+                key,
+                errors,
+                source_revision=source_revision,
+            )
 
     implementation = _require_list(protocol, "implementation", errors)
     if not implementation:
         errors.append("implementation must not be empty")
     for index, entry in enumerate(implementation):
-        _validate_sealed_file(repo_root, entry, f"implementation[{index}]", errors)
-    _validate_claim_source_implementation(repo_root, protocol, errors)
+        _validate_sealed_file(
+            repo_root,
+            entry,
+            f"implementation[{index}]",
+            errors,
+            source_revision=source_revision,
+        )
 
     if state == "frozen":
         expected = protocol.get("protocol_digest")
@@ -567,6 +581,7 @@ def _validate_run_bindings(
     repo_root: Path, run_root: Path, run: dict[str, Any]
 ) -> list[str]:
     errors: list[str] = []
+    source_revision = _claim_source_revision(run)
     missing = sorted(RUN_REQUIRED - run.keys())
     if missing:
         errors.append(f"run missing fields: {', '.join(missing)}")
@@ -615,9 +630,21 @@ def _validate_run_bindings(
         errors.append(str(exc))
     for key in ("config", "environment"):
         entry = run.get(key)
-        _validate_sealed_file(repo_root, entry, f"run.{key}", errors)
+        _validate_sealed_file(
+            repo_root,
+            entry,
+            f"run.{key}",
+            errors,
+            source_revision=source_revision,
+        )
     for index, entry in enumerate(run.get("datasets", [])):
-        _validate_sealed_file(repo_root, entry, f"run.datasets[{index}]", errors)
+        _validate_sealed_file(
+            repo_root,
+            entry,
+            f"run.datasets[{index}]",
+            errors,
+            source_revision=source_revision,
+        )
     if run.get("claim_eligible"):
         source = run.get("source", {})
         if source.get("clean") is not True:
@@ -977,6 +1004,54 @@ def create_bundle(args: argparse.Namespace) -> int:
     return 0
 
 
+def _protocol_source_paths(protocol: dict[str, Any]) -> set[str]:
+    paths: set[str] = set()
+    for key in ("config", "environment"):
+        entry = protocol.get(key)
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str):
+            paths.add(entry["path"])
+    for key in ("datasets", "implementation"):
+        entries = protocol.get(key)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if isinstance(entry, dict) and isinstance(entry.get("path"), str):
+                paths.add(entry["path"])
+    return paths
+
+
+def _validate_bundle_path(
+    repo_root: Path,
+    entry: object,
+    *,
+    source_revision: str | None = None,
+) -> str | None:
+    if not isinstance(entry, dict):
+        return "entry must be a mapping"
+    value = entry.get("path")
+    expected = entry.get("sha256")
+    current_error: str
+    try:
+        path = resolve_repo_path(repo_root, value)
+        if not path.exists():
+            current_error = f"missing path {value}"
+        elif not path.is_file() or sha256_file(path) == expected:
+            return None
+        else:
+            current_error = f"hash mismatch {value}"
+    except ValueError as exc:
+        current_error = str(exc)
+
+    if source_revision is not None:
+        try:
+            historical = sha256_at_revision(repo_root, source_revision, value)
+        except ValueError:
+            historical = None
+        if historical == expected:
+            return None
+    return current_error
+
+
 def _validate_bundle(
     repo_root: Path,
     run_root: Path,
@@ -1007,6 +1082,7 @@ def _validate_bundle(
         protocol_path = resolve_repo_path(repo_root, run.get("protocol_path"))
         protocol = strict_yaml_load(protocol_path)
         frozen_summaries = protocol_summary_declarations(protocol)
+        source_paths = _protocol_source_paths(protocol)
         frozen_gates = protocol.get("killing_gates")
         if not isinstance(frozen_gates, list):
             errors.append("frozen protocol killing_gates must be a list")
@@ -1015,6 +1091,7 @@ def _validate_bundle(
         errors.append(f"frozen protocol declarations: {exc}")
         frozen_summaries = []
         frozen_gates = []
+        source_paths = set()
     try:
         raw = bundle.get("raw_rows", {})
         raw_path = resolve_repo_path(repo_root, raw.get("path"))
@@ -1109,16 +1186,22 @@ def _validate_bundle(
             )
         except (KeyError, TypeError, ValueError) as exc:
             errors.append(f"gates[{index}] cannot be recomputed: {exc}")
-    for collection in ("links", "previews"):
-        for index, entry in enumerate(bundle.get(collection, [])):
-            try:
-                path = resolve_repo_path(repo_root, entry.get("path"))
-                if not path.exists():
-                    raise CustodyError(f"missing path {entry.get('path')}")
-                if path.is_file() and sha256_file(path) != entry.get("sha256"):
-                    raise CustodyError(f"hash mismatch {entry.get('path')}")
-            except (ValueError, CustodyError) as exc:
-                errors.append(f"{collection}[{index}]: {exc}")
+    source_revision = _claim_source_revision(run)
+    for index, entry in enumerate(bundle.get("links", [])):
+        value = entry.get("path") if isinstance(entry, dict) else None
+        error = _validate_bundle_path(
+            repo_root,
+            entry,
+            source_revision=(
+                source_revision if isinstance(value, str) and value in source_paths else None
+            ),
+        )
+        if error is not None:
+            errors.append(f"links[{index}]: {error}")
+    for index, entry in enumerate(bundle.get("previews", [])):
+        error = _validate_bundle_path(repo_root, entry)
+        if error is not None:
+            errors.append(f"previews[{index}]: {error}")
     if bundle.get("visual") is True and not bundle.get("previews"):
         errors.append("visual bundle is missing preview/readback")
     if not bundle.get("replay_command") or not bundle.get("view_command"):

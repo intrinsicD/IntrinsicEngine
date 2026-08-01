@@ -12,6 +12,12 @@ claimed_at: "2026-08-01T15:37:57Z"
 ---
 # BUG-126 — Claim custody validates historical source seals against the current worktree
 
+## Status
+- Fixed locally. Clean claim-grade protocol/run inputs now resolve at the
+  sealed Git revision, only declared source-input bundle links receive that
+  fallback, and all post-run evidence remains current-only. The 28 custody and
+  28 workflow-evidence regressions plus global custody/workflow validation pass.
+
 ## Goal
 - Keep a clean claim-eligible experiment auditable after a later commit changes
   one of its sealed source/config/dataset/implementation files, while retaining
@@ -36,37 +42,37 @@ claimed_at: "2026-08-01T15:37:57Z"
   receive a historical fallback.
 
 ## Required changes
-- [ ] Resolve the exact historical source revision only for clean,
+- [x] Resolve the exact historical source revision only for clean,
       claim-eligible protocol/run input seals.
-- [ ] Validate protocol datasets, config, environment, and implementation at
+- [x] Validate protocol datasets, config, environment, and implementation at
       that revision using lexical Git-tree paths.
-- [ ] For bundle links, accept the current file when its hash matches; otherwise
+- [x] For bundle links, accept the current file when its hash matches; otherwise
       accept a matching source-revision blob only for a clean claim-eligible
       run. Keep previews and other post-run evidence current-only.
-- [ ] Preserve current-tree validation for non-claim-eligible and dirty-source
+- [x] Preserve current-tree validation for non-claim-eligible and dirty-source
       workflows, and preserve all task/protocol/run/result/audit bindings.
 
 ## Tests
-- [ ] Add a regression that completes and audits a clean claim-grade run,
+- [x] Add a regression that completes and audits a clean claim-grade run,
       changes/commits its sealed source inputs, and still validates the
       historical run and mixed source/evidence bundle links.
-- [ ] Keep current-tree seal drift detectable for non-claim-eligible runs and
+- [x] Keep current-tree seal drift detectable for non-claim-eligible runs and
       keep evidence-link tampering detectable for claim-eligible runs.
-- [ ] Run the complete experiment-custody and workflow-evidence regression
+- [x] Run the complete experiment-custody and workflow-evidence regression
       suites.
 
 ## Docs
-- [ ] Clarify historical input-seal versus current evidence-artifact validation
+- [x] Clarify historical input-seal versus current evidence-artifact validation
       in the canonical workflow-evidence policy and regenerate its skill mirror.
-- [ ] Record the observed METHOD-016 reproduction and exact fixed gates here;
+- [x] Record the observed METHOD-016 reproduction and exact fixed gates here;
       update the bug index/session brief/retirement log on closure.
 
 ## Acceptance criteria
-- [ ] Global `experiment_custody.py validate` accepts METHOD-016 and METHOD-017
+- [x] Global `experiment_custody.py validate` accepts METHOD-016 and METHOD-017
       after METHOD-017 extends their shared source files.
-- [ ] A changed historical source declaration or changed current evidence
+- [x] A changed historical source declaration or changed current evidence
       artifact still fails closed with an actionable diagnostic.
-- [ ] Strict task/docs/layering checks remain green.
+- [x] Strict task/docs/layering checks remain green.
 
 ## Verification
 ```bash
