@@ -1,0 +1,84 @@
+schema_version: 1
+task_id: BUG-127
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T20:25:56Z'
+claim_eligible: false
+source:
+  base_ref: f7583999
+  base_revision: f758399995cb8b0812b1161e27c331dd36e9015f
+  head_revision: b3ebd3f62ee7c04e12c0018735c8e28f7a09ba04
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 8c22aef96a6c6b574444d35d297aada654316ba02a10ea4ee8e7289063aa8b29
+  - path: tasks/backlog/bugs/index.md
+    sha256: b9e56ebd44a1760df6c4fe01e325568f688e530c63d5b3d1796610076bb52421
+  - path: tasks/done/BUG-127-task-claim-multiline-dependency-front-matter.md
+    sha256: 34bda981511d9cd1adc13b121db4d588188dff967f0bc2d33bad6ccc14752bd4
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: c2f80c3951f0aee01640f75a91188d717f687685ae27f1617cdfc2cdf6d740e4
+  - path: tests/regression/tooling/Test.TaskClaim.py
+    sha256: 893487789f2487f4cb91f0ca23c79067b1258bbaeb7ea0e11521c884cc342d9d
+  - path: tools/agents/task_claim.py
+    sha256: b89ec16caeb2f53b3718bc0f8d15a8361d1153de081704ad1986b7ac7630a438
+  content_digest: c00a7ba1b69b13d6014b6a2c8d4f936c3f557882670b16b6b1c6d63f5ee035a9
+touched:
+  paths:
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-127-task-claim-multiline-dependency-front-matter.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/regression/tooling/Test.TaskClaim.py
+  - tools/agents/task_claim.py
+  layers:
+  - tests
+  modules: []
+extension_seam: Lexical claim metadata insertion after the complete depends_on YAML value
+future_change_plan: Extend front-matter claim keys through the same non-reformatting insertion helper
+  and multiline regression fixture
+acceptance:
+- criterion: Acquiring tasks with empty, inline, and multiline dependency lists
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Atomic, one-writer, overlap, release, and stale-recovery contracts remain
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-127/commands/diff-check.json
+- receipt: tasks/evidence/BUG-127/commands/docs-links.json
+- receipt: tasks/evidence/BUG-127/commands/session-brief-freshness.json
+- receipt: tasks/evidence/BUG-127/commands/strict-task-schema.json
+- receipt: tasks/evidence/BUG-127/commands/task-claim-suite.json
+changed_public_contracts:
+- task_claim.py acquire preserves inline and multiline task dependency metadata while recording custody
+diagnostics_and_previews:
+- The regression parses the post-acquire front matter and asserts both dependency identities and owner
+  custody
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-127-task-claim-multiline-dependency-front-matter.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- The updater remains intentionally lexical; unusual top-level comment placement is preserved but not
+  semantically interpreted
+skipped_checks: []
+artifacts:
+- path: tests/regression/tooling/Test.TaskClaim.py
+  sha256: 893487789f2487f4cb91f0ca23c79067b1258bbaeb7ea0e11521c884cc342d9d
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
