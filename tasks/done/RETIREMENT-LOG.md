@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-016`](METHOD-016-locally-optimal-projection-reference-backend.md) —
+LOP/WLOP point-cloud consolidation completed on 2026-08-01 at
+`CPUContracted`. `Geometry.PointCloud.Consolidation` now owns one deterministic
+serial reference loop with typed plain-LOP and density-corrected WLOP
+strategies, shared `Geometry.PointCloud.Kernels` weights, seeded initialization,
+explicit convergence/work diagnostics, and fail-closed input, neighborhood,
+index, and numeric states. Eight focused cases cover analytic plane/sphere
+denoising, repulsion spacing, density contrast, outlier isolation, a frozen
+plain-LOP result, determinism, coincident samples, non-convergence, invalid
+requests, and cloud garbage. The focused default selector, full grouped ASan
+and UBSan geometry cohorts, and the manifest-bound schema-v2 benchmark smoke
+pass; strict method/benchmark manifests, layering, test layout, task policy,
+documentation links, and module-inventory freshness close the structural
+surface. Runtime/config integration and the editor remain owned by
+`RUNTIME-175`/`UI-035`; no performance claim is made.
+
 [`GEOM-062`](GEOM-062-point-set-projection-weighting-kernels.md) — point-cloud
 projection kernels completed on 2026-08-01 at `CPUContracted`.
 `Geometry.PointCloud.Kernels` now owns compactly supported Gaussian,

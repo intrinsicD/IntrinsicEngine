@@ -77,64 +77,77 @@ reserved.
   `METHOD-019` owns the first real `cpu_optimized` identity and `METHOD-020`
   owns the runtime GPU backend.
 
+## Status
+
+- Completed on 2026-08-01 at `CPUContracted`. The shared strategy surface,
+  deterministic LOP/WLOP reference, analytic/fail-closed coverage, method
+  package, executable schema-v2 smoke, and architecture/module documentation
+  are complete.
+- Implementation commit: `d7c58028`; completion-evidence commit: pending.
+- The framework24 comparison checkout named by the backlog seed was not
+  retained in this repository and its URL, revision, and license could not be
+  recovered from repository history or public code search. It is therefore
+  treated as unlicensed comparison material: no code was copied, no dependency
+  was added, and the implementation provenance is the cited LOP/WLOP papers.
+
 ## Required changes
 
 ### Method package scaffolding
-- [ ] Clone `methods/_template/` to `methods/geometry/locally_optimal_projection/`.
-- [ ] Fill `method.yaml` (`id: geometry.locally_optimal_projection`; metrics: `mean_distance_to_reference_surface`, `uniformity_min_pairwise_distance`, `iterations`, `runtime_ms`).
-- [ ] Fill `paper.md` with both objectives/equations, density and repulsion
+- [x] Clone `methods/_template/` to `methods/geometry/locally_optimal_projection/`.
+- [x] Fill `method.yaml` (`id: geometry.locally_optimal_projection`; metrics: `mean_distance_to_reference_surface`, `uniformity_min_pairwise_distance`, `iterations`, `runtime_ms`).
+- [x] Fill `paper.md` with both objectives/equations, density and repulsion
       conventions, coordinate/support-radius units, initialization/stopping
       rules, strategy defaults, numerical assumptions, source/revision/license
       provenance, diagnostics, and explicit failure states.
 
 ### Public API in `src/geometry`
-- [ ] Add module `Geometry.PointCloud.Consolidation` (`.cppm` + `.cpp`) with
+- [x] Add module `Geometry.PointCloud.Consolidation` (`.cppm` + `.cpp`) with
       typed `Lop`/`Wlop` strategy payloads, shared support radius `h`,
       repulsion weight `mu` in `[0, 0.5)`, iteration/target/initialization
       controls, and `Consolidate(...)` returning projected positions plus
       explicit status and convergence diagnostics. Record
       `cpu_reference` identity, but expose no request/fallback selector until
       `METHOD-019` adds the second implementation.
-- [ ] Consume the shared `Geometry.PointCloud.Kernels` (`GEOM-062`) for the attraction/repulsion weights and WLOP density weights; no private weight math.
-- [ ] Deterministic: seeded initialization and fixed iteration order; identical `(seed, input, params)` produce bitwise-identical output across runs and thread counts.
-- [ ] Fail-closed on empty or too-small clouds, non-finite positions, `mu` outside [0, 0.5), and non-positive `h`, with explicit failure states.
-- [ ] Register the module in `src/geometry/CMakeLists.txt` (single `IntrinsicGeometry` target; alphabetical placement, no new link dependency).
+- [x] Consume the shared `Geometry.PointCloud.Kernels` (`GEOM-062`) for the attraction/repulsion weights and WLOP density weights; no private weight math.
+- [x] Deterministic: seeded initialization and fixed iteration order; identical `(seed, input, params)` produce bitwise-identical output across runs and thread counts.
+- [x] Fail-closed on empty or too-small clouds, non-finite positions, `mu` outside [0, 0.5), and non-positive `h`, with explicit failure states.
+- [x] Register the module in `src/geometry/CMakeLists.txt` (single `IntrinsicGeometry` target; alphabetical placement, no new link dependency).
 
 ### Benchmarks
-- [ ] Add executable manifest
+- [x] Add executable manifest
       `benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml`
       with stable ID `geometry.locally_optimal_projection.reference.smoke`,
       built-in noisy plane/sphere data, `intent: correctness`, fixed seed,
       explicit warmup/measured counts, and allowed metrics `runtime_ms` and
       `quality_error_l2`.
-- [ ] Emit schema-valid `cpu_reference` result JSON with denoising,
+- [x] Emit schema-valid `cpu_reference` result JSON with denoising,
       uniformity/outlier, iteration, strategy, and parameter diagnostics; no
       external dataset or performance claim.
 
 ## Tests
-- [ ] `tests/unit/geometry/Test.PointCloudConsolidation.cpp` with `unit;geometry` labels.
-- [ ] Denoising: on noisy plane and sphere fixtures, mean distance to the true surface strictly decreases versus the raw input and falls under a documented bound.
-- [ ] Uniformity: repulsion (`mu > 0`) improves the `GEOM-036` min-pairwise-distance metric versus `mu = 0`.
-- [ ] Outliers: sparse injected outliers do not pull the projected set beyond tolerance with WLOP density weights engaged.
-- [ ] Plain-LOP contrast: a unit-weight run matches the frozen plain-LOP
+- [x] `tests/unit/geometry/Test.PointCloudConsolidation.cpp` with `unit;geometry` labels.
+- [x] Denoising: on noisy plane and sphere fixtures, mean distance to the true surface strictly decreases versus the raw input and falls under a documented bound.
+- [x] Uniformity: repulsion (`mu > 0`) improves the `GEOM-036` min-pairwise-distance metric versus `mu = 0`.
+- [x] Outliers: sparse injected outliers do not pull the projected set beyond tolerance with WLOP density weights engaged.
+- [x] Plain-LOP contrast: a unit-weight run matches the frozen plain-LOP
       expectations on the plane fixture.
-- [ ] Determinism and fail-closed cases as listed above.
-- [ ] Freeze scale normalization and denoising/uniformity/outlier tolerances
+- [x] Determinism and fail-closed cases as listed above.
+- [x] Freeze scale normalization and denoising/uniformity/outlier tolerances
       before assertions; cover zero neighborhoods, coincident points,
       non-convergence, and target-count/resource-cap failures.
 
 ## Docs
-- [ ] `methods/geometry/locally_optimal_projection/README.md` with parameter-selection guidance (`h`, `mu`) and known limitations (thin structures, strongly anisotropic sampling).
-- [ ] Regenerate the module inventory.
+- [x] `methods/geometry/locally_optimal_projection/README.md` with parameter-selection guidance (`h`, `mu`) and known limitations (thin structures, strongly anisotropic sampling).
+- [x] Regenerate the module inventory.
 
 ## Acceptance criteria
-- [ ] WLOP is the default and plain LOP is available from the same
+- [x] WLOP is the default and plain LOP is available from the same
       implementation with density weighting disabled.
-- [ ] All correctness tests pass in the default CPU gate.
-- [ ] Benchmark smoke manifest validates and runs.
-- [ ] Smoke result validates and reports quality/error plus convergence
+- [x] All correctness tests pass in the default CPU gate.
+- [x] Benchmark smoke manifest validates and runs.
+- [x] Smoke result validates and reports quality/error plus convergence
       diagnostics for both LOP and WLOP.
-- [ ] Public API type discipline: the exported surface uses only
+- [x] Public API type discipline: the exported surface uses only
       `std`/`glm`/scalar types plus the engine's own point-cloud types. The
       `Cloud`-taking `Consolidate(cloud, params)` entry is explicitly
       in-contract (vertex `PropertySet` access, matching the
@@ -163,6 +176,19 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 - No production dependency on framework24 and no copied implementation without
   recorded compatible-license provenance.
 - No `std::rand` or global RNG state.
+
+## Verification evidence
+
+- Default Clang 23 build completed for `IntrinsicTests` and
+  `IntrinsicBenchmarkSmoke`; the eight focused consolidation cases passed.
+- The opt-in benchmark fixture ran and strict schema-v2 validation passed for
+  the complete emitted result set. The LOP/WLOP payload reported `passed` and
+  bound the declared manifest/parameters/thresholds.
+- Replacement-only `IntrinsicGeometryTests.Grouped` passed under both ASan and
+  UBSan with serial CTest execution.
+- Strict method/benchmark manifests, layering, test layout, task policy/task
+  schema, documentation links, generated module inventory, and
+  `git diff --check` passed without findings.
 
 ## Maturity
 - Target: `CPUContracted` for the `Wlop`/`Lop` reference strategies (correctness-first per the method workflow).

@@ -40,10 +40,10 @@ map.
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
   (rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
-- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](../../active/METHOD-016-locally-optimal-projection-reference-backend.md)
-  (WLOP default; establishes the shared typed
-  `Geometry.PointCloud.Consolidation` strategy surface; the first backend
-  selector belongs to `METHOD-019`; gated on `geometry/GEOM-062` kernels).
+- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](../../done/METHOD-016-locally-optimal-projection-reference-backend.md)
+  — retired at `CPUContracted`; WLOP is the default on the shared typed
+  `Geometry.PointCloud.Consolidation` strategy surface. The first backend
+  selector remains owned by `METHOD-019`.
 - [METHOD-017 — Continuous LOP (CLOP) reference backend](METHOD-017-continuous-lop-clop-reference-backend.md)
   (adds the `Clop` strategy; gated on `METHOD-016`, `geometry/GEOM-058`
   Gaussian-mixture seam, and `geometry/GEOM-062` kernels).
