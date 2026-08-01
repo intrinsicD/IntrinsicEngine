@@ -21,10 +21,16 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.InputActions;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 
@@ -178,9 +184,11 @@ TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
     ASSERT_NE(selection, nullptr);
     const Runtime::RuntimeInputActionHandle focusAction =
         inputActions->Register(
-            Runtime::MakeSandboxDefaultFocusInputAction(
+            Runtime::MakeFocusCameraOnSelectionInputAction(
                 *cameraControllers,
-                *selection));
+                *selection,
+                "Sandbox.DefaultFocusCameraOnSelection",
+                Runtime::RuntimeInputActionBinding{.KeyCode = 'F'}));
     ASSERT_TRUE(focusAction.IsValid());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())

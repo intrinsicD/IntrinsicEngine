@@ -56,13 +56,19 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
@@ -1360,9 +1366,11 @@ TEST(RuntimeAssetImportFormatCoverage,
     Runtime::CameraControllerRegistry cameras{};
     Runtime::SelectionController selection{};
     const Runtime::RuntimeInputActionDesc focus =
-        Runtime::MakeSandboxDefaultFocusInputAction(
+        Runtime::MakeFocusCameraOnSelectionInputAction(
             cameras,
-            selection);
+            selection,
+            "Sandbox.DefaultFocusCameraOnSelection",
+            Runtime::RuntimeInputActionBinding{.KeyCode = 'F'});
     EXPECT_EQ(
         focus.DebugName,
         "Sandbox.DefaultFocusCameraOnSelection");

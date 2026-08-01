@@ -54,7 +54,8 @@ retired under the runtime backlog as `RUNTIME-135`.
   state.
 - UI-029 is retired as the ICP registration editor follow-up for the `GEOM-055`
   observer seam: the top-level `ICP Registration` panel selects source and
-  target point-cloud entities, runs `Runtime.RegistrationAlignment`, stores the
+  target point-cloud entities, runs `ApplyEditorRegistrationCommand` from
+  `Runtime.GeometryProcessingOperations`, stores the
   convergence trajectory, and lets the user scrub intermediate poses through an
   undoable runtime-owned transform command.
 - UI-030 is retired as the 2026-07-01 editor-stutter diagnostic follow-up. The
@@ -264,7 +265,8 @@ split; narratives live in the retirement log.
   diagnostics, and defers renderer synchronization through geometry dirty tags.
 - [UI-029 — Editor ICP registration panel + convergence visualization](../../archive/UI-029-editor-registration-convergence-visualization.md)
   (done, 2026-07-05, `Operational`): the top-level `ICP Registration` panel
-  consumes `Runtime.RegistrationAlignment` to align selected point-cloud
+  consumes `ApplyEditorRegistrationCommand` from
+  `Runtime.GeometryProcessingOperations` to align selected point-cloud
   entities, records the per-iteration convergence trajectory, scrubs trajectory
   poses, and routes transform writeback through undoable runtime commands.
 - [UI-030 — Sandbox EditorUI frame-pacing diagnostics](../../archive/UI-030-editor-frame-pacing-diagnostics.md)

@@ -45,7 +45,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp,
-  src/runtime/Runtime.SandboxEditorFacades.cpp,
+  src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp,
   tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
   docs/architecture/runtime.md,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
@@ -61,7 +61,7 @@
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.EditorShell.cpp,
   src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp,
-  src/runtime/Runtime.SandboxEditorFacades.cppm,
+  src/runtime/Runtime.EditorWorkspaceSnapshots.cppm,
   docs/architecture/runtime.md,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp]
@@ -91,8 +91,8 @@
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/core/Core.Config.Engine.cppm,
   src/core/Core.Config.EngineLoad.cpp,
-  src/runtime/Runtime.SandboxParameterizationFacade.cpp,
-  tests/contract/runtime/Test.ParameterizationFacade.cpp,
+  src/runtime/Runtime.ParameterizationOperations.cpp,
+  tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N213, N215]
 - **From staging**: O32

@@ -242,7 +242,9 @@ fire none. The Sandbox progressive-Poisson payload remains value-only
 method/playground state. The parameterization payload similarly holds the
 selected CPU strategy, typed values, and UV-view choices. Runtime and the
 Sandbox panel decode those payloads through
-`Extrinsic.Runtime.SandboxConfigSections`; Core imports no Sandbox, runtime,
+the feature-owned `Extrinsic.Runtime.ClusteringConfig`,
+`Extrinsic.Runtime.ProgressivePoissonConfig`, and
+`Extrinsic.Runtime.ParameterizationConfig` modules; Core imports no Sandbox, runtime,
 graphics, or method types. See
 [runtime config control](runtime-config-control.md).
 

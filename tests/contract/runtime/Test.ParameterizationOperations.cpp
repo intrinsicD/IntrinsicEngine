@@ -13,6 +13,8 @@
 #include <gtest/gtest.h>
 #include "RuntimeTestModule.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -25,8 +27,13 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.SandboxConfigSections;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
@@ -55,7 +62,7 @@ namespace
     {
     public:
         explicit ConfigControlHarness(
-            Runtime::EngineConfigSectionRegistry sectionRegistry)
+            Runtime::RuntimeEngineConfigSectionRegistry sectionRegistry)
         {
             Config::EngineConfig config =
                 Runtime::CreateReferenceEngineConfig(sectionRegistry);
@@ -151,10 +158,10 @@ namespace
         ECS::Scene::Registry Scene{};
         Runtime::SelectionController Selection{};
         Runtime::EditorCommandHistory History{};
-        Runtime::SandboxEditorSelectedModelCache ModelCache{};
+        Runtime::EditorSelectedModelCache ModelCache{};
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         std::uint32_t StableEntityId{0u};
-        Runtime::SandboxEditorContext Context{};
+        Intrinsic::Tests::EditorFeatureTestContext Context{};
 
         explicit ParameterizationHarness(
             Geometry::HalfedgeMesh::Mesh mesh = MakeGridMesh())
@@ -195,13 +202,13 @@ namespace
         return config;
     }
 
-    [[nodiscard]] Runtime::SandboxEditorParameterizationResult Apply(
+    [[nodiscard]] Runtime::EditorParameterizationResult Apply(
         ParameterizationHarness& harness,
         const Runtime::ParameterizationStrategyKind strategy)
     {
-        return Runtime::ApplySandboxEditorParameterizationCommand(
+        return Runtime::ApplyEditorParameterizationCommand(
             harness.Context,
-            Runtime::SandboxEditorParameterizationCommand{
+            Runtime::EditorParameterizationCommand{
                 .StableEntityId = harness.StableEntityId,
                 .Config = MakeConfig(strategy),
             });
@@ -218,7 +225,7 @@ namespace
     }
 }
 
-TEST(ParameterizationFacade, StableTokensAndAllImplementedStrategiesWriteFiniteUvs)
+TEST(ParameterizationOperations, StableTokensAndAllImplementedStrategiesWriteFiniteUvs)
 {
     constexpr std::array strategies{
         Runtime::ParameterizationStrategyKind::Lscm,
@@ -233,13 +240,13 @@ TEST(ParameterizationFacade, StableTokensAndAllImplementedStrategiesWriteFiniteU
     {
         SCOPED_TRACE(tokens[i]);
         ParameterizationHarness harness{};
-        const Runtime::SandboxEditorParameterizationResult result =
+        const Runtime::EditorParameterizationResult result =
             Apply(harness, strategies[i]);
         ASSERT_TRUE(result.Succeeded()) << result.Message;
         EXPECT_EQ(result.Strategy, strategies[i]);
         EXPECT_EQ(result.StrategyToken, tokens[i]);
         EXPECT_EQ(
-            Runtime::StableTokenForSandboxEditorParameterizationStrategy(
+            Runtime::StableTokenForEditorParameterizationStrategy(
                 result.Strategy),
             tokens[i]);
         ASSERT_TRUE(harness.Uvs().has_value());
@@ -252,12 +259,12 @@ TEST(ParameterizationFacade, StableTokensAndAllImplementedStrategiesWriteFiniteU
     }
 }
 
-TEST(ParameterizationFacade, UndoRedoRestoresAbsentUvProperty)
+TEST(ParameterizationOperations, UndoRedoRestoresAbsentUvProperty)
 {
     ParameterizationHarness harness{};
     ASSERT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
 
-    const Runtime::SandboxEditorParameterizationResult result = Apply(
+    const Runtime::EditorParameterizationResult result = Apply(
         harness, Runtime::ParameterizationStrategyKind::HarmonicCotangent);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     const std::vector<glm::vec2> generated = *harness.Uvs();
@@ -284,7 +291,7 @@ TEST(ParameterizationFacade, UndoRedoRestoresAbsentUvProperty)
         harness.Entity));
 }
 
-TEST(ParameterizationFacade, UndoRedoRestoresPresentUvValues)
+TEST(ParameterizationOperations, UndoRedoRestoresPresentUvValues)
 {
     ParameterizationHarness harness{};
     const std::vector<glm::vec2> authored(
@@ -294,7 +301,7 @@ TEST(ParameterizationFacade, UndoRedoRestoresPresentUvValues)
         .Properties.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2{0.0f})
         .Vector() = authored;
 
-    const Runtime::SandboxEditorParameterizationResult result = Apply(
+    const Runtime::EditorParameterizationResult result = Apply(
         harness, Runtime::ParameterizationStrategyKind::TutteUniform);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     const std::vector<glm::vec2> generated = *harness.Uvs();
@@ -324,10 +331,10 @@ TEST(ParameterizationFacade, UndoRedoRestoresPresentUvValues)
               beforeRejectedUndo.Revision);
 }
 
-TEST(ParameterizationFacade, HistoryRejectsInterveningGeometryState)
+TEST(ParameterizationOperations, HistoryRejectsInterveningGeometryState)
 {
     ParameterizationHarness harness{};
-    const Runtime::SandboxEditorParameterizationResult result = Apply(
+    const Runtime::EditorParameterizationResult result = Apply(
         harness, Runtime::ParameterizationStrategyKind::TutteUniform);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     const std::vector<glm::vec2> generated = *harness.Uvs();
@@ -395,7 +402,7 @@ TEST(ParameterizationFacade, HistoryRejectsInterveningGeometryState)
     next[0] = originalNext;
 }
 
-TEST(ParameterizationFacade, HistoryDoesNotRetainSessionOwnedModelCache)
+TEST(ParameterizationOperations, HistoryDoesNotRetainSessionOwnedModelCache)
 {
     ECS::Scene::Registry scene{};
     Runtime::SelectionController selection{};
@@ -409,16 +416,16 @@ TEST(ParameterizationFacade, HistoryDoesNotRetainSessionOwnedModelCache)
 
     {
         auto modelCache =
-            std::make_unique<Runtime::SandboxEditorSelectedModelCache>();
-        Runtime::SandboxEditorContext context{};
+            std::make_unique<Runtime::EditorSelectedModelCache>();
+        Intrinsic::Tests::EditorFeatureTestContext context{};
         context.Scene = &scene;
         context.Selection = &selection;
         context.CommandHistory = &history;
         context.SelectedModelCache = modelCache.get();
-        const Runtime::SandboxEditorParameterizationResult result =
-            Runtime::ApplySandboxEditorParameterizationCommand(
+        const Runtime::EditorParameterizationResult result =
+            Runtime::ApplyEditorParameterizationCommand(
                 context,
-                Runtime::SandboxEditorParameterizationCommand{
+                Runtime::EditorParameterizationCommand{
                     .StableEntityId = stableEntityId,
                     .Config = MakeConfig(
                         Runtime::ParameterizationStrategyKind::Lscm),
@@ -433,7 +440,7 @@ TEST(ParameterizationFacade, HistoryDoesNotRetainSessionOwnedModelCache)
     EXPECT_TRUE(vertices.Properties.Get<glm::vec2>("v:texcoord"));
 }
 
-TEST(ParameterizationFacade, DeletedVertexTombstonePreservesStorageUvs)
+TEST(ParameterizationOperations, DeletedVertexTombstonePreservesStorageUvs)
 {
     Geometry::HalfedgeMesh::Mesh mesh = MakeGridMesh();
     const Geometry::VertexHandle tombstone =
@@ -443,7 +450,7 @@ TEST(ParameterizationFacade, DeletedVertexTombstonePreservesStorageUvs)
     ASSERT_EQ(mesh.DeletedVertexCount(), 1u);
 
     ParameterizationHarness harness{mesh};
-    const Runtime::SandboxEditorParameterizationResult result = Apply(
+    const Runtime::EditorParameterizationResult result = Apply(
         harness, Runtime::ParameterizationStrategyKind::Lscm);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.VertexCount, 10u);
@@ -452,7 +459,7 @@ TEST(ParameterizationFacade, DeletedVertexTombstonePreservesStorageUvs)
     EXPECT_EQ((*harness.Uvs())[tombstone.Index], glm::vec2(0.0f));
 }
 
-TEST(ParameterizationFacade, ConfiguredPathReadsActiveEngineConfig)
+TEST(ParameterizationOperations, ConfiguredPathReadsActiveEngineConfig)
 {
     ParameterizationHarness harness{};
     Runtime::RuntimeEngineConfigControlState state{};
@@ -461,10 +468,10 @@ TEST(ParameterizationFacade, ConfiguredPathReadsActiveEngineConfig)
         MakeConfig(Runtime::ParameterizationStrategyKind::TutteUniform));
     harness.Context.EngineConfigControlState = &state;
 
-    const Runtime::SandboxEditorParameterizationResult result =
-        Runtime::ApplySandboxEditorConfiguredParameterizationCommand(
+    const Runtime::EditorParameterizationResult result =
+        Runtime::ApplyEditorConfiguredParameterizationCommand(
             harness.Context,
-            Runtime::SandboxEditorConfiguredParameterizationCommand{
+            Runtime::EditorConfiguredParameterizationCommand{
                 .StableEntityId = harness.StableEntityId,
             });
     ASSERT_TRUE(result.Succeeded()) << result.Message;
@@ -474,10 +481,10 @@ TEST(ParameterizationFacade, ConfiguredPathReadsActiveEngineConfig)
     EXPECT_TRUE(AllFinite(*harness.Uvs()));
 }
 
-TEST(ParameterizationFacade, EditorConfigHelperUsesValidatedHotApplyLane)
+TEST(ParameterizationOperations, EditorConfigHelperUsesValidatedHotApplyLane)
 {
     ParameterizationHarness harness{};
-    Runtime::EngineConfigSectionRegistry registry{};
+    Runtime::RuntimeEngineConfigSectionRegistry registry{};
     ASSERT_TRUE(registry.Register(
         Runtime::MakeParameterizationConfigSectionRegistration()));
     ConfigControlHarness controlHarness{std::move(registry)};
@@ -499,28 +506,28 @@ TEST(ParameterizationFacade, EditorConfigHelperUsesValidatedHotApplyLane)
                 Runtime::RuntimeConfigControlSource::Editor);
         };
 
-    const Runtime::SandboxEditorParameterizationConfigResult result =
-        Runtime::ApplySandboxEditorParameterizationConfigCommand(
+    const Runtime::EditorParameterizationConfigResult result =
+        Runtime::ApplyEditorParameterizationConfigCommand(
             harness.Context,
-            Runtime::SandboxEditorParameterizationConfigCommand{
+            Runtime::EditorParameterizationConfigCommand{
                 .Config = MakeConfig(
                     Runtime::ParameterizationStrategyKind::TutteUniform),
             });
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorParameterizationConfigStatus::Applied);
+              Runtime::EditorParameterizationConfigStatus::Applied);
     EXPECT_EQ(result.Apply.Source,
               Runtime::RuntimeConfigControlSource::Editor);
     EXPECT_TRUE(result.Apply.SectionChanged(
         Runtime::kParameterizationConfigSectionName));
     const auto config =
-        Runtime::GetSandboxEditorParameterizationConfig(harness.Context);
+        Runtime::GetEditorParameterizationConfig(harness.Context);
     ASSERT_TRUE(config.has_value());
     EXPECT_EQ(config->Strategy,
               Runtime::ParameterizationStrategyKind::TutteUniform);
 }
 
-TEST(ParameterizationFacade, ConfigSourcesProduceIdenticalStateAndUvs)
+TEST(ParameterizationOperations, ConfigSourcesProduceIdenticalStateAndUvs)
 {
     constexpr std::array sources{
         Runtime::RuntimeConfigControlSource::Editor,
@@ -535,7 +542,7 @@ TEST(ParameterizationFacade, ConfigSourcesProduceIdenticalStateAndUvs)
     for (const Runtime::RuntimeConfigControlSource source : sources)
     {
         ParameterizationHarness harness{};
-        Runtime::EngineConfigSectionRegistry registry{};
+        Runtime::RuntimeEngineConfigSectionRegistry registry{};
         ASSERT_TRUE(registry.Register(
             Runtime::MakeParameterizationConfigSectionRegistration()));
         ConfigControlHarness controlHarness{std::move(registry)};
@@ -569,10 +576,10 @@ TEST(ParameterizationFacade, ConfigSourcesProduceIdenticalStateAndUvs)
             EXPECT_EQ(serialized, *referenceSerializedConfig);
 
         harness.Context.EngineConfigControlState = &state;
-        const Runtime::SandboxEditorParameterizationResult result =
-            Runtime::ApplySandboxEditorConfiguredParameterizationCommand(
+        const Runtime::EditorParameterizationResult result =
+            Runtime::ApplyEditorConfiguredParameterizationCommand(
                 harness.Context,
-                Runtime::SandboxEditorConfiguredParameterizationCommand{
+                Runtime::EditorConfiguredParameterizationCommand{
                     .StableEntityId = harness.StableEntityId,
                 });
         ASSERT_TRUE(result.Succeeded()) << result.Message;
@@ -584,7 +591,7 @@ TEST(ParameterizationFacade, ConfigSourcesProduceIdenticalStateAndUvs)
     }
 }
 
-TEST(ParameterizationFacade, IdenticalInputAndConfigAreDeterministic)
+TEST(ParameterizationOperations, IdenticalInputAndConfigAreDeterministic)
 {
     ParameterizationHarness first{};
     ParameterizationHarness second{};
@@ -599,7 +606,7 @@ TEST(ParameterizationFacade, IdenticalInputAndConfigAreDeterministic)
     EXPECT_EQ(*first.Uvs(), *second.Uvs());
 }
 
-TEST(ParameterizationFacade,
+TEST(ParameterizationOperations,
      SectionValidationKeepsNestedReferenceFallbackAtomic)
 {
     Runtime::ParameterizationConfig reference{};
@@ -646,77 +653,77 @@ TEST(ParameterizationFacade,
     EXPECT_DOUBLE_EQ(decoded->Lscm.SolverTolerance, 0.125);
 }
 
-TEST(ParameterizationFacade, InvalidEnumsAndNarrowingFailClosed)
+TEST(ParameterizationOperations, InvalidEnumsAndNarrowingFailClosed)
 {
     ParameterizationHarness harness{};
     Runtime::ParameterizationConfig config{};
     config.Strategy =
         static_cast<Runtime::ParameterizationStrategyKind>(999u);
-    auto result = Runtime::ApplySandboxEditorParameterizationCommand(
+    auto result = Runtime::ApplyEditorParameterizationCommand(
         harness.Context,
-        Runtime::SandboxEditorParameterizationCommand{
+        Runtime::EditorParameterizationCommand{
             .StableEntityId = harness.StableEntityId,
             .Config = config,
         });
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
 
     config = {};
     config.Lscm.PinUv0.U = std::numeric_limits<double>::max();
-    result = Runtime::ApplySandboxEditorParameterizationCommand(
+    result = Runtime::ApplyEditorParameterizationCommand(
         harness.Context,
-        Runtime::SandboxEditorParameterizationCommand{
+        Runtime::EditorParameterizationCommand{
             .StableEntityId = harness.StableEntityId,
             .Config = config,
         });
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
 
     config = {};
     config.Lscm.SolverTolerance = 1.0e31;
-    result = Runtime::ApplySandboxEditorParameterizationCommand(
+    result = Runtime::ApplyEditorParameterizationCommand(
         harness.Context,
-        Runtime::SandboxEditorParameterizationCommand{
+        Runtime::EditorParameterizationCommand{
             .StableEntityId = harness.StableEntityId,
             .Config = config,
         });
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
 
     config = MakeConfig(
         Runtime::ParameterizationStrategyKind::HarmonicCotangent);
     config.Harmonic.Boundary =
         static_cast<Runtime::ParameterizationBoundaryPolicy>(999u);
-    result = Runtime::ApplySandboxEditorParameterizationCommand(
+    result = Runtime::ApplyEditorParameterizationCommand(
         harness.Context,
-        Runtime::SandboxEditorParameterizationCommand{
+        Runtime::EditorParameterizationCommand{
             .StableEntityId = harness.StableEntityId,
             .Config = config,
         });
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
 
     config = MakeConfig(Runtime::ParameterizationStrategyKind::Bff);
     config.Bff.Mode =
         static_cast<Runtime::ParameterizationBffBoundaryMode>(999u);
-    result = Runtime::ApplySandboxEditorParameterizationCommand(
+    result = Runtime::ApplyEditorParameterizationCommand(
         harness.Context,
-        Runtime::SandboxEditorParameterizationCommand{
+        Runtime::EditorParameterizationCommand{
             .StableEntityId = harness.StableEntityId,
             .Config = config,
         });
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
 }
 
-TEST(ParameterizationFacade, InvalidConfigEditDoesNotSerializeFallbackToken)
+TEST(ParameterizationOperations, InvalidConfigEditDoesNotSerializeFallbackToken)
 {
     ParameterizationHarness harness{};
     Runtime::RuntimeEngineConfigControlState state{};
@@ -738,35 +745,35 @@ TEST(ParameterizationFacade, InvalidConfigEditDoesNotSerializeFallbackToken)
     Runtime::ParameterizationConfig invalid{};
     invalid.Strategy =
         static_cast<Runtime::ParameterizationStrategyKind>(999u);
-    const Runtime::SandboxEditorParameterizationConfigResult result =
-        Runtime::ApplySandboxEditorParameterizationConfigCommand(
+    const Runtime::EditorParameterizationConfigResult result =
+        Runtime::ApplyEditorParameterizationConfigCommand(
             harness.Context,
-            Runtime::SandboxEditorParameterizationConfigCommand{
+            Runtime::EditorParameterizationConfigCommand{
                 .Config = invalid,
             });
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(
         result.Status,
-        Runtime::SandboxEditorParameterizationConfigStatus::PreviewRejected);
+        Runtime::EditorParameterizationConfigStatus::PreviewRejected);
     EXPECT_FALSE(previewCalled);
 
     invalid = {};
     invalid.Harmonic.Boundary =
         static_cast<Runtime::ParameterizationBoundaryPolicy>(999u);
-    const Runtime::SandboxEditorParameterizationConfigResult inactiveResult =
-        Runtime::ApplySandboxEditorParameterizationConfigCommand(
+    const Runtime::EditorParameterizationConfigResult inactiveResult =
+        Runtime::ApplyEditorParameterizationConfigCommand(
             harness.Context,
-            Runtime::SandboxEditorParameterizationConfigCommand{
+            Runtime::EditorParameterizationConfigCommand{
                 .Config = invalid,
             });
     EXPECT_FALSE(inactiveResult.Succeeded());
     EXPECT_EQ(
         inactiveResult.Status,
-        Runtime::SandboxEditorParameterizationConfigStatus::PreviewRejected);
+        Runtime::EditorParameterizationConfigStatus::PreviewRejected);
     EXPECT_FALSE(previewCalled);
 }
 
-TEST(ParameterizationFacade, WrongTypedUvAndNonTriangleFacesFailClosed)
+TEST(ParameterizationOperations, WrongTypedUvAndNonTriangleFacesFailClosed)
 {
     ParameterizationHarness wrongType{};
     (void)wrongType.Vertices()
@@ -775,7 +782,7 @@ TEST(ParameterizationFacade, WrongTypedUvAndNonTriangleFacesFailClosed)
         wrongType, Runtime::ParameterizationStrategyKind::Lscm);
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_TRUE(wrongType.Vertices().Properties.Get<float>("v:texcoord"));
     EXPECT_FALSE(wrongType.Vertices().Properties.Get<glm::vec2>("v:texcoord"));
 
@@ -783,22 +790,22 @@ TEST(ParameterizationFacade, WrongTypedUvAndNonTriangleFacesFailClosed)
     result = Apply(quad, Runtime::ParameterizationStrategyKind::Lscm);
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_FALSE(quad.Vertices().Properties.Exists("v:texcoord"));
 }
 
-TEST(ParameterizationFacade, ViewModelIsPointerFreeAndCarriesAggregateDiagnostics)
+TEST(ParameterizationOperations, ViewModelIsPointerFreeAndCarriesAggregateDiagnostics)
 {
     ParameterizationHarness harness{};
-    const Runtime::SandboxEditorParameterizationResult result = Apply(
+    const Runtime::EditorParameterizationResult result = Apply(
         harness, Runtime::ParameterizationStrategyKind::HarmonicCotangent);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     harness.Context.LastParameterizationResult = &result;
 
-    const Runtime::SandboxEditorParameterizationViewModel model =
-        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
-    const Runtime::SandboxEditorParameterizationViewModel repeated =
-        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    const Runtime::EditorParameterizationViewModel model =
+        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+    const Runtime::EditorParameterizationViewModel repeated =
+        Runtime::BuildEditorParameterizationViewModel(harness.Context);
     EXPECT_TRUE(model.HasSelectedEntity);
     EXPECT_TRUE(model.SelectedEntityIsMesh);
     EXPECT_TRUE(model.HasUvCoordinates);
@@ -822,7 +829,7 @@ TEST(ParameterizationFacade, ViewModelIsPointerFreeAndCarriesAggregateDiagnostic
     EXPECT_EQ(model.LastDiagnostics->LiveFaceCount, 8u);
 }
 
-TEST(ParameterizationFacade, ViewModelFansFaceDiagnosticsIntoRenderedTriangles)
+TEST(ParameterizationOperations, ViewModelFansFaceDiagnosticsIntoRenderedTriangles)
 {
     ParameterizationHarness harness{MakeQuadMesh()};
     Runtime::RuntimeEngineConfigControlState state{};
@@ -838,11 +845,11 @@ TEST(ParameterizationFacade, ViewModelFansFaceDiagnosticsIntoRenderedTriangles)
             {1.0f, 1.0f},
             {0.0f, 1.0f},
         };
-    Runtime::SandboxEditorParameterizationResult last{};
-    const Runtime::SandboxEditorParameterizationViewModel current =
-        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    Runtime::EditorParameterizationResult last{};
+    const Runtime::EditorParameterizationViewModel current =
+        Runtime::BuildEditorParameterizationViewModel(harness.Context);
     ASSERT_TRUE(current.DiagnosticInputFingerprint.has_value());
-    last.Status = Runtime::SandboxEditorCommandStatus::Applied;
+    last.Status = Runtime::EditorCommandStatus::Applied;
     last.StableEntityId = harness.StableEntityId;
     last.ParameterizationStatus =
         Geometry::Parameterization::ParameterizationStatus::Success;
@@ -851,8 +858,8 @@ TEST(ParameterizationFacade, ViewModelFansFaceDiagnosticsIntoRenderedTriangles)
     last.Diagnostics.FaceConformalDistortion = {2.5f};
     harness.Context.LastParameterizationResult = &last;
 
-    const Runtime::SandboxEditorParameterizationViewModel model =
-        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    const Runtime::EditorParameterizationViewModel model =
+        Runtime::BuildEditorParameterizationViewModel(harness.Context);
     ASSERT_EQ(model.Triangles.size(), 2u);
     EXPECT_EQ(model.Triangles[0],
               (std::array<std::uint32_t, 3u>{0u, 1u, 2u}));
@@ -869,7 +876,7 @@ TEST(ParameterizationFacade, ViewModelFansFaceDiagnosticsIntoRenderedTriangles)
         (std::vector<float>{2.5f, 2.5f}));
 }
 
-TEST(ParameterizationFacade,
+TEST(ParameterizationOperations,
      FaceDiagnosticsRequireTheExactGeometryAndUvFingerprint)
 {
     ParameterizationHarness harness{};
@@ -879,27 +886,27 @@ TEST(ParameterizationFacade,
     Runtime::SetParameterizationConfig(state.ActiveConfig, config);
     harness.Context.EngineConfigControlState = &state;
 
-    Runtime::SandboxEditorParameterizationResult last = Apply(
+    Runtime::EditorParameterizationResult last = Apply(
         harness, Runtime::ParameterizationStrategyKind::HarmonicCotangent);
     ASSERT_TRUE(last.Succeeded()) << last.Message;
     ASSERT_TRUE(last.DiagnosticInputFingerprint.has_value());
     last.Diagnostics.FaceConformalDistortion.assign(8u, 2.0f);
     harness.Context.LastParameterizationResult = &last;
 
-    Runtime::SandboxEditorParameterizationViewModel model =
-        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    Runtime::EditorParameterizationViewModel model =
+        Runtime::BuildEditorParameterizationViewModel(harness.Context);
     EXPECT_EQ(model.TriangleConformalDistortion.size(), 8u);
     EXPECT_EQ(model.DiagnosticInputFingerprint,
               last.DiagnosticInputFingerprint);
 
     ASSERT_TRUE(harness.History.Undo().Succeeded());
-    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+    model = Runtime::BuildEditorParameterizationViewModel(
         harness.Context);
     EXPECT_FALSE(model.DiagnosticInputFingerprint.has_value());
     EXPECT_TRUE(model.TriangleConformalDistortion.empty());
 
     ASSERT_TRUE(harness.History.Redo().Succeeded());
-    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+    model = Runtime::BuildEditorParameterizationViewModel(
         harness.Context);
     EXPECT_EQ(model.DiagnosticInputFingerprint,
               last.DiagnosticInputFingerprint);
@@ -909,7 +916,7 @@ TEST(ParameterizationFacade,
     ASSERT_TRUE(uvs);
     const glm::vec2 originalUv = uvs.Vector().front();
     uvs.Vector().front().x = originalUv.x + 0.125f;
-    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+    model = Runtime::BuildEditorParameterizationViewModel(
         harness.Context);
     ASSERT_TRUE(model.DiagnosticInputFingerprint.has_value());
     EXPECT_NE(model.DiagnosticInputFingerprint,
@@ -917,7 +924,7 @@ TEST(ParameterizationFacade,
     EXPECT_TRUE(model.TriangleConformalDistortion.empty());
 
     uvs.Vector().front() = originalUv;
-    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+    model = Runtime::BuildEditorParameterizationViewModel(
         harness.Context);
     EXPECT_EQ(model.DiagnosticInputFingerprint,
               last.DiagnosticInputFingerprint);
@@ -927,7 +934,7 @@ TEST(ParameterizationFacade,
         GS::PropertyNames::kPosition);
     ASSERT_TRUE(positions);
     positions.Vector().front().x += 0.25f;
-    model = Runtime::BuildSandboxEditorParameterizationViewModel(
+    model = Runtime::BuildEditorParameterizationViewModel(
         harness.Context);
     ASSERT_TRUE(model.DiagnosticInputFingerprint.has_value());
     EXPECT_NE(model.DiagnosticInputFingerprint,
@@ -935,7 +942,7 @@ TEST(ParameterizationFacade,
     EXPECT_TRUE(model.TriangleConformalDistortion.empty());
 }
 
-TEST(ParameterizationFacade,
+TEST(ParameterizationOperations,
      DeletedFaceTombstoneKeepsDiagnosticsAlignedWithSourceFaceStorage)
 {
     Geometry::HalfedgeMesh::Mesh mesh = MakeGridMesh();
@@ -950,7 +957,7 @@ TEST(ParameterizationFacade,
     Runtime::SetParameterizationConfig(state.ActiveConfig, config);
     harness.Context.EngineConfigControlState = &state;
 
-    Runtime::SandboxEditorParameterizationResult result = Apply(
+    Runtime::EditorParameterizationResult result = Apply(
         harness, Runtime::ParameterizationStrategyKind::HarmonicCotangent);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.Diagnostics.FaceStorageCount, 8u);
@@ -965,8 +972,8 @@ TEST(ParameterizationFacade,
     }
 
     harness.Context.LastParameterizationResult = &result;
-    const Runtime::SandboxEditorParameterizationViewModel model =
-        Runtime::BuildSandboxEditorParameterizationViewModel(harness.Context);
+    const Runtime::EditorParameterizationViewModel model =
+        Runtime::BuildEditorParameterizationViewModel(harness.Context);
     ASSERT_EQ(model.TriangleConformalDistortion.size(), 7u);
     for (std::size_t triangle = 0u;
          triangle < model.TriangleConformalDistortion.size();
@@ -978,26 +985,26 @@ TEST(ParameterizationFacade,
     }
 }
 
-TEST(ParameterizationFacade, CpuViewDisablesGpuWorkAndReportsBackgroundFallback)
+TEST(ParameterizationOperations, CpuViewDisablesGpuWorkAndReportsBackgroundFallback)
 {
-    Runtime::SandboxEditorContext context{};
-    std::vector<Runtime::SandboxEditorParameterizationUvViewRequest> requests{};
+    Intrinsic::Tests::EditorFeatureTestContext context{};
+    std::vector<Runtime::EditorParameterizationUvViewRequest> requests{};
     context.ParameterizationUvViewCommands.Submit =
-        [&requests](Runtime::SandboxEditorParameterizationUvViewRequest request)
+        [&requests](Runtime::EditorParameterizationUvViewRequest request)
         {
             requests.push_back(request);
-            return Runtime::SandboxEditorParameterizationUvViewState{};
+            return Runtime::EditorParameterizationUvViewState{};
         };
 
-    Runtime::SandboxEditorParameterizationViewModel model{};
+    Runtime::EditorParameterizationViewModel model{};
     model.View.RenderMode = Runtime::ParameterizationUvRenderMode::CpuLayout;
     for (const Runtime::ParameterizationUvBackgroundMode background : {
              Runtime::ParameterizationUvBackgroundMode::Texture,
              Runtime::ParameterizationUvBackgroundMode::TexelDensity})
     {
         model.View.BackgroundMode = background;
-        const Runtime::SandboxEditorParameterizationUvViewState state =
-            Runtime::SubmitSandboxEditorParameterizationUvView(
+        const Runtime::EditorParameterizationUvViewState state =
+            Runtime::SubmitEditorParameterizationUvView(
                 context, model, 320u, 180u);
         ASSERT_FALSE(requests.empty());
         EXPECT_FALSE(requests.back().Enabled);
@@ -1005,7 +1012,7 @@ TEST(ParameterizationFacade, CpuViewDisablesGpuWorkAndReportsBackgroundFallback)
         EXPECT_EQ(requests.back().Height, 180u);
         EXPECT_EQ(
             state.Status,
-            Runtime::SandboxEditorParameterizationUvViewStatus::CpuLayout);
+            Runtime::EditorParameterizationUvViewStatus::CpuLayout);
         EXPECT_EQ(state.RequestedMode,
                   Runtime::ParameterizationUvRenderMode::CpuLayout);
         EXPECT_EQ(state.ActiveMode,
@@ -1018,10 +1025,10 @@ TEST(ParameterizationFacade, CpuViewDisablesGpuWorkAndReportsBackgroundFallback)
     }
 }
 
-TEST(ParameterizationFacade, GpuViewWithoutCommandSurfaceReportsCpuFallback)
+TEST(ParameterizationOperations, GpuViewWithoutCommandSurfaceReportsCpuFallback)
 {
-    Runtime::SandboxEditorContext context{};
-    Runtime::SandboxEditorParameterizationViewModel model{};
+    Intrinsic::Tests::EditorFeatureTestContext context{};
+    Runtime::EditorParameterizationViewModel model{};
     model.HasSelectedEntity = true;
     model.SelectedEntityIsMesh = true;
     model.HasUvCoordinates = true;
@@ -1036,12 +1043,12 @@ TEST(ParameterizationFacade, GpuViewWithoutCommandSurfaceReportsCpuFallback)
     model.Triangles = {{0u, 1u, 2u}};
     model.LineIndices = {0u, 1u, 1u, 2u, 2u, 0u};
 
-    const Runtime::SandboxEditorParameterizationUvViewState state =
-        Runtime::SubmitSandboxEditorParameterizationUvView(
+    const Runtime::EditorParameterizationUvViewState state =
+        Runtime::SubmitEditorParameterizationUvView(
             context, model, 400u, 240u);
     EXPECT_EQ(
         state.Status,
-        Runtime::SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational);
+        Runtime::EditorParameterizationUvViewStatus::CpuFallbackNonOperational);
     EXPECT_EQ(state.RequestedMode,
               Runtime::ParameterizationUvRenderMode::GpuShaded);
     EXPECT_EQ(state.ActiveMode,
@@ -1052,17 +1059,17 @@ TEST(ParameterizationFacade, GpuViewWithoutCommandSurfaceReportsCpuFallback)
     EXPECT_FALSE(state.GpuReady);
 }
 
-TEST(ParameterizationFacade, GpuViewRequestTokenIsStableAndSemantic)
+TEST(ParameterizationOperations, GpuViewRequestTokenIsStableAndSemantic)
 {
-    Runtime::SandboxEditorContext context{};
-    std::vector<Runtime::SandboxEditorParameterizationUvViewRequest> requests{};
+    Intrinsic::Tests::EditorFeatureTestContext context{};
+    std::vector<Runtime::EditorParameterizationUvViewRequest> requests{};
     context.ParameterizationUvViewCommands.Submit =
-        [&requests](Runtime::SandboxEditorParameterizationUvViewRequest request)
+        [&requests](Runtime::EditorParameterizationUvViewRequest request)
         {
             requests.push_back(request);
-            return Runtime::SandboxEditorParameterizationUvViewState{
+            return Runtime::EditorParameterizationUvViewState{
                 .Status =
-                    Runtime::SandboxEditorParameterizationUvViewStatus::Ready,
+                    Runtime::EditorParameterizationUvViewStatus::Ready,
                 .RequestedMode = request.View.RenderMode,
                 .ActiveMode = Runtime::ParameterizationUvRenderMode::GpuShaded,
                 .RequestedBackground = request.View.BackgroundMode,
@@ -1079,7 +1086,7 @@ TEST(ParameterizationFacade, GpuViewRequestTokenIsStableAndSemantic)
             };
         };
 
-    Runtime::SandboxEditorParameterizationViewModel model{};
+    Runtime::EditorParameterizationViewModel model{};
     model.HasSelectedEntity = true;
     model.SelectedEntityIsMesh = true;
     model.HasUvCoordinates = true;
@@ -1095,9 +1102,9 @@ TEST(ParameterizationFacade, GpuViewRequestTokenIsStableAndSemantic)
     model.TriangleConformalDistortion = {1.25f};
 
     const auto submit = [&context](
-                            const Runtime::SandboxEditorParameterizationViewModel& value)
+                            const Runtime::EditorParameterizationViewModel& value)
     {
-        return Runtime::SubmitSandboxEditorParameterizationUvView(
+        return Runtime::SubmitEditorParameterizationUvView(
             context, value, 640u, 360u);
     };
     const auto first = submit(model);
@@ -1113,7 +1120,7 @@ TEST(ParameterizationFacade, GpuViewRequestTokenIsStableAndSemantic)
     EXPECT_EQ(requests[0].RequestToken, requests[1].RequestToken);
     EXPECT_EQ(first.RequestToken, repeated.RequestToken);
     EXPECT_EQ(first.Status,
-              Runtime::SandboxEditorParameterizationUvViewStatus::Ready);
+              Runtime::EditorParameterizationUvViewStatus::Ready);
     EXPECT_EQ(first.ActiveMode,
               Runtime::ParameterizationUvRenderMode::GpuShaded);
     EXPECT_TRUE(first.GpuReady);

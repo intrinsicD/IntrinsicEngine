@@ -1235,3 +1235,119 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O82
+    timestamp: "2026-08-01T01:15+02:00"
+    provenance: ai-suggested
+    content: >
+      RUNTIME-138 should retire at its delivered cache/visibility baseline
+      instead of implementing the remaining broad selected-analysis job
+      pipeline; the recorded frame-pacing evidence did not identify editor CPU
+      work as dominant, and any later expensive derivation should be owned by
+      the concrete feature that measures it.
+    context: >
+      Semantic audit of the remaining runtime backlog found that RUNTIME-138's
+      2026-07-30 status already prescribes feature-local follow-ups while its
+      unchecked slices still require a universal async selected-analysis path.
+    potential_type: architecture
+    bound_to: [N312, N313]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O83
+    timestamp: "2026-08-01T01:15+02:00"
+    provenance: ai-suggested
+    content: >
+      RUNTIME-139 should be rewritten as deletion of the dormant static-AoS
+      planning surface, or withdrawn until a GPU/profile baseline proves vertex
+      fetch is a bottleneck; the existing CPU smoke explicitly records
+      adoption_claim=false and cannot justify a second storage and shader lane.
+    context: >
+      ADR-0022 makes uniform SoA the accepted design and permits AoS only after
+      profiling, while the current unblocked implementation task names no
+      qualifying result and the live planning hint is recorded but ignored by
+      allocation.
+    potential_type: constraint
+    bound_to: [N312, N313]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O84
+    timestamp: "2026-08-01T01:15+02:00"
+    provenance: ai-suggested
+    content: >
+      RUNTIME-175 remains a valid post-method integration leaf only if its
+      feature config value/schema/codec are runtime-owned, Sandbox owns
+      registration and defaults, config apply remains non-destructive, and the
+      explicit undoable consolidation operation is separate from UI-035's later
+      presentation proof.
+    context: >
+      The task currently calls the config value app-owned despite a runtime
+      codec and app-to-runtime-only layering, and its acceptance requires a UI
+      surface whose task depends on RUNTIME-175.
+    potential_type: architecture
+    bound_to: [N312, N313]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O85
+    timestamp: "2026-08-01T01:15+02:00"
+    provenance: ai-suggested
+    content: >
+      RUNTIME-189 should be withdrawn until METHOD-032 produces positive killing
+      evidence and a concrete production result/lifetime contract; a debug view
+      should not precede the method's explicit no-runtime-follow-up-until-positive
+      rule or invent sign-field payload that the frozen public result may not
+      expose.
+    context: >
+      The debug-draw task is already open, while METHOD-032 says a failed gate
+      leaves no promoted surface and runtime/UI integration opens only after
+      positive CPUContracted evidence.
+    potential_type: constraint
+    bound_to: [N312, N313]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O86
+    timestamp: "2026-08-01T01:15+02:00"
+    provenance: ai-suggested
+    content: >
+      RUNTIME-203 should be split into owner-local privatization leaves for
+      Engine composition and SceneInteraction internals, while
+      RenderRecipeActivation and DeviceBootstrap remain public: both have
+      multiple production consumers, and DeviceBootstrap also isolates the
+      volatile backend boundary.
+    context: >
+      Import census confirms the four genuine one-owner candidates but refutes
+      the task's one-consumer classification for recipe activation and device
+      bootstrap; bundling seven helpers across five owners also exceeds the
+      repository's one-finding-per-slice right-sizing rule.
+    potential_type: architecture
+    bound_to: [N312, N313]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O87
+    timestamp: "2026-08-01T01:15+02:00"
+    provenance: ai-suggested
+    content: >
+      RUNTIME-202 should remain the convergence gate but should not retire on a
+      module rename alone: its existing selected-model cache should become
+      runtime-private, and the approximately 19k-line universal editor
+      implementation should either be split by feature owner or explicitly
+      deferred without claiming implementation locality.
+    context: >
+      The active worktree removes Sandbox-named BMIs and passes strict layering,
+      but the new public EditorWorkspaceSnapshots surface still exports the
+      implementation-owned cache and the renamed private implementation remains
+      essentially the same size as the former facade implementation.
+    potential_type: architecture
+    bound_to: [N312, N313]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

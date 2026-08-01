@@ -25,6 +25,7 @@ Static analysis and performance analysis tooling.
 - BUG-004 refreshed `compile_hotspot_baseline.json` to use canonical source
   paths under the then-current layout; stale `src/Runtime/...` migration aliases
   are not accepted by the gate.
-- BUILD-004 replaced that historical target with five normalized physical-edge
+- BUILD-004 replaced that historical target with normalized physical-edge
   identities calibrated from the comparable hosted cohort documented in
-  `docs/benchmarking/ci-policy.md`.
+  `docs/benchmarking/ci-policy.md`. RUNTIME-202 removed the retired Sandbox
+  facade edge from the enforced set; it did not substitute an unmeasured edge.

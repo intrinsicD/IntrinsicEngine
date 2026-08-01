@@ -24,6 +24,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include "ProgressivePoissonReference.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
@@ -74,8 +76,14 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxConfigSections;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.ProgressivePoissonConfig;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexAttributeBinding;
@@ -280,14 +288,14 @@ void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
         registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
     }
 
-[[nodiscard]] Runtime::SandboxEditorContext MakeContext(
+[[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
         ECS::Scene::Registry& registry,
         Runtime::SelectionController& selection,
         const bool imguiAvailable = true,
         const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
         Extrinsic::RHI::IDevice* device = nullptr)
     {
-        return Runtime::SandboxEditorContext{
+        return Intrinsic::Tests::EditorFeatureTestContext{
             .Scene = &registry,
             .Selection = &selection,
             .LastRefinedPrimitive = lastPrimitive,
@@ -304,7 +312,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
     AddPointCloudSource(registry, cloud, 8u);
@@ -321,7 +329,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
 
-    const Runtime::SandboxEditorProgressivePoissonConfig config{
+    const Runtime::EditorProgressivePoissonConfig config{
         .Dimension = 3u,
         .GridWidth = 2u,
         .MaxLevels = 4u,
@@ -332,13 +340,13 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
         .ShuffleWithinLevels = true,
         .ShuffleSeed = 23u,
         .PrefixCount = 3u,
-        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Phase,
+        .Channel = Runtime::EditorProgressivePoissonChannel::Phase,
     };
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(cloud),
                 .Config = config,
@@ -349,17 +357,17 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
     EXPECT_GT(result.AcceptedCount, 0u);
     EXPECT_EQ(result.PrefixCount, std::min(3u, result.AcceptedCount));
     EXPECT_EQ(result.Channel,
-              Runtime::SandboxEditorProgressivePoissonChannel::Phase);
+              Runtime::EditorProgressivePoissonChannel::Phase);
     EXPECT_STREQ(
-        Runtime::DebugNameForSandboxEditorProgressivePoissonChannel(
+        Runtime::DebugNameForEditorProgressivePoissonChannel(
             result.Channel),
         "Phase");
     EXPECT_EQ(result.BackendId, PPR::kBackendId);
     EXPECT_EQ(result.BackendDisplayName, "CPU reference");
     EXPECT_EQ(result.RequestedBackend,
-              Runtime::SandboxEditorProgressivePoissonBackend::CpuReference);
+              Runtime::EditorProgressivePoissonBackend::CpuReference);
     EXPECT_EQ(result.ActualBackend,
-              Runtime::SandboxEditorProgressivePoissonBackend::CpuReference);
+              Runtime::EditorProgressivePoissonBackend::CpuReference);
     EXPECT_EQ(result.RequestedBackendId, PPR::kBackendId);
     EXPECT_FALSE(result.FellBackToCpu);
     EXPECT_TRUE(result.BackendFallbackReason.empty());
@@ -409,10 +417,10 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
     EXPECT_EQ(vis.ScalarFieldName, "p:poisson_phase");
 
     context.LastProgressivePoissonResult = &result;
-    const Runtime::SandboxEditorDomainWindowModel model =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel model =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+            Runtime::EditorDomainWindowKind::PointCloud);
     EXPECT_TRUE(model.Processing.PointCloudProgressivePoissonAvailable);
     ASSERT_TRUE(model.Processing.LastProgressivePoissonResult.has_value());
     EXPECT_TRUE(model.Processing.LastProgressivePoissonResult->Succeeded());
@@ -425,7 +433,7 @@ TEST(SandboxEditorUi,
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonHistory");
@@ -461,13 +469,13 @@ TEST(SandboxEditorUi,
         cloud,
         priorVisualization);
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(cloud),
-                .Config = Runtime::SandboxEditorProgressivePoissonConfig{
+                .Config = Runtime::EditorProgressivePoissonConfig{
                     .Dimension = 2u,
                     .GridWidth = 3u,
                     .MaxLevels = 5u,
@@ -477,7 +485,7 @@ TEST(SandboxEditorUi,
                     .ShuffleWithinLevels = false,
                     .PrefixCount = 3u,
                     .Channel =
-                        Runtime::SandboxEditorProgressivePoissonChannel::
+                        Runtime::EditorProgressivePoissonChannel::
                             Phase,
                 },
             });
@@ -549,7 +557,7 @@ TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
     Runtime::SelectionController selection;
     Tests::MockDevice device;
     device.Operational = false;
-    Runtime::SandboxEditorContext context =
+    Intrinsic::Tests::EditorFeatureTestContext context =
         MakeContext(registry, selection, true, nullptr, &device);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
@@ -564,7 +572,7 @@ TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
     };
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
 
-    Runtime::SandboxEditorProgressivePoissonConfig config{};
+    Runtime::EditorProgressivePoissonConfig config{};
     config.Dimension = 2u;
     config.GridWidth = 3u;
     config.MaxLevels = 5u;
@@ -573,14 +581,14 @@ TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
     config.RandomizeGridOrigin = false;
     config.ShuffleWithinLevels = false;
     config.PrefixCount = 3u;
-    config.Channel = Runtime::SandboxEditorProgressivePoissonChannel::Level;
+    config.Channel = Runtime::EditorProgressivePoissonChannel::Level;
     config.Backend =
-        Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute;
+        Runtime::EditorProgressivePoissonBackend::VulkanCompute;
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(cloud),
                 .Config = config,
@@ -588,9 +596,9 @@ TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
 
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.RequestedBackend,
-              Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute);
+              Runtime::EditorProgressivePoissonBackend::VulkanCompute);
     EXPECT_EQ(result.ActualBackend,
-              Runtime::SandboxEditorProgressivePoissonBackend::CpuReference);
+              Runtime::EditorProgressivePoissonBackend::CpuReference);
     EXPECT_EQ(result.RequestedBackendId, "gpu_vulkan_compute");
     EXPECT_EQ(result.BackendId, PPR::kBackendId);
     EXPECT_TRUE(result.FellBackToCpu);
@@ -621,7 +629,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
     AddPointCloudSource(registry, cloud, 6u);
@@ -635,7 +643,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
     };
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
 
-    const Runtime::SandboxEditorProgressivePoissonConfig config{
+    const Runtime::EditorProgressivePoissonConfig config{
         .Dimension = 2u,
         .GridWidth = 3u,
         .MaxLevels = 5u,
@@ -646,13 +654,13 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
         .ShuffleWithinLevels = false,
         .ShuffleSeed = 29u,
         .PrefixCount = 0u,
-        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Level,
+        .Channel = Runtime::EditorProgressivePoissonChannel::Level,
     };
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(cloud),
                 .Config = config,
@@ -704,13 +712,13 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    std::optional<Runtime::SandboxEditorProgressivePoissonResult>
+    std::optional<Runtime::EditorProgressivePoissonResult>
         completedResult{};
     context.MethodResultSinks.ProgressivePoisson =
-        [&completedResult](Runtime::SandboxEditorProgressivePoissonResult result)
+        [&completedResult](Runtime::EditorProgressivePoissonResult result)
         {
             completedResult = std::move(result);
         };
@@ -727,7 +735,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
     };
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
 
-    const Runtime::SandboxEditorProgressivePoissonConfig config{
+    const Runtime::EditorProgressivePoissonConfig config{
         .Dimension = 2u,
         .GridWidth = 3u,
         .MaxLevels = 5u,
@@ -738,39 +746,39 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
         .ShuffleWithinLevels = false,
         .ShuffleSeed = 29u,
         .PrefixCount = 3u,
-        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Phase,
+        .Channel = Runtime::EditorProgressivePoissonChannel::Phase,
     };
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(cloud),
                 .Config = config,
             });
 
-    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_NE(result.Message.find("queued"), std::string::npos);
     EXPECT_FALSE(registry.Raw()
                      .get<GS::Vertices>(cloud)
                      .Properties.Get<float>("p:poisson_phase"));
 
-    Runtime::SandboxEditorJobQueueSnapshot queued =
+    Runtime::EditorJobQueueSnapshot queued =
         jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.ProgressivePoisson.CPU");
     // `JobService` dispatches at submit, so the pre-drain state races
     // between Queued/Running/AwaitingGate; assert only that it is active.
     EXPECT_TRUE(
-        Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
+        Runtime::IsActiveEditorJobState(queued.Entries[0].State));
 
     EXPECT_FALSE(registry.Raw()
                      .get<GS::Vertices>(cloud)
                      .Properties.Get<float>("p:poisson_phase"));
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::SandboxEditorJobQueueSnapshot done =
+    Runtime::EditorJobQueueSnapshot done =
         jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
@@ -804,12 +812,12 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBefo
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     bool completedSinkCalled = false;
     context.MethodResultSinks.ProgressivePoisson =
-        [&completedSinkCalled](Runtime::SandboxEditorProgressivePoissonResult)
+        [&completedSinkCalled](Runtime::EditorProgressivePoissonResult)
         {
             completedSinkCalled = true;
         };
@@ -824,13 +832,13 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBefo
                      {1.0f, 1.0f, 0.0f},
                  });
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(cloud),
-                .Config = Runtime::SandboxEditorProgressivePoissonConfig{
+                .Config = Runtime::EditorProgressivePoissonConfig{
                     .Dimension = 2u,
                     .GridWidth = 3u,
                     .MaxLevels = 5u,
@@ -841,7 +849,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBefo
                     .PrefixCount = 0u,
                 },
             });
-    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     SetPositions(registry.Raw().get<GS::Vertices>(cloud),
                  {
@@ -853,7 +861,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBefo
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
 
-    Runtime::SandboxEditorJobQueueSnapshot done =
+    Runtime::EditorJobQueueSnapshot done =
         jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
@@ -867,13 +875,13 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    std::optional<Runtime::SandboxEditorProgressivePoissonResult>
+    std::optional<Runtime::EditorProgressivePoissonResult>
         completedResult{};
     context.MethodResultSinks.ProgressivePoisson =
-        [&completedResult](Runtime::SandboxEditorProgressivePoissonResult result)
+        [&completedResult](Runtime::EditorProgressivePoissonResult result)
         {
             completedResult = std::move(result);
         };
@@ -882,7 +890,7 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
     AddTriangleMeshSource(registry, mesh);
     registry.Raw().emplace<G::RenderSurface>(mesh);
 
-    const Runtime::SandboxEditorProgressivePoissonConfig config{
+    const Runtime::EditorProgressivePoissonConfig config{
         .Dimension = 2u,
         .GridWidth = 3u,
         .MaxLevels = 5u,
@@ -893,23 +901,23 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
         .ShuffleWithinLevels = true,
         .ShuffleSeed = 37u,
         .PrefixCount = 7u,
-        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Level,
+        .Channel = Runtime::EditorProgressivePoissonChannel::Level,
         .MeshSurfaceSampleCount = 24u,
         .MeshSurfaceSampleSeed = 41u,
         .MeshSurfaceMinTriangleArea = 1.0e-14,
         .MeshSurfaceInterpolateNormals = true,
     };
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .Config = config,
             });
 
-    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_TRUE(result.MeshSurfaceSamplingUsed);
     EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<GS::Faces>(mesh));
@@ -918,7 +926,7 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
     EXPECT_TRUE(registry.Raw().all_of<GS::Faces>(mesh));
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::SandboxEditorJobQueueSnapshot done =
+    Runtime::EditorJobQueueSnapshot done =
         jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
@@ -945,18 +953,18 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
     EXPECT_EQ(positions.Vector().size(), 24u);
     EXPECT_EQ(levels.Vector().size(), 24u);
 }
-TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
+TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
 {
     Runtime::RuntimeEngineConfigControlState controlState{};
     controlState.ActiveConfig = Core::Config::EngineConfig{};
-    Runtime::EngineConfigSectionRegistry sectionRegistry{};
+    Runtime::RuntimeEngineConfigSectionRegistry sectionRegistry{};
     ASSERT_TRUE(sectionRegistry.Register(
         Runtime::MakeProgressivePoissonConfigSectionRegistration()));
     Core::Config::PopulateEngineConfigSectionDefaults(
         controlState.ActiveConfig,
         sectionRegistry);
 
-    Runtime::SandboxEditorContext configContext{};
+    Intrinsic::Tests::EditorFeatureTestContext configContext{};
     configContext.EngineConfigControlState = &controlState;
     configContext.EngineConfigCommandsAvailable = true;
 
@@ -1013,11 +1021,11 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     config.AutoRunOnEdit = true;
     config.DebounceSeconds = 0.2;
 
-    const Runtime::SandboxEditorProgressivePoissonConfigResult configResult =
-        Runtime::ApplySandboxEditorProgressivePoissonConfigCommand(
+    const Runtime::EditorProgressivePoissonConfigResult configResult =
+        Runtime::ApplyEditorProgressivePoissonConfigCommand(
             configContext,
-            Runtime::SandboxEditorProgressivePoissonConfigCommand{
-                .Config = Runtime::MakeSandboxEditorProgressivePoissonConfig(
+            Runtime::EditorProgressivePoissonConfigCommand{
+                .Config = Runtime::MakeEditorProgressivePoissonConfig(
                     config),
                 .SourceId = "test-progressive-poisson-config",
             });
@@ -1036,16 +1044,16 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     EXPECT_TRUE(activePoisson->AutoRunOnEdit);
     EXPECT_DOUBLE_EQ(activePoisson->DebounceSeconds, 0.2);
 
-    const std::optional<Runtime::SandboxEditorProgressivePoissonConfig>
+    const std::optional<Runtime::EditorProgressivePoissonConfig>
         activeConfig =
-            Runtime::GetSandboxEditorProgressivePoissonConfig(configContext);
+            Runtime::GetEditorProgressivePoissonConfig(configContext);
     ASSERT_TRUE(activeConfig.has_value());
     EXPECT_TRUE(activeConfig->AutoRunOnEdit);
     EXPECT_DOUBLE_EQ(activeConfig->DebounceSeconds, 0.2);
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext commandContext =
+    Intrinsic::Tests::EditorFeatureTestContext commandContext =
         MakeContext(registry, selection);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
@@ -1060,14 +1068,14 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     };
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
 
-    const Runtime::SandboxEditorProgressivePoissonConfig runtimeConfig =
-        Runtime::MakeSandboxEditorProgressivePoissonConfig(*activePoisson);
+    const Runtime::EditorProgressivePoissonConfig runtimeConfig =
+        Runtime::MakeEditorProgressivePoissonConfig(*activePoisson);
     EXPECT_EQ(runtimeConfig.Backend,
-              Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute);
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+              Runtime::EditorProgressivePoissonBackend::VulkanCompute);
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             commandContext,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(cloud),
                 .Config = runtimeConfig,
@@ -1093,9 +1101,9 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     EXPECT_EQ(result.BackendId, PPR::kBackendId);
     EXPECT_EQ(result.BackendDisplayName, "CPU reference");
     EXPECT_EQ(result.RequestedBackend,
-              Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute);
+              Runtime::EditorProgressivePoissonBackend::VulkanCompute);
     EXPECT_EQ(result.ActualBackend,
-              Runtime::SandboxEditorProgressivePoissonBackend::CpuReference);
+              Runtime::EditorProgressivePoissonBackend::CpuReference);
     EXPECT_TRUE(result.FellBackToCpu);
     EXPECT_NE(result.BackendFallbackReason.find("no RHI device"),
               std::string::npos);
@@ -1219,7 +1227,7 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(decoded->Dimension, 2u);
     EXPECT_EQ(decoded->GridWidth, 11u);
 
-    Runtime::EngineConfigSectionRegistry registry{};
+    Runtime::RuntimeEngineConfigSectionRegistry registry{};
     ASSERT_TRUE(registry.Register(
         Runtime::MakeProgressivePoissonConfigSectionRegistration()));
     Core::Config::EngineConfig referenceConfig{};
@@ -1258,14 +1266,14 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMesh");
     AddTriangleMeshSource(registry, mesh);
     registry.Raw().emplace<G::RenderSurface>(mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    const Runtime::SandboxEditorProgressivePoissonConfig config{
+    const Runtime::EditorProgressivePoissonConfig config{
         .Dimension = 2u,
         .GridWidth = 3u,
         .MaxLevels = 5u,
@@ -1276,17 +1284,17 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
         .ShuffleWithinLevels = true,
         .ShuffleSeed = 37u,
         .PrefixCount = 7u,
-        .Channel = Runtime::SandboxEditorProgressivePoissonChannel::Level,
+        .Channel = Runtime::EditorProgressivePoissonChannel::Level,
         .MeshSurfaceSampleCount = 32u,
         .MeshSurfaceSampleSeed = 41u,
         .MeshSurfaceMinTriangleArea = 1.0e-14,
         .MeshSurfaceInterpolateNormals = true,
     };
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .Config = config,
@@ -1372,7 +1380,7 @@ TEST(SandboxEditorUi,
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMeshHistory");
@@ -1400,13 +1408,13 @@ TEST(SandboxEditorUi,
             .Properties.Get<glm::vec2>("v:texcoord")
             .Vector();
 
-    const Runtime::SandboxEditorProgressivePoissonResult result =
-        Runtime::ApplySandboxEditorProgressivePoissonCommand(
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
             context,
-            Runtime::SandboxEditorProgressivePoissonCommand{
+            Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
-                .Config = Runtime::SandboxEditorProgressivePoissonConfig{
+                .Config = Runtime::EditorProgressivePoissonConfig{
                     .Dimension = 2u,
                     .GridWidth = 3u,
                     .MaxLevels = 5u,
@@ -1417,7 +1425,7 @@ TEST(SandboxEditorUi,
                     .ShuffleSeed = 37u,
                     .PrefixCount = 7u,
                     .Channel =
-                        Runtime::SandboxEditorProgressivePoissonChannel::
+                        Runtime::EditorProgressivePoissonChannel::
                             Level,
                     .MeshSurfaceSampleCount = 16u,
                     .MeshSurfaceSampleSeed = 41u,
@@ -1485,7 +1493,7 @@ TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRe
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
 
     const std::vector<glm::vec3> target = MakeRegistrationCloud();
@@ -1506,13 +1514,13 @@ TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRe
     const glm::vec3 originalPosition =
         registry.Raw().get<ECSC::Transform::Component>(source).Position;
 
-    const Runtime::SandboxEditorRegistrationResult result =
-        Runtime::ApplySandboxEditorRegistrationCommand(
+    const Runtime::EditorRegistrationResult result =
+        Runtime::ApplyEditorRegistrationCommand(
             context,
-            Runtime::SandboxEditorRegistrationCommand{
+            Runtime::EditorRegistrationCommand{
                 .SourceStableEntityId = sourceId,
                 .TargetStableEntityId = targetId,
-                .Variant = Runtime::SandboxEditorICPVariant::PointToPoint,
+                .Variant = Runtime::EditorICPVariant::PointToPoint,
                 .MaxIterations = 60u,
                 .InlierRatio = 1.0,
                 .TrajectoryStep = 1000u,
@@ -1555,13 +1563,13 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    std::optional<Runtime::SandboxEditorRegistrationResult> completedResult{};
+    std::optional<Runtime::EditorRegistrationResult> completedResult{};
     context.MethodResultSinks.Registration =
-        [&completedResult](Runtime::SandboxEditorRegistrationResult result)
+        [&completedResult](Runtime::EditorRegistrationResult result)
         {
             completedResult = std::move(result);
         };
@@ -1584,19 +1592,19 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
     const ECSC::Transform::Component before =
         registry.Raw().get<ECSC::Transform::Component>(source);
 
-    const Runtime::SandboxEditorRegistrationResult result =
-        Runtime::ApplySandboxEditorRegistrationCommand(
+    const Runtime::EditorRegistrationResult result =
+        Runtime::ApplyEditorRegistrationCommand(
             context,
-            Runtime::SandboxEditorRegistrationCommand{
+            Runtime::EditorRegistrationCommand{
                 .SourceStableEntityId = sourceId,
                 .TargetStableEntityId = targetId,
-                .Variant = Runtime::SandboxEditorICPVariant::PointToPoint,
+                .Variant = Runtime::EditorICPVariant::PointToPoint,
                 .MaxIterations = 60u,
                 .InlierRatio = 1.0,
                 .TrajectoryStep = 1000u,
             });
 
-    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_EQ(result.SourcePointCount, sourcePoints.size());
     EXPECT_EQ(result.TargetPointCount, target.size());
     EXPECT_NE(result.Message.find("queued"), std::string::npos);
@@ -1607,14 +1615,14 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_NEAR(pending.Position.z, before.Position.z, 1.0e-6f);
     EXPECT_FALSE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
 
-    Runtime::SandboxEditorJobQueueSnapshot queued =
+    Runtime::EditorJobQueueSnapshot queued =
         jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.RegistrationICP.CPU");
     // `JobService` dispatches at submit, so the pre-drain state races
     // between Queued/Running/AwaitingGate; assert only that it is active.
     EXPECT_TRUE(
-        Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
+        Runtime::IsActiveEditorJobState(queued.Entries[0].State));
 
     EXPECT_FALSE(completedResult.has_value());
     EXPECT_NEAR(
@@ -1623,7 +1631,7 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
         1.0e-6f);
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::SandboxEditorJobQueueSnapshot done =
+    Runtime::EditorJobQueueSnapshot done =
         jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
@@ -1655,12 +1663,12 @@ TEST(SandboxEditorUi, RegistrationDerivedJobDiscardsStaleSourceBeforeApply)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     bool completedSinkCalled = false;
     context.MethodResultSinks.Registration =
-        [&completedSinkCalled](Runtime::SandboxEditorRegistrationResult)
+        [&completedSinkCalled](Runtime::EditorRegistrationResult)
         {
             completedSinkCalled = true;
         };
@@ -1681,18 +1689,18 @@ TEST(SandboxEditorUi, RegistrationDerivedJobDiscardsStaleSourceBeforeApply)
     const std::uint32_t targetId =
         Runtime::SelectionController::ToStableEntityId(targetEntity);
 
-    const Runtime::SandboxEditorRegistrationResult result =
-        Runtime::ApplySandboxEditorRegistrationCommand(
+    const Runtime::EditorRegistrationResult result =
+        Runtime::ApplyEditorRegistrationCommand(
             context,
-            Runtime::SandboxEditorRegistrationCommand{
+            Runtime::EditorRegistrationCommand{
                 .SourceStableEntityId = sourceId,
                 .TargetStableEntityId = targetId,
-                .Variant = Runtime::SandboxEditorICPVariant::PointToPoint,
+                .Variant = Runtime::EditorICPVariant::PointToPoint,
                 .MaxIterations = 60u,
                 .InlierRatio = 1.0,
                 .TrajectoryStep = 1000u,
             });
-    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
+    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     std::vector<glm::vec3> staleSourcePoints = sourcePoints;
     for (glm::vec3& point : staleSourcePoints)
@@ -1701,7 +1709,7 @@ TEST(SandboxEditorUi, RegistrationDerivedJobDiscardsStaleSourceBeforeApply)
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
 
-    Runtime::SandboxEditorJobQueueSnapshot done =
+    Runtime::EditorJobQueueSnapshot done =
         jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
@@ -1718,7 +1726,7 @@ TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParame
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     const std::vector<glm::vec3> cloud = MakeRegistrationCloud();
     const ECS::EntityHandle source =
@@ -1735,51 +1743,51 @@ TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParame
         Runtime::SelectionController::ToStableEntityId(mesh);
 
     EXPECT_EQ(
-        Runtime::ApplySandboxEditorRegistrationCommand(
+        Runtime::ApplyEditorRegistrationCommand(
             context,
-            Runtime::SandboxEditorRegistrationCommand{
+            Runtime::EditorRegistrationCommand{
                 .SourceStableEntityId = sourceId,
                 .TargetStableEntityId = sourceId,
             })
             .Status,
-        Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+        Runtime::EditorCommandStatus::InvalidProcessingParameters);
 
     EXPECT_EQ(
-        Runtime::ApplySandboxEditorRegistrationCommand(
+        Runtime::ApplyEditorRegistrationCommand(
             context,
-            Runtime::SandboxEditorRegistrationCommand{
+            Runtime::EditorRegistrationCommand{
                 .SourceStableEntityId = sourceId,
                 .TargetStableEntityId = targetId,
                 .MaxIterations = 0u,
             })
             .Status,
-        Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+        Runtime::EditorCommandStatus::InvalidProcessingParameters);
 
     EXPECT_EQ(
-        Runtime::ApplySandboxEditorRegistrationCommand(
+        Runtime::ApplyEditorRegistrationCommand(
             context,
-            Runtime::SandboxEditorRegistrationCommand{
+            Runtime::EditorRegistrationCommand{
                 .SourceStableEntityId = sourceId,
                 .TargetStableEntityId = targetId + 9999u,
             })
             .Status,
-        Runtime::SandboxEditorCommandStatus::StaleEntity);
+        Runtime::EditorCommandStatus::StaleEntity);
 
     EXPECT_EQ(
-        Runtime::ApplySandboxEditorRegistrationCommand(
+        Runtime::ApplyEditorRegistrationCommand(
             context,
-            Runtime::SandboxEditorRegistrationCommand{
+            Runtime::EditorRegistrationCommand{
                 .SourceStableEntityId = sourceId,
                 .TargetStableEntityId = meshId,
             })
             .Status,
-        Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+        Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
 }
 TEST(SandboxEditorUi, RegistrationCommandAlignsAcrossEntityTransforms)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     // Identical local clouds, but the target is translated in the scene. ICP run
     // on raw local arrays would return identity and leave the source at the
@@ -1798,13 +1806,13 @@ TEST(SandboxEditorUi, RegistrationCommandAlignsAcrossEntityTransforms)
     const std::uint32_t targetId =
         Runtime::SelectionController::ToStableEntityId(target);
 
-    const Runtime::SandboxEditorRegistrationResult result =
-        Runtime::ApplySandboxEditorRegistrationCommand(
+    const Runtime::EditorRegistrationResult result =
+        Runtime::ApplyEditorRegistrationCommand(
             context,
-            Runtime::SandboxEditorRegistrationCommand{
+            Runtime::EditorRegistrationCommand{
                 .SourceStableEntityId = sourceId,
                 .TargetStableEntityId = targetId,
-                .Variant = Runtime::SandboxEditorICPVariant::PointToPoint,
+                .Variant = Runtime::EditorICPVariant::PointToPoint,
                 .MaxIterations = 60u,
                 .InlierRatio = 1.0,
                 .TrajectoryStep = 1000u,

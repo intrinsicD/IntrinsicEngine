@@ -21,10 +21,18 @@ module Extrinsic.Sandbox.Editor.MethodPanels;
 
 import Extrinsic.Sandbox.Editor.Shell;
 
+import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.ProgressivePoissonConfig;
+import Extrinsic.Runtime.SceneEditingOperations;
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -49,7 +57,7 @@ namespace Extrinsic::Sandbox::Editor
         using ParameterizationUvBackgroundMode =
             decltype(ParameterizationPanelConfig{}.View.BackgroundMode);
         using ParameterizationSolverStatus = decltype(
-            Runtime::SandboxEditorParameterizationResult{}
+            Runtime::EditorParameterizationResult{}
                 .ParameterizationStatus);
 
         constexpr std::array<Runtime::ClusteringBackend, 2>
@@ -57,44 +65,44 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::ClusteringBackend::CpuReference,
                 Runtime::ClusteringBackend::VulkanCompute,
             };
-        constexpr std::array<Runtime::SandboxEditorProgressivePoissonChannel, 4>
+        constexpr std::array<Runtime::EditorProgressivePoissonChannel, 4>
             kProgressivePoissonChannels{
-                Runtime::SandboxEditorProgressivePoissonChannel::Level,
-                Runtime::SandboxEditorProgressivePoissonChannel::Phase,
-                Runtime::SandboxEditorProgressivePoissonChannel::SplatRadius,
-                Runtime::SandboxEditorProgressivePoissonChannel::PrefixVisible,
+                Runtime::EditorProgressivePoissonChannel::Level,
+                Runtime::EditorProgressivePoissonChannel::Phase,
+                Runtime::EditorProgressivePoissonChannel::SplatRadius,
+                Runtime::EditorProgressivePoissonChannel::PrefixVisible,
             };
-        constexpr std::array<Runtime::SandboxEditorProgressivePoissonBackend, 2>
+        constexpr std::array<Runtime::EditorProgressivePoissonBackend, 2>
             kProgressivePoissonBackends{
-                Runtime::SandboxEditorProgressivePoissonBackend::CpuReference,
-                Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute,
+                Runtime::EditorProgressivePoissonBackend::CpuReference,
+                Runtime::EditorProgressivePoissonBackend::VulkanCompute,
             };
 
         [[nodiscard]] bool DomainWindowReady(
-            const Runtime::SandboxEditorDomainWindowModel& model) noexcept
+            const Runtime::EditorDomainWindowModel& model) noexcept
         {
             return model.HasSelectedEntity && model.DomainMatches;
         }
 
         void DrawDiagnostics(
-            const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics)
+            const std::vector<Runtime::EditorDiagnostic>& diagnostics)
         {
-            for (const Runtime::SandboxEditorDiagnostic& diagnostic : diagnostics)
+            for (const Runtime::EditorDiagnostic& diagnostic : diagnostics)
             {
                 ImGui::TextDisabled(
                     "%s: %s",
-                    Runtime::DebugNameForSandboxEditorDiagnosticCode(
+                    Runtime::DebugNameForEditorDiagnosticCode(
                         diagnostic.Code),
                     diagnostic.Message.c_str());
             }
         }
 
         void DrawDomainWindowHeader(
-            const Runtime::SandboxEditorDomainWindowModel& model)
+            const Runtime::EditorDomainWindowModel& model)
         {
             ImGui::Text(
                 "Expected domain: %s",
-                Runtime::DebugNameForSandboxEditorGeometryDomain(
+                Runtime::DebugNameForEditorGeometryDomain(
                     model.ExpectedDomain));
             if (model.HasSelectedEntity)
             {
@@ -104,7 +112,7 @@ namespace Extrinsic::Sandbox::Editor
                     model.SelectedStableId);
                 ImGui::Text(
                     "Selected domain: %s",
-                    Runtime::DebugNameForSandboxEditorGeometryDomain(
+                    Runtime::DebugNameForEditorGeometryDomain(
                         model.SelectedDomain));
             }
             else
@@ -115,9 +123,9 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         [[nodiscard]] bool ContainsKMeansDomain(
-            const std::vector<Runtime::SandboxEditorGeometryProcessingDomain>&
+            const std::vector<Runtime::EditorGeometryProcessingDomain>&
                 domains,
-            const Runtime::SandboxEditorGeometryProcessingDomain domain)
+            const Runtime::EditorGeometryProcessingDomain domain)
         {
             return std::find(domains.begin(), domains.end(), domain) !=
                    domains.end();
@@ -145,9 +153,9 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         [[nodiscard]] Runtime::GeometryElementDomain KMeansDomain(
-            const Runtime::SandboxEditorGeometryProcessingDomain domain) noexcept
+            const Runtime::EditorGeometryProcessingDomain domain) noexcept
         {
-            using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+            using Domain = Runtime::EditorGeometryProcessingDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
@@ -161,7 +169,7 @@ namespace Extrinsic::Sandbox::Editor
             return Runtime::GeometryElementDomain::Unknown;
         }
 
-        [[nodiscard]] Runtime::SandboxEditorProgressivePoissonChannel
+        [[nodiscard]] Runtime::EditorProgressivePoissonChannel
         ProgressivePoissonChannelFromIndex(const std::int32_t index) noexcept
         {
             const std::int32_t clamped = std::clamp(
@@ -174,7 +182,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         [[nodiscard]] std::int32_t ProgressivePoissonChannelIndex(
-            const Runtime::SandboxEditorProgressivePoissonChannel channel) noexcept
+            const Runtime::EditorProgressivePoissonChannel channel) noexcept
         {
             const auto found = std::find(
                 kProgressivePoissonChannels.begin(),
@@ -186,7 +194,7 @@ namespace Extrinsic::Sandbox::Editor
                       std::distance(kProgressivePoissonChannels.begin(), found));
         }
 
-        [[nodiscard]] Runtime::SandboxEditorProgressivePoissonBackend
+        [[nodiscard]] Runtime::EditorProgressivePoissonBackend
         ProgressivePoissonBackendFromIndex(const std::int32_t index) noexcept
         {
             const std::int32_t clamped = std::clamp(
@@ -199,7 +207,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         [[nodiscard]] std::int32_t ProgressivePoissonBackendIndex(
-            const Runtime::SandboxEditorProgressivePoissonBackend backend) noexcept
+            const Runtime::EditorProgressivePoissonBackend backend) noexcept
         {
             const auto found = std::find(
                 kProgressivePoissonBackends.begin(),
@@ -241,7 +249,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         [[nodiscard]] bool IsSupportedParameterizationStrategy(
-            const Runtime::SandboxEditorParameterizationStrategy strategy) noexcept
+            const Runtime::EditorParameterizationStrategy strategy) noexcept
         {
             const auto options = SandboxParameterizationStrategyOptions();
             return std::any_of(
@@ -273,7 +281,7 @@ namespace Extrinsic::Sandbox::Editor
     std::array<SandboxParameterizationStrategyOption, 4u>
     SandboxParameterizationStrategyOptions() noexcept
     {
-        using Strategy = Runtime::SandboxEditorParameterizationStrategy;
+        using Strategy = Runtime::EditorParameterizationStrategy;
         return {
             SandboxParameterizationStrategyOption{
                 .Strategy = Strategy::Lscm,
@@ -305,19 +313,19 @@ namespace Extrinsic::Sandbox::Editor
     {
         if (stableEntityId == 0u ||
             !IsSupportedParameterizationStrategy(config.Strategy) ||
-            Runtime::StableTokenForSandboxEditorParameterizationStrategy(
+            Runtime::StableTokenForEditorParameterizationStrategy(
                 config.Strategy).empty())
         {
             return std::nullopt;
         }
         return SandboxParameterizationPanelApplyRequest{
             .Config =
-                Runtime::SandboxEditorParameterizationConfigCommand{
+                Runtime::EditorParameterizationConfigCommand{
                     .Config = config,
                     .SourceId = "sandbox.parameterization.panel",
                 },
             .Execute =
-                Runtime::SandboxEditorConfiguredParameterizationCommand{
+                Runtime::EditorConfiguredParameterizationCommand{
                     .StableEntityId = stableEntityId,
                 },
         };
@@ -325,7 +333,7 @@ namespace Extrinsic::Sandbox::Editor
 
     SandboxParameterizationPanelActionResult
     ApplySandboxParameterizationPanelAction(
-        const Runtime::SandboxEditorContext& context,
+        const SandboxEditorContext& context,
         const std::uint32_t stableEntityId,
         const SandboxParameterizationPanelConfig& config)
     {
@@ -336,21 +344,21 @@ namespace Extrinsic::Sandbox::Editor
         {
             SandboxParameterizationPanelActionResult rejected{};
             rejected.Config.Status =
-                Runtime::SandboxEditorParameterizationConfigStatus::PreviewRejected;
+                Runtime::EditorParameterizationConfigStatus::PreviewRejected;
             rejected.Config.Message =
                 "Parameterization panel request is invalid or unsupported.";
             return rejected;
         }
 
         SandboxParameterizationPanelActionResult result{};
-        result.Config = Runtime::ApplySandboxEditorParameterizationConfigCommand(
-            context,
+        result.Config = Runtime::ApplyEditorParameterizationConfigCommand(
+            context.GeometryCommands,
             request->Config);
         if (result.Config.Succeeded())
         {
             result.Execution =
-                Runtime::ApplySandboxEditorConfiguredParameterizationCommand(
-                    context,
+                Runtime::ApplyEditorConfiguredParameterizationCommand(
+                    context.GeometryCommands,
                     request->Execute);
         }
         return result;
@@ -370,7 +378,7 @@ namespace Extrinsic::Sandbox::Editor
 
     SandboxParameterizationUvProjection
     BuildSandboxParameterizationUvProjection(
-        const Runtime::SandboxEditorParameterizationViewModel& model,
+        const Runtime::EditorParameterizationViewModel& model,
         const SandboxParameterizationUvPane& pane)
     {
         SandboxParameterizationUvProjection projection{};
@@ -490,7 +498,7 @@ namespace Extrinsic::Sandbox::Editor
 
     SandboxParameterizationResultSummary
     BuildSandboxParameterizationResultSummary(
-        const Runtime::SandboxEditorParameterizationResult& result)
+        const Runtime::EditorParameterizationResult& result)
     {
         const auto& diagnostics = result.Diagnostics;
         return SandboxParameterizationResultSummary{
@@ -501,7 +509,7 @@ namespace Extrinsic::Sandbox::Editor
                               diagnostics.SkippedFaceCount > 0u,
             .StrategyToken = result.StrategyToken,
             .CommandStatus =
-                Runtime::DebugNameForSandboxEditorCommandStatus(result.Status),
+                Runtime::DebugNameForEditorCommandStatus(result.Status),
             .SolverStatus = ParameterizationSolverStatusLabel(
                 result.ParameterizationStatus),
             .Message = result.Message,
@@ -522,8 +530,8 @@ namespace Extrinsic::Sandbox::Editor
             std::optional<Runtime::KMeansRunCompleted> LastResult{};
             std::optional<Runtime::RuntimeEngineConfigApplyResult>
                 LastConfigApply{};
-            Runtime::SandboxEditorGeometryProcessingDomain Domain{
-                Runtime::SandboxEditorGeometryProcessingDomain::None};
+            Runtime::EditorGeometryProcessingDomain Domain{
+                Runtime::EditorGeometryProcessingDomain::None};
             std::int32_t Backend{0};
             std::int32_t ClusterCount{8};
             std::int32_t MaxIterations{32};
@@ -535,9 +543,9 @@ namespace Extrinsic::Sandbox::Editor
 
         struct ProgressivePoissonState
         {
-            std::optional<Runtime::SandboxEditorProgressivePoissonResult>
+            std::optional<Runtime::EditorProgressivePoissonResult>
                 LastResult{};
-            std::optional<Runtime::SandboxEditorProgressivePoissonConfigResult>
+            std::optional<Runtime::EditorProgressivePoissonConfigResult>
                 LastConfigResult{};
             std::int32_t Dimension{3};
             std::int32_t GridWidth{4};
@@ -567,15 +575,15 @@ namespace Extrinsic::Sandbox::Editor
             SandboxParameterizationPanelConfig Draft{};
             bool Initialized{false};
             bool Dirty{false};
-            std::optional<Runtime::SandboxEditorParameterizationConfigResult>
+            std::optional<Runtime::EditorParameterizationConfigResult>
                 LastConfigResult{};
-            std::optional<Runtime::SandboxEditorParameterizationResult>
+            std::optional<Runtime::EditorParameterizationResult>
                 LastResult{};
             float SplitRatio{0.42f};
             float Zoom{1.0f};
             glm::vec2 Pan{0.0f};
             std::optional<
-                Runtime::SandboxEditorParameterizationUvViewState>
+                Runtime::EditorParameterizationUvViewState>
                 LastUvViewState{};
         };
 
@@ -583,7 +591,7 @@ namespace Extrinsic::Sandbox::Editor
         std::vector<Runtime::EditorWindowHandle> Handles{};
         int CachedModelFrame{-1};
         std::array<
-            std::optional<Runtime::SandboxEditorDomainWindowModel>,
+            std::optional<Runtime::EditorDomainWindowModel>,
             3u>
             CachedDomainModels{};
         KMeansState KMeans{};
@@ -596,27 +604,27 @@ namespace Extrinsic::Sandbox::Editor
             Shell = &editorShell;
 
             RegisterKMeansWindow(
-                Runtime::SandboxEditorDomainWindowKind::PointCloud,
+                Runtime::EditorDomainWindowKind::PointCloud,
                 "pointcloud.processing.kmeans",
                 {"PointCloud", "Processing"},
                 "PointCloud / Processing / K-Means");
             RegisterKMeansWindow(
-                Runtime::SandboxEditorDomainWindowKind::Graph,
+                Runtime::EditorDomainWindowKind::Graph,
                 "graph.processing.kmeans",
                 {"Graph", "Processing"},
                 "Graph / Processing / K-Means");
             RegisterKMeansWindow(
-                Runtime::SandboxEditorDomainWindowKind::Mesh,
+                Runtime::EditorDomainWindowKind::Mesh,
                 "mesh.processing.kmeans",
                 {"Mesh", "Processing"},
                 "Mesh / Processing / K-Means");
             RegisterProgressivePoissonWindow(
-                Runtime::SandboxEditorDomainWindowKind::PointCloud,
+                Runtime::EditorDomainWindowKind::PointCloud,
                 "pointcloud.processing.progressive_poisson",
                 {"PointCloud", "Processing"},
                 "PointCloud / Processing / Progressive Poisson");
             RegisterProgressivePoissonWindow(
-                Runtime::SandboxEditorDomainWindowKind::Mesh,
+                Runtime::EditorDomainWindowKind::Mesh,
                 "mesh.processing.progressive_poisson",
                 {"Mesh", "Processing"},
                 "Mesh / Processing / Progressive Poisson");
@@ -644,10 +652,10 @@ namespace Extrinsic::Sandbox::Editor
             Parameterization = ParameterizationState{};
         }
 
-        [[nodiscard]] const Runtime::SandboxEditorDomainWindowModel&
+        [[nodiscard]] const Runtime::EditorDomainWindowModel&
         GetDomainWindowModel(
-            const Runtime::SandboxEditorContext& context,
-            const Runtime::SandboxEditorDomainWindowKind kind)
+            const SandboxEditorContext& context,
+            const Runtime::EditorDomainWindowKind kind)
         {
             const int frame = ImGui::GetFrameCount();
             if (CachedModelFrame != frame)
@@ -660,8 +668,8 @@ namespace Extrinsic::Sandbox::Editor
             auto& model = CachedDomainModels[static_cast<std::size_t>(kind)];
             if (!model.has_value())
             {
-                model = Runtime::BuildSandboxEditorDomainWindowModel(
-                    context,
+                model = Runtime::BuildEditorDomainWindowModel(
+                    context.SnapshotQueries,
                     kind);
             }
             else if (context.ModelBuildStats != nullptr)
@@ -672,7 +680,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void RegisterKMeansWindow(
-            const Runtime::SandboxEditorDomainWindowKind kind,
+            const Runtime::EditorDomainWindowKind kind,
             std::string id,
             std::vector<std::string> menuPath,
             std::string windowTitle)
@@ -687,7 +695,7 @@ namespace Extrinsic::Sandbox::Editor
                     .Draw =
                         [this, kind, windowTitle = callbackTitle](
                             bool& open,
-                            const Runtime::SandboxEditorContext& context)
+                            const SandboxEditorContext& context)
                         {
                             DrawKMeansWindow(open, context, kind, windowTitle);
                         },
@@ -695,7 +703,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void RegisterProgressivePoissonWindow(
-            const Runtime::SandboxEditorDomainWindowKind kind,
+            const Runtime::EditorDomainWindowKind kind,
             std::string id,
             std::vector<std::string> menuPath,
             std::string windowTitle)
@@ -710,7 +718,7 @@ namespace Extrinsic::Sandbox::Editor
                     .Draw =
                         [this, kind, windowTitle = callbackTitle](
                             bool& open,
-                            const Runtime::SandboxEditorContext& context)
+                            const SandboxEditorContext& context)
                         {
                             DrawProgressivePoissonWindow(
                                 open,
@@ -732,7 +740,7 @@ namespace Extrinsic::Sandbox::Editor
                     .Draw =
                         [this](
                             bool& open,
-                            const Runtime::SandboxEditorContext& context)
+                            const SandboxEditorContext& context)
                         {
                             DrawParameterizationWindow(open, context);
                         },
@@ -741,8 +749,8 @@ namespace Extrinsic::Sandbox::Editor
 
         void DrawKMeansWindow(
             bool& open,
-            const Runtime::SandboxEditorContext& context,
-            const Runtime::SandboxEditorDomainWindowKind kind,
+            const SandboxEditorContext& context,
+            const Runtime::EditorDomainWindowKind kind,
             const std::string& windowTitle)
         {
             ImGui::SetNextWindowSize(
@@ -750,7 +758,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGuiCond_FirstUseEver);
             if (ImGui::Begin(windowTitle.c_str(), &open))
             {
-                const Runtime::SandboxEditorDomainWindowModel& model =
+                const Runtime::EditorDomainWindowModel& model =
                     GetDomainWindowModel(context, kind);
                 DrawDomainWindowHeader(model);
                 DrawDiagnostics(model.Processing.Diagnostics);
@@ -769,10 +777,10 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawKMeansControls(
-            const Runtime::SandboxEditorDomainWindowModel& model,
-            const Runtime::SandboxEditorContext& context)
+            const Runtime::EditorDomainWindowModel& model,
+            const SandboxEditorContext& context)
         {
-            const Runtime::SandboxEditorGeometryProcessingModel& processing =
+            const Runtime::EditorGeometryProcessingModel& processing =
                 model.Processing;
             ImGui::SeparatorText("K-Means execution");
             if (processing.KMeansDomains.empty())
@@ -782,12 +790,12 @@ namespace Extrinsic::Sandbox::Editor
                 return;
             }
 
-            if (context.LastKMeansResult != nullptr)
-                KMeans.LastResult = *context.LastKMeansResult;
+            if (context.GeometryResults.LastKMeansResult.has_value())
+                KMeans.LastResult = *context.GeometryResults.LastKMeansResult;
             if (!KMeans.Initialized || !KMeans.Dirty)
             {
                 const std::optional<Runtime::ClusteringConfig> active =
-                    Runtime::GetSandboxEditorClusteringConfig(context);
+                    Runtime::GetEditorClusteringConfig(context.GeometryCommands);
                 if (active.has_value())
                 {
                     KMeans.Backend = KMeansBackendIndex(active->Backend);
@@ -807,15 +815,15 @@ namespace Extrinsic::Sandbox::Editor
 
             if (ImGui::BeginCombo(
                     "Domain##KMeans",
-                    Runtime::DebugNameForSandboxEditorGeometryProcessingDomain(
+                    Runtime::DebugNameForEditorGeometryProcessingDomain(
                         KMeans.Domain)))
             {
-                for (const Runtime::SandboxEditorGeometryProcessingDomain domain :
+                for (const Runtime::EditorGeometryProcessingDomain domain :
                      processing.KMeansDomains)
                 {
                     const bool selected = KMeans.Domain == domain;
                     if (ImGui::Selectable(
-                            Runtime::DebugNameForSandboxEditorGeometryProcessingDomain(
+                            Runtime::DebugNameForEditorGeometryProcessingDomain(
                                 domain),
                             selected))
                     {
@@ -897,16 +905,13 @@ namespace Extrinsic::Sandbox::Editor
             };
 
             const bool configAvailable =
-                context.EngineConfigControlState != nullptr &&
-                context.EngineConfigCommandsAvailable &&
-                context.PreviewEngineConfigDocument &&
-                context.ApplyEngineConfigHotSubset;
+                context.GeometryConfigCommandsAvailable;
             ImGui::BeginDisabled(!configAvailable || !KMeans.Dirty);
             if (ImGui::Button("Apply configuration##KMeans"))
             {
                 KMeans.LastConfigApply =
-                    Runtime::ApplySandboxEditorClusteringConfig(
-                        context,
+                    Runtime::ApplyEditorClusteringConfig(
+                        context.GeometryCommands,
                         clusteringConfig,
                         "sandbox.clustering.panel");
                 if (KMeans.LastConfigApply->Succeeded())
@@ -922,8 +927,7 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndDisabled();
 
-            const bool clusteringAvailable = context.Clustering != nullptr &&
-                context.Clustering->Available();
+            const bool clusteringAvailable = context.ClusteringAvailable;
             ImGui::BeginDisabled(!clusteringAvailable || !configAvailable);
             if (ImGui::Button("Run K-Means##KMeans"))
             {
@@ -932,8 +936,8 @@ namespace Extrinsic::Sandbox::Editor
                 const Runtime::KMeansPropertyRefs properties =
                     Runtime::MakeKMeansPropertyRefs(domain);
                 KMeans.LastConfigApply =
-                    Runtime::ApplySandboxEditorClusteringConfig(
-                        context,
+                    Runtime::ApplyEditorClusteringConfig(
+                        context.GeometryCommands,
                         clusteringConfig,
                         "sandbox.clustering.panel.run");
                 if (KMeans.LastConfigApply->Succeeded())
@@ -944,19 +948,9 @@ namespace Extrinsic::Sandbox::Editor
                             model.SelectedStableId,
                             properties,
                             clusteringConfig);
-                    const auto correlation =
-                        context.Clustering->RunKMeans(request);
-                    KMeans.LastResult = Runtime::KMeansRunCompleted{
-                        .Correlation = correlation,
-                        .World = context.World,
-                        .Status = Runtime::KMeansRunStatus::Queued,
-                        .StableEntityId = model.SelectedStableId,
-                        .Properties = request.Properties,
-                        .Parameters = request.Parameters,
-                        .RequestedBackend = request.Backend,
-                        .ActualBackend = Runtime::ClusteringBackend::None,
-                        .Message = "K-Means runtime job queued.",
-                    };
+                    KMeans.LastResult = Runtime::SubmitKMeansRun(
+                        context.GeometryCommands,
+                        request);
                 }
             }
             ImGui::EndDisabled();
@@ -1024,8 +1018,8 @@ namespace Extrinsic::Sandbox::Editor
 
         void DrawProgressivePoissonWindow(
             bool& open,
-            const Runtime::SandboxEditorContext& context,
-            const Runtime::SandboxEditorDomainWindowKind kind,
+            const SandboxEditorContext& context,
+            const Runtime::EditorDomainWindowKind kind,
             const std::string& windowTitle)
         {
             ImGui::SetNextWindowSize(
@@ -1033,7 +1027,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGuiCond_FirstUseEver);
             if (ImGui::Begin(windowTitle.c_str(), &open))
             {
-                const Runtime::SandboxEditorDomainWindowModel& model =
+                const Runtime::EditorDomainWindowModel& model =
                     GetDomainWindowModel(context, kind);
                 DrawDomainWindowHeader(model);
                 DrawDiagnostics(model.Processing.Diagnostics);
@@ -1053,7 +1047,7 @@ namespace Extrinsic::Sandbox::Editor
 
         static void SyncProgressivePoissonState(
             ProgressivePoissonState& state,
-            const Runtime::SandboxEditorProgressivePoissonConfig& config)
+            const Runtime::EditorProgressivePoissonConfig& config)
         {
             state.Dimension = static_cast<std::int32_t>(config.Dimension);
             state.GridWidth = static_cast<std::int32_t>(config.GridWidth);
@@ -1081,10 +1075,10 @@ namespace Extrinsic::Sandbox::Editor
                 static_cast<float>(config.DebounceSeconds);
         }
 
-        [[nodiscard]] Runtime::SandboxEditorProgressivePoissonConfig
+        [[nodiscard]] Runtime::EditorProgressivePoissonConfig
         BuildProgressivePoissonConfig() const
         {
-            return Runtime::SandboxEditorProgressivePoissonConfig{
+            return Runtime::EditorProgressivePoissonConfig{
                 .Dimension = static_cast<std::uint32_t>(
                     ProgressivePoisson.Dimension),
                 .GridWidth = static_cast<std::uint32_t>(
@@ -1122,14 +1116,14 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawProgressivePoissonControls(
-            const Runtime::SandboxEditorDomainWindowModel& model,
-            const Runtime::SandboxEditorContext& context)
+            const Runtime::EditorDomainWindowModel& model,
+            const SandboxEditorContext& context)
         {
-            const Runtime::SandboxEditorGeometryProcessingModel& processing =
+            const Runtime::EditorGeometryProcessingModel& processing =
                 model.Processing;
             ImGui::SeparatorText("Progressive Poisson");
             const bool meshInput =
-                model.Kind == Runtime::SandboxEditorDomainWindowKind::Mesh;
+                model.Kind == Runtime::EditorDomainWindowKind::Mesh;
             const bool available = meshInput
                 ? processing.MeshProgressivePoissonAvailable
                 : processing.PointCloudProgressivePoissonAvailable;
@@ -1140,25 +1134,23 @@ namespace Extrinsic::Sandbox::Editor
                 return;
             }
 
-            const std::optional<Runtime::SandboxEditorProgressivePoissonConfig>
+            const std::optional<Runtime::EditorProgressivePoissonConfig>
                 activeConfig =
-                    Runtime::GetSandboxEditorProgressivePoissonConfig(context);
-            const bool configFacadeAvailable =
+                    Runtime::GetEditorProgressivePoissonConfig(context.GeometryCommands);
+            const bool configControlAvailable =
                 activeConfig.has_value() &&
-                context.PreviewEngineConfigDocument &&
-                context.ApplyEngineConfigHotSubset &&
-                context.EngineConfigCommandsAvailable;
-            if (!configFacadeAvailable)
+                context.GeometryConfigCommandsAvailable;
+            if (!configControlAvailable)
             {
                 ImGui::TextDisabled(
                     "Progressive Poisson requires engine config-control.");
                 return;
             }
 
-            if (context.LastProgressivePoissonResult != nullptr)
+            if (context.GeometryResults.LastProgressivePoissonResult.has_value())
             {
                 ProgressivePoisson.LastResult =
-                    *context.LastProgressivePoissonResult;
+                    *context.GeometryResults.LastProgressivePoissonResult;
             }
             SyncProgressivePoissonState(ProgressivePoisson, *activeConfig);
 
@@ -1366,12 +1358,12 @@ namespace Extrinsic::Sandbox::Editor
                     "Interpolate vertex normals onto sampled surface points.");
             }
 
-            const Runtime::SandboxEditorProgressivePoissonChannel channel =
+            const Runtime::EditorProgressivePoissonChannel channel =
                 ProgressivePoissonChannelFromIndex(
                     ProgressivePoisson.Channel);
             if (ImGui::BeginCombo(
                     "Color channel##ProgressivePoisson",
-                    Runtime::DebugNameForSandboxEditorProgressivePoissonChannel(
+                    Runtime::DebugNameForEditorProgressivePoissonChannel(
                         channel)))
             {
                 for (std::size_t index = 0u;
@@ -1381,7 +1373,7 @@ namespace Extrinsic::Sandbox::Editor
                     const bool selected = ProgressivePoisson.Channel ==
                                           static_cast<std::int32_t>(index);
                     if (ImGui::Selectable(
-                            Runtime::DebugNameForSandboxEditorProgressivePoissonChannel(
+                            Runtime::DebugNameForEditorProgressivePoissonChannel(
                                 kProgressivePoissonChannels[index]),
                             selected))
                     {
@@ -1397,12 +1389,12 @@ namespace Extrinsic::Sandbox::Editor
             DrawProgressivePoissonTooltip(
                 "Scalar property used for point color visualization.");
 
-            const Runtime::SandboxEditorProgressivePoissonBackend backend =
+            const Runtime::EditorProgressivePoissonBackend backend =
                 ProgressivePoissonBackendFromIndex(
                     ProgressivePoisson.Backend);
             if (ImGui::BeginCombo(
                     "Backend##ProgressivePoisson",
-                    Runtime::DebugNameForSandboxEditorProgressivePoissonBackend(
+                    Runtime::DebugNameForEditorProgressivePoissonBackend(
                         backend)))
             {
                 for (std::size_t index = 0u;
@@ -1412,7 +1404,7 @@ namespace Extrinsic::Sandbox::Editor
                     const bool selected = ProgressivePoisson.Backend ==
                                           static_cast<std::int32_t>(index);
                     if (ImGui::Selectable(
-                            Runtime::DebugNameForSandboxEditorProgressivePoissonBackend(
+                            Runtime::DebugNameForEditorProgressivePoissonBackend(
                                 kProgressivePoissonBackends[index]),
                             selected))
                     {
@@ -1430,19 +1422,19 @@ namespace Extrinsic::Sandbox::Editor
 
             const auto applyConfig = [&]()
             {
-                return Runtime::ApplySandboxEditorProgressivePoissonConfigCommand(
-                    context,
-                    Runtime::SandboxEditorProgressivePoissonConfigCommand{
+                return Runtime::ApplyEditorProgressivePoissonConfigCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorProgressivePoissonConfigCommand{
                         .Config = BuildProgressivePoissonConfig(),
                         .SourceId = "sandbox.progressive_poisson",
                     });
             };
             const auto runSampler = [&]()
             {
-                Runtime::SandboxEditorProgressivePoissonResult result =
-                    Runtime::ApplySandboxEditorProgressivePoissonCommand(
-                        context,
-                        Runtime::SandboxEditorProgressivePoissonCommand{
+                Runtime::EditorProgressivePoissonResult result =
+                    Runtime::ApplyEditorProgressivePoissonCommand(
+                        context.GeometryCommands,
+                        Runtime::EditorProgressivePoissonCommand{
                             .StableEntityId = model.SelectedStableId,
                             .Config = BuildProgressivePoissonConfig(),
                         });
@@ -1510,7 +1502,7 @@ namespace Extrinsic::Sandbox::Editor
             }
 
             const std::optional<
-                Runtime::SandboxEditorProgressivePoissonResult>& result =
+                Runtime::EditorProgressivePoissonResult>& result =
                 ProgressivePoisson.LastResult.has_value()
                     ? ProgressivePoisson.LastResult
                     : processing.LastProgressivePoissonResult;
@@ -1904,7 +1896,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::SeparatorText("Parameterization method");
             changed |= DrawParameterizationStrategy(config);
             ImGui::SeparatorText("Strategy parameters");
-            using Strategy = Runtime::SandboxEditorParameterizationStrategy;
+            using Strategy = Runtime::EditorParameterizationStrategy;
             switch (config.Strategy)
             {
             case Strategy::Lscm:
@@ -1923,7 +1915,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         static void DrawParameterizationResult(
-            const std::optional<Runtime::SandboxEditorParameterizationResult>&
+            const std::optional<Runtime::EditorParameterizationResult>&
                 result)
         {
             ImGui::SeparatorText("Last run diagnostics");
@@ -1960,13 +1952,13 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawParameterizationControlPane(
-            const Runtime::SandboxEditorContext& context,
-            const Runtime::SandboxEditorParameterizationViewModel& model)
+            const SandboxEditorContext& context,
+            const Runtime::EditorParameterizationViewModel& model)
         {
             if (!Parameterization.Initialized || !Parameterization.Dirty)
             {
                 const auto active =
-                    Runtime::GetSandboxEditorParameterizationConfig(context);
+                    Runtime::GetEditorParameterizationConfig(context.GeometryCommands);
                 if (active.has_value())
                 {
                     Parameterization.Draft = *active;
@@ -1974,8 +1966,8 @@ namespace Extrinsic::Sandbox::Editor
                 }
             }
 
-            if (context.LastParameterizationResult != nullptr)
-                Parameterization.LastResult = *context.LastParameterizationResult;
+            if (context.GeometryResults.LastParameterizationResult.has_value())
+                Parameterization.LastResult = *context.GeometryResults.LastParameterizationResult;
 
             Parameterization.Dirty |=
                 DrawParameterizationConfigControls(Parameterization.Draft);
@@ -1983,16 +1975,15 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TextDisabled("Draft has unapplied changes.");
 
             const bool configAvailable =
-                context.EngineConfigControlState != nullptr &&
-                context.EngineConfigCommandsAvailable;
+                context.GeometryConfigCommandsAvailable;
             if (!configAvailable)
                 ImGui::BeginDisabled();
             if (ImGui::Button("Apply configuration##Parameterization"))
             {
                 Parameterization.LastConfigResult =
-                    Runtime::ApplySandboxEditorParameterizationConfigCommand(
-                        context,
-                        Runtime::SandboxEditorParameterizationConfigCommand{
+                    Runtime::ApplyEditorParameterizationConfigCommand(
+                        context.GeometryCommands,
+                        Runtime::EditorParameterizationConfigCommand{
                             .Config = Parameterization.Draft,
                             .SourceId = "sandbox.parameterization.panel",
                         });
@@ -2005,7 +1996,7 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::Button("Reload active##Parameterization"))
             {
                 const auto active =
-                    Runtime::GetSandboxEditorParameterizationConfig(context);
+                    Runtime::GetEditorParameterizationConfig(context.GeometryCommands);
                 if (active.has_value())
                 {
                     Parameterization.Draft = *active;
@@ -2034,11 +2025,13 @@ namespace Extrinsic::Sandbox::Editor
             if (!canRun)
                 ImGui::EndDisabled();
 
-            const bool historyAvailable = context.CommandHistory != nullptr;
-            const Runtime::EditorCommandHistorySnapshot history =
-                historyAvailable
-                    ? context.CommandHistory->Snapshot()
-                    : Runtime::EditorCommandHistorySnapshot{};
+            const bool historyAvailable =
+                context.Document != nullptr &&
+                context.DocumentCommands.Available();
+            const Runtime::EditorDocumentModel history =
+                context.Document != nullptr
+                    ? *context.Document
+                    : Runtime::EditorDocumentModel{};
             const bool canUndoUv =
                 history.CanUndo && history.UndoLabel == "Parameterize mesh UVs";
             const bool canRedoUv =
@@ -2048,7 +2041,7 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::Button("Undo UV writeback##Parameterization") &&
                 historyAvailable)
             {
-                (void)context.CommandHistory->Undo();
+                (void)context.DocumentCommands.Undo();
             }
             if (!canUndoUv)
                 ImGui::EndDisabled();
@@ -2058,7 +2051,7 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::Button("Redo UV writeback##Parameterization") &&
                 historyAvailable)
             {
-                (void)context.CommandHistory->Redo();
+                (void)context.DocumentCommands.Redo();
             }
             if (!canRedoUv)
                 ImGui::EndDisabled();
@@ -2085,8 +2078,8 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         void DrawParameterizationUvPane(
-            const Runtime::SandboxEditorContext& context,
-            const Runtime::SandboxEditorParameterizationViewModel& model)
+            const SandboxEditorContext& context,
+            const Runtime::EditorParameterizationViewModel& model)
         {
             ImGui::TextUnformatted("UV layout");
             ImGui::SameLine();
@@ -2102,7 +2095,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::SameLine();
                 ImGui::TextDisabled(
                     "%s / %s%s",
-                    Runtime::DebugNameForSandboxEditorParameterizationUvViewStatus(
+                    Runtime::DebugNameForEditorParameterizationUvViewStatus(
                         Parameterization.LastUvViewState->Status),
                     ParameterizationUvBackgroundModeLabel(
                         Parameterization.LastUvViewState->ActiveBackground),
@@ -2122,9 +2115,9 @@ namespace Extrinsic::Sandbox::Editor
             ImVec2 canvasSize = ImGui::GetContentRegionAvail();
             canvasSize.x = std::max(canvasSize.x, 80.0f);
             canvasSize.y = std::max(canvasSize.y, 80.0f);
-            Runtime::SandboxEditorParameterizationUvViewState uvView =
-                Runtime::SubmitSandboxEditorParameterizationUvView(
-                    context,
+            Runtime::EditorParameterizationUvViewState uvView =
+                Runtime::SubmitEditorParameterizationUvView(
+                    context.GeometryCommands,
                     model,
                     static_cast<std::uint32_t>(canvasSize.x),
                     static_cast<std::uint32_t>(canvasSize.y));
@@ -2332,7 +2325,7 @@ namespace Extrinsic::Sandbox::Editor
 
         void DrawParameterizationWindow(
             bool& open,
-            const Runtime::SandboxEditorContext& context)
+            const SandboxEditorContext& context)
         {
             ImGui::SetNextWindowSize(
                 ImVec2(920.0f, 600.0f),
@@ -2342,8 +2335,8 @@ namespace Extrinsic::Sandbox::Editor
                     &open);
             if (contentsVisible)
             {
-                Runtime::SandboxEditorParameterizationViewModel model =
-                    Runtime::BuildSandboxEditorParameterizationViewModel(context);
+                Runtime::EditorParameterizationViewModel model =
+                    Runtime::BuildEditorParameterizationViewModel(context.GeometryCommands);
                 if (model.HasSelectedEntity)
                 {
                     ImGui::Text(
@@ -2376,7 +2369,7 @@ namespace Extrinsic::Sandbox::Editor
                 DrawParameterizationControlPane(context, model);
                 ImGui::EndChild();
                 if (const auto active =
-                        Runtime::GetSandboxEditorParameterizationConfig(context);
+                        Runtime::GetEditorParameterizationConfig(context.GeometryCommands);
                     active.has_value())
                 {
                     model.View = active->View;
@@ -2414,14 +2407,14 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::End();
             if (!open || !contentsVisible)
             {
-                Runtime::DisableSandboxEditorParameterizationUvView(context);
+                Runtime::DisableEditorParameterizationUvView(context.GeometryCommands);
                 Parameterization.LastUvViewState.reset();
             }
         }
 
         static void DrawProgressivePoissonResultStatus(
             const std::optional<
-                Runtime::SandboxEditorProgressivePoissonResult>& lastResult)
+                Runtime::EditorProgressivePoissonResult>& lastResult)
         {
             if (!lastResult.has_value())
             {
@@ -2429,14 +2422,14 @@ namespace Extrinsic::Sandbox::Editor
                 return;
             }
 
-            const Runtime::SandboxEditorProgressivePoissonResult& result =
+            const Runtime::EditorProgressivePoissonResult& result =
                 *lastResult;
             ImGui::Text(
                 "Last progressive Poisson run: %s",
-                Runtime::DebugNameForSandboxEditorCommandStatus(result.Status));
+                Runtime::DebugNameForEditorCommandStatus(result.Status));
             ImGui::Text(
                 "Channel: %s",
-                Runtime::DebugNameForSandboxEditorProgressivePoissonChannel(
+                Runtime::DebugNameForEditorProgressivePoissonChannel(
                     result.Channel));
             if (!result.BackendId.empty())
             {

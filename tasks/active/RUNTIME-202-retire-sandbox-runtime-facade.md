@@ -2,6 +2,7 @@
 id: RUNTIME-202
 theme: F
 depends_on:
+  - BUG-125
   - RUNTIME-191
   - RUNTIME-193
   - RUNTIME-196
@@ -22,10 +23,15 @@ maturity_target: Retired
 
 ## Status
 
-- In progress on 2026-07-31. The task is claimed on
-  `codex/runtime-202-retire-sandbox-facade`; next verification is the focused
-  Sandbox/runtime contract build after the export-to-owner inventory and app
-  context boundary land.
+- Implementation complete on 2026-08-01. The task remains claimed on
+  `codex/runtime-202-retire-sandbox-facade`. The aggregate `IntrinsicTests`
+  build, 194/194 focused Sandbox/runtime/config tests, and one 4010/4010
+  default CPU sweep pass. A later hash-bound sweep and combined repetition
+  reproduced two pre-existing queued-import test races now tracked by
+  `BUG-125`; fixed-surface review waits for that dependency to restore a
+  deterministic canonical gate. Strict layering/task/ARA/test-layout/root-
+  hygiene checks pass, and the policy-defined GLFW/LSan process test is skipped
+  by the CPU selector.
 - Re-gated on 2026-07-30: `RUNTIME-138` is no longer a prerequisite. Facade
   retirement must preserve the current selected-model cache and diagnostic
   behavior, migrate existing selection/property behavior to its feature
@@ -83,27 +89,27 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Inventory every exported Sandbox facade/config type and map it to:
+- [x] Inventory every exported Sandbox facade/config type and map it to:
       feature-owned runtime contract, app-owned view/config record, or
       deletion; record no unowned compatibility bucket.
-- [ ] Make `src/app/Sandbox` compose panel models from copied narrow service
+- [x] Make `src/app/Sandbox` compose panel models from copied narrow service
       snapshots and submit the corresponding typed feature operation.
-- [ ] Move feature config schemas/codecs beside their runtime feature owner;
+- [x] Move feature config schemas/codecs beside their runtime feature owner;
       keep app-owned registration/default aggregation and one generic config
       preview/validate/apply lane.
-- [ ] Move Sandbox default-policy descriptor aggregation/installation into
+- [x] Move Sandbox default-policy descriptor aggregation/installation into
       `src/app/Sandbox`; keep only reusable typed policy records/operations
       with their runtime feature owner.
-- [ ] Migrate existing selection/property analysis, texture baking,
+- [x] Migrate existing selection/property analysis, texture baking,
       clustering, progressive Poisson, registration, parameterization, asset
       import, visualization/spatial debug, presentation/material edits, and
       scene commands without app-to-lower-layer imports or a replacement
       selected-analysis service.
-- [ ] Remove Sandbox-specific backend/domain/value/result duplicates in favor
+- [x] Remove Sandbox-specific backend/domain/value/result duplicates in favor
       of each feature's typed request/result and the canonical property record.
-- [ ] Inline or privatize thin `RegistrationAlignment` pass-through logic in
+- [x] Inline or privatize thin `RegistrationAlignment` pass-through logic in
       the typed registration operation; geometry remains the algorithm owner.
-- [ ] Delete `Runtime.SandboxEditorFacades`,
+- [x] Delete `Runtime.SandboxEditorFacades`,
       `Runtime.SandboxConfigSections`,
       `Runtime.SandboxDefaultPolicies`,
       `Runtime.SandboxMethodFacade`,
@@ -113,30 +119,31 @@ maturity_target: Retired
 
 ## Tests
 
-- [ ] A workflow matrix covers every existing Sandbox action through the
+- [x] A workflow matrix covers every existing Sandbox action through the
       app-owned context and narrow runtime operation, including validation,
       pending/ready/failure, mutation, undo, and stale completion.
-- [ ] Config-file, UI, and agent/CLI requests remain co-equal for every
+- [x] Config-file, UI, and agent/CLI requests remain co-equal for every
       config-backed feature.
-- [ ] App layering tests prove panels import runtime only and runtime modules
+- [x] App layering tests prove panels import runtime only and runtime modules
       contain no ImGui/panel models.
-- [ ] Compile/source ratchets prove the deleted facade/config symbols and
+- [x] Compile/source ratchets prove the deleted facade/config symbols and
       compatibility aliases are absent from all production targets.
 
 ## Docs
 
-- [ ] Update runtime and Sandbox architecture docs with the app aggregation /
+- [x] Update runtime and Sandbox architecture docs with the app aggregation /
       feature-owner split and a mapping from every removed facade area.
-- [ ] Regenerate module inventory and remove all old facade/config examples.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Regenerate module inventory and remove all old facade/config examples.
+- [ ] Refresh task indexes, session brief, and retirement records after the
+      independent review accepts the frozen implementation surface.
 
 ## Acceptance criteria
 
-- [ ] No production panel, agent command, config application, or runtime test
+- [x] No production panel, agent command, config application, or runtime test
       uses the Sandbox facade family.
-- [ ] Runtime exposes only feature-owned operations/services/snapshots; app
+- [x] Runtime exposes only feature-owned operations/services/snapshots; app
       owns view composition without live lower-layer state.
-- [ ] The facade/config modules and all compatibility routes are deleted after
+- [x] The facade/config modules and all compatibility routes are deleted after
       the workflow/config/layering matrix passes.
 
 ## Verification

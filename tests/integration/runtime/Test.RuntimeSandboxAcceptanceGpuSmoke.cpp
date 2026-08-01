@@ -47,6 +47,8 @@
 
 #include "RuntimeTestModule.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
@@ -102,8 +104,13 @@ import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxConfigSections;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
@@ -3466,16 +3473,16 @@ public:
                 FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
             if (triangle != Extrinsic::ECS::InvalidEntityHandle)
             {
-                const Extrinsic::Runtime::SandboxEditorContext context{
+                const Intrinsic::Tests::EditorFeatureTestContext context{
                     .Scene = &*engine.Worlds().Get(engine.ActiveWorld()),
                     .Selection = &Selection(engine),
                     .CommandHistory =
                         &*engine.Services()
                               .Find<RT::EditorCommandHistory>(),
                 };
-                EditStatus = Extrinsic::Runtime::ApplySandboxEditorTransformEdit(
+                EditStatus = Extrinsic::Runtime::ApplyEditorTransformEdit(
                     context,
-                    Extrinsic::Runtime::SandboxEditorTransformEditCommand{
+                    Extrinsic::Runtime::EditorTransformEditCommand{
                         .StableEntityId =
                             Extrinsic::Runtime::SelectionController::ToStableEntityId(triangle),
                         .SetPosition = true,
@@ -3491,8 +3498,8 @@ public:
 
     void Shutdown() override {}
 
-    Extrinsic::Runtime::SandboxEditorCommandStatus EditStatus{
-        Extrinsic::Runtime::SandboxEditorCommandStatus::NoChange};
+    Extrinsic::Runtime::EditorCommandStatus EditStatus{
+        Extrinsic::Runtime::EditorCommandStatus::NoChange};
 
 private:
     std::uint32_t m_Frames{0u};
@@ -3563,7 +3570,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, InspectorTransformEditShiftsReferenceTria
         return;
     }
 
-    ASSERT_EQ(appPtr->EditStatus, Extrinsic::Runtime::SandboxEditorCommandStatus::Applied)
+    ASSERT_EQ(appPtr->EditStatus, Extrinsic::Runtime::EditorCommandStatus::Applied)
         << "Inspector transform-edit command did not apply during the bounded "
            "run.";
 
@@ -6084,9 +6091,9 @@ private:
             FailureReason = std::move(reason);
     }
 
-    [[nodiscard]] RT::SandboxEditorContext CommandContext() const
+    [[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext CommandContext() const
     {
-        return RT::SandboxEditorContext{
+        return Intrinsic::Tests::EditorFeatureTestContext{
             .Scene = m_Scene,
             .World = m_World,
             .CommandHistory = m_History,
@@ -6096,17 +6103,17 @@ private:
         };
     }
 
-    [[nodiscard]] std::vector<RT::SandboxEditorTextureBakeTarget> Targets(
+    [[nodiscard]] std::vector<RT::EditorTextureBakeTarget> Targets(
         const Extrinsic::Graphics::Colormap::Type colormap) const
     {
         return {
-            RT::SandboxEditorTextureBakeTarget{
+            RT::EditorTextureBakeTarget{
                 .PresentationKey =
                     std::string{kRuntime190Presentation},
                 .Semantic = RT::GeometryPresentationSlotSemantic::Albedo,
                 .Colormap = colormap,
             },
-            RT::SandboxEditorTextureBakeTarget{
+            RT::EditorTextureBakeTarget{
                 .PresentationKey =
                     std::string{kRuntime190Presentation},
                 .Semantic =
@@ -6116,10 +6123,10 @@ private:
         };
     }
 
-    [[nodiscard]] RT::SandboxEditorTextureBakeCommand
+    [[nodiscard]] RT::EditorTextureBakeCommand
     VertexCommand(const Extrinsic::Graphics::Colormap::Type colormap) const
     {
-        RT::SandboxEditorTextureBakeCommand command{};
+        RT::EditorTextureBakeCommand command{};
         command.StableEntityId = m_StableEntityId;
         command.PresentationKey =
             std::string{kRuntime190Presentation};
@@ -6144,13 +6151,13 @@ private:
         return command;
     }
 
-    [[nodiscard]] RT::SandboxEditorTextureBakeCommand
+    [[nodiscard]] RT::EditorTextureBakeCommand
     EncodedCommand(
         const RT::GeometryElementDomain domain,
         std::string property,
         std::string output) const
     {
-        RT::SandboxEditorTextureBakeCommand command{};
+        RT::EditorTextureBakeCommand command{};
         command.StableEntityId = m_StableEntityId;
         command.SourceDomain = domain;
         command.ExpectedValueKind =
@@ -6171,26 +6178,26 @@ private:
 
     [[nodiscard]] bool ScheduleInitialBakes()
     {
-        const RT::SandboxEditorContext context = CommandContext();
+        const Intrinsic::Tests::EditorFeatureTestContext context = CommandContext();
         m_VertexCommand = VertexCommand(
             Extrinsic::Graphics::Colormap::Type::Viridis);
-        const RT::SandboxEditorTextureBakeCommand face = EncodedCommand(
+        const RT::EditorTextureBakeCommand face = EncodedCommand(
             RT::GeometryElementDomain::MeshFace,
             "f:runtime190_color",
             std::string{kRuntime190FaceOutput});
-        const RT::SandboxEditorTextureBakeCommand edge = EncodedCommand(
+        const RT::EditorTextureBakeCommand edge = EncodedCommand(
             RT::GeometryElementDomain::MeshEdge,
             "e:runtime190_color",
             std::string{kRuntime190EdgeOutput});
 
-        const RT::SandboxEditorTextureBakeCommandResult vertexResult =
-            RT::ApplySandboxEditorTextureBakeCommand(
+        const RT::EditorTextureBakeCommandResult vertexResult =
+            RT::ApplyEditorTextureBakeCommand(
                 context,
                 m_VertexCommand);
-        const RT::SandboxEditorTextureBakeCommandResult faceResult =
-            RT::ApplySandboxEditorTextureBakeCommand(context, face);
-        const RT::SandboxEditorTextureBakeCommandResult edgeResult =
-            RT::ApplySandboxEditorTextureBakeCommand(context, edge);
+        const RT::EditorTextureBakeCommandResult faceResult =
+            RT::ApplyEditorTextureBakeCommand(context, face);
+        const RT::EditorTextureBakeCommandResult edgeResult =
+            RT::ApplyEditorTextureBakeCommand(context, edge);
         if (!vertexResult.Succeeded() || !vertexResult.Scheduled ||
             !faceResult.Succeeded() || !faceResult.Scheduled ||
             !edgeResult.Succeeded() || !edgeResult.Scheduled)
@@ -6233,7 +6240,7 @@ private:
     [[nodiscard]] bool RenameEdgeAndSelectInferno()
     {
         const RT::TextureBakeMutationResult renamed =
-            RT::RenameSandboxEditorBakedTexture(
+            RT::RenameEditorBakedTexture(
                 CommandContext(),
                 m_StableEntityId,
                 kRuntime190EdgeOutput,
@@ -6245,12 +6252,12 @@ private:
             return false;
         }
 
-        const RT::SandboxEditorTextureBakeCommand edge = EncodedCommand(
+        const RT::EditorTextureBakeCommand edge = EncodedCommand(
             RT::GeometryElementDomain::MeshEdge,
             "e:runtime190_color",
             std::string{kRuntime190EdgeOutput});
-        const RT::SandboxEditorTextureBakeCommandResult edgeResult =
-            RT::ApplySandboxEditorTextureBakeCommand(
+        const RT::EditorTextureBakeCommandResult edgeResult =
+            RT::ApplyEditorTextureBakeCommand(
                 CommandContext(),
                 edge);
         if (!edgeResult.Succeeded() || !edgeResult.Scheduled ||
@@ -6270,12 +6277,12 @@ private:
             return false;
         }
 
-        const std::vector<RT::SandboxEditorTextureBakeTarget> inferno =
+        const std::vector<RT::EditorTextureBakeTarget> inferno =
             Targets(Extrinsic::Graphics::Colormap::Type::Inferno);
         const RT::TextureBakeMutationResult changed =
-            RT::SetSandboxEditorBakedTextureTargets(
+            RT::SetEditorBakedTextureTargets(
                 CommandContext(),
-                RT::SandboxEditorTextureBakeTargetUpdateRequest{
+                RT::EditorTextureBakeTargetUpdateRequest{
                     .StableEntityId = m_StableEntityId,
                     .OutputName = std::string{kRuntime190VertexOutput},
                     .Targets = inferno,
@@ -6333,8 +6340,8 @@ private:
             .Properties.Get<float>("v:runtime190_scalar")
             .Vector();
         values = {0.75f, 0.75f, 0.75f};
-        const RT::SandboxEditorTextureBakeCommandResult rebake =
-            RT::ApplySandboxEditorTextureBakeCommand(
+        const RT::EditorTextureBakeCommandResult rebake =
+            RT::ApplyEditorTextureBakeCommand(
                 CommandContext(),
                 m_VertexCommand);
         if (!rebake.Succeeded() || !rebake.Scheduled)
@@ -6369,7 +6376,7 @@ private:
         for (const std::string_view name : names)
         {
             const RT::TextureBakeMutationResult removed =
-                RT::RemoveSandboxEditorBakedTexture(
+                RT::RemoveEditorBakedTexture(
                     CommandContext(),
                     m_StableEntityId,
                     name);
@@ -6586,7 +6593,7 @@ private:
     Extrinsic::RHI::BufferHandle m_FaceReadback{};
     Extrinsic::RHI::BufferHandle m_EdgeReadback{};
     Extrinsic::RHI::BufferHandle m_InfernoBackbuffer{};
-    RT::SandboxEditorTextureBakeCommand m_VertexCommand{};
+    RT::EditorTextureBakeCommand m_VertexCommand{};
     Stage m_Stage{Stage::WaitingToSchedule};
     std::uint32_t m_SettleFrames{0u};
 };

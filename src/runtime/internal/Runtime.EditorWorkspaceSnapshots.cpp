@@ -25,7 +25,7 @@ module;
 
 #include "ProgressivePoissonReference.hpp"
 
-module Extrinsic.Runtime.SandboxEditorFacades;
+module Extrinsic.Runtime.Private.EditorFeatures;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.GeometryPayload;
@@ -78,10 +78,10 @@ import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
-import Extrinsic.Runtime.SandboxConfigSections;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
@@ -115,39 +115,10 @@ import Geometry.Subdivision;
 import Geometry.UvAtlas;
 
 #include "Runtime.EditorMutation.Internal.hpp"
-#include "Runtime.SandboxEditorFacades.Internal.hpp"
+#include "internal/Runtime.EditorFeatures.Detail.hpp"
 
-namespace Extrinsic::Runtime
-{
-    void SandboxEditorSelectedModelCache::Clear() noexcept
-    {
-        for (SandboxEditorSelectedAnalysisCacheEntry& entry : SelectedAnalysis)
-            entry.Valid = false;
-        for (SandboxEditorVisualizationModelCacheEntry& entry : Visualization)
-            entry.Valid = false;
-        ++Counters.Invalidations;
-    }
-
-    SandboxEditorSelectedModelCacheStats SandboxEditorSelectedModelCache::Stats()
-        const noexcept
-    {
-        SandboxEditorSelectedModelCacheStats stats = Counters;
-        for (const SandboxEditorSelectedAnalysisCacheEntry& entry :
-             SelectedAnalysis)
-        {
-            if (entry.Valid)
-                ++stats.Entries;
-        }
-        for (const SandboxEditorVisualizationModelCacheEntry& entry :
-             Visualization)
-        {
-            if (entry.Valid)
-                ++stats.Entries;
-        }
-        return stats;
-    }
-
-    namespace
+namespace Extrinsic::Runtime::EditorFeatureDetail {
+namespace
     {
         namespace ECSC = Extrinsic::ECS::Components;
         namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
@@ -157,7 +128,47 @@ namespace Extrinsic::Runtime
         namespace A = Extrinsic::Assets;
         namespace GN = Geometry::HalfedgeMesh::VertexNormals;
         namespace GraphNormals = Geometry::Graph::VertexNormals;
-        namespace PointNormals = Geometry::PointCloud::Normals;
+namespace Reg = Geometry::Registration;
+
+struct RegistrationAlignmentOutcome {
+  bool HasResult{false};
+  Reg::RegistrationResult Result{};
+  std::vector<Reg::IterationTrace> Traces{};
+
+  [[nodiscard]] std::size_t IterationCount() const noexcept {
+    return Traces.size();
+  }
+};
+
+[[nodiscard]] RegistrationAlignmentOutcome
+AlignPointClouds(const std::span<const glm::vec3> sourcePoints,
+                 const std::span<const glm::vec3> targetPoints,
+                 const std::span<const glm::vec3> targetNormals,
+                 const Reg::RegistrationParams &params) {
+  RegistrationAlignmentOutcome outcome;
+  outcome.Traces.reserve(params.MaxIterations);
+  const auto result =
+      Reg::AlignICP(sourcePoints, targetPoints, targetNormals, params,
+                    [&outcome](const Reg::IterationTrace &trace) {
+                      outcome.Traces.push_back(trace);
+                    });
+  if (result) {
+    outcome.HasResult = true;
+    outcome.Result = *result;
+  }
+  return outcome;
+}
+
+[[nodiscard]] glm::mat4
+TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
+               const std::size_t index) {
+  if (index == 0u || outcome.Traces.empty())
+    return glm::mat4(1.0f);
+
+  const std::size_t clamped = std::min(index, outcome.Traces.size());
+  return glm::mat4(outcome.Traces[clamped - 1u].Transform);
+}
+namespace PointNormals = Geometry::PointCloud::Normals;
         namespace SurfaceSampling = Geometry::PointCloud::SurfaceSampling;
         namespace Smooth = Geometry::Smoothing;
         namespace Curv = Geometry::Curvature;
@@ -170,49 +181,49 @@ namespace Extrinsic::Runtime
         namespace Reg = Geometry::Registration;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
-        using SandboxEditorModelBuildClock = std::chrono::steady_clock;
+        using EditorModelBuildClock = std::chrono::steady_clock;
 
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
             const entt::registry& raw,
             std::uint32_t stableId);
 
-        [[nodiscard]] std::uint64_t SandboxEditorElapsedNs(
-            const SandboxEditorModelBuildClock::time_point start) noexcept
+        [[nodiscard]] std::uint64_t EditorElapsedNs(
+            const EditorModelBuildClock::time_point start) noexcept
         {
             const auto elapsed =
                 std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    SandboxEditorModelBuildClock::now() - start)
+                    EditorModelBuildClock::now() - start)
                     .count();
             return elapsed > 0
                 ? static_cast<std::uint64_t>(elapsed)
                 : 1u;
         }
 
-        class ScopedSandboxEditorStatTimer final
+        class ScopedEditorStatTimer final
         {
         public:
-            explicit ScopedSandboxEditorStatTimer(
+            explicit ScopedEditorStatTimer(
                 std::uint64_t* target) noexcept
                 : m_Target(target)
             {
                 if (m_Target != nullptr)
-                    m_Start = SandboxEditorModelBuildClock::now();
+                    m_Start = EditorModelBuildClock::now();
             }
 
-            ScopedSandboxEditorStatTimer(
-                const ScopedSandboxEditorStatTimer&) = delete;
-            ScopedSandboxEditorStatTimer& operator=(
-                const ScopedSandboxEditorStatTimer&) = delete;
+            ScopedEditorStatTimer(
+                const ScopedEditorStatTimer&) = delete;
+            ScopedEditorStatTimer& operator=(
+                const ScopedEditorStatTimer&) = delete;
 
-            ~ScopedSandboxEditorStatTimer()
+            ~ScopedEditorStatTimer()
             {
                 if (m_Target != nullptr)
-                    *m_Target += SandboxEditorElapsedNs(m_Start);
+                    *m_Target += EditorElapsedNs(m_Start);
             }
 
         private:
             std::uint64_t* m_Target{nullptr};
-            SandboxEditorModelBuildClock::time_point m_Start{};
+            EditorModelBuildClock::time_point m_Start{};
         };
 
         [[nodiscard]] bool IsModelTextureImportPayload(
@@ -245,7 +256,7 @@ namespace Extrinsic::Runtime
             bool CanImport{false};
             A::AssetPayloadKind ResolvedPayloadKind{
                 A::AssetPayloadKind::Unknown};
-            std::array<SandboxEditorFileImportPayloadOption, 6> PayloadOptions{};
+            std::array<EditorFileImportPayloadOption, 6> PayloadOptions{};
             std::string PayloadHintDisabledReason{};
             std::string ImportDisabledReason{};
             Core::ErrorCode Error{Core::ErrorCode::Success};
@@ -349,7 +360,7 @@ namespace Extrinsic::Runtime
                 evaluation.PayloadHintDisabledReason = reason;
                 evaluation.ImportDisabledReason = reason;
                 evaluation.Error = error;
-                for (SandboxEditorFileImportPayloadOption& option :
+                for (EditorFileImportPayloadOption& option :
                      evaluation.PayloadOptions)
                 {
                     option.DisabledReason = reason;
@@ -433,7 +444,7 @@ namespace Extrinsic::Runtime
             }
 
             evaluation.CanChoosePayloadHint = true;
-            for (SandboxEditorFileImportPayloadOption& option :
+            for (EditorFileImportPayloadOption& option :
                  evaluation.PayloadOptions)
             {
                 const A::AssetRouteDiagnostic optionDiagnostic =
@@ -465,7 +476,7 @@ namespace Extrinsic::Runtime
             const auto selectedOption = std::ranges::find(
                 evaluation.PayloadOptions,
                 selectedPayloadKind,
-                &SandboxEditorFileImportPayloadOption::Kind);
+                &EditorFileImportPayloadOption::Kind);
             if (selectedOption == evaluation.PayloadOptions.end())
             {
                 evaluation.ImportDisabledReason =
@@ -487,77 +498,77 @@ namespace Extrinsic::Runtime
             return evaluation;
         }
 
-        // Validation tables belong to the non-ImGui command facade. App
-        // presentation consumes the exported option records instead of
+// Validation tables belong to the non-ImGui typed operations. App
+// presentation consumes the exported option records instead of
         // duplicating runtime-owned availability policy.
-        inline constexpr std::array<SandboxEditorMeshDenoiseStage, 1>
+        inline constexpr std::array<EditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
-                SandboxEditorMeshDenoiseStage::FullBilateral,
+                EditorMeshDenoiseStage::FullBilateral,
             }};
-        inline constexpr std::array<SandboxEditorMeshCurvatureOutput, 4>
+        inline constexpr std::array<EditorMeshCurvatureOutput, 4>
             kMeshCurvatureOutputs{{
-                SandboxEditorMeshCurvatureOutput::All,
-                SandboxEditorMeshCurvatureOutput::Mean,
-                SandboxEditorMeshCurvatureOutput::Gaussian,
-                SandboxEditorMeshCurvatureOutput::PrincipalDirections,
+                EditorMeshCurvatureOutput::All,
+                EditorMeshCurvatureOutput::Mean,
+                EditorMeshCurvatureOutput::Gaussian,
+                EditorMeshCurvatureOutput::PrincipalDirections,
             }};
-        inline constexpr std::array<SandboxEditorMeshRemeshMode, 2>
+        inline constexpr std::array<EditorMeshRemeshMode, 2>
             kMeshRemeshModes{{
-                SandboxEditorMeshRemeshMode::Uniform,
-                SandboxEditorMeshRemeshMode::Adaptive,
+                EditorMeshRemeshMode::Uniform,
+                EditorMeshRemeshMode::Adaptive,
             }};
-        inline constexpr std::array<SandboxEditorMeshRemeshSizingLaw, 2>
+        inline constexpr std::array<EditorMeshRemeshSizingLaw, 2>
             kMeshRemeshSizingLaws{{
-                SandboxEditorMeshRemeshSizingLaw::MeanCurvature,
-                SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
+                EditorMeshRemeshSizingLaw::MeanCurvature,
+                EditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
             }};
-        inline constexpr std::array<SandboxEditorMeshSimplifyMetric, 2>
+        inline constexpr std::array<EditorMeshSimplifyMetric, 2>
             kMeshSimplifyMetrics{{
-                SandboxEditorMeshSimplifyMetric::ClassicalQEM,
-                SandboxEditorMeshSimplifyMetric::FA_QEM,
+                EditorMeshSimplifyMetric::ClassicalQEM,
+                EditorMeshSimplifyMetric::FA_QEM,
             }};
-        inline constexpr std::array<SandboxEditorICPVariant, 2>
-            kSandboxEditorICPVariants{{
-                SandboxEditorICPVariant::PointToPoint,
-                SandboxEditorICPVariant::PointToPlane,
+        inline constexpr std::array<EditorICPVariant, 2>
+            kEditorICPVariants{{
+                EditorICPVariant::PointToPoint,
+                EditorICPVariant::PointToPlane,
             }};
-        inline constexpr std::array<SandboxEditorMeshSubdivideOperator, 3>
+        inline constexpr std::array<EditorMeshSubdivideOperator, 3>
             kMeshSubdivideOperators{{
-                SandboxEditorMeshSubdivideOperator::Loop,
-                SandboxEditorMeshSubdivideOperator::CatmullClark,
-                SandboxEditorMeshSubdivideOperator::Sqrt3,
+                EditorMeshSubdivideOperator::Loop,
+                EditorMeshSubdivideOperator::CatmullClark,
+                EditorMeshSubdivideOperator::Sqrt3,
             }};
 
         [[nodiscard]] GS::Domain ExpectedDomainForWindowKind(
-            const SandboxEditorDomainWindowKind kind) noexcept
+            const EditorDomainWindowKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorDomainWindowKind::Mesh:
+            case EditorDomainWindowKind::Mesh:
                 return GS::Domain::Mesh;
-            case SandboxEditorDomainWindowKind::Graph:
+            case EditorDomainWindowKind::Graph:
                 return GS::Domain::Graph;
-            case SandboxEditorDomainWindowKind::PointCloud:
+            case EditorDomainWindowKind::PointCloud:
                 return GS::Domain::PointCloud;
             }
             return GS::Domain::None;
         }
 
-        [[nodiscard]] SandboxEditorSelectedAnalysisCacheConsumer
+        [[nodiscard]] EditorSelectedAnalysisCacheConsumer
         SelectedAnalysisCacheConsumerForWindowKind(
-            const SandboxEditorDomainWindowKind kind) noexcept
+            const EditorDomainWindowKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorDomainWindowKind::Mesh:
-                return SandboxEditorSelectedAnalysisCacheConsumer::MeshDomainWindow;
-            case SandboxEditorDomainWindowKind::Graph:
-                return SandboxEditorSelectedAnalysisCacheConsumer::GraphDomainWindow;
-            case SandboxEditorDomainWindowKind::PointCloud:
-                return SandboxEditorSelectedAnalysisCacheConsumer::
+            case EditorDomainWindowKind::Mesh:
+                return EditorSelectedAnalysisCacheConsumer::MeshDomainWindow;
+            case EditorDomainWindowKind::Graph:
+                return EditorSelectedAnalysisCacheConsumer::GraphDomainWindow;
+            case EditorDomainWindowKind::PointCloud:
+                return EditorSelectedAnalysisCacheConsumer::
                     PointCloudDomainWindow;
             }
-            return SandboxEditorSelectedAnalysisCacheConsumer::Inspector;
+            return EditorSelectedAnalysisCacheConsumer::Inspector;
         }
 
         [[nodiscard]] std::string ErrorName(const Core::ErrorCode error)
@@ -566,8 +577,8 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildImportSuccessMessage(
-            const SandboxEditorFileImportCommand& command,
-            const SandboxEditorFileImportResult& result)
+            const EditorFileImportCommand& command,
+            const EditorFileImportResult& result)
         {
             std::string message = "Imported ";
             message += A::DebugNameForAssetPayloadKind(result.PayloadKind);
@@ -582,7 +593,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildImportPendingMessage(
-            const SandboxEditorFileImportCommand& command,
+            const EditorFileImportCommand& command,
             const A::AssetPayloadKind payloadKind)
         {
             std::string message = "Queued ";
@@ -606,13 +617,13 @@ namespace Extrinsic::Runtime
             return message;
         }
 
-        [[nodiscard]] SandboxEditorFileImportResult BuildFileImportResultFromRuntimeEvent(
+        [[nodiscard]] EditorFileImportResult BuildFileImportResultFromRuntimeEvent(
             const RuntimeAssetImportEvent& event)
         {
             if (!event.Result.has_value())
             {
-                return SandboxEditorFileImportResult{
-                    .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                return EditorFileImportResult{
+                    .Status = EditorCommandStatus::AssetImportFailed,
                     .PayloadKind = event.RequestedPayloadKind,
                     .Error = event.Error,
                     .Message = BuildImportFailureMessage(event.Error),
@@ -620,8 +631,8 @@ namespace Extrinsic::Runtime
             }
 
             const RuntimeAssetImportResult& imported = *event.Result;
-            SandboxEditorFileImportResult result{
-                .Status = SandboxEditorCommandStatus::Applied,
+            EditorFileImportResult result{
+                .Status = EditorCommandStatus::Applied,
                 .Asset = imported.Asset,
                 .PayloadKind = imported.PayloadKind,
                 .Error = Core::ErrorCode::Success,
@@ -632,7 +643,7 @@ namespace Extrinsic::Runtime
                 .RequestedTextureUpload = imported.RequestedTextureUpload,
             };
             result.Message = BuildImportSuccessMessage(
-                SandboxEditorFileImportCommand{
+                EditorFileImportCommand{
                     .Path = event.Path,
                     .PayloadKind = event.RequestedPayloadKind,
                 },
@@ -641,30 +652,30 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildSceneFileSuccessMessage(
-            const SandboxEditorSceneFileCommand& command,
-            const SandboxEditorSceneFileResult& result)
+            const EditorSceneFileCommand& command,
+            const EditorSceneFileResult& result)
         {
             std::string message{};
             switch (result.Operation)
             {
-            case SandboxEditorSceneFileOperation::New:
+            case EditorSceneFileOperation::New:
                 message = "Created new scene";
                 break;
-            case SandboxEditorSceneFileOperation::Save:
+            case EditorSceneFileOperation::Save:
                 message = "Saved scene";
                 break;
-            case SandboxEditorSceneFileOperation::Load:
+            case EditorSceneFileOperation::Load:
                 message = "Opened scene";
                 break;
-            case SandboxEditorSceneFileOperation::Close:
+            case EditorSceneFileOperation::Close:
                 message = "Closed scene";
                 break;
             }
             if (!command.Path.empty())
             {
-                if (result.Operation == SandboxEditorSceneFileOperation::Save)
+                if (result.Operation == EditorSceneFileOperation::Save)
                     message += " to ";
-                else if (result.Operation == SandboxEditorSceneFileOperation::Load)
+                else if (result.Operation == EditorSceneFileOperation::Load)
                     message += " from ";
                 else
                     message += " ";
@@ -683,22 +694,22 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildSceneFileFailureMessage(
-            const SandboxEditorSceneFileOperation operation,
+            const EditorSceneFileOperation operation,
             const Core::ErrorCode error)
         {
             std::string message{};
             switch (operation)
             {
-            case SandboxEditorSceneFileOperation::New:
+            case EditorSceneFileOperation::New:
                 message = "Scene new failed: ";
                 break;
-            case SandboxEditorSceneFileOperation::Save:
+            case EditorSceneFileOperation::Save:
                 message = "Scene save failed: ";
                 break;
-            case SandboxEditorSceneFileOperation::Load:
+            case EditorSceneFileOperation::Load:
                 message = "Scene open failed: ";
                 break;
-            case SandboxEditorSceneFileOperation::Close:
+            case EditorSceneFileOperation::Close:
                 message = "Scene close failed: ";
                 break;
             }
@@ -708,30 +719,30 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildSceneFilePendingMessage(
-            const SandboxEditorSceneFileCommand& command,
-            const SandboxEditorSceneFileOperation operation)
+            const EditorSceneFileCommand& command,
+            const EditorSceneFileOperation operation)
         {
             std::string message{};
             switch (operation)
             {
-            case SandboxEditorSceneFileOperation::New:
+            case EditorSceneFileOperation::New:
                 message = "Queued scene new";
                 break;
-            case SandboxEditorSceneFileOperation::Save:
+            case EditorSceneFileOperation::Save:
                 message = "Queued scene save";
                 break;
-            case SandboxEditorSceneFileOperation::Load:
+            case EditorSceneFileOperation::Load:
                 message = "Queued scene open";
                 break;
-            case SandboxEditorSceneFileOperation::Close:
+            case EditorSceneFileOperation::Close:
                 message = "Queued scene close";
                 break;
             }
             if (!command.Path.empty())
             {
-                if (operation == SandboxEditorSceneFileOperation::Save)
+                if (operation == EditorSceneFileOperation::Save)
                     message += " to ";
-                else if (operation == SandboxEditorSceneFileOperation::Load)
+                else if (operation == EditorSceneFileOperation::Load)
                     message += " from ";
                 else
                     message += " ";
@@ -741,32 +752,32 @@ namespace Extrinsic::Runtime
             return message;
         }
 
-        [[nodiscard]] SandboxEditorSceneFileOperation ToSandboxSceneFileOperation(
+        [[nodiscard]] EditorSceneFileOperation ToSandboxSceneFileOperation(
             const RuntimeSceneFileOperation operation) noexcept
         {
             switch (operation)
             {
             case RuntimeSceneFileOperation::Save:
-                return SandboxEditorSceneFileOperation::Save;
+                return EditorSceneFileOperation::Save;
             case RuntimeSceneFileOperation::Load:
-                return SandboxEditorSceneFileOperation::Load;
+                return EditorSceneFileOperation::Load;
             case RuntimeSceneFileOperation::None:
                 break;
             }
-            return SandboxEditorSceneFileOperation::Load;
+            return EditorSceneFileOperation::Load;
         }
 
-        [[nodiscard]] SandboxEditorSceneFileResult
+        [[nodiscard]] EditorSceneFileResult
         BuildSceneFileResultFromRuntimeEvent(const RuntimeSceneFileEvent& event)
         {
-            const SandboxEditorSceneFileOperation operation =
+            const EditorSceneFileOperation operation =
                 ToSandboxSceneFileOperation(event.Operation);
             if (!event.Succeeded())
             {
-                return SandboxEditorSceneFileResult{
-                    .Status = operation == SandboxEditorSceneFileOperation::Save
-                        ? SandboxEditorCommandStatus::SceneSaveFailed
-                        : SandboxEditorCommandStatus::SceneLoadFailed,
+                return EditorSceneFileResult{
+                    .Status = operation == EditorSceneFileOperation::Save
+                        ? EditorCommandStatus::SceneSaveFailed
+                        : EditorCommandStatus::SceneLoadFailed,
                     .Operation = operation,
                     .Task = event.Task,
                     .Error = event.Error,
@@ -774,32 +785,32 @@ namespace Extrinsic::Runtime
                 };
             }
 
-            SandboxEditorSceneFileResult result{
-                .Status = SandboxEditorCommandStatus::Applied,
+            EditorSceneFileResult result{
+                .Status = EditorCommandStatus::Applied,
                 .Operation = operation,
                 .Task = event.Task,
                 .Error = Core::ErrorCode::Success,
             };
-            if (operation == SandboxEditorSceneFileOperation::Load &&
+            if (operation == EditorSceneFileOperation::Load &&
                 event.LoadResult.has_value())
             {
                 result.Stats = event.LoadResult->Stats;
             }
-            else if (operation == SandboxEditorSceneFileOperation::Save &&
+            else if (operation == EditorSceneFileOperation::Save &&
                      event.SaveResult.has_value())
             {
                 result.Stats = event.SaveResult->Stats;
             }
             result.Message = BuildSceneFileSuccessMessage(
-                SandboxEditorSceneFileCommand{.Path = event.Path},
+                EditorSceneFileCommand{.Path = event.Path},
                 result);
             return result;
         }
 
-        [[nodiscard]] SandboxEditorVisualizationConfigModel FromVisualizationConfig(
+        [[nodiscard]] EditorVisualizationConfigModel FromVisualizationConfig(
             const G::VisualizationConfig& config)
         {
-            return SandboxEditorVisualizationConfigModel{
+            return EditorVisualizationConfigModel{
                 .HasConfig = true,
                 .Source = config.Source,
                 .Color = config.Color,
@@ -820,7 +831,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] G::VisualizationConfig ToVisualizationConfig(
-            const SandboxEditorVisualizationConfigCommand& command)
+            const EditorVisualizationConfigCommand& command)
         {
             G::VisualizationConfig config{};
             config.Source = command.Source;
@@ -845,17 +856,17 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] const std::optional<G::VisualizationConfig>*
         LaneOverrideForTarget(const G::VisualizationLaneOverrides& overrides,
-                              const SandboxEditorVisualizationTarget target) noexcept
+                              const EditorVisualizationTarget target) noexcept
         {
             switch (target)
             {
-            case SandboxEditorVisualizationTarget::Surface:
+            case EditorVisualizationTarget::Surface:
                 return &overrides.Surface;
-            case SandboxEditorVisualizationTarget::Edges:
+            case EditorVisualizationTarget::Edges:
                 return &overrides.Edges;
-            case SandboxEditorVisualizationTarget::Points:
+            case EditorVisualizationTarget::Points:
                 return &overrides.Points;
-            case SandboxEditorVisualizationTarget::Entity:
+            case EditorVisualizationTarget::Entity:
                 break;
             }
             return nullptr;
@@ -863,17 +874,17 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::optional<G::VisualizationConfig>*
         MutableLaneOverrideForTarget(G::VisualizationLaneOverrides& overrides,
-                                     const SandboxEditorVisualizationTarget target) noexcept
+                                     const EditorVisualizationTarget target) noexcept
         {
             switch (target)
             {
-            case SandboxEditorVisualizationTarget::Surface:
+            case EditorVisualizationTarget::Surface:
                 return &overrides.Surface;
-            case SandboxEditorVisualizationTarget::Edges:
+            case EditorVisualizationTarget::Edges:
                 return &overrides.Edges;
-            case SandboxEditorVisualizationTarget::Points:
+            case EditorVisualizationTarget::Points:
                 return &overrides.Points;
-            case SandboxEditorVisualizationTarget::Entity:
+            case EditorVisualizationTarget::Entity:
                 break;
             }
             return nullptr;
@@ -883,9 +894,9 @@ namespace Extrinsic::Runtime
         StoredVisualizationConfigForTarget(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
-            const SandboxEditorVisualizationTarget target)
+            const EditorVisualizationTarget target)
         {
-            if (target == SandboxEditorVisualizationTarget::Entity)
+            if (target == EditorVisualizationTarget::Entity)
             {
                 if (const auto* config = raw.try_get<G::VisualizationConfig>(entity))
                     return *config;
@@ -906,7 +917,7 @@ namespace Extrinsic::Runtime
         EffectiveVisualizationConfigForTarget(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
-            const SandboxEditorVisualizationTarget target)
+            const EditorVisualizationTarget target)
         {
             if (std::optional<G::VisualizationConfig> stored =
                     StoredVisualizationConfigForTarget(raw, entity, target);
@@ -914,31 +925,31 @@ namespace Extrinsic::Runtime
             {
                 return stored;
             }
-            if (target == SandboxEditorVisualizationTarget::Entity)
+            if (target == EditorVisualizationTarget::Entity)
                 return std::nullopt;
             return StoredVisualizationConfigForTarget(
                 raw,
                 entity,
-                SandboxEditorVisualizationTarget::Entity);
+                EditorVisualizationTarget::Entity);
         }
 
-        [[nodiscard]] SandboxEditorVisualizationConfigModel
+        [[nodiscard]] EditorVisualizationConfigModel
         BuildVisualizationConfigModelForTarget(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
-            const SandboxEditorVisualizationTarget target)
+            const EditorVisualizationTarget target)
         {
             const std::optional<G::VisualizationConfig> config =
                 EffectiveVisualizationConfigForTarget(raw, entity, target);
             return config.has_value()
                 ? FromVisualizationConfig(*config)
-                : SandboxEditorVisualizationConfigModel{};
+                : EditorVisualizationConfigModel{};
         }
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyVisualizationConfigTarget(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
-            const SandboxEditorVisualizationTarget target,
+            const EditorVisualizationTarget target,
             const std::optional<G::VisualizationConfig>& config)
         {
             if (scene == nullptr)
@@ -950,7 +961,7 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
                 return EditorCommandHistoryStatus::StaleEntity;
 
-            if (target == SandboxEditorVisualizationTarget::Entity)
+            if (target == EditorVisualizationTarget::Entity)
             {
                 if (config.has_value())
                     raw.emplace_or_replace<G::VisualizationConfig>(entity, *config);
@@ -1021,8 +1032,8 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry* Scene{nullptr};
             WorldHandle World{};
             std::uint32_t StableEntityId{0u};
-            SandboxEditorVisualizationTarget Target{
-                SandboxEditorVisualizationTarget::Entity};
+            EditorVisualizationTarget Target{
+                EditorVisualizationTarget::Entity};
         };
 
         [[nodiscard]] EditorCommandHistoryResult
@@ -1031,7 +1042,7 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry* scene,
             const WorldHandle world,
             const std::uint32_t stableEntityId,
-            const SandboxEditorVisualizationTarget target,
+            const EditorVisualizationTarget target,
             const std::optional<G::VisualizationConfig>& before,
             const std::optional<G::VisualizationConfig>& after,
             std::string label)
@@ -1136,9 +1147,9 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool DomainSupportsVisualizationConfig(
-            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+            const EditorVisualizationPropertyDomain domain) noexcept
         {
-            using Domain = SandboxEditorVisualizationPropertyDomain;
+            using Domain = EditorVisualizationPropertyDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
@@ -1153,9 +1164,9 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] G::VisualizationConfig::Domain ToVisualizationConfigDomain(
-            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+            const EditorVisualizationPropertyDomain domain) noexcept
         {
-            using Domain = SandboxEditorVisualizationPropertyDomain;
+            using Domain = EditorVisualizationPropertyDomain;
             switch (domain)
             {
             case Domain::MeshEdges:
@@ -1172,9 +1183,9 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] G::VisualizationConfig::ColorSource ToColorBufferSource(
-            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+            const EditorVisualizationPropertyDomain domain) noexcept
         {
-            using Domain = SandboxEditorVisualizationPropertyDomain;
+            using Domain = EditorVisualizationPropertyDomain;
             switch (domain)
             {
             case Domain::MeshEdges:
@@ -1191,9 +1202,9 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
-            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+            const EditorVisualizationPropertyDomain domain) noexcept
         {
-            using Domain = SandboxEditorVisualizationPropertyDomain;
+            using Domain = EditorVisualizationPropertyDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
@@ -1214,7 +1225,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
             const GeometryEntityAvailability& availability,
-            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+            const EditorVisualizationPropertyDomain domain) noexcept
         {
             return ResolveGeometryPropertySet(
                 availability,
@@ -1222,43 +1233,43 @@ namespace Extrinsic::Runtime
         }
 
         void AppendVisualizationPropertiesForDomain(
-            std::vector<SandboxEditorVisualizationPropertyInfo>& out,
+            std::vector<EditorVisualizationPropertyInfo>& out,
             const Geometry::PropertySet& properties,
-            SandboxEditorVisualizationPropertyDomain domain);
+            EditorVisualizationPropertyDomain domain);
 
-        [[nodiscard]] SandboxEditorVisualizationTarget
+        [[nodiscard]] EditorVisualizationTarget
         VisualizationTargetForWindowKind(
-            const SandboxEditorDomainWindowKind kind) noexcept
+            const EditorDomainWindowKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorDomainWindowKind::Mesh:
-                return SandboxEditorVisualizationTarget::Surface;
-            case SandboxEditorDomainWindowKind::Graph:
-                return SandboxEditorVisualizationTarget::Edges;
-            case SandboxEditorDomainWindowKind::PointCloud:
-                return SandboxEditorVisualizationTarget::Points;
+            case EditorDomainWindowKind::Mesh:
+                return EditorVisualizationTarget::Surface;
+            case EditorDomainWindowKind::Graph:
+                return EditorVisualizationTarget::Edges;
+            case EditorDomainWindowKind::PointCloud:
+                return EditorVisualizationTarget::Points;
             }
-            return SandboxEditorVisualizationTarget::Entity;
+            return EditorVisualizationTarget::Entity;
         }
 
         [[nodiscard]] bool VisualizationTargetAvailableForView(
             const GeometryEntityAvailability& availability,
-            const SandboxEditorVisualizationTarget target) noexcept
+            const EditorVisualizationTarget target) noexcept
         {
             switch (target)
             {
-            case SandboxEditorVisualizationTarget::Entity:
+            case EditorVisualizationTarget::Entity:
                 return availability.HasGeometry();
-            case SandboxEditorVisualizationTarget::Surface:
+            case EditorVisualizationTarget::Surface:
                 return ResolveRenderLaneAvailability(
                     availability,
                     GeometryRenderLane::Surface).Ready();
-            case SandboxEditorVisualizationTarget::Edges:
+            case EditorVisualizationTarget::Edges:
                 return ResolveRenderLaneAvailability(
                     availability,
                     GeometryRenderLane::Edges).Ready();
-            case SandboxEditorVisualizationTarget::Points:
+            case EditorVisualizationTarget::Points:
                 return ResolveRenderLaneAvailability(
                     availability,
                     GeometryRenderLane::Points).Ready();
@@ -1267,12 +1278,12 @@ namespace Extrinsic::Runtime
         }
 
         void AppendVisualizationPropertiesForTarget(
-            std::vector<SandboxEditorVisualizationPropertyInfo>& out,
+            std::vector<EditorVisualizationPropertyInfo>& out,
             const GeometryEntityAvailability& availability,
-            const SandboxEditorVisualizationTarget target)
+            const EditorVisualizationTarget target)
         {
             const auto append =
-                [&](const SandboxEditorVisualizationPropertyDomain domain)
+                [&](const EditorVisualizationPropertyDomain domain)
                 {
                     if (const Geometry::PropertySet* properties =
                             PropertySetForVisualizationDomain(availability, domain))
@@ -1286,34 +1297,34 @@ namespace Extrinsic::Runtime
 
             switch (target)
             {
-            case SandboxEditorVisualizationTarget::Entity:
-                append(SandboxEditorVisualizationPropertyDomain::MeshVertices);
-                append(SandboxEditorVisualizationPropertyDomain::MeshEdges);
-                append(SandboxEditorVisualizationPropertyDomain::MeshFaces);
-                append(SandboxEditorVisualizationPropertyDomain::GraphVertices);
-                append(SandboxEditorVisualizationPropertyDomain::GraphEdges);
-                append(SandboxEditorVisualizationPropertyDomain::PointCloudPoints);
+            case EditorVisualizationTarget::Entity:
+                append(EditorVisualizationPropertyDomain::MeshVertices);
+                append(EditorVisualizationPropertyDomain::MeshEdges);
+                append(EditorVisualizationPropertyDomain::MeshFaces);
+                append(EditorVisualizationPropertyDomain::GraphVertices);
+                append(EditorVisualizationPropertyDomain::GraphEdges);
+                append(EditorVisualizationPropertyDomain::PointCloudPoints);
                 break;
-            case SandboxEditorVisualizationTarget::Surface:
-                append(SandboxEditorVisualizationPropertyDomain::MeshVertices);
-                append(SandboxEditorVisualizationPropertyDomain::MeshFaces);
+            case EditorVisualizationTarget::Surface:
+                append(EditorVisualizationPropertyDomain::MeshVertices);
+                append(EditorVisualizationPropertyDomain::MeshFaces);
                 break;
-            case SandboxEditorVisualizationTarget::Edges:
-                append(SandboxEditorVisualizationPropertyDomain::MeshEdges);
-                append(SandboxEditorVisualizationPropertyDomain::GraphEdges);
+            case EditorVisualizationTarget::Edges:
+                append(EditorVisualizationPropertyDomain::MeshEdges);
+                append(EditorVisualizationPropertyDomain::GraphEdges);
                 break;
-            case SandboxEditorVisualizationTarget::Points:
-                append(SandboxEditorVisualizationPropertyDomain::MeshVertices);
-                append(SandboxEditorVisualizationPropertyDomain::GraphVertices);
-                append(SandboxEditorVisualizationPropertyDomain::PointCloudPoints);
+            case EditorVisualizationTarget::Points:
+                append(EditorVisualizationPropertyDomain::MeshVertices);
+                append(EditorVisualizationPropertyDomain::GraphVertices);
+                append(EditorVisualizationPropertyDomain::PointCloudPoints);
                 break;
             }
         }
 
         void AppendVisualizationPropertiesForDomain(
-            std::vector<SandboxEditorVisualizationPropertyInfo>& out,
+            std::vector<EditorVisualizationPropertyInfo>& out,
             const Geometry::PropertySet& properties,
-            const SandboxEditorVisualizationPropertyDomain domain)
+            const EditorVisualizationPropertyDomain domain)
         {
             if (!DomainSupportsVisualizationConfig(domain))
                 return;
@@ -1346,7 +1357,7 @@ namespace Extrinsic::Runtime
                     continue;
                 }
 
-                out.push_back(SandboxEditorVisualizationPropertyInfo{
+                out.push_back(EditorVisualizationPropertyInfo{
                     .Name = name,
                     .Domain = domain,
                     .ValueKind = kind,
@@ -1359,14 +1370,14 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] std::vector<SandboxEditorVisualizationPropertyInfo>
+        [[nodiscard]] std::vector<EditorVisualizationPropertyInfo>
         BuildVisualizationProperties(const GeometryEntityAvailability& availability)
         {
-            std::vector<SandboxEditorVisualizationPropertyInfo> out{};
+            std::vector<EditorVisualizationPropertyInfo> out{};
             AppendVisualizationPropertiesForTarget(
                 out,
                 availability,
-                SandboxEditorVisualizationTarget::Entity);
+                EditorVisualizationTarget::Entity);
             return out;
         }
 
@@ -1378,15 +1389,15 @@ namespace Extrinsic::Runtime
             GeometryRenderLane lane,
             GeometryPresentationSlotSemantic semantic) noexcept;
         void AddDiagnostic(
-            std::vector<SandboxEditorDiagnostic>& diagnostics,
-            SandboxEditorDiagnosticCode code,
+            std::vector<EditorDiagnostic>& diagnostics,
+            EditorDiagnosticCode code,
             std::string message);
 
         [[nodiscard]] const Geometry::PropertySet* PropertySetForCatalogDomain(
             const GeometryEntityAvailability& availability,
-            const SandboxEditorPropertyCatalogDomain domain) noexcept
+            const EditorPropertyCatalogDomain domain) noexcept
         {
-            using Domain = SandboxEditorPropertyCatalogDomain;
+            using Domain = EditorPropertyCatalogDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
@@ -1422,9 +1433,9 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
-            const SandboxEditorPropertyCatalogDomain domain) noexcept
+            const EditorPropertyCatalogDomain domain) noexcept
         {
-            using Domain = SandboxEditorPropertyCatalogDomain;
+            using Domain = EditorPropertyCatalogDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
@@ -1524,7 +1535,7 @@ namespace Extrinsic::Runtime
                    std::to_string(value.w) + ")";
         }
 
-        [[nodiscard]] SandboxEditorPropertyValuePreview BuildPropertyValuePreview(
+        [[nodiscard]] EditorPropertyValuePreview BuildPropertyValuePreview(
             const Geometry::PropertySet& properties,
             const std::string& name,
             const Geometry::PropertyValueKind kind,
@@ -1533,7 +1544,7 @@ namespace Extrinsic::Runtime
             if (!index.has_value() || *index >= properties.Size())
                 return {};
 
-            SandboxEditorPropertyValuePreview preview{
+            EditorPropertyValuePreview preview{
                 .HasValue = true,
                 .ElementIndex = *index,
             };
@@ -1579,7 +1590,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::optional<std::size_t> PreviewIndexForCatalogDomain(
-            const SandboxEditorPropertyCatalogDomain domain,
+            const EditorPropertyCatalogDomain domain,
             const PrimitiveSelectionResult* primitive,
             const std::uint32_t selectedStableId) noexcept
         {
@@ -1591,7 +1602,7 @@ namespace Extrinsic::Runtime
             if (!sameEntity)
                 return std::nullopt;
 
-            using Domain = SandboxEditorPropertyCatalogDomain;
+            using Domain = EditorPropertyCatalogDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
@@ -1631,9 +1642,9 @@ namespace Extrinsic::Runtime
         }
 
         void AppendPropertyCatalogRowsForDomain(
-            std::vector<SandboxEditorPropertyCatalogRow>& out,
+            std::vector<EditorPropertyCatalogRow>& out,
             const Geometry::PropertySet& properties,
-            const SandboxEditorPropertyCatalogDomain domain,
+            const EditorPropertyCatalogDomain domain,
             const std::optional<std::size_t> previewIndex)
         {
             for (const std::string& name : properties.Properties())
@@ -1641,7 +1652,7 @@ namespace Extrinsic::Runtime
                 const Geometry::PropertyValueKind kind =
                     DetectGeometryPropertyValueKind(properties, name);
                 const bool supported = IsPropertyCatalogSupportedKind(kind);
-                SandboxEditorPropertyCatalogRow row{
+                EditorPropertyCatalogRow row{
                     .Name = name,
                     .Domain = domain,
                     .ValueKind = kind,
@@ -1671,7 +1682,7 @@ namespace Extrinsic::Runtime
         }
 
         void AppendPropertyCatalogRows(
-            std::vector<SandboxEditorPropertyCatalogRow>& out,
+            std::vector<EditorPropertyCatalogRow>& out,
             const GS::ConstSourceView& view,
             const PrimitiveSelectionResult* primitive,
             const std::uint32_t selectedStableId)
@@ -1679,7 +1690,7 @@ namespace Extrinsic::Runtime
             const GeometryEntityAvailability availability =
                 BuildGeometryAvailability(view);
             const auto append =
-                [&](const SandboxEditorPropertyCatalogDomain domain)
+                [&](const EditorPropertyCatalogDomain domain)
                 {
                     const Geometry::PropertySet* properties =
                         PropertySetForCatalogDomain(availability, domain);
@@ -1695,16 +1706,16 @@ namespace Extrinsic::Runtime
                             selectedStableId));
                 };
 
-            append(SandboxEditorPropertyCatalogDomain::MeshVertices);
-            append(SandboxEditorPropertyCatalogDomain::MeshEdges);
-            append(SandboxEditorPropertyCatalogDomain::MeshHalfedges);
-            append(SandboxEditorPropertyCatalogDomain::MeshFaces);
-            append(SandboxEditorPropertyCatalogDomain::GraphVertices);
-            append(SandboxEditorPropertyCatalogDomain::GraphEdges);
-            append(SandboxEditorPropertyCatalogDomain::PointCloudPoints);
+            append(EditorPropertyCatalogDomain::MeshVertices);
+            append(EditorPropertyCatalogDomain::MeshEdges);
+            append(EditorPropertyCatalogDomain::MeshHalfedges);
+            append(EditorPropertyCatalogDomain::MeshFaces);
+            append(EditorPropertyCatalogDomain::GraphVertices);
+            append(EditorPropertyCatalogDomain::GraphEdges);
+            append(EditorPropertyCatalogDomain::PointCloudPoints);
         }
 
-        [[nodiscard]] SandboxEditorPropertyBindingTargetModel
+        [[nodiscard]] EditorPropertyBindingTargetModel
         BuildPropertyBindingTargetModel(
             const GS::ConstSourceView& view,
             const GeometryPresentationSlotSnapshot& slot)
@@ -1731,7 +1742,7 @@ namespace Extrinsic::Runtime
             const GeometryEntityAvailability geometryAvailability =
                 BuildGeometryAvailability(view);
 
-            SandboxEditorPropertyBindingTargetModel model{
+            EditorPropertyBindingTargetModel model{
                 .Lane = slot.Lane,
                 .PresentationKey = slot.PresentationKey,
                 .PresentationKind = slot.PresentationKind,
@@ -1755,7 +1766,7 @@ namespace Extrinsic::Runtime
                 for (const GeometryPresentationPropertyOption& option : options)
                 {
                     model.Options.push_back(
-                        SandboxEditorGeometryPresentationPropertyOptionModel{
+                        EditorGeometryPresentationPropertyOptionModel{
                             .Descriptor = option.Property,
                             .ActualValueKind = option.Property.ValueKind,
                             .ElementCount = option.ElementCount,
@@ -1767,13 +1778,13 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] std::optional<SandboxEditorPropertyCatalogDomain>
+        [[nodiscard]] std::optional<EditorPropertyCatalogDomain>
         VertexChannelCatalogDomainForView(
             const GS::ConstSourceView& view) noexcept
         {
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
-            using Domain = SandboxEditorPropertyCatalogDomain;
+            using Domain = EditorPropertyCatalogDomain;
             switch (availability.ProvenanceDomain)
             {
             case GS::Domain::Mesh:
@@ -1792,7 +1803,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const Geometry::PropertySet*
         VertexChannelPropertySetForView(
             const GS::ConstSourceView& view,
-            const SandboxEditorPropertyCatalogDomain domain) noexcept
+            const EditorPropertyCatalogDomain domain) noexcept
         {
             const GeometryEntityAvailability availability =
                 BuildGeometryAvailability(view);
@@ -1864,7 +1875,7 @@ namespace Extrinsic::Runtime
         }
 
         void RecordVertexChannelResolverScratch(
-            SandboxEditorModelBuildStats* stats,
+            EditorWorkspaceSnapshotStats* stats,
             const std::size_t byteCount)
         {
             if (stats == nullptr)
@@ -1882,9 +1893,9 @@ namespace Extrinsic::Runtime
             const std::string_view propertyName,
             const AttributeSourceType sourceType,
             const std::size_t elementCount,
-            SandboxEditorModelBuildStats* modelBuildStats)
+            EditorWorkspaceSnapshotStats* modelBuildStats)
         {
-            ScopedSandboxEditorStatTimer timer{
+            ScopedEditorStatTimer timer{
                 modelBuildStats != nullptr
                     ? &modelBuildStats->VertexChannelValidationTimeNs
                     : nullptr};
@@ -2187,17 +2198,17 @@ namespace Extrinsic::Runtime
                 });
         }
 
-        [[nodiscard]] SandboxEditorVertexChannelBindingTargetModel
+        [[nodiscard]] EditorVertexChannelBindingTargetModel
         BuildVertexChannelBindingTargetModel(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
             const GS::ConstSourceView& view,
-            const std::vector<SandboxEditorPropertyCatalogRow>& rows,
-            const SandboxEditorPropertyCatalogDomain domain,
+            const std::vector<EditorPropertyCatalogRow>& rows,
+            const EditorPropertyCatalogDomain domain,
             const VertexChannel channel,
-            SandboxEditorModelBuildStats* modelBuildStats)
+            EditorWorkspaceSnapshotStats* modelBuildStats)
         {
-            SandboxEditorVertexChannelBindingTargetModel model{
+            EditorVertexChannelBindingTargetModel model{
                 .Channel = channel,
             };
 
@@ -2236,12 +2247,12 @@ namespace Extrinsic::Runtime
                     BuildVertexChannelResolverDiagnostic(model.Resolver);
             }
 
-            for (const SandboxEditorPropertyCatalogRow& row : rows)
+            for (const EditorPropertyCatalogRow& row : rows)
             {
                 if (row.Domain != domain || !row.Supported)
                     continue;
 
-                SandboxEditorVertexChannelBindingOptionModel option{
+                EditorVertexChannelBindingOptionModel option{
                     .PropertyName = row.Name,
                     .Domain = row.Domain,
                     .ValueKind = row.ValueKind,
@@ -2287,13 +2298,13 @@ namespace Extrinsic::Runtime
         }
 
         void AppendVertexChannelBindingTargets(
-            SandboxEditorPropertyCatalogModel& model,
-            const SandboxEditorContext& context,
+            EditorPropertyCatalogModel& model,
+            const EditorFeatureBindings& context,
             const entt::registry& raw,
             const ECS::EntityHandle entity,
             const GS::ConstSourceView& view)
         {
-            const std::optional<SandboxEditorPropertyCatalogDomain> domain =
+            const std::optional<EditorPropertyCatalogDomain> domain =
                 VertexChannelCatalogDomainForView(view);
             if (!domain.has_value())
                 return;
@@ -2322,12 +2333,12 @@ namespace Extrinsic::Runtime
                     context.ModelBuildStats));
         }
 
-        [[nodiscard]] SandboxEditorPropertyCatalogModel BuildPropertyCatalogModel(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorPropertyCatalogModel BuildPropertyCatalogModel(
+            const EditorFeatureBindings& context,
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
-            ScopedSandboxEditorStatTimer timer{
+            ScopedEditorStatTimer timer{
                 context.ModelBuildStats != nullptr
                     ? &context.ModelBuildStats->PropertyCatalogModelBuildTimeNs
                     : nullptr};
@@ -2335,7 +2346,7 @@ namespace Extrinsic::Runtime
             {
                 ++context.ModelBuildStats->PropertyCatalogModelBuilds;
             }
-            SandboxEditorPropertyCatalogModel model{};
+            EditorPropertyCatalogModel model{};
             model.HasSelectedEntity = true;
             model.SelectedStableId = SelectionController::ToStableEntityId(entity);
             const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
@@ -2377,32 +2388,32 @@ namespace Extrinsic::Runtime
             {
                 AddDiagnostic(
                     model.Diagnostics,
-                    SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
+                    EditorDiagnosticCode::UnsupportedGeometryDomain,
                     "Selected entity has no valid geometry property catalog.");
             }
             return model;
         }
 
         [[nodiscard]] bool PropertySupportsPreset(
-            const SandboxEditorVisualizationPropertyInfo& property,
-            const SandboxEditorVisualizationPropertyPreset preset) noexcept
+            const EditorVisualizationPropertyInfo& property,
+            const EditorVisualizationPropertyPreset preset) noexcept
         {
             switch (preset)
             {
-            case SandboxEditorVisualizationPropertyPreset::Scalar:
+            case EditorVisualizationPropertyPreset::Scalar:
                 return property.ScalarPresetAvailable;
-            case SandboxEditorVisualizationPropertyPreset::Isoline:
+            case EditorVisualizationPropertyPreset::Isoline:
                 return property.IsolinePresetAvailable;
-            case SandboxEditorVisualizationPropertyPreset::ColorBuffer:
+            case EditorVisualizationPropertyPreset::ColorBuffer:
                 return property.ColorBufferPresetAvailable;
             }
             return false;
         }
 
-        [[nodiscard]] SandboxEditorVisualizationRecipeModel
+        [[nodiscard]] EditorVisualizationRecipeModel
         FromVisualizationRecipe(const VisualizationRecipe& recipe)
         {
-            return SandboxEditorVisualizationRecipeModel{
+            return EditorVisualizationRecipeModel{
                 .HasRecipe = true,
                 .Kind = GetVisualizationRecipeKind(recipe),
                 .Recipe = recipe,
@@ -2443,18 +2454,18 @@ namespace Extrinsic::Runtime
             return "Unknown";
         }
 
-        struct SandboxEditorRenderHintState
+        struct EditorRenderHintState
         {
             std::optional<G::RenderSurface> Surface{};
             std::optional<G::RenderEdges> Edges{};
             std::optional<G::RenderPoints> Points{};
         };
 
-        [[nodiscard]] SandboxEditorRenderHintState ReadRenderHintState(
+        [[nodiscard]] EditorRenderHintState ReadRenderHintState(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
-            SandboxEditorRenderHintState state{};
+            EditorRenderHintState state{};
             if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
                 state.Surface = *surface;
             if (const auto* lines = raw.try_get<G::RenderEdges>(entity))
@@ -2517,8 +2528,8 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool SameRenderHintState(
-            const SandboxEditorRenderHintState& lhs,
-            const SandboxEditorRenderHintState& rhs)
+            const EditorRenderHintState& lhs,
+            const EditorRenderHintState& rhs)
         {
             return SameOptionalRenderComponent(
                        lhs.Surface, rhs.Surface, SameRenderSurface) &&
@@ -2534,7 +2545,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool AnyRenderHintEdit(
-            const SandboxEditorRenderHintCommand& command) noexcept
+            const EditorRenderHintCommand& command) noexcept
         {
             return command.SetSurface ||
                    command.SetEdges ||
@@ -2545,7 +2556,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool RenderHintCommandMatchesDomain(
-            const SandboxEditorRenderHintCommand& command,
+            const EditorRenderHintCommand& command,
             const GeometryEntityAvailability& availability) noexcept
         {
             const bool editsSurface = command.SetSurface;
@@ -2591,9 +2602,9 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] SandboxEditorRenderHintState ApplyRenderHintCommandToState(
-            SandboxEditorRenderHintState state,
-            const SandboxEditorRenderHintCommand& command)
+        [[nodiscard]] EditorRenderHintState ApplyRenderHintCommandToState(
+            EditorRenderHintState state,
+            const EditorRenderHintCommand& command)
         {
             if (command.SetSurface)
             {
@@ -2661,7 +2672,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] EditorCommandHistoryStatus ApplyRenderHintState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
-            const SandboxEditorRenderHintState& state)
+            const EditorRenderHintState& state)
         {
             if (scene == nullptr)
                 return EditorCommandHistoryStatus::MissingScene;
@@ -2702,8 +2713,8 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry* scene,
             const WorldHandle world,
             const std::uint32_t stableEntityId,
-            const SandboxEditorRenderHintState& before,
-            const SandboxEditorRenderHintState& after)
+            const EditorRenderHintState& before,
+            const EditorRenderHintState& after)
         {
             return Internal::ExecuteUndoableEntityMutation(
                 history,
@@ -2718,8 +2729,8 @@ namespace Extrinsic::Runtime
                 after,
                 [](
                     const EditorRenderHintMutationIdentity& identity,
-                    const SandboxEditorRenderHintState& expected,
-                    const SandboxEditorRenderHintState&)
+                    const EditorRenderHintState& expected,
+                    const EditorRenderHintState&)
                 {
                     if (identity.Scene == nullptr || !identity.World.IsValid())
                         return EditorCommandHistoryStatus::MissingScene;
@@ -2741,7 +2752,7 @@ namespace Extrinsic::Runtime
                 },
                 [](
                     const EditorRenderHintMutationIdentity& identity,
-                    const SandboxEditorRenderHintState& target)
+                    const EditorRenderHintState& target)
                 {
                     return ApplyRenderHintState(
                         identity.Scene,
@@ -2750,8 +2761,8 @@ namespace Extrinsic::Runtime
                 },
                 [](
                     const EditorRenderHintMutationIdentity&,
-                    const SandboxEditorRenderHintState&,
-                    const SandboxEditorRenderHintState& target)
+                    const EditorRenderHintState&,
+                    const EditorRenderHintState& target)
                 {
                     return target;
                 });
@@ -2799,21 +2810,21 @@ namespace Extrinsic::Runtime
         // state the worker fills, so the envelope carries only the diagnostic
         // the retired `DerivedJobOutput` exposed — and exists at all because an
         // empty envelope is how `JobService` reports a dropped job.
-        struct SandboxEditorJobResult
+        struct EditorJobResult
         {
             std::string Diagnostic{};
         };
 
-        using SandboxEditorJobIdentityIndex =
+        using EditorJobIdentityIndex =
             std::unordered_map<JobToken,
-                               SandboxEditorJobIdentity,
+                               EditorJobIdentity,
                                Core::StrongHandleHash<JobTokenTag>>;
 
-        [[nodiscard]] SandboxEditorJobRecord ToSandboxEditorJobRecord(
+        [[nodiscard]] EditorJobRecord ToEditorJobRecord(
             const JobSnapshot& job,
-            const SandboxEditorJobIdentity& identity)
+            const EditorJobIdentity& identity)
         {
-            return SandboxEditorJobRecord{
+            return EditorJobRecord{
                 .Token = job.Token,
                 .Identity = identity,
                 .Name = job.DebugName,
@@ -2824,11 +2835,11 @@ namespace Extrinsic::Runtime
             };
         }
 
-        void PruneSandboxEditorJobIdentities(
+        void PruneEditorJobIdentities(
             const std::vector<JobSnapshot>& jobs,
-            SandboxEditorJobIdentityIndex& identities)
+            EditorJobIdentityIndex& identities)
         {
-            SandboxEditorJobIdentityIndex retained{};
+            EditorJobIdentityIndex retained{};
             retained.reserve(identities.size());
             for (const JobSnapshot& job : jobs)
             {
@@ -2839,32 +2850,31 @@ namespace Extrinsic::Runtime
             identities = std::move(retained);
         }
 
-        [[nodiscard]] std::optional<SandboxEditorJobRecord>
-        FindActiveSandboxEditorJob(
+        [[nodiscard]] std::optional<EditorJobRecord>
+        FindActiveEditorJob(
             const JobService& jobs,
-            const SandboxEditorJobIdentityIndex& identities,
-            const SandboxEditorJobIdentity& requested)
+            const EditorJobIdentityIndex& identities,
+            const EditorJobIdentity& requested)
         {
             for (const JobSnapshot& job : jobs.SnapshotAll())
             {
                 const auto identity = identities.find(job.Token);
-                if (identity != identities.end() &&
-                    IsActiveSandboxEditorJobState(job.State) &&
-                    SameSandboxEditorJobOutput(identity->second, requested))
+                if (identity != identities.end() && IsActiveEditorJobStateImpl(job.State) &&
+        SameEditorJobOutputImpl(identity->second, requested))
                 {
-                    return ToSandboxEditorJobRecord(job, identity->second);
+                    return ToEditorJobRecord(job, identity->second);
                 }
             }
             return std::nullopt;
         }
 
-        [[nodiscard]] std::vector<SandboxEditorJobRecord>
-        SnapshotSandboxEditorJobsForEntity(
+        [[nodiscard]] std::vector<EditorJobRecord>
+        SnapshotEditorJobsForEntity(
             const JobService& jobs,
-            const SandboxEditorJobIdentityIndex& identities,
+            const EditorJobIdentityIndex& identities,
             const std::uint32_t stableEntityId)
         {
-            std::vector<SandboxEditorJobRecord> rows{};
+            std::vector<EditorJobRecord> rows{};
             for (const JobSnapshot& job : jobs.SnapshotAll())
             {
                 const auto identity = identities.find(job.Token);
@@ -2873,7 +2883,7 @@ namespace Extrinsic::Runtime
                 {
                     continue;
                 }
-                rows.push_back(ToSandboxEditorJobRecord(job, identity->second));
+                rows.push_back(ToEditorJobRecord(job, identity->second));
             }
             return rows;
         }
@@ -2943,10 +2953,10 @@ namespace Extrinsic::Runtime
             return GeometryElementDomain::Unknown;
         }
 
-        [[nodiscard]] SandboxEditorGeometryPresentationPropertyOptionModel
+        [[nodiscard]] EditorGeometryPresentationPropertyOptionModel
         ToGeometryPresentationPropertyOptionModel(const GeometryPresentationPropertyOption& option)
         {
-            return SandboxEditorGeometryPresentationPropertyOptionModel{
+            return EditorGeometryPresentationPropertyOptionModel{
                 .Descriptor = option.Property,
                 .ActualValueKind = option.Property.ValueKind,
                 .ElementCount = option.ElementCount,
@@ -2955,20 +2965,20 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorJobDependencyModel
-        ToSandboxEditorJobDependencyModel(
-            const SandboxEditorJobDependency& dependency)
+        [[nodiscard]] EditorJobDependencyModel
+        ToEditorJobDependencyModel(
+            const EditorJobDependency& dependency)
         {
-            return SandboxEditorJobDependencyModel{
+            return EditorJobDependencyModel{
                 .Job = dependency.Job,
                 .Reason = dependency.Reason,
             };
         }
 
-        [[nodiscard]] SandboxEditorJobModel ToSandboxEditorJobModel(
-            const SandboxEditorJobRecord& job)
+        [[nodiscard]] EditorJobModel ToEditorJobModel(
+            const EditorJobRecord& job)
         {
-            SandboxEditorJobModel model{
+            EditorJobModel model{
                 .Handle = job.Token,
                 .Key = job.Identity,
                 .Name = job.Name,
@@ -2983,25 +2993,25 @@ namespace Extrinsic::Runtime
                 .Diagnostic = job.Diagnostic,
             };
             model.Dependencies.reserve(job.Dependencies.size());
-            for (const SandboxEditorJobDependency& dependency : job.Dependencies)
+            for (const EditorJobDependency& dependency : job.Dependencies)
                 model.Dependencies.push_back(
-                    ToSandboxEditorJobDependencyModel(dependency));
+                    ToEditorJobDependencyModel(dependency));
             return model;
         }
 
-        [[nodiscard]] std::optional<SandboxEditorJobModel>
+        [[nodiscard]] std::optional<EditorJobModel>
         FindDerivedJobModelForOutput(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
             const std::string_view outputName)
         {
             if (!context.JobCommands.SnapshotEntity)
                 return std::nullopt;
 
-            const std::vector<SandboxEditorJobRecord> jobs =
+            const std::vector<EditorJobRecord> jobs =
                 context.JobCommands.SnapshotEntity(stableEntityId);
-            const SandboxEditorJobRecord* selected = nullptr;
-            for (const SandboxEditorJobRecord& job : jobs)
+            const EditorJobRecord* selected = nullptr;
+            for (const EditorJobRecord& job : jobs)
             {
                 if (job.Identity.EntityId != stableEntityId ||
                     std::string_view{job.Identity.OutputName} != outputName)
@@ -3015,16 +3025,15 @@ namespace Extrinsic::Runtime
                     continue;
                 }
 
-                const bool jobActive = IsActiveSandboxEditorJobState(job.State);
-                const bool selectedActive =
-                    IsActiveSandboxEditorJobState(selected->State);
+                const bool jobActive = IsActiveEditorJobStateImpl(job.State);
+                const bool selectedActive = IsActiveEditorJobStateImpl(selected->State);
                 if (jobActive || !selectedActive)
                     selected = &job;
             }
 
             if (selected == nullptr)
                 return std::nullopt;
-            return ToSandboxEditorJobModel(*selected);
+            return ToEditorJobModel(*selected);
         }
 
         struct GeometryPresentationEditorState
@@ -3148,11 +3157,11 @@ namespace Extrinsic::Runtime
             return *status;
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
+        [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
             EditorCommandHistoryStatus status) noexcept;
 
-        [[nodiscard]] SandboxEditorCommandStatus CommitGeometryPresentationChange(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorCommandStatus CommitGeometryPresentationChange(
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
             GeometryPresentationEditorState before,
             GeometryPresentationEditorState after)
@@ -3229,7 +3238,7 @@ namespace Extrinsic::Runtime
                                 *identity.Scene,
                                 identity.StableEntityId);
                         });
-                return ToSandboxEditorCommandStatus(result.Status);
+                return ToEditorCommandStatus(result.Status);
             }
 
             const EditorCommandHistoryStatus applied =
@@ -3238,11 +3247,11 @@ namespace Extrinsic::Runtime
                     stableEntityId,
                     after);
             if (applied != EditorCommandHistoryStatus::Applied)
-                return ToSandboxEditorCommandStatus(applied);
+                return ToEditorCommandStatus(applied);
             (void)StampGeometryPresentationGeneration(
                 *context.Scene,
                 stableEntityId);
-            return SandboxEditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
         }
 
         [[nodiscard]] bool PropertySourceKindAllowedForGeometryPresentationSlotCommand(
@@ -3267,7 +3276,7 @@ namespace Extrinsic::Runtime
             return G::RenderPoints::RenderType::Sphere;
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
+        [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
             const EditorCommandHistoryStatus status) noexcept
         {
             switch (status)
@@ -3276,17 +3285,17 @@ namespace Extrinsic::Runtime
             case EditorCommandHistoryStatus::Recorded:
             case EditorCommandHistoryStatus::Undone:
             case EditorCommandHistoryStatus::Redone:
-                return SandboxEditorCommandStatus::Applied;
+                return EditorCommandStatus::Applied;
             case EditorCommandHistoryStatus::NoChange:
-                return SandboxEditorCommandStatus::NoChange;
+                return EditorCommandStatus::NoChange;
             case EditorCommandHistoryStatus::MissingScene:
-                return SandboxEditorCommandStatus::MissingScene;
+                return EditorCommandStatus::MissingScene;
             case EditorCommandHistoryStatus::MissingSelectionController:
-                return SandboxEditorCommandStatus::MissingSelectionController;
+                return EditorCommandStatus::MissingSelectionController;
             case EditorCommandHistoryStatus::StaleEntity:
-                return SandboxEditorCommandStatus::StaleEntity;
+                return EditorCommandStatus::StaleEntity;
             case EditorCommandHistoryStatus::MissingTransform:
-                return SandboxEditorCommandStatus::MissingTransform;
+                return EditorCommandStatus::MissingTransform;
             case EditorCommandHistoryStatus::EmptyUndoStack:
             case EditorCommandHistoryStatus::EmptyRedoStack:
             case EditorCommandHistoryStatus::InvalidCommand:
@@ -3294,9 +3303,9 @@ namespace Extrinsic::Runtime
             case EditorCommandHistoryStatus::UndoFailed:
             case EditorCommandHistoryStatus::RedoFailed:
             case EditorCommandHistoryStatus::UnsupportedOperation:
-                return SandboxEditorCommandStatus::NoChange;
+                return EditorCommandStatus::NoChange;
             }
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         }
 
         [[nodiscard]] Core::Extent2D SafeViewport(
@@ -3310,116 +3319,116 @@ namespace Extrinsic::Runtime
             return Core::Extent2D{1, 1};
         }
 
-        constexpr SandboxEditorGeometryProcessingDomain kMeshTopologyDomains =
-            SandboxEditorGeometryProcessingDomain::MeshVertices |
-            SandboxEditorGeometryProcessingDomain::MeshEdges |
-            SandboxEditorGeometryProcessingDomain::MeshHalfedges |
-            SandboxEditorGeometryProcessingDomain::MeshFaces;
+        constexpr EditorGeometryProcessingDomain kMeshTopologyDomains =
+            EditorGeometryProcessingDomain::MeshVertices |
+            EditorGeometryProcessingDomain::MeshEdges |
+            EditorGeometryProcessingDomain::MeshHalfedges |
+            EditorGeometryProcessingDomain::MeshFaces;
 
         [[nodiscard]] constexpr bool IsSurfaceTopologyAlgorithm(
-            const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
+            const EditorGeometryProcessingAlgorithm algorithm) noexcept
         {
             switch (algorithm)
             {
-            case SandboxEditorGeometryProcessingAlgorithm::MeshDenoise:
-            case SandboxEditorGeometryProcessingAlgorithm::Curvature:
-            case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
-            case SandboxEditorGeometryProcessingAlgorithm::Simplification:
-            case SandboxEditorGeometryProcessingAlgorithm::Smoothing:
-            case SandboxEditorGeometryProcessingAlgorithm::Subdivision:
-            case SandboxEditorGeometryProcessingAlgorithm::Repair:
+            case EditorGeometryProcessingAlgorithm::MeshDenoise:
+            case EditorGeometryProcessingAlgorithm::Curvature:
+            case EditorGeometryProcessingAlgorithm::Remeshing:
+            case EditorGeometryProcessingAlgorithm::Simplification:
+            case EditorGeometryProcessingAlgorithm::Smoothing:
+            case EditorGeometryProcessingAlgorithm::Subdivision:
+            case EditorGeometryProcessingAlgorithm::Repair:
                 return true;
-            case SandboxEditorGeometryProcessingAlgorithm::KMeans:
-            case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
-            case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
-            case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
-            case SandboxEditorGeometryProcessingAlgorithm::SurfaceReconstruction:
-            case SandboxEditorGeometryProcessingAlgorithm::VectorHeat:
-            case SandboxEditorGeometryProcessingAlgorithm::Parameterization:
-            case SandboxEditorGeometryProcessingAlgorithm::BooleanCSG:
-            case SandboxEditorGeometryProcessingAlgorithm::Registration:
-            case SandboxEditorGeometryProcessingAlgorithm::BilateralFilter:
-            case SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation:
-            case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
-            case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
-            case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
-            case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
+            case EditorGeometryProcessingAlgorithm::KMeans:
+            case EditorGeometryProcessingAlgorithm::NormalEstimation:
+            case EditorGeometryProcessingAlgorithm::ShortestPath:
+            case EditorGeometryProcessingAlgorithm::ConvexHull:
+            case EditorGeometryProcessingAlgorithm::SurfaceReconstruction:
+            case EditorGeometryProcessingAlgorithm::VectorHeat:
+            case EditorGeometryProcessingAlgorithm::Parameterization:
+            case EditorGeometryProcessingAlgorithm::BooleanCSG:
+            case EditorGeometryProcessingAlgorithm::Registration:
+            case EditorGeometryProcessingAlgorithm::BilateralFilter:
+            case EditorGeometryProcessingAlgorithm::OutlierEstimation:
+            case EditorGeometryProcessingAlgorithm::KernelDensity:
+            case EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
+            case EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
+            case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
                 return false;
             }
             return false;
         }
 
-        [[nodiscard]] SandboxEditorGeometryProcessingDomain
+        [[nodiscard]] EditorGeometryProcessingDomain
         DomainsForSourceView(const GS::ConstSourceView& view) noexcept
         {
             const GeometryEntityAvailability availability =
                 BuildGeometryAvailability(view);
-            SandboxEditorGeometryProcessingDomain domains =
-                SandboxEditorGeometryProcessingDomain::None;
+            EditorGeometryProcessingDomain domains =
+                EditorGeometryProcessingDomain::None;
 
             if (availability.Sources.ProvenanceDomain == GS::Domain::Mesh)
             {
                 if (SupportsGeometryElementDomain(
                         availability,
                         GeometryElementDomain::MeshVertex))
-                    domains |= SandboxEditorGeometryProcessingDomain::MeshVertices;
+                    domains |= EditorGeometryProcessingDomain::MeshVertices;
                 if (SupportsGeometryElementDomain(
                         availability,
                         GeometryElementDomain::MeshEdge))
-                    domains |= SandboxEditorGeometryProcessingDomain::MeshEdges;
+                    domains |= EditorGeometryProcessingDomain::MeshEdges;
                 if (SupportsGeometryElementDomain(
                         availability,
                         GeometryElementDomain::MeshHalfedge))
-                    domains |= SandboxEditorGeometryProcessingDomain::MeshHalfedges;
+                    domains |= EditorGeometryProcessingDomain::MeshHalfedges;
                 if (SupportsGeometryElementDomain(
                         availability,
                         GeometryElementDomain::MeshFace))
-                    domains |= SandboxEditorGeometryProcessingDomain::MeshFaces;
+                    domains |= EditorGeometryProcessingDomain::MeshFaces;
             }
             else if (availability.Sources.ProvenanceDomain == GS::Domain::Graph)
             {
                 if (SupportsGeometryElementDomain(
                         availability,
                         GeometryElementDomain::GraphNode))
-                    domains |= SandboxEditorGeometryProcessingDomain::GraphVertices;
+                    domains |= EditorGeometryProcessingDomain::GraphVertices;
                 if (SupportsGeometryElementDomain(
                         availability,
                         GeometryElementDomain::GraphEdge))
-                    domains |= SandboxEditorGeometryProcessingDomain::GraphEdges;
+                    domains |= EditorGeometryProcessingDomain::GraphEdges;
                 if (availability.Sources.Has(
                         GS::SourceCapability::Halfedges))
-                    domains |= SandboxEditorGeometryProcessingDomain::GraphHalfedges;
+                    domains |= EditorGeometryProcessingDomain::GraphHalfedges;
             }
             else if (availability.Sources.ProvenanceDomain == GS::Domain::PointCloud)
             {
                 if (SupportsGeometryElementDomain(
                         availability,
                         GeometryElementDomain::PointCloudPoint))
-                    domains |= SandboxEditorGeometryProcessingDomain::PointCloudPoints;
+                    domains |= EditorGeometryProcessingDomain::PointCloudPoints;
             }
 
             return domains;
         }
 
-        [[nodiscard]] SandboxEditorDiagnostic MakeDiagnostic(
-            const SandboxEditorDiagnosticCode code,
+        [[nodiscard]] EditorDiagnostic MakeDiagnostic(
+            const EditorDiagnosticCode code,
             std::string message)
         {
-            return SandboxEditorDiagnostic{
+            return EditorDiagnostic{
                 .Code = code,
                 .Message = std::move(message),
             };
         }
 
-        void AddDiagnostic(std::vector<SandboxEditorDiagnostic>& diagnostics,
-                           const SandboxEditorDiagnosticCode code,
+        void AddDiagnostic(std::vector<EditorDiagnostic>& diagnostics,
+                           const EditorDiagnosticCode code,
                            std::string message)
         {
             diagnostics.push_back(MakeDiagnostic(code, std::move(message)));
         }
 
-        void AppendDiagnostics(std::vector<SandboxEditorDiagnostic>& destination,
-                               const std::vector<SandboxEditorDiagnostic>& source)
+        void AppendDiagnostics(std::vector<EditorDiagnostic>& destination,
+                               const std::vector<EditorDiagnostic>& source)
         {
             destination.insert(destination.end(), source.begin(), source.end());
         }
@@ -3430,11 +3439,11 @@ namespace Extrinsic::Runtime
                 static_cast<std::uint32_t>(entity));
         }
 
-        [[nodiscard]] SandboxEditorEntityRow BuildEntityRow(
+        [[nodiscard]] EditorEntityRow BuildEntityRow(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
-            SandboxEditorEntityRow row{};
+            EditorEntityRow row{};
             row.Entity = entity;
             row.StableEntityId = SelectionController::ToStableEntityId(entity);
             row.Name = FallbackEntityName(entity);
@@ -3457,11 +3466,11 @@ namespace Extrinsic::Runtime
             return row;
         }
 
-        [[nodiscard]] SandboxEditorTransformModel BuildTransformModel(
+        [[nodiscard]] EditorTransformModel BuildTransformModel(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
-            SandboxEditorTransformModel model{};
+            EditorTransformModel model{};
             if (const auto* local = raw.try_get<ECSC::Transform::Component>(entity))
             {
                 model.HasLocalTransform = true;
@@ -3479,11 +3488,11 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] SandboxEditorRenderHintModel BuildRenderHintModel(
+        [[nodiscard]] EditorRenderHintModel BuildRenderHintModel(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
-            SandboxEditorRenderHintModel model{};
+            EditorRenderHintModel model{};
             if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
             {
                 model.HasRenderSurface = true;
@@ -3529,12 +3538,12 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] SandboxEditorGeometryDomainModel BuildGeometryDomainModel(
+        [[nodiscard]] EditorGeometryDomainModel BuildGeometryDomainModel(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
             const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-            return SandboxEditorGeometryDomainModel{
+            return EditorGeometryDomainModel{
                 .Domain = view.ActiveDomain,
                 .Valid = view.Valid(),
                 .VertexCount = view.VerticesAlive(),
@@ -3566,38 +3575,38 @@ namespace Extrinsic::Runtime
         }
 
         void AppendGeometryPresentationJobRowsForEntity(
-            SandboxEditorGeometryPresentationModel& model,
-            const SandboxEditorContext& context,
+            EditorGeometryPresentationModel& model,
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId)
         {
             if (!context.JobCommands.SnapshotEntity)
                 return;
 
-            for (const SandboxEditorJobRecord& job :
+            for (const EditorJobRecord& job :
                  context.JobCommands.SnapshotEntity(stableEntityId))
-                model.Jobs.push_back(ToSandboxEditorJobModel(job));
+                model.Jobs.push_back(ToEditorJobModel(job));
         }
 
         void AccumulateGeometryPresentationJobSummaryForEntity(
-            SandboxEditorGeometryCompositionSummary& summary,
-            const SandboxEditorContext& context,
+            EditorGeometryCompositionSummary& summary,
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId)
         {
             if (!context.JobCommands.SnapshotEntity)
                 return;
 
-            for (const SandboxEditorJobRecord& job :
+            for (const EditorJobRecord& job :
                  context.JobCommands.SnapshotEntity(stableEntityId))
             {
                 ++summary.ChildJobCount;
-                if (IsActiveSandboxEditorJobState(job.State))
+                if (IsActiveEditorJobStateImpl(job.State))
                     ++summary.ChildActiveJobCount;
-                if (IsFailedSandboxEditorJobState(job.State))
+                if (IsFailedEditorJobStateImpl(job.State))
                     ++summary.ChildFailedJobCount;
             }
         }
 
-        [[nodiscard]] std::vector<SandboxEditorGeometryPresentationPropertyOptionModel>
+        [[nodiscard]] std::vector<EditorGeometryPresentationPropertyOptionModel>
         BuildGeometryPresentationSlotPropertyOptions(
             const GS::ConstSourceView& view,
             const GeometryPresentationSlotSnapshot& extractedSlot)
@@ -3632,20 +3641,20 @@ namespace Extrinsic::Runtime
                     domain,
                     expected);
 
-            std::vector<SandboxEditorGeometryPresentationPropertyOptionModel> out{};
+            std::vector<EditorGeometryPresentationPropertyOptionModel> out{};
             out.reserve(options.size());
             for (const GeometryPresentationPropertyOption& option : options)
                 out.push_back(ToGeometryPresentationPropertyOptionModel(option));
             return out;
         }
 
-        [[nodiscard]] SandboxEditorGeometryPresentationSlotModel ToGeometryPresentationSlotModel(
+        [[nodiscard]] EditorGeometryPresentationSlotModel ToGeometryPresentationSlotModel(
             const GS::ConstSourceView& view,
             const GeometryPresentationRecipe& bindings,
             const GeometryPresentationRuntimeState& runtimeState,
             const GeometryPresentationSlotSnapshot& extractedSlot)
         {
-            SandboxEditorGeometryPresentationSlotModel model{
+            EditorGeometryPresentationSlotModel model{
                 .Lane = extractedSlot.Lane,
                 .PresentationKey = extractedSlot.PresentationKey,
                 .PresentationKind = extractedSlot.PresentationKind,
@@ -3689,9 +3698,9 @@ namespace Extrinsic::Runtime
         }
 
         void AccumulateGeometryPresentationChildSummary(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const entt::registry& raw,
-            SandboxEditorGeometryCompositionSummary& summary,
+            EditorGeometryCompositionSummary& summary,
             const ECS::EntityHandle child)
         {
             if (!raw.valid(child))
@@ -3729,9 +3738,9 @@ namespace Extrinsic::Runtime
         }
 
         void AccumulateGeometryPresentationCompositionSummary(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const entt::registry& raw,
-            SandboxEditorGeometryPresentationModel& model,
+            EditorGeometryPresentationModel& model,
             const ECS::EntityHandle entity)
         {
             const ECS::Hierarchy::Structure::HierarchyQueryResult children =
@@ -3740,7 +3749,7 @@ namespace Extrinsic::Runtime
             {
                 AddDiagnostic(
                     model.Diagnostics,
-                    SandboxEditorDiagnosticCode::CorruptHierarchy,
+                    EditorDiagnosticCode::CorruptHierarchy,
                     std::string{"Geometry-presentation composition hierarchy query failed: "} +
                         ECS::Hierarchy::Structure::
                             DebugNameForHierarchyQueryStatus(children.Status) +
@@ -3750,7 +3759,7 @@ namespace Extrinsic::Runtime
             if (children.Entities.empty())
                 return;
 
-            SandboxEditorGeometryCompositionSummary& summary =
+            EditorGeometryCompositionSummary& summary =
                 model.Composition;
             summary.HasChildren = true;
             for (const ECS::EntityHandle child : children.Entities)
@@ -3761,9 +3770,9 @@ namespace Extrinsic::Runtime
                     child);
         }
 
-        [[nodiscard]] SandboxEditorGeometryPresentationModel
+        [[nodiscard]] EditorGeometryPresentationModel
         BuildGeometryPresentationModel(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
@@ -3771,7 +3780,7 @@ namespace Extrinsic::Runtime
             {
                 ++context.ModelBuildStats->GeometryPresentationModelBuilds;
             }
-            SandboxEditorGeometryPresentationModel model{};
+            EditorGeometryPresentationModel model{};
             const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
             model.Shape = InferGeometryPresentationShape(view);
 
@@ -3823,14 +3832,14 @@ namespace Extrinsic::Runtime
             {
                 AddDiagnostic(
                     model.Diagnostics,
-                    SandboxEditorDiagnosticCode::InvalidVisualizationProperty,
+                    EditorDiagnosticCode::InvalidVisualizationProperty,
                     "Geometry presentation has slot diagnostics.");
             }
             return model;
         }
 
         [[nodiscard]] std::optional<std::size_t> FindCatalogMatchIndex(
-            const SandboxEditorPropertyCatalogModel& catalog,
+            const EditorPropertyCatalogModel& catalog,
             const GeometryPropertyRef& descriptor)
         {
             if (descriptor.Domain == GeometryElementDomain::Unknown ||
@@ -3841,7 +3850,7 @@ namespace Extrinsic::Runtime
 
             for (std::size_t i = 0u; i < catalog.Rows.size(); ++i)
             {
-                const SandboxEditorPropertyCatalogRow& row = catalog.Rows[i];
+                const EditorPropertyCatalogRow& row = catalog.Rows[i];
                 if (row.Descriptor.Domain == descriptor.Domain &&
                     row.Name == descriptor.Name)
                 {
@@ -3851,15 +3860,15 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
-        [[nodiscard]] SandboxEditorBoundRenderStateRow MakeRenderHintRow(
+        [[nodiscard]] EditorBoundRenderStateRow MakeRenderHintRow(
             std::string label,
             const GeometryRenderLane lane,
             const bool enabled,
             std::string sourceDescription,
             std::string disabledReason = {})
         {
-            return SandboxEditorBoundRenderStateRow{
-                .Kind = SandboxEditorBoundRenderStateRowKind::RenderHint,
+            return EditorBoundRenderStateRow{
+                .Kind = EditorBoundRenderStateRowKind::RenderHint,
                 .Label = std::move(label),
                 .Lane = lane,
                 .Readiness = enabled
@@ -3872,8 +3881,8 @@ namespace Extrinsic::Runtime
         }
 
         void AppendRenderHintRows(
-            std::vector<SandboxEditorBoundRenderStateRow>& rows,
-            const SandboxEditorRenderHintModel& hints)
+            std::vector<EditorBoundRenderStateRow>& rows,
+            const EditorRenderHintModel& hints)
         {
             rows.push_back(
                 MakeRenderHintRow(
@@ -3921,17 +3930,17 @@ namespace Extrinsic::Runtime
         }
 
         void AppendBoundSlotRows(
-            std::vector<SandboxEditorBoundRenderStateRow>& rows,
-            const SandboxEditorPropertyCatalogModel& catalog,
-            const SandboxEditorGeometryPresentationModel& presentation)
+            std::vector<EditorBoundRenderStateRow>& rows,
+            const EditorPropertyCatalogModel& catalog,
+            const EditorGeometryPresentationModel& presentation)
         {
-            for (const SandboxEditorGeometryPresentationSlotModel& slot :
+            for (const EditorGeometryPresentationSlotModel& slot :
                  presentation.Slots)
             {
                 const std::optional<std::size_t> match =
                     FindCatalogMatchIndex(catalog, slot.Property);
-                rows.push_back(SandboxEditorBoundRenderStateRow{
-                    .Kind = SandboxEditorBoundRenderStateRowKind::GeometryPresentationSlot,
+                rows.push_back(EditorBoundRenderStateRow{
+                    .Kind = EditorBoundRenderStateRowKind::GeometryPresentationSlot,
                     .Label = std::string{ToString(slot.Semantic)},
                     .Lane = slot.Lane,
                     .PresentationKey = slot.PresentationKey,
@@ -3960,20 +3969,20 @@ namespace Extrinsic::Runtime
         }
 
         void AppendBoundJobRows(
-            std::vector<SandboxEditorBoundRenderStateRow>& rows,
-            const SandboxEditorGeometryPresentationModel& presentation)
+            std::vector<EditorBoundRenderStateRow>& rows,
+            const EditorGeometryPresentationModel& presentation)
         {
-            for (const SandboxEditorJobModel& job :
+            for (const EditorJobModel& job :
                  presentation.Jobs)
             {
-                rows.push_back(SandboxEditorBoundRenderStateRow{
-                    .Kind = SandboxEditorBoundRenderStateRowKind::DerivedJob,
+                rows.push_back(EditorBoundRenderStateRow{
+                    .Kind = EditorBoundRenderStateRowKind::DerivedJob,
                     .Label = job.Name,
                     .Lane = GeometryRenderLane::Surface,
                     .Semantic = job.Key.OutputSemantic,
-                    .Readiness = IsFailedSandboxEditorJobState(job.Status)
+                    .Readiness = IsFailedEditorJobStateImpl(job.Status)
                         ? GeometryPresentationReadiness::Failed
-                        : (IsActiveSandboxEditorJobState(job.Status)
+                        : (IsActiveEditorJobStateImpl(job.Status)
                                ? GeometryPresentationReadiness::Pending
                                : GeometryPresentationReadiness::Ready),
                     .Job = job.Handle,
@@ -3988,19 +3997,19 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] SandboxEditorBoundRenderStateModel BuildBoundRenderStateModel(
-            const SandboxEditorContext& context,
-            const SandboxEditorPropertyCatalogModel& catalog,
-            const SandboxEditorGeometryPresentationModel& presentation,
-            const SandboxEditorRenderHintModel& renderHints,
-            const SandboxEditorGeometryDomainModel& geometry,
+        [[nodiscard]] EditorBoundRenderStateModel BuildBoundRenderStateModel(
+            const EditorFeatureBindings& context,
+            const EditorPropertyCatalogModel& catalog,
+            const EditorGeometryPresentationModel& presentation,
+            const EditorRenderHintModel& renderHints,
+            const EditorGeometryDomainModel& geometry,
             const std::uint32_t stableEntityId)
         {
             if (context.ModelBuildStats != nullptr)
             {
                 ++context.ModelBuildStats->BoundStateModelBuilds;
             }
-            SandboxEditorBoundRenderStateModel model{};
+            EditorBoundRenderStateModel model{};
             model.HasSelectedEntity = true;
             model.SelectedStableId = stableEntityId;
             model.Shape = presentation.Shape;
@@ -4013,8 +4022,8 @@ namespace Extrinsic::Runtime
 
             if (presentation.Composition.HasChildren)
             {
-                model.Rows.push_back(SandboxEditorBoundRenderStateRow{
-                    .Kind = SandboxEditorBoundRenderStateRowKind::CompositionSummary,
+                model.Rows.push_back(EditorBoundRenderStateRow{
+                    .Kind = EditorBoundRenderStateRowKind::CompositionSummary,
                     .Label = "Composition summary",
                     .Readiness = presentation.Composition.ChildFailedSlotCount > 0u ||
                                          presentation.Composition.ChildFailedJobCount > 0u
@@ -4031,8 +4040,8 @@ namespace Extrinsic::Runtime
 
             if (!presentation.HasRecipe)
             {
-                model.Rows.push_back(SandboxEditorBoundRenderStateRow{
-                    .Kind = SandboxEditorBoundRenderStateRowKind::DisabledCommand,
+                model.Rows.push_back(EditorBoundRenderStateRow{
+                    .Kind = EditorBoundRenderStateRowKind::DisabledCommand,
                     .Label = "Geometry presentation",
                     .Readiness = GeometryPresentationReadiness::Unsupported,
                     .Enabled = false,
@@ -4044,8 +4053,8 @@ namespace Extrinsic::Runtime
             if (geometry.Domain == GS::Domain::Graph ||
                 geometry.Domain == GS::Domain::PointCloud)
             {
-                model.Rows.push_back(SandboxEditorBoundRenderStateRow{
-                    .Kind = SandboxEditorBoundRenderStateRowKind::DisabledCommand,
+                model.Rows.push_back(EditorBoundRenderStateRow{
+                    .Kind = EditorBoundRenderStateRowKind::DisabledCommand,
                     .Label = "Texture bake",
                     .Readiness = GeometryPresentationReadiness::Unsupported,
                     .Enabled = false,
@@ -4058,7 +4067,7 @@ namespace Extrinsic::Runtime
             {
                 AddDiagnostic(
                     model.Diagnostics,
-                    SandboxEditorDiagnosticCode::InvalidVisualizationProperty,
+                    EditorDiagnosticCode::InvalidVisualizationProperty,
                     "No bound render state rows were available.");
             }
             return model;
@@ -4128,13 +4137,13 @@ namespace Extrinsic::Runtime
         {
             Geometry::MeshSoup::IndexedMesh Mesh{};
             std::vector<std::uint32_t> SourceFaceForSoupFace{};
-            SandboxEditorCommandStatus Status{
-                SandboxEditorCommandStatus::NoChange};
+            EditorCommandStatus Status{
+                EditorCommandStatus::NoChange};
             std::string Diagnostic{};
 
             [[nodiscard]] bool Succeeded() const noexcept
             {
-                return Status == SandboxEditorCommandStatus::Applied;
+                return Status == EditorCommandStatus::Applied;
             }
         };
 
@@ -4149,7 +4158,7 @@ namespace Extrinsic::Runtime
                 view.HalfedgeSource == nullptr ||
                 view.FaceSource == nullptr)
             {
-                result.Status = SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                result.Status = EditorCommandStatus::UnsupportedGeometryDomain;
                 result.Diagnostic = "UV regeneration requires selected mesh GeometrySources.";
                 return result;
             }
@@ -4159,14 +4168,14 @@ namespace Extrinsic::Runtime
                     GS::PropertyNames::kPosition);
             if (!positions || positions.Vector().empty())
             {
-                result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 result.Diagnostic = "selected mesh has no vertex position property";
                 return result;
             }
             if (positions.Vector().size() >
                 static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
             {
-                result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 result.Diagnostic = "selected mesh has too many vertices for UV regeneration";
                 return result;
             }
@@ -4188,7 +4197,7 @@ namespace Extrinsic::Runtime
                 toVertices.Vector().size() != halfedgeFaces.Vector().size() ||
                 faceHalfedges.Vector().empty())
             {
-                result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 result.Diagnostic = "selected mesh has invalid halfedge/face topology";
                 return result;
             }
@@ -4212,7 +4221,7 @@ namespace Extrinsic::Runtime
                     ring);
                 if (status == MeshFaceRingStatus::Invalid)
                 {
-                    result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    result.Status = EditorCommandStatus::InvalidProcessingParameters;
                     result.Diagnostic = "selected mesh topology is not valid for UV regeneration";
                     return result;
                 }
@@ -4229,12 +4238,12 @@ namespace Extrinsic::Runtime
 
             if (result.Mesh.FaceCount() == 0u)
             {
-                result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 result.Diagnostic = "selected mesh has no valid surface faces";
                 return result;
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             return result;
         }
 
@@ -4471,11 +4480,11 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool IsTextureBakeSourceDomain(
-            const SandboxEditorPropertyCatalogDomain domain) noexcept
+            const EditorPropertyCatalogDomain domain) noexcept
         {
-            return domain == SandboxEditorPropertyCatalogDomain::MeshVertices ||
-                   domain == SandboxEditorPropertyCatalogDomain::MeshEdges ||
-                   domain == SandboxEditorPropertyCatalogDomain::MeshFaces;
+            return domain == EditorPropertyCatalogDomain::MeshVertices ||
+                   domain == EditorPropertyCatalogDomain::MeshEdges ||
+                   domain == EditorPropertyCatalogDomain::MeshFaces;
         }
 
         [[nodiscard]] bool IsNonBakeableMeshAttribute(
@@ -4487,10 +4496,10 @@ namespace Extrinsic::Runtime
                    name == "v:tex";
         }
 
-        [[nodiscard]] SandboxEditorTextureBakeSourceRow BuildTextureBakeSourceRow(
-            const SandboxEditorPropertyCatalogRow& row)
+        [[nodiscard]] EditorTextureBakeSourceRow BuildTextureBakeSourceRow(
+            const EditorPropertyCatalogRow& row)
         {
-            SandboxEditorTextureBakeSourceRow out{
+            EditorTextureBakeSourceRow out{
                 .Name = row.Name,
                 .CatalogDomain = row.Domain,
                 .BakeDomain = ToGeometryElementDomain(row.Domain),
@@ -4502,7 +4511,7 @@ namespace Extrinsic::Runtime
 
             if (!IsTextureBakeSourceDomain(row.Domain))
             {
-                out.Category = SandboxEditorTextureBakeSourceCategory::WrongDomain;
+                out.Category = EditorTextureBakeSourceCategory::WrongDomain;
                 out.DisabledReason =
                     "texture baking supports mesh vertex, edge, and face properties";
                 return out;
@@ -4510,8 +4519,8 @@ namespace Extrinsic::Runtime
             if (row.Connectivity || IsNonBakeableMeshAttribute(row.Name))
             {
                 out.Category = row.Connectivity
-                    ? SandboxEditorTextureBakeSourceCategory::Connectivity
-                    : SandboxEditorTextureBakeSourceCategory::Internal;
+                    ? EditorTextureBakeSourceCategory::Connectivity
+                    : EditorTextureBakeSourceCategory::Internal;
                 out.DisabledReason =
                     row.Connectivity
                         ? "connectivity properties are visible but not texture-bake sources"
@@ -4522,7 +4531,7 @@ namespace Extrinsic::Runtime
             if (!row.Supported ||
                 !IsPropertyCatalogSupportedKind(row.ValueKind))
             {
-                out.Category = SandboxEditorTextureBakeSourceCategory::Unsupported;
+                out.Category = EditorTextureBakeSourceCategory::Unsupported;
                 out.DisabledReason = row.UnsupportedReason.empty()
                     ? "unsupported property value type"
                     : row.UnsupportedReason;
@@ -4530,17 +4539,17 @@ namespace Extrinsic::Runtime
             }
 
             out.Category = row.Internal
-                ? SandboxEditorTextureBakeSourceCategory::Internal
-                : SandboxEditorTextureBakeSourceCategory::Bakeable;
+                ? EditorTextureBakeSourceCategory::Internal
+                : EditorTextureBakeSourceCategory::Bakeable;
             out.Bakeable = true;
             return out;
         }
 
-        [[nodiscard]] SandboxEditorUvDiagnosticsModel BuildUvDiagnosticsModel(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorUvDiagnosticsModel BuildUvDiagnosticsModel(
+            const EditorFeatureBindings& context,
             const GS::ConstSourceView& view)
         {
-            ScopedSandboxEditorStatTimer timer{
+            ScopedEditorStatTimer timer{
                 context.ModelBuildStats != nullptr
                     ? &context.ModelBuildStats->UvDiagnosticsModelBuildTimeNs
                     : nullptr};
@@ -4548,7 +4557,7 @@ namespace Extrinsic::Runtime
             {
                 ++context.ModelBuildStats->UvDiagnosticsModelBuilds;
             }
-            SandboxEditorUvDiagnosticsModel model{};
+            EditorUvDiagnosticsModel model{};
             model.HasSelectedEntity = true;
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
@@ -4594,7 +4603,7 @@ namespace Extrinsic::Runtime
                 else
                 {
                     model.TexcoordsFinite = true;
-                    SandboxEditorModelBuildStats* stats =
+                    EditorWorkspaceSnapshotStats* stats =
                         context.ModelBuildStats;
                     for (const glm::vec2 uv : texcoords.Vector())
                     {
@@ -4614,14 +4623,14 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] SandboxEditorTextureBakeControlsModel
+        [[nodiscard]] EditorTextureBakeControlsModel
         BuildTextureBakeControlsModel(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const GS::ConstSourceView& view,
-            const SandboxEditorPropertyCatalogModel& catalog,
+            const EditorPropertyCatalogModel& catalog,
             const std::uint32_t stableEntityId)
         {
-            ScopedSandboxEditorStatTimer timer{
+            ScopedEditorStatTimer timer{
                 context.ModelBuildStats != nullptr
                     ? &context.ModelBuildStats->TextureBakeModelBuildTimeNs
                     : nullptr};
@@ -4629,7 +4638,7 @@ namespace Extrinsic::Runtime
             {
                 ++context.ModelBuildStats->TextureBakeModelBuilds;
             }
-            SandboxEditorTextureBakeControlsModel model{};
+            EditorTextureBakeControlsModel model{};
             model.HasSelectedEntity = true;
             model.SelectedStableId = stableEntityId;
             const GS::SourceAvailability availability =
@@ -4679,19 +4688,19 @@ namespace Extrinsic::Runtime
                             auto found = std::ranges::find(
                                 model.TextureBakeTargets,
                                 slot.GeneratedOutputName,
-                                &SandboxEditorTextureBakeTargetSnapshot::
+                                &EditorTextureBakeTargetSnapshot::
                                     OutputName);
                             if (found == model.TextureBakeTargets.end())
                             {
                                 model.TextureBakeTargets.push_back(
-                                    SandboxEditorTextureBakeTargetSnapshot{
+                                    EditorTextureBakeTargetSnapshot{
                                         .OutputName = slot.GeneratedOutputName,
                                     });
                                 found =
                                     std::prev(model.TextureBakeTargets.end());
                             }
                             found->Targets.push_back(
-                                SandboxEditorTextureBakeTarget{
+                                EditorTextureBakeTarget{
                                     .PresentationKey = presentation.Key,
                                     .Semantic = slot.Semantic,
                                     .Colormap = slot.TextureColormap,
@@ -4703,8 +4712,8 @@ namespace Extrinsic::Runtime
             }
 
             model.Sources.reserve(catalog.Rows.size());
-            SandboxEditorModelBuildStats* stats = context.ModelBuildStats;
-            for (const SandboxEditorPropertyCatalogRow& row : catalog.Rows)
+            EditorWorkspaceSnapshotStats* stats = context.ModelBuildStats;
+            for (const EditorPropertyCatalogRow& row : catalog.Rows)
             {
                 if (stats != nullptr)
                     ++stats->TextureBakeSourceRowsEnumerated;
@@ -4715,7 +4724,7 @@ namespace Extrinsic::Runtime
                 std::any_of(
                     model.Sources.begin(),
                     model.Sources.end(),
-                    [](const SandboxEditorTextureBakeSourceRow& row)
+                    [](const EditorTextureBakeSourceRow& row)
                     {
                         return row.Bakeable;
                     });
@@ -4745,7 +4754,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveFirstSelectedEntity(
-            const SandboxEditorContext& context)
+            const EditorFeatureBindings& context)
         {
             if (context.Scene == nullptr || context.Selection == nullptr)
                 return std::nullopt;
@@ -4763,7 +4772,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] const Geometry::PropertySet*
         ResolveSelectedMeshVertexProperties(
-            const SandboxEditorContext& context)
+            const EditorFeatureBindings& context)
         {
             const std::optional<ECS::EntityHandle> selected =
                 ResolveFirstSelectedEntity(context);
@@ -4774,7 +4783,7 @@ namespace Extrinsic::Runtime
                 BuildGeometryAvailability(context.Scene->Raw(), *selected);
             return PropertySetForCatalogDomain(
                 availability,
-                SandboxEditorPropertyCatalogDomain::MeshVertices);
+                EditorPropertyCatalogDomain::MeshVertices);
         }
 
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
@@ -4788,24 +4797,26 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
-        void InvalidateSelectedModelCache(const SandboxEditorContext& context)
+        void InvalidateSelectedModelCache(const EditorFeatureBindings& context)
         {
-            if (context.SelectedModelCache != nullptr)
+            if (context.InvalidateWorkspaceSnapshotCache)
+                context.InvalidateWorkspaceSnapshotCache();
+            else if (context.SelectedModelCache != nullptr)
                 context.SelectedModelCache->Clear();
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus InvalidateSelectedModelCacheIfApplied(
-            const SandboxEditorContext& context,
-            const SandboxEditorCommandStatus status)
+        [[nodiscard]] EditorCommandStatus
+        InvalidateSelectedModelCacheIfApplied(const EditorFeatureBindings& context,
+                                              const EditorCommandStatus status)
         {
-            if (status == SandboxEditorCommandStatus::Applied)
+            if (status == EditorCommandStatus::Applied)
                 InvalidateSelectedModelCache(context);
             return status;
         }
 
-        [[nodiscard]] std::vector<std::uint32_t> BuildSelectedStableIdsForCacheKey(
-            const SandboxEditorContext& context,
-            const std::uint32_t fallbackStableId)
+        [[nodiscard]] std::vector<std::uint32_t>
+        BuildSelectedStableIdsForCacheKey(const EditorFeatureBindings& context,
+                                          const std::uint32_t fallbackStableId)
         {
             std::vector<std::uint32_t> selectedIds{};
             if (context.Selection != nullptr)
@@ -4819,7 +4830,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::uint64_t CurrentCommandHistoryRevision(
-            const SandboxEditorContext& context)
+            const EditorFeatureBindings& context)
         {
             if (context.CommandHistory == nullptr)
                 return 0u;
@@ -4827,7 +4838,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::uint64_t CurrentSelectionGeneration(
-            const SandboxEditorContext& context)
+            const EditorFeatureBindings& context)
         {
             if (context.Selection == nullptr)
                 return 0u;
@@ -4835,11 +4846,11 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::uint64_t CurrentPrimitiveSelectionGeneration(
-            const SandboxEditorContext& context,
-            const SandboxEditorSelectedModelCacheSection section)
+            const EditorFeatureBindings& context,
+            const EditorSelectedModelCacheSection section)
         {
             if (section !=
-                SandboxEditorSelectedModelCacheSection::SelectedAnalysis)
+                EditorSelectedModelCacheSection::SelectedAnalysis)
             {
                 return 0u;
             }
@@ -4847,10 +4858,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::uint64_t CurrentVisualizationRecipeRevision(
-            const SandboxEditorContext& context,
-            const SandboxEditorSelectedModelCacheSection section)
+            const EditorFeatureBindings& context,
+            const EditorSelectedModelCacheSection section)
         {
-            if (section != SandboxEditorSelectedModelCacheSection::Visualization ||
+            if (section != EditorSelectedModelCacheSection::Visualization ||
                 !context.VisualizationRecipes.Available())
             {
                 return 0u;
@@ -4870,10 +4881,10 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t GeometryPresentationRecipeGenerationForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
-            const SandboxEditorSelectedModelCacheSection section)
+            const EditorSelectedModelCacheSection section)
         {
             if (section !=
-                SandboxEditorSelectedModelCacheSection::SelectedAnalysis)
+                EditorSelectedModelCacheSection::SelectedAnalysis)
             {
                 return 0u;
             }
@@ -4882,16 +4893,16 @@ namespace Extrinsic::Runtime
             return state != nullptr ? state->RecipeGeneration : 0u;
         }
 
-        constexpr std::uint64_t kSandboxEditorSignatureOffset =
+        constexpr std::uint64_t kEditorSignatureOffset =
             1469598103934665603ull;
-        constexpr std::uint64_t kSandboxEditorSignaturePrime =
+        constexpr std::uint64_t kEditorSignaturePrime =
             1099511628211ull;
 
         void MixSignatureByte(std::uint64_t& signature,
                               const std::uint8_t value) noexcept
         {
             signature ^= value;
-            signature *= kSandboxEditorSignaturePrime;
+            signature *= kEditorSignaturePrime;
         }
 
         void MixSignature(std::uint64_t& signature,
@@ -4943,15 +4954,15 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t RenderHintSignatureForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
-            const SandboxEditorSelectedModelCacheSection section)
+            const EditorSelectedModelCacheSection section)
         {
             if (section !=
-                SandboxEditorSelectedModelCacheSection::SelectedAnalysis)
+                EditorSelectedModelCacheSection::SelectedAnalysis)
             {
                 return 0u;
             }
 
-            std::uint64_t signature = kSandboxEditorSignatureOffset;
+            std::uint64_t signature = kEditorSignatureOffset;
             if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
             {
                 MixSignature(signature, 1u);
@@ -5033,13 +5044,13 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t VisualizationStateSignatureForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
-            const SandboxEditorSelectedModelCacheSection section,
-            const SandboxEditorVisualizationTarget target)
+            const EditorSelectedModelCacheSection section,
+            const EditorVisualizationTarget target)
         {
-            if (section != SandboxEditorSelectedModelCacheSection::Visualization)
+            if (section != EditorSelectedModelCacheSection::Visualization)
                 return 0u;
 
-            std::uint64_t signature = kSandboxEditorSignatureOffset;
+            std::uint64_t signature = kEditorSignatureOffset;
             AppendVisualizationConfigSignature(
                 signature,
                 EffectiveVisualizationConfigForTarget(raw, entity, target));
@@ -5086,7 +5097,7 @@ namespace Extrinsic::Runtime
             const ECS::EntityHandle entity)
         {
             const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-            std::uint64_t signature = kSandboxEditorSignatureOffset;
+            std::uint64_t signature = kEditorSignatureOffset;
             MixSignature(signature,
                          static_cast<std::uint64_t>(view.ActiveDomain));
             MixSignature(signature, view.HasMeshTopologyMarker ? 1u : 0u);
@@ -5131,19 +5142,19 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::uint64_t DerivedJobStateSignatureForEntity(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
-            const SandboxEditorSelectedModelCacheSection section)
+            const EditorSelectedModelCacheSection section)
         {
-            if (section != SandboxEditorSelectedModelCacheSection::SelectedAnalysis ||
+            if (section != EditorSelectedModelCacheSection::SelectedAnalysis ||
                 !context.JobCommands.SnapshotEntity)
             {
                 return 0u;
             }
 
-            std::uint64_t signature = kSandboxEditorSignatureOffset;
+            std::uint64_t signature = kEditorSignatureOffset;
             std::uint64_t order = 0u;
-            for (const SandboxEditorJobRecord& job :
+            for (const EditorJobRecord& job :
                  context.JobCommands.SnapshotEntity(stableEntityId))
             {
                 MixSignature(signature, order++);
@@ -5171,22 +5182,22 @@ namespace Extrinsic::Runtime
             return order == 0u ? 0u : signature;
         }
 
-        [[nodiscard]] SandboxEditorSelectedModelCacheKey
+        [[nodiscard]] EditorSelectedModelCacheKey
         BuildSelectedModelCacheKey(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const entt::registry& raw,
             const ECS::EntityHandle entity,
-            const SandboxEditorGeometryDomainModel& geometry,
-            const SandboxEditorSelectedModelCacheSection section,
-            const SandboxEditorSelectedAnalysisCacheConsumer
+            const EditorGeometryDomainModel& geometry,
+            const EditorSelectedModelCacheSection section,
+            const EditorSelectedAnalysisCacheConsumer
                 selectedAnalysisConsumer =
-                    SandboxEditorSelectedAnalysisCacheConsumer::Inspector,
-            const SandboxEditorVisualizationTarget visualizationTarget =
-                SandboxEditorVisualizationTarget::Entity)
+                    EditorSelectedAnalysisCacheConsumer::Inspector,
+            const EditorVisualizationTarget visualizationTarget =
+                EditorVisualizationTarget::Entity)
         {
             const std::uint32_t stableId =
                 SelectionController::ToStableEntityId(entity);
-            return SandboxEditorSelectedModelCacheKey{
+            return EditorSelectedModelCacheKey{
                 .Section = section,
                 .SelectedAnalysisConsumer = selectedAnalysisConsumer,
                 .VisualizationTarget = visualizationTarget,
@@ -5233,7 +5244,7 @@ namespace Extrinsic::Runtime
             };
         }
 
-        void RecordSelectedAnalysisCacheHit(const SandboxEditorContext& context)
+        void RecordSelectedAnalysisCacheHit(const EditorFeatureBindings& context)
         {
             if (context.SelectedModelCache != nullptr)
                 ++context.SelectedModelCache->Counters.SelectedAnalysisCacheHits;
@@ -5241,7 +5252,7 @@ namespace Extrinsic::Runtime
                 ++context.ModelBuildStats->SelectedAnalysisCacheHits;
         }
 
-        void RecordSelectedAnalysisCacheMiss(const SandboxEditorContext& context)
+        void RecordSelectedAnalysisCacheMiss(const EditorFeatureBindings& context)
         {
             if (context.SelectedModelCache != nullptr)
                 ++context.SelectedModelCache->Counters.SelectedAnalysisCacheMisses;
@@ -5249,7 +5260,7 @@ namespace Extrinsic::Runtime
                 ++context.ModelBuildStats->SelectedAnalysisCacheMisses;
         }
 
-        void RecordVisualizationCacheHit(const SandboxEditorContext& context)
+        void RecordVisualizationCacheHit(const EditorFeatureBindings& context)
         {
             if (context.SelectedModelCache != nullptr)
                 ++context.SelectedModelCache->Counters.VisualizationModelCacheHits;
@@ -5257,7 +5268,7 @@ namespace Extrinsic::Runtime
                 ++context.ModelBuildStats->VisualizationModelCacheHits;
         }
 
-        void RecordVisualizationCacheMiss(const SandboxEditorContext& context)
+        void RecordVisualizationCacheMiss(const EditorFeatureBindings& context)
         {
             if (context.SelectedModelCache != nullptr)
                 ++context.SelectedModelCache->Counters.VisualizationModelCacheMisses;
@@ -5265,10 +5276,10 @@ namespace Extrinsic::Runtime
                 ++context.ModelBuildStats->VisualizationModelCacheMisses;
         }
 
-        [[nodiscard]] SandboxEditorSelectedAnalysisCacheEntry*
+        [[nodiscard]] EditorSelectedAnalysisCacheEntry*
         ResolveSelectedAnalysisCacheEntry(
-            SandboxEditorSelectedModelCache& cache,
-            const SandboxEditorSelectedAnalysisCacheConsumer consumer)
+            EditorSelectedModelCache& cache,
+            const EditorSelectedAnalysisCacheConsumer consumer)
         {
             const std::size_t index = static_cast<std::size_t>(consumer);
             return index < cache.SelectedAnalysis.size()
@@ -5276,21 +5287,21 @@ namespace Extrinsic::Runtime
                 : nullptr;
         }
 
-        [[nodiscard]] SandboxEditorSelectedAnalysisModel
+        [[nodiscard]] EditorSelectedAnalysisModel
         BuildSelectedAnalysisModelUncached(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const entt::registry& raw,
             const ECS::EntityHandle entity,
             const GS::ConstSourceView& sourceView,
-            const SandboxEditorRenderHintModel& renderHints,
-            const SandboxEditorGeometryDomainModel& geometry,
+            const EditorRenderHintModel& renderHints,
+            const EditorGeometryDomainModel& geometry,
             const std::uint32_t stableId)
         {
-            ScopedSandboxEditorStatTimer timer{
+            ScopedEditorStatTimer timer{
                 context.ModelBuildStats != nullptr
                     ? &context.ModelBuildStats->SelectedAnalysisModelBuildTimeNs
                     : nullptr};
-            SandboxEditorSelectedAnalysisModel model{};
+            EditorSelectedAnalysisModel model{};
             model.PropertyCatalog =
                 BuildPropertyCatalogModel(context, raw, entity);
             model.GeometryPresentation =
@@ -5312,18 +5323,18 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] SandboxEditorSelectedAnalysisModel BuildSelectedAnalysisModel(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorSelectedAnalysisModel BuildSelectedAnalysisModel(
+            const EditorFeatureBindings& context,
             const entt::registry& raw,
             const ECS::EntityHandle entity,
             const GS::ConstSourceView& sourceView,
-            const SandboxEditorRenderHintModel& renderHints,
-            const SandboxEditorGeometryDomainModel& geometry,
+            const EditorRenderHintModel& renderHints,
+            const EditorGeometryDomainModel& geometry,
             const std::uint32_t stableId,
-            const SandboxEditorSelectedAnalysisCacheConsumer consumer =
-                SandboxEditorSelectedAnalysisCacheConsumer::Inspector)
+            const EditorSelectedAnalysisCacheConsumer consumer =
+                EditorSelectedAnalysisCacheConsumer::Inspector)
         {
-            SandboxEditorSelectedModelCache* cache = context.SelectedModelCache;
+            EditorSelectedModelCache* cache = context.SelectedModelCache;
             if (cache == nullptr)
             {
                 return BuildSelectedAnalysisModelUncached(
@@ -5336,7 +5347,7 @@ namespace Extrinsic::Runtime
                     stableId);
             }
 
-            SandboxEditorSelectedAnalysisCacheEntry* entry =
+            EditorSelectedAnalysisCacheEntry* entry =
                 ResolveSelectedAnalysisCacheEntry(*cache, consumer);
             if (entry == nullptr)
             {
@@ -5350,13 +5361,13 @@ namespace Extrinsic::Runtime
                     stableId);
             }
 
-            const SandboxEditorSelectedModelCacheKey key =
+            const EditorSelectedModelCacheKey key =
                 BuildSelectedModelCacheKey(
                     context,
                     raw,
                     entity,
                     geometry,
-                    SandboxEditorSelectedModelCacheSection::SelectedAnalysis,
+                    EditorSelectedModelCacheSection::SelectedAnalysis,
                     consumer);
             if (entry->Valid && entry->Key == key)
             {
@@ -5365,7 +5376,7 @@ namespace Extrinsic::Runtime
             }
 
             RecordSelectedAnalysisCacheMiss(context);
-            SandboxEditorSelectedAnalysisModel model =
+            EditorSelectedAnalysisModel model =
                 BuildSelectedAnalysisModelUncached(
                     context,
                     raw,
@@ -5374,7 +5385,7 @@ namespace Extrinsic::Runtime
                     renderHints,
                     geometry,
                     stableId);
-            *entry = SandboxEditorSelectedAnalysisCacheEntry{
+            *entry = EditorSelectedAnalysisCacheEntry{
                 .Valid = true,
                 .Key = key,
                 .Model = model,
@@ -5433,10 +5444,10 @@ namespace Extrinsic::Runtime
         // The guard refuses a duplicate submission when the same entity+output
         // already has a non-terminal `JobService` job. Identity stays with the
         // editor session and is resolved through its active-output query.
-        [[nodiscard]] std::optional<SandboxEditorJobRecord>
+        [[nodiscard]] std::optional<EditorJobRecord>
         FindActiveEditorJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorJobIdentity& identity)
+            const EditorFeatureBindings& context,
+            const EditorJobIdentity& identity)
         {
             if (!context.JobCommands.FindActive)
                 return std::nullopt;
@@ -5459,7 +5470,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::string BuildActiveDerivedJobMessage(
             const std::string_view label,
-            const SandboxEditorJobRecord& job)
+            const EditorJobRecord& job)
         {
             std::string message{label};
             message += " already has an active ";
@@ -5473,14 +5484,14 @@ namespace Extrinsic::Runtime
         struct MeshForVertexNormalsResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
-            SandboxEditorCommandStatus Status{
-                SandboxEditorCommandStatus::NoChange};
+            EditorCommandStatus Status{
+                EditorCommandStatus::NoChange};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::string Diagnostic{};
 
             [[nodiscard]] bool Succeeded() const noexcept
             {
-                return Status == SandboxEditorCommandStatus::Applied;
+                return Status == EditorCommandStatus::Applied;
             }
         };
 
@@ -5495,7 +5506,7 @@ namespace Extrinsic::Runtime
                 view.HalfedgeSource == nullptr ||
                 view.FaceSource == nullptr)
             {
-                result.Status = SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                result.Status = EditorCommandStatus::UnsupportedGeometryDomain;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "Mesh vertex normals require selected mesh GeometrySources.";
@@ -5509,7 +5520,7 @@ namespace Extrinsic::Runtime
                 positions.Vector().size() != view.VertexSource->Properties.Size())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "selected mesh requires count-matched v:position for normal recompute";
@@ -5520,7 +5531,7 @@ namespace Extrinsic::Runtime
                     std::numeric_limits<Geometry::PropertyIndex>::max()))
             {
                 result.Status =
-                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "selected mesh has too many vertices for normal recompute";
@@ -5547,7 +5558,7 @@ namespace Extrinsic::Runtime
                     view.FaceSource->Properties.Size())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "selected mesh has invalid halfedge/face topology for normal recompute";
@@ -5581,7 +5592,7 @@ namespace Extrinsic::Runtime
                 if (status == MeshFaceRingStatus::Invalid)
                 {
                     result.Status =
-                        SandboxEditorCommandStatus::InvalidProcessingParameters;
+                        EditorCommandStatus::InvalidProcessingParameters;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Diagnostic =
                         "selected mesh topology is not valid for normal recompute";
@@ -5600,7 +5611,7 @@ namespace Extrinsic::Runtime
                 if (!result.Mesh.AddFace(faceVertices).has_value())
                 {
                     result.Status =
-                        SandboxEditorCommandStatus::InvalidProcessingParameters;
+                        EditorCommandStatus::InvalidProcessingParameters;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Diagnostic = "selected mesh face ring could not be reconstructed "
                                         "for normal recompute";
@@ -5608,18 +5619,18 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             return result;
         }
 
-        [[nodiscard]] SandboxEditorMeshVertexNormalsResult MakeMeshNormalsResult(
-            const SandboxEditorCommandStatus status,
+        [[nodiscard]] EditorMeshVertexNormalsResult MakeMeshNormalsResult(
+            const EditorCommandStatus status,
             const GN::RecomputeStatus normalStatus,
             const GN::AveragingMode weighting,
             const Core::ErrorCode error,
             std::string message)
         {
-            return SandboxEditorMeshVertexNormalsResult{
+            return EditorMeshVertexNormalsResult{
                 .Status = status,
                 .NormalStatus = normalStatus,
                 .Weighting = weighting,
@@ -5629,7 +5640,7 @@ namespace Extrinsic::Runtime
         }
 
         void CopyMeshNormalCounters(const GN::Result& source,
-                                    SandboxEditorMeshVertexNormalsResult& target)
+                                    EditorMeshVertexNormalsResult& target)
         {
             target.NormalStatus = source.Status;
             target.Weighting = source.Weighting;
@@ -5671,7 +5682,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildMeshNormalsSuccessMessage(
-            const SandboxEditorMeshVertexNormalsResult& result)
+            const EditorMeshVertexNormalsResult& result)
         {
             std::string message = "Mesh vertex normals recomputed (weighting=";
             message += std::string(GN::DebugName(result.Weighting));
@@ -5688,14 +5699,14 @@ namespace Extrinsic::Runtime
             return std::isfinite(value) && value > 0.0;
         }
 
-        [[nodiscard]] SandboxEditorGraphVertexNormalsResult MakeGraphNormalsResult(
-            const SandboxEditorCommandStatus status,
+        [[nodiscard]] EditorGraphVertexNormalsResult MakeGraphNormalsResult(
+            const EditorCommandStatus status,
             const GraphNormals::RecomputeStatus normalStatus,
             const bool orientTowardFallback,
             const Core::ErrorCode error,
             std::string message)
         {
-            return SandboxEditorGraphVertexNormalsResult{
+            return EditorGraphVertexNormalsResult{
                 .Status = status,
                 .NormalStatus = normalStatus,
                 .OrientTowardFallback = orientTowardFallback,
@@ -5706,7 +5717,7 @@ namespace Extrinsic::Runtime
 
         void CopyGraphNormalCounters(
             const GraphNormals::Diagnostics& source,
-            SandboxEditorGraphVertexNormalsResult& target)
+            EditorGraphVertexNormalsResult& target)
         {
             target.VertexSlotCount = source.VertexSlotCount;
             target.EdgeSlotCount = source.EdgeSlotCount;
@@ -5751,14 +5762,14 @@ namespace Extrinsic::Runtime
         {
             Geometry::Halfedges Halfedges{};
             std::size_t EdgeSlotCount{0};
-            SandboxEditorCommandStatus Status{
-                SandboxEditorCommandStatus::NoChange};
+            EditorCommandStatus Status{
+                EditorCommandStatus::NoChange};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::string Diagnostic{};
 
             [[nodiscard]] bool Succeeded() const noexcept
             {
-                return Status == SandboxEditorCommandStatus::Applied;
+                return Status == EditorCommandStatus::Applied;
             }
         };
 
@@ -5774,7 +5785,7 @@ namespace Extrinsic::Runtime
                 view.EdgeSource == nullptr)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                    EditorCommandStatus::UnsupportedGeometryDomain;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "Graph vertex normals require selected graph GeometrySources.";
@@ -5794,7 +5805,7 @@ namespace Extrinsic::Runtime
                 edgeV1.Vector().size() != edgeSlotCount)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic = "selected graph requires count-matched edge endpoint "
                                     "properties for normal recompute";
@@ -5810,7 +5821,7 @@ namespace Extrinsic::Runtime
                 connectivity.Vector().size() != edgeSlotCount * 2u)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::Unknown;
                 result.Diagnostic = "graph normal recompute could not build halfedge "
                                     "connectivity scratch storage";
@@ -5834,12 +5845,12 @@ namespace Extrinsic::Runtime
             }
 
             result.EdgeSlotCount = edgeSlotCount;
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             return result;
         }
 
         [[nodiscard]] std::string BuildGraphNormalsSuccessMessage(
-            const SandboxEditorGraphVertexNormalsResult& result)
+            const EditorGraphVertexNormalsResult& result)
         {
             std::string message = "Graph vertex normals recomputed (written=";
             message += std::to_string(result.WrittenCount);
@@ -5851,15 +5862,15 @@ namespace Extrinsic::Runtime
             return message;
         }
 
-        [[nodiscard]] SandboxEditorPointCloudVertexNormalsResult
+        [[nodiscard]] EditorPointCloudVertexNormalsResult
         MakePointCloudNormalsResult(
-            const SandboxEditorCommandStatus status,
+            const EditorCommandStatus status,
             const PointNormals::RecomputeStatus normalStatus,
-            const SandboxEditorPointCloudVertexNormalsCommand& command,
+            const EditorPointCloudVertexNormalsCommand& command,
             const Core::ErrorCode error,
             std::string message)
         {
-            return SandboxEditorPointCloudVertexNormalsResult{
+            return EditorPointCloudVertexNormalsResult{
                 .Status = status,
                 .NormalStatus = normalStatus,
                 .Orientation = command.Orientation,
@@ -5874,7 +5885,7 @@ namespace Extrinsic::Runtime
 
         void CopyPointCloudNormalCounters(
             const PointNormals::Diagnostics& source,
-            SandboxEditorPointCloudVertexNormalsResult& target)
+            EditorPointCloudVertexNormalsResult& target)
         {
             target.PointSlotCount = source.PointSlotCount;
             target.FinitePointCount = source.FinitePointCount;
@@ -5924,7 +5935,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildPointCloudNormalsSuccessMessage(
-            const SandboxEditorPointCloudVertexNormalsResult& result)
+            const EditorPointCloudVertexNormalsResult& result)
         {
             std::string message =
                 "Point-cloud vertex normals recomputed (backend=";
@@ -5979,14 +5990,14 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec3> BeforePositions{};
             std::vector<bool> DeletedVertices{};
             std::vector<std::uint32_t> SourceFaceForMeshFace{};
-            SandboxEditorCommandStatus Status{
-                SandboxEditorCommandStatus::NoChange};
+            EditorCommandStatus Status{
+                EditorCommandStatus::NoChange};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::string Diagnostic{};
 
             [[nodiscard]] bool Succeeded() const noexcept
             {
-                return Status == SandboxEditorCommandStatus::Applied;
+                return Status == EditorCommandStatus::Applied;
             }
         };
 
@@ -6002,7 +6013,7 @@ namespace Extrinsic::Runtime
                 view.FaceSource == nullptr)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                    EditorCommandStatus::UnsupportedGeometryDomain;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "Mesh denoise requires selected mesh GeometrySources.";
@@ -6015,7 +6026,7 @@ namespace Extrinsic::Runtime
             if (!positions || positions.Vector().empty())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "Mesh denoise requires a non-empty v:position property.";
@@ -6030,7 +6041,7 @@ namespace Extrinsic::Runtime
                 if (deleted.Vector().size() != result.BeforePositions.size())
                 {
                     result.Status =
-                        SandboxEditorCommandStatus::InvalidProcessingParameters;
+                        EditorCommandStatus::InvalidProcessingParameters;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Diagnostic =
                         "Mesh denoise requires v:deleted to match v:position when present.";
@@ -6058,7 +6069,7 @@ namespace Extrinsic::Runtime
             if (!converted.Succeeded())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic = "Mesh denoise could not convert selected "
                                     "GeometrySources to halfedge topology.";
@@ -6067,7 +6078,7 @@ namespace Extrinsic::Runtime
             if (converted.Mesh.VerticesSize() != result.BeforePositions.size())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "Mesh denoise conversion changed the vertex slot count.";
@@ -6077,7 +6088,7 @@ namespace Extrinsic::Runtime
                 soup.SourceFaceForSoupFace.size())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic =
                     "Mesh denoise conversion changed the face slot count.";
@@ -6087,7 +6098,7 @@ namespace Extrinsic::Runtime
             result.Mesh = std::move(converted.Mesh);
             result.SourceFaceForMeshFace =
                 std::move(soup.SourceFaceForSoupFace);
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             return result;
         }
@@ -6171,8 +6182,8 @@ namespace Extrinsic::Runtime
             Dirty::MarkVertexAttributesDirty(raw, entity);
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus CommitMeshDenoisePositions(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorCommandStatus CommitMeshDenoisePositions(
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
             std::vector<glm::vec3> before,
             std::vector<glm::vec3> after)
@@ -6180,13 +6191,13 @@ namespace Extrinsic::Runtime
             if (context.CommandHistory != nullptr)
             {
                 if (context.Scene == nullptr)
-                    return SandboxEditorCommandStatus::MissingScene;
+                    return EditorCommandStatus::MissingScene;
                 const ECS::EntityHandle entity =
                     SelectionController::ToEntityHandle(stableEntityId);
                 if (entity == ECS::InvalidEntityHandle ||
                     !context.Scene->Raw().valid(entity))
                 {
-                    return SandboxEditorCommandStatus::StaleEntity;
+                    return EditorCommandStatus::StaleEntity;
                 }
 
                 const MeshPositionState beforeState =
@@ -6297,7 +6308,7 @@ namespace Extrinsic::Runtime
                                 .Positions = target,
                             };
                         });
-                return ToSandboxEditorCommandStatus(history.Status);
+                return ToEditorCommandStatus(history.Status);
             }
 
             const EditorCommandHistoryStatus applied =
@@ -6306,16 +6317,16 @@ namespace Extrinsic::Runtime
                     stableEntityId,
                     after);
             if (applied != EditorCommandHistoryStatus::Applied)
-                return ToSandboxEditorCommandStatus(applied);
+                return ToEditorCommandStatus(applied);
             StampMeshDenoisePositionDirty(
                 *context.Scene,
                 stableEntityId);
-            return SandboxEditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
         }
 
         void CopyMeshDenoiseCounters(
             const Smooth::BilateralDenoiseResult& source,
-            SandboxEditorMeshDenoiseResult& target)
+            EditorMeshDenoiseResult& target)
         {
             target.NormalIterations =
                 static_cast<std::uint32_t>(
@@ -6336,7 +6347,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildMeshDenoiseSuccessMessage(
-            const SandboxEditorMeshDenoiseResult& result)
+            const EditorMeshDenoiseResult& result)
         {
             std::string message = "Mesh denoise completed (written=";
             message += std::to_string(result.WrittenCount);
@@ -6355,14 +6366,14 @@ namespace Extrinsic::Runtime
             Geometry::HalfedgeMesh::Mesh Mesh{};
             std::vector<glm::vec3> SourcePositions{};
             std::size_t VertexSlotCount{0u};
-            SandboxEditorCommandStatus Status{
-                SandboxEditorCommandStatus::NoChange};
+            EditorCommandStatus Status{
+                EditorCommandStatus::NoChange};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::string Diagnostic{};
 
             [[nodiscard]] bool Succeeded() const noexcept
             {
-                return Status == SandboxEditorCommandStatus::Applied;
+                return Status == EditorCommandStatus::Applied;
             }
         };
 
@@ -6382,13 +6393,13 @@ namespace Extrinsic::Runtime
                 result.Diagnostic.clear();
             }
             else if (source.Status ==
-                     SandboxEditorCommandStatus::UnsupportedGeometryDomain)
+                     EditorCommandStatus::UnsupportedGeometryDomain)
             {
                 result.Diagnostic =
                     "Mesh curvature requires selected mesh GeometrySources.";
             }
             else if (source.Status ==
-                     SandboxEditorCommandStatus::InvalidProcessingParameters)
+                     EditorCommandStatus::InvalidProcessingParameters)
             {
                 result.Diagnostic = "Mesh curvature requires finite count-matched vertex "
                                     "positions and valid mesh topology.";
@@ -6621,10 +6632,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool CurvatureOutputRequestsDirections(
-            const SandboxEditorMeshCurvatureOutput output) noexcept
+            const EditorMeshCurvatureOutput output) noexcept
         {
-            return output == SandboxEditorMeshCurvatureOutput::All ||
-                   output == SandboxEditorMeshCurvatureOutput::PrincipalDirections;
+            return output == EditorMeshCurvatureOutput::All ||
+                   output == EditorMeshCurvatureOutput::PrincipalDirections;
         }
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshCurvatureState(
@@ -6670,8 +6681,8 @@ namespace Extrinsic::Runtime
             Dirty::MarkVertexAttributesDirty(raw, entity);
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus CommitMeshCurvatureProperties(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorCommandStatus CommitMeshCurvatureProperties(
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
             std::vector<glm::vec3> positions,
             MeshCurvaturePropertyState before,
@@ -6680,13 +6691,13 @@ namespace Extrinsic::Runtime
             if (context.CommandHistory != nullptr)
             {
                 if (context.Scene == nullptr)
-                    return SandboxEditorCommandStatus::MissingScene;
+                    return EditorCommandStatus::MissingScene;
                 const ECS::EntityHandle entity =
                     SelectionController::ToEntityHandle(stableEntityId);
                 if (entity == ECS::InvalidEntityHandle ||
                     !context.Scene->Raw().valid(entity))
                 {
-                    return SandboxEditorCommandStatus::StaleEntity;
+                    return EditorCommandStatus::StaleEntity;
                 }
 
                 const MeshPositionState positionState =
@@ -6826,21 +6837,21 @@ namespace Extrinsic::Runtime
                                 .Properties = target,
                             };
                         });
-                return ToSandboxEditorCommandStatus(history.Status);
+                return ToEditorCommandStatus(history.Status);
             }
 
             const EditorCommandHistoryStatus applied =
                 ApplyMeshCurvatureState(context.Scene, stableEntityId, after);
             if (applied != EditorCommandHistoryStatus::Applied)
-                return ToSandboxEditorCommandStatus(applied);
+                return ToEditorCommandStatus(applied);
             StampMeshCurvaturePropertyDirty(
                 *context.Scene,
                 stableEntityId);
-            return SandboxEditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
         }
 
         [[nodiscard]] std::string BuildMeshCurvatureSuccessMessage(
-            const SandboxEditorMeshCurvatureResult& result)
+            const EditorMeshCurvatureResult& result)
         {
             std::string message = "Mesh curvature computed (vertices=";
             message += std::to_string(result.VertexSlotCount);
@@ -6855,7 +6866,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool ValidMeshRemeshMode(
-            const SandboxEditorMeshRemeshMode mode) noexcept
+            const EditorMeshRemeshMode mode) noexcept
         {
             return std::find(kMeshRemeshModes.begin(),
                              kMeshRemeshModes.end(),
@@ -6863,7 +6874,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool ValidMeshRemeshSizingLaw(
-            const SandboxEditorMeshRemeshSizingLaw sizingLaw) noexcept
+            const EditorMeshRemeshSizingLaw sizingLaw) noexcept
         {
             return std::find(kMeshRemeshSizingLaws.begin(),
                              kMeshRemeshSizingLaws.end(),
@@ -6871,7 +6882,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool ValidMeshSubdivideOperator(
-            const SandboxEditorMeshSubdivideOperator op) noexcept
+            const EditorMeshSubdivideOperator op) noexcept
         {
             return std::find(kMeshSubdivideOperators.begin(),
                              kMeshSubdivideOperators.end(),
@@ -6879,25 +6890,25 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool ValidMeshSimplifyMetric(
-            const SandboxEditorMeshSimplifyMetric metric) noexcept
+            const EditorMeshSimplifyMetric metric) noexcept
         {
             return std::find(kMeshSimplifyMetrics.begin(),
                              kMeshSimplifyMetrics.end(),
                              metric) != kMeshSimplifyMetrics.end();
         }
 
-        [[nodiscard]] bool ValidSandboxEditorICPVariant(
-            const SandboxEditorICPVariant variant) noexcept
+        [[nodiscard]] bool ValidEditorICPVariant(
+            const EditorICPVariant variant) noexcept
         {
-            return std::find(kSandboxEditorICPVariants.begin(),
-                             kSandboxEditorICPVariants.end(),
-                             variant) != kSandboxEditorICPVariants.end();
+            return std::find(kEditorICPVariants.begin(),
+                             kEditorICPVariants.end(),
+                             variant) != kEditorICPVariants.end();
         }
 
         [[nodiscard]] Reg::ICPVariant ToGeometryICPVariant(
-            const SandboxEditorICPVariant variant) noexcept
+            const EditorICPVariant variant) noexcept
         {
-            return variant == SandboxEditorICPVariant::PointToPlane
+            return variant == EditorICPVariant::PointToPlane
                        ? Reg::ICPVariant::PointToPlane
                        : Reg::ICPVariant::PointToPoint;
         }
@@ -6905,14 +6916,14 @@ namespace Extrinsic::Runtime
         struct MeshTopologySourceResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
-            SandboxEditorCommandStatus Status{
-                SandboxEditorCommandStatus::NoChange};
+            EditorCommandStatus Status{
+                EditorCommandStatus::NoChange};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::string Diagnostic{};
 
             [[nodiscard]] bool Succeeded() const noexcept
             {
-                return Status == SandboxEditorCommandStatus::Applied;
+                return Status == EditorCommandStatus::Applied;
             }
         };
 
@@ -6932,13 +6943,13 @@ namespace Extrinsic::Runtime
 
             result.Diagnostic = std::string{operationName};
             if (source.Status ==
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain)
+                EditorCommandStatus::UnsupportedGeometryDomain)
             {
                 result.Diagnostic +=
                     " requires selected mesh GeometrySources.";
             }
             else if (source.Status ==
-                     SandboxEditorCommandStatus::InvalidProcessingParameters)
+                     EditorCommandStatus::InvalidProcessingParameters)
             {
                 result.Diagnostic +=
                     " requires a non-empty finite mesh with valid topology.";
@@ -7129,8 +7140,8 @@ namespace Extrinsic::Runtime
             return EditorCommandHistoryStatus::Applied;
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus CommitMeshTopologyReplacement(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorCommandStatus CommitMeshTopologyReplacement(
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
             const char* label,
             const std::uint64_t expectedGeometryMetadataSignature,
@@ -7247,7 +7258,7 @@ namespace Extrinsic::Runtime
                                 .Mesh = target,
                             };
                         });
-                return ToSandboxEditorCommandStatus(history.Status);
+                return ToEditorCommandStatus(history.Status);
             }
 
             const EditorCommandHistoryStatus applied =
@@ -7256,13 +7267,13 @@ namespace Extrinsic::Runtime
                     stableEntityId,
                     after);
             if (applied != EditorCommandHistoryStatus::Applied)
-                return ToSandboxEditorCommandStatus(applied);
+                return ToEditorCommandStatus(applied);
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, stableEntityId);
             if (entity.has_value())
                 MarkMeshTopologyReplacementDirty(raw, *entity);
-            return SandboxEditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
         }
 
         // UI-027: outlier removal changes the point count, so the published
@@ -7370,8 +7381,8 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus CommitPointCloudReplacement(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorCommandStatus CommitPointCloudReplacement(
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
             const char* label,
             const std::uint64_t expectedGeometryMetadataSignature,
@@ -7489,7 +7500,7 @@ namespace Extrinsic::Runtime
                                         : nullptr,
                             };
                         });
-                return ToSandboxEditorCommandStatus(history.Status);
+                return ToEditorCommandStatus(history.Status);
             }
 
             const EditorCommandHistoryStatus applied =
@@ -7498,13 +7509,13 @@ namespace Extrinsic::Runtime
                     stableEntityId,
                     after);
             if (applied != EditorCommandHistoryStatus::Applied)
-                return ToSandboxEditorCommandStatus(applied);
+                return ToEditorCommandStatus(applied);
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, stableEntityId);
             if (entity.has_value())
                 MarkPointCloudReplacementDirty(raw, *entity);
-            return SandboxEditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
         }
 
         [[nodiscard]] const char* DebugNameForOutlierRemovalStatus(
@@ -7528,13 +7539,13 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] AdaptiveRemesh::SizingLaw ToAdaptiveSizingLaw(
-            const SandboxEditorMeshRemeshSizingLaw sizingLaw) noexcept
+            const EditorMeshRemeshSizingLaw sizingLaw) noexcept
         {
             switch (sizingLaw)
             {
-            case SandboxEditorMeshRemeshSizingLaw::MeanCurvature:
+            case EditorMeshRemeshSizingLaw::MeanCurvature:
                 return AdaptiveRemesh::SizingLaw::MeanCurvature;
-            case SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin:
+            case EditorMeshRemeshSizingLaw::ErrorBoundedTaubin:
                 return AdaptiveRemesh::SizingLaw::ErrorBoundedTaubin;
             }
             return AdaptiveRemesh::SizingLaw::MeanCurvature;
@@ -7542,7 +7553,7 @@ namespace Extrinsic::Runtime
 
         void CopyRemeshCounters(
             const Geometry::RemeshingOperationResult& source,
-            SandboxEditorMeshRemeshResult& target)
+            EditorMeshRemeshResult& target)
         {
             target.IterationsPerformed =
                 static_cast<std::uint32_t>(source.IterationsPerformed);
@@ -7554,10 +7565,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildMeshRemeshSuccessMessage(
-            const SandboxEditorMeshRemeshResult& result)
+            const EditorMeshRemeshResult& result)
         {
             std::string message = "Mesh remesh completed (mode=";
-            message += DebugNameForSandboxEditorMeshRemeshMode(result.Mode);
+            message += DebugNameForEditorMeshRemeshModeImpl(result.Mode);
             message += ", inputFaces=";
             message += std::to_string(result.InputFaceCount);
             message += ", outputFaces=";
@@ -7569,10 +7580,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildMeshSubdivideSuccessMessage(
-            const SandboxEditorMeshSubdivideResult& result)
+            const EditorMeshSubdivideResult& result)
         {
             std::string message = "Mesh subdivide completed (operator=";
-            message += DebugNameForSandboxEditorMeshSubdivideOperator(
+            message += DebugNameForEditorMeshSubdivideOperatorImpl(
                 result.Operator);
             message += ", inputFaces=";
             message += std::to_string(result.InputFaceCount);
@@ -7585,10 +7596,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildMeshSimplifySuccessMessage(
-            const SandboxEditorMeshSimplifyResult& result)
+            const EditorMeshSimplifyResult& result)
         {
             std::string message = "Mesh simplify completed (metric=";
-            message += DebugNameForSandboxEditorMeshSimplifyMetric(
+            message += DebugNameForEditorMeshSimplifyMetricImpl(
                 result.Metric);
             message += ", inputFaces=";
             message += std::to_string(result.InputFaceCount);
@@ -7600,13 +7611,13 @@ namespace Extrinsic::Runtime
             return message;
         }
 
-        [[nodiscard]] SandboxEditorMeshCurvatureResult
+        [[nodiscard]] EditorMeshCurvatureResult
         MakeMeshCurvatureBaseResult(
-            const SandboxEditorMeshCurvatureCommand& command,
+            const EditorMeshCurvatureCommand& command,
             const bool directionsAvailable)
         {
-            return SandboxEditorMeshCurvatureResult{
-                .Status = SandboxEditorCommandStatus::NoChange,
+            return EditorMeshCurvatureResult{
+                .Status = EditorCommandStatus::NoChange,
                 .Output = command.Output,
                 .DirectionsRequested =
                     command.PublishPrincipalDirections &&
@@ -7616,11 +7627,11 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorMeshDenoiseResult MakeMeshDenoiseBaseResult(
-            const SandboxEditorMeshDenoiseCommand& command)
+        [[nodiscard]] EditorMeshDenoiseResult MakeMeshDenoiseBaseResult(
+            const EditorMeshDenoiseCommand& command)
         {
-            return SandboxEditorMeshDenoiseResult{
-                .Status = SandboxEditorCommandStatus::NoChange,
+            return EditorMeshDenoiseResult{
+                .Status = EditorCommandStatus::NoChange,
                 .DenoiseStatus = Smooth::DenoiseStatus::Success,
                 .Stage = command.Stage,
                 .NormalIterations = command.NormalIterations,
@@ -7632,11 +7643,11 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorMeshRemeshResult MakeMeshRemeshBaseResult(
-            const SandboxEditorMeshRemeshCommand& command)
+        [[nodiscard]] EditorMeshRemeshResult MakeMeshRemeshBaseResult(
+            const EditorMeshRemeshCommand& command)
         {
-            return SandboxEditorMeshRemeshResult{
-                .Status = SandboxEditorCommandStatus::NoChange,
+            return EditorMeshRemeshResult{
+                .Status = EditorCommandStatus::NoChange,
                 .Mode = command.Mode,
                 .SizingLaw = command.SizingLaw,
                 .IterationsRequested = command.Iterations,
@@ -7646,12 +7657,12 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorMeshSubdivideResult
+        [[nodiscard]] EditorMeshSubdivideResult
         MakeMeshSubdivideBaseResult(
-            const SandboxEditorMeshSubdivideCommand& command)
+            const EditorMeshSubdivideCommand& command)
         {
-            return SandboxEditorMeshSubdivideResult{
-                .Status = SandboxEditorCommandStatus::NoChange,
+            return EditorMeshSubdivideResult{
+                .Status = EditorCommandStatus::NoChange,
                 .Operator = command.Operator,
                 .IterationsRequested = command.Iterations,
                 .PreserveLoopFeatureEdges = command.PreserveLoopFeatureEdges,
@@ -7659,11 +7670,11 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorMeshSimplifyResult MakeMeshSimplifyBaseResult(
-            const SandboxEditorMeshSimplifyCommand& command)
+        [[nodiscard]] EditorMeshSimplifyResult MakeMeshSimplifyBaseResult(
+            const EditorMeshSimplifyCommand& command)
         {
-            return SandboxEditorMeshSimplifyResult{
-                .Status = SandboxEditorCommandStatus::NoChange,
+            return EditorMeshSimplifyResult{
+                .Status = EditorCommandStatus::NoChange,
                 .Metric = command.Metric,
                 .TargetFaces = command.TargetFaces,
                 .MaxError = command.MaxError,
@@ -7671,16 +7682,16 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorMeshCurvatureResult
+        [[nodiscard]] EditorMeshCurvatureResult
         MakePendingMeshCurvatureResult(
-            const SandboxEditorMeshCurvatureCommand& command,
+            const EditorMeshCurvatureCommand& command,
             const bool directionsAvailable,
             const std::size_t vertexSlotCount,
             const JobToken handle)
         {
-            SandboxEditorMeshCurvatureResult result =
+            EditorMeshCurvatureResult result =
                 MakeMeshCurvatureBaseResult(command, directionsAvailable);
-            result.Status = SandboxEditorCommandStatus::Pending;
+            result.Status = EditorCommandStatus::Pending;
             result.VertexSlotCount = vertexSlotCount;
             result.Message = "Mesh curvature CPU job queued";
             AppendDerivedJobHandleToMessage(result.Message, handle);
@@ -7688,14 +7699,14 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] SandboxEditorMeshDenoiseResult MakePendingMeshDenoiseResult(
-            const SandboxEditorMeshDenoiseCommand& command,
+        [[nodiscard]] EditorMeshDenoiseResult MakePendingMeshDenoiseResult(
+            const EditorMeshDenoiseCommand& command,
             const MeshDenoiseSourceResult& source,
             const JobToken handle)
         {
-            SandboxEditorMeshDenoiseResult result =
+            EditorMeshDenoiseResult result =
                 MakeMeshDenoiseBaseResult(command);
-            result.Status = SandboxEditorCommandStatus::Pending;
+            result.Status = EditorCommandStatus::Pending;
             result.VertexSlotCount = source.BeforePositions.size();
             result.SkippedDeletedVertexCount =
                 static_cast<std::size_t>(
@@ -7710,14 +7721,14 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] SandboxEditorMeshRemeshResult MakePendingMeshRemeshResult(
-            const SandboxEditorMeshRemeshCommand& command,
+        [[nodiscard]] EditorMeshRemeshResult MakePendingMeshRemeshResult(
+            const EditorMeshRemeshCommand& command,
             const Geometry::HalfedgeMesh::Mesh& mesh,
             const JobToken handle)
         {
-            SandboxEditorMeshRemeshResult result =
+            EditorMeshRemeshResult result =
                 MakeMeshRemeshBaseResult(command);
-            result.Status = SandboxEditorCommandStatus::Pending;
+            result.Status = EditorCommandStatus::Pending;
             result.InputVertexCount = mesh.VertexCount();
             result.InputFaceCount = mesh.FaceCount();
             result.Message = "Mesh remesh CPU job queued";
@@ -7726,15 +7737,15 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] SandboxEditorMeshSubdivideResult
+        [[nodiscard]] EditorMeshSubdivideResult
         MakePendingMeshSubdivideResult(
-            const SandboxEditorMeshSubdivideCommand& command,
+            const EditorMeshSubdivideCommand& command,
             const Geometry::HalfedgeMesh::Mesh& mesh,
             const JobToken handle)
         {
-            SandboxEditorMeshSubdivideResult result =
+            EditorMeshSubdivideResult result =
                 MakeMeshSubdivideBaseResult(command);
-            result.Status = SandboxEditorCommandStatus::Pending;
+            result.Status = EditorCommandStatus::Pending;
             result.InputVertexCount = mesh.VertexCount();
             result.InputFaceCount = mesh.FaceCount();
             result.Message = "Mesh subdivide CPU job queued";
@@ -7743,15 +7754,15 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] SandboxEditorMeshSimplifyResult
+        [[nodiscard]] EditorMeshSimplifyResult
         MakePendingMeshSimplifyResult(
-            const SandboxEditorMeshSimplifyCommand& command,
+            const EditorMeshSimplifyCommand& command,
             const Geometry::HalfedgeMesh::Mesh& mesh,
             const JobToken handle)
         {
-            SandboxEditorMeshSimplifyResult result =
+            EditorMeshSimplifyResult result =
                 MakeMeshSimplifyBaseResult(command);
-            result.Status = SandboxEditorCommandStatus::Pending;
+            result.Status = EditorCommandStatus::Pending;
             result.InputVertexCount = mesh.VertexCount();
             result.InputFaceCount = mesh.FaceCount();
             result.Message = "Mesh simplify CPU job queued";
@@ -7768,12 +7779,12 @@ namespace Extrinsic::Runtime
                 : error;
         }
 
-        [[nodiscard]] SandboxEditorPointCloudOutlierRemovalResult
+        [[nodiscard]] EditorPointCloudOutlierRemovalResult
         MakePointCloudOutlierRemovalBaseResult(
-            const SandboxEditorPointCloudOutlierRemovalCommand& command)
+            const EditorPointCloudOutlierRemovalCommand& command)
         {
-            return SandboxEditorPointCloudOutlierRemovalResult{
-                .Status = SandboxEditorCommandStatus::NoChange,
+            return EditorPointCloudOutlierRemovalResult{
+                .Status = EditorCommandStatus::NoChange,
                 .Method = command.Method,
                 .GeometryStatus =
                     Geometry::PointCloud::OutlierRemovalStatus::Success,
@@ -7783,7 +7794,7 @@ namespace Extrinsic::Runtime
 
         void CopyPointCloudOutlierRemovalCounters(
             const Geometry::PointCloud::OutlierRemovalResult& source,
-            SandboxEditorPointCloudOutlierRemovalResult& target)
+            EditorPointCloudOutlierRemovalResult& target)
         {
             target.GeometryStatus = source.Status;
             target.OriginalCount = source.OriginalCount;
@@ -7796,7 +7807,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildPointCloudOutlierRemovalSuccessMessage(
-            const SandboxEditorPointCloudOutlierRemovalResult& result)
+            const EditorPointCloudOutlierRemovalResult& result)
         {
             std::string message = "Removed ";
             message += std::to_string(result.RejectedCount);
@@ -7813,15 +7824,15 @@ namespace Extrinsic::Runtime
             return message;
         }
 
-        [[nodiscard]] SandboxEditorPointCloudOutlierRemovalResult
+        [[nodiscard]] EditorPointCloudOutlierRemovalResult
         MakePendingPointCloudOutlierRemovalResult(
-            const SandboxEditorPointCloudOutlierRemovalCommand& command,
+            const EditorPointCloudOutlierRemovalCommand& command,
             const std::size_t livePointCount,
             const JobToken handle)
         {
-            SandboxEditorPointCloudOutlierRemovalResult result =
+            EditorPointCloudOutlierRemovalResult result =
                 MakePointCloudOutlierRemovalBaseResult(command);
-            result.Status = SandboxEditorCommandStatus::Pending;
+            result.Status = EditorCommandStatus::Pending;
             result.OriginalCount = livePointCount;
             result.KeptCount = livePointCount;
             result.Message = "Point-cloud outlier-removal CPU job queued";
@@ -7830,7 +7841,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        struct SandboxEditorPointCloudOutlierRemovalCpuJobState
+        struct EditorPointCloudOutlierRemovalCpuJobState
         {
             std::uint32_t StableEntityId{0u};
             std::uint64_t GeometryMetadataSignature{0u};
@@ -7838,14 +7849,14 @@ namespace Extrinsic::Runtime
             Geometry::PointCloud::Cloud BeforeCloud{};
             Geometry::PointCloud::Cloud WorkCloud{};
             Geometry::PointCloud::Cloud AfterCloud{};
-            SandboxEditorPointCloudOutlierRemovalCommand Command{};
-            SandboxEditorPointCloudOutlierRemovalResult Result{};
+            EditorPointCloudOutlierRemovalCommand Command{};
+            EditorPointCloudOutlierRemovalResult Result{};
         };
 
         [[nodiscard]] JobApplyValidation
         ValidatePointCloudOutlierRemovalCpuJobApply(
-            const SandboxEditorContext& context,
-            const SandboxEditorPointCloudOutlierRemovalCpuJobState& job)
+            const EditorFeatureBindings& context,
+            const EditorPointCloudOutlierRemovalCpuJobState& job)
         {
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
@@ -7881,8 +7892,8 @@ namespace Extrinsic::Runtime
         }
 
         void PublishPointCloudOutlierRemovalResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorPointCloudOutlierRemovalResult result)
+            const EditorFeatureBindings& context,
+            EditorPointCloudOutlierRemovalResult result)
         {
             if (context.MethodResultSinks.PointCloudOutlierRemoval)
             {
@@ -7894,11 +7905,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] JobResultEnvelope
         RunPointCloudOutlierRemovalCpuWorker(
             const std::shared_ptr<
-                SandboxEditorPointCloudOutlierRemovalCpuJobState>& state)
+                EditorPointCloudOutlierRemovalCpuJobState>& state)
         {
             const bool statistical =
                 state->Command.Method ==
-                SandboxEditorPointCloudOutlierMethod::Statistical;
+                EditorPointCloudOutlierMethod::Statistical;
             Geometry::PointCloud::OutlierRemovalResult removal{};
             if (statistical)
             {
@@ -7921,7 +7932,7 @@ namespace Extrinsic::Runtime
                         params);
             }
 
-            SandboxEditorPointCloudOutlierRemovalResult& result =
+            EditorPointCloudOutlierRemovalResult& result =
                 state->Result;
             CopyPointCloudOutlierRemovalCounters(removal, result);
             if (removal.Status !=
@@ -7930,16 +7941,16 @@ namespace Extrinsic::Runtime
                 result.Status =
                     removal.Status ==
                             Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters
-                        ? SandboxEditorCommandStatus::InvalidProcessingParameters
-                        : SandboxEditorCommandStatus::GeometryProcessingFailed;
+                        ? EditorCommandStatus::InvalidProcessingParameters
+                        : EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry.PointCloud outlier removal failed with ";
                 result.Message +=
                     DebugNameForOutlierRemovalStatus(removal.Status);
                 result.Message += ".";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -7952,19 +7963,19 @@ namespace Extrinsic::Runtime
                         static_cast<std::uint32_t>(rejected)});
             }
             state->AfterCloud.GarbageCollection();
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Point-cloud outlier-removal CPU result ready",
                 });
         }
 
         [[nodiscard]] Core::Result PublishPointCloudOutlierRemovalCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorPointCloudOutlierRemovalCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorPointCloudOutlierRemovalCpuJobState& job)
         {
-            SandboxEditorPointCloudOutlierRemovalResult result = job.Result;
+            EditorPointCloudOutlierRemovalResult result = job.Result;
             if (!result.Succeeded())
             {
                 PublishPointCloudOutlierRemovalResultSink(context, result);
@@ -7973,8 +7984,8 @@ namespace Extrinsic::Runtime
 
             const bool statistical =
                 job.Command.Method ==
-                SandboxEditorPointCloudOutlierMethod::Statistical;
-            const SandboxEditorCommandStatus commitStatus =
+                EditorPointCloudOutlierMethod::Statistical;
+            const EditorCommandStatus commitStatus =
                 CommitPointCloudReplacement(
                     context,
                     job.StableEntityId,
@@ -7985,7 +7996,7 @@ namespace Extrinsic::Runtime
                     std::move(job.Snapshot),
                     std::move(job.BeforeCloud),
                     std::move(job.AfterCloud));
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -7995,7 +8006,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(Core::ErrorCode::Unknown);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message =
                 BuildPointCloudOutlierRemovalSuccessMessage(result);
@@ -8004,22 +8015,22 @@ namespace Extrinsic::Runtime
             return Core::Ok();
         }
 
-        [[nodiscard]] SandboxEditorJobIdentity
+        [[nodiscard]] EditorJobIdentity
         MakePointCloudOutlierRemovalCpuJobIdentity(
-            const SandboxEditorPointCloudOutlierRemovalCpuJobState& state)
+            const EditorPointCloudOutlierRemovalCpuJobState& state)
         {
-            return SandboxEditorJobIdentity{
+            return EditorJobIdentity{
                 .EntityId = state.StableEntityId,
-                .Scope = SandboxEditorJobScope::PointCloudPoint,
+                .Scope = EditorJobScope::PointCloudPoint,
                 .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                 .OutputName = "point_cloud_outlier_removal",
             };
         }
 
         [[nodiscard]] JobDesc MakePointCloudOutlierRemovalCpuJobDesc(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const std::shared_ptr<
-                SandboxEditorPointCloudOutlierRemovalCpuJobState>& state)
+                EditorPointCloudOutlierRemovalCpuJobState>& state)
         {
             return JobDesc{
                 .DebugName = "Sandbox.PointCloudOutlierRemoval.CPU",
@@ -8046,7 +8057,7 @@ namespace Extrinsic::Runtime
                     [context, state](KernelEventBus&,
                                      const JobResultEnvelope& result) -> bool
                     {
-                        if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                        if (result.TryGet<EditorJobResult>() == nullptr)
                             return false;
                         return PublishPointCloudOutlierRemovalCpuJob(
                                    context,
@@ -8056,17 +8067,17 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorPointCloudOutlierRemovalResult
+        [[nodiscard]] EditorPointCloudOutlierRemovalResult
         SubmitPointCloudOutlierRemovalCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorPointCloudOutlierRemovalCommand& command,
+            const EditorFeatureBindings& context,
+            const EditorPointCloudOutlierRemovalCommand& command,
             Geometry::PointCloud::Cloud beforeCloud,
             Geometry::PointCloud::Cloud workCloud,
             PointCloudSourceSnapshot snapshot,
             const std::uint64_t geometryMetadataSignature)
         {
             auto state = std::make_shared<
-                SandboxEditorPointCloudOutlierRemovalCpuJobState>();
+                EditorPointCloudOutlierRemovalCpuJobState>();
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->Snapshot = std::move(snapshot);
@@ -8077,14 +8088,14 @@ namespace Extrinsic::Runtime
             state->Result.OriginalCount = state->WorkCloud.VertexCount();
             state->Result.KeptCount = state->WorkCloud.VertexCount();
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakePointCloudOutlierRemovalCpuJobIdentity(*state);
             JobDesc desc =
                 MakePointCloudOutlierRemovalCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorPointCloudOutlierRemovalResult pending =
+                EditorPointCloudOutlierRemovalResult pending =
                     MakePendingPointCloudOutlierRemovalResult(
                         command,
                         state->WorkCloud.VertexCount(),
@@ -8100,10 +8111,10 @@ namespace Extrinsic::Runtime
                 identity);
             if (!handle.IsValid())
             {
-                SandboxEditorPointCloudOutlierRemovalResult result =
+                EditorPointCloudOutlierRemovalResult result =
                     MakePointCloudOutlierRemovalBaseResult(command);
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.GeometryStatus =
                     Geometry::PointCloud::OutlierRemovalStatus::BuildFailed;
                 result.Error = Core::ErrorCode::InvalidState;
@@ -8118,7 +8129,7 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
-        enum class SandboxEditorVertexNormalsCpuJobKind : std::uint8_t
+        enum class EditorVertexNormalsCpuJobKind : std::uint8_t
         {
             Mesh,
             Graph,
@@ -8126,74 +8137,74 @@ namespace Extrinsic::Runtime
         };
 
         [[nodiscard]] const char* VertexNormalsCpuJobName(
-            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+            const EditorVertexNormalsCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::Mesh:
                 return "Sandbox.MeshVertexNormals.CPU";
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return "Sandbox.GraphVertexNormals.CPU";
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 return "Sandbox.PointCloudVertexNormals.CPU";
             }
             return "Sandbox.VertexNormals.CPU";
         }
 
         [[nodiscard]] const char* VertexNormalsCpuJobOutputName(
-            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+            const EditorVertexNormalsCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::Mesh:
                 return "mesh_vertex_normals";
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return "graph_vertex_normals";
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 return "point_cloud_vertex_normals";
             }
             return "vertex_normals";
         }
 
         [[nodiscard]] GeometryElementDomain VertexNormalsCpuJobDomain(
-            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+            const EditorVertexNormalsCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::Mesh:
                 return GeometryElementDomain::MeshVertex;
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return GeometryElementDomain::GraphNode;
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 return GeometryElementDomain::PointCloudPoint;
             }
             return GeometryElementDomain::Unknown;
         }
 
         [[nodiscard]] GS::Domain VertexNormalsExpectedSourceDomain(
-            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+            const EditorVertexNormalsCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::Mesh:
                 return GS::Domain::Mesh;
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return GS::Domain::Graph;
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 return GS::Domain::PointCloud;
             }
             return GS::Domain::None;
         }
 
-        [[nodiscard]] SandboxEditorMeshVertexNormalsResult
+        [[nodiscard]] EditorMeshVertexNormalsResult
         MakePendingMeshVertexNormalsResult(
-            const SandboxEditorMeshVertexNormalsCommand& command,
+            const EditorMeshVertexNormalsCommand& command,
             const std::size_t vertexSlotCount,
             const JobToken handle)
         {
-            SandboxEditorMeshVertexNormalsResult result =
+            EditorMeshVertexNormalsResult result =
                 MakeMeshNormalsResult(
-                    SandboxEditorCommandStatus::Pending,
+                    EditorCommandStatus::Pending,
                     GN::RecomputeStatus::Success,
                     command.Weighting,
                     Core::ErrorCode::Success,
@@ -8204,16 +8215,16 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] SandboxEditorGraphVertexNormalsResult
+        [[nodiscard]] EditorGraphVertexNormalsResult
         MakePendingGraphVertexNormalsResult(
-            const SandboxEditorGraphVertexNormalsCommand& command,
+            const EditorGraphVertexNormalsCommand& command,
             const std::size_t vertexSlotCount,
             const std::size_t edgeSlotCount,
             const JobToken handle)
         {
-            SandboxEditorGraphVertexNormalsResult result =
+            EditorGraphVertexNormalsResult result =
                 MakeGraphNormalsResult(
-                    SandboxEditorCommandStatus::Pending,
+                    EditorCommandStatus::Pending,
                     GraphNormals::RecomputeStatus::Success,
                     command.OrientTowardFallback,
                     Core::ErrorCode::Success,
@@ -8225,15 +8236,15 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] SandboxEditorPointCloudVertexNormalsResult
+        [[nodiscard]] EditorPointCloudVertexNormalsResult
         MakePendingPointCloudVertexNormalsResult(
-            const SandboxEditorPointCloudVertexNormalsCommand& command,
+            const EditorPointCloudVertexNormalsCommand& command,
             const std::size_t pointSlotCount,
             const JobToken handle)
         {
-            SandboxEditorPointCloudVertexNormalsResult result =
+            EditorPointCloudVertexNormalsResult result =
                 MakePointCloudNormalsResult(
-                    SandboxEditorCommandStatus::Pending,
+                    EditorCommandStatus::Pending,
                     PointNormals::RecomputeStatus::Success,
                     command,
                     Core::ErrorCode::Success,
@@ -8247,10 +8258,10 @@ namespace Extrinsic::Runtime
         struct VertexNormalPropertyState;
         struct VertexNormalsSourceState;
 
-        struct SandboxEditorVertexNormalsCpuJobState
+        struct EditorVertexNormalsCpuJobState
         {
-            SandboxEditorVertexNormalsCpuJobKind Kind{
-                SandboxEditorVertexNormalsCpuJobKind::Mesh};
+            EditorVertexNormalsCpuJobKind Kind{
+                EditorVertexNormalsCpuJobKind::Mesh};
             std::uint32_t StableEntityId{0u};
             std::uint64_t GeometryMetadataSignature{0u};
             std::vector<glm::vec3> SnapshotPositions{};
@@ -8263,27 +8274,27 @@ namespace Extrinsic::Runtime
             Geometry::Halfedges GraphHalfedges{};
             std::size_t GraphEdgeSlotCount{0u};
             Geometry::Vertices PointCloudPoints{};
-            SandboxEditorMeshVertexNormalsCommand MeshCommand{};
-            SandboxEditorGraphVertexNormalsCommand GraphCommand{};
-            SandboxEditorPointCloudVertexNormalsCommand PointCloudCommand{};
-            SandboxEditorMeshVertexNormalsResult MeshResult{};
-            SandboxEditorGraphVertexNormalsResult GraphResult{};
-            SandboxEditorPointCloudVertexNormalsResult PointCloudResult{};
+            EditorMeshVertexNormalsCommand MeshCommand{};
+            EditorGraphVertexNormalsCommand GraphCommand{};
+            EditorPointCloudVertexNormalsCommand PointCloudCommand{};
+            EditorMeshVertexNormalsResult MeshResult{};
+            EditorGraphVertexNormalsResult GraphResult{};
+            EditorPointCloudVertexNormalsResult PointCloudResult{};
         };
 
         [[nodiscard]] const Geometry::PropertySet*
         VertexNormalsSourceProperties(
             const GS::ConstSourceView& view,
-            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+            const EditorVertexNormalsCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 return view.VertexSource != nullptr
                     ? &view.VertexSource->Properties
                     : nullptr;
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return view.NodeSource != nullptr
                     ? &view.NodeSource->Properties
                     : nullptr;
@@ -8293,16 +8304,16 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Geometry::PropertySet* VertexNormalsTargetProperties(
             GS::MutableSourceView& view,
-            const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
+            const EditorVertexNormalsCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 return view.VertexSource != nullptr
                     ? &view.VertexSource->Properties
                     : nullptr;
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return view.NodeSource != nullptr
                     ? &view.NodeSource->Properties
                     : nullptr;
@@ -8335,8 +8346,8 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry* Scene{nullptr};
             WorldHandle World{};
             std::uint32_t StableEntityId{0u};
-            SandboxEditorVertexNormalsCpuJobKind Kind{
-                SandboxEditorVertexNormalsCpuJobKind::Mesh};
+            EditorVertexNormalsCpuJobKind Kind{
+                EditorVertexNormalsCpuJobKind::Mesh};
         };
 
         struct VertexNormalsMutationGeneration
@@ -8402,13 +8413,13 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool CaptureVertexNormalsSourceState(
             const GS::ConstSourceView& view,
-            const SandboxEditorVertexNormalsCpuJobKind kind,
+            const EditorVertexNormalsCpuJobKind kind,
             VertexNormalsSourceState& out)
         {
             out = {};
             switch (kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::Mesh:
                 if (view.VertexSource == nullptr ||
                     view.HalfedgeSource == nullptr ||
                     view.FaceSource == nullptr)
@@ -8422,7 +8433,7 @@ namespace Extrinsic::Runtime
                 out.Halfedges = view.HalfedgeSource->Properties;
                 out.Faces = view.FaceSource->Properties;
                 return true;
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 if (view.NodeSource == nullptr ||
                     view.EdgeSource == nullptr)
                 {
@@ -8432,7 +8443,7 @@ namespace Extrinsic::Runtime
                     view.NodeSource->Properties);
                 out.Edges = view.EdgeSource->Properties;
                 return true;
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 if (view.VertexSource == nullptr)
                     return false;
                 out.Primary = CopyVertexNormalSourceProperties(
@@ -8478,7 +8489,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] EditorCommandHistoryStatus ApplyVertexNormalPropertyState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
-            const SandboxEditorVertexNormalsCpuJobKind kind,
+            const EditorVertexNormalsCpuJobKind kind,
             const VertexNormalPropertyState& state)
         {
             if (scene == nullptr)
@@ -8522,10 +8533,10 @@ namespace Extrinsic::Runtime
             return EditorCommandHistoryStatus::Applied;
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus CommitVertexNormalProperty(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorCommandStatus CommitVertexNormalProperty(
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
-            const SandboxEditorVertexNormalsCpuJobKind kind,
+            const EditorVertexNormalsCpuJobKind kind,
             const char* label,
             const std::uint64_t expectedGeometryMetadataSignature,
             VertexNormalsSourceState source,
@@ -8682,7 +8693,7 @@ namespace Extrinsic::Runtime
                                 .Normal = target,
                             };
                         });
-                return ToSandboxEditorCommandStatus(history.Status);
+                return ToEditorCommandStatus(history.Status);
             }
 
             const EditorCommandHistoryStatus applied =
@@ -8692,19 +8703,19 @@ namespace Extrinsic::Runtime
                     kind,
                     after);
             if (applied != EditorCommandHistoryStatus::Applied)
-                return ToSandboxEditorCommandStatus(applied);
+                return ToEditorCommandStatus(applied);
 
             const ECS::EntityHandle entity =
                 SelectionController::ToEntityHandle(stableEntityId);
             Dirty::MarkVertexNormalsDirty(
                 context.Scene->Raw(),
                 entity);
-            return SandboxEditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
         }
 
         [[nodiscard]] JobApplyValidation ValidateVertexNormalsCpuJobApply(
-            const SandboxEditorContext& context,
-            const SandboxEditorVertexNormalsCpuJobState& job)
+            const EditorFeatureBindings& context,
+            const EditorVertexNormalsCpuJobState& job)
         {
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
@@ -8776,24 +8787,24 @@ namespace Extrinsic::Runtime
         }
 
         void PublishMeshVertexNormalsResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshVertexNormalsResult result)
+            const EditorFeatureBindings& context,
+            EditorMeshVertexNormalsResult result)
         {
             if (context.MethodResultSinks.MeshVertexNormals)
                 context.MethodResultSinks.MeshVertexNormals(std::move(result));
         }
 
         void PublishGraphVertexNormalsResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorGraphVertexNormalsResult result)
+            const EditorFeatureBindings& context,
+            EditorGraphVertexNormalsResult result)
         {
             if (context.MethodResultSinks.GraphVertexNormals)
                 context.MethodResultSinks.GraphVertexNormals(std::move(result));
         }
 
         void PublishPointCloudVertexNormalsResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorPointCloudVertexNormalsResult result)
+            const EditorFeatureBindings& context,
+            EditorPointCloudVertexNormalsResult result)
         {
             if (context.MethodResultSinks.PointCloudVertexNormals)
             {
@@ -8803,7 +8814,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] JobResultEnvelope RunMeshVertexNormalsCpuWorker(
-            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+            const std::shared_ptr<EditorVertexNormalsCpuJobState>& state)
         {
             GN::Params params{};
             params.Weighting = state->MeshCommand.Weighting;
@@ -8814,10 +8825,10 @@ namespace Extrinsic::Runtime
             params.SkipDeleted = true;
 
             const GN::Result normalResult = GN::Recompute(state->Mesh, params);
-            SandboxEditorMeshVertexNormalsResult& result = state->MeshResult;
+            EditorMeshVertexNormalsResult& result = state->MeshResult;
             result.Status = normalResult.Status == GN::RecomputeStatus::Success
-                ? SandboxEditorCommandStatus::Applied
-                : SandboxEditorCommandStatus::GeometryProcessingFailed;
+                ? EditorCommandStatus::Applied
+                : EditorCommandStatus::GeometryProcessingFailed;
             result.Error = normalResult.Status == GN::RecomputeStatus::Success
                 ? Core::ErrorCode::Success
                 : Core::ErrorCode::Unknown;
@@ -8829,8 +8840,8 @@ namespace Extrinsic::Runtime
                     "Geometry.HalfedgeMesh.Vertices.Normals failed with ";
                 result.Message += std::string(GN::DebugName(normalResult.Status));
                 result.Message += ".";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -8840,26 +8851,26 @@ namespace Extrinsic::Runtime
                     state->SnapshotPositions.size())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.NormalStatus = GN::RecomputeStatus::InvalidOutputProperty;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message      = "Geometry.HalfedgeMesh.Vertices.Normals produced missing "
                                       "or count-mismatched normals.";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
 
             state->Normals = normalResult.Normals.Vector();
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Mesh vertex-normal CPU result ready",
                 });
         }
 
         [[nodiscard]] JobResultEnvelope RunGraphVertexNormalsCpuWorker(
-            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+            const std::shared_ptr<EditorVertexNormalsCpuJobState>& state)
         {
             GraphNormals::Params params{};
             params.PositionProperty = GS::PropertyNames::kPosition;
@@ -8888,12 +8899,12 @@ namespace Extrinsic::Runtime
                     Geometry::ConstPropertySet(state->GraphEdges)
                         .Get<bool>("e:deleted"));
 
-            SandboxEditorGraphVertexNormalsResult& result =
+            EditorGraphVertexNormalsResult& result =
                 state->GraphResult;
             result.Status = normalResult.Status ==
                     GraphNormals::RecomputeStatus::Success
-                ? SandboxEditorCommandStatus::Applied
-                : SandboxEditorCommandStatus::GeometryProcessingFailed;
+                ? EditorCommandStatus::Applied
+                : EditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus = normalResult.Status;
             result.OrientTowardFallback =
                 state->GraphCommand.OrientTowardFallback;
@@ -8906,8 +8917,8 @@ namespace Extrinsic::Runtime
                 result.Message +=
                     std::string(GraphNormals::DebugName(normalResult.Status));
                 result.Message += ".";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -8917,28 +8928,28 @@ namespace Extrinsic::Runtime
                     state->SnapshotPositions.size())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.NormalStatus =
                     GraphNormals::RecomputeStatus::InvalidOutputProperty;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.Graph.Vertex.Normals produced missing or "
                                  "count-mismatched normals.";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
 
             state->Normals = normalResult.Normals.Vector();
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Graph vertex-normal CPU result ready",
                 });
         }
 
         [[nodiscard]] JobResultEnvelope
         RunPointCloudVertexNormalsCpuWorker(
-            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+            const std::shared_ptr<EditorVertexNormalsCpuJobState>& state)
         {
             Geometry::PointCloud::Cloud scratchCloud{state->PointCloudPoints};
             PointNormals::Params params{};
@@ -8959,12 +8970,12 @@ namespace Extrinsic::Runtime
             const PointNormals::Result normalResult =
                 PointNormals::Recompute(scratchCloud, params);
 
-            SandboxEditorPointCloudVertexNormalsResult& result =
+            EditorPointCloudVertexNormalsResult& result =
                 state->PointCloudResult;
             result.Status = normalResult.Status ==
                     PointNormals::RecomputeStatus::Success
-                ? SandboxEditorCommandStatus::Applied
-                : SandboxEditorCommandStatus::GeometryProcessingFailed;
+                ? EditorCommandStatus::Applied
+                : EditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus = normalResult.Status;
             result.Backend = normalResult.Backend;
             result.Orientation = state->PointCloudCommand.Orientation;
@@ -8982,8 +8993,8 @@ namespace Extrinsic::Runtime
                 result.Message +=
                     std::string(PointNormals::DebugName(normalResult.Status));
                 result.Message += ".";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -8993,45 +9004,45 @@ namespace Extrinsic::Runtime
                     state->SnapshotPositions.size())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.NormalStatus =
                     PointNormals::RecomputeStatus::InvalidOutputProperty;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.PointCloud.Normals produced missing or "
                                  "count-mismatched normals.";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
 
             state->Normals = normalResult.Normals.Vector();
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Point-cloud vertex-normal CPU result ready",
                 });
         }
 
         [[nodiscard]] JobResultEnvelope RunVertexNormalsCpuWorker(
-            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+            const std::shared_ptr<EditorVertexNormalsCpuJobState>& state)
         {
             switch (state->Kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::Mesh:
                 return RunMeshVertexNormalsCpuWorker(state);
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return RunGraphVertexNormalsCpuWorker(state);
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 return RunPointCloudVertexNormalsCpuWorker(state);
             }
             return JobResultEnvelope{};
         }
 
         [[nodiscard]] Core::Result PublishMeshVertexNormalsCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorVertexNormalsCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorVertexNormalsCpuJobState& job)
         {
-            SandboxEditorMeshVertexNormalsResult result = job.MeshResult;
+            EditorMeshVertexNormalsResult result = job.MeshResult;
             if (!result.Succeeded())
             {
                 PublishMeshVertexNormalsResultSink(context, result);
@@ -9041,7 +9052,7 @@ namespace Extrinsic::Runtime
                 job.BeforeNormal == nullptr)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
                     "Mesh vertex-normal publication is missing its source snapshot.";
@@ -9049,17 +9060,17 @@ namespace Extrinsic::Runtime
                 return Core::Err(result.Error);
             }
 
-            const SandboxEditorCommandStatus commitStatus =
+            const EditorCommandStatus commitStatus =
                 CommitVertexNormalProperty(
                     context,
                     job.StableEntityId,
-                    SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                    EditorVertexNormalsCpuJobKind::Mesh,
                     "Recompute mesh vertex normals",
                     job.GeometryMetadataSignature,
                     *job.SourceState,
                     *job.BeforeNormal,
                     job.Normals);
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -9069,7 +9080,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(result.Error);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildMeshNormalsSuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -9078,10 +9089,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishGraphVertexNormalsCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorVertexNormalsCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorVertexNormalsCpuJobState& job)
         {
-            SandboxEditorGraphVertexNormalsResult result = job.GraphResult;
+            EditorGraphVertexNormalsResult result = job.GraphResult;
             if (!result.Succeeded())
             {
                 PublishGraphVertexNormalsResultSink(context, result);
@@ -9091,7 +9102,7 @@ namespace Extrinsic::Runtime
                 job.BeforeNormal == nullptr)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
                     "Graph vertex-normal publication is missing its source snapshot.";
@@ -9099,17 +9110,17 @@ namespace Extrinsic::Runtime
                 return Core::Err(result.Error);
             }
 
-            const SandboxEditorCommandStatus commitStatus =
+            const EditorCommandStatus commitStatus =
                 CommitVertexNormalProperty(
                     context,
                     job.StableEntityId,
-                    SandboxEditorVertexNormalsCpuJobKind::Graph,
+                    EditorVertexNormalsCpuJobKind::Graph,
                     "Recompute graph vertex normals",
                     job.GeometryMetadataSignature,
                     *job.SourceState,
                     *job.BeforeNormal,
                     job.Normals);
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -9119,7 +9130,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(result.Error);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildGraphNormalsSuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -9128,10 +9139,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishPointCloudVertexNormalsCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorVertexNormalsCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorVertexNormalsCpuJobState& job)
         {
-            SandboxEditorPointCloudVertexNormalsResult result =
+            EditorPointCloudVertexNormalsResult result =
                 job.PointCloudResult;
             if (!result.Succeeded())
             {
@@ -9142,7 +9153,7 @@ namespace Extrinsic::Runtime
                 job.BeforeNormal == nullptr)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
                     "Point-cloud vertex-normal publication is missing its source snapshot.";
@@ -9150,17 +9161,17 @@ namespace Extrinsic::Runtime
                 return Core::Err(result.Error);
             }
 
-            const SandboxEditorCommandStatus commitStatus =
+            const EditorCommandStatus commitStatus =
                 CommitVertexNormalProperty(
                     context,
                     job.StableEntityId,
-                    SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                    EditorVertexNormalsCpuJobKind::PointCloud,
                     "Recompute point-cloud vertex normals",
                     job.GeometryMetadataSignature,
                     *job.SourceState,
                     *job.BeforeNormal,
                     job.Normals);
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -9170,7 +9181,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(result.Error);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildPointCloudNormalsSuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -9179,27 +9190,27 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishVertexNormalsCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorVertexNormalsCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorVertexNormalsCpuJobState& job)
         {
             switch (job.Kind)
             {
-            case SandboxEditorVertexNormalsCpuJobKind::Mesh:
+            case EditorVertexNormalsCpuJobKind::Mesh:
                 return PublishMeshVertexNormalsCpuJob(context, job);
-            case SandboxEditorVertexNormalsCpuJobKind::Graph:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return PublishGraphVertexNormalsCpuJob(context, job);
-            case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::PointCloud:
                 return PublishPointCloudVertexNormalsCpuJob(context, job);
             }
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
 
-        [[nodiscard]] SandboxEditorJobIdentity MakeVertexNormalsCpuJobIdentity(
-            const SandboxEditorVertexNormalsCpuJobState& state)
+        [[nodiscard]] EditorJobIdentity MakeVertexNormalsCpuJobIdentity(
+            const EditorVertexNormalsCpuJobState& state)
         {
-            return SandboxEditorJobIdentity{
+            return EditorJobIdentity{
                 .EntityId = state.StableEntityId,
-                .Scope = ToSandboxEditorJobScope(
+                .Scope = ToEditorJobScopeImpl(
                     VertexNormalsCpuJobDomain(state.Kind)),
                 .OutputSemantic = GeometryPresentationSlotSemantic::Normal,
                 .OutputName = VertexNormalsCpuJobOutputName(state.Kind),
@@ -9207,8 +9218,8 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] JobDesc MakeVertexNormalsCpuJobDesc(
-            const SandboxEditorContext& context,
-            const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
+            const EditorFeatureBindings& context,
+            const std::shared_ptr<EditorVertexNormalsCpuJobState>& state)
         {
             const std::uint32_t estimatedCost =
                 std::max<std::uint32_t>(
@@ -9240,7 +9251,7 @@ namespace Extrinsic::Runtime
                     [context, state](KernelEventBus&,
                                      const JobResultEnvelope& result) -> bool
                     {
-                        if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                        if (result.TryGet<EditorJobResult>() == nullptr)
                             return false;
                         return PublishVertexNormalsCpuJob(context, *state)
                             .has_value();
@@ -9248,18 +9259,18 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorMeshVertexNormalsResult
+        [[nodiscard]] EditorMeshVertexNormalsResult
         SubmitMeshVertexNormalsCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorMeshVertexNormalsCommand& command,
+            const EditorFeatureBindings& context,
+            const EditorMeshVertexNormalsCommand& command,
             Geometry::HalfedgeMesh::Mesh mesh,
             VertexNormalsSourceState sourceState,
             VertexNormalPropertyState beforeNormal,
             const std::uint64_t geometryMetadataSignature)
         {
             auto state =
-                std::make_shared<SandboxEditorVertexNormalsCpuJobState>();
-            state->Kind = SandboxEditorVertexNormalsCpuJobKind::Mesh;
+                std::make_shared<EditorVertexNormalsCpuJobState>();
+            state->Kind = EditorVertexNormalsCpuJobKind::Mesh;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(mesh);
@@ -9272,7 +9283,7 @@ namespace Extrinsic::Runtime
             state->Mesh = std::move(mesh);
             state->MeshCommand = command;
             state->MeshResult = MakeMeshNormalsResult(
-                SandboxEditorCommandStatus::NoChange,
+                EditorCommandStatus::NoChange,
                 GN::RecomputeStatus::Success,
                 command.Weighting,
                 Core::ErrorCode::Success,
@@ -9280,13 +9291,13 @@ namespace Extrinsic::Runtime
             state->MeshResult.VertexSlotCount =
                 state->SnapshotPositions.size();
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeVertexNormalsCpuJobIdentity(*state);
             JobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorMeshVertexNormalsResult pending =
+                EditorMeshVertexNormalsResult pending =
                     MakePendingMeshVertexNormalsResult(
                         command,
                         state->SnapshotPositions.size(),
@@ -9303,7 +9314,7 @@ namespace Extrinsic::Runtime
             if (!handle.IsValid())
             {
                 return MakeMeshNormalsResult(
-                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    EditorCommandStatus::GeometryProcessingFailed,
                     GN::RecomputeStatus::InvalidOutputProperty, command.Weighting,
                     Core::ErrorCode::InvalidState,
                     "Mesh vertex-normal CPU job submission was rejected by the runtime job "
@@ -9316,10 +9327,10 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
-        [[nodiscard]] SandboxEditorGraphVertexNormalsResult
+        [[nodiscard]] EditorGraphVertexNormalsResult
         SubmitGraphVertexNormalsCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorGraphVertexNormalsCommand& command,
+            const EditorFeatureBindings& context,
+            const EditorGraphVertexNormalsCommand& command,
             Geometry::Vertices nodes,
             Geometry::PropertySet edges,
             Geometry::Halfedges halfedges,
@@ -9333,7 +9344,7 @@ namespace Extrinsic::Runtime
             if (!positions.has_value())
             {
                 return MakeGraphNormalsResult(
-                    SandboxEditorCommandStatus::InvalidProcessingParameters,
+                    EditorCommandStatus::InvalidProcessingParameters,
                     GraphNormals::RecomputeStatus::InvalidPositionProperty,
                     command.OrientTowardFallback, Core::ErrorCode::InvalidArgument,
                     "selected graph requires count-matched finite v:position for normal "
@@ -9341,8 +9352,8 @@ namespace Extrinsic::Runtime
             }
 
             auto state =
-                std::make_shared<SandboxEditorVertexNormalsCpuJobState>();
-            state->Kind = SandboxEditorVertexNormalsCpuJobKind::Graph;
+                std::make_shared<EditorVertexNormalsCpuJobState>();
+            state->Kind = EditorVertexNormalsCpuJobKind::Graph;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = std::move(*positions);
@@ -9358,7 +9369,7 @@ namespace Extrinsic::Runtime
             state->GraphEdgeSlotCount = edgeSlotCount;
             state->GraphCommand = command;
             state->GraphResult = MakeGraphNormalsResult(
-                SandboxEditorCommandStatus::NoChange,
+                EditorCommandStatus::NoChange,
                 GraphNormals::RecomputeStatus::Success,
                 command.OrientTowardFallback,
                 Core::ErrorCode::Success,
@@ -9367,13 +9378,13 @@ namespace Extrinsic::Runtime
                 state->SnapshotPositions.size();
             state->GraphResult.EdgeSlotCount = edgeSlotCount;
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeVertexNormalsCpuJobIdentity(*state);
             JobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorGraphVertexNormalsResult pending =
+                EditorGraphVertexNormalsResult pending =
                     MakePendingGraphVertexNormalsResult(
                         command,
                         state->SnapshotPositions.size(),
@@ -9391,7 +9402,7 @@ namespace Extrinsic::Runtime
             if (!handle.IsValid())
             {
                 return MakeGraphNormalsResult(
-                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    EditorCommandStatus::GeometryProcessingFailed,
                     GraphNormals::RecomputeStatus::InvalidOutputProperty,
                     command.OrientTowardFallback, Core::ErrorCode::InvalidState,
                     "Graph vertex-normal CPU job submission was rejected by the runtime "
@@ -9405,10 +9416,10 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
-        [[nodiscard]] SandboxEditorPointCloudVertexNormalsResult
+        [[nodiscard]] EditorPointCloudVertexNormalsResult
         SubmitPointCloudVertexNormalsCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorPointCloudVertexNormalsCommand& command,
+            const EditorFeatureBindings& context,
+            const EditorPointCloudVertexNormalsCommand& command,
             Geometry::Vertices points,
             VertexNormalsSourceState sourceState,
             VertexNormalPropertyState beforeNormal,
@@ -9419,7 +9430,7 @@ namespace Extrinsic::Runtime
             if (!positions.has_value())
             {
                 return MakePointCloudNormalsResult(
-                    SandboxEditorCommandStatus::InvalidProcessingParameters,
+                    EditorCommandStatus::InvalidProcessingParameters,
                     PointNormals::RecomputeStatus::InvalidPositionProperty, command,
                     Core::ErrorCode::InvalidArgument,
                     "selected point-cloud requires count-matched finite v:position for "
@@ -9427,8 +9438,8 @@ namespace Extrinsic::Runtime
             }
 
             auto state =
-                std::make_shared<SandboxEditorVertexNormalsCpuJobState>();
-            state->Kind = SandboxEditorVertexNormalsCpuJobKind::PointCloud;
+                std::make_shared<EditorVertexNormalsCpuJobState>();
+            state->Kind = EditorVertexNormalsCpuJobKind::PointCloud;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = std::move(*positions);
@@ -9441,7 +9452,7 @@ namespace Extrinsic::Runtime
             state->PointCloudPoints = std::move(points);
             state->PointCloudCommand = command;
             state->PointCloudResult = MakePointCloudNormalsResult(
-                SandboxEditorCommandStatus::NoChange,
+                EditorCommandStatus::NoChange,
                 PointNormals::RecomputeStatus::Success,
                 command,
                 Core::ErrorCode::Success,
@@ -9449,13 +9460,13 @@ namespace Extrinsic::Runtime
             state->PointCloudResult.PointSlotCount =
                 state->SnapshotPositions.size();
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeVertexNormalsCpuJobIdentity(*state);
             JobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorPointCloudVertexNormalsResult pending =
+                EditorPointCloudVertexNormalsResult pending =
                     MakePendingPointCloudVertexNormalsResult(
                         command,
                         state->SnapshotPositions.size(),
@@ -9472,7 +9483,7 @@ namespace Extrinsic::Runtime
             if (!handle.IsValid())
             {
                 return MakePointCloudNormalsResult(
-                    SandboxEditorCommandStatus::GeometryProcessingFailed,
+                    EditorCommandStatus::GeometryProcessingFailed,
                     PointNormals::RecomputeStatus::InvalidOutputProperty, command,
                     Core::ErrorCode::InvalidState,
                     "Point-cloud vertex-normal CPU job submission was rejected by the "
@@ -9485,7 +9496,7 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
-        enum class SandboxEditorMeshCpuJobKind : std::uint8_t
+        enum class EditorMeshCpuJobKind : std::uint8_t
         {
             Curvature,
             Denoise,
@@ -9495,54 +9506,54 @@ namespace Extrinsic::Runtime
         };
 
         [[nodiscard]] const char* MeshCpuJobName(
-            const SandboxEditorMeshCpuJobKind kind) noexcept
+            const EditorMeshCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorMeshCpuJobKind::Curvature:
+            case EditorMeshCpuJobKind::Curvature:
                 return "Sandbox.MeshCurvature.CPU";
-            case SandboxEditorMeshCpuJobKind::Denoise:
+            case EditorMeshCpuJobKind::Denoise:
                 return "Sandbox.MeshDenoise.CPU";
-            case SandboxEditorMeshCpuJobKind::Remesh:
+            case EditorMeshCpuJobKind::Remesh:
                 return "Sandbox.MeshRemesh.CPU";
-            case SandboxEditorMeshCpuJobKind::Subdivide:
+            case EditorMeshCpuJobKind::Subdivide:
                 return "Sandbox.MeshSubdivide.CPU";
-            case SandboxEditorMeshCpuJobKind::Simplify:
+            case EditorMeshCpuJobKind::Simplify:
                 return "Sandbox.MeshSimplify.CPU";
             }
             return "Sandbox.MeshProcessing.CPU";
         }
 
         [[nodiscard]] const char* MeshCpuJobOutputName(
-            const SandboxEditorMeshCpuJobKind kind) noexcept
+            const EditorMeshCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorMeshCpuJobKind::Curvature:
+            case EditorMeshCpuJobKind::Curvature:
                 return "mesh_curvature_properties";
-            case SandboxEditorMeshCpuJobKind::Denoise:
+            case EditorMeshCpuJobKind::Denoise:
                 return "mesh_denoise_positions";
-            case SandboxEditorMeshCpuJobKind::Remesh:
+            case EditorMeshCpuJobKind::Remesh:
                 return "mesh_remesh_topology";
-            case SandboxEditorMeshCpuJobKind::Subdivide:
+            case EditorMeshCpuJobKind::Subdivide:
                 return "mesh_subdivide_topology";
-            case SandboxEditorMeshCpuJobKind::Simplify:
+            case EditorMeshCpuJobKind::Simplify:
                 return "mesh_simplify_topology";
             }
             return "mesh_processing";
         }
 
         [[nodiscard]] GeometryPresentationSlotSemantic MeshCpuJobOutputSemantic(
-            const SandboxEditorMeshCpuJobKind kind) noexcept
+            const EditorMeshCpuJobKind kind) noexcept
         {
             switch (kind)
             {
-            case SandboxEditorMeshCpuJobKind::Curvature:
+            case EditorMeshCpuJobKind::Curvature:
                 return GeometryPresentationSlotSemantic::ScalarField;
-            case SandboxEditorMeshCpuJobKind::Denoise:
-            case SandboxEditorMeshCpuJobKind::Remesh:
-            case SandboxEditorMeshCpuJobKind::Subdivide:
-            case SandboxEditorMeshCpuJobKind::Simplify:
+            case EditorMeshCpuJobKind::Denoise:
+            case EditorMeshCpuJobKind::Remesh:
+            case EditorMeshCpuJobKind::Subdivide:
+            case EditorMeshCpuJobKind::Simplify:
                 return GeometryPresentationSlotSemantic::Displacement;
             }
             return GeometryPresentationSlotSemantic::Displacement;
@@ -9574,10 +9585,10 @@ namespace Extrinsic::Runtime
             }
         }
 
-        struct SandboxEditorMeshCpuJobState
+        struct EditorMeshCpuJobState
         {
-            SandboxEditorMeshCpuJobKind Kind{
-                SandboxEditorMeshCpuJobKind::Denoise};
+            EditorMeshCpuJobKind Kind{
+                EditorMeshCpuJobKind::Denoise};
             std::uint32_t StableEntityId{0u};
             std::uint64_t GeometryMetadataSignature{0u};
             std::vector<glm::vec3> SnapshotPositions{};
@@ -9587,21 +9598,21 @@ namespace Extrinsic::Runtime
             MeshCurvaturePropertyState CurvatureBefore{};
             MeshCurvaturePropertyState CurvatureAfter{};
             std::vector<glm::vec3> DenoiseAfterPositions{};
-            SandboxEditorMeshCurvatureCommand CurvatureCommand{};
-            SandboxEditorMeshDenoiseCommand DenoiseCommand{};
-            SandboxEditorMeshRemeshCommand RemeshCommand{};
-            SandboxEditorMeshSubdivideCommand SubdivideCommand{};
-            SandboxEditorMeshSimplifyCommand SimplifyCommand{};
-            SandboxEditorMeshCurvatureResult CurvatureResult{};
-            SandboxEditorMeshDenoiseResult DenoiseResult{};
-            SandboxEditorMeshRemeshResult RemeshResult{};
-            SandboxEditorMeshSubdivideResult SubdivideResult{};
-            SandboxEditorMeshSimplifyResult SimplifyResult{};
+            EditorMeshCurvatureCommand CurvatureCommand{};
+            EditorMeshDenoiseCommand DenoiseCommand{};
+            EditorMeshRemeshCommand RemeshCommand{};
+            EditorMeshSubdivideCommand SubdivideCommand{};
+            EditorMeshSimplifyCommand SimplifyCommand{};
+            EditorMeshCurvatureResult CurvatureResult{};
+            EditorMeshDenoiseResult DenoiseResult{};
+            EditorMeshRemeshResult RemeshResult{};
+            EditorMeshSubdivideResult SubdivideResult{};
+            EditorMeshSimplifyResult SimplifyResult{};
         };
 
         [[nodiscard]] JobApplyValidation ValidateMeshCpuJobApply(
-            const SandboxEditorContext& context,
-            const SandboxEditorMeshCpuJobState& job)
+            const EditorFeatureBindings& context,
+            const EditorMeshCpuJobState& job)
         {
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
@@ -9635,15 +9646,15 @@ namespace Extrinsic::Runtime
                 return JobApplyValidation::StaleGeneration;
             }
 
-            if ((job.Kind == SandboxEditorMeshCpuJobKind::Remesh ||
-                 job.Kind == SandboxEditorMeshCpuJobKind::Subdivide ||
-                 job.Kind == SandboxEditorMeshCpuJobKind::Simplify) &&
+            if ((job.Kind == EditorMeshCpuJobKind::Remesh ||
+                 job.Kind == EditorMeshCpuJobKind::Subdivide ||
+                 job.Kind == EditorMeshCpuJobKind::Simplify) &&
                 !SameMeshTopologyState(view, job.BeforeMesh))
             {
                 return JobApplyValidation::StaleGeneration;
             }
 
-            if (job.Kind == SandboxEditorMeshCpuJobKind::Curvature)
+            if (job.Kind == EditorMeshCpuJobKind::Curvature)
             {
                 GS::MutableSourceView mutableView =
                     GS::BuildMutableView(raw, *entity);
@@ -9672,49 +9683,49 @@ namespace Extrinsic::Runtime
         }
 
         void PublishMeshCurvatureResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshCurvatureResult result)
+            const EditorFeatureBindings& context,
+            EditorMeshCurvatureResult result)
         {
             if (context.MethodResultSinks.MeshCurvature)
                 context.MethodResultSinks.MeshCurvature(std::move(result));
         }
 
         void PublishMeshDenoiseResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshDenoiseResult result)
+            const EditorFeatureBindings& context,
+            EditorMeshDenoiseResult result)
         {
             if (context.MethodResultSinks.MeshDenoise)
                 context.MethodResultSinks.MeshDenoise(std::move(result));
         }
 
         void PublishMeshRemeshResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshRemeshResult result)
+            const EditorFeatureBindings& context,
+            EditorMeshRemeshResult result)
         {
             if (context.MethodResultSinks.MeshRemesh)
                 context.MethodResultSinks.MeshRemesh(std::move(result));
         }
 
         void PublishMeshSubdivideResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshSubdivideResult result)
+            const EditorFeatureBindings& context,
+            EditorMeshSubdivideResult result)
         {
             if (context.MethodResultSinks.MeshSubdivide)
                 context.MethodResultSinks.MeshSubdivide(std::move(result));
         }
 
         void PublishMeshSimplifyResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshSimplifyResult result)
+            const EditorFeatureBindings& context,
+            EditorMeshSimplifyResult result)
         {
             if (context.MethodResultSinks.MeshSimplify)
                 context.MethodResultSinks.MeshSimplify(std::move(result));
         }
 
         [[nodiscard]] JobResultEnvelope RunMeshCurvatureCpuWorker(
-            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+            const std::shared_ptr<EditorMeshCpuJobState>& state)
         {
-            SandboxEditorMeshCurvatureResult& result = state->CurvatureResult;
+            EditorMeshCurvatureResult& result = state->CurvatureResult;
             result.VertexSlotCount = state->SnapshotPositions.size();
 
             Curv::CurvatureField curvature =
@@ -9727,12 +9738,12 @@ namespace Extrinsic::Runtime
                     result.VertexSlotCount)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.Curvature produced missing or count-mismatched "
                                  "scalar properties.";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -9749,12 +9760,12 @@ namespace Extrinsic::Runtime
             if (result.NonFiniteScalarCount != 0u)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry.Curvature produced non-finite scalar curvature values.";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -9778,12 +9789,12 @@ namespace Extrinsic::Runtime
                         result.VertexSlotCount)
                 {
                     result.Status =
-                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                        EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.Curvature produced missing or "
                                      "count-mismatched principal-direction properties.";
-                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                        SandboxEditorJobResult{
+                    return JobResultEnvelope::Make<EditorJobResult>(
+                        EditorJobResult{
                             .Diagnostic = result.Message,
                         });
                 }
@@ -9800,12 +9811,12 @@ namespace Extrinsic::Runtime
                 if (result.NonFiniteDirectionCount != 0u)
                 {
                     result.Status =
-                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                        EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message =
                         "Geometry.Curvature produced non-finite principal directions.";
-                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                        SandboxEditorJobResult{
+                    return JobResultEnvelope::Make<EditorJobResult>(
+                        EditorJobResult{
                             .Diagnostic = result.Message,
                         });
                 }
@@ -9818,19 +9829,19 @@ namespace Extrinsic::Runtime
                 result.DirectionWrittenCount = dir1.size() + dir2.size();
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.DirectionsPublished =
                 result.DirectionPropertyCount == 2u &&
                 result.DirectionWrittenCount == result.VertexSlotCount * 2u;
             result.Error = Core::ErrorCode::Success;
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Mesh curvature CPU result ready",
                 });
         }
 
         [[nodiscard]] JobResultEnvelope RunMeshDenoiseCpuWorker(
-            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+            const std::shared_ptr<EditorMeshCpuJobState>& state)
         {
             Smooth::BilateralDenoiseParams params{};
             params.NormalIterations = state->DenoiseCommand.NormalIterations;
@@ -9843,7 +9854,7 @@ namespace Extrinsic::Runtime
 
             const Smooth::BilateralDenoiseResult denoise =
                 Smooth::DenoiseBilateral(state->Mesh, params);
-            SandboxEditorMeshDenoiseResult& result = state->DenoiseResult;
+            EditorMeshDenoiseResult& result = state->DenoiseResult;
             result.DenoiseStatus = denoise.Status;
             result.Error = ErrorForDenoiseStatus(denoise.Status);
             CopyMeshDenoiseCounters(denoise, result);
@@ -9859,12 +9870,12 @@ namespace Extrinsic::Runtime
             if (denoise.Status != Smooth::DenoiseStatus::Success)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Message = "Geometry.Smoothing denoise failed with ";
                 result.Message += std::string(Smooth::DebugName(denoise.Status));
                 result.Message += ".";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -9877,13 +9888,13 @@ namespace Extrinsic::Runtime
                     afterPositions.size()}))
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.DenoiseStatus = Smooth::DenoiseStatus::NonFiniteInput;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message       = "Geometry.Smoothing denoise produced invalid or "
                                        "count-mismatched positions.";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -9901,24 +9912,24 @@ namespace Extrinsic::Runtime
                     ++movedPublishedVertices;
             }
             result.MovedVertexCount = movedPublishedVertices;
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             state->DenoiseAfterPositions = std::move(afterPositions);
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Mesh denoise CPU result ready",
                 });
         }
 
         [[nodiscard]] JobResultEnvelope RunMeshRemeshCpuWorker(
-            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+            const std::shared_ptr<EditorMeshCpuJobState>& state)
         {
-            SandboxEditorMeshRemeshResult& result = state->RemeshResult;
+            EditorMeshRemeshResult& result = state->RemeshResult;
             result.InputVertexCount = state->Mesh.VertexCount();
             result.InputFaceCount = state->Mesh.FaceCount();
 
             std::optional<Geometry::RemeshingOperationResult> remeshResult{};
-            if (state->RemeshCommand.Mode == SandboxEditorMeshRemeshMode::Uniform)
+            if (state->RemeshCommand.Mode == EditorMeshRemeshMode::Uniform)
             {
                 Remesh::RemeshingParams params{};
                 params.TargetLength = state->RemeshCommand.TargetEdgeLength;
@@ -9966,12 +9977,12 @@ namespace Extrinsic::Runtime
             if (!remeshResult.has_value())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry remeshing failed for the selected mesh and parameters.";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -9981,25 +9992,25 @@ namespace Extrinsic::Runtime
             CopyRemeshCounters(*remeshResult, result);
             result.OutputVertexCount = state->Mesh.VertexCount();
             result.OutputFaceCount = state->Mesh.FaceCount();
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Mesh remesh CPU result ready",
                 });
         }
 
         [[nodiscard]] JobResultEnvelope RunMeshSubdivideCpuWorker(
-            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+            const std::shared_ptr<EditorMeshCpuJobState>& state)
         {
-            SandboxEditorMeshSubdivideResult& result =
+            EditorMeshSubdivideResult& result =
                 state->SubdivideResult;
             result.InputVertexCount = state->Mesh.VertexCount();
             result.InputFaceCount = state->Mesh.FaceCount();
 
             Geometry::HalfedgeMesh::Mesh output{};
             if (state->SubdivideCommand.Operator ==
-                SandboxEditorMeshSubdivideOperator::Loop)
+                EditorMeshSubdivideOperator::Loop)
             {
                 LoopSubdivide::SubdivisionParams params{};
                 params.Iterations = state->SubdivideCommand.Iterations;
@@ -10015,12 +10026,12 @@ namespace Extrinsic::Runtime
                 if (!subdivision.has_value())
                 {
                     result.Status =
-                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                        EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.Subdivision Loop subdivision failed for the "
                                      "selected mesh and parameters.";
-                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                        SandboxEditorJobResult{
+                    return JobResultEnvelope::Make<EditorJobResult>(
+                        EditorJobResult{
                             .Diagnostic = result.Message,
                         });
                 }
@@ -10031,7 +10042,7 @@ namespace Extrinsic::Runtime
                 result.OutputFaceCount = subdivision->FinalFaceCount;
             }
             else if (state->SubdivideCommand.Operator ==
-                     SandboxEditorMeshSubdivideOperator::CatmullClark)
+                     EditorMeshSubdivideOperator::CatmullClark)
             {
                 CatmullClark::SubdivisionParams params{};
                 params.Iterations = state->SubdivideCommand.Iterations;
@@ -10041,12 +10052,12 @@ namespace Extrinsic::Runtime
                 if (!subdivision.has_value())
                 {
                     result.Status =
-                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                        EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.CatmullClark subdivision failed for the "
                                      "selected mesh and parameters.";
-                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                        SandboxEditorJobResult{
+                    return JobResultEnvelope::Make<EditorJobResult>(
+                        EditorJobResult{
                             .Diagnostic = result.Message,
                         });
                 }
@@ -10068,12 +10079,12 @@ namespace Extrinsic::Runtime
                 if (!subdivision.has_value())
                 {
                     result.Status =
-                        SandboxEditorCommandStatus::GeometryProcessingFailed;
+                        EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the "
                                      "selected mesh and parameters.";
-                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                        SandboxEditorJobResult{
+                    return JobResultEnvelope::Make<EditorJobResult>(
+                        EditorJobResult{
                             .Diagnostic = result.Message,
                         });
                 }
@@ -10088,26 +10099,26 @@ namespace Extrinsic::Runtime
                 output.GarbageCollection();
             result.OutputVertexCount = output.VertexCount();
             result.OutputFaceCount = output.FaceCount();
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             state->Mesh = std::move(output);
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Mesh subdivide CPU result ready",
                 });
         }
 
         [[nodiscard]] JobResultEnvelope RunMeshSimplifyCpuWorker(
-            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+            const std::shared_ptr<EditorMeshCpuJobState>& state)
         {
-            SandboxEditorMeshSimplifyResult& result = state->SimplifyResult;
+            EditorMeshSimplifyResult& result = state->SimplifyResult;
             result.InputVertexCount = state->Mesh.VertexCount();
             result.InputFaceCount = state->Mesh.FaceCount();
 
             Simpl::Params params{};
             params.Metric =
                 state->SimplifyCommand.Metric ==
-                        SandboxEditorMeshSimplifyMetric::FA_QEM
+                        EditorMeshSimplifyMetric::FA_QEM
                     ? Simpl::Metric::FA_QEM
                     : Simpl::Metric::ClassicalQEM;
             params.TargetFaces = state->SimplifyCommand.TargetFaces;
@@ -10131,12 +10142,12 @@ namespace Extrinsic::Runtime
             if (!simplification.has_value())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry.Simplification failed for the selected mesh and parameters.";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -10154,51 +10165,51 @@ namespace Extrinsic::Runtime
             result.SharpFeatureVerticesPinned =
                 simplification->SharpFeatureVerticesPinned;
             result.SeamVerticesPinned = simplification->SeamVerticesPinned;
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "Mesh simplify CPU result ready",
                 });
         }
 
         [[nodiscard]] JobResultEnvelope RunMeshCpuWorker(
-            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+            const std::shared_ptr<EditorMeshCpuJobState>& state)
         {
             switch (state->Kind)
             {
-            case SandboxEditorMeshCpuJobKind::Curvature:
+            case EditorMeshCpuJobKind::Curvature:
                 return RunMeshCurvatureCpuWorker(state);
-            case SandboxEditorMeshCpuJobKind::Denoise:
+            case EditorMeshCpuJobKind::Denoise:
                 return RunMeshDenoiseCpuWorker(state);
-            case SandboxEditorMeshCpuJobKind::Remesh:
+            case EditorMeshCpuJobKind::Remesh:
                 return RunMeshRemeshCpuWorker(state);
-            case SandboxEditorMeshCpuJobKind::Subdivide:
+            case EditorMeshCpuJobKind::Subdivide:
                 return RunMeshSubdivideCpuWorker(state);
-            case SandboxEditorMeshCpuJobKind::Simplify:
+            case EditorMeshCpuJobKind::Simplify:
                 return RunMeshSimplifyCpuWorker(state);
             }
             return JobResultEnvelope{};
         }
 
         [[nodiscard]] Core::Result PublishMeshDenoiseCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorMeshCpuJobState& job)
         {
-            SandboxEditorMeshDenoiseResult result = job.DenoiseResult;
+            EditorMeshDenoiseResult result = job.DenoiseResult;
             if (!result.Succeeded())
             {
                 PublishMeshDenoiseResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
 
-            const SandboxEditorCommandStatus commitStatus =
+            const EditorCommandStatus commitStatus =
                 CommitMeshDenoisePositions(
                     context,
                     job.StableEntityId,
                     job.SnapshotPositions,
                     job.DenoiseAfterPositions);
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -10208,7 +10219,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(Core::ErrorCode::Unknown);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildMeshDenoiseSuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -10217,24 +10228,24 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishMeshCurvatureCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorMeshCpuJobState& job)
         {
-            SandboxEditorMeshCurvatureResult result = job.CurvatureResult;
+            EditorMeshCurvatureResult result = job.CurvatureResult;
             if (!result.Succeeded())
             {
                 PublishMeshCurvatureResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
 
-            const SandboxEditorCommandStatus commitStatus =
+            const EditorCommandStatus commitStatus =
                 CommitMeshCurvatureProperties(
                     context,
                     job.StableEntityId,
                     std::move(job.SnapshotPositions),
                     std::move(job.CurvatureBefore),
                     std::move(job.CurvatureAfter));
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -10244,7 +10255,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(Core::ErrorCode::Unknown);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.DirectionsPublished =
                 result.DirectionPropertyCount == 2u &&
                 result.DirectionWrittenCount == result.VertexSlotCount * 2u;
@@ -10256,17 +10267,17 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishMeshRemeshCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorMeshCpuJobState& job)
         {
-            SandboxEditorMeshRemeshResult result = job.RemeshResult;
+            EditorMeshRemeshResult result = job.RemeshResult;
             if (!result.Succeeded())
             {
                 PublishMeshRemeshResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
 
-            const SandboxEditorCommandStatus commitStatus =
+            const EditorCommandStatus commitStatus =
                 CommitMeshTopologyReplacement(
                     context,
                     job.StableEntityId,
@@ -10274,7 +10285,7 @@ namespace Extrinsic::Runtime
                     job.GeometryMetadataSignature,
                     std::move(job.BeforeMesh),
                     std::move(job.Mesh));
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -10284,7 +10295,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(Core::ErrorCode::Unknown);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildMeshRemeshSuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -10293,17 +10304,17 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishMeshSubdivideCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorMeshCpuJobState& job)
         {
-            SandboxEditorMeshSubdivideResult result = job.SubdivideResult;
+            EditorMeshSubdivideResult result = job.SubdivideResult;
             if (!result.Succeeded())
             {
                 PublishMeshSubdivideResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
 
-            const SandboxEditorCommandStatus commitStatus =
+            const EditorCommandStatus commitStatus =
                 CommitMeshTopologyReplacement(
                     context,
                     job.StableEntityId,
@@ -10311,7 +10322,7 @@ namespace Extrinsic::Runtime
                     job.GeometryMetadataSignature,
                     std::move(job.BeforeMesh),
                     std::move(job.Mesh));
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -10321,7 +10332,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(Core::ErrorCode::Unknown);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildMeshSubdivideSuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -10330,17 +10341,17 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishMeshSimplifyCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorMeshCpuJobState& job)
         {
-            SandboxEditorMeshSimplifyResult result = job.SimplifyResult;
+            EditorMeshSimplifyResult result = job.SimplifyResult;
             if (!result.Succeeded())
             {
                 PublishMeshSimplifyResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
 
-            const SandboxEditorCommandStatus commitStatus =
+            const EditorCommandStatus commitStatus =
                 CommitMeshTopologyReplacement(
                     context,
                     job.StableEntityId,
@@ -10348,7 +10359,7 @@ namespace Extrinsic::Runtime
                     job.GeometryMetadataSignature,
                     std::move(job.BeforeMesh),
                     std::move(job.Mesh));
-            if (commitStatus != SandboxEditorCommandStatus::Applied)
+            if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -10358,7 +10369,7 @@ namespace Extrinsic::Runtime
                 return Core::Err(Core::ErrorCode::Unknown);
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildMeshSimplifySuccessMessage(result);
             InvalidateSelectedModelCache(context);
@@ -10367,20 +10378,20 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishMeshCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorMeshCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorMeshCpuJobState& job)
         {
             switch (job.Kind)
             {
-            case SandboxEditorMeshCpuJobKind::Curvature:
+            case EditorMeshCpuJobKind::Curvature:
                 return PublishMeshCurvatureCpuJob(context, job);
-            case SandboxEditorMeshCpuJobKind::Denoise:
+            case EditorMeshCpuJobKind::Denoise:
                 return PublishMeshDenoiseCpuJob(context, job);
-            case SandboxEditorMeshCpuJobKind::Remesh:
+            case EditorMeshCpuJobKind::Remesh:
                 return PublishMeshRemeshCpuJob(context, job);
-            case SandboxEditorMeshCpuJobKind::Subdivide:
+            case EditorMeshCpuJobKind::Subdivide:
                 return PublishMeshSubdivideCpuJob(context, job);
-            case SandboxEditorMeshCpuJobKind::Simplify:
+            case EditorMeshCpuJobKind::Simplify:
                 return PublishMeshSimplifyCpuJob(context, job);
             }
             return Core::Err(Core::ErrorCode::InvalidArgument);
@@ -10389,20 +10400,20 @@ namespace Extrinsic::Runtime
         // The retired key carried `SourcePropertyGeneration`; the dedup guard
         // never compared it, and the staleness it stood for is re-checked by
         // `ValidateMeshCpuJobApply` immediately before the apply.
-        [[nodiscard]] SandboxEditorJobIdentity MakeMeshCpuJobIdentity(
-            const SandboxEditorMeshCpuJobState& state)
+        [[nodiscard]] EditorJobIdentity MakeMeshCpuJobIdentity(
+            const EditorMeshCpuJobState& state)
         {
-            return SandboxEditorJobIdentity{
+            return EditorJobIdentity{
                 .EntityId = state.StableEntityId,
-                .Scope = SandboxEditorJobScope::MeshSurface,
+                .Scope = EditorJobScope::MeshSurface,
                 .OutputSemantic = MeshCpuJobOutputSemantic(state.Kind),
                 .OutputName = MeshCpuJobOutputName(state.Kind),
             };
         }
 
         [[nodiscard]] JobDesc MakeMeshCpuJobDesc(
-            const SandboxEditorContext& context,
-            const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
+            const EditorFeatureBindings& context,
+            const std::shared_ptr<EditorMeshCpuJobState>& state)
         {
             const std::uint32_t estimatedCost =
                 std::max<std::uint32_t>(
@@ -10432,23 +10443,23 @@ namespace Extrinsic::Runtime
                     [context, state](KernelEventBus&,
                                      const JobResultEnvelope& result) -> bool
                     {
-                        if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                        if (result.TryGet<EditorJobResult>() == nullptr)
                             return false;
                         return PublishMeshCpuJob(context, *state).has_value();
                     },
             };
         }
 
-        [[nodiscard]] SandboxEditorMeshCurvatureResult
+        [[nodiscard]] EditorMeshCurvatureResult
         SubmitMeshCurvatureCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorMeshCurvatureCommand& command,
+            const EditorFeatureBindings& context,
+            const EditorMeshCurvatureCommand& command,
             MeshCurvatureSourceResult source,
             MeshCurvaturePropertyState before,
             const std::uint64_t geometryMetadataSignature)
         {
-            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
-            state->Kind = SandboxEditorMeshCpuJobKind::Curvature;
+            auto state = std::make_shared<EditorMeshCpuJobState>();
+            state->Kind = EditorMeshCpuJobKind::Curvature;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions =
@@ -10463,13 +10474,13 @@ namespace Extrinsic::Runtime
                 context.MeshCurvatureDirectionsAvailable);
             state->CurvatureResult.VertexSlotCount = source.VertexSlotCount;
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
             JobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorMeshCurvatureResult pending =
+                EditorMeshCurvatureResult pending =
                     MakePendingMeshCurvatureResult(
                         command,
                         context.MeshCurvatureDirectionsAvailable,
@@ -10485,12 +10496,12 @@ namespace Extrinsic::Runtime
                 identity);
             if (!handle.IsValid())
             {
-                SandboxEditorMeshCurvatureResult result =
+                EditorMeshCurvatureResult result =
                     MakeMeshCurvatureBaseResult(
                         command,
                         context.MeshCurvatureDirectionsAvailable);
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.VertexSlotCount = source.VertexSlotCount;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message         = "Mesh curvature CPU job submission was rejected by the "
@@ -10505,14 +10516,14 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
-        [[nodiscard]] SandboxEditorMeshDenoiseResult SubmitMeshDenoiseCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorMeshDenoiseCommand& command,
+        [[nodiscard]] EditorMeshDenoiseResult SubmitMeshDenoiseCpuJob(
+            const EditorFeatureBindings& context,
+            const EditorMeshDenoiseCommand& command,
             MeshDenoiseSourceResult source,
             const std::uint64_t geometryMetadataSignature)
         {
-            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
-            state->Kind = SandboxEditorMeshCpuJobKind::Denoise;
+            auto state = std::make_shared<EditorMeshCpuJobState>();
+            state->Kind = EditorMeshCpuJobKind::Denoise;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = std::move(source.BeforePositions);
@@ -10531,16 +10542,16 @@ namespace Extrinsic::Runtime
                 state->DenoiseResult.VertexSlotCount -
                 state->DenoiseResult.SkippedDeletedVertexCount;
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
             JobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
                 MeshDenoiseSourceResult pendingSource{};
                 pendingSource.BeforePositions = state->SnapshotPositions;
                 pendingSource.DeletedVertices = state->DeletedVertices;
-                SandboxEditorMeshDenoiseResult pending =
+                EditorMeshDenoiseResult pending =
                     MakePendingMeshDenoiseResult(
                         command,
                         pendingSource,
@@ -10555,10 +10566,10 @@ namespace Extrinsic::Runtime
                 identity);
             if (!handle.IsValid())
             {
-                SandboxEditorMeshDenoiseResult result =
+                EditorMeshDenoiseResult result =
                     MakeMeshDenoiseBaseResult(command);
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
@@ -10575,14 +10586,14 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
-        [[nodiscard]] SandboxEditorMeshRemeshResult SubmitMeshRemeshCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorMeshRemeshCommand& command,
+        [[nodiscard]] EditorMeshRemeshResult SubmitMeshRemeshCpuJob(
+            const EditorFeatureBindings& context,
+            const EditorMeshRemeshCommand& command,
             MeshTopologySourceResult source,
             const std::uint64_t geometryMetadataSignature)
         {
-            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
-            state->Kind = SandboxEditorMeshCpuJobKind::Remesh;
+            auto state = std::make_shared<EditorMeshCpuJobState>();
+            state->Kind = EditorMeshCpuJobKind::Remesh;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
@@ -10594,13 +10605,13 @@ namespace Extrinsic::Runtime
                 state->BeforeMesh.VertexCount();
             state->RemeshResult.InputFaceCount = state->BeforeMesh.FaceCount();
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
             JobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorMeshRemeshResult pending =
+                EditorMeshRemeshResult pending =
                     MakePendingMeshRemeshResult(
                         command,
                         state->BeforeMesh,
@@ -10615,10 +10626,10 @@ namespace Extrinsic::Runtime
                 identity);
             if (!handle.IsValid())
             {
-                SandboxEditorMeshRemeshResult result =
+                EditorMeshRemeshResult result =
                     MakeMeshRemeshBaseResult(command);
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
                     "Mesh remesh CPU job submission was rejected by the runtime job lane.";
@@ -10628,15 +10639,15 @@ namespace Extrinsic::Runtime
             return MakePendingMeshRemeshResult(command, state->BeforeMesh, handle);
         }
 
-        [[nodiscard]] SandboxEditorMeshSubdivideResult
+        [[nodiscard]] EditorMeshSubdivideResult
         SubmitMeshSubdivideCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorMeshSubdivideCommand& command,
+            const EditorFeatureBindings& context,
+            const EditorMeshSubdivideCommand& command,
             MeshTopologySourceResult source,
             const std::uint64_t geometryMetadataSignature)
         {
-            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
-            state->Kind = SandboxEditorMeshCpuJobKind::Subdivide;
+            auto state = std::make_shared<EditorMeshCpuJobState>();
+            state->Kind = EditorMeshCpuJobKind::Subdivide;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
@@ -10649,13 +10660,13 @@ namespace Extrinsic::Runtime
             state->SubdivideResult.InputFaceCount =
                 state->BeforeMesh.FaceCount();
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
             JobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorMeshSubdivideResult pending =
+                EditorMeshSubdivideResult pending =
                     MakePendingMeshSubdivideResult(
                         command,
                         state->BeforeMesh,
@@ -10670,10 +10681,10 @@ namespace Extrinsic::Runtime
                 identity);
             if (!handle.IsValid())
             {
-                SandboxEditorMeshSubdivideResult result =
+                EditorMeshSubdivideResult result =
                     MakeMeshSubdivideBaseResult(command);
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message = "Mesh subdivide CPU job submission was rejected by the "
                                  "runtime job lane.";
@@ -10686,14 +10697,14 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
-        [[nodiscard]] SandboxEditorMeshSimplifyResult SubmitMeshSimplifyCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorMeshSimplifyCommand& command,
+        [[nodiscard]] EditorMeshSimplifyResult SubmitMeshSimplifyCpuJob(
+            const EditorFeatureBindings& context,
+            const EditorMeshSimplifyCommand& command,
             MeshTopologySourceResult source,
             const std::uint64_t geometryMetadataSignature)
         {
-            auto state = std::make_shared<SandboxEditorMeshCpuJobState>();
-            state->Kind = SandboxEditorMeshCpuJobKind::Simplify;
+            auto state = std::make_shared<EditorMeshCpuJobState>();
+            state->Kind = EditorMeshCpuJobKind::Simplify;
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
@@ -10705,13 +10716,13 @@ namespace Extrinsic::Runtime
                 state->BeforeMesh.VertexCount();
             state->SimplifyResult.InputFaceCount = state->BeforeMesh.FaceCount();
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
             JobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorMeshSimplifyResult pending =
+                EditorMeshSimplifyResult pending =
                     MakePendingMeshSimplifyResult(
                         command,
                         state->BeforeMesh,
@@ -10726,10 +10737,10 @@ namespace Extrinsic::Runtime
                 identity);
             if (!handle.IsValid())
             {
-                SandboxEditorMeshSimplifyResult result =
+                EditorMeshSimplifyResult result =
                     MakeMeshSimplifyBaseResult(command);
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message = "Mesh simplify CPU job submission was rejected by the "
                                  "runtime job lane.";
@@ -10743,10 +10754,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildRegistrationSuccessMessage(
-            const SandboxEditorRegistrationResult& result)
+            const EditorRegistrationResult& result)
         {
             std::string message = "ICP registration completed (variant=";
-            message += DebugNameForSandboxEditorICPVariant(result.Variant);
+            message += DebugNameForEditorICPVariantImpl(result.Variant);
             message += ", iterations=";
             message += std::to_string(result.IterationsPerformed);
             message += ", step=";
@@ -10805,27 +10816,27 @@ namespace Extrinsic::Runtime
             return glm::vec3(sum / static_cast<double>(points.size()));
         }
 
-        [[nodiscard]] SandboxEditorRegistrationResult
+        [[nodiscard]] EditorRegistrationResult
         MakeRegistrationBaseResult(
-            const SandboxEditorRegistrationCommand& command)
+            const EditorRegistrationCommand& command)
         {
-            return SandboxEditorRegistrationResult{
-                .Status = SandboxEditorCommandStatus::NoChange,
+            return EditorRegistrationResult{
+                .Status = EditorCommandStatus::NoChange,
                 .Variant = command.Variant,
                 .Error = Core::ErrorCode::Success,
             };
         }
 
-        [[nodiscard]] SandboxEditorRegistrationResult
+        [[nodiscard]] EditorRegistrationResult
         MakePendingRegistrationResult(
-            const SandboxEditorRegistrationCommand& command,
+            const EditorRegistrationCommand& command,
             const std::size_t sourcePointCount,
             const std::size_t targetPointCount,
             const JobToken handle)
         {
-            SandboxEditorRegistrationResult result =
+            EditorRegistrationResult result =
                 MakeRegistrationBaseResult(command);
-            result.Status = SandboxEditorCommandStatus::Pending;
+            result.Status = EditorCommandStatus::Pending;
             result.SourcePointCount = sourcePointCount;
             result.TargetPointCount = targetPointCount;
             result.Message = "ICP registration CPU job queued";
@@ -10933,19 +10944,19 @@ namespace Extrinsic::Runtime
                 });
         }
 
-        struct SandboxEditorRegistrationCpuJobState
+        struct EditorRegistrationCpuJobState
         {
             std::uint32_t SourceStableEntityId{0u};
             std::uint32_t TargetStableEntityId{0u};
             std::uint64_t SourceGeometryMetadataSignature{0u};
             std::uint64_t TargetGeometryMetadataSignature{0u};
-            SandboxEditorRegistrationCommand Command{};
+            EditorRegistrationCommand Command{};
             std::vector<glm::vec3> SourceLocalPoints{};
             std::vector<glm::vec3> TargetLocalPoints{};
             ECSC::Transform::Component SourceBeforeTransform{};
             bool TargetHadTransform{false};
             ECSC::Transform::Component TargetBeforeTransform{};
-            SandboxEditorRegistrationResult Result{};
+            EditorRegistrationResult Result{};
             ECSC::Transform::Component SourceAfterTransform{};
         };
 
@@ -10963,8 +10974,8 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] JobApplyValidation
         ValidateRegistrationCpuJobApply(
-            const SandboxEditorContext& context,
-            const SandboxEditorRegistrationCpuJobState& job)
+            const EditorFeatureBindings& context,
+            const EditorRegistrationCpuJobState& job)
         {
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
@@ -11040,17 +11051,17 @@ namespace Extrinsic::Runtime
         }
 
         void PublishRegistrationResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorRegistrationResult result)
+            const EditorFeatureBindings& context,
+            EditorRegistrationResult result)
         {
             if (context.MethodResultSinks.Registration)
                 context.MethodResultSinks.Registration(std::move(result));
         }
 
         [[nodiscard]] JobResultEnvelope RunRegistrationCpuWorker(
-            const std::shared_ptr<SandboxEditorRegistrationCpuJobState>& state)
+            const std::shared_ptr<EditorRegistrationCpuJobState>& state)
         {
-            SandboxEditorRegistrationResult& result = state->Result;
+            EditorRegistrationResult& result = state->Result;
             result.SourcePointCount = state->SourceLocalPoints.size();
             result.TargetPointCount = state->TargetLocalPoints.size();
 
@@ -11086,12 +11097,12 @@ namespace Extrinsic::Runtime
             if (!outcome.HasResult)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "ICP rejected the selected point clouds (fewer than 3 "
                                  "points or invalid parameters).";
-                return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                    SandboxEditorJobResult{
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
                         .Diagnostic = result.Message,
                     });
             }
@@ -11116,19 +11127,19 @@ namespace Extrinsic::Runtime
                 pose * ModelMatrixFromTransform(state->SourceBeforeTransform),
                 state->SourceAfterTransform);
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = "ICP registration CPU result ready",
                 });
         }
 
         [[nodiscard]] Core::Result PublishRegistrationCpuJob(
-            const SandboxEditorContext& context,
-            SandboxEditorRegistrationCpuJobState& job)
+            const EditorFeatureBindings& context,
+            EditorRegistrationCpuJobState& job)
         {
-            SandboxEditorRegistrationResult result = job.Result;
+            EditorRegistrationResult result = job.Result;
             if (!result.Succeeded())
             {
                 PublishRegistrationResultSink(context, result);
@@ -11137,7 +11148,7 @@ namespace Extrinsic::Runtime
 
             if (context.Scene == nullptr)
             {
-                result.Status = SandboxEditorCommandStatus::MissingScene;
+                result.Status = EditorCommandStatus::MissingScene;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message = "ICP registration requires an attached scene.";
                 PublishRegistrationResultSink(context, result);
@@ -11149,7 +11160,7 @@ namespace Extrinsic::Runtime
                 ResolveStableEntity(raw, job.SourceStableEntityId);
             if (!sourceEntity.has_value())
             {
-                result.Status = SandboxEditorCommandStatus::StaleEntity;
+                result.Status = EditorCommandStatus::StaleEntity;
                 result.Error = Core::ErrorCode::ResourceNotFound;
                 result.Message =
                     "ICP registration source entity is stale or no longer live.";
@@ -11161,7 +11172,7 @@ namespace Extrinsic::Runtime
                 raw.try_get<ECSC::Transform::Component>(*sourceEntity);
             if (transform == nullptr)
             {
-                result.Status = SandboxEditorCommandStatus::MissingTransform;
+                result.Status = EditorCommandStatus::MissingTransform;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
                     "ICP registration source entity has no Transform to drive.";
@@ -11180,17 +11191,17 @@ namespace Extrinsic::Runtime
                         job.SourceBeforeTransform,
                         job.SourceAfterTransform,
                         "Align point clouds (ICP)");
-                result.Status = ToSandboxEditorCommandStatus(history.Status);
+                result.Status = ToEditorCommandStatus(history.Status);
             }
             else
             {
                 *transform = job.SourceAfterTransform;
                 raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(
                     *sourceEntity);
-                result.Status = SandboxEditorCommandStatus::Applied;
+                result.Status = EditorCommandStatus::Applied;
             }
 
-            if (result.Status != SandboxEditorCommandStatus::Applied)
+            if (result.Status != EditorCommandStatus::Applied)
             {
                 result.Error = Core::ErrorCode::Unknown;
                 result.Message =
@@ -11208,20 +11219,20 @@ namespace Extrinsic::Runtime
         // The retired key carried the source *and* target geometry signatures;
         // neither was part of the dedup comparison, and both are re-checked by
         // `ValidateRegistrationCpuJobApply` before the apply.
-        [[nodiscard]] SandboxEditorJobIdentity MakeRegistrationCpuJobIdentity(
-            const SandboxEditorRegistrationCpuJobState& state)
+        [[nodiscard]] EditorJobIdentity MakeRegistrationCpuJobIdentity(
+            const EditorRegistrationCpuJobState& state)
         {
-            return SandboxEditorJobIdentity{
+            return EditorJobIdentity{
                 .EntityId = state.SourceStableEntityId,
-                .Scope = SandboxEditorJobScope::PointCloudPoint,
+                .Scope = EditorJobScope::PointCloudPoint,
                 .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                 .OutputName = "registration_transform",
             };
         }
 
         [[nodiscard]] JobDesc MakeRegistrationCpuJobDesc(
-            const SandboxEditorContext& context,
-            const std::shared_ptr<SandboxEditorRegistrationCpuJobState>& state)
+            const EditorFeatureBindings& context,
+            const std::shared_ptr<EditorRegistrationCpuJobState>& state)
         {
             const std::uint32_t estimatedCost =
                 std::max<std::uint32_t>(
@@ -11251,7 +11262,7 @@ namespace Extrinsic::Runtime
                     [context, state](KernelEventBus&,
                                      const JobResultEnvelope& result) -> bool
                     {
-                        if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                        if (result.TryGet<EditorJobResult>() == nullptr)
                             return false;
                         return PublishRegistrationCpuJob(context, *state)
                             .has_value();
@@ -11259,10 +11270,10 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorRegistrationResult
+        [[nodiscard]] EditorRegistrationResult
         SubmitRegistrationCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorRegistrationCommand& command,
+            const EditorFeatureBindings& context,
+            const EditorRegistrationCommand& command,
             std::vector<glm::vec3> sourcePoints,
             std::vector<glm::vec3> targetPoints,
             const ECSC::Transform::Component& sourceTransform,
@@ -11271,7 +11282,7 @@ namespace Extrinsic::Runtime
             const std::uint64_t targetGeometryMetadataSignature)
         {
             auto state =
-                std::make_shared<SandboxEditorRegistrationCpuJobState>();
+                std::make_shared<EditorRegistrationCpuJobState>();
             state->SourceStableEntityId = command.SourceStableEntityId;
             state->TargetStableEntityId = command.TargetStableEntityId;
             state->SourceGeometryMetadataSignature =
@@ -11291,13 +11302,13 @@ namespace Extrinsic::Runtime
             state->Result.SourcePointCount = state->SourceLocalPoints.size();
             state->Result.TargetPointCount = state->TargetLocalPoints.size();
 
-            const SandboxEditorJobIdentity identity =
+            const EditorJobIdentity identity =
                 MakeRegistrationCpuJobIdentity(*state);
             JobDesc desc = MakeRegistrationCpuJobDesc(context, state);
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorRegistrationResult pending =
+                EditorRegistrationResult pending =
                     MakePendingRegistrationResult(
                         command,
                         state->SourceLocalPoints.size(),
@@ -11313,10 +11324,10 @@ namespace Extrinsic::Runtime
                 identity);
             if (!handle.IsValid())
             {
-                SandboxEditorRegistrationResult result =
+                EditorRegistrationResult result =
                     MakeRegistrationBaseResult(command);
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.SourcePointCount = state->SourceLocalPoints.size();
                 result.TargetPointCount = state->TargetLocalPoints.size();
                 result.Error = Core::ErrorCode::InvalidState;
@@ -11332,21 +11343,21 @@ namespace Extrinsic::Runtime
                 handle);
         }
 
-        [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
-            const SandboxEditorContext& context)
+        [[nodiscard]] EditorGeometryProcessingModel BuildGeometryProcessingModel(
+            const EditorFeatureBindings& context)
         {
-            SandboxEditorGeometryProcessingModel model{};
+            EditorGeometryProcessingModel model{};
             if (context.Scene == nullptr)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::MissingScene,
+                              EditorDiagnosticCode::MissingScene,
                               "Scene registry is unavailable for processing controls.");
                 return model;
             }
             if (context.Selection == nullptr)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::MissingSelectionController,
+                              EditorDiagnosticCode::MissingSelectionController,
                               "Selection controller is unavailable for processing controls.");
                 return model;
             }
@@ -11356,14 +11367,14 @@ namespace Extrinsic::Runtime
             if (!selected.has_value())
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::NoSelectedEntity,
+                              EditorDiagnosticCode::NoSelectedEntity,
                               "No selected entity is available for processing controls.");
                 return model;
             }
 
             model.HasSelectedEntity = true;
             model.Capabilities =
-                GetSandboxEditorGeometryProcessingCapabilities(
+      GetEditorGeometryProcessingCapabilitiesImpl(
                     *context.Scene,
                     *selected);
 
@@ -11373,7 +11384,7 @@ namespace Extrinsic::Runtime
             {
                 model.DirectMeshEnrichmentStatus = enrichment->Status;
                 model.DirectMeshEnrichmentPending =
-                    IsActiveSandboxEditorJobState(enrichment->Status);
+        IsActiveEditorJobStateImpl(enrichment->Status);
                 model.DirectMeshEnrichmentDiagnostic = enrichment->Diagnostic;
                 if (model.DirectMeshEnrichmentPending &&
                     model.DirectMeshEnrichmentDiagnostic.empty())
@@ -11388,21 +11399,21 @@ namespace Extrinsic::Runtime
                 return model;
 
             model.Entries =
-                ResolveSandboxEditorGeometryProcessingEntries(model.Capabilities);
+      ResolveEditorGeometryProcessingEntriesImpl(model.Capabilities);
             model.KMeansDomains =
-                GetAvailableSandboxEditorKMeansDomains(*context.Scene, *selected);
+      GetAvailableEditorKMeansDomainsImpl(*context.Scene, *selected);
             model.MeshDenoiseAvailable =
                 context.MeshDenoiseKernelAvailable &&
                 model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::MeshVertices);
+                    EditorGeometryProcessingDomain::MeshVertices);
             model.MeshCurvatureAvailable =
                 context.MeshCurvatureKernelAvailable &&
                 model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::MeshVertices);
+                    EditorGeometryProcessingDomain::MeshVertices);
             model.MeshCurvatureDirectionsAvailable =
                 model.MeshCurvatureAvailable &&
                 context.MeshCurvatureDirectionsAvailable;
@@ -11440,35 +11451,35 @@ namespace Extrinsic::Runtime
             model.MeshSimplifyAvailable =
                 context.MeshSimplifyKernelAvailable &&
                 model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::MeshVertices);
+                    EditorGeometryProcessingDomain::MeshVertices);
             model.MeshVertexNormalsAvailable =
                 model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::MeshVertices);
+                    EditorGeometryProcessingDomain::MeshVertices);
             model.GraphVertexNormalsAvailable =
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::GraphVertices);
+                    EditorGeometryProcessingDomain::GraphVertices);
             model.PointCloudVertexNormalsAvailable =
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+                    EditorGeometryProcessingDomain::PointCloudPoints);
             model.PointCloudOutlierRemovalAvailable =
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+                    EditorGeometryProcessingDomain::PointCloudPoints);
             model.PointCloudProgressivePoissonAvailable =
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+                    EditorGeometryProcessingDomain::PointCloudPoints);
             model.MeshProgressivePoissonAvailable =
                 model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnySandboxEditorGeometryProcessingDomain(
+                HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    SandboxEditorGeometryProcessingDomain::MeshVertices);
+                    EditorGeometryProcessingDomain::MeshVertices);
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;
@@ -11478,7 +11489,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastKMeansResult->Message.empty()
                             ? "Last K-Means command failed."
                             : context.LastKMeansResult->Message);
@@ -11492,7 +11503,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastMeshDenoiseResult->Message.empty()
                             ? "Last mesh denoise command failed."
                             : context.LastMeshDenoiseResult->Message);
@@ -11506,7 +11517,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastMeshCurvatureResult->Message.empty()
                             ? "Last mesh curvature command failed."
                             : context.LastMeshCurvatureResult->Message);
@@ -11520,7 +11531,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastMeshRemeshResult->Message.empty()
                             ? "Last mesh remesh command failed."
                             : context.LastMeshRemeshResult->Message);
@@ -11534,7 +11545,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastMeshSubdivideResult->Message.empty()
                             ? "Last mesh subdivide command failed."
                             : context.LastMeshSubdivideResult->Message);
@@ -11548,7 +11559,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastMeshSimplifyResult->Message.empty()
                             ? "Last mesh simplify command failed."
                             : context.LastMeshSimplifyResult->Message);
@@ -11562,7 +11573,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastMeshVertexNormalsResult->Message.empty()
                             ? "Last mesh vertex-normal command failed."
                             : context.LastMeshVertexNormalsResult->Message);
@@ -11576,7 +11587,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastGraphVertexNormalsResult->Message.empty()
                             ? "Last graph vertex-normal command failed."
                             : context.LastGraphVertexNormalsResult->Message);
@@ -11590,7 +11601,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastPointCloudVertexNormalsResult->Message.empty()
                             ? "Last point-cloud vertex-normal command failed."
                             : context.LastPointCloudVertexNormalsResult->Message);
@@ -11604,7 +11615,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastPointCloudOutlierRemovalResult->Message.empty()
                             ? "Last point-cloud outlier-removal command failed."
                             : context.LastPointCloudOutlierRemovalResult->Message);
@@ -11618,7 +11629,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        EditorDiagnosticCode::GeometryProcessingFailed,
                         context.LastProgressivePoissonResult->Message.empty()
                             ? "Last progressive-Poisson command failed."
                             : context.LastProgressivePoissonResult->Message);
@@ -11627,16 +11638,16 @@ namespace Extrinsic::Runtime
             if (!model.Capabilities.HasAny())
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
+                              EditorDiagnosticCode::UnsupportedGeometryDomain,
                               "Selected entity has no supported GeometrySources processing domain.");
             }
             return model;
         }
 
-        [[nodiscard]] SandboxEditorPrimitiveDetailModel BuildPrimitiveDetailModel(
+        [[nodiscard]] EditorPrimitiveDetailModel BuildPrimitiveDetailModel(
             const PrimitiveSelectionResult& primitive)
         {
-            return SandboxEditorPrimitiveDetailModel{
+            return EditorPrimitiveDetailModel{
                 .HasPrimitive = true,
                 .Primitive = primitive,
                 .HasFaceId = primitive.FaceId != kInvalidPrimitiveIndex,
@@ -11646,10 +11657,10 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorInspectorModel BuildInspectorModel(
-            const SandboxEditorContext& context)
+        [[nodiscard]] EditorInspectorModel BuildInspectorModel(
+            const EditorFeatureBindings& context)
         {
-            ScopedSandboxEditorStatTimer timer{
+            ScopedEditorStatTimer timer{
                 context.ModelBuildStats != nullptr
                     ? &context.ModelBuildStats->InspectorModelBuildTimeNs
                     : nullptr};
@@ -11657,11 +11668,11 @@ namespace Extrinsic::Runtime
             {
                 ++context.ModelBuildStats->InspectorModelBuilds;
             }
-            SandboxEditorInspectorModel model{};
+            EditorInspectorModel model{};
             if (context.Scene == nullptr)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::MissingScene,
+                              EditorDiagnosticCode::MissingScene,
                               "Scene registry is unavailable.");
                 return model;
             }
@@ -11671,7 +11682,7 @@ namespace Extrinsic::Runtime
             if (!selected.has_value())
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::NoSelectedEntity,
+                              EditorDiagnosticCode::NoSelectedEntity,
                               "No selected entity is available for inspection.");
                 return model;
             }
@@ -11682,7 +11693,7 @@ namespace Extrinsic::Runtime
             model.Transform = BuildTransformModel(raw, *selected);
             model.RenderHints = BuildRenderHintModel(raw, *selected);
             model.Geometry = BuildGeometryDomainModel(raw, *selected);
-            SandboxEditorSelectedAnalysisModel selectedAnalysis =
+            EditorSelectedAnalysisModel selectedAnalysis =
                 BuildSelectedAnalysisModel(
                     context,
                     raw,
@@ -11696,32 +11707,32 @@ namespace Extrinsic::Runtime
             model.BoundState = std::move(selectedAnalysis.BoundState);
             model.TextureBake = std::move(selectedAnalysis.TextureBake);
             model.Processing =
-                GetSandboxEditorGeometryProcessingCapabilities(
+      GetEditorGeometryProcessingCapabilitiesImpl(
                     *context.Scene,
                     *selected);
 
             if (model.Geometry.Domain == GS::Domain::Unknown)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
+                              EditorDiagnosticCode::UnsupportedGeometryDomain,
                               "Selected entity has mixed GeometrySources topology.");
             }
 
             return model;
         }
 
-        [[nodiscard]] SandboxEditorSelectionModel BuildSelectionModel(
-            const SandboxEditorContext& context)
+        [[nodiscard]] EditorSelectionModel BuildSelectionModel(
+            const EditorFeatureBindings& context)
         {
             if (context.ModelBuildStats != nullptr)
             {
                 ++context.ModelBuildStats->SelectionModelBuilds;
             }
-            SandboxEditorSelectionModel model{};
+            EditorSelectionModel model{};
             if (context.Selection == nullptr)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::MissingSelectionController,
+                              EditorDiagnosticCode::MissingSelectionController,
                               "Selection controller is unavailable.");
                 return model;
             }
@@ -11758,7 +11769,7 @@ namespace Extrinsic::Runtime
             else
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::MissingScene,
+                              EditorDiagnosticCode::MissingScene,
                               "Scene registry is unavailable for selection details.");
             }
 
@@ -11771,23 +11782,23 @@ namespace Extrinsic::Runtime
             if (model.SelectedStableIds.empty() && !model.Primitive.HasPrimitive)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::NoSelectedEntity,
+                              EditorDiagnosticCode::NoSelectedEntity,
                               "No selected entity or refined primitive is available.");
             }
 
             return model;
         }
 
-        [[nodiscard]] SandboxEditorDocumentModel BuildDocumentModel(
-            const SandboxEditorContext& context)
+        [[nodiscard]] EditorDocumentModel BuildDocumentModel(
+            const EditorFeatureBindings& context)
         {
-            SandboxEditorDocumentModel model{};
+            EditorDocumentModel model{};
             if (context.CommandHistory == nullptr)
             {
                 model.StatusText =
                     "Document history is disabled: runtime command history is unavailable.";
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::EditorCommandHistoryUnavailable,
+                              EditorDiagnosticCode::EditorCommandHistoryUnavailable,
                               model.StatusText);
                 return model;
             }
@@ -11814,10 +11825,10 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] SandboxEditorSceneFileModel BuildSceneFileModel(
-            const SandboxEditorContext& context)
+        [[nodiscard]] EditorSceneFileModel BuildSceneFileModel(
+            const EditorFeatureBindings& context)
         {
-            SandboxEditorSceneFileModel model{};
+            EditorSceneFileModel model{};
             model.CanNew = static_cast<bool>(context.SceneFileCommands.New);
             model.CanClose = static_cast<bool>(context.SceneFileCommands.Close);
             model.CanSave = static_cast<bool>(context.SceneFileCommands.Save);
@@ -11839,7 +11850,7 @@ namespace Extrinsic::Runtime
                 model.StatusText =
                     "Scene workflows are disabled: runtime scene commands are unavailable.";
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::SceneFileUnavailable,
+                              EditorDiagnosticCode::SceneFileUnavailable,
                               model.StatusText);
             }
             if (context.LastSceneFileResult != nullptr)
@@ -11849,20 +11860,20 @@ namespace Extrinsic::Runtime
                     model.StatusText = context.LastSceneFileResult->Message;
                 if (!context.LastSceneFileResult->Succeeded() &&
                     context.LastSceneFileResult->Status !=
-                        SandboxEditorCommandStatus::Pending)
+                        EditorCommandStatus::Pending)
                 {
                     AddDiagnostic(model.Diagnostics,
-                                  SandboxEditorDiagnosticCode::SceneFileFailed,
+                                  EditorDiagnosticCode::SceneFileFailed,
                                   model.StatusText);
                 }
             }
             return model;
         }
 
-        [[nodiscard]] SandboxEditorFileImportModel BuildFileImportModel(
-            const SandboxEditorContext& context)
+        [[nodiscard]] EditorFileImportModel BuildFileImportModel(
+            const EditorFeatureBindings& context)
         {
-            SandboxEditorFileImportModel model{};
+            EditorFileImportModel model{};
             model.Enabled =
                 context.AssetImportCommandsAvailable ||
                 context.AssetImportCommands.Available();
@@ -11894,7 +11905,7 @@ namespace Extrinsic::Runtime
                 {
                     AddDiagnostic(
                         model.Diagnostics,
-                        SandboxEditorDiagnosticCode::AssetImportUnavailable,
+                        EditorDiagnosticCode::AssetImportUnavailable,
                         model.StatusText);
                 }
             }
@@ -11908,10 +11919,10 @@ namespace Extrinsic::Runtime
                 }
                 if (!context.LastAssetImportResult->Succeeded() &&
                     context.LastAssetImportResult->Status !=
-                        SandboxEditorCommandStatus::Pending)
+                        EditorCommandStatus::Pending)
                 {
                     AddDiagnostic(model.Diagnostics,
-                                  SandboxEditorDiagnosticCode::AssetImportFailed,
+                                  EditorDiagnosticCode::AssetImportFailed,
                                   context.LastAssetImportResult->Message.empty()
                                       ? model.StatusText
                                       : context.LastAssetImportResult->Message);
@@ -11933,12 +11944,12 @@ namespace Extrinsic::Runtime
             return std::chrono::duration<double>(end - entry.EnqueuedAt).count();
         }
 
-        [[nodiscard]] SandboxEditorAssetImportQueueRow
+        [[nodiscard]] EditorAssetImportQueueRow
         BuildAssetImportQueueRow(
             const RuntimeAssetImportQueueEntry& entry,
             const RuntimeAssetImportQueueTimePoint now)
         {
-            SandboxEditorAssetImportQueueRow row{};
+            EditorAssetImportQueueRow row{};
             row.Operation = entry.Operation;
             row.Sequence = entry.Sequence;
             row.Source = entry.Source;
@@ -11962,10 +11973,10 @@ namespace Extrinsic::Runtime
             return row;
         }
 
-        [[nodiscard]] SandboxEditorAssetImportQueueModel
-        BuildAssetImportQueueModel(const SandboxEditorContext& context)
+        [[nodiscard]] EditorAssetImportQueueModel
+        BuildAssetImportQueueModel(const EditorFeatureBindings& context)
         {
-            SandboxEditorAssetImportQueueModel model{};
+            EditorAssetImportQueueModel model{};
             model.ActiveCount = context.AssetImportQueue.ActiveCount;
             model.TerminalCount = context.AssetImportQueue.TerminalCount;
             model.ClearCompletedAvailable =
@@ -12001,7 +12012,7 @@ namespace Extrinsic::Runtime
             if (!model.ClearCompletedAvailable)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::AssetImportUnavailable,
+                              EditorDiagnosticCode::AssetImportUnavailable,
                               "Asset import queue commands are unavailable.");
             }
             return model;
@@ -12066,10 +12077,10 @@ namespace Extrinsic::Runtime
             return "Unknown";
         }
 
-        [[nodiscard]] SandboxEditorGpuProfileModel BuildGpuProfileModel(
+        [[nodiscard]] EditorGpuProfileModel BuildGpuProfileModel(
             const Graphics::RenderGraphGpuProfileStats& stats)
         {
-            SandboxEditorGpuProfileModel model{
+            EditorGpuProfileModel model{
                 .Status = GpuProfileStatusName(stats.Status),
                 .Source = GpuTimestampSourceName(stats.Source),
                 .Diagnostic = stats.Diagnostic,
@@ -12086,7 +12097,7 @@ namespace Extrinsic::Runtime
                  stats.QueueEnvelopes)
             {
                 model.QueueEnvelopes.push_back(
-                    SandboxEditorGpuProfileQueueModel{
+                    EditorGpuProfileQueueModel{
                         .Queue = RHI::QueueAffinityName(queue.Queue),
                         .Source = GpuTimestampSourceName(queue.Source),
                         .DurationNs = queue.DurationNs,
@@ -12097,7 +12108,7 @@ namespace Extrinsic::Runtime
                  stats.Passes)
             {
                 model.Passes.push_back(
-                    SandboxEditorGpuProfilePassModel{
+                    EditorGpuProfilePassModel{
                         .Name = pass.Name,
                         .HasTypedId = pass.Id.IsValid(),
                         .TypedId = pass.Id.Value,
@@ -12111,10 +12122,10 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] SandboxEditorRenderGraphModel BuildRenderGraphModel(
-            const SandboxEditorContext& context)
+        [[nodiscard]] EditorRenderGraphModel BuildRenderGraphModel(
+            const EditorFeatureBindings& context)
         {
-            SandboxEditorRenderGraphModel model{};
+            EditorRenderGraphModel model{};
             model.GpuProfilingToggleAvailable =
                 context.EngineConfigCommandsAvailable &&
                 context.EngineConfigControlState != nullptr &&
@@ -12175,7 +12186,7 @@ namespace Extrinsic::Runtime
                 model.StatusText =
                     "Frame graph diagnostics are disabled: renderer stats are unavailable.";
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable,
+                              EditorDiagnosticCode::RenderGraphStatsUnavailable,
                               model.StatusText);
                 return model;
             }
@@ -12228,7 +12239,7 @@ namespace Extrinsic::Runtime
                  stats.CommandRecords.Passes)
             {
                 model.CommandPasses.push_back(
-                    SandboxEditorRenderGraphPassModel{
+                    EditorRenderGraphPassModel{
                         .Name = pass.Name,
                         .HasTypedId = pass.Id.IsValid(),
                         .TypedId = pass.Id.Value,
@@ -12238,10 +12249,10 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] SandboxEditorCameraRenderModel BuildCameraRenderModel(
-            const SandboxEditorContext& context)
+        [[nodiscard]] EditorCameraRenderModel BuildCameraRenderModel(
+            const EditorFeatureBindings& context)
         {
-            SandboxEditorCameraRenderModel model{};
+            EditorCameraRenderModel model{};
             model.CameraControlsAvailable = context.CameraControllers != nullptr;
             model.RenderSettingsAvailable = context.CameraControllers != nullptr;
 
@@ -12259,18 +12270,18 @@ namespace Extrinsic::Runtime
             if (!model.CameraControlsAvailable)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::CameraRenderCommandsUnavailable,
+                              EditorDiagnosticCode::CameraRenderCommandsUnavailable,
                               "Camera/render setting command seams are unavailable.");
             }
             return model;
         }
 
-        [[nodiscard]] SandboxEditorVisualizationModel BuildVisualizationModel(
-            const SandboxEditorContext& context,
-            const SandboxEditorVisualizationTarget target =
-                SandboxEditorVisualizationTarget::Entity)
+        [[nodiscard]] EditorVisualizationModel BuildVisualizationModel(
+            const EditorFeatureBindings& context,
+            const EditorVisualizationTarget target =
+                EditorVisualizationTarget::Entity)
         {
-            ScopedSandboxEditorStatTimer timer{
+            ScopedEditorStatTimer timer{
                 context.ModelBuildStats != nullptr
                     ? &context.ModelBuildStats->VisualizationModelBuildTimeNs
                     : nullptr};
@@ -12278,7 +12289,7 @@ namespace Extrinsic::Runtime
             {
                 ++context.ModelBuildStats->VisualizationModelBuilds;
             }
-            SandboxEditorVisualizationModel model{};
+            EditorVisualizationModel model{};
             model.GeometryDomainControlsAvailable = context.VisualizationCommandsAvailable;
             model.RecipeControlsAvailable =
                 context.VisualizationCommandsAvailable &&
@@ -12287,14 +12298,14 @@ namespace Extrinsic::Runtime
             if (!context.VisualizationCommandsAvailable)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::VisualizationCommandsUnavailable,
+                              EditorDiagnosticCode::VisualizationCommandsUnavailable,
                               "Visualization command seams are unavailable.");
                 return model;
             }
             if (context.Scene == nullptr)
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::MissingScene,
+                              EditorDiagnosticCode::MissingScene,
                               "Scene registry is unavailable for visualization controls.");
                 return model;
             }
@@ -12304,7 +12315,7 @@ namespace Extrinsic::Runtime
             if (!selected.has_value())
             {
                 AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::NoSelectedEntity,
+                              EditorDiagnosticCode::NoSelectedEntity,
                               "No selected entity is available for visualization controls.");
                 return model;
             }
@@ -12321,11 +12332,11 @@ namespace Extrinsic::Runtime
             model.TargetAvailable =
                 VisualizationTargetAvailableForView(availability, target);
             model.Properties =
-                target == SandboxEditorVisualizationTarget::Entity
+                target == EditorVisualizationTarget::Entity
                     ? BuildVisualizationProperties(availability)
                     : [&availability, target]()
                       {
-                          std::vector<SandboxEditorVisualizationPropertyInfo> out{};
+                          std::vector<EditorVisualizationPropertyInfo> out{};
                           AppendVisualizationPropertiesForTarget(
                               out,
                               availability,
@@ -12345,10 +12356,10 @@ namespace Extrinsic::Runtime
             return model;
         }
 
-        [[nodiscard]] SandboxEditorVisualizationModelCacheEntry*
+        [[nodiscard]] EditorVisualizationModelCacheEntry*
         ResolveVisualizationCacheEntry(
-            SandboxEditorSelectedModelCache& cache,
-            const SandboxEditorVisualizationTarget target)
+            EditorSelectedModelCache& cache,
+            const EditorVisualizationTarget target)
         {
             const std::size_t index = static_cast<std::size_t>(target);
             return index < cache.Visualization.size()
@@ -12356,12 +12367,12 @@ namespace Extrinsic::Runtime
                 : nullptr;
         }
 
-        [[nodiscard]] SandboxEditorVisualizationModel BuildCachedVisualizationModel(
-            const SandboxEditorContext& context,
-            const SandboxEditorVisualizationTarget target =
-                SandboxEditorVisualizationTarget::Entity)
+        [[nodiscard]] EditorVisualizationModel BuildCachedVisualizationModel(
+            const EditorFeatureBindings& context,
+            const EditorVisualizationTarget target =
+                EditorVisualizationTarget::Entity)
         {
-            SandboxEditorSelectedModelCache* cache = context.SelectedModelCache;
+            EditorSelectedModelCache* cache = context.SelectedModelCache;
             if (cache == nullptr || !context.VisualizationCommandsAvailable ||
                 context.Scene == nullptr)
             {
@@ -12373,22 +12384,22 @@ namespace Extrinsic::Runtime
             if (!selected.has_value())
                 return BuildVisualizationModel(context, target);
 
-            SandboxEditorVisualizationModelCacheEntry* entry =
+            EditorVisualizationModelCacheEntry* entry =
                 ResolveVisualizationCacheEntry(*cache, target);
             if (entry == nullptr)
                 return BuildVisualizationModel(context, target);
 
             const entt::registry& raw = context.Scene->Raw();
-            const SandboxEditorGeometryDomainModel geometry =
+            const EditorGeometryDomainModel geometry =
                 BuildGeometryDomainModel(raw, *selected);
-            const SandboxEditorSelectedModelCacheKey key =
+            const EditorSelectedModelCacheKey key =
                 BuildSelectedModelCacheKey(
                     context,
                     raw,
                     *selected,
                     geometry,
-                    SandboxEditorSelectedModelCacheSection::Visualization,
-                    SandboxEditorSelectedAnalysisCacheConsumer::Inspector,
+                    EditorSelectedModelCacheSection::Visualization,
+                    EditorSelectedAnalysisCacheConsumer::Inspector,
                     target);
 
             if (entry->Valid && entry->Key == key)
@@ -12398,9 +12409,9 @@ namespace Extrinsic::Runtime
             }
 
             RecordVisualizationCacheMiss(context);
-            SandboxEditorVisualizationModel model =
+            EditorVisualizationModel model =
                 BuildVisualizationModel(context, target);
-            *entry = SandboxEditorVisualizationModelCacheEntry{
+            *entry = EditorVisualizationModelCacheEntry{
                 .Valid = true,
                 .Key = key,
                 .Model = model,
@@ -12445,11 +12456,11 @@ namespace Extrinsic::Runtime
             return ConfigMode::Grid;
         }
 
-        [[nodiscard]] SandboxEditorParameterizationUvViewStatus
+        [[nodiscard]] EditorParameterizationUvViewStatus
         ToSandboxUvViewStatus(const Graphics::UvViewStatus status) noexcept
         {
             using SandboxStatus =
-                SandboxEditorParameterizationUvViewStatus;
+                EditorParameterizationUvViewStatus;
             switch (status)
             {
             case Graphics::UvViewStatus::Disabled:
@@ -12476,18 +12487,18 @@ namespace Extrinsic::Runtime
                      (token << 6u) + (token >> 2u);
         }
 
-        [[nodiscard]] SandboxEditorParameterizationUvViewState
+        [[nodiscard]] EditorParameterizationUvViewState
         SubmitRuntimeParameterizationUvView(Graphics::IRenderer& renderer, RHI::IDevice& device,
                                             ServiceRegistry& services,
                                             const RenderExtractionCache* renderExtraction,
-                                            SandboxEditorParameterizationUvViewRequest request)
+                                            EditorParameterizationUvViewRequest request)
         {
             using ConfigBackground = ParameterizationUvBackgroundMode;
             using ConfigMode = ParameterizationUvRenderMode;
             using SandboxStatus =
-                SandboxEditorParameterizationUvViewStatus;
+                EditorParameterizationUvViewStatus;
 
-            SandboxEditorParameterizationUvViewState state{
+            EditorParameterizationUvViewState state{
                 .Status = request.Enabled
                     ? SandboxStatus::WaitingForGpuFrame
                     : SandboxStatus::CpuLayout,
@@ -12656,7 +12667,7 @@ namespace Extrinsic::Runtime
             return state;
         }
 
-        [[nodiscard]] SandboxEditorContext BuildContextFromRuntime(WorldRegistry& worlds,
+        [[nodiscard]] EditorFeatureBindings BuildContextFromRuntime(WorldRegistry& worlds,
                                                                    ServiceRegistry& services)
         {
             RenderExtractionCache* renderExtraction    = services.Find<RenderExtractionCache>();
@@ -12673,7 +12684,7 @@ namespace Extrinsic::Runtime
             Assets::AssetService* const assetService   = services.Find<Assets::AssetService>();
             AssetWorkflowModule* const assetWorkflow = services.Find<AssetWorkflowModule>();
             TextureBakeService* const textureBake          = services.Find<TextureBakeService>();
-            SandboxEditorContext context{
+            EditorFeatureBindings context{
                 .Scene          = activeScene,
                 .World          = activeWorld,
                 .Selection      = selection,
@@ -12691,15 +12702,15 @@ namespace Extrinsic::Runtime
                 .Device            = device,
                 .TextureBake       = textureBake,
                 .AssetImportCommands =
-                    SandboxEditorAssetImportCommandSurface{
+                    EditorAssetImportCommandSurface{
                         .Import =
-                            [assetWorkflow](const SandboxEditorFileImportCommand& command)
+                            [assetWorkflow](const EditorFileImportCommand& command)
                         {
                             if (assetWorkflow == nullptr)
                             {
-                                return SandboxEditorFileImportResult{
+                                return EditorFileImportResult{
                                     .Status =
-                                        SandboxEditorCommandStatus::
+                                        EditorCommandStatus::
                                             AssetImportFailed,
                                     .PayloadKind = command.PayloadKind,
                                     .Error = Core::ErrorCode::InvalidState,
@@ -12726,16 +12737,16 @@ namespace Extrinsic::Runtime
                                         std::move(recipe));
                                 if (!queued.has_value())
                                 {
-                                    return SandboxEditorFileImportResult{
-                                        .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                                    return EditorFileImportResult{
+                                        .Status = EditorCommandStatus::AssetImportFailed,
                                         .PayloadKind = route->PayloadKind,
                                         .Error = queued.error(),
                                         .Message = BuildImportFailureMessage(queued.error()),
                                     };
                                 }
 
-                                return SandboxEditorFileImportResult{
-                                    .Status = SandboxEditorCommandStatus::Pending,
+                                return EditorFileImportResult{
+                                    .Status = EditorCommandStatus::Pending,
                                     .Operation = queued->Operation,
                                     .PayloadKind = queued->PayloadKind,
                                     .Error = Core::ErrorCode::Success,
@@ -12753,16 +12764,16 @@ namespace Extrinsic::Runtime
                                 });
                             if (!imported.has_value())
                             {
-                                return SandboxEditorFileImportResult{
-                                    .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                                return EditorFileImportResult{
+                                    .Status = EditorCommandStatus::AssetImportFailed,
                                     .PayloadKind = command.PayloadKind,
                                     .Error = imported.error(),
                                     .Message = BuildImportFailureMessage(imported.error()),
                                 };
                             }
 
-                            SandboxEditorFileImportResult result{
-                                .Status = SandboxEditorCommandStatus::Applied,
+                            EditorFileImportResult result{
+                                .Status = EditorCommandStatus::Applied,
                                 .Asset = imported->Asset,
                                 .PayloadKind = imported->PayloadKind,
                                 .PrimitiveEntitiesCreated =
@@ -12782,7 +12793,7 @@ namespace Extrinsic::Runtime
                         },
                     },
                 .AssetImportQueueCommands =
-                    SandboxEditorAssetImportQueueCommandSurface{
+                    EditorAssetImportQueueCommandSurface{
                         .ClearCompleted =
                             [assetWorkflow]()
                         {
@@ -12802,18 +12813,18 @@ namespace Extrinsic::Runtime
                         },
                     },
                 .SceneFileCommands =
-                    SandboxEditorSceneFileCommandSurface{
+                    EditorSceneFileCommandSurface{
                         .New =
                             [sceneDocuments]()
                         {
                             if (sceneDocuments == nullptr)
                             {
-                                return SandboxEditorSceneFileResult{
-                                    .Status = SandboxEditorCommandStatus::SceneNewFailed,
-                                    .Operation = SandboxEditorSceneFileOperation::New,
+                                return EditorSceneFileResult{
+                                    .Status = EditorCommandStatus::SceneNewFailed,
+                                    .Operation = EditorSceneFileOperation::New,
                                     .Error = Core::ErrorCode::InvalidState,
                                     .Message = BuildSceneFileFailureMessage(
-                                        SandboxEditorSceneFileOperation::New,
+                                        EditorSceneFileOperation::New,
                                         Core::ErrorCode::InvalidState),
                                 };
                             }
@@ -12821,33 +12832,33 @@ namespace Extrinsic::Runtime
                                 sceneDocuments->NewSceneDocument();
                             if (!created.has_value())
                             {
-                                return SandboxEditorSceneFileResult{
-                                    .Status = SandboxEditorCommandStatus::SceneNewFailed,
-                                    .Operation = SandboxEditorSceneFileOperation::New,
+                                return EditorSceneFileResult{
+                                    .Status = EditorCommandStatus::SceneNewFailed,
+                                    .Operation = EditorSceneFileOperation::New,
                                     .Error = created.error(),
                                     .Message = BuildSceneFileFailureMessage(
-                                        SandboxEditorSceneFileOperation::New,
+                                        EditorSceneFileOperation::New,
                                         created.error()),
                                 };
                             }
-                            SandboxEditorSceneFileResult result{
-                                .Status = SandboxEditorCommandStatus::Applied,
-                                .Operation = SandboxEditorSceneFileOperation::New,
+                            EditorSceneFileResult result{
+                                .Status = EditorCommandStatus::Applied,
+                                .Operation = EditorSceneFileOperation::New,
                             };
                             result.Message = BuildSceneFileSuccessMessage({}, result);
                             return result;
                         },
                         .Save =
-                            [sceneDocuments](const SandboxEditorSceneFileCommand& command)
+                            [sceneDocuments](const EditorSceneFileCommand& command)
                         {
                             if (sceneDocuments == nullptr)
                             {
-                                return SandboxEditorSceneFileResult{
-                                    .Status = SandboxEditorCommandStatus::SceneSaveFailed,
-                                    .Operation = SandboxEditorSceneFileOperation::Save,
+                                return EditorSceneFileResult{
+                                    .Status = EditorCommandStatus::SceneSaveFailed,
+                                    .Operation = EditorSceneFileOperation::Save,
                                     .Error = Core::ErrorCode::InvalidState,
                                     .Message = BuildSceneFileFailureMessage(
-                                        SandboxEditorSceneFileOperation::Save,
+                                        EditorSceneFileOperation::Save,
                                         Core::ErrorCode::InvalidState),
                                 };
                             }
@@ -12856,18 +12867,18 @@ namespace Extrinsic::Runtime
                                     command.Path);
                             if (!queued.has_value())
                             {
-                                return SandboxEditorSceneFileResult{
-                                    .Status = SandboxEditorCommandStatus::SceneSaveFailed,
-                                    .Operation = SandboxEditorSceneFileOperation::Save,
+                                return EditorSceneFileResult{
+                                    .Status = EditorCommandStatus::SceneSaveFailed,
+                                    .Operation = EditorSceneFileOperation::Save,
                                     .Error = queued.error(),
                                     .Message = BuildSceneFileFailureMessage(
-                                        SandboxEditorSceneFileOperation::Save,
+                                        EditorSceneFileOperation::Save,
                                         queued.error()),
                                 };
                             }
-                            SandboxEditorSceneFileResult result{
-                                .Status = SandboxEditorCommandStatus::Pending,
-                                .Operation = SandboxEditorSceneFileOperation::Save,
+                            EditorSceneFileResult result{
+                                .Status = EditorCommandStatus::Pending,
+                                .Operation = EditorSceneFileOperation::Save,
                                 .Task = queued->Task,
                                 .Error = Core::ErrorCode::Success,
                             };
@@ -12877,16 +12888,16 @@ namespace Extrinsic::Runtime
                             return result;
                         },
                         .Load =
-                            [sceneDocuments](const SandboxEditorSceneFileCommand& command)
+                            [sceneDocuments](const EditorSceneFileCommand& command)
                         {
                             if (sceneDocuments == nullptr)
                             {
-                                return SandboxEditorSceneFileResult{
-                                    .Status = SandboxEditorCommandStatus::SceneLoadFailed,
-                                    .Operation = SandboxEditorSceneFileOperation::Load,
+                                return EditorSceneFileResult{
+                                    .Status = EditorCommandStatus::SceneLoadFailed,
+                                    .Operation = EditorSceneFileOperation::Load,
                                     .Error = Core::ErrorCode::InvalidState,
                                     .Message = BuildSceneFileFailureMessage(
-                                        SandboxEditorSceneFileOperation::Load,
+                                        EditorSceneFileOperation::Load,
                                         Core::ErrorCode::InvalidState),
                                 };
                             }
@@ -12895,18 +12906,18 @@ namespace Extrinsic::Runtime
                                     command.Path);
                             if (!queued.has_value())
                             {
-                                return SandboxEditorSceneFileResult{
-                                    .Status = SandboxEditorCommandStatus::SceneLoadFailed,
-                                    .Operation = SandboxEditorSceneFileOperation::Load,
+                                return EditorSceneFileResult{
+                                    .Status = EditorCommandStatus::SceneLoadFailed,
+                                    .Operation = EditorSceneFileOperation::Load,
                                     .Error = queued.error(),
                                     .Message = BuildSceneFileFailureMessage(
-                                        SandboxEditorSceneFileOperation::Load,
+                                        EditorSceneFileOperation::Load,
                                         queued.error()),
                                 };
                             }
-                            SandboxEditorSceneFileResult result{
-                                .Status = SandboxEditorCommandStatus::Pending,
-                                .Operation = SandboxEditorSceneFileOperation::Load,
+                            EditorSceneFileResult result{
+                                .Status = EditorCommandStatus::Pending,
+                                .Operation = EditorSceneFileOperation::Load,
                                 .Task = queued->Task,
                                 .Error = Core::ErrorCode::Success,
                             };
@@ -12920,12 +12931,12 @@ namespace Extrinsic::Runtime
                         {
                             if (sceneDocuments == nullptr)
                             {
-                                return SandboxEditorSceneFileResult{
-                                    .Status = SandboxEditorCommandStatus::SceneCloseFailed,
-                                    .Operation = SandboxEditorSceneFileOperation::Close,
+                                return EditorSceneFileResult{
+                                    .Status = EditorCommandStatus::SceneCloseFailed,
+                                    .Operation = EditorSceneFileOperation::Close,
                                     .Error = Core::ErrorCode::InvalidState,
                                     .Message = BuildSceneFileFailureMessage(
-                                        SandboxEditorSceneFileOperation::Close,
+                                        EditorSceneFileOperation::Close,
                                         Core::ErrorCode::InvalidState),
                                 };
                             }
@@ -12933,39 +12944,39 @@ namespace Extrinsic::Runtime
                                 sceneDocuments->CloseSceneDocument();
                             if (!closed.has_value())
                             {
-                                return SandboxEditorSceneFileResult{
-                                    .Status = SandboxEditorCommandStatus::SceneCloseFailed,
-                                    .Operation = SandboxEditorSceneFileOperation::Close,
+                                return EditorSceneFileResult{
+                                    .Status = EditorCommandStatus::SceneCloseFailed,
+                                    .Operation = EditorSceneFileOperation::Close,
                                     .Error = closed.error(),
                                     .Message = BuildSceneFileFailureMessage(
-                                        SandboxEditorSceneFileOperation::Close,
+                                        EditorSceneFileOperation::Close,
                                         closed.error()),
                                 };
                             }
-                            SandboxEditorSceneFileResult result{
-                                .Status = SandboxEditorCommandStatus::Applied,
-                                .Operation = SandboxEditorSceneFileOperation::Close,
+                            EditorSceneFileResult result{
+                                .Status = EditorCommandStatus::Applied,
+                                .Operation = EditorSceneFileOperation::Close,
                             };
                             result.Message = BuildSceneFileSuccessMessage({}, result);
                             return result;
                         },
                     },
                 .ParameterizationUvViewCommands =
-                    SandboxEditorParameterizationUvViewCommandSurface{
+                    EditorParameterizationUvViewCommandSurface{
                         .Submit =
                             [renderer, device, &services,
-                             renderExtraction](SandboxEditorParameterizationUvViewRequest request)
+                             renderExtraction](EditorParameterizationUvViewRequest request)
                         {
                             if (renderer == nullptr || device == nullptr)
                             {
-                                return SandboxEditorParameterizationUvViewState{};
+                                return EditorParameterizationUvViewState{};
                             }
                             return SubmitRuntimeParameterizationUvView(
                                 *renderer, *device, services, renderExtraction, std::move(request));
                         },
                     },
                 .VisualizationRecipes =
-                    SandboxEditorVisualizationRecipeCommandSurface{
+                    EditorVisualizationRecipeCommandSurface{
                         .GetRecipe =
                             [renderExtraction](const std::uint32_t stableEntityId)
                         {
@@ -13066,16 +13077,16 @@ namespace Extrinsic::Runtime
         }
 
         void GuardAttachmentCommandSurfaces(
-            SandboxEditorContext& context,
+            EditorFeatureBindings& context,
             const std::shared_ptr<std::atomic_bool>& epoch)
         {
             context.AssetImportCommands.Import = GuardAttachmentCommand(
                 std::move(context.AssetImportCommands.Import),
                 epoch,
-                [](const SandboxEditorFileImportCommand& command)
+                [](const EditorFileImportCommand& command)
                 {
-                    return SandboxEditorFileImportResult{
-                        .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                    return EditorFileImportResult{
+                        .Status = EditorCommandStatus::AssetImportFailed,
                         .PayloadKind = command.PayloadKind,
                         .Error = Core::ErrorCode::InvalidState,
                         .Message =
@@ -13103,9 +13114,9 @@ namespace Extrinsic::Runtime
                 epoch,
                 []()
                 {
-                    return SandboxEditorSceneFileResult{
-                        .Status = SandboxEditorCommandStatus::SceneNewFailed,
-                        .Operation = SandboxEditorSceneFileOperation::New,
+                    return EditorSceneFileResult{
+                        .Status = EditorCommandStatus::SceneNewFailed,
+                        .Operation = EditorSceneFileOperation::New,
                         .Error = Core::ErrorCode::InvalidState,
                         .Message =
                             "New scene failed: editor session attachment expired.",
@@ -13114,11 +13125,11 @@ namespace Extrinsic::Runtime
             context.SceneFileCommands.Save = GuardAttachmentCommand(
                 std::move(context.SceneFileCommands.Save),
                 epoch,
-                [](const SandboxEditorSceneFileCommand&)
+                [](const EditorSceneFileCommand&)
                 {
-                    return SandboxEditorSceneFileResult{
-                        .Status = SandboxEditorCommandStatus::SceneSaveFailed,
-                        .Operation = SandboxEditorSceneFileOperation::Save,
+                    return EditorSceneFileResult{
+                        .Status = EditorCommandStatus::SceneSaveFailed,
+                        .Operation = EditorSceneFileOperation::Save,
                         .Error = Core::ErrorCode::InvalidState,
                         .Message =
                             "Scene save failed: editor session attachment expired.",
@@ -13127,11 +13138,11 @@ namespace Extrinsic::Runtime
             context.SceneFileCommands.Load = GuardAttachmentCommand(
                 std::move(context.SceneFileCommands.Load),
                 epoch,
-                [](const SandboxEditorSceneFileCommand&)
+                [](const EditorSceneFileCommand&)
                 {
-                    return SandboxEditorSceneFileResult{
-                        .Status = SandboxEditorCommandStatus::SceneLoadFailed,
-                        .Operation = SandboxEditorSceneFileOperation::Load,
+                    return EditorSceneFileResult{
+                        .Status = EditorCommandStatus::SceneLoadFailed,
+                        .Operation = EditorSceneFileOperation::Load,
                         .Error = Core::ErrorCode::InvalidState,
                         .Message =
                             "Scene load failed: editor session attachment expired.",
@@ -13142,9 +13153,9 @@ namespace Extrinsic::Runtime
                 epoch,
                 []()
                 {
-                    return SandboxEditorSceneFileResult{
-                        .Status = SandboxEditorCommandStatus::SceneCloseFailed,
-                        .Operation = SandboxEditorSceneFileOperation::Close,
+                    return EditorSceneFileResult{
+                        .Status = EditorCommandStatus::SceneCloseFailed,
+                        .Operation = EditorSceneFileOperation::Close,
                         .Error = Core::ErrorCode::InvalidState,
                         .Message =
                             "Scene close failed: editor session attachment expired.",
@@ -13152,11 +13163,11 @@ namespace Extrinsic::Runtime
                 });
             context.ParameterizationUvViewCommands.Submit = GuardAttachmentCommand(
                 std::move(context.ParameterizationUvViewCommands.Submit), epoch,
-                [](SandboxEditorParameterizationUvViewRequest request)
+                [](EditorParameterizationUvViewRequest request)
                 {
-                    return SandboxEditorParameterizationUvViewState{
+                    return EditorParameterizationUvViewState{
                         .Status =
-                            SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational,
+                            EditorParameterizationUvViewStatus::CpuFallbackNonOperational,
                         .RequestedMode       = request.View.RenderMode,
                         .ActiveMode          = ParameterizationUvRenderMode::CpuLayout,
                         .RequestedBackground = request.View.BackgroundMode,
@@ -13227,30 +13238,31 @@ namespace Extrinsic::Runtime
             }
         }
 
-    }
+    } // namespace
 
-    namespace Detail
+namespace Detail
     {
-        std::optional<ECS::EntityHandle> ResolveSandboxMethodStableEntity(
+        std::optional<ECS::EntityHandle>
+ResolveEditorStableEntity(
             const entt::registry& raw,
             const std::uint32_t stableId)
         {
             return ResolveStableEntity(raw, stableId);
         }
 
-        std::uint64_t SandboxEditorGeometryMetadataSignatureForEntity(
+        std::uint64_t EditorGeometryMetadataSignatureForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
             return GeometryMetadataSignatureForEntity(raw, entity);
         }
 
-        SandboxEditorMeshSourceSnapshot BuildSandboxEditorMeshSourceSnapshot(
+        EditorMeshSourceSnapshot BuildEditorMeshSourceSnapshot(
             const GS::ConstSourceView& view)
         {
             MeshDenoiseSourceResult source =
                 BuildHalfedgeMeshForDenoise(view);
-            return SandboxEditorMeshSourceSnapshot{
+            return EditorMeshSourceSnapshot{
                 .Mesh = std::move(source.Mesh),
                 .BeforePositions = std::move(source.BeforePositions),
                 .DeletedVertices = std::move(source.DeletedVertices),
@@ -13262,146 +13274,148 @@ namespace Extrinsic::Runtime
             };
         }
 
-        void InvalidateSandboxMethodSelectedModelCache(
-            const SandboxEditorContext& context)
+        void InvalidateEditorSelectedModelCache(
+            const EditorFeatureBindings& context)
         {
             InvalidateSelectedModelCache(context);
         }
 
-        std::optional<SandboxEditorJobRecord> FindActiveSandboxMethodJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorJobIdentity& identity)
+        std::optional<EditorJobRecord>
+FindActiveEditorGeometryJob(
+            const EditorFeatureBindings& context,
+            const EditorJobIdentity& identity)
         {
             return FindActiveEditorJob(context, identity);
         }
 
-        std::string BuildActiveSandboxMethodDerivedJobMessage(
+        std::string BuildActiveEditorGeometryJobMessage(
             const std::string_view label,
-            const SandboxEditorJobRecord& job)
+            const EditorJobRecord& job)
         {
             return BuildActiveDerivedJobMessage(label, job);
         }
 
-        SandboxEditorCommandStatus ToSandboxMethodCommandStatus(
+        EditorCommandStatus
+ToEditorMethodCommandStatus(
             const EditorCommandHistoryStatus status) noexcept
         {
-            return ToSandboxEditorCommandStatus(status);
+            return ToEditorCommandStatus(status);
         }
-    }
+    } // namespace Detail
 
-    const char*
-    DebugNameForSandboxEditorDiagnosticCode(const SandboxEditorDiagnosticCode code) noexcept
+const char*
+DebugNameForEditorDiagnosticCodeImpl(const EditorDiagnosticCode code) noexcept
     {
         switch (code)
         {
-        case SandboxEditorDiagnosticCode::MissingScene:
+        case EditorDiagnosticCode::MissingScene:
             return "MissingScene";
-        case SandboxEditorDiagnosticCode::MissingSelectionController:
+        case EditorDiagnosticCode::MissingSelectionController:
             return "MissingSelectionController";
-        case SandboxEditorDiagnosticCode::MissingImGuiAdapter:
+        case EditorDiagnosticCode::MissingImGuiAdapter:
             return "MissingImGuiAdapter";
-        case SandboxEditorDiagnosticCode::AssetImportUnavailable:
+        case EditorDiagnosticCode::AssetImportUnavailable:
             return "AssetImportUnavailable";
-        case SandboxEditorDiagnosticCode::AssetImportFailed:
+        case EditorDiagnosticCode::AssetImportFailed:
             return "AssetImportFailed";
-        case SandboxEditorDiagnosticCode::SceneFileUnavailable:
+        case EditorDiagnosticCode::SceneFileUnavailable:
             return "SceneFileUnavailable";
-        case SandboxEditorDiagnosticCode::SceneFileFailed:
+        case EditorDiagnosticCode::SceneFileFailed:
             return "SceneFileFailed";
-        case SandboxEditorDiagnosticCode::NoSelectedEntity:
+        case EditorDiagnosticCode::NoSelectedEntity:
             return "NoSelectedEntity";
-        case SandboxEditorDiagnosticCode::UnsupportedGeometryDomain:
+        case EditorDiagnosticCode::UnsupportedGeometryDomain:
             return "UnsupportedGeometryDomain";
-        case SandboxEditorDiagnosticCode::CameraRenderCommandsUnavailable:
+        case EditorDiagnosticCode::CameraRenderCommandsUnavailable:
             return "CameraRenderCommandsUnavailable";
-        case SandboxEditorDiagnosticCode::VisualizationCommandsUnavailable:
+        case EditorDiagnosticCode::VisualizationCommandsUnavailable:
             return "VisualizationCommandsUnavailable";
-        case SandboxEditorDiagnosticCode::RenderRecipeCommandsUnavailable:
+        case EditorDiagnosticCode::RenderRecipeCommandsUnavailable:
             return "RenderRecipeCommandsUnavailable";
-        case SandboxEditorDiagnosticCode::InvalidVisualizationProperty:
+        case EditorDiagnosticCode::InvalidVisualizationProperty:
             return "InvalidVisualizationProperty";
-        case SandboxEditorDiagnosticCode::InvalidVertexChannelBinding:
+        case EditorDiagnosticCode::InvalidVertexChannelBinding:
             return "InvalidVertexChannelBinding";
-        case SandboxEditorDiagnosticCode::GeometryProcessingFailed:
+        case EditorDiagnosticCode::GeometryProcessingFailed:
             return "GeometryProcessingFailed";
-        case SandboxEditorDiagnosticCode::CorruptHierarchy:
+        case EditorDiagnosticCode::CorruptHierarchy:
             return "CorruptHierarchy";
-        case SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable:
+        case EditorDiagnosticCode::RenderGraphStatsUnavailable:
             return "RenderGraphStatsUnavailable";
-        case SandboxEditorDiagnosticCode::EditorCommandHistoryUnavailable:
+        case EditorDiagnosticCode::EditorCommandHistoryUnavailable:
             return "EditorCommandHistoryUnavailable";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorCommandStatus(
-        const SandboxEditorCommandStatus status) noexcept
+    const char*
+DebugNameForEditorCommandStatusImpl(
+        const EditorCommandStatus status) noexcept
     {
         switch (status)
         {
-        case SandboxEditorCommandStatus::Applied:
+        case EditorCommandStatus::Applied:
             return "Applied";
-        case SandboxEditorCommandStatus::Pending:
+        case EditorCommandStatus::Pending:
             return "Pending";
-        case SandboxEditorCommandStatus::NoChange:
+        case EditorCommandStatus::NoChange:
             return "NoChange";
-        case SandboxEditorCommandStatus::MissingScene:
+        case EditorCommandStatus::MissingScene:
             return "MissingScene";
-        case SandboxEditorCommandStatus::MissingSelectionController:
+        case EditorCommandStatus::MissingSelectionController:
             return "MissingSelectionController";
-        case SandboxEditorCommandStatus::MissingCameraControllerRegistry:
+        case EditorCommandStatus::MissingCameraControllerRegistry:
             return "MissingCameraControllerRegistry";
-        case SandboxEditorCommandStatus::MissingAssetImportCommands:
+        case EditorCommandStatus::MissingAssetImportCommands:
             return "MissingAssetImportCommands";
-        case SandboxEditorCommandStatus::MissingSceneFileCommands:
+        case EditorCommandStatus::MissingSceneFileCommands:
             return "MissingSceneFileCommands";
-        case SandboxEditorCommandStatus::MissingPrimitiveViewCommands:
+        case EditorCommandStatus::MissingPrimitiveViewCommands:
             return "MissingPrimitiveViewCommands";
-        case SandboxEditorCommandStatus::MissingVisualizationCommands:
+        case EditorCommandStatus::MissingVisualizationCommands:
             return "MissingVisualizationCommands";
-        case SandboxEditorCommandStatus::AssetImportFailed:
+        case EditorCommandStatus::AssetImportFailed:
             return "AssetImportFailed";
-        case SandboxEditorCommandStatus::SceneNewFailed:
+        case EditorCommandStatus::SceneNewFailed:
             return "SceneNewFailed";
-        case SandboxEditorCommandStatus::SceneSaveFailed:
+        case EditorCommandStatus::SceneSaveFailed:
             return "SceneSaveFailed";
-        case SandboxEditorCommandStatus::SceneLoadFailed:
+        case EditorCommandStatus::SceneLoadFailed:
             return "SceneLoadFailed";
-        case SandboxEditorCommandStatus::SceneCloseFailed:
+        case EditorCommandStatus::SceneCloseFailed:
             return "SceneCloseFailed";
-        case SandboxEditorCommandStatus::StaleEntity:
+        case EditorCommandStatus::StaleEntity:
             return "StaleEntity";
-        case SandboxEditorCommandStatus::MissingTransform:
+        case EditorCommandStatus::MissingTransform:
             return "MissingTransform";
-        case SandboxEditorCommandStatus::UnsupportedGeometryDomain:
+        case EditorCommandStatus::UnsupportedGeometryDomain:
             return "UnsupportedGeometryDomain";
-        case SandboxEditorCommandStatus::InvalidVisualizationProperty:
+        case EditorCommandStatus::InvalidVisualizationProperty:
             return "InvalidVisualizationProperty";
-        case SandboxEditorCommandStatus::InvalidVertexChannelBinding:
+        case EditorCommandStatus::InvalidVertexChannelBinding:
             return "InvalidVertexChannelBinding";
-        case SandboxEditorCommandStatus::InvalidProcessingParameters:
+        case EditorCommandStatus::InvalidProcessingParameters:
             return "InvalidProcessingParameters";
-        case SandboxEditorCommandStatus::GeometryProcessingFailed:
+        case EditorCommandStatus::GeometryProcessingFailed:
             return "GeometryProcessingFailed";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorUvAtlasStatus(
+    const char*DebugNameForEditorUvAtlasStatusImpl(
         const Geometry::UvAtlas::UvAtlasStatus status) noexcept
     {
         return Geometry::UvAtlas::ToString(status);
     }
 
-    const char* DebugNameForSandboxEditorUvAtlasProvenance(
+    const char*DebugNameForEditorUvAtlasProvenanceImpl(
         const Geometry::UvAtlas::UvAtlasProvenance provenance) noexcept
     {
         return Geometry::UvAtlas::ToString(provenance);
     }
 
-    Geometry::ConstPropertySet
-    ResolveSandboxEditorSelectedMeshVertexProperties(
-        const SandboxEditorContext& context)
+    Geometry::ConstPropertySet ResolveEditorSelectedMeshVertexPropertiesImpl(
+        const EditorFeatureBindings& context)
     {
         const Geometry::PropertySet* properties =
             ResolveSelectedMeshVertexProperties(context);
@@ -13410,29 +13424,28 @@ namespace Extrinsic::Runtime
             : Geometry::ConstPropertySet{};
     }
 
-    const char* DebugNameForSandboxEditorAssetPayloadKind(
-        const SandboxEditorAssetPayloadKind kind) noexcept
+    const char*DebugNameForEditorAssetPayloadKindImpl(
+        const EditorAssetPayloadKind kind) noexcept
     {
         return A::DebugNameForAssetPayloadKind(kind);
     }
 
-    std::string_view DebugNameForSandboxEditorRenderRecipeConfigState(
-        const SandboxEditorRenderRecipeConfigState state) noexcept
+    std::string_view DebugNameForEditorRenderRecipeConfigStateImpl(
+        const EditorRenderRecipeConfigState state) noexcept
     {
         return Graphics::ToString(state);
     }
 
-    std::string_view
-    DebugNameForSandboxEditorRenderRecipeConfigDiagnosticCode(
-        const SandboxEditorRenderRecipeConfigDiagnosticCode code) noexcept
+    std::string_view DebugNameForEditorRenderRecipeConfigDiagnosticCodeImpl(
+        const EditorRenderRecipeConfigDiagnosticCode code) noexcept
     {
         return Graphics::ToString(code);
     }
 
-    const char* DebugNameForSandboxEditorRenderRecipeDraftState(
-        const SandboxEditorRenderRecipeDraftState state) noexcept
+    const char*DebugNameForEditorRenderRecipeDraftStateImpl(
+        const EditorRenderRecipeDraftState state) noexcept
     {
-        using State = SandboxEditorRenderRecipeDraftState;
+        using State = EditorRenderRecipeDraftState;
         switch (state)
         {
         case State::InactiveDraft:
@@ -13453,10 +13466,10 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorRenderRecipeCommandKind(
-        const SandboxEditorRenderRecipeCommandKind kind) noexcept
+    const char*DebugNameForEditorRenderRecipeCommandKindImpl(
+        const EditorRenderRecipeCommandKind kind) noexcept
     {
-        using Kind = SandboxEditorRenderRecipeCommandKind;
+        using Kind = EditorRenderRecipeCommandKind;
         switch (kind)
         {
         case Kind::UpdateDraft:
@@ -13477,10 +13490,10 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorRenderRecipeCommandStatus(
-        const SandboxEditorRenderRecipeCommandStatus status) noexcept
+    const char*DebugNameForEditorRenderRecipeCommandStatusImpl(
+        const EditorRenderRecipeCommandStatus status) noexcept
     {
-        using Status = SandboxEditorRenderRecipeCommandStatus;
+        using Status = EditorRenderRecipeCommandStatus;
         switch (status)
         {
         case Status::NoChange:
@@ -13519,7 +13532,8 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorGeometryDomain(
+    const char*
+DebugNameForEditorGeometryDomainImpl(
         const GS::Domain domain) noexcept
     {
         switch (domain)
@@ -13538,22 +13552,23 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorDomainWindowKind(
-        const SandboxEditorDomainWindowKind kind) noexcept
+    const char*DebugNameForEditorDomainWindowKindImpl(
+        const EditorDomainWindowKind kind) noexcept
     {
         switch (kind)
         {
-        case SandboxEditorDomainWindowKind::Mesh:
+        case EditorDomainWindowKind::Mesh:
             return "Mesh";
-        case SandboxEditorDomainWindowKind::Graph:
+        case EditorDomainWindowKind::Graph:
             return "Graph";
-        case SandboxEditorDomainWindowKind::PointCloud:
+        case EditorDomainWindowKind::PointCloud:
             return "PointCloud";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorPrimitiveKind(
+    const char*
+DebugNameForEditorPrimitiveKindImpl(
         const RefinedPrimitiveKind kind) noexcept
     {
         switch (kind)
@@ -13574,7 +13589,7 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorCameraControllerKind(
+    const char*DebugNameForEditorCameraControllerKindImpl(
         const Core::Config::CameraControllerKind kind) noexcept
     {
         switch (kind)
@@ -13591,7 +13606,7 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorVisualizationColorSource(
+    const char*DebugNameForEditorVisualizationColorSourceImpl(
         const G::VisualizationConfig::ColorSource source) noexcept
     {
         switch (source)
@@ -13612,7 +13627,7 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorVisualizationDomain(
+    const char*DebugNameForEditorVisualizationDomainImpl(
         const G::VisualizationConfig::Domain domain) noexcept
     {
         switch (domain)
@@ -13627,7 +13642,7 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorVisualizationRecipeKind(
+    const char*DebugNameForEditorVisualizationRecipeKindImpl(
         const VisualizationRecipeKind kind) noexcept
     {
         switch (kind)
@@ -13644,10 +13659,10 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorVisualizationPropertyDomain(
-        const SandboxEditorVisualizationPropertyDomain domain) noexcept
+    const char*DebugNameForEditorVisualizationPropertyDomainImpl(
+        const EditorVisualizationPropertyDomain domain) noexcept
     {
-        using Domain = SandboxEditorVisualizationPropertyDomain;
+        using Domain = EditorVisualizationPropertyDomain;
         switch (domain)
         {
         case Domain::MeshVertices:
@@ -13666,10 +13681,10 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorVisualizationPropertyPreset(
-        const SandboxEditorVisualizationPropertyPreset preset) noexcept
+    const char*DebugNameForEditorVisualizationPropertyPresetImpl(
+        const EditorVisualizationPropertyPreset preset) noexcept
     {
-        using Preset = SandboxEditorVisualizationPropertyPreset;
+        using Preset = EditorVisualizationPropertyPreset;
         switch (preset)
         {
         case Preset::Scalar:
@@ -13682,10 +13697,10 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorVisualizationTarget(
-        const SandboxEditorVisualizationTarget target) noexcept
+    const char*DebugNameForEditorVisualizationTargetImpl(
+        const EditorVisualizationTarget target) noexcept
     {
-        using Target = SandboxEditorVisualizationTarget;
+        using Target = EditorVisualizationTarget;
         switch (target)
         {
         case Target::Entity:
@@ -13700,10 +13715,10 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorPropertyCatalogDomain(
-        const SandboxEditorPropertyCatalogDomain domain) noexcept
+    const char*DebugNameForEditorPropertyCatalogDomainImpl(
+        const EditorPropertyCatalogDomain domain) noexcept
     {
-        using Domain = SandboxEditorPropertyCatalogDomain;
+        using Domain = EditorPropertyCatalogDomain;
         switch (domain)
         {
         case Domain::MeshVertices:
@@ -13724,34 +13739,35 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    SandboxEditorJobScope ToSandboxEditorJobScope(
+    EditorJobScope
+ToEditorJobScopeImpl(
         const GeometryElementDomain domain) noexcept
     {
         switch (domain)
         {
         case GeometryElementDomain::MeshVertex:
-            return SandboxEditorJobScope::MeshVertex;
+            return EditorJobScope::MeshVertex;
         case GeometryElementDomain::MeshEdge:
-            return SandboxEditorJobScope::MeshEdge;
+            return EditorJobScope::MeshEdge;
         case GeometryElementDomain::MeshHalfedge:
-            return SandboxEditorJobScope::MeshHalfedge;
+            return EditorJobScope::MeshHalfedge;
         case GeometryElementDomain::MeshFace:
-            return SandboxEditorJobScope::MeshFace;
+            return EditorJobScope::MeshFace;
         case GeometryElementDomain::GraphNode:
-            return SandboxEditorJobScope::GraphNode;
+            return EditorJobScope::GraphNode;
         case GeometryElementDomain::GraphEdge:
-            return SandboxEditorJobScope::GraphEdge;
+            return EditorJobScope::GraphEdge;
         case GeometryElementDomain::PointCloudPoint:
-            return SandboxEditorJobScope::PointCloudPoint;
+            return EditorJobScope::PointCloudPoint;
         default:
             break;
         }
-        return SandboxEditorJobScope::Unknown;
+        return EditorJobScope::Unknown;
     }
 
-    bool SameSandboxEditorJobOutput(
-        const SandboxEditorJobIdentity& lhs,
-        const SandboxEditorJobIdentity& rhs) noexcept
+    bool SameEditorJobOutputImpl(
+        const EditorJobIdentity& lhs,
+        const EditorJobIdentity& rhs) noexcept
     {
         return lhs.EntityId == rhs.EntityId &&
                lhs.Scope == rhs.Scope &&
@@ -13759,7 +13775,7 @@ namespace Extrinsic::Runtime
                lhs.OutputName == rhs.OutputName;
     }
 
-    bool IsActiveSandboxEditorJobState(const JobState state) noexcept
+    bool IsActiveEditorJobStateImpl(const JobState state) noexcept
     {
         switch (state)
         {
@@ -13774,7 +13790,7 @@ namespace Extrinsic::Runtime
         }
     }
 
-    bool IsFailedSandboxEditorJobState(const JobState state) noexcept
+    bool IsFailedEditorJobStateImpl(const JobState state) noexcept
     {
         switch (state)
         {
@@ -13788,10 +13804,10 @@ namespace Extrinsic::Runtime
         }
     }
 
-    const char* DebugNameForSandboxEditorBoundRenderStateRowKind(
-        const SandboxEditorBoundRenderStateRowKind kind) noexcept
+    const char*DebugNameForEditorBoundRenderStateRowKindImpl(
+        const EditorBoundRenderStateRowKind kind) noexcept
     {
-        using Kind = SandboxEditorBoundRenderStateRowKind;
+        using Kind = EditorBoundRenderStateRowKind;
         switch (kind)
         {
         case Kind::RenderHint:
@@ -13808,14 +13824,14 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    std::vector<SandboxEditorGeometryProcessingMenuItem>
-    GetSandboxEditorGeometryProcessingMenuItems(
-        const SandboxEditorDomainWindowKind kind)
+    std::vector<EditorGeometryProcessingMenuItem>
+GetEditorGeometryProcessingMenuItemsImpl(
+        const EditorDomainWindowKind kind)
     {
-        using Domain = SandboxEditorGeometryProcessingDomain;
+        using Domain = EditorGeometryProcessingDomain;
         switch (kind)
         {
-        case SandboxEditorDomainWindowKind::Mesh:
+        case EditorDomainWindowKind::Mesh:
             return {
                 {.Domain = Domain::MeshVertices,
                  .Label = "Vertices",
@@ -13828,7 +13844,7 @@ namespace Extrinsic::Runtime
                 {.Domain = Domain::MeshEdges, .Label = "Edges"},
                 {.Domain = Domain::MeshFaces, .Label = "Faces"},
             };
-        case SandboxEditorDomainWindowKind::Graph:
+        case EditorDomainWindowKind::Graph:
             return {
                 {.Domain = Domain::GraphVertices,
                  .Label = "Vertices",
@@ -13836,7 +13852,7 @@ namespace Extrinsic::Runtime
                 {.Domain = Domain::GraphEdges, .Label = "Edges"},
                 {.Domain = Domain::GraphHalfedges, .Label = "Halfedges"},
             };
-        case SandboxEditorDomainWindowKind::PointCloud:
+        case EditorDomainWindowKind::PointCloud:
             return {
                 {.Domain = Domain::PointCloudPoints,
                  .Label = "Vertices",
@@ -13846,70 +13862,69 @@ namespace Extrinsic::Runtime
         return {};
     }
 
-    SandboxEditorGeometryProcessingDomain
-    GetSandboxEditorSupportedGeometryProcessingDomains(
-        const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
+    EditorGeometryProcessingDomain GetEditorSupportedGeometryProcessingDomainsImpl(
+        const EditorGeometryProcessingAlgorithm algorithm) noexcept
     {
-        using Domain = SandboxEditorGeometryProcessingDomain;
+        using Domain = EditorGeometryProcessingDomain;
         switch (algorithm)
         {
-        case SandboxEditorGeometryProcessingAlgorithm::KMeans:
+        case EditorGeometryProcessingAlgorithm::KMeans:
             return Domain::MeshVertices |
                    Domain::GraphVertices |
                    Domain::PointCloudPoints;
-        case SandboxEditorGeometryProcessingAlgorithm::MeshDenoise:
-        case SandboxEditorGeometryProcessingAlgorithm::Curvature:
+        case EditorGeometryProcessingAlgorithm::MeshDenoise:
+        case EditorGeometryProcessingAlgorithm::Curvature:
             return Domain::MeshVertices;
-        case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
-        case SandboxEditorGeometryProcessingAlgorithm::Simplification:
-        case SandboxEditorGeometryProcessingAlgorithm::Smoothing:
-        case SandboxEditorGeometryProcessingAlgorithm::Subdivision:
-        case SandboxEditorGeometryProcessingAlgorithm::Repair:
+        case EditorGeometryProcessingAlgorithm::Remeshing:
+        case EditorGeometryProcessingAlgorithm::Simplification:
+        case EditorGeometryProcessingAlgorithm::Smoothing:
+        case EditorGeometryProcessingAlgorithm::Subdivision:
+        case EditorGeometryProcessingAlgorithm::Repair:
             return kMeshTopologyDomains;
-        case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
+        case EditorGeometryProcessingAlgorithm::NormalEstimation:
             return Domain::MeshVertices |
                    Domain::GraphVertices |
                    Domain::PointCloudPoints;
-        case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
+        case EditorGeometryProcessingAlgorithm::ShortestPath:
             return Domain::MeshVertices | Domain::GraphVertices;
-        case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
+        case EditorGeometryProcessingAlgorithm::ConvexHull:
             return Domain::MeshVertices | Domain::PointCloudPoints;
-        case SandboxEditorGeometryProcessingAlgorithm::SurfaceReconstruction:
+        case EditorGeometryProcessingAlgorithm::SurfaceReconstruction:
             return Domain::PointCloudPoints;
-        case SandboxEditorGeometryProcessingAlgorithm::VectorHeat:
+        case EditorGeometryProcessingAlgorithm::VectorHeat:
             return Domain::MeshVertices;
-        case SandboxEditorGeometryProcessingAlgorithm::Parameterization:
+        case EditorGeometryProcessingAlgorithm::Parameterization:
             return Domain::MeshVertices | Domain::MeshFaces;
-        case SandboxEditorGeometryProcessingAlgorithm::BooleanCSG:
+        case EditorGeometryProcessingAlgorithm::BooleanCSG:
             return Domain::MeshVertices | Domain::MeshFaces;
-        case SandboxEditorGeometryProcessingAlgorithm::Registration:
-        case SandboxEditorGeometryProcessingAlgorithm::BilateralFilter:
-        case SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation:
-        case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
-        case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
-        case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
+        case EditorGeometryProcessingAlgorithm::Registration:
+        case EditorGeometryProcessingAlgorithm::BilateralFilter:
+        case EditorGeometryProcessingAlgorithm::OutlierEstimation:
+        case EditorGeometryProcessingAlgorithm::KernelDensity:
+        case EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
+        case EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
             return Domain::PointCloudPoints;
-        case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
+        case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
             return Domain::MeshVertices | Domain::PointCloudPoints;
         }
         return Domain::None;
     }
 
-    bool SupportsSandboxEditorGeometryProcessingDomain(
-        const SandboxEditorGeometryProcessingAlgorithm algorithm,
-        const SandboxEditorGeometryProcessingDomain domain) noexcept
+    bool SupportsEditorGeometryProcessingDomainImpl(
+        const EditorGeometryProcessingAlgorithm algorithm,
+        const EditorGeometryProcessingDomain domain) noexcept
     {
-        return HasAnySandboxEditorGeometryProcessingDomain(
-            GetSandboxEditorSupportedGeometryProcessingDomains(algorithm),
+        return HasAnyEditorGeometryProcessingDomain(
+      GetEditorSupportedGeometryProcessingDomainsImpl(algorithm),
             domain);
     }
 
-    SandboxEditorGeometryProcessingCapabilities
-    GetSandboxEditorGeometryProcessingCapabilities(
+    EditorGeometryProcessingCapabilities
+GetEditorGeometryProcessingCapabilitiesImpl(
         const ECS::Scene::Registry& registry,
         const ECS::EntityHandle entity)
     {
-        SandboxEditorGeometryProcessingCapabilities capabilities{};
+        EditorGeometryProcessingCapabilities capabilities{};
         const entt::registry& raw = registry.Raw();
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return capabilities;
@@ -13932,39 +13947,39 @@ namespace Extrinsic::Runtime
         return capabilities;
     }
 
-    std::vector<SandboxEditorGeometryProcessingEntry>
-    ResolveSandboxEditorGeometryProcessingEntries(
-        const SandboxEditorGeometryProcessingCapabilities capabilities)
+    std::vector<EditorGeometryProcessingEntry>
+ResolveEditorGeometryProcessingEntriesImpl(
+        const EditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 22>
+        static constexpr std::array<EditorGeometryProcessingAlgorithm, 22>
             kAlgorithmOrder{
-                SandboxEditorGeometryProcessingAlgorithm::KMeans,
-                SandboxEditorGeometryProcessingAlgorithm::NormalEstimation,
-                SandboxEditorGeometryProcessingAlgorithm::MeshDenoise,
-                SandboxEditorGeometryProcessingAlgorithm::Curvature,
-                SandboxEditorGeometryProcessingAlgorithm::Registration,
-                SandboxEditorGeometryProcessingAlgorithm::BilateralFilter,
-                SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation,
-                SandboxEditorGeometryProcessingAlgorithm::KernelDensity,
-                SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling,
-                SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval,
-                SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval,
-                SandboxEditorGeometryProcessingAlgorithm::ShortestPath,
-                SandboxEditorGeometryProcessingAlgorithm::VectorHeat,
-                SandboxEditorGeometryProcessingAlgorithm::Parameterization,
-                SandboxEditorGeometryProcessingAlgorithm::ConvexHull,
-                SandboxEditorGeometryProcessingAlgorithm::SurfaceReconstruction,
-                SandboxEditorGeometryProcessingAlgorithm::BooleanCSG,
-                SandboxEditorGeometryProcessingAlgorithm::Remeshing,
-                SandboxEditorGeometryProcessingAlgorithm::Simplification,
-                SandboxEditorGeometryProcessingAlgorithm::Smoothing,
-                SandboxEditorGeometryProcessingAlgorithm::Subdivision,
-                SandboxEditorGeometryProcessingAlgorithm::Repair,
+                EditorGeometryProcessingAlgorithm::KMeans,
+                EditorGeometryProcessingAlgorithm::NormalEstimation,
+                EditorGeometryProcessingAlgorithm::MeshDenoise,
+                EditorGeometryProcessingAlgorithm::Curvature,
+                EditorGeometryProcessingAlgorithm::Registration,
+                EditorGeometryProcessingAlgorithm::BilateralFilter,
+                EditorGeometryProcessingAlgorithm::OutlierEstimation,
+                EditorGeometryProcessingAlgorithm::KernelDensity,
+                EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling,
+                EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval,
+                EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval,
+                EditorGeometryProcessingAlgorithm::ShortestPath,
+                EditorGeometryProcessingAlgorithm::VectorHeat,
+                EditorGeometryProcessingAlgorithm::Parameterization,
+                EditorGeometryProcessingAlgorithm::ConvexHull,
+                EditorGeometryProcessingAlgorithm::SurfaceReconstruction,
+                EditorGeometryProcessingAlgorithm::BooleanCSG,
+                EditorGeometryProcessingAlgorithm::Remeshing,
+                EditorGeometryProcessingAlgorithm::Simplification,
+                EditorGeometryProcessingAlgorithm::Smoothing,
+                EditorGeometryProcessingAlgorithm::Subdivision,
+                EditorGeometryProcessingAlgorithm::Repair,
             };
 
-        std::vector<SandboxEditorGeometryProcessingEntry> entries{};
+        std::vector<EditorGeometryProcessingEntry> entries{};
         entries.reserve(kAlgorithmOrder.size());
-        for (const SandboxEditorGeometryProcessingAlgorithm algorithm :
+        for (const EditorGeometryProcessingAlgorithm algorithm :
              kAlgorithmOrder)
         {
             if (IsSurfaceTopologyAlgorithm(algorithm) &&
@@ -13973,13 +13988,13 @@ namespace Extrinsic::Runtime
                 continue;
             }
 
-            const SandboxEditorGeometryProcessingDomain domains =
+            const EditorGeometryProcessingDomain domains =
                 capabilities.Domains &
-                GetSandboxEditorSupportedGeometryProcessingDomains(algorithm);
-            if (domains == SandboxEditorGeometryProcessingDomain::None)
+        GetEditorSupportedGeometryProcessingDomainsImpl(algorithm);
+            if (domains == EditorGeometryProcessingDomain::None)
                 continue;
 
-            entries.push_back(SandboxEditorGeometryProcessingEntry{
+            entries.push_back(EditorGeometryProcessingEntry{
                 .Algorithm = algorithm,
                 .Domains = domains,
             });
@@ -13987,20 +14002,20 @@ namespace Extrinsic::Runtime
         return entries;
     }
 
-    std::vector<SandboxEditorGeometryProcessingEntry>
-    ResolveSandboxEditorGeometryProcessingEntries(
+    std::vector<EditorGeometryProcessingEntry>
+ResolveEditorGeometryProcessingEntriesImpl(
         const ECS::Scene::Registry& registry,
         const ECS::EntityHandle entity)
     {
-        return ResolveSandboxEditorGeometryProcessingEntries(
-            GetSandboxEditorGeometryProcessingCapabilities(registry, entity));
+        return ResolveEditorGeometryProcessingEntriesImpl(
+      GetEditorGeometryProcessingCapabilitiesImpl(registry, entity));
     }
 
 
-    const char* DebugNameForSandboxEditorGeometryProcessingDomain(
-        const SandboxEditorGeometryProcessingDomain domain) noexcept
+    const char*DebugNameForEditorGeometryProcessingDomainImpl(
+        const EditorGeometryProcessingDomain domain) noexcept
     {
-        using Domain = SandboxEditorGeometryProcessingDomain;
+        using Domain = EditorGeometryProcessingDomain;
         switch (domain)
         {
         case Domain::None:
@@ -14025,159 +14040,161 @@ namespace Extrinsic::Runtime
         return "Mixed";
     }
 
-    const char* DebugNameForSandboxEditorGeometryProcessingAlgorithm(
-        const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
+    const char*DebugNameForEditorGeometryProcessingAlgorithmImpl(
+        const EditorGeometryProcessingAlgorithm algorithm) noexcept
     {
         switch (algorithm)
         {
-        case SandboxEditorGeometryProcessingAlgorithm::KMeans:
+        case EditorGeometryProcessingAlgorithm::KMeans:
             return "K-Means";
-        case SandboxEditorGeometryProcessingAlgorithm::MeshDenoise:
+        case EditorGeometryProcessingAlgorithm::MeshDenoise:
             return "Mesh Denoise";
-        case SandboxEditorGeometryProcessingAlgorithm::Curvature:
+        case EditorGeometryProcessingAlgorithm::Curvature:
             return "Curvature";
-        case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
+        case EditorGeometryProcessingAlgorithm::Remeshing:
             return "Remeshing";
-        case SandboxEditorGeometryProcessingAlgorithm::Simplification:
+        case EditorGeometryProcessingAlgorithm::Simplification:
             return "Simplification";
-        case SandboxEditorGeometryProcessingAlgorithm::Smoothing:
+        case EditorGeometryProcessingAlgorithm::Smoothing:
             return "Smoothing";
-        case SandboxEditorGeometryProcessingAlgorithm::Subdivision:
+        case EditorGeometryProcessingAlgorithm::Subdivision:
             return "Subdivision";
-        case SandboxEditorGeometryProcessingAlgorithm::Repair:
+        case EditorGeometryProcessingAlgorithm::Repair:
             return "Repair";
-        case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
+        case EditorGeometryProcessingAlgorithm::NormalEstimation:
             return "Normals";
-        case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
+        case EditorGeometryProcessingAlgorithm::ShortestPath:
             return "Shortest Path";
-        case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
+        case EditorGeometryProcessingAlgorithm::ConvexHull:
             return "Convex Hull";
-        case SandboxEditorGeometryProcessingAlgorithm::SurfaceReconstruction:
+        case EditorGeometryProcessingAlgorithm::SurfaceReconstruction:
             return "Surface Reconstruction";
-        case SandboxEditorGeometryProcessingAlgorithm::VectorHeat:
+        case EditorGeometryProcessingAlgorithm::VectorHeat:
             return "Vector Heat Method";
-        case SandboxEditorGeometryProcessingAlgorithm::Parameterization:
+        case EditorGeometryProcessingAlgorithm::Parameterization:
             return "Parameterization";
-        case SandboxEditorGeometryProcessingAlgorithm::BooleanCSG:
+        case EditorGeometryProcessingAlgorithm::BooleanCSG:
             return "Boolean CSG";
-        case SandboxEditorGeometryProcessingAlgorithm::Registration:
+        case EditorGeometryProcessingAlgorithm::Registration:
             return "ICP Registration";
-        case SandboxEditorGeometryProcessingAlgorithm::BilateralFilter:
+        case EditorGeometryProcessingAlgorithm::BilateralFilter:
             return "Bilateral Filter";
-        case SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation:
+        case EditorGeometryProcessingAlgorithm::OutlierEstimation:
             return "Outlier Estimation";
-        case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
+        case EditorGeometryProcessingAlgorithm::KernelDensity:
             return "Kernel Density";
-        case SandboxEditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
+        case EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
             return "Statistical Outlier Removal";
-        case SandboxEditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
+        case EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
             return "Radius Outlier Removal";
-        case SandboxEditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
+        case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
             return "Progressive Poisson Sampling";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorMeshCurvatureOutput(
-        const SandboxEditorMeshCurvatureOutput output) noexcept
+    const char*DebugNameForEditorMeshCurvatureOutputImpl(
+        const EditorMeshCurvatureOutput output) noexcept
     {
         switch (output)
         {
-        case SandboxEditorMeshCurvatureOutput::All:
+        case EditorMeshCurvatureOutput::All:
             return "All";
-        case SandboxEditorMeshCurvatureOutput::Mean:
+        case EditorMeshCurvatureOutput::Mean:
             return "Mean";
-        case SandboxEditorMeshCurvatureOutput::Gaussian:
+        case EditorMeshCurvatureOutput::Gaussian:
             return "Gaussian";
-        case SandboxEditorMeshCurvatureOutput::PrincipalDirections:
+        case EditorMeshCurvatureOutput::PrincipalDirections:
             return "Principal";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorMeshRemeshMode(
-        const SandboxEditorMeshRemeshMode mode) noexcept
+    const char*
+DebugNameForEditorMeshRemeshModeImpl(
+        const EditorMeshRemeshMode mode) noexcept
     {
         switch (mode)
         {
-        case SandboxEditorMeshRemeshMode::Uniform:
+        case EditorMeshRemeshMode::Uniform:
             return "Uniform";
-        case SandboxEditorMeshRemeshMode::Adaptive:
+        case EditorMeshRemeshMode::Adaptive:
             return "Adaptive";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorMeshRemeshSizingLaw(
-        const SandboxEditorMeshRemeshSizingLaw sizingLaw) noexcept
+    const char*DebugNameForEditorMeshRemeshSizingLawImpl(
+        const EditorMeshRemeshSizingLaw sizingLaw) noexcept
     {
         switch (sizingLaw)
         {
-        case SandboxEditorMeshRemeshSizingLaw::MeanCurvature:
+        case EditorMeshRemeshSizingLaw::MeanCurvature:
             return "Mean curvature";
-        case SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin:
+        case EditorMeshRemeshSizingLaw::ErrorBoundedTaubin:
             return "Error-bounded Taubin";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorMeshSubdivideOperator(
-        const SandboxEditorMeshSubdivideOperator op) noexcept
+    const char*DebugNameForEditorMeshSubdivideOperatorImpl(
+        const EditorMeshSubdivideOperator op) noexcept
     {
         switch (op)
         {
-        case SandboxEditorMeshSubdivideOperator::Loop:
+        case EditorMeshSubdivideOperator::Loop:
             return "Loop";
-        case SandboxEditorMeshSubdivideOperator::CatmullClark:
+        case EditorMeshSubdivideOperator::CatmullClark:
             return "Catmull-Clark";
-        case SandboxEditorMeshSubdivideOperator::Sqrt3:
+        case EditorMeshSubdivideOperator::Sqrt3:
             return "Sqrt(3)";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorMeshSimplifyMetric(
-        const SandboxEditorMeshSimplifyMetric metric) noexcept
+    const char*DebugNameForEditorMeshSimplifyMetricImpl(
+        const EditorMeshSimplifyMetric metric) noexcept
     {
         switch (metric)
         {
-        case SandboxEditorMeshSimplifyMetric::ClassicalQEM:
+        case EditorMeshSimplifyMetric::ClassicalQEM:
             return "Classical QEM";
-        case SandboxEditorMeshSimplifyMetric::FA_QEM:
+        case EditorMeshSimplifyMetric::FA_QEM:
             return "FA-QEM (feature-aware)";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorICPVariant(
-        const SandboxEditorICPVariant variant) noexcept
+    const char*
+DebugNameForEditorICPVariantImpl(
+        const EditorICPVariant variant) noexcept
     {
         switch (variant)
         {
-        case SandboxEditorICPVariant::PointToPoint:
+        case EditorICPVariant::PointToPoint:
             return "Point-to-point";
-        case SandboxEditorICPVariant::PointToPlane:
+        case EditorICPVariant::PointToPlane:
             return "Point-to-plane";
         }
         return "Unknown";
     }
 
-    SandboxEditorGpuProfilingConfigResult
-    ApplySandboxEditorGpuProfilingConfigCommand(
-        const SandboxEditorContext& context,
+    EditorGpuProfilingConfigResult
+ApplyEditorGpuProfilingConfigCommandImpl(
+        const EditorFeatureBindings& context,
         const bool enabled,
         std::string sourceId)
     {
-        SandboxEditorGpuProfilingConfigResult result{};
+        EditorGpuProfilingConfigResult result{};
         if (context.EngineConfigControlState == nullptr ||
             !context.PreviewEngineConfigDocument ||
             !context.ApplyEngineConfigHotSubset ||
             !context.EngineConfigCommandsAvailable)
         {
             result.Status =
-                SandboxEditorGpuProfilingConfigStatus::MissingConfigFacade;
+                EditorGpuProfilingConfigStatus::MissingConfigControl;
             result.Message =
-                "GPU profiling config requires the engine config-control facade.";
+        "GPU profiling config requires the engine config-control module.";
             return result;
         }
 
@@ -14194,7 +14211,7 @@ namespace Extrinsic::Runtime
         if (!Core::Config::IsConfigUsable(result.Preview))
         {
             result.Status =
-                SandboxEditorGpuProfilingConfigStatus::PreviewRejected;
+                EditorGpuProfilingConfigStatus::PreviewRejected;
             result.Message =
                 "GPU profiling config preview was rejected.";
             return result;
@@ -14204,7 +14221,7 @@ namespace Extrinsic::Runtime
         if (!result.Apply.Succeeded())
         {
             result.Status =
-                SandboxEditorGpuProfilingConfigStatus::ApplyRejected;
+                EditorGpuProfilingConfigStatus::ApplyRejected;
             result.Message =
                 "GPU profiling config hot-apply was rejected.";
             return result;
@@ -14212,38 +14229,39 @@ namespace Extrinsic::Runtime
 
         result.Status =
             result.Apply.Status == RuntimeEngineConfigApplyStatus::NoChange
-                ? SandboxEditorGpuProfilingConfigStatus::NoChange
-                : SandboxEditorGpuProfilingConfigStatus::Applied;
+                ? EditorGpuProfilingConfigStatus::NoChange
+                : EditorGpuProfilingConfigStatus::Applied;
         result.Message =
-            result.Status == SandboxEditorGpuProfilingConfigStatus::NoChange
+            result.Status == EditorGpuProfilingConfigStatus::NoChange
                 ? "GPU profiling config unchanged."
                 : "GPU profiling config applied.";
         return result;
     }
 
-    SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
-        const SandboxEditorContext& context)
+    EditorWorkspaceSnapshot
+BuildEditorWorkspaceSnapshotImpl(
+        const EditorFeatureBindings& context)
     {
-        return BuildSandboxEditorPanelFrame(
+        return BuildEditorWorkspaceSnapshotImpl(
             context,
-            SandboxEditorModelBuildRequest{});
+            EditorWorkspaceSnapshotRequest{});
     }
 
-    SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
-        const SandboxEditorContext& context,
-        const SandboxEditorModelBuildRequest& request)
+    EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshotImpl(
+        const EditorFeatureBindings& context,
+        const EditorWorkspaceSnapshotRequest& request)
     {
-        SandboxEditorPanelFrame frame{};
-        SandboxEditorModelBuildStats stats{};
-        const SandboxEditorModelBuildClock::time_point frameBuildStart =
-            SandboxEditorModelBuildClock::now();
-        SandboxEditorContext modelContext = context;
+        EditorWorkspaceSnapshot frame{};
+        EditorWorkspaceSnapshotStats stats{};
+        const EditorModelBuildClock::time_point frameBuildStart =
+            EditorModelBuildClock::now();
+        EditorFeatureBindings modelContext = context;
         modelContext.ModelBuildStats = &stats;
 
         if (modelContext.Scene == nullptr)
         {
             AddDiagnostic(frame.Diagnostics,
-                          SandboxEditorDiagnosticCode::MissingScene,
+                          EditorDiagnosticCode::MissingScene,
                           "Scene registry is unavailable.");
         }
         else if (request.Hierarchy)
@@ -14257,8 +14275,8 @@ namespace Extrinsic::Runtime
                 });
             std::sort(frame.Hierarchy.begin(),
                       frame.Hierarchy.end(),
-                      [](const SandboxEditorEntityRow& lhs,
-                         const SandboxEditorEntityRow& rhs)
+                      [](const EditorEntityRow& lhs,
+                         const EditorEntityRow& rhs)
                       {
                           if (lhs.StableEntityId != rhs.StableEntityId)
                               return lhs.StableEntityId < rhs.StableEntityId;
@@ -14269,13 +14287,13 @@ namespace Extrinsic::Runtime
         if (modelContext.Selection == nullptr)
         {
             AddDiagnostic(frame.Diagnostics,
-                          SandboxEditorDiagnosticCode::MissingSelectionController,
+                          EditorDiagnosticCode::MissingSelectionController,
                           "Selection controller is unavailable.");
         }
         if (!modelContext.ImGuiAdapterAvailable)
         {
             AddDiagnostic(frame.Diagnostics,
-                          SandboxEditorDiagnosticCode::MissingImGuiAdapter,
+                          EditorDiagnosticCode::MissingImGuiAdapter,
                           "Runtime ImGui adapter is unavailable.");
         }
 
@@ -14309,7 +14327,7 @@ namespace Extrinsic::Runtime
         }
         if (request.RenderRecipe)
         {
-            frame.RenderRecipe = BuildSandboxEditorRenderRecipeEditorModel(modelContext);
+            frame.RenderRecipe = BuildEditorRenderRecipeEditorModelImpl(modelContext);
         }
         if (request.CameraRender)
         {
@@ -14319,17 +14337,18 @@ namespace Extrinsic::Runtime
         {
             frame.Visualization = BuildCachedVisualizationModel(modelContext);
         }
-        stats.PanelFrameModelBuildTimeNs +=
-            SandboxEditorElapsedNs(frameBuildStart);
+        stats.WorkspaceSnapshotBuildTimeNs +=
+            EditorElapsedNs(frameBuildStart);
         frame.ModelBuildStats = stats;
         return frame;
     }
 
-    SandboxEditorDomainWindowModel BuildSandboxEditorDomainWindowModel(
-        const SandboxEditorContext& context,
-        const SandboxEditorDomainWindowKind kind)
+    EditorDomainWindowModel
+BuildEditorDomainWindowModelImpl(
+        const EditorFeatureBindings& context,
+        const EditorDomainWindowKind kind)
     {
-        ScopedSandboxEditorStatTimer timer{
+        ScopedEditorStatTimer timer{
             context.ModelBuildStats != nullptr
                 ? &context.ModelBuildStats->DomainWindowModelBuildTimeNs
                 : nullptr};
@@ -14337,7 +14356,7 @@ namespace Extrinsic::Runtime
         {
             ++context.ModelBuildStats->DomainWindowModelBuilds;
         }
-        SandboxEditorDomainWindowModel model{};
+        EditorDomainWindowModel model{};
         model.Kind = kind;
         model.ExpectedDomain = ExpectedDomainForWindowKind(kind);
         model.VisualizationTarget = VisualizationTargetForWindowKind(kind);
@@ -14347,14 +14366,14 @@ namespace Extrinsic::Runtime
         if (context.Scene == nullptr)
         {
             AddDiagnostic(model.Diagnostics,
-                          SandboxEditorDiagnosticCode::MissingScene,
+                          EditorDiagnosticCode::MissingScene,
                           "Scene registry is unavailable for domain window.");
             return model;
         }
         if (context.Selection == nullptr)
         {
             AddDiagnostic(model.Diagnostics,
-                          SandboxEditorDiagnosticCode::MissingSelectionController,
+                          EditorDiagnosticCode::MissingSelectionController,
                           "Selection controller is unavailable for domain window.");
             return model;
         }
@@ -14366,7 +14385,7 @@ namespace Extrinsic::Runtime
             const bool hadStaleSelection =
                 !context.Selection->SelectedStableIds().empty();
             AddDiagnostic(model.Diagnostics,
-                          SandboxEditorDiagnosticCode::NoSelectedEntity,
+                          EditorDiagnosticCode::NoSelectedEntity,
                           hadStaleSelection
                               ? "Selected entity is stale or no longer live."
                               : "No selected entity is available for domain window.");
@@ -14388,9 +14407,9 @@ namespace Extrinsic::Runtime
             VisualizationTargetAvailableForView(
                 availability,
                 model.VisualizationTarget);
-        const SandboxEditorGeometryDomainModel geometry =
+        const EditorGeometryDomainModel geometry =
             BuildGeometryDomainModel(raw, *selected);
-        SandboxEditorSelectedAnalysisModel selectedAnalysis =
+        EditorSelectedAnalysisModel selectedAnalysis =
             BuildSelectedAnalysisModel(
                 context,
                 raw,
@@ -14412,21 +14431,21 @@ namespace Extrinsic::Runtime
         if (!model.DomainMatches)
         {
             std::string message =
-                std::string(DebugNameForSandboxEditorDomainWindowKind(kind));
+                std::string(DebugNameForEditorDomainWindowKindImpl(kind));
             message += " window requires ";
-            message += DebugNameForSandboxEditorGeometryDomain(model.ExpectedDomain);
+            message += DebugNameForEditorGeometryDomainImpl(model.ExpectedDomain);
             message += "-domain selection; selected domain is ";
-            message += DebugNameForSandboxEditorGeometryDomain(model.SelectedDomain);
+            message += DebugNameForEditorGeometryDomainImpl(model.SelectedDomain);
             message += ".";
             AddDiagnostic(model.Diagnostics,
-                          SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
+                          EditorDiagnosticCode::UnsupportedGeometryDomain,
                           std::move(message));
         }
 
         if (!context.VisualizationCommandsAvailable)
         {
             AddDiagnostic(model.Diagnostics,
-                          SandboxEditorDiagnosticCode::VisualizationCommandsUnavailable,
+                          EditorDiagnosticCode::VisualizationCommandsUnavailable,
                           "Visualization command seams are unavailable.");
         }
         else
@@ -14451,7 +14470,7 @@ namespace Extrinsic::Runtime
         return model;
     }
 
-    bool SelectSandboxEditorEntity(const SandboxEditorContext& context,
+    bool SelectEditorEntityImpl(const EditorFeatureBindings& context,
                                    const std::uint32_t stableEntityId)
     {
         if (context.Scene == nullptr || context.Selection == nullptr)
@@ -14495,9 +14514,10 @@ namespace Extrinsic::Runtime
         return changed;
     }
 
-    SandboxEditorFileImportResult ApplySandboxEditorFileImportCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorFileImportCommand& command)
+    EditorFileImportResult
+ApplyEditorFileImportCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorFileImportCommand& command)
     {
         const FileImportPrerequisiteEvaluation prerequisites =
             EvaluateFileImportPrerequisites(
@@ -14506,10 +14526,10 @@ namespace Extrinsic::Runtime
                 command.PayloadKind);
         if (!prerequisites.CanImport)
         {
-            return SandboxEditorFileImportResult{
+            return EditorFileImportResult{
                 .Status = context.AssetImportCommands.Available()
-                    ? SandboxEditorCommandStatus::AssetImportFailed
-                    : SandboxEditorCommandStatus::MissingAssetImportCommands,
+                    ? EditorCommandStatus::AssetImportFailed
+                    : EditorCommandStatus::MissingAssetImportCommands,
                 .PayloadKind = prerequisites.ResolvedPayloadKind ==
                         A::AssetPayloadKind::Unknown
                     ? command.PayloadKind
@@ -14519,18 +14539,18 @@ namespace Extrinsic::Runtime
             };
         }
 
-        SandboxEditorFileImportCommand resolvedCommand = command;
+        EditorFileImportCommand resolvedCommand = command;
         resolvedCommand.PayloadKind = prerequisites.ResolvedPayloadKind;
-        SandboxEditorFileImportResult result =
+        EditorFileImportResult result =
             context.AssetImportCommands.Import(resolvedCommand);
-        if (result.Status == SandboxEditorCommandStatus::Applied)
+        if (result.Status == EditorCommandStatus::Applied)
         {
             if (result.Message.empty())
                 result.Message = BuildImportSuccessMessage(resolvedCommand, result);
             result.Error = Core::ErrorCode::Success;
             InvalidateSelectedModelCache(context);
         }
-        else if (result.Status == SandboxEditorCommandStatus::Pending)
+        else if (result.Status == EditorCommandStatus::Pending)
         {
             if (result.Message.empty())
                 result.Message = BuildImportPendingMessage(
@@ -14545,41 +14565,42 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorSceneFileResult ApplySandboxEditorSceneSaveCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorSceneFileCommand& command)
+    EditorSceneFileResult
+ApplyEditorSceneSaveCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorSceneFileCommand& command)
     {
         if (!context.SceneFileCommands.Available())
         {
-            return SandboxEditorSceneFileResult{
-                .Status = SandboxEditorCommandStatus::MissingSceneFileCommands,
-                .Operation = SandboxEditorSceneFileOperation::Save,
+            return EditorSceneFileResult{
+                .Status = EditorCommandStatus::MissingSceneFileCommands,
+                .Operation = EditorSceneFileOperation::Save,
                 .Error = Core::ErrorCode::InvalidState,
                 .Message = "Scene file command surface is unavailable.",
             };
         }
         if (command.Path.empty())
         {
-            return SandboxEditorSceneFileResult{
-                .Status = SandboxEditorCommandStatus::SceneSaveFailed,
-                .Operation = SandboxEditorSceneFileOperation::Save,
+            return EditorSceneFileResult{
+                .Status = EditorCommandStatus::SceneSaveFailed,
+                .Operation = EditorSceneFileOperation::Save,
                 .Error = Core::ErrorCode::InvalidPath,
                 .Message = BuildSceneFileFailureMessage(
-                    SandboxEditorSceneFileOperation::Save,
+                    EditorSceneFileOperation::Save,
                     Core::ErrorCode::InvalidPath),
             };
         }
 
-        SandboxEditorSceneFileResult result = context.SceneFileCommands.Save(command);
-        result.Operation = SandboxEditorSceneFileOperation::Save;
-        if (result.Status == SandboxEditorCommandStatus::Applied)
+        EditorSceneFileResult result = context.SceneFileCommands.Save(command);
+        result.Operation = EditorSceneFileOperation::Save;
+        if (result.Status == EditorCommandStatus::Applied)
         {
             if (result.Message.empty())
                 result.Message = BuildSceneFileSuccessMessage(command, result);
             result.Error = Core::ErrorCode::Success;
             InvalidateSelectedModelCache(context);
         }
-        else if (result.Status == SandboxEditorCommandStatus::Pending)
+        else if (result.Status == EditorCommandStatus::Pending)
         {
             if (result.Message.empty())
                 result.Message = BuildSceneFilePendingMessage(
@@ -14594,41 +14615,42 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorSceneFileResult ApplySandboxEditorSceneLoadCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorSceneFileCommand& command)
+    EditorSceneFileResult
+ApplyEditorSceneLoadCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorSceneFileCommand& command)
     {
         if (!context.SceneFileCommands.Available())
         {
-            return SandboxEditorSceneFileResult{
-                .Status = SandboxEditorCommandStatus::MissingSceneFileCommands,
-                .Operation = SandboxEditorSceneFileOperation::Load,
+            return EditorSceneFileResult{
+                .Status = EditorCommandStatus::MissingSceneFileCommands,
+                .Operation = EditorSceneFileOperation::Load,
                 .Error = Core::ErrorCode::InvalidState,
                 .Message = "Scene file command surface is unavailable.",
             };
         }
         if (command.Path.empty())
         {
-            return SandboxEditorSceneFileResult{
-                .Status = SandboxEditorCommandStatus::SceneLoadFailed,
-                .Operation = SandboxEditorSceneFileOperation::Load,
+            return EditorSceneFileResult{
+                .Status = EditorCommandStatus::SceneLoadFailed,
+                .Operation = EditorSceneFileOperation::Load,
                 .Error = Core::ErrorCode::InvalidPath,
                 .Message = BuildSceneFileFailureMessage(
-                    SandboxEditorSceneFileOperation::Load,
+                    EditorSceneFileOperation::Load,
                     Core::ErrorCode::InvalidPath),
             };
         }
 
-        SandboxEditorSceneFileResult result = context.SceneFileCommands.Load(command);
-        result.Operation = SandboxEditorSceneFileOperation::Load;
-        if (result.Status == SandboxEditorCommandStatus::Applied)
+        EditorSceneFileResult result = context.SceneFileCommands.Load(command);
+        result.Operation = EditorSceneFileOperation::Load;
+        if (result.Status == EditorCommandStatus::Applied)
         {
             if (result.Message.empty())
                 result.Message = BuildSceneFileSuccessMessage(command, result);
             result.Error = Core::ErrorCode::Success;
             InvalidateSelectedModelCache(context);
         }
-        else if (result.Status == SandboxEditorCommandStatus::Pending)
+        else if (result.Status == EditorCommandStatus::Pending)
         {
             if (result.Message.empty())
                 result.Message = BuildSceneFilePendingMessage(
@@ -14643,22 +14665,23 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorSceneFileResult ApplySandboxEditorNewSceneCommand(
-        const SandboxEditorContext& context)
+    EditorSceneFileResult
+ApplyEditorNewSceneCommandImpl(
+        const EditorFeatureBindings& context)
     {
         if (!context.SceneFileCommands.New)
         {
-            return SandboxEditorSceneFileResult{
-                .Status = SandboxEditorCommandStatus::MissingSceneFileCommands,
-                .Operation = SandboxEditorSceneFileOperation::New,
+            return EditorSceneFileResult{
+                .Status = EditorCommandStatus::MissingSceneFileCommands,
+                .Operation = EditorSceneFileOperation::New,
                 .Error = Core::ErrorCode::InvalidState,
                 .Message = "New scene command surface is unavailable.",
             };
         }
 
-        SandboxEditorSceneFileResult result = context.SceneFileCommands.New();
-        result.Operation = SandboxEditorSceneFileOperation::New;
-        if (result.Status == SandboxEditorCommandStatus::Applied)
+        EditorSceneFileResult result = context.SceneFileCommands.New();
+        result.Operation = EditorSceneFileOperation::New;
+        if (result.Status == EditorCommandStatus::Applied)
         {
             if (result.Message.empty())
                 result.Message = BuildSceneFileSuccessMessage({}, result);
@@ -14673,22 +14696,23 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorSceneFileResult ApplySandboxEditorCloseSceneCommand(
-        const SandboxEditorContext& context)
+    EditorSceneFileResult
+ApplyEditorCloseSceneCommandImpl(
+        const EditorFeatureBindings& context)
     {
         if (!context.SceneFileCommands.Close)
         {
-            return SandboxEditorSceneFileResult{
-                .Status = SandboxEditorCommandStatus::MissingSceneFileCommands,
-                .Operation = SandboxEditorSceneFileOperation::Close,
+            return EditorSceneFileResult{
+                .Status = EditorCommandStatus::MissingSceneFileCommands,
+                .Operation = EditorSceneFileOperation::Close,
                 .Error = Core::ErrorCode::InvalidState,
                 .Message = "Close scene command surface is unavailable.",
             };
         }
 
-        SandboxEditorSceneFileResult result = context.SceneFileCommands.Close();
-        result.Operation = SandboxEditorSceneFileOperation::Close;
-        if (result.Status == SandboxEditorCommandStatus::Applied)
+        EditorSceneFileResult result = context.SceneFileCommands.Close();
+        result.Operation = EditorSceneFileOperation::Close;
+        if (result.Status == EditorCommandStatus::Applied)
         {
             if (result.Message.empty())
                 result.Message = BuildSceneFileSuccessMessage({}, result);
@@ -14703,26 +14727,27 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorTransformEdit(
-        const SandboxEditorContext& context,
-        const SandboxEditorTransformEditCommand& command)
+    EditorCommandStatus
+ApplyEditorTransformEditImpl(
+        const EditorFeatureBindings& context,
+        const EditorTransformEditCommand& command)
     {
         if (!command.SetPosition && !command.SetRotation && !command.SetScale)
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
         if (context.Selection == nullptr)
-            return SandboxEditorCommandStatus::MissingSelectionController;
+            return EditorCommandStatus::MissingSelectionController;
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
             SelectionController::ToEntityHandle(command.StableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
 
         auto* transform = raw.try_get<ECSC::Transform::Component>(entity);
         if (transform == nullptr)
-            return SandboxEditorCommandStatus::MissingTransform;
+            return EditorCommandStatus::MissingTransform;
 
         if (context.CommandHistory != nullptr)
         {
@@ -14743,7 +14768,7 @@ namespace Extrinsic::Runtime
                     *transform,
                     next,
                     "Edit Transform");
-            return ToSandboxEditorCommandStatus(result.Status);
+            return ToEditorCommandStatus(result.Status);
         }
 
         if (command.SetPosition)
@@ -14753,22 +14778,22 @@ namespace Extrinsic::Runtime
         if (command.SetScale)
             transform->Scale = command.Scale;
         raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(entity);
-        return SandboxEditorCommandStatus::Applied;
+        return EditorCommandStatus::Applied;
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorCameraControllerCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorCameraControllerCommand& command)
+    EditorCommandStatus ApplyEditorCameraControllerCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorCameraControllerCommand& command)
     {
         if (context.CameraControllers == nullptr)
-            return SandboxEditorCommandStatus::MissingCameraControllerRegistry;
+            return EditorCommandStatus::MissingCameraControllerRegistry;
 
         ICameraController* existing =
             context.CameraControllers->ResolveOrNull(command.Slot);
         if (existing != nullptr && existing->Kind() == command.Kind &&
             command.PreserveCurrentView)
         {
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         }
 
         Graphics::CameraViewInput seed{};
@@ -14781,44 +14806,45 @@ namespace Extrinsic::Runtime
         context.CameraControllers->Replace(
             command.Slot,
             CreateCameraController(command.Kind, seed));
-        return SandboxEditorCommandStatus::Applied;
+        return EditorCommandStatus::Applied;
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorPrimitiveViewCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorPrimitiveViewCommand& command)
+    EditorCommandStatus
+ApplyEditorPrimitiveViewCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorPrimitiveViewCommand& command)
     {
         if (!command.SetEdgeView &&
             !command.SetVertexView &&
             !command.SetVertexRenderMode &&
             !command.SetVertexPointRadius)
         {
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         }
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
         if (command.SetVertexPointRadius &&
             !IsFinitePositive(command.VertexPointRadiusPx))
         {
-            return SandboxEditorCommandStatus::InvalidProcessingParameters;
+            return EditorCommandStatus::InvalidProcessingParameters;
         }
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
             SelectionController::ToEntityHandle(command.StableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
 
         const GeometryEntityAvailability availability =
             BuildGeometryAvailability(raw, entity);
         if (availability.Sources.ProvenanceDomain != GS::Domain::Mesh)
-            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            return EditorCommandStatus::UnsupportedGeometryDomain;
         if ((command.SetVertexView && command.EnableVertexView) ||
             command.SetVertexRenderMode ||
             command.SetVertexPointRadius)
         {
             if (!availability.Sources.Has(GS::SourceCapability::VertexPoints))
-                return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                return EditorCommandStatus::UnsupportedGeometryDomain;
         }
         if (command.SetEdgeView && command.EnableEdgeView)
         {
@@ -14830,13 +14856,13 @@ namespace Extrinsic::Runtime
             if (!availability.Sources.Has(GS::SourceCapability::VertexPoints) ||
                 (!hasExplicitEdges && !hasMeshWireTopology))
             {
-                return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                return EditorCommandStatus::UnsupportedGeometryDomain;
             }
         }
 
-        const SandboxEditorRenderHintState before =
+        const EditorRenderHintState before =
             ReadRenderHintState(raw, entity);
-        SandboxEditorRenderHintState after = before;
+        EditorRenderHintState after = before;
         if (command.SetEdgeView)
         {
             if (command.EnableEdgeView)
@@ -14868,7 +14894,7 @@ namespace Extrinsic::Runtime
         }
 
         if (SameRenderHintState(before, after))
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         if (context.CommandHistory != nullptr)
         {
             const EditorCommandHistoryResult result =
@@ -14881,47 +14907,48 @@ namespace Extrinsic::Runtime
                     after);
             return InvalidateSelectedModelCacheIfApplied(
                 context,
-                ToSandboxEditorCommandStatus(result.Status));
+                ToEditorCommandStatus(result.Status));
         }
         return InvalidateSelectedModelCacheIfApplied(
             context,
-            ToSandboxEditorCommandStatus(
+            ToEditorCommandStatus(
                 ApplyRenderHintState(context.Scene, command.StableEntityId, after)));
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorRenderHintCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorRenderHintCommand& command)
+    EditorCommandStatus
+ApplyEditorRenderHintCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorRenderHintCommand& command)
     {
         if (!AnyRenderHintEdit(command))
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
         if ((command.SetUniformEdgeWidth &&
              !IsFinitePositive(command.UniformEdgeWidth)) ||
             (command.SetUniformPointSize &&
              !IsFinitePositive(command.UniformPointSize)))
         {
-            return SandboxEditorCommandStatus::InvalidProcessingParameters;
+            return EditorCommandStatus::InvalidProcessingParameters;
         }
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
             SelectionController::ToEntityHandle(command.StableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
 
         const GeometryEntityAvailability availability =
             BuildGeometryAvailability(raw, entity);
         if (!RenderHintCommandMatchesDomain(command, availability))
-            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            return EditorCommandStatus::UnsupportedGeometryDomain;
 
-        const SandboxEditorRenderHintState before =
+        const EditorRenderHintState before =
             ReadRenderHintState(raw, entity);
-        const SandboxEditorRenderHintState after =
+        const EditorRenderHintState after =
             ApplyRenderHintCommandToState(before, command);
         if (SameRenderHintState(before, after))
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
 
         if (context.CommandHistory != nullptr)
         {
@@ -14935,29 +14962,29 @@ namespace Extrinsic::Runtime
                     after);
             return InvalidateSelectedModelCacheIfApplied(
                 context,
-                ToSandboxEditorCommandStatus(result.Status));
+                ToEditorCommandStatus(result.Status));
         }
 
         return InvalidateSelectedModelCacheIfApplied(
             context,
-            ToSandboxEditorCommandStatus(
+            ToEditorCommandStatus(
                 ApplyRenderHintState(context.Scene, command.StableEntityId, after)));
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorVisualizationConfigCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorVisualizationConfigCommand& command)
+    EditorCommandStatus ApplyEditorVisualizationConfigCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorVisualizationConfigCommand& command)
     {
         if (!context.VisualizationCommandsAvailable)
-            return SandboxEditorCommandStatus::MissingVisualizationCommands;
+            return EditorCommandStatus::MissingVisualizationCommands;
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
             SelectionController::ToEntityHandle(command.StableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
 
         const std::optional<G::VisualizationConfig> before =
             StoredVisualizationConfigForTarget(raw, entity, command.Target);
@@ -14971,17 +14998,17 @@ namespace Extrinsic::Runtime
         if (!after.has_value())
         {
             if (!before.has_value())
-                return SandboxEditorCommandStatus::NoChange;
+                return EditorCommandStatus::NoChange;
         }
         else if (before.has_value() && SameVisualizationConfig(*before, *after))
         {
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         }
         else if (!before.has_value() &&
                  effectiveBefore.has_value() &&
                  SameVisualizationConfig(*effectiveBefore, *after))
         {
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         }
 
         if (context.CommandHistory != nullptr)
@@ -14998,12 +15025,12 @@ namespace Extrinsic::Runtime
                     "Change Visualization");
             return InvalidateSelectedModelCacheIfApplied(
                 context,
-                ToSandboxEditorCommandStatus(result.Status));
+                ToEditorCommandStatus(result.Status));
         }
 
         return InvalidateSelectedModelCacheIfApplied(
             context,
-            ToSandboxEditorCommandStatus(
+            ToEditorCommandStatus(
                 ApplyVisualizationConfigTarget(
                     context.Scene,
                     command.StableEntityId,
@@ -15011,22 +15038,22 @@ namespace Extrinsic::Runtime
                     after)));
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorVisualizationPropertyCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorVisualizationPropertyCommand& command)
+    EditorCommandStatus ApplyEditorVisualizationPropertyCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorVisualizationPropertyCommand& command)
     {
         if (!context.VisualizationCommandsAvailable)
-            return SandboxEditorCommandStatus::MissingVisualizationCommands;
+            return EditorCommandStatus::MissingVisualizationCommands;
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
             SelectionController::ToEntityHandle(command.StableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
         if (command.PropertyName.empty())
-            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+            return EditorCommandStatus::InvalidVisualizationProperty;
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
         const GeometryEntityAvailability availability =
@@ -15034,15 +15061,15 @@ namespace Extrinsic::Runtime
         const Geometry::PropertySet* properties =
             PropertySetForVisualizationDomain(availability, command.Domain);
         if (properties == nullptr)
-            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            return EditorCommandStatus::UnsupportedGeometryDomain;
 
-        std::optional<SandboxEditorVisualizationPropertyInfo> matched{};
-        std::vector<SandboxEditorVisualizationPropertyInfo> allProperties{};
+        std::optional<EditorVisualizationPropertyInfo> matched{};
+        std::vector<EditorVisualizationPropertyInfo> allProperties{};
         AppendVisualizationPropertiesForDomain(
             allProperties,
             *properties,
             command.Domain);
-        for (const SandboxEditorVisualizationPropertyInfo& property :
+        for (const EditorVisualizationPropertyInfo& property :
              allProperties)
         {
             if (property.Name == command.PropertyName)
@@ -15054,10 +15081,10 @@ namespace Extrinsic::Runtime
         if (!matched.has_value() ||
             !PropertySupportsPreset(*matched, command.Preset))
         {
-            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+            return EditorCommandStatus::InvalidVisualizationProperty;
         }
 
-        SandboxEditorVisualizationConfigCommand configCommand{
+        EditorVisualizationConfigCommand configCommand{
             .StableEntityId = command.StableEntityId,
             .Target = command.Target,
             .EnableConfig = true,
@@ -15085,109 +15112,109 @@ namespace Extrinsic::Runtime
 
         switch (command.Preset)
         {
-        case SandboxEditorVisualizationPropertyPreset::Scalar:
+        case EditorVisualizationPropertyPreset::Scalar:
             if (!command.ScalarAutoRange &&
                 !(command.ScalarRangeMin < command.ScalarRangeMax))
             {
-                return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+                return EditorCommandStatus::InvalidVisualizationProperty;
             }
             configCommand.Source =
                 G::VisualizationConfig::ColorSource::ScalarField;
             configCommand.IsolineCount = 0u;
             break;
-        case SandboxEditorVisualizationPropertyPreset::Isoline:
+        case EditorVisualizationPropertyPreset::Isoline:
             if (command.IsolineCount == 0u ||
                 (!command.ScalarAutoRange &&
                  !(command.ScalarRangeMin < command.ScalarRangeMax)))
             {
-                return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+                return EditorCommandStatus::InvalidVisualizationProperty;
             }
             configCommand.Source =
                 G::VisualizationConfig::ColorSource::ScalarField;
             configCommand.IsolineCount = command.IsolineCount;
             break;
-        case SandboxEditorVisualizationPropertyPreset::ColorBuffer:
+        case EditorVisualizationPropertyPreset::ColorBuffer:
             configCommand.Source = ToColorBufferSource(command.Domain);
             configCommand.IsolineCount = 0u;
             break;
         }
 
-        return ApplySandboxEditorVisualizationConfigCommand(
+        return ApplyEditorVisualizationConfigCommandImpl(
             context,
             configCommand);
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorVisualizationRecipeCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorVisualizationRecipeCommand& command)
+    EditorCommandStatus ApplyEditorVisualizationRecipeCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorVisualizationRecipeCommand& command)
     {
         if (!context.VisualizationCommandsAvailable ||
             !context.VisualizationRecipes.Available())
-            return SandboxEditorCommandStatus::MissingVisualizationCommands;
+            return EditorCommandStatus::MissingVisualizationCommands;
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
             SelectionController::ToEntityHandle(command.StableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
 
         const GeometryEntityAvailability availability =
             BuildGeometryAvailability(raw, entity);
         if (!availability.HasGeometry())
-            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            return EditorCommandStatus::UnsupportedGeometryDomain;
 
         const std::optional<VisualizationRecipe> current =
             context.VisualizationRecipes.GetRecipe(command.StableEntityId);
         if (!command.EnableRecipe)
         {
             if (!current.has_value())
-                return SandboxEditorCommandStatus::NoChange;
+                return EditorCommandStatus::NoChange;
             context.VisualizationRecipes.ClearRecipe(command.StableEntityId);
             InvalidateSelectedModelCache(context);
-            return SandboxEditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
         }
 
         if (current.has_value() &&
             SameVisualizationRecipe(*current, command.Recipe))
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
 
         context.VisualizationRecipes.SetRecipe(
             command.StableEntityId,
             command.Recipe);
         InvalidateSelectedModelCache(context);
-        return SandboxEditorCommandStatus::Applied;
+        return EditorCommandStatus::Applied;
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorVertexChannelBindingCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorVertexChannelBindingCommand& command)
+    EditorCommandStatus ApplyEditorVertexChannelBindingCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorVertexChannelBindingCommand& command)
     {
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
         if (command.Channel != VertexChannel::Normal &&
             command.Channel != VertexChannel::Color)
         {
-            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+            return EditorCommandStatus::InvalidVertexChannelBinding;
         }
 
         entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
             ResolveStableEntity(raw, command.StableEntityId);
         if (!entity.has_value())
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
-        const std::optional<SandboxEditorPropertyCatalogDomain> domain =
+        const std::optional<EditorPropertyCatalogDomain> domain =
             VertexChannelCatalogDomainForView(view);
         if (!domain.has_value())
-            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            return EditorCommandStatus::UnsupportedGeometryDomain;
 
         const Geometry::PropertySet* properties =
             VertexChannelPropertySetForView(view, *domain);
         if (properties == nullptr)
-            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            return EditorCommandStatus::UnsupportedGeometryDomain;
 
         const std::optional<VertexChannelBindingSet> before =
             StoredVertexChannelBindingSet(raw, *entity);
@@ -15197,14 +15224,14 @@ namespace Extrinsic::Runtime
         VertexChannelSourceBinding* target =
             FindMutableVertexChannelBinding(after, command.Channel);
         if (target == nullptr)
-            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+            return EditorCommandStatus::InvalidVertexChannelBinding;
 
         if (!command.EnableBinding)
         {
             if (!before.has_value() ||
                 !IsVertexChannelBindingEnabled(*target))
             {
-                return SandboxEditorCommandStatus::NoChange;
+                return EditorCommandStatus::NoChange;
             }
 
             *target = {};
@@ -15213,7 +15240,7 @@ namespace Extrinsic::Runtime
         else
         {
             if (command.PropertyName.empty())
-                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+                return EditorCommandStatus::InvalidVertexChannelBinding;
 
             const Geometry::PropertyValueKind valueKind =
                 DetectGeometryPropertyValueKind(
@@ -15222,7 +15249,7 @@ namespace Extrinsic::Runtime
             const std::optional<AttributeSourceType> sourceType =
                 ToAttributeSourceType(valueKind);
             if (!sourceType.has_value())
-                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+                return EditorCommandStatus::InvalidVertexChannelBinding;
 
             const AttributeBindResult resolver =
                 EvaluateVertexChannelBinding(
@@ -15233,7 +15260,7 @@ namespace Extrinsic::Runtime
                     properties->Size(),
                     context.ModelBuildStats);
             if (!resolver.Ok())
-                return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+                return EditorCommandStatus::InvalidVertexChannelBinding;
 
             const VertexChannelSourceBinding next{
                 .Enabled = true,
@@ -15246,7 +15273,7 @@ namespace Extrinsic::Runtime
             if (before.has_value() &&
                 SameVertexChannelSourceBinding(*target, next))
             {
-                return SandboxEditorCommandStatus::NoChange;
+                return EditorCommandStatus::NoChange;
             }
 
             *target = next;
@@ -15268,7 +15295,7 @@ namespace Extrinsic::Runtime
                         : std::nullopt);
             return InvalidateSelectedModelCacheIfApplied(
                 context,
-                ToSandboxEditorCommandStatus(result.Status));
+                ToEditorCommandStatus(result.Status));
         }
 
         const EditorCommandHistoryStatus applied =
@@ -15282,28 +15309,28 @@ namespace Extrinsic::Runtime
             MarkVertexChannelDirty(raw, *entity, command.Channel);
         return InvalidateSelectedModelCacheIfApplied(
             context,
-            ToSandboxEditorCommandStatus(applied));
+            ToEditorCommandStatus(applied));
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorGeometryPresentationSlotDefaultCommand& command)
+    EditorCommandStatus ApplyEditorGeometryPresentationSlotDefaultCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorGeometryPresentationSlotDefaultCommand& command)
     {
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
         if (!IsFiniteDefaultValue(command.Value))
-            return SandboxEditorCommandStatus::InvalidProcessingParameters;
+            return EditorCommandStatus::InvalidProcessingParameters;
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
             SelectionController::ToEntityHandle(command.StableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
 
         const auto* current =
             raw.try_get<GeometryPresentationRecipe>(entity);
         if (current == nullptr)
-            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            return EditorCommandStatus::UnsupportedGeometryDomain;
 
         const auto* currentRuntime =
             raw.try_get<GeometryPresentationRuntimeState>(entity);
@@ -15319,14 +15346,14 @@ namespace Extrinsic::Runtime
             command.PresentationKey,
             command.Semantic);
         if (lookup.Presentation == nullptr || lookup.Slot == nullptr)
-            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+            return EditorCommandStatus::InvalidVisualizationProperty;
 
         GeometryPresentationSlotRecipe& slot = *lookup.Slot;
         if (slot.SourceKind == GeometryPresentationSourceKind::UniformDefault &&
             slot.Enabled == command.Enabled &&
             SameGeometryPresentationDefaultValue(slot.UniformDefault, command.Value))
         {
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         }
 
         slot.SourceKind = GeometryPresentationSourceKind::UniformDefault;
@@ -15352,28 +15379,28 @@ namespace Extrinsic::Runtime
                 std::move(after)));
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorGeometryPresentationSlotPropertyCommand& command)
+    EditorCommandStatus ApplyEditorGeometryPresentationSlotPropertyCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorGeometryPresentationSlotPropertyCommand& command)
     {
         if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
+            return EditorCommandStatus::MissingScene;
         if (!PropertySourceKindAllowedForGeometryPresentationSlotCommand(command.SourceKind) ||
             command.PropertyName.empty())
         {
-            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+            return EditorCommandStatus::InvalidVisualizationProperty;
         }
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
             SelectionController::ToEntityHandle(command.StableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
+            return EditorCommandStatus::StaleEntity;
 
         const auto* current =
             raw.try_get<GeometryPresentationRecipe>(entity);
         if (current == nullptr)
-            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            return EditorCommandStatus::UnsupportedGeometryDomain;
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
         const GeometryEntityAvailability availability =
@@ -15392,7 +15419,7 @@ namespace Extrinsic::Runtime
                 descriptor,
                 expectedCount);
         if (!resolution.Resolved())
-            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+            return EditorCommandStatus::InvalidVisualizationProperty;
         descriptor.ValueKind = resolution.ResolvedValueKind;
 
         const auto* currentRuntime =
@@ -15409,7 +15436,7 @@ namespace Extrinsic::Runtime
             command.PresentationKey,
             command.Semantic);
         if (lookup.Presentation == nullptr || lookup.Slot == nullptr)
-            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+            return EditorCommandStatus::InvalidVisualizationProperty;
 
         GeometryPresentationSlotRecipe& slot = *lookup.Slot;
         const GeometryPresentationReadiness nextReadiness =
@@ -15424,7 +15451,7 @@ namespace Extrinsic::Runtime
         if (slot.SourceKind == command.SourceKind && slot.Enabled &&
             SameGeometryPresentationPropertyDescriptor(slot.Property, descriptor))
         {
-            return SandboxEditorCommandStatus::NoChange;
+            return EditorCommandStatus::NoChange;
         }
 
         slot.SourceKind = command.SourceKind;
@@ -15449,8 +15476,8 @@ namespace Extrinsic::Runtime
                 std::move(after)));
     }
 
-    bool IsSandboxEditorTextureBakeTargetCompatible(
-        const SandboxEditorTextureBakeTarget& target,
+    bool IsEditorTextureBakeTargetCompatibleImpl(
+        const EditorTextureBakeTarget& target,
         const Geometry::PropertyValueKind valueKind,
         const PropertyTextureBakeStorage storage,
         const PropertyTextureBakeEncoding encoding) noexcept
@@ -15522,20 +15549,20 @@ namespace Extrinsic::Runtime
         return false;
     }
 
-    [[nodiscard]] bool ValidateSandboxEditorTextureBakeTargetSet(
+    [[nodiscard]] bool ValidateEditorTextureBakeTargetSet(
         const PropertyTextureBakeRecord& output,
-        const std::span<const SandboxEditorTextureBakeTarget> targets,
+        const std::span<const EditorTextureBakeTarget> targets,
         std::string& diagnostic)
     {
         std::optional<Graphics::Colormap::Type> scalarColormap{};
-        for (const SandboxEditorTextureBakeTarget& target : targets)
+        for (const EditorTextureBakeTarget& target : targets)
         {
             if (target.Colormap >= Graphics::Colormap::Type::Count)
             {
                 diagnostic = "generated texture target colormap is invalid";
                 return false;
             }
-            if (!IsSandboxEditorTextureBakeTargetCompatible(
+            if (!IsEditorTextureBakeTargetCompatibleImpl(
                     target,
                     output.Source.ValueKind,
                     output.Storage,
@@ -15566,24 +15593,24 @@ namespace Extrinsic::Runtime
     }
 
     PropertyTextureBakeRepresentation
-    ResolveSandboxEditorTextureBakeTargetRepresentation(
+ResolveEditorTextureBakeTargetRepresentationImpl(
         const Geometry::PropertyValueKind valueKind,
         const PropertyTextureBakeStorage requestedStorage,
         const PropertyTextureBakeEncoding requestedEncoding,
-        const std::span<const SandboxEditorTextureBakeTarget> targets) noexcept
+        const std::span<const EditorTextureBakeTarget> targets) noexcept
     {
         PropertyTextureBakeStorage storage = requestedStorage;
         PropertyTextureBakeEncoding encoding = requestedEncoding;
         const bool hasNormalTarget = std::ranges::any_of(
             targets,
-            [](const SandboxEditorTextureBakeTarget& target)
+            [](const EditorTextureBakeTarget& target)
             {
                 return target.Semantic ==
                        GeometryPresentationSlotSemantic::Normal;
             });
         const bool hasLinearPbrTarget = std::ranges::any_of(
             targets,
-            [](const SandboxEditorTextureBakeTarget& target)
+            [](const EditorTextureBakeTarget& target)
             {
                 return target.Semantic ==
                            GeometryPresentationSlotSemantic::Roughness ||
@@ -15613,22 +15640,23 @@ namespace Extrinsic::Runtime
             valueKind, storage, encoding);
     }
 
-    SandboxEditorTextureBakeCommandResult ApplySandboxEditorTextureBakeCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorTextureBakeCommand& command)
+    EditorTextureBakeCommandResult
+ApplyEditorTextureBakeCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorTextureBakeCommand& command)
     {
         if (context.Scene == nullptr)
         {
-            return SandboxEditorTextureBakeCommandResult{
-                .Status = SandboxEditorCommandStatus::MissingScene,
+            return EditorTextureBakeCommandResult{
+                .Status = EditorCommandStatus::MissingScene,
                 .BakeStatus = PropertyTextureBakeStatus::MissingScene,
                 .Diagnostic = "Scene registry is unavailable.",
             };
         }
         if (context.TextureBake == nullptr)
         {
-            return SandboxEditorTextureBakeCommandResult{
-                .Status = SandboxEditorCommandStatus::AssetImportFailed,
+            return EditorTextureBakeCommandResult{
+                .Status = EditorCommandStatus::AssetImportFailed,
                 .BakeStatus =
                     PropertyTextureBakeStatus::NonOperationalBackend,
                 .Diagnostic = "Texture-bake runtime module is unavailable.",
@@ -15636,8 +15664,8 @@ namespace Extrinsic::Runtime
         }
         if (!context.TextureBake->Available())
         {
-            return SandboxEditorTextureBakeCommandResult{
-                .Status = SandboxEditorCommandStatus::InvalidVisualizationProperty,
+            return EditorTextureBakeCommandResult{
+                .Status = EditorCommandStatus::InvalidVisualizationProperty,
                 .BakeStatus =
                     PropertyTextureBakeStatus::NonOperationalBackend,
                 .Diagnostic =
@@ -15648,8 +15676,8 @@ namespace Extrinsic::Runtime
             command.Width == 0u ||
             command.Height == 0u)
         {
-            return SandboxEditorTextureBakeCommandResult{
-                .Status = SandboxEditorCommandStatus::InvalidVisualizationProperty,
+            return EditorTextureBakeCommandResult{
+                .Status = EditorCommandStatus::InvalidVisualizationProperty,
                 .BakeStatus = command.PropertyName.empty()
                     ? PropertyTextureBakeStatus::MissingProperty
                     : PropertyTextureBakeStatus::InvalidResolution,
@@ -15657,18 +15685,18 @@ namespace Extrinsic::Runtime
             };
         }
 
-        std::vector<SandboxEditorTextureBakeTarget> targets =
+        std::vector<EditorTextureBakeTarget> targets =
             command.Targets;
         if (targets.empty() && command.BindGeneratedTexture)
         {
-            targets.push_back(SandboxEditorTextureBakeTarget{
+            targets.push_back(EditorTextureBakeTarget{
                 .PresentationKey = command.PresentationKey,
                 .Semantic = command.TargetSemantic,
                 .Colormap = command.EncodingColormap,
                 .NormalSpace = command.NormalSpace,
             });
         }
-        for (SandboxEditorTextureBakeTarget& target : targets)
+        for (EditorTextureBakeTarget& target : targets)
         {
             if (target.Semantic ==
                 GeometryPresentationSlotSemantic::Normal)
@@ -15681,7 +15709,7 @@ namespace Extrinsic::Runtime
         PropertyTextureBakeEncoding encoding = command.Encoder;
         const bool normalTarget = std::ranges::any_of(
             targets,
-            [](const SandboxEditorTextureBakeTarget& target)
+            [](const EditorTextureBakeTarget& target)
             {
                 return target.Semantic ==
                     GeometryPresentationSlotSemantic::Normal;
@@ -15741,28 +15769,28 @@ namespace Extrinsic::Runtime
                 scheduledOutput = *output;
         }
 
-        SandboxEditorCommandStatus status =
-            SandboxEditorCommandStatus::Applied;
+        EditorCommandStatus status =
+            EditorCommandStatus::Applied;
         if (!bake.Succeeded())
         {
             switch (bake.Status)
             {
             case PropertyTextureBakeStatus::MissingScene:
-                status = SandboxEditorCommandStatus::MissingScene;
+                status = EditorCommandStatus::MissingScene;
                 break;
             case PropertyTextureBakeStatus::MissingAssetService:
             case PropertyTextureBakeStatus::AssetLoadFailed:
-                status = SandboxEditorCommandStatus::AssetImportFailed;
+                status = EditorCommandStatus::AssetImportFailed;
                 break;
             case PropertyTextureBakeStatus::StaleEntity:
-                status = SandboxEditorCommandStatus::StaleEntity;
+                status = EditorCommandStatus::StaleEntity;
                 break;
             case PropertyTextureBakeStatus::NonMeshSource:
             case PropertyTextureBakeStatus::UnsupportedSourceDomain:
-                status = SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                status = EditorCommandStatus::UnsupportedGeometryDomain;
                 break;
             case PropertyTextureBakeStatus::CommandFailed:
-                status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+                status = EditorCommandStatus::GeometryProcessingFailed;
                 break;
             case PropertyTextureBakeStatus::Success:
             case PropertyTextureBakeStatus::Scheduled:
@@ -15782,11 +15810,11 @@ namespace Extrinsic::Runtime
             case PropertyTextureBakeStatus::BakeFailed:
             case PropertyTextureBakeStatus::JobSubmitFailed:
             case PropertyTextureBakeStatus::StaleCompletion:
-                status = SandboxEditorCommandStatus::InvalidVisualizationProperty;
+                status = EditorCommandStatus::InvalidVisualizationProperty;
                 break;
             }
         }
-        if (status == SandboxEditorCommandStatus::Applied &&
+        if (status == EditorCommandStatus::Applied &&
             !targets.empty())
         {
             TextureBakeMutationResult bound{};
@@ -15828,10 +15856,10 @@ namespace Extrinsic::Runtime
                         ? *raw.try_get<GeometryPresentationRuntimeState>(entity)
                         : GeometryPresentationRuntimeState{};
                 std::string targetDiagnostic{};
-                bool compatible = ValidateSandboxEditorTextureBakeTargetSet(
+                bool compatible = ValidateEditorTextureBakeTargetSet(
                     *scheduledOutput, targets, targetDiagnostic);
-                std::vector<SandboxEditorTextureBakeTarget> resolvedTargets{};
-                for (SandboxEditorTextureBakeTarget& target : targets)
+                std::vector<EditorTextureBakeTarget> resolvedTargets{};
+                for (EditorTextureBakeTarget& target : targets)
                 {
                     if (!compatible)
                         break;
@@ -15869,7 +15897,7 @@ namespace Extrinsic::Runtime
                     }
                     if (std::ranges::any_of(
                             resolvedTargets,
-                            [&](const SandboxEditorTextureBakeTarget& existing)
+                            [&](const EditorTextureBakeTarget& existing)
                             {
                                 return existing.PresentationKey ==
                                            presentation->Key &&
@@ -15944,8 +15972,8 @@ namespace Extrinsic::Runtime
             {
                 (void)context.TextureBake->Remove(command.StableEntityId,
                                                   bake.OutputName);
-                return SandboxEditorTextureBakeCommandResult{
-                    .Status = SandboxEditorCommandStatus::
+                return EditorTextureBakeCommandResult{
+                    .Status = EditorCommandStatus::
                         InvalidVisualizationProperty,
                     .BakeStatus = PropertyTextureBakeStatus::CommandFailed,
                     .OutputName = bake.OutputName,
@@ -15954,7 +15982,7 @@ namespace Extrinsic::Runtime
             }
         }
 
-        SandboxEditorTextureBakeCommandResult result{
+        EditorTextureBakeCommandResult result{
             .Status = status,
             .BakeStatus = bake.Status,
             .GeneratedTexture = bake.GeneratedTexture,
@@ -15965,13 +15993,13 @@ namespace Extrinsic::Runtime
             .OutputName = bake.OutputName,
             .Diagnostic = bake.Diagnostic,
         };
-        if (result.Status == SandboxEditorCommandStatus::Applied)
+        if (result.Status == EditorCommandStatus::Applied)
             InvalidateSelectedModelCache(context);
         return result;
     }
 
-    TextureBakeMutationResult RenameSandboxEditorBakedTexture(
-        const SandboxEditorContext& context,
+    TextureBakeMutationResult RenameEditorBakedTextureImpl(
+        const EditorFeatureBindings& context,
         const std::uint32_t stableEntityId,
         const std::string_view currentName,
         const std::string_view newName)
@@ -16029,8 +16057,9 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    TextureBakeMutationResult RemoveSandboxEditorBakedTexture(
-        const SandboxEditorContext& context,
+    TextureBakeMutationResult
+RemoveEditorBakedTextureImpl(
+        const EditorFeatureBindings& context,
         const std::uint32_t stableEntityId,
         const std::string_view outputName)
     {
@@ -16096,9 +16125,9 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    TextureBakeMutationResult SetSandboxEditorBakedTextureTargets(
-        const SandboxEditorContext& context,
-        const SandboxEditorTextureBakeTargetUpdateRequest& request)
+    TextureBakeMutationResult SetEditorBakedTextureTargetsImpl(
+        const EditorFeatureBindings& context,
+        const EditorTextureBakeTargetUpdateRequest& request)
     {
         if (context.TextureBake == nullptr || context.Scene == nullptr)
         {
@@ -16133,7 +16162,7 @@ namespace Extrinsic::Runtime
             };
         }
         std::string targetDiagnostic{};
-        if (!ValidateSandboxEditorTextureBakeTargetSet(
+        if (!ValidateEditorTextureBakeTargetSet(
                 *output, request.Targets, targetDiagnostic))
         {
             return TextureBakeMutationResult{
@@ -16157,7 +16186,7 @@ namespace Extrinsic::Runtime
             raw.try_get<GeometryPresentationRuntimeState>(entity) != nullptr
                 ? *raw.try_get<GeometryPresentationRuntimeState>(entity)
                 : GeometryPresentationRuntimeState{};
-        std::vector<SandboxEditorTextureBakeTarget> resolvedTargets{};
+        std::vector<EditorTextureBakeTarget> resolvedTargets{};
 
         for (GeometryPresentationBindingRecipe& presentation :
              next.Presentations)
@@ -16184,7 +16213,7 @@ namespace Extrinsic::Runtime
             }
         }
 
-        for (const SandboxEditorTextureBakeTarget& target : request.Targets)
+        for (const EditorTextureBakeTarget& target : request.Targets)
         {
             GeometryPresentationBindingRecipe* presentation =
                 target.PresentationKey.empty()
@@ -16220,7 +16249,7 @@ namespace Extrinsic::Runtime
             }
             if (std::ranges::any_of(
                     resolvedTargets,
-                    [&](const SandboxEditorTextureBakeTarget& existing)
+                    [&](const EditorTextureBakeTarget& existing)
                     {
                         return existing.PresentationKey == presentation->Key &&
                                existing.Semantic == target.Semantic;
@@ -16232,7 +16261,7 @@ namespace Extrinsic::Runtime
                                   "duplicate slot",
                 };
             }
-            resolvedTargets.push_back(SandboxEditorTextureBakeTarget{
+            resolvedTargets.push_back(EditorTextureBakeTarget{
                 .PresentationKey = presentation->Key,
                 .Semantic = target.Semantic,
                 .Colormap = target.Colormap,
@@ -16289,7 +16318,7 @@ namespace Extrinsic::Runtime
         };
     }
 
-    struct SandboxEditorUvRegenerationSourceSnapshot
+    struct EditorUvRegenerationSourceSnapshot
     {
         std::vector<glm::vec3> Positions{};
         std::vector<std::uint32_t> EdgeV0{};
@@ -16312,7 +16341,7 @@ namespace Extrinsic::Runtime
 
     [[nodiscard]] bool CaptureUvRegenerationSourceSnapshot(
         const GS::ConstSourceView& view,
-        SandboxEditorUvRegenerationSourceSnapshot& out)
+        EditorUvRegenerationSourceSnapshot& out)
     {
         if (view.VertexSource == nullptr ||
             view.EdgeSource == nullptr ||
@@ -16364,8 +16393,8 @@ namespace Extrinsic::Runtime
     }
 
     [[nodiscard]] bool SameUvRegenerationSourceSnapshot(
-        const SandboxEditorUvRegenerationSourceSnapshot& lhs,
-        const SandboxEditorUvRegenerationSourceSnapshot& rhs) noexcept
+        const EditorUvRegenerationSourceSnapshot& lhs,
+        const EditorUvRegenerationSourceSnapshot& rhs) noexcept
     {
         return SameGeometryPositions(lhs.Positions, rhs.Positions) &&
                lhs.EdgeV0 == rhs.EdgeV0 &&
@@ -16418,16 +16447,16 @@ namespace Extrinsic::Runtime
     struct UvMeshTopologyMutationGeneration
     {
         std::uint64_t GeometryMetadataSignature{0u};
-        SandboxEditorUvRegenerationSourceSnapshot Snapshot{};
+        EditorUvRegenerationSourceSnapshot Snapshot{};
         UvMeshKnownPropertySnapshot Properties{};
     };
 
-    [[nodiscard]] SandboxEditorCommandStatus CommitUvMeshTopologyReplacement(
-        const SandboxEditorContext& context,
+    [[nodiscard]] EditorCommandStatus CommitUvMeshTopologyReplacement(
+        const EditorFeatureBindings& context,
         const std::uint32_t stableEntityId,
         const char* label,
         const std::uint64_t expectedGeometryMetadataSignature,
-        SandboxEditorUvRegenerationSourceSnapshot expectedSnapshot,
+        EditorUvRegenerationSourceSnapshot expectedSnapshot,
         Geometry::HalfedgeMesh::Mesh before,
         Geometry::HalfedgeMesh::Mesh after)
     {
@@ -16440,19 +16469,19 @@ namespace Extrinsic::Runtime
         {
             if (context.Scene == nullptr)
             {
-                return SandboxEditorCommandStatus::MissingScene;
+                return EditorCommandStatus::MissingScene;
             }
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, stableEntityId);
             if (!entity.has_value())
-                return SandboxEditorCommandStatus::StaleEntity;
+                return EditorCommandStatus::StaleEntity;
             const UvMeshKnownPropertySnapshot beforeProperties =
                 CaptureUvMeshKnownPropertyState(
                     GS::BuildConstView(raw, *entity));
             if (beforeProperties == nullptr)
             {
-                return SandboxEditorCommandStatus::
+                return EditorCommandStatus::
                     UnsupportedGeometryDomain;
             }
 
@@ -16519,7 +16548,7 @@ namespace Extrinsic::Runtime
                             return EditorCommandHistoryStatus::StaleEntity;
                         }
 
-                        SandboxEditorUvRegenerationSourceSnapshot current{};
+                        EditorUvRegenerationSourceSnapshot current{};
                         if (!CaptureUvRegenerationSourceSnapshot(
                                 view,
                                 current) ||
@@ -16555,7 +16584,7 @@ namespace Extrinsic::Runtime
                             ResolveStableEntity(
                                 raw,
                                 identity.StableEntityId);
-                        SandboxEditorUvRegenerationSourceSnapshot current{};
+                        EditorUvRegenerationSourceSnapshot current{};
                         if (entity.has_value())
                         {
                             MarkMeshTopologyReplacementDirty(raw, *entity);
@@ -16580,7 +16609,7 @@ namespace Extrinsic::Runtime
                             .Properties = properties,
                         };
                     });
-            return ToSandboxEditorCommandStatus(history.Status);
+            return ToEditorCommandStatus(history.Status);
         }
 
         const EditorCommandHistoryStatus applied =
@@ -16589,7 +16618,7 @@ namespace Extrinsic::Runtime
                 stableEntityId,
                 after);
         if (applied != EditorCommandHistoryStatus::Applied)
-            return ToSandboxEditorCommandStatus(applied);
+            return ToEditorCommandStatus(applied);
         entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
             ResolveStableEntity(raw, stableEntityId);
@@ -16598,16 +16627,16 @@ namespace Extrinsic::Runtime
             MarkMeshTopologyReplacementDirty(raw, *entity);
             Dirty::MarkGpuDirty(raw, *entity);
         }
-        return SandboxEditorCommandStatus::Applied;
+        return EditorCommandStatus::Applied;
     }
 
-    [[nodiscard]] SandboxEditorUvRegenerationCommandResult
+    [[nodiscard]] EditorUvRegenerationCommandResult
     MakeUvRegenerationResult(
-        const SandboxEditorCommandStatus status,
+        const EditorCommandStatus status,
         const Geometry::UvAtlas::UvAtlasStatus uvStatus,
         std::string diagnostic)
     {
-        return SandboxEditorUvRegenerationCommandResult{
+        return EditorUvRegenerationCommandResult{
             .Status = status,
             .UvStatus = uvStatus,
             .Diagnostic = std::move(diagnostic),
@@ -16616,7 +16645,7 @@ namespace Extrinsic::Runtime
 
     void CopyUvAtlasCounters(
         const Geometry::UvAtlas::UvAtlasResult& atlas,
-        SandboxEditorUvRegenerationCommandResult& result)
+        EditorUvRegenerationCommandResult& result)
     {
         result.UvStatus = atlas.Status;
         result.Provenance = atlas.Provenance;
@@ -16631,23 +16660,23 @@ namespace Extrinsic::Runtime
                 : 0u;
     }
 
-    [[nodiscard]] SandboxEditorUvRegenerationCommandResult
+    [[nodiscard]] EditorUvRegenerationCommandResult
     MakePendingUvRegenerationResult(
         const JobToken handle)
     {
-        SandboxEditorUvRegenerationCommandResult result{};
-        result.Status = SandboxEditorCommandStatus::Pending;
+        EditorUvRegenerationCommandResult result{};
+        result.Status = EditorCommandStatus::Pending;
         result.Diagnostic = "UV regeneration CPU job queued";
         AppendDerivedJobHandleToMessage(result.Diagnostic, handle);
         result.Diagnostic += ".";
         return result;
     }
 
-    struct SandboxEditorUvRegenerationCpuJobState
+    struct EditorUvRegenerationCpuJobState
     {
         std::uint32_t StableEntityId{0u};
         std::uint64_t GeometryMetadataSignature{0u};
-        SandboxEditorUvRegenerationSourceSnapshot Snapshot{};
+        EditorUvRegenerationSourceSnapshot Snapshot{};
         MeshSoupFromGeometrySourcesResult Soup{};
         Geometry::PropertySet SourceVertexProperties{};
         bool HasSourceVertexProperties{false};
@@ -16656,14 +16685,14 @@ namespace Extrinsic::Runtime
         std::vector<glm::vec2> AuthoredTexcoords{};
         Geometry::HalfedgeMesh::Mesh BeforeMesh{};
         Geometry::HalfedgeMesh::Mesh AfterMesh{};
-        SandboxEditorUvRegenerationCommand Command{};
-        SandboxEditorUvRegenerationCommandResult Result{};
+        EditorUvRegenerationCommand Command{};
+        EditorUvRegenerationCommandResult Result{};
     };
 
     [[nodiscard]] JobApplyValidation
     ValidateUvRegenerationCpuJobApply(
-        const SandboxEditorContext& context,
-        const SandboxEditorUvRegenerationCpuJobState& job)
+        const EditorFeatureBindings& context,
+        const EditorUvRegenerationCpuJobState& job)
     {
         if (context.Scene == nullptr)
             return JobApplyValidation::MissingTarget;
@@ -16686,7 +16715,7 @@ namespace Extrinsic::Runtime
             return JobApplyValidation::StaleGeneration;
         }
 
-        SandboxEditorUvRegenerationSourceSnapshot current{};
+        EditorUvRegenerationSourceSnapshot current{};
         if (!CaptureUvRegenerationSourceSnapshot(view, current) ||
             !SameUvRegenerationSourceSnapshot(current, job.Snapshot) ||
             view.VertexSource == nullptr ||
@@ -16707,15 +16736,15 @@ namespace Extrinsic::Runtime
     }
 
     void PublishUvRegenerationResultSink(
-        const SandboxEditorContext& context,
-        SandboxEditorUvRegenerationCommandResult result)
+        const EditorFeatureBindings& context,
+        EditorUvRegenerationCommandResult result)
     {
         if (context.MethodResultSinks.UvRegeneration)
             context.MethodResultSinks.UvRegeneration(std::move(result));
     }
 
     [[nodiscard]] JobResultEnvelope RunUvRegenerationCpuWorker(
-        const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
+        const std::shared_ptr<EditorUvRegenerationCpuJobState>& state)
     {
         Geometry::UvAtlas::UvAtlasOptions options{};
         options.PreserveValidAuthoredUvs =
@@ -16749,14 +16778,14 @@ namespace Extrinsic::Runtime
                 atlas.Status ==
                     Geometry::UvAtlas::UvAtlasStatus::BackendFailed;
             state->Result.Status = backendFailure
-                ? SandboxEditorCommandStatus::GeometryProcessingFailed
-                : SandboxEditorCommandStatus::InvalidProcessingParameters;
+                ? EditorCommandStatus::GeometryProcessingFailed
+                : EditorCommandStatus::InvalidProcessingParameters;
             state->Result.Diagnostic =
                 atlas.Diagnostics.BackendDetail.empty()
                     ? std::string{Geometry::UvAtlas::ToString(atlas.Status)}
                     : atlas.Diagnostics.BackendDetail;
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = state->Result.Diagnostic,
                 });
         }
@@ -16766,11 +16795,11 @@ namespace Extrinsic::Runtime
         if (!converted.Succeeded())
         {
             state->Result.Status =
-                SandboxEditorCommandStatus::GeometryProcessingFailed;
+                EditorCommandStatus::GeometryProcessingFailed;
             state->Result.Diagnostic =
                 "generated UV mesh could not be converted back to halfedge topology";
-            return JobResultEnvelope::Make<SandboxEditorJobResult>(
-                SandboxEditorJobResult{
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
                     .Diagnostic = state->Result.Diagnostic,
                 });
         }
@@ -16782,24 +16811,24 @@ namespace Extrinsic::Runtime
             atlas,
             converted.Mesh);
         state->AfterMesh = std::move(converted.Mesh);
-        state->Result.Status = SandboxEditorCommandStatus::Applied;
+        state->Result.Status = EditorCommandStatus::Applied;
         state->Result.Diagnostic = atlas.Diagnostics.BackendDetail;
-        return JobResultEnvelope::Make<SandboxEditorJobResult>(
-            SandboxEditorJobResult{
+        return JobResultEnvelope::Make<EditorJobResult>(
+            EditorJobResult{
                 .Diagnostic = "UV regeneration CPU result ready",
             });
     }
 
-    [[nodiscard]] SandboxEditorUvRegenerationCommandResult
+    [[nodiscard]] EditorUvRegenerationCommandResult
     CommitUvRegenerationCpuJobResult(
-        const SandboxEditorContext& context,
-        SandboxEditorUvRegenerationCpuJobState& job)
+        const EditorFeatureBindings& context,
+        EditorUvRegenerationCpuJobState& job)
     {
-        SandboxEditorUvRegenerationCommandResult result = job.Result;
+        EditorUvRegenerationCommandResult result = job.Result;
         if (!result.Succeeded())
             return result;
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitUvMeshTopologyReplacement(
                 context,
                 job.StableEntityId,
@@ -16808,7 +16837,7 @@ namespace Extrinsic::Runtime
                 std::move(job.Snapshot),
                 std::move(job.BeforeMesh),
                 std::move(job.AfterMesh));
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Diagnostic =
@@ -16816,16 +16845,16 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Status = EditorCommandStatus::Applied;
         InvalidateSelectedModelCache(context);
         return result;
     }
 
     [[nodiscard]] Core::Result PublishUvRegenerationCpuJob(
-        const SandboxEditorContext& context,
-        SandboxEditorUvRegenerationCpuJobState& job)
+        const EditorFeatureBindings& context,
+        EditorUvRegenerationCpuJobState& job)
     {
-        SandboxEditorUvRegenerationCommandResult result =
+        EditorUvRegenerationCommandResult result =
             CommitUvRegenerationCpuJobResult(context, job);
         const bool succeeded = result.Succeeded();
         PublishUvRegenerationResultSink(context, std::move(result));
@@ -16835,20 +16864,20 @@ namespace Extrinsic::Runtime
     // The retired key carried `SourcePropertyGeneration`; the dedup guard never
     // compared it, and the source/metadata staleness it stood for is re-checked
     // by `ValidateUvRegenerationCpuJobApply` immediately before the apply.
-    [[nodiscard]] SandboxEditorJobIdentity MakeUvRegenerationCpuJobIdentity(
-        const SandboxEditorUvRegenerationCpuJobState& state)
+    [[nodiscard]] EditorJobIdentity MakeUvRegenerationCpuJobIdentity(
+        const EditorUvRegenerationCpuJobState& state)
     {
-        return SandboxEditorJobIdentity{
+        return EditorJobIdentity{
             .EntityId = state.StableEntityId,
-            .Scope = SandboxEditorJobScope::MeshSurface,
+            .Scope = EditorJobScope::MeshSurface,
             .OutputSemantic = GeometryPresentationSlotSemantic::Albedo,
             .OutputName = std::string{kUvRegenerationJobOutputName},
         };
     }
 
     [[nodiscard]] JobDesc MakeUvRegenerationCpuJobDesc(
-        const SandboxEditorContext& context,
-        const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
+        const EditorFeatureBindings& context,
+        const std::shared_ptr<EditorUvRegenerationCpuJobState>& state)
     {
         return JobDesc{
             .DebugName = "Sandbox.UvRegeneration.CPU",
@@ -16878,7 +16907,7 @@ namespace Extrinsic::Runtime
                 [context, state](KernelEventBus&,
                                  const JobResultEnvelope& result) -> bool
                 {
-                    if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                    if (result.TryGet<EditorJobResult>() == nullptr)
                         return false;
                     return PublishUvRegenerationCpuJob(context, *state)
                         .has_value();
@@ -16886,18 +16915,18 @@ namespace Extrinsic::Runtime
         };
     }
 
-    [[nodiscard]] SandboxEditorUvRegenerationCommandResult
+    [[nodiscard]] EditorUvRegenerationCommandResult
     SubmitUvRegenerationCpuJob(
-        const SandboxEditorContext& context,
-        const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
+        const EditorFeatureBindings& context,
+        const std::shared_ptr<EditorUvRegenerationCpuJobState>& state)
     {
-        const SandboxEditorJobIdentity identity =
+        const EditorJobIdentity identity =
             MakeUvRegenerationCpuJobIdentity(*state);
         JobDesc desc = MakeUvRegenerationCpuJobDesc(context, state);
-        if (const std::optional<SandboxEditorJobRecord> active =
+        if (const std::optional<EditorJobRecord> active =
                 FindActiveEditorJob(context, identity))
         {
-            SandboxEditorUvRegenerationCommandResult pending =
+            EditorUvRegenerationCommandResult pending =
                 MakePendingUvRegenerationResult(active->Token);
             pending.Diagnostic =
                 BuildActiveDerivedJobMessage("UV regeneration CPU", *active);
@@ -16910,7 +16939,7 @@ namespace Extrinsic::Runtime
         if (!handle.IsValid())
         {
             return MakeUvRegenerationResult(
-                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                EditorCommandStatus::GeometryProcessingFailed,
                 Geometry::UvAtlas::UvAtlasStatus::BackendFailed,
                 "UV regeneration CPU job submission was rejected by the runtime job "
                 "lane.");
@@ -16919,21 +16948,21 @@ namespace Extrinsic::Runtime
         return MakePendingUvRegenerationResult(handle);
     }
 
-    SandboxEditorUvRegenerationCommandResult ApplySandboxEditorUvRegenerationCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorUvRegenerationCommand& command)
+    EditorUvRegenerationCommandResult ApplyEditorUvRegenerationCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorUvRegenerationCommand& command)
     {
         if (context.Scene == nullptr)
         {
             return MakeUvRegenerationResult(
-                SandboxEditorCommandStatus::MissingScene,
+                EditorCommandStatus::MissingScene,
                 Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
                 "Scene registry is unavailable.");
         }
         if (command.Resolution == 0u || command.Padding >= command.Resolution)
         {
             return MakeUvRegenerationResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
                 "UV regeneration requires a positive resolution and padding smaller "
                 "than the atlas.");
@@ -16941,7 +16970,7 @@ namespace Extrinsic::Runtime
         if (!command.BackendName.empty() && command.BackendName != "xatlas")
         {
             return MakeUvRegenerationResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable,
                 "Only the promoted xatlas UV backend is available.");
         }
@@ -16952,7 +16981,7 @@ namespace Extrinsic::Runtime
         if (!entity.has_value())
         {
             return MakeUvRegenerationResult(
-                SandboxEditorCommandStatus::StaleEntity,
+                EditorCommandStatus::StaleEntity,
                 Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
                 "UV regeneration target entity is stale or no longer live.");
         }
@@ -16978,11 +17007,11 @@ namespace Extrinsic::Runtime
                 topology.Diagnostic);
         }
 
-        SandboxEditorUvRegenerationSourceSnapshot snapshot{};
+        EditorUvRegenerationSourceSnapshot snapshot{};
         if (!CaptureUvRegenerationSourceSnapshot(view, snapshot))
         {
             return MakeUvRegenerationResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
                 "UV regeneration requires count-matched mesh position, edge, "
                 "halfedge, and face topology properties.");
@@ -16998,7 +17027,7 @@ namespace Extrinsic::Runtime
         }
 
         auto state =
-            std::make_shared<SandboxEditorUvRegenerationCpuJobState>();
+            std::make_shared<EditorUvRegenerationCpuJobState>();
         state->StableEntityId = command.StableEntityId;
         state->GeometryMetadataSignature =
             GeometryMetadataSignatureForEntity(raw, *entity);
@@ -17030,10 +17059,10 @@ namespace Extrinsic::Runtime
 
         const JobResultEnvelope worker =
             RunUvRegenerationCpuWorker(state);
-        if (worker.TryGet<SandboxEditorJobResult>() == nullptr)
+        if (worker.TryGet<EditorJobResult>() == nullptr)
         {
             return MakeUvRegenerationResult(
-                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                EditorCommandStatus::GeometryProcessingFailed,
                 Geometry::UvAtlas::UvAtlasStatus::BackendFailed,
                 "UV regeneration CPU worker failed.");
         }
@@ -17041,16 +17070,17 @@ namespace Extrinsic::Runtime
         return CommitUvRegenerationCpuJobResult(context, *state);
     }
 
-    SandboxEditorMeshDenoiseResult ApplySandboxEditorMeshDenoiseCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorMeshDenoiseCommand& command)
+    EditorMeshDenoiseResult
+ApplyEditorMeshDenoiseCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorMeshDenoiseCommand& command)
     {
-        SandboxEditorMeshDenoiseResult result =
+        EditorMeshDenoiseResult result =
             MakeMeshDenoiseBaseResult(command);
 
         if (context.Scene == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Status = EditorCommandStatus::MissingScene;
             result.DenoiseStatus = Smooth::DenoiseStatus::EmptyMesh;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Scene registry is unavailable for mesh denoise.";
@@ -17058,7 +17088,7 @@ namespace Extrinsic::Runtime
         }
         if (!context.MeshDenoiseKernelAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message       = "Geometry.Smoothing mesh denoiser is unavailable in this "
@@ -17080,7 +17110,7 @@ namespace Extrinsic::Runtime
             !IsPositiveFinite(command.DegenerateNormalLengthEpsilon))
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message       = "Mesh denoise requires a valid stage, positive iteration "
@@ -17094,7 +17124,7 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.StableEntityId);
         if (!entity.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Status = EditorCommandStatus::StaleEntity;
             result.DenoiseStatus = Smooth::DenoiseStatus::EmptyMesh;
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message =
@@ -17118,7 +17148,7 @@ namespace Extrinsic::Runtime
             result.Status = source.Status;
             result.DenoiseStatus =
                 source.Status ==
-                        SandboxEditorCommandStatus::UnsupportedGeometryDomain
+                        EditorCommandStatus::UnsupportedGeometryDomain
                     ? Smooth::DenoiseStatus::EmptyMesh
                     : Smooth::DenoiseStatus::InvalidParams;
             result.Error = source.Error;
@@ -17155,7 +17185,7 @@ namespace Extrinsic::Runtime
 
         if (denoise.Status != Smooth::DenoiseStatus::Success)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Message = "Geometry.Smoothing denoise failed with ";
             result.Message += std::string(Smooth::DebugName(denoise.Status));
             result.Message += ".";
@@ -17169,7 +17199,7 @@ namespace Extrinsic::Runtime
                 afterPositions.data(),
                 afterPositions.size()}))
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.DenoiseStatus = Smooth::DenoiseStatus::NonFiniteInput;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message       = "Geometry.Smoothing denoise produced invalid or "
@@ -17190,13 +17220,13 @@ namespace Extrinsic::Runtime
         }
         result.MovedVertexCount = movedPublishedVertices;
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitMeshDenoisePositions(
                 context,
                 command.StableEntityId,
                 std::move(source.BeforePositions),
                 std::move(afterPositions));
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -17205,32 +17235,33 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Status = EditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshDenoiseSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
     }
 
-    SandboxEditorMeshCurvatureResult ApplySandboxEditorMeshCurvatureCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorMeshCurvatureCommand& command)
+    EditorMeshCurvatureResult
+ApplyEditorMeshCurvatureCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorMeshCurvatureCommand& command)
     {
-        SandboxEditorMeshCurvatureResult result =
+        EditorMeshCurvatureResult result =
             MakeMeshCurvatureBaseResult(
                 command,
                 context.MeshCurvatureDirectionsAvailable);
 
         if (context.Scene == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Status = EditorCommandStatus::MissingScene;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Scene registry is unavailable for mesh curvature.";
             return result;
         }
         if (!context.MeshCurvatureKernelAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Geometry.Curvature mesh curvature is unavailable in this "
                              "runtime configuration.";
@@ -17244,7 +17275,7 @@ namespace Extrinsic::Runtime
         if (!validOutput)
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Mesh curvature requires a valid output mode.";
             return result;
@@ -17255,7 +17286,7 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.StableEntityId);
         if (!entity.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Status = EditorCommandStatus::StaleEntity;
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message =
                 "Mesh curvature target entity is stale or no longer live.";
@@ -17277,7 +17308,7 @@ namespace Extrinsic::Runtime
         GS::MutableSourceView publishView = GS::BuildMutableView(raw, *entity);
         if (!publishView.Valid() || publishView.VertexSource == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            result.Status = EditorCommandStatus::UnsupportedGeometryDomain;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "Mesh curvature target has no writable vertex GeometrySources.";
@@ -17292,7 +17323,7 @@ namespace Extrinsic::Runtime
                 before,
                 captureDiagnostic))
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::TypeMismatch;
             result.Message = captureDiagnostic;
             return result;
@@ -17316,7 +17347,7 @@ namespace Extrinsic::Runtime
             curvature.GaussianCurvatureProperty.Vector().size() !=
                 result.VertexSlotCount)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Geometry.Curvature produced missing or count-mismatched "
                              "scalar properties.";
@@ -17334,7 +17365,7 @@ namespace Extrinsic::Runtime
                 std::span<const double>{gaussian.data(), gaussian.size()});
         if (result.NonFiniteScalarCount != 0u)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "Geometry.Curvature produced non-finite scalar curvature values.";
@@ -17360,7 +17391,7 @@ namespace Extrinsic::Runtime
                     result.VertexSlotCount)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.Curvature produced missing or "
                                  "count-mismatched principal-direction properties.";
@@ -17379,7 +17410,7 @@ namespace Extrinsic::Runtime
             if (result.NonFiniteDirectionCount != 0u)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry.Curvature produced non-finite principal directions.";
@@ -17394,14 +17425,14 @@ namespace Extrinsic::Runtime
             result.DirectionWrittenCount = dir1.size() + dir2.size();
         }
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitMeshCurvatureProperties(
                 context,
                 command.StableEntityId,
                 std::move(source.SourcePositions),
                 std::move(before),
                 std::move(after));
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -17410,7 +17441,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Status = EditorCommandStatus::Applied;
         result.DirectionsPublished =
             result.DirectionPropertyCount == 2u &&
             result.DirectionWrittenCount == result.VertexSlotCount * 2u;
@@ -17420,16 +17451,17 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorMeshRemeshResult ApplySandboxEditorMeshRemeshCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorMeshRemeshCommand& command)
+    EditorMeshRemeshResult
+ApplyEditorMeshRemeshCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorMeshRemeshCommand& command)
     {
-        SandboxEditorMeshRemeshResult result =
+        EditorMeshRemeshResult result =
             MakeMeshRemeshBaseResult(command);
 
         if (context.Scene == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Status = EditorCommandStatus::MissingScene;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Scene registry is unavailable for mesh remesh.";
             return result;
@@ -17446,30 +17478,30 @@ namespace Extrinsic::Runtime
             command.MaxReferenceProjectionDistance < 0.0 ||
             (command.ProjectToSurface && command.ReferenceProjectionK == 0u) ||
             (command.SizingLaw ==
-                 SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
+                 EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
              !IsPositiveFinite(command.ApproximationError)))
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Mesh remesh requires a valid mode, sizing law, positive "
                              "iteration count, finite non-negative target length, "
                              "positive lambda, and valid projection/sizing parameters.";
             return result;
         }
-        if (command.Mode == SandboxEditorMeshRemeshMode::Uniform &&
+        if (command.Mode == EditorMeshRemeshMode::Uniform &&
             !context.MeshRemeshUniformKernelAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Geometry.Remeshing uniform remesher is unavailable in "
                              "this runtime configuration.";
             return result;
         }
-        if (command.Mode == SandboxEditorMeshRemeshMode::Adaptive &&
+        if (command.Mode == EditorMeshRemeshMode::Adaptive &&
             !context.MeshRemeshAdaptiveKernelAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Geometry.HalfedgeMesh.AdaptiveRemeshing is unavailable "
                              "in this runtime configuration.";
@@ -17478,17 +17510,17 @@ namespace Extrinsic::Runtime
         if (command.ProjectToSurface &&
             !context.MeshRemeshProjectToSurfaceAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Mesh remesh project-to-surface is unavailable in this "
                              "runtime configuration.";
             return result;
         }
         if (command.SizingLaw ==
-                SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
+                EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
             !context.MeshRemeshErrorBoundedSizingAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Mesh remesh error-bounded Taubin sizing is unavailable "
                              "in this runtime configuration.";
@@ -17500,7 +17532,7 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.StableEntityId);
         if (!entity.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Status = EditorCommandStatus::StaleEntity;
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message =
                 "Mesh remesh target entity is stale or no longer live.";
@@ -17532,7 +17564,7 @@ namespace Extrinsic::Runtime
         Geometry::HalfedgeMesh::Mesh before = source.Mesh;
 
         std::optional<Geometry::RemeshingOperationResult> remeshResult{};
-        if (command.Mode == SandboxEditorMeshRemeshMode::Uniform)
+        if (command.Mode == EditorMeshRemeshMode::Uniform)
         {
             Remesh::RemeshingParams params{};
             params.TargetLength = command.TargetEdgeLength;
@@ -17568,7 +17600,7 @@ namespace Extrinsic::Runtime
 
         if (!remeshResult.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "Geometry remeshing failed for the selected mesh and parameters.";
@@ -17581,7 +17613,7 @@ namespace Extrinsic::Runtime
         result.OutputVertexCount = source.Mesh.VertexCount();
         result.OutputFaceCount = source.Mesh.FaceCount();
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitMeshTopologyReplacement(
                 context,
                 command.StableEntityId,
@@ -17589,7 +17621,7 @@ namespace Extrinsic::Runtime
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(source.Mesh));
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -17598,23 +17630,24 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Status = EditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshRemeshSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
     }
 
-    SandboxEditorMeshSubdivideResult ApplySandboxEditorMeshSubdivideCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorMeshSubdivideCommand& command)
+    EditorMeshSubdivideResult
+ApplyEditorMeshSubdivideCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorMeshSubdivideCommand& command)
     {
-        SandboxEditorMeshSubdivideResult result =
+        EditorMeshSubdivideResult result =
             MakeMeshSubdivideBaseResult(command);
 
         if (context.Scene == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Status = EditorCommandStatus::MissingScene;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Scene registry is unavailable for mesh subdivide.";
             return result;
@@ -17625,46 +17658,46 @@ namespace Extrinsic::Runtime
              command.FeatureEdgePropertyName.empty()))
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Mesh subdivide requires a valid operator, positive "
                              "iteration count, and a feature-edge property name when "
                              "feature preservation is enabled.";
             return result;
         }
-        if (command.Operator == SandboxEditorMeshSubdivideOperator::Loop &&
+        if (command.Operator == EditorMeshSubdivideOperator::Loop &&
             !context.MeshSubdivideLoopKernelAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Geometry.Subdivision Loop subdivision is unavailable in "
                              "this runtime configuration.";
             return result;
         }
         if (command.Operator ==
-                SandboxEditorMeshSubdivideOperator::CatmullClark &&
+                EditorMeshSubdivideOperator::CatmullClark &&
             !context.MeshSubdivideCatmullClarkKernelAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Geometry.CatmullClark subdivision is unavailable in this "
                              "runtime configuration.";
             return result;
         }
-        if (command.Operator == SandboxEditorMeshSubdivideOperator::Sqrt3 &&
+        if (command.Operator == EditorMeshSubdivideOperator::Sqrt3 &&
             !context.MeshSubdivideSqrt3KernelAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 is unavailable in "
                              "this runtime configuration.";
             return result;
         }
         if (command.PreserveLoopFeatureEdges &&
-            command.Operator != SandboxEditorMeshSubdivideOperator::Loop)
+            command.Operator != EditorMeshSubdivideOperator::Loop)
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Loop feature-edge preservation can only be used with the "
                              "Loop subdivision operator.";
@@ -17673,7 +17706,7 @@ namespace Extrinsic::Runtime
         if (command.PreserveLoopFeatureEdges &&
             !context.MeshSubdivideLoopFeatureEdgesAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Loop subdivision feature-edge preservation is "
                              "unavailable in this runtime configuration.";
@@ -17685,7 +17718,7 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.StableEntityId);
         if (!entity.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Status = EditorCommandStatus::StaleEntity;
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message =
                 "Mesh subdivide target entity is stale or no longer live.";
@@ -17717,7 +17750,7 @@ namespace Extrinsic::Runtime
         Geometry::HalfedgeMesh::Mesh before = source.Mesh;
         Geometry::HalfedgeMesh::Mesh output{};
 
-        if (command.Operator == SandboxEditorMeshSubdivideOperator::Loop)
+        if (command.Operator == EditorMeshSubdivideOperator::Loop)
         {
             LoopSubdivide::SubdivisionParams params{};
             params.Iterations = command.Iterations;
@@ -17729,7 +17762,7 @@ namespace Extrinsic::Runtime
             if (!subdivision.has_value())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.Subdivision Loop subdivision failed for the "
                                  "selected mesh and parameters.";
@@ -17742,7 +17775,7 @@ namespace Extrinsic::Runtime
             result.OutputFaceCount = subdivision->FinalFaceCount;
         }
         else if (command.Operator ==
-                 SandboxEditorMeshSubdivideOperator::CatmullClark)
+                 EditorMeshSubdivideOperator::CatmullClark)
         {
             CatmullClark::SubdivisionParams params{};
             params.Iterations = command.Iterations;
@@ -17751,7 +17784,7 @@ namespace Extrinsic::Runtime
             if (!subdivision.has_value())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.CatmullClark subdivision failed for the "
                                  "selected mesh and parameters.";
@@ -17773,7 +17806,7 @@ namespace Extrinsic::Runtime
             if (!subdivision.has_value())
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the "
                                  "selected mesh and parameters.";
@@ -17791,7 +17824,7 @@ namespace Extrinsic::Runtime
         result.OutputVertexCount = output.VertexCount();
         result.OutputFaceCount = output.FaceCount();
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitMeshTopologyReplacement(
                 context,
                 command.StableEntityId,
@@ -17799,7 +17832,7 @@ namespace Extrinsic::Runtime
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(output));
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -17808,23 +17841,24 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Status = EditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshSubdivideSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
     }
 
-    SandboxEditorMeshSimplifyResult ApplySandboxEditorMeshSimplifyCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorMeshSimplifyCommand& command)
+    EditorMeshSimplifyResult
+ApplyEditorMeshSimplifyCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorMeshSimplifyCommand& command)
     {
-        SandboxEditorMeshSimplifyResult result =
+        EditorMeshSimplifyResult result =
             MakeMeshSimplifyBaseResult(command);
 
         if (context.Scene == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Status = EditorCommandStatus::MissingScene;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "Scene registry is unavailable for mesh simplify.";
             return result;
@@ -17840,7 +17874,7 @@ namespace Extrinsic::Runtime
             command.FeatureAngleThresholdDegrees > 180.0)
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Mesh simplify requires a valid metric, a positive target "
                              "face count or maximum error, non-negative weights, and a "
@@ -17849,7 +17883,7 @@ namespace Extrinsic::Runtime
         }
         if (!context.MeshSimplifyKernelAvailable)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message =
                 "Geometry.Simplification is unavailable in this runtime configuration.";
@@ -17861,7 +17895,7 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.StableEntityId);
         if (!entity.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Status = EditorCommandStatus::StaleEntity;
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message =
                 "Mesh simplify target entity is stale or no longer live.";
@@ -17901,7 +17935,7 @@ namespace Extrinsic::Runtime
 
         Simpl::Params params{};
         params.Metric =
-            command.Metric == SandboxEditorMeshSimplifyMetric::FA_QEM
+            command.Metric == EditorMeshSimplifyMetric::FA_QEM
                 ? Simpl::Metric::FA_QEM
                 : Simpl::Metric::ClassicalQEM;
         params.TargetFaces = command.TargetFaces;
@@ -17920,7 +17954,7 @@ namespace Extrinsic::Runtime
         if (!simplification.has_value())
         {
             result.Status =
-                SandboxEditorCommandStatus::GeometryProcessingFailed;
+                EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "Geometry.Simplification failed for the selected mesh and parameters.";
@@ -17941,7 +17975,7 @@ namespace Extrinsic::Runtime
             simplification->SharpFeatureVerticesPinned;
         result.SeamVerticesPinned = simplification->SeamVerticesPinned;
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitMeshTopologyReplacement(
                 context,
                 command.StableEntityId,
@@ -17949,7 +17983,7 @@ namespace Extrinsic::Runtime
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(source.Mesh));
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -17958,22 +17992,21 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        result.Status = SandboxEditorCommandStatus::Applied;
+        result.Status = EditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
         result.Message = BuildMeshSimplifySuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
     }
 
-    SandboxEditorMeshVertexNormalsResult
-    ApplySandboxEditorMeshVertexNormalsCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorMeshVertexNormalsCommand& command)
+    EditorMeshVertexNormalsResult ApplyEditorMeshVertexNormalsCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorMeshVertexNormalsCommand& command)
     {
         if (context.Scene == nullptr)
         {
             return MakeMeshNormalsResult(
-                SandboxEditorCommandStatus::MissingScene,
+                EditorCommandStatus::MissingScene,
                 GN::RecomputeStatus::EmptyMesh,
                 command.Weighting,
                 Core::ErrorCode::InvalidState,
@@ -17983,7 +18016,7 @@ namespace Extrinsic::Runtime
             command.DegenerateNormalLengthEpsilon <= 0.0)
         {
             return MakeMeshNormalsResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 GN::RecomputeStatus::InvalidOutputProperty, command.Weighting,
                 Core::ErrorCode::InvalidArgument,
                 "Mesh vertex-normal recompute requires a positive finite degeneracy "
@@ -17996,7 +18029,7 @@ namespace Extrinsic::Runtime
         if (!entity.has_value())
         {
             return MakeMeshNormalsResult(
-                SandboxEditorCommandStatus::StaleEntity,
+                EditorCommandStatus::StaleEntity,
                 GN::RecomputeStatus::EmptyMesh,
                 command.Weighting,
                 Core::ErrorCode::ResourceNotFound,
@@ -18023,20 +18056,20 @@ namespace Extrinsic::Runtime
         const Geometry::PropertySet* normalProperties =
             VertexNormalsSourceProperties(
                 sourceView,
-                SandboxEditorVertexNormalsCpuJobKind::Mesh);
+                EditorVertexNormalsCpuJobKind::Mesh);
         VertexNormalsSourceState sourceState{};
         VertexNormalPropertyState beforeNormal{};
         if (normalProperties == nullptr ||
             !CaptureVertexNormalsSourceState(
                 sourceView,
-                SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                EditorVertexNormalsCpuJobKind::Mesh,
                 sourceState) ||
             !CaptureVertexNormalPropertyState(
                 *normalProperties,
                 beforeNormal))
         {
             return MakeMeshNormalsResult(
-                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                EditorCommandStatus::GeometryProcessingFailed,
                 GN::RecomputeStatus::PropertyTypeConflict,
                 command.Weighting,
                 Core::ErrorCode::TypeMismatch,
@@ -18065,10 +18098,10 @@ namespace Extrinsic::Runtime
         params.SkipDeleted = true;
 
         const GN::Result normalResult = GN::Recompute(mesh, params);
-        SandboxEditorMeshVertexNormalsResult result{
+        EditorMeshVertexNormalsResult result{
             .Status = normalResult.Status == GN::RecomputeStatus::Success
-                ? SandboxEditorCommandStatus::Applied
-                : SandboxEditorCommandStatus::GeometryProcessingFailed,
+                ? EditorCommandStatus::Applied
+                : EditorCommandStatus::GeometryProcessingFailed,
             .NormalStatus = normalResult.Status,
             .Weighting = normalResult.Weighting,
             .Error = normalResult.Status == GN::RecomputeStatus::Success
@@ -18084,17 +18117,17 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitVertexNormalProperty(
                 context,
                 command.StableEntityId,
-                SandboxEditorVertexNormalsCpuJobKind::Mesh,
+                EditorVertexNormalsCpuJobKind::Mesh,
                 "Recompute mesh vertex normals",
                 geometryMetadataSignature,
                 std::move(sourceState),
                 std::move(beforeNormal),
                 normalResult.Normals.Vector());
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -18108,15 +18141,14 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorGraphVertexNormalsResult
-    ApplySandboxEditorGraphVertexNormalsCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorGraphVertexNormalsCommand& command)
+    EditorGraphVertexNormalsResult ApplyEditorGraphVertexNormalsCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorGraphVertexNormalsCommand& command)
     {
         if (context.Scene == nullptr)
         {
             return MakeGraphNormalsResult(
-                SandboxEditorCommandStatus::MissingScene,
+                EditorCommandStatus::MissingScene,
                 GraphNormals::RecomputeStatus::EmptyGraph,
                 command.OrientTowardFallback,
                 Core::ErrorCode::InvalidState,
@@ -18126,7 +18158,7 @@ namespace Extrinsic::Runtime
             !IsPositiveFinite(command.CollinearEigenvalueRatioEpsilon))
         {
             return MakeGraphNormalsResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 GraphNormals::RecomputeStatus::InvalidOutputProperty, command.OrientTowardFallback,
                 Core::ErrorCode::InvalidArgument,
                 "Graph vertex-normal recompute requires positive finite degeneracy and "
@@ -18139,7 +18171,7 @@ namespace Extrinsic::Runtime
         if (!entity.has_value())
         {
             return MakeGraphNormalsResult(
-                SandboxEditorCommandStatus::StaleEntity,
+                EditorCommandStatus::StaleEntity,
                 GraphNormals::RecomputeStatus::EmptyGraph,
                 command.OrientTowardFallback,
                 Core::ErrorCode::ResourceNotFound,
@@ -18166,20 +18198,20 @@ namespace Extrinsic::Runtime
         const Geometry::PropertySet* normalProperties =
             VertexNormalsSourceProperties(
                 sourceView,
-                SandboxEditorVertexNormalsCpuJobKind::Graph);
+                EditorVertexNormalsCpuJobKind::Graph);
         VertexNormalsSourceState sourceState{};
         VertexNormalPropertyState beforeNormal{};
         if (normalProperties == nullptr ||
             !CaptureVertexNormalsSourceState(
                 sourceView,
-                SandboxEditorVertexNormalsCpuJobKind::Graph,
+                EditorVertexNormalsCpuJobKind::Graph,
                 sourceState) ||
             !CaptureVertexNormalPropertyState(
                 *normalProperties,
                 beforeNormal))
         {
             return MakeGraphNormalsResult(
-                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                EditorCommandStatus::GeometryProcessingFailed,
                 GraphNormals::RecomputeStatus::PropertyTypeConflict,
                 command.OrientTowardFallback,
                 Core::ErrorCode::TypeMismatch,
@@ -18228,11 +18260,11 @@ namespace Extrinsic::Runtime
                 Geometry::ConstPropertySet(view.EdgeSource->Properties)
                     .Get<bool>("e:deleted"));
 
-        SandboxEditorGraphVertexNormalsResult result{
+        EditorGraphVertexNormalsResult result{
             .Status = normalResult.Status ==
                     GraphNormals::RecomputeStatus::Success
-                ? SandboxEditorCommandStatus::Applied
-                : SandboxEditorCommandStatus::GeometryProcessingFailed,
+                ? EditorCommandStatus::Applied
+                : EditorCommandStatus::GeometryProcessingFailed,
             .NormalStatus = normalResult.Status,
             .OrientTowardFallback = command.OrientTowardFallback,
             .Error = ErrorForGraphNormalStatus(normalResult.Status),
@@ -18249,7 +18281,7 @@ namespace Extrinsic::Runtime
 
         if (!normalResult.Normals.IsValid())
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus =
                 GraphNormals::RecomputeStatus::InvalidOutputProperty;
             result.Error = Core::ErrorCode::InvalidArgument;
@@ -18258,17 +18290,17 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitVertexNormalProperty(
                 context,
                 command.StableEntityId,
-                SandboxEditorVertexNormalsCpuJobKind::Graph,
+                EditorVertexNormalsCpuJobKind::Graph,
                 "Recompute graph vertex normals",
                 geometryMetadataSignature,
                 std::move(sourceState),
                 std::move(beforeNormal),
                 normalResult.Normals.Vector());
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -18282,15 +18314,15 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorPointCloudVertexNormalsResult
-    ApplySandboxEditorPointCloudVertexNormalsCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorPointCloudVertexNormalsCommand& command)
+    EditorPointCloudVertexNormalsResult
+ApplyEditorPointCloudVertexNormalsCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorPointCloudVertexNormalsCommand& command)
     {
         if (context.Scene == nullptr)
         {
             return MakePointCloudNormalsResult(
-                SandboxEditorCommandStatus::MissingScene, PointNormals::RecomputeStatus::EmptyInput,
+                EditorCommandStatus::MissingScene, PointNormals::RecomputeStatus::EmptyInput,
                 command, Core::ErrorCode::InvalidState,
                 "Scene registry is unavailable for point-cloud vertex-normal "
                 "recompute.");
@@ -18303,7 +18335,7 @@ namespace Extrinsic::Runtime
              (!std::isfinite(command.Radius) || command.Radius <= 0.0f)))
         {
             return MakePointCloudNormalsResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 PointNormals::RecomputeStatus::InvalidOutputProperty, command,
                 Core::ErrorCode::InvalidArgument,
                 "Point-cloud vertex-normal recompute requires positive finite "
@@ -18316,7 +18348,7 @@ namespace Extrinsic::Runtime
         if (!entity.has_value())
         {
             return MakePointCloudNormalsResult(
-                SandboxEditorCommandStatus::StaleEntity,
+                EditorCommandStatus::StaleEntity,
                 PointNormals::RecomputeStatus::EmptyInput,
                 command,
                 Core::ErrorCode::ResourceNotFound,
@@ -18330,7 +18362,7 @@ namespace Extrinsic::Runtime
             view.VertexSource == nullptr)
         {
             return MakePointCloudNormalsResult(
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                EditorCommandStatus::UnsupportedGeometryDomain,
                 PointNormals::RecomputeStatus::EmptyInput, command,
                 Core::ErrorCode::InvalidArgument,
                 "Point-cloud vertex normals require selected point-cloud "
@@ -18344,20 +18376,20 @@ namespace Extrinsic::Runtime
         const Geometry::PropertySet* normalProperties =
             VertexNormalsSourceProperties(
                 sourceView,
-                SandboxEditorVertexNormalsCpuJobKind::PointCloud);
+                EditorVertexNormalsCpuJobKind::PointCloud);
         VertexNormalsSourceState sourceState{};
         VertexNormalPropertyState beforeNormal{};
         if (normalProperties == nullptr ||
             !CaptureVertexNormalsSourceState(
                 sourceView,
-                SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                EditorVertexNormalsCpuJobKind::PointCloud,
                 sourceState) ||
             !CaptureVertexNormalPropertyState(
                 *normalProperties,
                 beforeNormal))
         {
             return MakePointCloudNormalsResult(
-                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                EditorCommandStatus::GeometryProcessingFailed,
                 PointNormals::RecomputeStatus::PropertyTypeConflict,
                 command,
                 Core::ErrorCode::TypeMismatch,
@@ -18396,11 +18428,11 @@ namespace Extrinsic::Runtime
         const PointNormals::Result normalResult =
             PointNormals::Recompute(scratchCloud, params);
 
-        SandboxEditorPointCloudVertexNormalsResult result{
+        EditorPointCloudVertexNormalsResult result{
             .Status = normalResult.Status ==
                     PointNormals::RecomputeStatus::Success
-                ? SandboxEditorCommandStatus::Applied
-                : SandboxEditorCommandStatus::GeometryProcessingFailed,
+                ? EditorCommandStatus::Applied
+                : EditorCommandStatus::GeometryProcessingFailed,
             .NormalStatus = normalResult.Status,
             .Backend = normalResult.Backend,
             .Orientation = command.Orientation,
@@ -18422,7 +18454,7 @@ namespace Extrinsic::Runtime
 
         if (!normalResult.Normals.IsValid())
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus =
                 PointNormals::RecomputeStatus::InvalidOutputProperty;
             result.Error = Core::ErrorCode::InvalidArgument;
@@ -18431,17 +18463,17 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        const SandboxEditorCommandStatus commitStatus =
+        const EditorCommandStatus commitStatus =
             CommitVertexNormalProperty(
                 context,
                 command.StableEntityId,
-                SandboxEditorVertexNormalsCpuJobKind::PointCloud,
+                EditorVertexNormalsCpuJobKind::PointCloud,
                 "Recompute point-cloud vertex normals",
                 geometryMetadataSignature,
                 std::move(sourceState),
                 std::move(beforeNormal),
                 normalResult.Normals.Vector());
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -18455,17 +18487,17 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorPointCloudOutlierRemovalResult
-    ApplySandboxEditorPointCloudOutlierRemovalCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorPointCloudOutlierRemovalCommand& command)
+    EditorPointCloudOutlierRemovalResult
+ApplyEditorPointCloudOutlierRemovalCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorPointCloudOutlierRemovalCommand& command)
     {
-        SandboxEditorPointCloudOutlierRemovalResult result =
+        EditorPointCloudOutlierRemovalResult result =
             MakePointCloudOutlierRemovalBaseResult(command);
 
         if (context.Scene == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Status = EditorCommandStatus::MissingScene;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "Point-cloud outlier removal requires an attached scene.";
@@ -18474,14 +18506,14 @@ namespace Extrinsic::Runtime
 
         const bool statistical =
             command.Method ==
-            SandboxEditorPointCloudOutlierMethod::Statistical;
+            EditorPointCloudOutlierMethod::Statistical;
         if (statistical)
         {
             if (command.KNeighbors == 0u ||
                 !std::isfinite(command.StdDevMultiplier))
             {
                 result.Status =
-                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    EditorCommandStatus::InvalidProcessingParameters;
                 result.GeometryStatus =
                     Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
@@ -18494,7 +18526,7 @@ namespace Extrinsic::Runtime
                  command.SearchRadius <= 0.0f)
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.GeometryStatus =
                 Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
@@ -18508,7 +18540,7 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.StableEntityId);
         if (!entity.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Status = EditorCommandStatus::StaleEntity;
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message =
                 "Point-cloud outlier-removal target entity is stale or no longer live.";
@@ -18522,7 +18554,7 @@ namespace Extrinsic::Runtime
             view.VertexSource == nullptr)
         {
             result.Status =
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                EditorCommandStatus::UnsupportedGeometryDomain;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Point-cloud outlier removal requires selected "
                              "point-cloud GeometrySources.";
@@ -18534,7 +18566,7 @@ namespace Extrinsic::Runtime
         if (sourceSnapshot == nullptr)
         {
             result.Status =
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                EditorCommandStatus::UnsupportedGeometryDomain;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Point-cloud outlier removal requires selected "
                              "point-cloud GeometrySources.";
@@ -18550,7 +18582,7 @@ namespace Extrinsic::Runtime
         if (!MirrorGeometrySourcePositionsToPointCloudStorage(originalPoints))
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.GeometryStatus =
                 Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
@@ -18572,7 +18604,7 @@ namespace Extrinsic::Runtime
         if (!MirrorGeometrySourcePositionsToPointCloudStorage(workPoints))
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.GeometryStatus =
                 Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
@@ -18589,7 +18621,7 @@ namespace Extrinsic::Runtime
                  .has_value())
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.GeometryStatus =
                 Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
@@ -18639,8 +18671,8 @@ namespace Extrinsic::Runtime
             result.Status =
                 removal.Status ==
                         Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters
-                    ? SandboxEditorCommandStatus::InvalidProcessingParameters
-                    : SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    ? EditorCommandStatus::InvalidProcessingParameters
+                    : EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Geometry.PointCloud outlier removal failed with ";
             result.Message += DebugNameForOutlierRemovalStatus(removal.Status);
@@ -18659,7 +18691,7 @@ namespace Extrinsic::Runtime
                 Geometry::VertexHandle{static_cast<std::uint32_t>(rejected)});
         afterCloud.GarbageCollection();
 
-        const SandboxEditorCommandStatus status =
+        const EditorCommandStatus status =
             CommitPointCloudReplacement(
                 context,
                 command.StableEntityId,
@@ -18671,7 +18703,7 @@ namespace Extrinsic::Runtime
                 std::move(beforeCloud),
                 std::move(afterCloud));
         result.Status = status;
-        if (status != SandboxEditorCommandStatus::Applied)
+        if (status != EditorCommandStatus::Applied)
         {
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message = "Point-cloud outlier-removal publication failed; the "
@@ -18684,16 +18716,17 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorRegistrationResult ApplySandboxEditorRegistrationCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorRegistrationCommand& command)
+    EditorRegistrationResult
+ApplyEditorRegistrationCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorRegistrationCommand& command)
     {
-        SandboxEditorRegistrationResult result =
+        EditorRegistrationResult result =
             MakeRegistrationBaseResult(command);
 
         if (context.Scene == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::MissingScene;
+            result.Status = EditorCommandStatus::MissingScene;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message = "ICP registration requires an attached scene.";
             return result;
@@ -18701,19 +18734,19 @@ namespace Extrinsic::Runtime
         if (command.SourceStableEntityId == command.TargetStableEntityId)
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "ICP registration requires two distinct source and target entities.";
             return result;
         }
-        if (!ValidSandboxEditorICPVariant(command.Variant) ||
+        if (!ValidEditorICPVariant(command.Variant) ||
             command.MaxIterations == 0u ||
             !(command.InlierRatio > 0.0 && command.InlierRatio <= 1.0) ||
             !std::isfinite(command.MaxCorrespondenceDistance))
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "ICP registration requires a valid variant, a positive "
                              "iteration count, an inlier ratio in (0, 1], and a finite "
@@ -18726,7 +18759,7 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.SourceStableEntityId);
         if (!sourceEntity.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Status = EditorCommandStatus::StaleEntity;
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message =
                 "ICP registration source entity is stale or no longer live.";
@@ -18736,7 +18769,7 @@ namespace Extrinsic::Runtime
             ResolveStableEntity(raw, command.TargetStableEntityId);
         if (!targetEntity.has_value())
         {
-            result.Status = SandboxEditorCommandStatus::StaleEntity;
+            result.Status = EditorCommandStatus::StaleEntity;
             result.Error = Core::ErrorCode::ResourceNotFound;
             result.Message =
                 "ICP registration target entity is stale or no longer live.";
@@ -18750,7 +18783,7 @@ namespace Extrinsic::Runtime
             sourceView.VertexSource == nullptr)
         {
             result.Status =
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                EditorCommandStatus::UnsupportedGeometryDomain;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "ICP registration source must be a point-cloud entity.";
@@ -18763,7 +18796,7 @@ namespace Extrinsic::Runtime
             targetView.VertexSource == nullptr)
         {
             result.Status =
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                EditorCommandStatus::UnsupportedGeometryDomain;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "ICP registration target must be a point-cloud entity.";
@@ -18779,7 +18812,7 @@ namespace Extrinsic::Runtime
         if (!sourcePoints.has_value() || !targetPoints.has_value())
         {
             result.Status =
-                SandboxEditorCommandStatus::InvalidProcessingParameters;
+                EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "ICP registration requires both point clouds to expose a "
                              "count-matched, finite v:position property.";
@@ -18792,7 +18825,7 @@ namespace Extrinsic::Runtime
             raw.try_get<ECSC::Transform::Component>(*sourceEntity);
         if (transform == nullptr)
         {
-            result.Status = SandboxEditorCommandStatus::MissingTransform;
+            result.Status = EditorCommandStatus::MissingTransform;
             result.Error = Core::ErrorCode::InvalidState;
             result.Message =
                 "ICP registration source entity has no Transform to drive.";
@@ -18856,7 +18889,7 @@ namespace Extrinsic::Runtime
             AlignPointClouds(prealignedSourceWorld, targetWorld, {}, params);
         if (!outcome.HasResult)
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "ICP rejected the selected point clouds (fewer than 3 "
                              "points or invalid parameters).";
@@ -18894,16 +18927,16 @@ namespace Extrinsic::Runtime
                     *transform,
                     next,
                     "Align point clouds (ICP)");
-            result.Status = ToSandboxEditorCommandStatus(history.Status);
+            result.Status = ToEditorCommandStatus(history.Status);
         }
         else
         {
             *transform = next;
             raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(*sourceEntity);
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
         }
 
-        if (result.Status != SandboxEditorCommandStatus::Applied)
+        if (result.Status != EditorCommandStatus::Applied)
         {
             result.Error = Core::ErrorCode::Unknown;
             result.Message =
@@ -18916,16 +18949,16 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    SandboxEditorSession::SandboxEditorSession()
+    EditorWorkspaceSession::EditorWorkspaceSession()
     {
     }
 
-    SandboxEditorSession::~SandboxEditorSession()
+    EditorWorkspaceSession::~EditorWorkspaceSession()
     {
         Detach();
     }
 
-    void SandboxEditorSession::Attach(WorldRegistry& worlds, ServiceRegistry& services)
+    void EditorWorkspaceSession::Attach(WorldRegistry& worlds, ServiceRegistry& services)
     {
         Detach();
         m_Worlds          = &worlds;
@@ -18953,10 +18986,10 @@ namespace Extrinsic::Runtime
         }
     }
 
-    bool SandboxEditorSession::PrepareFrame(
-        const SandboxEditorModelBuildRequest& request,
+    bool EditorWorkspaceSession::PrepareFrame(
+        const EditorWorkspaceSnapshotRequest& request,
         std::string pendingAssetImportPath,
-        const SandboxEditorAssetPayloadKind pendingAssetImportPayloadKind,
+        const EditorAssetPayloadKind pendingAssetImportPayloadKind,
         std::string pendingSceneFilePath)
     {
         m_FramePrepared = false;
@@ -18988,19 +19021,21 @@ namespace Extrinsic::Runtime
             sceneDocuments != nullptr
                 ? &sceneDocuments->GetLastSceneFileEvent()
                 : nullptr;
-        if (runtimeSceneFile != nullptr &&
-            runtimeSceneFile->has_value() &&
-            (*runtimeSceneFile)->Sequence !=
-                m_LastObservedRuntimeSceneFileSequence)
+        if (runtimeSceneFile != nullptr && runtimeSceneFile->has_value() &&
+            (*runtimeSceneFile)->Sequence != m_LastObservedRuntimeSceneFileSequence)
         {
-            m_LastSceneFileResult =
-                BuildSceneFileResultFromRuntimeEvent(
-                    **runtimeSceneFile);
-            m_LastObservedRuntimeSceneFileSequence =
-                (*runtimeSceneFile)->Sequence;
+            m_LastSceneFileResult = BuildSceneFileResultFromRuntimeEvent(**runtimeSceneFile);
+            m_LastObservedRuntimeSceneFileSequence = (*runtimeSceneFile)->Sequence;
         }
-        m_Context                     = BuildContextFromRuntime(*m_Worlds, *m_Services);
-        SandboxEditorContext& context = m_Context;
+        m_Context = BuildContextFromRuntime(*m_Worlds, *m_Services);
+        EditorFeatureBindings& context = m_Context;
+        context.AttachmentActive = [epoch = m_AttachmentEpoch]
+        { return AttachmentEpochIsActive(epoch); };
+        context.InvalidateWorkspaceSnapshotCache = [epoch = m_AttachmentEpoch, this]
+        {
+            if (AttachmentEpochIsActive(epoch))
+                m_SelectedModelCache.Clear();
+        };
         GuardAttachmentCommandSurfaces(context, m_AttachmentEpoch);
         context.SelectedModelCache = &m_SelectedModelCache;
         // The editor owns domain identity while `JobService` owns lifecycle.
@@ -19009,30 +19044,26 @@ namespace Extrinsic::Runtime
         // the attachment epoch before reaching session-owned state.
         if (m_Jobs != nullptr)
         {
-            PruneSandboxEditorJobIdentities(
-                m_Jobs->SnapshotAll(),
-                m_JobIdentities);
-            context.JobCommands.Submit =
-                [epoch = m_AttachmentEpoch, this](
-                    JobDesc desc,
-                    SandboxEditorJobIdentity identity) -> JobToken
-                {
-                    if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
-                        return JobToken{};
-                    desc.Scope = m_Worlds->ActiveWorld();
-                    const JobToken token = m_Jobs->Submit(std::move(desc));
-                    if (token.IsValid())
-                        m_JobIdentities.insert_or_assign(token, std::move(identity));
-                    return token;
-                };
+            PruneEditorJobIdentities(m_Jobs->SnapshotAll(), m_JobIdentities);
+            context.JobCommands.Submit = [epoch = m_AttachmentEpoch, this](
+                                             JobDesc desc, EditorJobIdentity identity) -> JobToken
+            {
+                if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
+                    return JobToken{};
+                desc.Scope = m_Worlds->ActiveWorld();
+                const JobToken token = m_Jobs->Submit(std::move(desc));
+                if (token.IsValid())
+                    m_JobIdentities.insert_or_assign(token, std::move(identity));
+                return token;
+            };
             context.JobCommands.FindActive =
                 [epoch = m_AttachmentEpoch,
-                 this](const SandboxEditorJobIdentity& identity)
-                    -> std::optional<SandboxEditorJobRecord>
+                 this](const EditorJobIdentity& identity)
+                    -> std::optional<EditorJobRecord>
                 {
                     if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
                         return std::nullopt;
-                    return FindActiveSandboxEditorJob(
+                    return FindActiveEditorJob(
                         *m_Jobs,
                         m_JobIdentities,
                         identity);
@@ -19040,11 +19071,11 @@ namespace Extrinsic::Runtime
             context.JobCommands.SnapshotEntity =
                 [epoch = m_AttachmentEpoch,
                  this](const std::uint32_t stableEntityId)
-                    -> std::vector<SandboxEditorJobRecord>
+                    -> std::vector<EditorJobRecord>
                 {
                     if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
                         return {};
-                    return SnapshotSandboxEditorJobsForEntity(
+                    return SnapshotEditorJobsForEntity(
                         *m_Jobs,
                         m_JobIdentities,
                         stableEntityId);
@@ -19053,7 +19084,7 @@ namespace Extrinsic::Runtime
         context.Clustering = m_ClusteringService;
         context.MethodResultSinks.ProgressivePoisson =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorProgressivePoissonResult result)
+                EditorProgressivePoissonResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastProgressivePoissonResult =
@@ -19061,56 +19092,56 @@ namespace Extrinsic::Runtime
             };
         context.MethodResultSinks.UvRegeneration =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorUvRegenerationCommandResult result)
+                EditorUvRegenerationCommandResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastUvRegenerationResult = std::move(result);
             };
         context.MethodResultSinks.Parameterization =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorParameterizationResult result)
+                EditorParameterizationResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastParameterizationResult = std::move(result);
             };
         context.MethodResultSinks.MeshCurvature =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorMeshCurvatureResult result)
+                EditorMeshCurvatureResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastMeshCurvatureResult = std::move(result);
             };
         context.MethodResultSinks.MeshDenoise =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorMeshDenoiseResult result)
+                EditorMeshDenoiseResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastMeshDenoiseResult = std::move(result);
             };
         context.MethodResultSinks.MeshRemesh =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorMeshRemeshResult result)
+                EditorMeshRemeshResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastMeshRemeshResult = std::move(result);
             };
         context.MethodResultSinks.MeshSubdivide =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorMeshSubdivideResult result)
+                EditorMeshSubdivideResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastMeshSubdivideResult = std::move(result);
             };
         context.MethodResultSinks.MeshSimplify =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorMeshSimplifyResult result)
+                EditorMeshSimplifyResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastMeshSimplifyResult = std::move(result);
             };
         context.MethodResultSinks.MeshVertexNormals =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorMeshVertexNormalsResult result)
+                EditorMeshVertexNormalsResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastMeshVertexNormalsResult =
@@ -19118,7 +19149,7 @@ namespace Extrinsic::Runtime
             };
         context.MethodResultSinks.GraphVertexNormals =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorGraphVertexNormalsResult result)
+                EditorGraphVertexNormalsResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastGraphVertexNormalsResult =
@@ -19126,7 +19157,7 @@ namespace Extrinsic::Runtime
             };
         context.MethodResultSinks.PointCloudVertexNormals =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorPointCloudVertexNormalsResult result)
+                EditorPointCloudVertexNormalsResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastPointCloudVertexNormalsResult =
@@ -19134,7 +19165,7 @@ namespace Extrinsic::Runtime
             };
         context.MethodResultSinks.PointCloudOutlierRemoval =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorPointCloudOutlierRemovalResult result)
+                EditorPointCloudOutlierRemovalResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastPointCloudOutlierRemovalResult =
@@ -19142,7 +19173,7 @@ namespace Extrinsic::Runtime
             };
         context.MethodResultSinks.Registration =
             [epoch = m_AttachmentEpoch, this](
-                SandboxEditorRegistrationResult result)
+                EditorRegistrationResult result)
             {
                 if (AttachmentEpochIsActive(epoch))
                     m_LastRegistrationResult = std::move(result);
@@ -19260,19 +19291,19 @@ namespace Extrinsic::Runtime
                 };
             context.EngineConfigCommandsAvailable = true;
         }
-        m_LastFrame = BuildSandboxEditorPanelFrame(context, request);
+        m_LastFrame = BuildEditorWorkspaceSnapshotImpl(context, request);
         context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
         m_FramePrepared = true;
         return true;
     }
 
-    bool SandboxEditorSession::VisitPreparedFrame(
-        const SandboxEditorPreparedFrameVisitor& visitor)
+    bool EditorWorkspaceSession::VisitPreparedFrame(
+        const EditorWorkspacePreparedFrameVisitor& visitor)
     {
         if (!m_FramePrepared || !visitor)
             return false;
 
-        visitor(SandboxEditorPreparedFrameView{
+        visitor(EditorWorkspacePreparedFrame{
             .Context = m_Context,
             .Frame = m_LastFrame,
             .LastAssetImportResult = m_LastImportResult,
@@ -19282,7 +19313,7 @@ namespace Extrinsic::Runtime
         return true;
     }
 
-    void SandboxEditorSession::Detach()
+    void EditorWorkspaceSession::Detach()
     {
         if (m_AttachmentEpoch != nullptr)
         {
@@ -19312,7 +19343,7 @@ namespace Extrinsic::Runtime
         ResetAttachmentState();
     }
 
-    void SandboxEditorSession::ResetAttachmentState()
+    void EditorWorkspaceSession::ResetAttachmentState()
     {
         m_FramePrepared = false;
         m_Context = {};
@@ -19342,4 +19373,4 @@ namespace Extrinsic::Runtime
         m_RenderArtifactRegistry = {};
     }
 
-}
+} // namespace Extrinsic::Runtime::EditorFeatureDetail

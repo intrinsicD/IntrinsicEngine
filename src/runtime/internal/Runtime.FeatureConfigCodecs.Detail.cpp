@@ -15,12 +15,12 @@ module;
 
 #include <nlohmann/json.hpp>
 
-module Extrinsic.Runtime.SandboxConfigSections;
+module Extrinsic.Runtime.Private.FeatureConfigCodecs;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
-namespace Extrinsic::Runtime
+namespace Extrinsic::Runtime::FeatureConfigDetail
 {
     namespace
     {
@@ -1388,7 +1388,7 @@ namespace Extrinsic::Runtime
         }
     }
 
-    RunKMeans MakeConfiguredKMeansRequest(
+    RunKMeans MakeConfiguredKMeansRequestImpl(
         const std::uint32_t stableEntityId,
         KMeansPropertyRefs properties,
         const ClusteringConfig& config)
@@ -1401,7 +1401,7 @@ namespace Extrinsic::Runtime
         };
     }
 
-    std::string SerializeClusteringConfig(
+    std::string SerializeClusteringConfigImpl(
         const ClusteringConfig& config)
     {
         return json::object({
@@ -1414,7 +1414,7 @@ namespace Extrinsic::Runtime
         }).dump();
     }
 
-    std::string SerializeProgressivePoissonPlaygroundConfig(
+    std::string SerializeProgressivePoissonPlaygroundConfigImpl(
         const ProgressivePoissonPlaygroundConfig& config)
     {
         return json::object({
@@ -1441,7 +1441,7 @@ namespace Extrinsic::Runtime
         }).dump();
     }
 
-    std::string SerializeParameterizationConfig(
+    std::string SerializeParameterizationConfigImpl(
         const ParameterizationConfig& config)
     {
         return json::object({
@@ -1486,7 +1486,7 @@ namespace Extrinsic::Runtime
     }
 
     Core::Config::EngineConfigSectionValidationResult
-    ValidateClusteringConfigSection(
+    ValidateClusteringConfigSectionImpl(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
         const std::string_view diagnosticSubject)
@@ -1505,12 +1505,12 @@ namespace Extrinsic::Runtime
                 .Result = &result,
                 .Path = std::string{diagnosticSubject},
             });
-        result.CanonicalPayloadJson = SerializeClusteringConfig(config);
+        result.CanonicalPayloadJson = SerializeClusteringConfigImpl(config);
         return result;
     }
 
     Core::Config::EngineConfigSectionValidationResult
-    ValidateProgressivePoissonConfigSection(
+    ValidateProgressivePoissonConfigSectionImpl(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
         const std::string_view diagnosticSubject)
@@ -1532,12 +1532,12 @@ namespace Extrinsic::Runtime
                     .Path = std::string{diagnosticSubject},
                 });
         result.CanonicalPayloadJson =
-            SerializeProgressivePoissonPlaygroundConfig(config);
+            SerializeProgressivePoissonPlaygroundConfigImpl(config);
         return result;
     }
 
     Core::Config::EngineConfigSectionValidationResult
-    ValidateParameterizationConfigSection(
+    ValidateParameterizationConfigSectionImpl(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
         const std::string_view diagnosticSubject)
@@ -1556,11 +1556,11 @@ namespace Extrinsic::Runtime
                 .Result = &result,
                 .Path = std::string{diagnosticSubject},
             });
-        result.CanonicalPayloadJson = SerializeParameterizationConfig(config);
+        result.CanonicalPayloadJson = SerializeParameterizationConfigImpl(config);
         return result;
     }
 
-    std::optional<ClusteringConfig> GetClusteringConfig(
+    std::optional<ClusteringConfig> GetClusteringConfigImpl(
         const Core::Config::EngineConfig& config)
     {
         const Core::Config::EngineConfigSection* section =
@@ -1574,16 +1574,16 @@ namespace Extrinsic::Runtime
         {
             return std::nullopt;
         }
-        const auto validated = ValidateClusteringConfigSection(
+        const auto validated = ValidateClusteringConfigSectionImpl(
             section->PayloadJson,
-            SerializeClusteringConfig(ClusteringConfig{}),
+            SerializeClusteringConfigImpl(ClusteringConfig{}),
             kClusteringConfigSectionName);
         if (validated.State != Core::Config::EngineConfigState::Valid)
             return std::nullopt;
         return DecodeClusteringCanonical(validated.CanonicalPayloadJson);
     }
 
-    void SetClusteringConfig(
+    void SetClusteringConfigImpl(
         Core::Config::EngineConfig& config,
         const ClusteringConfig& value)
     {
@@ -1593,12 +1593,12 @@ namespace Extrinsic::Runtime
                 .Name = std::string{kClusteringConfigSectionName},
                 .SchemaId = std::string{kClusteringConfigSectionSchemaId},
                 .SchemaVersion = kClusteringConfigSectionSchemaVersion,
-                .PayloadJson = SerializeClusteringConfig(value),
+                .PayloadJson = SerializeClusteringConfigImpl(value),
             });
     }
 
     std::optional<ProgressivePoissonPlaygroundConfig>
-    GetProgressivePoissonPlaygroundConfig(
+    GetProgressivePoissonPlaygroundConfigImpl(
         const Core::Config::EngineConfig& config)
     {
         const Core::Config::EngineConfigSection* section =
@@ -1612,9 +1612,9 @@ namespace Extrinsic::Runtime
         {
             return std::nullopt;
         }
-        const auto validated = ValidateProgressivePoissonConfigSection(
+        const auto validated = ValidateProgressivePoissonConfigSectionImpl(
             section->PayloadJson,
-            SerializeProgressivePoissonPlaygroundConfig(
+            SerializeProgressivePoissonPlaygroundConfigImpl(
                 ProgressivePoissonPlaygroundConfig{}),
             kProgressivePoissonConfigSectionName);
         if (validated.State != Core::Config::EngineConfigState::Valid)
@@ -1625,7 +1625,7 @@ namespace Extrinsic::Runtime
             validated.CanonicalPayloadJson);
     }
 
-    void SetProgressivePoissonPlaygroundConfig(
+    void SetProgressivePoissonPlaygroundConfigImpl(
         Core::Config::EngineConfig& config,
         const ProgressivePoissonPlaygroundConfig& value)
     {
@@ -1638,11 +1638,11 @@ namespace Extrinsic::Runtime
                 .SchemaVersion =
                     kProgressivePoissonConfigSectionSchemaVersion,
                 .PayloadJson =
-                    SerializeProgressivePoissonPlaygroundConfig(value),
+                    SerializeProgressivePoissonPlaygroundConfigImpl(value),
             });
     }
 
-    std::optional<ParameterizationConfig> GetParameterizationConfig(
+    std::optional<ParameterizationConfig> GetParameterizationConfigImpl(
         const Core::Config::EngineConfig& config)
     {
         const Core::Config::EngineConfigSection* section =
@@ -1656,9 +1656,9 @@ namespace Extrinsic::Runtime
         {
             return std::nullopt;
         }
-        const auto validated = ValidateParameterizationConfigSection(
+        const auto validated = ValidateParameterizationConfigSectionImpl(
             section->PayloadJson,
-            SerializeParameterizationConfig(ParameterizationConfig{}),
+            SerializeParameterizationConfigImpl(ParameterizationConfig{}),
             kParameterizationConfigSectionName);
         if (validated.State != Core::Config::EngineConfigState::Valid)
         {
@@ -1667,7 +1667,7 @@ namespace Extrinsic::Runtime
         return DecodeParameterizationCanonical(validated.CanonicalPayloadJson);
     }
 
-    void SetParameterizationConfig(
+    void SetParameterizationConfigImpl(
         Core::Config::EngineConfig& config,
         const ParameterizationConfig& value)
     {
@@ -1677,12 +1677,12 @@ namespace Extrinsic::Runtime
                 .Name = std::string{kParameterizationConfigSectionName},
                 .SchemaId = std::string{kParameterizationConfigSectionSchemaId},
                 .SchemaVersion = kParameterizationConfigSectionSchemaVersion,
-                .PayloadJson = SerializeParameterizationConfig(value),
+                .PayloadJson = SerializeParameterizationConfigImpl(value),
             });
     }
 
     Core::Config::EngineConfigSectionRegistration
-    MakeClusteringConfigSectionRegistration(
+    MakeClusteringConfigSectionRegistrationImpl(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -1694,15 +1694,15 @@ namespace Extrinsic::Runtime
                     .SchemaVersion =
                         kClusteringConfigSectionSchemaVersion,
                     .PayloadJson =
-                        SerializeClusteringConfig(ClusteringConfig{}),
+                        SerializeClusteringConfigImpl(ClusteringConfig{}),
                 },
-            .Validate = ValidateClusteringConfigSection,
+            .Validate = ValidateClusteringConfigSectionImpl,
             .OnChanged = std::move(onChanged),
         };
     }
 
     Core::Config::EngineConfigSectionRegistration
-    MakeProgressivePoissonConfigSectionRegistration(
+    MakeProgressivePoissonConfigSectionRegistrationImpl(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -1716,16 +1716,16 @@ namespace Extrinsic::Runtime
                     .SchemaVersion =
                         kProgressivePoissonConfigSectionSchemaVersion,
                     .PayloadJson =
-                        SerializeProgressivePoissonPlaygroundConfig(
+                        SerializeProgressivePoissonPlaygroundConfigImpl(
                             ProgressivePoissonPlaygroundConfig{}),
                 },
-            .Validate = ValidateProgressivePoissonConfigSection,
+            .Validate = ValidateProgressivePoissonConfigSectionImpl,
             .OnChanged = std::move(onChanged),
         };
     }
 
     Core::Config::EngineConfigSectionRegistration
-    MakeParameterizationConfigSectionRegistration(
+    MakeParameterizationConfigSectionRegistrationImpl(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -1737,10 +1737,10 @@ namespace Extrinsic::Runtime
                     .SchemaVersion =
                         kParameterizationConfigSectionSchemaVersion,
                     .PayloadJson =
-                        SerializeParameterizationConfig(
+                        SerializeParameterizationConfigImpl(
                             ParameterizationConfig{}),
                 },
-            .Validate = ValidateParameterizationConfigSection,
+            .Validate = ValidateParameterizationConfigSectionImpl,
             .OnChanged = std::move(onChanged),
         };
     }

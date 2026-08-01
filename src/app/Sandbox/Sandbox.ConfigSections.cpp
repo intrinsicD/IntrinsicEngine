@@ -5,14 +5,16 @@ module;
 
 module Extrinsic.Sandbox.ConfigSections;
 
-import Extrinsic.Runtime.SandboxConfigSections;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.ProgressivePoissonConfig;
 
 namespace Extrinsic::Sandbox
 {
-    Runtime::EngineConfigSectionRegistry CreateSandboxConfigSectionRegistry(
+    Runtime::RuntimeEngineConfigSectionRegistry CreateSandboxConfigSectionRegistry(
         SandboxConfigSectionCallbacks callbacks)
     {
-        Runtime::EngineConfigSectionRegistry registry{};
+        Runtime::RuntimeEngineConfigSectionRegistry registry{};
         if (!registry.Register(
                 Runtime::MakeClusteringConfigSectionRegistration(
                     std::move(callbacks.Clustering))) ||

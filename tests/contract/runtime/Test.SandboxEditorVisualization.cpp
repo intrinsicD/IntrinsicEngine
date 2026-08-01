@@ -24,6 +24,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
@@ -77,7 +79,12 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
@@ -182,12 +189,12 @@ void SetTexcoords(GS::Vertices& vertices,
     // A small deterministic, asymmetric point lattice — distinct extents per axis
     // give ICP a well-conditioned correspondence problem (UI-029).
 
-[[nodiscard]] const Runtime::SandboxEditorVertexChannelBindingTargetModel*
+[[nodiscard]] const Runtime::EditorVertexChannelBindingTargetModel*
     FindVertexChannelTarget(
-        const Runtime::SandboxEditorPropertyCatalogModel& catalog,
+        const Runtime::EditorPropertyCatalogModel& catalog,
         const Runtime::VertexChannel channel)
     {
-        for (const Runtime::SandboxEditorVertexChannelBindingTargetModel& target :
+        for (const Runtime::EditorVertexChannelBindingTargetModel& target :
              catalog.VertexChannelTargets)
         {
             if (target.Channel == channel)
@@ -370,14 +377,14 @@ void AddGraphSource(ECS::Scene::Registry& registry,
         raw.emplace<G::RenderPoints>(entity);
     }
 
-[[nodiscard]] Runtime::SandboxEditorContext MakeContext(
+[[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
         ECS::Scene::Registry& registry,
         Runtime::SelectionController& selection,
         const bool imguiAvailable = true,
         const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
         Extrinsic::RHI::IDevice* device = nullptr)
     {
-        return Runtime::SandboxEditorContext{
+        return Intrinsic::Tests::EditorFeatureTestContext{
             .Scene = &registry,
             .Selection = &selection,
             .LastRefinedPrimitive = lastPrimitive,
@@ -403,12 +410,12 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     const auto exercise =
         [&](const ECS::EntityHandle entity,
-            const Runtime::SandboxEditorDomainWindowKind windowKind,
-            const Runtime::SandboxEditorPropertyCatalogDomain catalogDomain,
+            const Runtime::EditorDomainWindowKind windowKind,
+            const Runtime::EditorPropertyCatalogDomain catalogDomain,
             const Runtime::GeometryElementDomain geometryDomain,
             Geometry::PropertySet& properties,
             const std::size_t expectedCount)
@@ -423,8 +430,8 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
                 std::vector<float>(expectedCount, 0.5f));
 
             ASSERT_TRUE(selection.SetSelectedEntity(registry, entity));
-            Runtime::SandboxEditorPanelFrame frame =
-                Runtime::BuildSandboxEditorPanelFrame(context);
+            Runtime::EditorWorkspaceSnapshot frame =
+                Runtime::BuildEditorWorkspaceSnapshot(context);
             const auto* normalTarget = FindVertexChannelTarget(
                 frame.Inspector.PropertyCatalog,
                 Runtime::VertexChannel::Normal);
@@ -435,7 +442,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
             const auto customOption = std::find_if(
                 normalTarget->Options.begin(),
                 normalTarget->Options.end(),
-                [catalogDomain](const Runtime::SandboxEditorVertexChannelBindingOptionModel& option)
+                [catalogDomain](const Runtime::EditorVertexChannelBindingOptionModel& option)
                 {
                     return option.Domain == catalogDomain &&
                            option.PropertyName == "v:custom_normal";
@@ -446,17 +453,17 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
 
             registry.Raw().remove<Dirty::DirtyVertexAttributes,
                                   Dirty::DirtyVertexNormals>(entity);
-            const Runtime::SandboxEditorCommandStatus status =
-                Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+            const Runtime::EditorCommandStatus status =
+                Runtime::ApplyEditorVertexChannelBindingCommand(
                     context,
-                    Runtime::SandboxEditorVertexChannelBindingCommand{
+                    Runtime::EditorVertexChannelBindingCommand{
                         .StableEntityId =
                             Runtime::SelectionController::ToStableEntityId(entity),
                         .Channel = Runtime::VertexChannel::Normal,
                         .EnableBinding = true,
                         .PropertyName = "v:custom_normal",
                     });
-            EXPECT_EQ(status, Runtime::SandboxEditorCommandStatus::Applied);
+            EXPECT_EQ(status, Runtime::EditorCommandStatus::Applied);
 
             const auto* bindings =
                 registry.Raw().try_get<Runtime::VertexChannelBindingSet>(entity);
@@ -470,10 +477,10 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
             EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(entity));
             EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(entity));
 
-            const Runtime::SandboxEditorCommandStatus invalid =
-                Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+            const Runtime::EditorCommandStatus invalid =
+                Runtime::ApplyEditorVertexChannelBindingCommand(
                     context,
-                    Runtime::SandboxEditorVertexChannelBindingCommand{
+                    Runtime::EditorVertexChannelBindingCommand{
                         .StableEntityId =
                             Runtime::SelectionController::ToStableEntityId(entity),
                         .Channel = Runtime::VertexChannel::Normal,
@@ -481,10 +488,10 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
                         .PropertyName = "v:temperature",
                     });
             EXPECT_EQ(invalid,
-                      Runtime::SandboxEditorCommandStatus::InvalidVertexChannelBinding);
+                      Runtime::EditorCommandStatus::InvalidVertexChannelBinding);
 
-            const Runtime::SandboxEditorDomainWindowModel model =
-                Runtime::BuildSandboxEditorDomainWindowModel(context, windowKind);
+            const Runtime::EditorDomainWindowModel model =
+                Runtime::BuildEditorDomainWindowModel(context, windowKind);
             const auto* domainTarget = FindVertexChannelTarget(
                 model.PropertyCatalog,
                 Runtime::VertexChannel::Normal);
@@ -496,8 +503,8 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
     const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
     AddTriangleMeshSource(registry, mesh);
     exercise(mesh,
-             Runtime::SandboxEditorDomainWindowKind::Mesh,
-             Runtime::SandboxEditorPropertyCatalogDomain::MeshVertices,
+             Runtime::EditorDomainWindowKind::Mesh,
+             Runtime::EditorPropertyCatalogDomain::MeshVertices,
              Runtime::GeometryElementDomain::MeshVertex,
              registry.Raw().get<GS::Vertices>(mesh).Properties,
              3u);
@@ -505,8 +512,8 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
     const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
     AddGraphSource(registry, graph);
     exercise(graph,
-             Runtime::SandboxEditorDomainWindowKind::Graph,
-             Runtime::SandboxEditorPropertyCatalogDomain::GraphVertices,
+             Runtime::EditorDomainWindowKind::Graph,
+             Runtime::EditorPropertyCatalogDomain::GraphVertices,
              Runtime::GeometryElementDomain::GraphNode,
              registry.Raw().get<GS::Nodes>(graph).Properties,
              3u);
@@ -520,8 +527,8 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
                      {0.0f, 1.0f, 0.0f},
                  });
     exercise(cloud,
-             Runtime::SandboxEditorDomainWindowKind::PointCloud,
-             Runtime::SandboxEditorPropertyCatalogDomain::PointCloudPoints,
+             Runtime::EditorDomainWindowKind::PointCloud,
+             Runtime::EditorPropertyCatalogDomain::PointCloudPoints,
              Runtime::GeometryElementDomain::PointCloudPoint,
              registry.Raw().get<GS::Vertices>(cloud).Properties,
              3u);
@@ -530,7 +537,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "ColorMesh");
     AddTriangleMeshSource(registry, mesh);
@@ -544,8 +551,8 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
                     });
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     const auto* colorTarget = FindVertexChannelTarget(
         frame.Inspector.PropertyCatalog,
         Runtime::VertexChannel::Color);
@@ -553,7 +560,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
     const auto paintOption = std::find_if(
         colorTarget->Options.begin(),
         colorTarget->Options.end(),
-        [](const Runtime::SandboxEditorVertexChannelBindingOptionModel& option)
+        [](const Runtime::EditorVertexChannelBindingOptionModel& option)
         {
             return option.PropertyName == "v:paint";
         });
@@ -563,15 +570,15 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
     EXPECT_EQ(
-        Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+        Runtime::ApplyEditorVertexChannelBindingCommand(
             context,
-            Runtime::SandboxEditorVertexChannelBindingCommand{
+            Runtime::EditorVertexChannelBindingCommand{
                 .StableEntityId = stableId,
                 .Channel = Runtime::VertexChannel::Color,
                 .EnableBinding = true,
                 .PropertyName = "v:paint",
             }),
-        Runtime::SandboxEditorCommandStatus::Applied);
+        Runtime::EditorCommandStatus::Applied);
     const auto* bindings =
         registry.Raw().try_get<Runtime::VertexChannelBindingSet>(mesh);
     ASSERT_NE(bindings, nullptr);
@@ -587,14 +594,14 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
     registry.Raw().remove<Dirty::DirtyVertexColors>(mesh);
 
     EXPECT_EQ(
-        Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+        Runtime::ApplyEditorVertexChannelBindingCommand(
             context,
-            Runtime::SandboxEditorVertexChannelBindingCommand{
+            Runtime::EditorVertexChannelBindingCommand{
                 .StableEntityId = stableId,
                 .Channel = Runtime::VertexChannel::Color,
                 .EnableBinding = false,
             }),
-        Runtime::SandboxEditorCommandStatus::Applied);
+        Runtime::EditorCommandStatus::Applied);
     EXPECT_FALSE(registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
@@ -605,7 +612,7 @@ TEST(SandboxEditorUi,
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "BindingHistory");
@@ -624,15 +631,15 @@ TEST(SandboxEditorUi,
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
     EXPECT_EQ(
-        Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+        Runtime::ApplyEditorVertexChannelBindingCommand(
             context,
-            Runtime::SandboxEditorVertexChannelBindingCommand{
+            Runtime::EditorVertexChannelBindingCommand{
                 .StableEntityId = stableId,
                 .Channel = Runtime::VertexChannel::Normal,
                 .EnableBinding = true,
                 .PropertyName = "v:custom_normal",
             }),
-        Runtime::SandboxEditorCommandStatus::Applied);
+        Runtime::EditorCommandStatus::Applied);
     ASSERT_EQ(history.UndoCount(), 1u);
 
     const Runtime::VertexChannelBindingSet after =
@@ -675,8 +682,8 @@ TEST(SandboxEditorUi,
 }
 TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
 {
-    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
-    using Preset = Runtime::SandboxEditorVisualizationPropertyPreset;
+    using Domain = Runtime::EditorVisualizationPropertyDomain;
+    using Preset = Runtime::EditorVisualizationPropertyPreset;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -696,12 +703,12 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
@@ -711,7 +718,7 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
                       .ScalarRangeMax = 2.0f,
                       .ScalarBinCount = 8u,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
     const auto& scalar = registry.Raw().get<G::VisualizationConfig>(mesh);
     EXPECT_EQ(scalar.Source, G::VisualizationConfig::ColorSource::ScalarField);
@@ -722,9 +729,9 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
     EXPECT_FLOAT_EQ(scalar.Scalar.RangeMax, 2.0f);
     EXPECT_EQ(scalar.Scalar.BinCount, 8u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
@@ -734,46 +741,46 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
                       .ScalarRangeMax = 2.0f,
                       .ScalarBinCount = 8u,
                   }),
-              Runtime::SandboxEditorCommandStatus::NoChange);
+              Runtime::EditorCommandStatus::NoChange);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Isoline,
                       .PropertyName = "v:temperature",
                       .IsolineCount = 6u,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     const auto& isoline = registry.Raw().get<G::VisualizationConfig>(mesh);
     EXPECT_EQ(isoline.Source, G::VisualizationConfig::ColorSource::ScalarField);
     EXPECT_EQ(isoline.ScalarFieldName, "v:temperature");
     EXPECT_EQ(isoline.Scalar.Isolines.Num, 6u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::ColorBuffer,
                       .PropertyName = "v:kmeans_color",
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     const auto& vertexColor = registry.Raw().get<G::VisualizationConfig>(mesh);
     EXPECT_EQ(vertexColor.Source,
               G::VisualizationConfig::ColorSource::PerVertexBuffer);
     EXPECT_EQ(vertexColor.ColorBufferName, "v:kmeans_color");
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshEdges,
                       .Preset = Preset::ColorBuffer,
                       .PropertyName = "e:debug_color",
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     const auto& edgeColor = registry.Raw().get<G::VisualizationConfig>(mesh);
     EXPECT_EQ(edgeColor.Source,
               G::VisualizationConfig::ColorSource::PerEdgeBuffer);
@@ -800,49 +807,49 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
                       invalidBaseline.Scalar.Isolines.Num);
         };
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::GraphVertices,
                       .Preset = Preset::Scalar,
                       .PropertyName = "v:temperature",
                   }),
-              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
                       .PropertyName = "v:position",
                   }),
-              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
                       .PropertyName = "v:kmeans_label",
                   }),
-              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
                       .PropertyName = "missing",
                   }),
-              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
@@ -851,37 +858,37 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
                       .ScalarRangeMin = 2.0f,
                       .ScalarRangeMax = -1.0f,
                   }),
-              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId =
                           std::numeric_limits<std::uint32_t>::max(),
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
                       .PropertyName = "v:temperature",
                   }),
-              Runtime::SandboxEditorCommandStatus::StaleEntity);
+              Runtime::EditorCommandStatus::StaleEntity);
 
-    Runtime::SandboxEditorContext unavailable = context;
+    Intrinsic::Tests::EditorFeatureTestContext unavailable = context;
     unavailable.VisualizationCommandsAvailable = false;
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
                   unavailable,
-                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                  Runtime::EditorVisualizationPropertyCommand{
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
                       .PropertyName = "v:temperature",
                   }),
-              Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
+              Runtime::EditorCommandStatus::MissingVisualizationCommands);
     expectVisualizationConfigUnchanged();
 
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationPropertyPreset(
+    EXPECT_STREQ(Runtime::DebugNameForEditorVisualizationPropertyPreset(
                      Preset::ColorBuffer),
                  "ColorBuffer");
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
-                     Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty),
+    EXPECT_STREQ(Runtime::DebugNameForEditorCommandStatus(
+                     Runtime::EditorCommandStatus::InvalidVisualizationProperty),
                  "InvalidVisualizationProperty");
 }
 TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
@@ -889,7 +896,7 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
 
     auto& raw = registry.Raw();
@@ -898,15 +905,15 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     AddTriangleMeshSource(registry, mesh);
     const std::uint32_t meshStableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = meshStableId,
                       .SetSurface = true,
                       .EnableSurface = true,
                       .SurfaceDomain = G::RenderSurface::SourceDomain::Face,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderSurface>(mesh));
     EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
               G::RenderSurface::SourceDomain::Face);
@@ -933,9 +940,9 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     raw.get<G::RenderSurface>(mesh).Domain =
         G::RenderSurface::SourceDomain::Face;
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = meshStableId,
                       .SetEdges = true,
                       .EnableEdges = true,
@@ -943,16 +950,16 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
                       .SetUniformEdgeWidth = true,
                       .UniformEdgeWidth = 3.0f,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
     const G::RenderEdges& meshEdges = raw.get<G::RenderEdges>(mesh);
     EXPECT_EQ(meshEdges.Domain, G::RenderEdges::SourceDomain::Edge);
     ASSERT_NE(std::get_if<float>(&meshEdges.WidthSource), nullptr);
     EXPECT_FLOAT_EQ(*std::get_if<float>(&meshEdges.WidthSource), 3.0f);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = meshStableId,
                       .SetPoints = true,
                       .EnablePoints = true,
@@ -960,7 +967,7 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
                       .SetUniformPointSize = true,
                       .UniformPointSize = 7.0f,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
     const G::RenderPoints& meshPoints = raw.get<G::RenderPoints>(mesh);
     EXPECT_EQ(meshPoints.Type, G::RenderPoints::RenderType::Surfel);
@@ -971,28 +978,28 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     AddGraphSource(registry, graph);
     const std::uint32_t graphStableId =
         Runtime::SelectionController::ToStableEntityId(graph);
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = graphStableId,
                       .SetEdges = true,
                       .EnableEdges = false,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_FALSE(raw.all_of<G::RenderEdges>(graph));
     EXPECT_TRUE(history.Undo().Succeeded());
     EXPECT_TRUE(raw.all_of<G::RenderEdges>(graph));
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = graphStableId,
                       .PointType = G::RenderPoints::RenderType::Flat,
                       .SetPointRenderType = true,
                       .SetUniformPointSize = true,
                       .UniformPointSize = 0.25f,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(graph));
     const G::RenderPoints& graphPoints = raw.get<G::RenderPoints>(graph);
     EXPECT_EQ(graphPoints.Type, G::RenderPoints::RenderType::Flat);
@@ -1000,10 +1007,10 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     EXPECT_FLOAT_EQ(*std::get_if<float>(&graphPoints.SizeSource), 0.25f);
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    const Runtime::SandboxEditorDomainWindowModel graphModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel graphModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::Graph);
+            Runtime::EditorDomainWindowKind::Graph);
     EXPECT_TRUE(graphModel.RenderHints.HasRenderPoints);
     EXPECT_EQ(graphModel.RenderHints.PointRenderType, "Flat");
     EXPECT_EQ(graphModel.RenderHints.PointRenderTypeValue,
@@ -1015,26 +1022,26 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     AddPointCloudSource(registry, cloud, 3u);
     const std::uint32_t cloudStableId =
         Runtime::SelectionController::ToStableEntityId(cloud);
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = cloudStableId,
                       .SetEdges = true,
                       .EnableEdges = true,
                   }),
-              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = cloudStableId,
                       .SetPoints = true,
                       .EnablePoints = false,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_FALSE(raw.all_of<G::RenderPoints>(cloud));
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = cloudStableId,
                       .SetPoints = true,
                       .EnablePoints = true,
@@ -1042,7 +1049,7 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
                       .SetUniformPointSize = true,
                       .UniformPointSize = 0.05f,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(cloud));
     const G::RenderPoints& cloudPoints = raw.get<G::RenderPoints>(cloud);
     EXPECT_EQ(cloudPoints.Type, G::RenderPoints::RenderType::Surfel);
@@ -1073,18 +1080,18 @@ TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
     EXPECT_EQ(first.GraphGeometryUploads, 1u);
     EXPECT_EQ(first.GraphGeometryReuploads, 0u);
 
-    Runtime::SandboxEditorContext context = MakeContext(scene, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(scene, selection);
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(graph);
-    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
-                  Runtime::SandboxEditorRenderHintCommand{
+                  Runtime::EditorRenderHintCommand{
                       .StableEntityId = stableId,
                       .SetEdges = true,
                       .EnableEdges = true,
                       .EdgeDomain = G::RenderEdges::SourceDomain::Vertex,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderEdges>(graph));
 
     const Runtime::RuntimeRenderExtractionStats second =
@@ -1106,8 +1113,8 @@ TEST(SandboxEditorUi, SelectEntityCommandRoutesThroughSelectionController)
     const ECS::EntityHandle second = MakeSelectable(registry, "Second");
     ASSERT_TRUE(selection.SetSelectedEntity(registry, first));
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    EXPECT_TRUE(Runtime::SelectSandboxEditorEntity(
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    EXPECT_TRUE(Runtime::SelectEditorEntity(
         context,
         Runtime::SelectionController::ToStableEntityId(second)));
 
@@ -1121,22 +1128,22 @@ TEST(SandboxEditorUi, TransformEditCommandMutatesLocalTransformAndMarksDirty)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     const ECS::EntityHandle entity = MakeSelectable(registry, "Editable");
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(entity);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorTransformEdit(
+    EXPECT_EQ(Runtime::ApplyEditorTransformEdit(
                   context,
-                  Runtime::SandboxEditorTransformEditCommand{
+                  Runtime::EditorTransformEditCommand{
                       .StableEntityId = stableId,
                   }),
-              Runtime::SandboxEditorCommandStatus::NoChange);
+              Runtime::EditorCommandStatus::NoChange);
     EXPECT_FALSE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(entity));
 
-    const Runtime::SandboxEditorCommandStatus status =
-        Runtime::ApplySandboxEditorTransformEdit(
+    const Runtime::EditorCommandStatus status =
+        Runtime::ApplyEditorTransformEdit(
             context,
-            Runtime::SandboxEditorTransformEditCommand{
+            Runtime::EditorTransformEditCommand{
                 .StableEntityId = stableId,
                 .SetPosition = true,
                 .Position = glm::vec3{4.0f, 5.0f, 6.0f},
@@ -1146,8 +1153,8 @@ TEST(SandboxEditorUi, TransformEditCommandMutatesLocalTransformAndMarksDirty)
                 .Scale = glm::vec3{2.0f, 2.5f, 3.0f},
             });
 
-    EXPECT_EQ(status, Runtime::SandboxEditorCommandStatus::Applied);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(status),
+    EXPECT_EQ(status, Runtime::EditorCommandStatus::Applied);
+    EXPECT_STREQ(Runtime::DebugNameForEditorCommandStatus(status),
                  "Applied");
     const auto& transform =
         registry.Raw().get<ECSC::Transform::Component>(entity);
@@ -1160,16 +1167,16 @@ TEST(SandboxEditorUi, TransformEditCommandMutatesLocalTransformAndMarksDirty)
     EXPECT_FLOAT_EQ(transform.Scale.z, 3.0f);
     EXPECT_TRUE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(entity));
 
-    Runtime::SandboxEditorContext missingSelection = context;
+    Intrinsic::Tests::EditorFeatureTestContext missingSelection = context;
     missingSelection.Selection = nullptr;
-    EXPECT_EQ(Runtime::ApplySandboxEditorTransformEdit(
+    EXPECT_EQ(Runtime::ApplyEditorTransformEdit(
                   missingSelection,
-                  Runtime::SandboxEditorTransformEditCommand{
+                  Runtime::EditorTransformEditCommand{
                       .StableEntityId = stableId,
                       .SetPosition = true,
                       .Position = glm::vec3{1.0f},
                   }),
-              Runtime::SandboxEditorCommandStatus::MissingSelectionController);
+              Runtime::EditorCommandStatus::MissingSelectionController);
 }
 TEST(SandboxEditorUi,
      TransformEditHistoryRejectsInterveningStateAndRestoresExactly)
@@ -1178,23 +1185,23 @@ TEST(SandboxEditorUi,
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
     const ECS::EntityHandle entity = MakeSelectable(registry, "Undoable");
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(entity);
     const ECSC::Transform::Component before =
         registry.Raw().get<ECSC::Transform::Component>(entity);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorTransformEdit(
+    EXPECT_EQ(Runtime::ApplyEditorTransformEdit(
                   context,
-                  Runtime::SandboxEditorTransformEditCommand{
+                  Runtime::EditorTransformEditCommand{
                       .StableEntityId = stableId,
                       .SetPosition = true,
                       .Position = glm::vec3{4.0f, 5.0f, 6.0f},
                       .SetScale = true,
                       .Scale = glm::vec3{2.0f, 2.5f, 3.0f},
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_EQ(history.UndoCount(), 1u);
     const ECSC::Transform::Component after =
         registry.Raw().get<ECSC::Transform::Component>(entity);
@@ -1234,43 +1241,43 @@ TEST(SandboxEditorUi, CameraControllerCommandReplacesMainController)
         Runtime::CreateCameraController(
             Extrinsic::Core::Config::CameraControllerKind::Orbit));
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CameraControllers = &cameraControllers;
     context.CameraViewport = Extrinsic::Core::Extent2D{640, 40};
 
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.CameraRender.CameraControlsAvailable);
     ASSERT_TRUE(frame.CameraRender.HasMainCameraController);
     EXPECT_EQ(frame.CameraRender.MainCameraControllerKind,
               Extrinsic::Core::Config::CameraControllerKind::Orbit);
 
-    const Runtime::SandboxEditorCommandStatus status =
-        Runtime::ApplySandboxEditorCameraControllerCommand(
+    const Runtime::EditorCommandStatus status =
+        Runtime::ApplyEditorCameraControllerCommand(
             context,
-            Runtime::SandboxEditorCameraControllerCommand{
+            Runtime::EditorCameraControllerCommand{
                 .Kind = Extrinsic::Core::Config::CameraControllerKind::Fly,
             });
 
-    EXPECT_EQ(status, Runtime::SandboxEditorCommandStatus::Applied);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCameraControllerKind(
+    EXPECT_EQ(status, Runtime::EditorCommandStatus::Applied);
+    EXPECT_STREQ(Runtime::DebugNameForEditorCameraControllerKind(
                      cameraControllers.Resolve(Runtime::CameraControllerSlot::Main)
                          .Kind()),
                  "Fly");
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorCameraControllerCommand(
+    EXPECT_EQ(Runtime::ApplyEditorCameraControllerCommand(
                   context,
-                  Runtime::SandboxEditorCameraControllerCommand{
+                  Runtime::EditorCameraControllerCommand{
                       .Kind = Extrinsic::Core::Config::CameraControllerKind::Fly,
                   }),
-              Runtime::SandboxEditorCommandStatus::NoChange);
+              Runtime::EditorCommandStatus::NoChange);
 
-    Runtime::SandboxEditorContext missingRegistry = context;
+    Intrinsic::Tests::EditorFeatureTestContext missingRegistry = context;
     missingRegistry.CameraControllers = nullptr;
-    EXPECT_EQ(Runtime::ApplySandboxEditorCameraControllerCommand(
+    EXPECT_EQ(Runtime::ApplyEditorCameraControllerCommand(
                   missingRegistry,
-                  Runtime::SandboxEditorCameraControllerCommand{}),
-              Runtime::SandboxEditorCommandStatus::MissingCameraControllerRegistry);
+                  Runtime::EditorCameraControllerCommand{}),
+              Runtime::EditorCommandStatus::MissingCameraControllerRegistry);
 }
 TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
 {
@@ -1284,11 +1291,11 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
     const std::uint32_t meshStableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+    EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,
-                  Runtime::SandboxEditorPrimitiveViewCommand{
+                  Runtime::EditorPrimitiveViewCommand{
                       .StableEntityId = meshStableId,
                       .SetEdgeView = true,
                       .EnableEdgeView = true,
@@ -1300,7 +1307,7 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
                       .SetVertexPointRadius = true,
                       .VertexPointRadiusPx = 11.0f,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
     const G::RenderPoints& points = raw.get<G::RenderPoints>(mesh);
@@ -1308,33 +1315,33 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
     ASSERT_NE(std::get_if<float>(&points.SizeSource), nullptr);
     EXPECT_FLOAT_EQ(*std::get_if<float>(&points.SizeSource), 11.0f);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+    EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,
-                  Runtime::SandboxEditorPrimitiveViewCommand{
+                  Runtime::EditorPrimitiveViewCommand{
                       .StableEntityId = meshStableId,
                       .SetVertexPointRadius = true,
                       .VertexPointRadiusPx = 0.0f,
                   }),
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_TRUE(raw.all_of<G::RenderPoints>(mesh));
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+    EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,
-                  Runtime::SandboxEditorPrimitiveViewCommand{
+                  Runtime::EditorPrimitiveViewCommand{
                       .StableEntityId = meshStableId,
                       .SetEdgeView = true,
                       .EnableEdgeView = false,
                       .SetVertexView = true,
                       .EnableVertexView = false,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_FALSE(raw.all_of<G::RenderEdges>(mesh));
     EXPECT_FALSE(raw.all_of<G::RenderPoints>(mesh));
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+    EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,
-                  Runtime::SandboxEditorPrimitiveViewCommand{}),
-              Runtime::SandboxEditorCommandStatus::NoChange);
+                  Runtime::EditorPrimitiveViewCommand{}),
+              Runtime::EditorCommandStatus::NoChange);
 
     const ECS::EntityHandle vertexOnlyMesh =
         MakeSelectable(registry, "Vertex Only Mesh");
@@ -1346,9 +1353,9 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
     });
     const std::uint32_t vertexOnlyStableId =
         Runtime::SelectionController::ToStableEntityId(vertexOnlyMesh);
-    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+    EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,
-                  Runtime::SandboxEditorPrimitiveViewCommand{
+                  Runtime::EditorPrimitiveViewCommand{
                       .StableEntityId = vertexOnlyStableId,
                       .SetVertexView = true,
                       .EnableVertexView = true,
@@ -1358,7 +1365,7 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
                       .SetVertexPointRadius = true,
                       .VertexPointRadiusPx = 7.0f,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(vertexOnlyMesh));
     EXPECT_FALSE(raw.all_of<G::RenderEdges>(vertexOnlyMesh));
     const G::RenderPoints& vertexOnlyPoints =
@@ -1367,28 +1374,28 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
     ASSERT_NE(std::get_if<float>(&vertexOnlyPoints.SizeSource), nullptr);
     EXPECT_FLOAT_EQ(*std::get_if<float>(&vertexOnlyPoints.SizeSource), 7.0f);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+    EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,
-                  Runtime::SandboxEditorPrimitiveViewCommand{
+                  Runtime::EditorPrimitiveViewCommand{
                       .StableEntityId = vertexOnlyStableId,
                       .SetEdgeView = true,
                       .EnableEdgeView = true,
                   }),
-              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
     AddPointCloudSource(registry, cloud, 2u);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
     const std::uint32_t cloudStableId =
         Runtime::SelectionController::ToStableEntityId(cloud);
-    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+    EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,
-                  Runtime::SandboxEditorPrimitiveViewCommand{
+                  Runtime::EditorPrimitiveViewCommand{
                       .StableEntityId = cloudStableId,
                       .SetEdgeView = true,
                       .EnableEdgeView = true,
                   }),
-              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
 }
 
 TEST(SandboxEditorUi, PrimitiveViewHistoryRejectsInterveningRenderHints)
@@ -1405,15 +1412,15 @@ TEST(SandboxEditorUi, PrimitiveViewHistoryRejectsInterveningRenderHints)
             .Domain = G::RenderSurface::SourceDomain::Face,
         });
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
 
     EXPECT_EQ(
-        Runtime::ApplySandboxEditorPrimitiveViewCommand(
+        Runtime::ApplyEditorPrimitiveViewCommand(
             context,
-            Runtime::SandboxEditorPrimitiveViewCommand{
+            Runtime::EditorPrimitiveViewCommand{
                 .StableEntityId = stableId,
                 .SetEdgeView = true,
                 .EnableEdgeView = true,
@@ -1425,7 +1432,7 @@ TEST(SandboxEditorUi, PrimitiveViewHistoryRejectsInterveningRenderHints)
                 .SetVertexPointRadius = true,
                 .VertexPointRadiusPx = 9.0f,
             }),
-        Runtime::SandboxEditorCommandStatus::Applied);
+        Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
 
@@ -1465,10 +1472,10 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorVisualizationConfigCommand scalar{
+    const Runtime::EditorVisualizationConfigCommand scalar{
         .StableEntityId = stableId,
         .EnableConfig = true,
         .Source = G::VisualizationConfig::ColorSource::ScalarField,
@@ -1481,10 +1488,10 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
         .IsolineCount = 8u,
     };
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
                   scalar),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
     const auto& config = registry.Raw().get<G::VisualizationConfig>(mesh);
     EXPECT_EQ(config.Source, G::VisualizationConfig::ColorSource::ScalarField);
@@ -1495,27 +1502,27 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
     EXPECT_FLOAT_EQ(config.Scalar.RangeMax, 2.0f);
     EXPECT_EQ(config.Scalar.BinCount, 4u);
     EXPECT_EQ(config.Scalar.Isolines.Num, 8u);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationColorSource(
+    EXPECT_STREQ(Runtime::DebugNameForEditorVisualizationColorSource(
                      config.Source),
                  "ScalarField");
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationDomain(
+    EXPECT_STREQ(Runtime::DebugNameForEditorVisualizationDomain(
                      config.ScalarDomain),
                  "Face");
 
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Visualization.Visualization.HasConfig);
     EXPECT_EQ(frame.Visualization.Visualization.Source,
               G::VisualizationConfig::ColorSource::ScalarField);
     EXPECT_EQ(frame.Visualization.Visualization.ScalarFieldName, "curvature");
     EXPECT_EQ(frame.Visualization.Visualization.IsolineCount, 8u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
                   scalar),
-              Runtime::SandboxEditorCommandStatus::NoChange);
+              Runtime::EditorCommandStatus::NoChange);
 
-    const Runtime::SandboxEditorVisualizationConfigCommand uniform{
+    const Runtime::EditorVisualizationConfigCommand uniform{
         .StableEntityId = stableId,
         .EnableConfig = true,
         .Source = G::VisualizationConfig::ColorSource::UniformColor,
@@ -1529,10 +1536,10 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
         .IsolineCount = 8u,
     };
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
                   uniform),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
     const auto& uniformConfig = registry.Raw().get<G::VisualizationConfig>(mesh);
     EXPECT_EQ(uniformConfig.Source,
@@ -1549,7 +1556,7 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
     EXPECT_EQ(uniformConfig.Scalar.BinCount, 4u);
     EXPECT_EQ(uniformConfig.Scalar.Isolines.Num, 8u);
 
-    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Visualization.Visualization.HasConfig);
     EXPECT_EQ(frame.Visualization.Visualization.Source,
               G::VisualizationConfig::ColorSource::UniformColor);
@@ -1558,30 +1565,30 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
     EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.z, 0.875f);
     EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.w, 1.0f);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
                   uniform),
-              Runtime::SandboxEditorCommandStatus::NoChange);
+              Runtime::EditorCommandStatus::NoChange);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationConfigCommand{
+                  Runtime::EditorVisualizationConfigCommand{
                       .StableEntityId = stableId,
                       .EnableConfig = false,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_FALSE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
 
-    Runtime::SandboxEditorContext unavailable = context;
+    Intrinsic::Tests::EditorFeatureTestContext unavailable = context;
     unavailable.VisualizationCommandsAvailable = false;
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   unavailable,
                   scalar),
-              Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
+              Runtime::EditorCommandStatus::MissingVisualizationCommands);
 }
 TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
 {
-    using Target = Runtime::SandboxEditorVisualizationTarget;
+    using Target = Runtime::EditorVisualizationTarget;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -1598,11 +1605,11 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
     base.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
     registry.Raw().emplace<G::VisualizationConfig>(mesh, base);
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorVisualizationConfigCommand pointUniform{
+    const Runtime::EditorVisualizationConfigCommand pointUniform{
         .StableEntityId = stableId,
         .Target = Target::Points,
         .EnableConfig = true,
@@ -1610,10 +1617,10 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
         .Color = glm::vec4{0.0f, 0.8f, 0.2f, 1.0f},
     };
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
                   pointUniform),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     const auto& defaultConfig = registry.Raw().get<G::VisualizationConfig>(mesh);
     EXPECT_EQ(defaultConfig.Color, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
     ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
@@ -1626,10 +1633,10 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
     EXPECT_FALSE(overrides.Surface.has_value());
     EXPECT_FALSE(overrides.Edges.has_value());
 
-    const Runtime::SandboxEditorDomainWindowModel pointModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
+    const Runtime::EditorDomainWindowModel pointModel =
+        Runtime::BuildEditorDomainWindowModel(
             context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+            Runtime::EditorDomainWindowKind::PointCloud);
     ASSERT_TRUE(pointModel.Visualization.Visualization.HasConfig);
     EXPECT_EQ(pointModel.Visualization.Visualization.Color,
               glm::vec4(0.0f, 0.8f, 0.2f, 1.0f));
@@ -1648,14 +1655,14 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
                     .get<G::VisualizationLaneOverrides>(mesh)
                     .Points.has_value());
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationConfigCommand{
+                  Runtime::EditorVisualizationConfigCommand{
                       .StableEntityId = stableId,
                       .Target = Target::Points,
                       .EnableConfig = false,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
 }
@@ -1671,20 +1678,20 @@ TEST(SandboxEditorUi,
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
     context.VisualizationCommandsAvailable = true;
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationConfigCommand{
+                  Runtime::EditorVisualizationConfigCommand{
                       .StableEntityId = stableId,
                       .EnableConfig = true,
                       .Source =
                           G::VisualizationConfig::ColorSource::UniformColor,
                       .Color = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f},
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
     const G::VisualizationConfig applied =
         registry.Raw().get<G::VisualizationConfig>(mesh);
@@ -1730,10 +1737,10 @@ TEST(SandboxEditorUi, VisualizationRecipeCommandRoutesThroughRuntimeSurface)
     std::uint32_t setCount{0u};
     std::uint32_t clearCount{0u};
 
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
     context.VisualizationRecipes =
-        Runtime::SandboxEditorVisualizationRecipeCommandSurface{
+        Runtime::EditorVisualizationRecipeCommandSurface{
             .GetRecipe =
                 [&](const std::uint32_t queriedStableId)
                     -> std::optional<Runtime::VisualizationRecipe>
@@ -1784,16 +1791,16 @@ TEST(SandboxEditorUi, VisualizationRecipeCommandRoutesThroughRuntimeSurface)
         },
     };
 
-    const Runtime::SandboxEditorVisualizationRecipeCommand setVector{
+    const Runtime::EditorVisualizationRecipeCommand setVector{
         .StableEntityId = stableId,
         .EnableRecipe = true,
         .Recipe = vectorRecipe,
     };
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
                   context,
                   setVector),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(storedRecipe.has_value());
     EXPECT_EQ(storedStableId, stableId);
     EXPECT_EQ(Runtime::GetVisualizationRecipeKind(*storedRecipe),
@@ -1804,12 +1811,12 @@ TEST(SandboxEditorUi, VisualizationRecipeCommandRoutesThroughRuntimeSurface)
     EXPECT_EQ(storedVector.VectorBufferBDA, 0xAABB'2000u);
     EXPECT_FALSE(storedVector.DepthTested);
     EXPECT_EQ(setCount, 1u);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationRecipeKind(
+    EXPECT_STREQ(Runtime::DebugNameForEditorVisualizationRecipeKind(
                      Runtime::GetVisualizationRecipeKind(*storedRecipe)),
                  "VectorField");
 
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
+    Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Visualization.RecipeControlsAvailable);
     ASSERT_TRUE(frame.Visualization.Recipe.HasRecipe);
     EXPECT_EQ(frame.Visualization.Recipe.Kind,
@@ -1818,57 +1825,57 @@ TEST(SandboxEditorUi, VisualizationRecipeCommandRoutesThroughRuntimeSurface)
                   frame.Visualization.Recipe.Recipe.Data).OutputName,
               "velocity_glyphs");
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
                   context,
                   setVector),
-              Runtime::SandboxEditorCommandStatus::NoChange);
+              Runtime::EditorCommandStatus::NoChange);
     EXPECT_EQ(setCount, 1u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationRecipeCommand{
+                  Runtime::EditorVisualizationRecipeCommand{
                       .StableEntityId = stableId,
                       .EnableRecipe = false,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_FALSE(storedRecipe.has_value());
     EXPECT_EQ(clearCount, 1u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationRecipeCommand{
+                  Runtime::EditorVisualizationRecipeCommand{
                       .StableEntityId = stableId,
                       .EnableRecipe = false,
                   }),
-              Runtime::SandboxEditorCommandStatus::NoChange);
+              Runtime::EditorCommandStatus::NoChange);
     EXPECT_EQ(clearCount, 1u);
 
-    Runtime::SandboxEditorContext missingSurface = context;
+    Intrinsic::Tests::EditorFeatureTestContext missingSurface = context;
     missingSurface.VisualizationRecipes = {};
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
                   missingSurface,
                   setVector),
-              Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
+              Runtime::EditorCommandStatus::MissingVisualizationCommands);
 
     const ECS::EntityHandle empty = MakeSelectable(registry, "NoGeometry");
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationRecipeCommand{
+                  Runtime::EditorVisualizationRecipeCommand{
                       .StableEntityId =
                           Runtime::SelectionController::ToStableEntityId(empty),
                       .EnableRecipe = true,
                       .Recipe = vectorRecipe,
                   }),
-              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationRecipeCommand{
+                  Runtime::EditorVisualizationRecipeCommand{
                       .StableEntityId = std::numeric_limits<std::uint32_t>::max(),
                       .EnableRecipe = true,
                       .Recipe = vectorRecipe,
                   }),
-              Runtime::SandboxEditorCommandStatus::StaleEntity);
+              Runtime::EditorCommandStatus::StaleEntity);
 }
 TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
 {
@@ -1896,22 +1903,22 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
 
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
 
     const Runtime::GeometryPresentationDefaultValue newColor{
         .Kind = Geometry::PropertyValueKind::Vec4,
         .Vector = glm::vec4{0.9f, 0.1f, 0.2f, 1.0f},
     };
-    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
+    EXPECT_EQ(Runtime::ApplyEditorGeometryPresentationSlotDefaultCommand(
                   context,
-                  Runtime::SandboxEditorGeometryPresentationSlotDefaultCommand{
+                  Runtime::EditorGeometryPresentationSlotDefaultCommand{
                       .StableEntityId = stableId,
                       .PresentationKey = "mesh.surface",
                       .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
                       .Value = newColor,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_TRUE(history.IsDirty());
     auto& bindings =
         registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
@@ -1939,9 +1946,9 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
             .RecipeGeneration,
         9u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorGeometryPresentationSlotPropertyCommand(
                   context,
-                  Runtime::SandboxEditorGeometryPresentationSlotPropertyCommand{
+                  Runtime::EditorGeometryPresentationSlotPropertyCommand{
                       .StableEntityId = stableId,
                       .PresentationKey = "mesh.surface",
                       .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
@@ -1952,7 +1959,7 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
                           Geometry::PropertyValueKind::Vec4,
                       .PropertyName = "v:paint",
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     auto& propertyBindings =
         registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
     const auto& propertyRuntimeState =
@@ -1976,9 +1983,9 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
     EXPECT_EQ(albedoStatus->Readiness,
               Runtime::GeometryPresentationReadiness::Pending);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
+    EXPECT_EQ(Runtime::ApplyEditorGeometryPresentationSlotPropertyCommand(
                   context,
-                  Runtime::SandboxEditorGeometryPresentationSlotPropertyCommand{
+                  Runtime::EditorGeometryPresentationSlotPropertyCommand{
                       .StableEntityId = stableId,
                       .PresentationKey = "mesh.surface",
                       .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
@@ -1989,20 +1996,20 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
                           Geometry::PropertyValueKind::Vec4,
                       .PropertyName = "v:temperature",
                   }),
-              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
 
-    Runtime::SandboxEditorContext directContext = context;
+    Intrinsic::Tests::EditorFeatureTestContext directContext = context;
     directContext.CommandHistory = nullptr;
-    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
+    EXPECT_EQ(Runtime::ApplyEditorGeometryPresentationSlotDefaultCommand(
                   directContext,
-                  Runtime::SandboxEditorGeometryPresentationSlotDefaultCommand{
+                  Runtime::EditorGeometryPresentationSlotDefaultCommand{
                       .StableEntityId = stableId,
                       .PresentationKey = "mesh.surface",
                       .Semantic =
                           Runtime::GeometryPresentationSlotSemantic::Albedo,
                       .Value = newColor,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_EQ(
         registry.Raw()
             .get<Runtime::GeometryPresentationRuntimeState>(mesh)
@@ -2029,22 +2036,22 @@ TEST(SandboxEditorUi,
 
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
     const Runtime::GeometryPresentationDefaultValue authored{
         .Kind = Geometry::PropertyValueKind::Vec4,
         .Vector = glm::vec4{0.9f, 0.1f, 0.2f, 1.0f},
     };
-    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
+    EXPECT_EQ(Runtime::ApplyEditorGeometryPresentationSlotDefaultCommand(
                   context,
-                  Runtime::SandboxEditorGeometryPresentationSlotDefaultCommand{
+                  Runtime::EditorGeometryPresentationSlotDefaultCommand{
                       .StableEntityId = stableId,
                       .PresentationKey = "mesh.surface",
                       .Semantic =
                           Runtime::GeometryPresentationSlotSemantic::Albedo,
                       .Value = authored,
                   }),
-              Runtime::SandboxEditorCommandStatus::Applied);
+              Runtime::EditorCommandStatus::Applied);
     EXPECT_EQ(
         registry.Raw()
             .get<Runtime::GeometryPresentationRuntimeState>(mesh)

@@ -21,7 +21,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.SandboxEditorFacades;
+module Extrinsic.Runtime.Private.EditorFeatures;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -30,16 +30,16 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshSurfaceTopology;
-import Extrinsic.Runtime.SandboxConfigSections;
+import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
 import Geometry.Parameterization;
 import Geometry.Properties;
 
 #include "Runtime.EditorMutation.Internal.hpp"
-#include "Runtime.SandboxEditorFacades.Internal.hpp"
+#include "internal/Runtime.EditorFeatures.Detail.hpp"
 
-namespace Extrinsic::Runtime
+namespace Extrinsic::Runtime::EditorFeatureDetail
 {
     namespace
     {
@@ -336,7 +336,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsSerializableParameterizationConfigValid(
             const ParameterizationConfig& config)
         {
-            if (StableTokenForSandboxEditorParameterizationStrategy(
+            if (StableTokenForEditorParameterizationStrategyImpl(
                     config.Strategy).empty())
             {
                 return false;
@@ -488,7 +488,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::uint64_t BuildUvViewRequestToken(
-            const SandboxEditorParameterizationViewModel& model,
+            const EditorParameterizationViewModel& model,
             const std::uint32_t width,
             const std::uint32_t height) noexcept
         {
@@ -678,7 +678,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool RestoreDeletedVertexSlots(
-            Detail::SandboxEditorMeshSourceSnapshot& source,
+            Detail::EditorMeshSourceSnapshot& source,
             std::string& diagnostic)
         {
             if (source.DeletedVertices.size() != source.Mesh.VerticesSize())
@@ -713,7 +713,7 @@ namespace Extrinsic::Runtime
                 return EditorCommandHistoryStatus::MissingScene;
             entt::registry& raw = scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
-                Detail::ResolveSandboxMethodStableEntity(raw, stableEntityId);
+                Detail::ResolveEditorStableEntity(raw, stableEntityId);
             if (!entity.has_value())
                 return EditorCommandHistoryStatus::StaleEntity;
 
@@ -765,7 +765,7 @@ namespace Extrinsic::Runtime
         {
             entt::registry& raw = scene.Raw();
             const std::optional<ECS::EntityHandle> entity =
-                Detail::ResolveSandboxMethodStableEntity(
+                Detail::ResolveEditorStableEntity(
                     raw,
                     stableEntityId);
             if (!entity.has_value())
@@ -774,8 +774,8 @@ namespace Extrinsic::Runtime
             Dirty::MarkVertexAttributesDirty(raw, *entity);
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus CommitUvState(
-            const SandboxEditorContext& context,
+        [[nodiscard]] EditorCommandStatus CommitUvState(
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
             const std::uint64_t expectedGeometryMetadataSignature,
             ParameterizationSourceSnapshot expectedSource,
@@ -784,18 +784,18 @@ namespace Extrinsic::Runtime
         {
             if (context.CommandHistory == nullptr)
             {
-                const SandboxEditorCommandStatus status =
-                    Detail::ToSandboxMethodCommandStatus(
+                const EditorCommandStatus status =
+                    Detail::ToEditorMethodCommandStatus(
                         ApplyUvState(
                             context.Scene,
                             stableEntityId,
                             after));
-                if (status == SandboxEditorCommandStatus::Applied)
+                if (status == EditorCommandStatus::Applied)
                 {
                     StampUvStateDirty(
                         *context.Scene,
                         stableEntityId);
-                    Detail::InvalidateSandboxMethodSelectedModelCache(context);
+                    Detail::InvalidateEditorSelectedModelCache(context);
                 }
                 return status;
             }
@@ -835,7 +835,7 @@ namespace Extrinsic::Runtime
 
                         entt::registry& raw = identity.Scene->Raw();
                         const std::optional<ECS::EntityHandle> entity =
-                            Detail::ResolveSandboxMethodStableEntity(
+                            Detail::ResolveEditorStableEntity(
                                 raw,
                                 identity.StableEntityId);
                         if (!entity.has_value())
@@ -852,7 +852,7 @@ namespace Extrinsic::Runtime
                         if (expected.Source == nullptr || target == nullptr)
                             return EditorCommandHistoryStatus::CommandFailed;
                         if (Detail::
-                                SandboxEditorGeometryMetadataSignatureForEntity(
+                                EditorGeometryMetadataSignatureForEntity(
                                     raw,
                                     *entity) !=
                                 expected.GeometryMetadataSignature)
@@ -892,14 +892,14 @@ namespace Extrinsic::Runtime
                             identity.StableEntityId);
                         entt::registry& raw = identity.Scene->Raw();
                         const std::optional<ECS::EntityHandle> entity =
-                            Detail::ResolveSandboxMethodStableEntity(
+                            Detail::ResolveEditorStableEntity(
                                 raw,
                                 identity.StableEntityId);
                         return ParameterizationMutationGeneration{
                             .GeometryMetadataSignature =
                                 entity.has_value()
                                     ? Detail::
-                                          SandboxEditorGeometryMetadataSignatureForEntity(
+                                          EditorGeometryMetadataSignatureForEntity(
                                               raw,
                                               *entity)
                                     : 0u,
@@ -912,34 +912,34 @@ namespace Extrinsic::Runtime
                                     : nullptr,
                         };
                     });
-            const SandboxEditorCommandStatus status =
-                Detail::ToSandboxMethodCommandStatus(history.Status);
-            if (status == SandboxEditorCommandStatus::Applied)
-                Detail::InvalidateSandboxMethodSelectedModelCache(context);
+            const EditorCommandStatus status =
+                Detail::ToEditorMethodCommandStatus(history.Status);
+            if (status == EditorCommandStatus::Applied)
+                Detail::InvalidateEditorSelectedModelCache(context);
             return status;
         }
 
-        [[nodiscard]] SandboxEditorParameterizationResult MakeResult(
-            const SandboxEditorParameterizationCommand& command,
-            const SandboxEditorCommandStatus status,
+        [[nodiscard]] EditorParameterizationResult MakeResult(
+            const EditorParameterizationCommand& command,
+            const EditorCommandStatus status,
             const Parameterization::ParameterizationStatus parameterizationStatus,
             std::string message)
         {
-            return SandboxEditorParameterizationResult{
+            return EditorParameterizationResult{
                 .Status = status,
                 .StableEntityId = command.StableEntityId,
                 .Strategy = command.Config.Strategy,
                 .StrategyToken = std::string{
-                    StableTokenForSandboxEditorParameterizationStrategy(
+                    StableTokenForEditorParameterizationStrategyImpl(
                         command.Config.Strategy)},
                 .ParameterizationStatus = parameterizationStatus,
                 .Message = std::move(message),
             };
         }
 
-        [[nodiscard]] SandboxEditorParameterizationResult PublishResult(
-            const SandboxEditorContext& context,
-            SandboxEditorParameterizationResult result)
+        [[nodiscard]] EditorParameterizationResult PublishResult(
+            const EditorFeatureBindings& context,
+            EditorParameterizationResult result)
         {
             if (context.MethodResultSinks.Parameterization)
                 context.MethodResultSinks.Parameterization(result);
@@ -947,29 +947,29 @@ namespace Extrinsic::Runtime
         }
     }
 
-    std::string_view StableTokenForSandboxEditorParameterizationStrategy(
-        const SandboxEditorParameterizationStrategy strategy) noexcept
+    std::string_view StableTokenForEditorParameterizationStrategyImpl(
+        const EditorParameterizationStrategy strategy) noexcept
     {
         switch (strategy)
         {
-        case SandboxEditorParameterizationStrategy::Lscm:
+        case EditorParameterizationStrategy::Lscm:
             return "lscm";
-        case SandboxEditorParameterizationStrategy::HarmonicCotangent:
+        case EditorParameterizationStrategy::HarmonicCotangent:
             return "harmonic_cotangent";
-        case SandboxEditorParameterizationStrategy::TutteUniform:
+        case EditorParameterizationStrategy::TutteUniform:
             return "tutte_uniform";
-        case SandboxEditorParameterizationStrategy::Bff:
+        case EditorParameterizationStrategy::Bff:
             return "bff";
         }
         return {};
     }
 
-    SandboxEditorParameterizationResult
-    ApplySandboxEditorParameterizationCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorParameterizationCommand& command)
+    EditorParameterizationResult
+    ApplyEditorParameterizationCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorParameterizationCommand& command)
     {
-        const auto finish = [&context](SandboxEditorParameterizationResult result)
+        const auto finish = [&context](EditorParameterizationResult result)
         {
             return PublishResult(context, std::move(result));
         };
@@ -977,32 +977,32 @@ namespace Extrinsic::Runtime
         {
             return finish(MakeResult(
                 command,
-                SandboxEditorCommandStatus::MissingScene,
+                EditorCommandStatus::MissingScene,
                 Parameterization::ParameterizationStatus::InvalidInput,
                 "Parameterization requires a scene registry."));
         }
 
         const auto strategy = ToGeometryStrategy(command.Config);
         if (!strategy.has_value() ||
-            StableTokenForSandboxEditorParameterizationStrategy(
+            StableTokenForEditorParameterizationStrategyImpl(
                 command.Config.Strategy).empty())
         {
             return finish(MakeResult(
                 command,
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 Parameterization::ParameterizationStatus::InvalidInput,
                 "Parameterization config is invalid or unsupported."));
         }
 
         entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
-            Detail::ResolveSandboxMethodStableEntity(
+            Detail::ResolveEditorStableEntity(
                 raw, command.StableEntityId);
         if (!entity.has_value())
         {
             return finish(MakeResult(
                 command,
-                SandboxEditorCommandStatus::StaleEntity,
+                EditorCommandStatus::StaleEntity,
                 Parameterization::ParameterizationStatus::InvalidInput,
                 "Parameterization target is stale or no longer live."));
         }
@@ -1016,8 +1016,8 @@ namespace Extrinsic::Runtime
                 command,
                 GS::BuildSourceAvailability(view).ProvenanceDomain ==
                         GS::Domain::Mesh
-                    ? SandboxEditorCommandStatus::InvalidProcessingParameters
-                    : SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                    ? EditorCommandStatus::InvalidProcessingParameters
+                    : EditorCommandStatus::UnsupportedGeometryDomain,
                 Parameterization::ParameterizationStatus::InvalidInput,
                 std::move(topologyDiagnostic)));
         }
@@ -1028,7 +1028,7 @@ namespace Extrinsic::Runtime
         {
             return finish(MakeResult(
                 command,
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 Parameterization::ParameterizationStatus::InvalidInput,
                 "Existing v:texcoord has the wrong type, count, or non-finite values."));
         }
@@ -1038,19 +1038,19 @@ namespace Extrinsic::Runtime
         {
             return finish(MakeResult(
                 command,
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 Parameterization::ParameterizationStatus::InvalidInput,
                 "Parameterization requires finite count-matched positions and "
                 "valid triangle topology."));
         }
         const std::uint64_t geometryMetadataSignature =
-            Detail::SandboxEditorGeometryMetadataSignatureForEntity(
+            Detail::EditorGeometryMetadataSignatureForEntity(
                 raw,
                 *entity);
 
-        Detail::SandboxEditorMeshSourceSnapshot source =
-            Detail::BuildSandboxEditorMeshSourceSnapshot(view);
-        if (source.Status != SandboxEditorCommandStatus::Applied)
+        Detail::EditorMeshSourceSnapshot source =
+            Detail::BuildEditorMeshSourceSnapshot(view);
+        if (source.Status != EditorCommandStatus::Applied)
         {
             return finish(MakeResult(
                 command,
@@ -1064,7 +1064,7 @@ namespace Extrinsic::Runtime
         {
             return finish(MakeResult(
                 command,
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                EditorCommandStatus::InvalidProcessingParameters,
                 Parameterization::ParameterizationStatus::InvalidInput,
                 std::move(topologyDiagnostic)));
         }
@@ -1079,15 +1079,15 @@ namespace Extrinsic::Runtime
         {
             return finish(MakeResult(
                 command,
-                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                EditorCommandStatus::GeometryProcessingFailed,
                 Parameterization::ParameterizationStatus::SolverFailed,
                 "Parameterization could not align face diagnostics with source storage."));
         }
-        SandboxEditorParameterizationResult result = MakeResult(
+        EditorParameterizationResult result = MakeResult(
             command,
             parameterized.Succeeded()
-                ? SandboxEditorCommandStatus::Applied
-                : SandboxEditorCommandStatus::GeometryProcessingFailed,
+                ? EditorCommandStatus::Applied
+                : EditorCommandStatus::GeometryProcessingFailed,
             parameterized.Status,
             parameterized.Succeeded()
                 ? "Mesh parameterization applied."
@@ -1101,7 +1101,7 @@ namespace Extrinsic::Runtime
         if (parameterized.UVs.size() != vertexCount ||
             !AllFiniteUvs(parameterized.UVs))
         {
-            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.ParameterizationStatus =
                 Parameterization::ParameterizationStatus::SolverFailed;
             result.Message =
@@ -1132,7 +1132,7 @@ namespace Extrinsic::Runtime
             }
         }
 
-        const SandboxEditorCommandStatus commitStatus = CommitUvState(
+        const EditorCommandStatus commitStatus = CommitUvState(
             context,
             command.StableEntityId,
             geometryMetadataSignature,
@@ -1142,7 +1142,7 @@ namespace Extrinsic::Runtime
                 .Present = true,
                 .Values = std::move(parameterized.UVs),
             });
-        if (commitStatus != SandboxEditorCommandStatus::Applied)
+        if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
             result.Message =
@@ -1152,21 +1152,21 @@ namespace Extrinsic::Runtime
         return finish(std::move(result));
     }
 
-    SandboxEditorParameterizationResult
-    ApplySandboxEditorConfiguredParameterizationCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorConfiguredParameterizationCommand& command)
+    EditorParameterizationResult
+    ApplyEditorConfiguredParameterizationCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorConfiguredParameterizationCommand& command)
     {
         if (context.EngineConfigControlState == nullptr)
         {
-            SandboxEditorParameterizationCommand direct{
+            EditorParameterizationCommand direct{
                 .StableEntityId = command.StableEntityId,
             };
             return PublishResult(
                 context,
                 MakeResult(
                     direct,
-                    SandboxEditorCommandStatus::InvalidProcessingParameters,
+                    EditorCommandStatus::InvalidProcessingParameters,
                     Parameterization::ParameterizationStatus::InvalidInput,
                     "Configured parameterization requires engine config state."));
         }
@@ -1175,46 +1175,46 @@ namespace Extrinsic::Runtime
                 context.EngineConfigControlState->ActiveConfig);
         if (!config.has_value())
         {
-            SandboxEditorParameterizationCommand direct{
+            EditorParameterizationCommand direct{
                 .StableEntityId = command.StableEntityId,
             };
             return PublishResult(
                 context,
                 MakeResult(
                     direct,
-                    SandboxEditorCommandStatus::InvalidProcessingParameters,
+                    EditorCommandStatus::InvalidProcessingParameters,
                     Parameterization::ParameterizationStatus::InvalidInput,
                     "Configured parameterization is missing its registered config section."));
         }
-        return ApplySandboxEditorParameterizationCommand(
+        return ApplyEditorParameterizationCommandImpl(
             context,
-            SandboxEditorParameterizationCommand{
+            EditorParameterizationCommand{
                 .StableEntityId = command.StableEntityId,
                 .Config = *config,
             });
     }
 
-    SandboxEditorParameterizationConfigResult
-    ApplySandboxEditorParameterizationConfigCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorParameterizationConfigCommand& command)
+    EditorParameterizationConfigResult
+    ApplyEditorParameterizationConfigCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorParameterizationConfigCommand& command)
     {
-        SandboxEditorParameterizationConfigResult result{};
+        EditorParameterizationConfigResult result{};
         if (context.EngineConfigControlState == nullptr ||
             !context.PreviewEngineConfigDocument ||
             !context.ApplyEngineConfigHotSubset ||
             !context.EngineConfigCommandsAvailable)
         {
             result.Status =
-                SandboxEditorParameterizationConfigStatus::MissingConfigFacade;
+                EditorParameterizationConfigStatus::MissingConfigControl;
             result.Message =
-                "Parameterization config requires the engine config-control facade.";
+                "Parameterization config requires the engine config-control module.";
             return result;
         }
         if (!IsSerializableParameterizationConfigValid(command.Config))
         {
             result.Status =
-                SandboxEditorParameterizationConfigStatus::PreviewRejected;
+                EditorParameterizationConfigStatus::PreviewRejected;
             result.Message =
                 "Parameterization config is invalid or unsupported.";
             return result;
@@ -1231,7 +1231,7 @@ namespace Extrinsic::Runtime
         if (!Core::Config::IsConfigUsable(result.Preview))
         {
             result.Status =
-                SandboxEditorParameterizationConfigStatus::PreviewRejected;
+                EditorParameterizationConfigStatus::PreviewRejected;
             result.Message = "Parameterization config preview was rejected.";
             return result;
         }
@@ -1240,24 +1240,24 @@ namespace Extrinsic::Runtime
         if (!result.Apply.Succeeded())
         {
             result.Status =
-                SandboxEditorParameterizationConfigStatus::ApplyRejected;
+                EditorParameterizationConfigStatus::ApplyRejected;
             result.Message = "Parameterization config hot-apply was rejected.";
             return result;
         }
         result.Status =
             result.Apply.Status == RuntimeEngineConfigApplyStatus::NoChange
-                ? SandboxEditorParameterizationConfigStatus::NoChange
-                : SandboxEditorParameterizationConfigStatus::Applied;
+                ? EditorParameterizationConfigStatus::NoChange
+                : EditorParameterizationConfigStatus::Applied;
         result.Message =
-            result.Status == SandboxEditorParameterizationConfigStatus::NoChange
+            result.Status == EditorParameterizationConfigStatus::NoChange
                 ? "Parameterization config unchanged."
                 : "Parameterization config applied.";
         return result;
     }
 
     std::optional<ParameterizationConfig>
-    GetSandboxEditorParameterizationConfig(
-        const SandboxEditorContext& context) noexcept
+    GetEditorParameterizationConfigImpl(
+        const EditorFeatureBindings& context) noexcept
     {
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
@@ -1265,11 +1265,11 @@ namespace Extrinsic::Runtime
             context.EngineConfigControlState->ActiveConfig);
     }
 
-    SandboxEditorParameterizationViewModel
-    BuildSandboxEditorParameterizationViewModel(
-        const SandboxEditorContext& context)
+    EditorParameterizationViewModel
+    BuildEditorParameterizationViewModelImpl(
+        const EditorFeatureBindings& context)
     {
-        SandboxEditorParameterizationViewModel model{};
+        EditorParameterizationViewModel model{};
         if (context.EngineConfigControlState != nullptr)
         {
             if (const auto active = GetParameterizationConfig(
@@ -1297,7 +1297,7 @@ namespace Extrinsic::Runtime
 
         const entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
-            Detail::ResolveSandboxMethodStableEntity(
+            Detail::ResolveEditorStableEntity(
                 raw, model.SelectedStableEntityId);
         if (!entity.has_value())
         {
@@ -1436,20 +1436,20 @@ namespace Extrinsic::Runtime
         return model;
     }
 
-    SandboxEditorParameterizationUvViewState
-    SubmitSandboxEditorParameterizationUvView(
-        const SandboxEditorContext& context,
-        const SandboxEditorParameterizationViewModel& model,
+    EditorParameterizationUvViewState
+    SubmitEditorParameterizationUvViewImpl(
+        const EditorFeatureBindings& context,
+        const EditorParameterizationViewModel& model,
         const std::uint32_t width,
         const std::uint32_t height)
     {
         const bool gpuRequested =
             model.View.RenderMode ==
             ParameterizationUvRenderMode::GpuShaded;
-        SandboxEditorParameterizationUvViewState fallback{
+        EditorParameterizationUvViewState fallback{
             .Status = gpuRequested
-                ? SandboxEditorParameterizationUvViewStatus::WaitingForGpuFrame
-                : SandboxEditorParameterizationUvViewStatus::CpuLayout,
+                ? EditorParameterizationUvViewStatus::WaitingForGpuFrame
+                : EditorParameterizationUvViewStatus::CpuLayout,
             .RequestedMode = model.View.RenderMode,
             .ActiveMode = ParameterizationUvRenderMode::CpuLayout,
             .RequestedBackground = model.View.BackgroundMode,
@@ -1472,7 +1472,7 @@ namespace Extrinsic::Runtime
             if (context.ParameterizationUvViewCommands.Available())
             {
                 (void)context.ParameterizationUvViewCommands.Submit(
-                    SandboxEditorParameterizationUvViewRequest{
+                    EditorParameterizationUvViewRequest{
                         .Enabled = false,
                         .StableEntityId = model.SelectedStableEntityId,
                         .Width = width,
@@ -1485,7 +1485,7 @@ namespace Extrinsic::Runtime
             return fallback;
         }
 
-        SandboxEditorParameterizationUvViewRequest request{
+        EditorParameterizationUvViewRequest request{
             .Enabled = model.HasSelectedEntity &&
                        model.SelectedEntityIsMesh && model.HasUvCoordinates &&
                        model.HasFiniteUvBounds && width > 0u && height > 0u,
@@ -1505,7 +1505,7 @@ namespace Extrinsic::Runtime
         if (!request.Enabled)
         {
             fallback.Status =
-                SandboxEditorParameterizationUvViewStatus::InvalidRequest;
+                EditorParameterizationUvViewStatus::InvalidRequest;
             fallback.Message = model.Message.empty()
                 ? "GPU UV view requires a selected mesh with finite UVs and a non-empty pane."
                 : model.Message;
@@ -1516,7 +1516,7 @@ namespace Extrinsic::Runtime
             if (gpuRequested)
             {
                 fallback.Status =
-                    SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational;
+                    EditorParameterizationUvViewStatus::CpuFallbackNonOperational;
                 fallback.Message =
                     "GPU UV view command routing is unavailable; CPU layout is active.";
             }
@@ -1534,35 +1534,35 @@ namespace Extrinsic::Runtime
             std::move(request));
     }
 
-    void DisableSandboxEditorParameterizationUvView(
-        const SandboxEditorContext& context)
+    void DisableEditorParameterizationUvViewImpl(
+        const EditorFeatureBindings& context)
     {
         if (!context.ParameterizationUvViewCommands.Available())
             return;
         (void)context.ParameterizationUvViewCommands.Submit(
-            SandboxEditorParameterizationUvViewRequest{});
+            EditorParameterizationUvViewRequest{});
     }
 
-    const char* DebugNameForSandboxEditorParameterizationUvViewStatus(
-        const SandboxEditorParameterizationUvViewStatus status) noexcept
+    const char* DebugNameForEditorParameterizationUvViewStatusImpl(
+        const EditorParameterizationUvViewStatus status) noexcept
     {
         switch (status)
         {
-        case SandboxEditorParameterizationUvViewStatus::Disabled:
+        case EditorParameterizationUvViewStatus::Disabled:
             return "disabled";
-        case SandboxEditorParameterizationUvViewStatus::CpuLayout:
+        case EditorParameterizationUvViewStatus::CpuLayout:
             return "CPU layout";
-        case SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational:
+        case EditorParameterizationUvViewStatus::CpuFallbackNonOperational:
             return "CPU fallback (GPU unavailable)";
-        case SandboxEditorParameterizationUvViewStatus::WaitingForGeometry:
+        case EditorParameterizationUvViewStatus::WaitingForGeometry:
             return "CPU fallback (waiting for geometry)";
-        case SandboxEditorParameterizationUvViewStatus::WaitingForGpuFrame:
+        case EditorParameterizationUvViewStatus::WaitingForGpuFrame:
             return "CPU fallback (waiting for GPU frame)";
-        case SandboxEditorParameterizationUvViewStatus::InvalidRequest:
+        case EditorParameterizationUvViewStatus::InvalidRequest:
             return "CPU fallback (invalid request)";
-        case SandboxEditorParameterizationUvViewStatus::ResourceCreationFailed:
+        case EditorParameterizationUvViewStatus::ResourceCreationFailed:
             return "CPU fallback (GPU resource failure)";
-        case SandboxEditorParameterizationUvViewStatus::Ready:
+        case EditorParameterizationUvViewStatus::Ready:
             return "GPU shaded";
         }
         return "unknown";

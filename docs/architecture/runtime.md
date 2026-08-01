@@ -183,8 +183,9 @@ same cancellation/stale validation gate, publish `KMeansRunCompleted`, commit
 labels/colors during the main-thread event pump, and emit
 `ClusterLabelsChanged` as the standing visualization refresh reaction.
 `Runtime.Engine.cppm` and `Runtime.Engine.cpp` do not import or name the K-Means
-module. Sandbox facades borrow the service and last typed completion; they own
-no backend-specific DTO or queue. Config files, UI, and agent/CLI hot apply use
+module. The focused editor workspace and geometry-operation paths borrow the
+service and last typed completion; they own no backend-specific DTO or queue.
+Config files, UI, and agent/CLI hot apply use
 the registered `sandbox.clustering` section and the same request mapper.
 
 `Extrinsic.Runtime.AsyncWorkModule` is the app-composed lifecycle owner for the
@@ -359,10 +360,12 @@ frame contributions; it passes neither `Engine&` nor application state to
 contributors. The app-owned `Extrinsic.Sandbox.Editor.Shell` resolves that
 host during attachment, registers one owned frame contribution plus the ten
 core Sandbox windows and app panel registrations, and unregisters them before
-detach. Sandbox-aware callbacks receive a
-frame-local `SandboxEditorContext` from
-`Extrinsic.Runtime.SandboxEditorFacades`, never `Engine&`; registered paths are
-merged into the menu tree without a fixed runtime enum or draw-switch table.
+detach. Sandbox-aware callbacks receive the app-owned, frame-local
+`SandboxEditorContext`, composed from copied runtime snapshots and focused
+scene, geometry, visualization, render-recipe, and workspace-query handles,
+never `Engine&`; the private all-feature attachment binding remains in runtime.
+Registered paths are merged into the menu tree without a fixed runtime enum or
+draw-switch table.
 The frame loop owns one `EditorInputCaptureSnapshot`, resets it at frame
 start, and lends the same value by reference to every hook context.
 `EditorUiModule` copies the adapter's completed capture into that value only
@@ -384,16 +387,19 @@ finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.
 `src/runtime/Editor` contains only these generic host, registry, and property
 widget facilities. The former `Extrinsic.Runtime.SandboxEditorUi` module and
-runtime-owned Sandbox presentation are retired. The surviving
-`Extrinsic.Runtime.SandboxEditorFacades` module is a presentation-free public
-contract for data models, commands, result sinks, and session wiring; its
-app-facing lower-layer type spellings are compatibility aliases rather than
-new ownership boundaries.
+runtime-owned Sandbox presentation are retired. Runtime publishes focused
+`EditorWorkspaceSnapshots`, `EditorJobProjection`,
+`SceneEditingOperations`, `GeometryProcessingOperations`,
+`VisualizationEditingOperations`, and `RenderRecipeEditingOperations`
+contracts. Their shared detail BMI is implementation-only and direct app
+imports are source-ratcheted. The app copies the prepared bindings/snapshot
+into `SandboxEditorContext` and `SandboxEditorFrame`, so Sandbox window and
+frame composition remain app-owned.
 
 `Extrinsic.Sandbox.Editor.Shell` owns hierarchy, inspector, selection,
 file/import, frame-graph, render-recipe/artifact, camera, and visualization
 presentation. All core windows are closed by default and use the shared
-registry. Mesh Appearance forwards the facade's callback-scoped borrowed
+registry. Mesh Appearance forwards the workspace's callback-scoped borrowed
 selected-mesh vertex-property view to the runtime-owned generic scalar-property
 widget; app presentation does not retain that view or import geometry directly.
 `Extrinsic.Sandbox.Editor.MethodPanels` registers
@@ -415,11 +421,11 @@ paths, titles, closed defaults, controls, per-frame lazy model cache, and
 immediate/asynchronous result publication. Runtime retains the exported domain
 models, callback-scoped borrowed property view, command/job execution,
 UV/outlier result state, and result sinks; the app module imports runtime only.
-Progressive Poisson facade bodies and clustering config-control helpers compile
-in the private `Runtime.SandboxMethodFacade.cpp` implementation unit. K-Means
+Progressive Poisson operation bodies and clustering config-control helpers compile
+in the private `Runtime.GeometryProcessingOperations.cpp` implementation unit. K-Means
 execution goes directly from the app panel to the borrowed `ClusteringService`;
 the Vulkan recorder/cache/readback partition is private to
-`Extrinsic.Runtime.ClusteringModule`. Render-recipe and artifact facades compile
+`Extrinsic.Runtime.ClusteringModule`. Render-recipe and artifact operations compile
 in their own private implementation unit. The app-to-runtime dependency
 direction is unchanged.
 

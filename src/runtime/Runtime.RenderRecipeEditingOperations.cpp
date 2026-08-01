@@ -6,22 +6,22 @@ module;
 #include <utility>
 #include <vector>
 
-module Extrinsic.Runtime.SandboxEditorFacades;
+module Extrinsic.Runtime.Private.EditorFeatures;
 
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.RenderArtifactPublication;
 
-namespace Extrinsic::Runtime
+namespace Extrinsic::Runtime::EditorFeatureDetail
 {
     namespace
     {
-        void AddDiagnostic(std::vector<SandboxEditorDiagnostic>& diagnostics,
-                           const SandboxEditorDiagnosticCode code,
+        void AddDiagnostic(std::vector<EditorDiagnostic>& diagnostics,
+                           const EditorDiagnosticCode code,
                            std::string message)
         {
-            diagnostics.push_back(SandboxEditorDiagnostic{
+            diagnostics.push_back(EditorDiagnostic{
                 .Code = code,
                 .Message = std::move(message),
             });
@@ -144,7 +144,7 @@ namespace Extrinsic::Runtime
             return names;
         }
 
-        [[nodiscard]] SandboxEditorRenderRecipeSlotModel BuildRenderRecipeSlotRow(
+        [[nodiscard]] EditorRenderRecipeSlotModel BuildRenderRecipeSlotRow(
             const Graphics::RendererDescriptor& renderer,
             const Graphics::RecipeExtensionSlotDescriptor& slot)
         {
@@ -157,7 +157,7 @@ namespace Extrinsic::Runtime
             else if (slot.Kind == Graphics::RecipeSlotKind::FixedCore)
                 disabledReason = "fixed renderer core";
 
-            return SandboxEditorRenderRecipeSlotModel{
+            return EditorRenderRecipeSlotModel{
                 .StableName = slot.StableName,
                 .Kind = slot.Kind,
                 .SchemaId = slot.SchemaId,
@@ -171,12 +171,12 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorRenderRecipeBindingOverrideModel
+        [[nodiscard]] EditorRenderRecipeBindingOverrideModel
         BuildRenderRecipeBindingRow(const Graphics::BindingIntent& intent)
         {
             const bool required =
                 intent.Requirement == Graphics::BindingRequirement::Required;
-            return SandboxEditorRenderRecipeBindingOverrideModel{
+            return EditorRenderRecipeBindingOverrideModel{
                 .SemanticName = intent.SemanticName,
                 .Slot = intent.ConsumerRole,
                 .SourceDomain = DebugNameForBindingSourceDomain(intent.SourceDomain),
@@ -190,10 +190,10 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorRenderRecipeOutputModel BuildRenderRecipeOutputRow(
+        [[nodiscard]] EditorRenderRecipeOutputModel BuildRenderRecipeOutputRow(
             const Graphics::ViewOutputDescriptor& output)
         {
-            return SandboxEditorRenderRecipeOutputModel{
+            return EditorRenderRecipeOutputModel{
                 .Name = output.Name,
                 .Kind = std::string{Graphics::ToString(output.Kind)},
                 .Format = output.Format,
@@ -201,7 +201,7 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorRenderArtifactRow BuildRenderArtifactRow(
+        [[nodiscard]] EditorRenderArtifactRow BuildRenderArtifactRow(
             const RenderArtifactRecord& record)
         {
             const RenderArtifactUiStatus status = ToUiStatus(record);
@@ -216,7 +216,7 @@ namespace Extrinsic::Runtime
                 disabledReason = std::string{"state:"} +
                                  std::string{ToString(status)};
             }
-            return SandboxEditorRenderArtifactRow{
+            return EditorRenderArtifactRow{
                 .ArtifactId = record.Metadata.ArtifactId,
                 .Purpose = record.Metadata.Purpose,
                 .Kind = record.Kind,
@@ -229,17 +229,18 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] SandboxEditorRenderRecipeCommandResult
+        [[nodiscard]] EditorRenderRecipeCommandResult
         MakeRenderRecipeCommandResult(
-            const SandboxEditorRenderRecipeCommandStatus status,
-            const SandboxEditorRenderRecipeEditorState* state)
+            const EditorRenderRecipeCommandStatus status,
+            const EditorRenderRecipeEditorState* state)
         {
-            SandboxEditorRenderRecipeCommandResult result{
+            EditorRenderRecipeCommandResult result{
                 .Status = status,
             };
             if (state != nullptr)
             {
                 result.DraftState = state->DraftState;
+                result.Revision = state->DraftRevision;
                 if (state->HasLastPreview)
                 {
                     result.ValidationState = state->LastPreview.State;
@@ -249,15 +250,15 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] SandboxEditorRenderRecipeCommandResult
+        [[nodiscard]] EditorRenderRecipeCommandResult
         MakeRenderRecipeArtifactResult(
             const RenderArtifactOperationResult& operation,
-            const SandboxEditorRenderRecipeCommandStatus successStatus)
+            const EditorRenderRecipeCommandStatus successStatus)
         {
-            return SandboxEditorRenderRecipeCommandResult{
+            return EditorRenderRecipeCommandResult{
                 .Status = operation.Succeeded()
                     ? successStatus
-                    : SandboxEditorRenderRecipeCommandStatus::ArtifactCommandFailed,
+                    : EditorRenderRecipeCommandStatus::ArtifactCommandFailed,
                 .ArtifactStatus = operation.Status,
                 .ArtifactState = operation.State,
                 .ArtifactId = operation.ArtifactId,
@@ -268,14 +269,14 @@ namespace Extrinsic::Runtime
         }
     }
 
-    SandboxEditorRenderRecipeEditorModel
-    BuildSandboxEditorRenderRecipeEditorModel(const SandboxEditorContext& context)
+    EditorRenderRecipeEditorModel
+    BuildEditorRenderRecipeEditorModelImpl(const EditorFeatureBindings& context)
     {
-        SandboxEditorRenderRecipeEditorModel model{};
+        EditorRenderRecipeEditorModel model{};
         if (context.RenderRecipeContext == nullptr)
         {
             AddDiagnostic(model.Diagnostics,
-                          SandboxEditorDiagnosticCode::RenderRecipeCommandsUnavailable,
+                          EditorDiagnosticCode::RenderRecipeCommandsUnavailable,
                           "Render recipe context is unavailable.");
             return model;
         }
@@ -283,7 +284,7 @@ namespace Extrinsic::Runtime
         model.Available = true;
         const Graphics::RenderRecipeConfigContext& recipeContext =
             *context.RenderRecipeContext;
-        const SandboxEditorRenderRecipeEditorState* state =
+        const EditorRenderRecipeEditorState* state =
             context.RenderRecipeEditorState;
 
         const RuntimeRenderRecipeState* runtimeState =
@@ -340,7 +341,7 @@ namespace Extrinsic::Runtime
         if (!context.RenderRecipeCommandsAvailable)
         {
             AddDiagnostic(model.Diagnostics,
-                          SandboxEditorDiagnosticCode::RenderRecipeCommandsUnavailable,
+                          EditorDiagnosticCode::RenderRecipeCommandsUnavailable,
                           "Render recipe command seams are unavailable.");
         }
 
@@ -357,8 +358,8 @@ namespace Extrinsic::Runtime
         model.CanCancel =
             context.RenderRecipeCommandsAvailable &&
             state != nullptr &&
-            state->DraftState != SandboxEditorRenderRecipeDraftState::InactiveDraft &&
-            state->DraftState != SandboxEditorRenderRecipeDraftState::Canceled;
+            state->DraftState != EditorRenderRecipeDraftState::InactiveDraft &&
+            state->DraftState != EditorRenderRecipeDraftState::Canceled;
 
         model.Slots.reserve(recipeContext.Renderer.DeclaredRecipeSlots.size() +
                             recipe.Slots.size());
@@ -373,7 +374,7 @@ namespace Extrinsic::Runtime
             }
             else
             {
-                model.Slots.push_back(SandboxEditorRenderRecipeSlotModel{
+                model.Slots.push_back(EditorRenderRecipeSlotModel{
                     .StableName = slotName,
                     .DeclaredByRenderer = true,
                     .Editable = true,
@@ -422,21 +423,21 @@ namespace Extrinsic::Runtime
         return model;
     }
 
-    SandboxEditorRenderRecipeCommandResult
-    ApplySandboxEditorRenderRecipeCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorRenderRecipeCommand& command)
+    EditorRenderRecipeCommandResult
+    ApplyEditorRenderRecipeCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorRenderRecipeCommand& command)
     {
-        SandboxEditorRenderRecipeEditorState* state =
+        EditorRenderRecipeEditorState* state =
             context.RenderRecipeEditorState;
         if (state == nullptr)
         {
-            return SandboxEditorRenderRecipeCommandResult{
-                .Status = SandboxEditorRenderRecipeCommandStatus::MissingEditorState,
+            return EditorRenderRecipeCommandResult{
+                .Status = EditorRenderRecipeCommandStatus::MissingEditorState,
             };
         }
 
-        using Kind = SandboxEditorRenderRecipeCommandKind;
+        using Kind = EditorRenderRecipeCommandKind;
         switch (command.Kind)
         {
         case Kind::UpdateDraft:
@@ -446,7 +447,7 @@ namespace Extrinsic::Runtime
                 !command.Debounced)
             {
                 return MakeRenderRecipeCommandResult(
-                    SandboxEditorRenderRecipeCommandStatus::NoChange,
+                    EditorRenderRecipeCommandStatus::NoChange,
                     state);
             }
             state->DraftDocument = command.Document;
@@ -455,12 +456,12 @@ namespace Extrinsic::Runtime
             state->HasLastPreview = false;
             ++state->DraftRevision;
             state->DraftState = command.Debounced
-                ? SandboxEditorRenderRecipeDraftState::Debounced
-                : SandboxEditorRenderRecipeDraftState::InactiveDraft;
+                ? EditorRenderRecipeDraftState::Debounced
+                : EditorRenderRecipeDraftState::InactiveDraft;
             return MakeRenderRecipeCommandResult(
                 command.Debounced
-                    ? SandboxEditorRenderRecipeCommandStatus::Debounced
-                    : SandboxEditorRenderRecipeCommandStatus::DraftUpdated,
+                    ? EditorRenderRecipeCommandStatus::Debounced
+                    : EditorRenderRecipeCommandStatus::DraftUpdated,
                 state);
         }
         case Kind::ValidateDraft:
@@ -469,7 +470,7 @@ namespace Extrinsic::Runtime
             if (!context.PreviewRenderRecipeDocument)
             {
                 return MakeRenderRecipeCommandResult(
-                    SandboxEditorRenderRecipeCommandStatus::MissingRecipeContext,
+                    EditorRenderRecipeCommandStatus::MissingRecipeContext,
                     state);
             }
             if (!command.Document.empty())
@@ -488,20 +489,20 @@ namespace Extrinsic::Runtime
             if (usable)
             {
                 state->DraftState = command.Kind == Kind::ValidateDraft
-                    ? SandboxEditorRenderRecipeDraftState::Validated
-                    : SandboxEditorRenderRecipeDraftState::Previewed;
+                    ? EditorRenderRecipeDraftState::Validated
+                    : EditorRenderRecipeDraftState::Previewed;
                 return MakeRenderRecipeCommandResult(
                     command.Kind == Kind::ValidateDraft
-                        ? SandboxEditorRenderRecipeCommandStatus::Validated
-                        : SandboxEditorRenderRecipeCommandStatus::Previewed,
+                        ? EditorRenderRecipeCommandStatus::Validated
+                        : EditorRenderRecipeCommandStatus::Previewed,
                     state);
             }
 
-            state->DraftState = SandboxEditorRenderRecipeDraftState::Rejected;
+            state->DraftState = EditorRenderRecipeDraftState::Rejected;
             return MakeRenderRecipeCommandResult(
                 command.Kind == Kind::ValidateDraft
-                    ? SandboxEditorRenderRecipeCommandStatus::ValidationFailed
-                    : SandboxEditorRenderRecipeCommandStatus::PreviewFailed,
+                    ? EditorRenderRecipeCommandStatus::ValidationFailed
+                    : EditorRenderRecipeCommandStatus::PreviewFailed,
                 state);
         }
         case Kind::ActivatePreview:
@@ -510,7 +511,7 @@ namespace Extrinsic::Runtime
                 !Graphics::IsConfigUsable(state->LastPreview))
             {
                 return MakeRenderRecipeCommandResult(
-                    SandboxEditorRenderRecipeCommandStatus::PreviewFailed,
+                    EditorRenderRecipeCommandStatus::PreviewFailed,
                     state);
             }
             if (context.ApplyRenderRecipePreview)
@@ -520,7 +521,7 @@ namespace Extrinsic::Runtime
                 if (!applyResult.Succeeded())
                 {
                     return MakeRenderRecipeCommandResult(
-                        SandboxEditorRenderRecipeCommandStatus::ActivationFailed,
+                        EditorRenderRecipeCommandStatus::ActivationFailed,
                         state);
                 }
             }
@@ -528,10 +529,10 @@ namespace Extrinsic::Runtime
             state->ActiveViewOutput = state->LastPreview.Preview.ViewOutput;
             state->ActiveBindings = state->LastPreview.Preview.Bindings;
             state->HasActiveOverride = true;
-            state->DraftState = SandboxEditorRenderRecipeDraftState::Activated;
+            state->DraftState = EditorRenderRecipeDraftState::Activated;
             ++state->ActiveRevision;
             return MakeRenderRecipeCommandResult(
-                SandboxEditorRenderRecipeCommandStatus::Activated,
+                EditorRenderRecipeCommandStatus::Activated,
                 state);
         }
         case Kind::CancelDraft:
@@ -539,28 +540,28 @@ namespace Extrinsic::Runtime
             if (state->DraftDocument.empty() &&
                 !state->HasLastPreview &&
                 (state->DraftState ==
-                     SandboxEditorRenderRecipeDraftState::InactiveDraft ||
+                     EditorRenderRecipeDraftState::InactiveDraft ||
                  state->DraftState ==
-                     SandboxEditorRenderRecipeDraftState::Canceled))
+                     EditorRenderRecipeDraftState::Canceled))
             {
                 return MakeRenderRecipeCommandResult(
-                    SandboxEditorRenderRecipeCommandStatus::NoChange,
+                    EditorRenderRecipeCommandStatus::NoChange,
                     state);
             }
             state->DraftDocument.clear();
             state->HasLastPreview = false;
-            state->DraftState = SandboxEditorRenderRecipeDraftState::Canceled;
+            state->DraftState = EditorRenderRecipeDraftState::Canceled;
             ++state->DraftRevision;
             return MakeRenderRecipeCommandResult(
-                SandboxEditorRenderRecipeCommandStatus::Canceled,
+                EditorRenderRecipeCommandStatus::Canceled,
                 state);
         }
         case Kind::PublishArtifact:
         {
             if (context.RenderArtifacts == nullptr)
             {
-                return SandboxEditorRenderRecipeCommandResult{
-                    .Status = SandboxEditorRenderRecipeCommandStatus::MissingArtifactRegistry,
+                return EditorRenderRecipeCommandResult{
+                    .Status = EditorRenderRecipeCommandStatus::MissingArtifactRegistry,
                 };
             }
             const std::string targetUri = command.TargetUri.empty()
@@ -581,14 +582,14 @@ namespace Extrinsic::Runtime
                     });
             return MakeRenderRecipeArtifactResult(
                 operation,
-                SandboxEditorRenderRecipeCommandStatus::Published);
+                EditorRenderRecipeCommandStatus::Published);
         }
         case Kind::ApplyArtifact:
         {
             if (context.RenderArtifacts == nullptr)
             {
-                return SandboxEditorRenderRecipeCommandResult{
-                    .Status = SandboxEditorRenderRecipeCommandStatus::MissingArtifactRegistry,
+                return EditorRenderRecipeCommandResult{
+                    .Status = EditorRenderRecipeCommandStatus::MissingArtifactRegistry,
                 };
             }
             RenderArtifactOperationResult operation =
@@ -608,12 +609,12 @@ namespace Extrinsic::Runtime
                     });
             return MakeRenderRecipeArtifactResult(
                 operation,
-                SandboxEditorRenderRecipeCommandStatus::Applied);
+                EditorRenderRecipeCommandStatus::Applied);
         }
         }
 
         return MakeRenderRecipeCommandResult(
-            SandboxEditorRenderRecipeCommandStatus::NoChange,
+            EditorRenderRecipeCommandStatus::NoChange,
             state);
     }
 

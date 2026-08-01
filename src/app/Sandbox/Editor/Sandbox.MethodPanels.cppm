@@ -13,18 +13,20 @@ module;
 
 export module Extrinsic.Sandbox.Editor.MethodPanels;
 
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Sandbox.Editor.Shell;
 
 export namespace Extrinsic::Sandbox::Editor
 {
     using SandboxParameterizationPanelConfig = decltype(
-        Runtime::SandboxEditorParameterizationConfigCommand{}.Config);
+        Runtime::EditorParameterizationConfigCommand{}.Config);
 
     struct SandboxParameterizationStrategyOption
     {
-        Runtime::SandboxEditorParameterizationStrategy Strategy{
-            Runtime::SandboxEditorParameterizationStrategy::Lscm};
+        Runtime::EditorParameterizationStrategy Strategy{
+            Runtime::EditorParameterizationStrategy::Lscm};
         std::string_view Label{};
         std::string_view StableToken{};
     };
@@ -34,8 +36,8 @@ export namespace Extrinsic::Sandbox::Editor
 
     struct SandboxParameterizationPanelApplyRequest
     {
-        Runtime::SandboxEditorParameterizationConfigCommand Config{};
-        Runtime::SandboxEditorConfiguredParameterizationCommand Execute{};
+        Runtime::EditorParameterizationConfigCommand Config{};
+        Runtime::EditorConfiguredParameterizationCommand Execute{};
     };
 
     [[nodiscard]] std::optional<SandboxParameterizationPanelApplyRequest>
@@ -45,8 +47,8 @@ export namespace Extrinsic::Sandbox::Editor
 
     struct SandboxParameterizationPanelActionResult
     {
-        Runtime::SandboxEditorParameterizationConfigResult Config{};
-        std::optional<Runtime::SandboxEditorParameterizationResult> Execution{};
+        Runtime::EditorParameterizationConfigResult Config{};
+        std::optional<Runtime::EditorParameterizationResult> Execution{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -57,7 +59,7 @@ export namespace Extrinsic::Sandbox::Editor
 
     [[nodiscard]] SandboxParameterizationPanelActionResult
     ApplySandboxParameterizationPanelAction(
-        const Runtime::SandboxEditorContext& context,
+        const SandboxEditorContext& context,
         std::uint32_t stableEntityId,
         const SandboxParameterizationPanelConfig& config);
 
@@ -87,7 +89,7 @@ export namespace Extrinsic::Sandbox::Editor
 
     [[nodiscard]] SandboxParameterizationUvProjection
     BuildSandboxParameterizationUvProjection(
-        const Runtime::SandboxEditorParameterizationViewModel& model,
+        const Runtime::EditorParameterizationViewModel& model,
         const SandboxParameterizationUvPane& pane);
 
     [[nodiscard]] glm::vec2 ProjectSandboxParameterizationUvPoint(
@@ -113,7 +115,7 @@ export namespace Extrinsic::Sandbox::Editor
 
     [[nodiscard]] SandboxParameterizationResultSummary
     BuildSandboxParameterizationResultSummary(
-        const Runtime::SandboxEditorParameterizationResult& result);
+        const Runtime::EditorParameterizationResult& result);
 
     class MethodPanels final
     {

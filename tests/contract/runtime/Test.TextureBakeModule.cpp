@@ -3,7 +3,12 @@
 #include <gtest/gtest.h>
 
 import Extrinsic.Runtime.GeometryPresentation;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.TextureBakeModule;
 import Geometry.Properties;
 
@@ -11,20 +16,20 @@ namespace Runtime = Extrinsic::Runtime;
 
 TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
 {
-    const std::vector<Runtime::SandboxEditorTextureBakeTarget> targets{
-        Runtime::SandboxEditorTextureBakeTarget{
+    const std::vector<Runtime::EditorTextureBakeTarget> targets{
+        Runtime::EditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic =
                 Runtime::GeometryPresentationSlotSemantic::Albedo,
         },
-        Runtime::SandboxEditorTextureBakeTarget{
+        Runtime::EditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic =
                 Runtime::GeometryPresentationSlotSemantic::ScalarField,
         },
     };
     const Runtime::PropertyTextureBakeRepresentation representation =
-        Runtime::ResolveSandboxEditorTextureBakeTargetRepresentation(
+        Runtime::ResolveEditorTextureBakeTargetRepresentation(
             Geometry::PropertyValueKind::Float,
             Runtime::PropertyTextureBakeStorage::Auto,
             Runtime::PropertyTextureBakeEncoding::Auto,
@@ -36,12 +41,12 @@ TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
     EXPECT_EQ(
         representation.Encoding,
         Runtime::PropertyTextureBakeEncoding::LinearScalar);
-    EXPECT_TRUE(Runtime::IsSandboxEditorTextureBakeTargetCompatible(
+    EXPECT_TRUE(Runtime::IsEditorTextureBakeTargetCompatible(
         targets[0],
         Geometry::PropertyValueKind::Float,
         representation.Storage,
         representation.Encoding));
-    EXPECT_TRUE(Runtime::IsSandboxEditorTextureBakeTargetCompatible(
+    EXPECT_TRUE(Runtime::IsEditorTextureBakeTargetCompatible(
         targets[1],
         Geometry::PropertyValueKind::Float,
         representation.Storage,
@@ -50,15 +55,15 @@ TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
 
 TEST(RuntimeTextureBakeModule, NormalAndLabelDefaultsChooseEncodedStorage)
 {
-    const std::vector<Runtime::SandboxEditorTextureBakeTarget> normalTargets{
-        Runtime::SandboxEditorTextureBakeTarget{
+    const std::vector<Runtime::EditorTextureBakeTarget> normalTargets{
+        Runtime::EditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic =
                 Runtime::GeometryPresentationSlotSemantic::Normal,
         },
     };
     const auto normal =
-        Runtime::ResolveSandboxEditorTextureBakeTargetRepresentation(
+        Runtime::ResolveEditorTextureBakeTargetRepresentation(
             Geometry::PropertyValueKind::Vec3,
             Runtime::PropertyTextureBakeStorage::Auto,
             Runtime::PropertyTextureBakeEncoding::Auto,
@@ -69,21 +74,21 @@ TEST(RuntimeTextureBakeModule, NormalAndLabelDefaultsChooseEncodedStorage)
     EXPECT_EQ(
         normal.Encoding,
         Runtime::PropertyTextureBakeEncoding::Normal);
-    EXPECT_TRUE(Runtime::IsSandboxEditorTextureBakeTargetCompatible(
+    EXPECT_TRUE(Runtime::IsEditorTextureBakeTargetCompatible(
         normalTargets.front(),
         Geometry::PropertyValueKind::Vec3,
         normal.Storage,
         normal.Encoding));
 
-    const std::vector<Runtime::SandboxEditorTextureBakeTarget> albedoTargets{
-        Runtime::SandboxEditorTextureBakeTarget{
+    const std::vector<Runtime::EditorTextureBakeTarget> albedoTargets{
+        Runtime::EditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic =
                 Runtime::GeometryPresentationSlotSemantic::Albedo,
         },
     };
     const auto label =
-        Runtime::ResolveSandboxEditorTextureBakeTargetRepresentation(
+        Runtime::ResolveEditorTextureBakeTargetRepresentation(
             Geometry::PropertyValueKind::UInt32,
             Runtime::PropertyTextureBakeStorage::Auto,
             Runtime::PropertyTextureBakeEncoding::Auto,

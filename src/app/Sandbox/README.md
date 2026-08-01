@@ -28,8 +28,9 @@ input policy similarly imports `Extrinsic.Runtime.InputActions` and registers
 against the published `RuntimeInputActionRegistry`, with no Engine forwarding
 method.
 `Sandbox.ConfigSections` is the pre-boot composition surface for the current
-`sandbox.progressive_poisson` and `sandbox.parameterization` records. The
-runtime module owns their typed DTOs/codecs. `main.cpp` constructs the
+`sandbox.clustering`, `sandbox.progressive_poisson`, and
+`sandbox.parameterization` records. Their runtime feature modules own the typed
+DTOs/codecs. `main.cpp` constructs the
 app-composed `Runtime::EngineConfigControl` first, gives it the registered
 Sandbox section registry, resolves boot config through that exact control's
 `SectionRegistry()`, and then moves the same control object into
@@ -42,7 +43,7 @@ but editor recipe and engine-config command surfaces truthfully remain
 unavailable with null state and empty callbacks.
 
 Sandbox also composes the optional `Runtime::SceneDocumentModule`. The
-presentation-free editor facade resolves that exact module and its exact owned
+presentation-free scene operation path resolves that exact module and its exact owned
 `Runtime::EditorCommandHistory` through `Engine::Services()`; it never calls an
 Engine document/history/scene getter. `File / Scene` save/open/new/close,
 last-file-event presentation, dirty state, undo, and redo therefore share the
@@ -70,7 +71,7 @@ rather than a performance claim.
 Sandbox separately composes optional `Runtime::SceneInteractionModule`. It
 owns one active-world interaction cohort—selection, stable lookup, pick
 readback/refinement, gizmo drag/undo/scratch/packets—and publishes the exact
-module plus exact `SelectionController`. The editor/default-policy facades
+module plus exact `SelectionController`. The editor operations and app default policy
 resolve those services once; they never call an Engine interaction getter.
 Camera and completed UI capture reach interaction through deterministic typed
 viewport hooks. Render extraction receives only a copied, world-tagged
@@ -95,23 +96,24 @@ optional `Runtime.EditorUiModule`; the shell resolves its Engine-free
 registered window handle, and unregisters them before detach. The shell owns
 the ten core Sandbox windows, menu composition, ImGui state, and frame
 presentation while the module owns adapter/overlay/action/hook lifecycle.
-Runtime exposes the presentation-free
-`Runtime.SandboxEditorFacades` models, commands, result sinks, and attached
-session. `Sandbox.Editor.MethodPanels` owns the K-Means, Progressive Poisson,
+Runtime exposes presentation-free workspace snapshots, job projections, and
+focused scene, geometry, visualization, and render-recipe operations. The shell
+copies prepared bindings/snapshots into app-owned `SandboxEditorContext` and
+`SandboxEditorFrame` records. `Sandbox.Editor.MethodPanels` owns the K-Means, Progressive Poisson,
 and parameterization ImGui controls and registers six domain windows through
-the shell's context-aware contribution facade. The app
+the shell's context-aware contribution seam. The app
 continues to import the same runtime module surface. `Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
 registers those nine windows under their existing menu paths, owns their ImGui
-input/result-presentation state, and consumes only runtime models and command
-facades. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
+input/result-presentation state, and consumes only runtime snapshots and typed
+operations. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
 Properties, and Selection windows for Mesh, Graph, and PointCloud plus
 PointCloud Remove Outliers. It owns their menu paths, lazy per-frame model
 cache, texture-bake and property-widget draft state, outlier controls, and
 result presentation. K-Means and Progressive Poisson command/config/result
-implementations compile in a private runtime facade unit; all other panel
-models, processing commands, history/jobs, validation, and result sinks likewise
+implementations compile in a private runtime operation unit; all other feature
+snapshots, processing commands, history/jobs, validation, and result sinks likewise
 remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
 dependencies. Import authoring, direct-mesh postprocess, selection, and focus
 are fields of the runtime-owned `AssetImportRecipe`; Sandbox owns no import
@@ -142,7 +144,7 @@ import recipe policy remain runtime/asset owned; the sandbox app only requests
 the workflow.
 
 `File / Import` is a linear path -> payload-hint -> import workflow. The path
-field remains editable whenever the window is bound, while the runtime facade
+field remains editable whenever the window is bound, while the runtime scene snapshot
 independently reports whether the payload chooser and import command are ready.
 Single-payload formats may keep the `Unknown` hint as automatic resolution;
 ambiguous PLY input requires an explicit mesh or point-cloud hint. Disabled
@@ -167,16 +169,16 @@ The promoted editor also exposes stable top-level ImGui menu slots for
 domain windows for render-hint status, visualization/spatial-debug controls,
 primitive-selection details, and processing-discovery affordances. These
 windows are registered by the app-owned `Sandbox.Editor.DomainPanels` module
-through `Sandbox.Editor.Shell`'s contribution facade backed by
+through `Sandbox.Editor.Shell`'s contribution seam backed by
 `Runtime.EditorWindowRegistry`; runtime has no fixed Sandbox windows or
-presentation state. The panels reuse `Runtime.SandboxEditorFacades` models,
+presentation state. The panels reuse focused runtime feature snapshots,
 the callback-scoped selected-mesh property view, and runtime-owned command
 surfaces, and the sandbox app
 still does not own selection, ECS mutation, method jobs, rendering, or asset
 state.
 
 `Mesh > Processing > Parameterize (UV)` exposes exactly the four CPU strategies
-implemented by the runtime facade: LSCM, harmonic cotangent, uniform Tutte, and
+implemented by `Runtime.GeometryProcessingOperations`: LSCM, harmonic cotangent, uniform Tutte, and
 Boundary First Flattening. Its controls keep an explicit panel-local draft for
 the selected strategy's typed values; edits remain marked as unapplied until
 the user applies or reloads the draft. Applying routes through the validated

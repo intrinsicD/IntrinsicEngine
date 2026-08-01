@@ -2,6 +2,13 @@
 id: BUG-096
 theme: G
 depends_on: [RUNTIME-192, RUNTIME-194]
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 maturity_target: CPUContracted
 ---
 # BUG-096 — ICP point-to-plane ignores target normals
@@ -24,9 +31,9 @@ maturity_target: CPUContracted
   the public geometry registration contract. Geometry owns ICP mathematics;
   runtime owns ECS property lookup, world-space conversion, async snapshot
   validity, and editor-facing command/result state.
-- Both synchronous and queued runtime registration call
-  `AlignPointClouds(prealignedSourceWorld, targetWorld, {}, params)`, passing an
-  empty target-normal span even when the target has `v:normal`.
+- Both synchronous and queued branches in `ApplyEditorRegistrationCommand`
+  call `Geometry::Registration::AlignICP` with an empty target-normal span even
+  when the target has `v:normal`.
 - `Geometry.Registration` currently changes the effective variant from
   `PointToPlane` to `PointToPoint` when target normals are empty or
   count-mismatched. The runtime result retains the requested command variant,
@@ -51,7 +58,7 @@ maturity_target: CPUContracted
       stable prerequisite/status reason and must not mutate the source.
 - [ ] Transform target normals into world space with the inverse-transpose
       normal transform and normalize them before calling
-      `Geometry::AlignPointClouds`.
+      `Geometry::Registration::AlignICP`.
 - [ ] Pass the validated target-normal span through the typed registration
       operation on `JobService`. Include its source-property generation in
       staleness validation so a normal edit before apply discards the result;
@@ -81,9 +88,8 @@ maturity_target: CPUContracted
 - [ ] Add a queued stale case that edits target normals after submission and
       proves the completion is discarded without applying the old transform.
 - [ ] Pin requested/effective variant reporting and point-to-point behavior in
-      the typed registration-operation tests. `RUNTIME-202` may delete the
-      thin `RegistrationAlignment` production wrapper after this behavior is
-      covered through its owner.
+      the typed registration-operation tests. `RUNTIME-202` deleted the thin
+      standalone wrapper; extend `GeometryProcessingOperations` directly.
 
 ## Docs
 - [ ] Document the runtime point-to-plane prerequisites, world-space normal
@@ -110,10 +116,9 @@ maturity_target: CPUContracted
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci \
-  --target IntrinsicRuntimeContractTests IntrinsicRuntimeUnitTests
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
 ctest --test-dir build/ci --output-on-failure \
-  -R '^SandboxEditorUi\.(RegistrationPointToPlaneUsesTargetNormals|QueuedRegistrationPointToPlaneUsesTargetNormals|RegistrationPointToPlaneRejectsInvalidTargetNormals|QueuedRegistrationPointToPlaneDiscardsStaleTargetNormals)$|^RuntimeRegistrationAlignment\.' \
+  -R '^SandboxEditorUi\.(RegistrationPointToPlaneUsesTargetNormals|QueuedRegistrationPointToPlaneUsesTargetNormals|RegistrationPointToPlaneRejectsInvalidTargetNormals|QueuedRegistrationPointToPlaneDiscardsStaleTargetNormals)$' \
   --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure \

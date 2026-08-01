@@ -17,8 +17,11 @@ module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 
 import Extrinsic.Sandbox.Editor.Shell;
 
+import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorWindowRegistry;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.SelectionController;
 
 namespace Extrinsic::Sandbox::Editor
@@ -26,45 +29,45 @@ namespace Extrinsic::Sandbox::Editor
     namespace
     {
         using MeshNormalWeighting = decltype(
-            Runtime::SandboxEditorMeshVertexNormalsCommand{}.Weighting);
+            Runtime::EditorMeshVertexNormalsCommand{}.Weighting);
         using PointNormalOrientation = decltype(
-            Runtime::SandboxEditorPointCloudVertexNormalsCommand{}.Orientation);
-        constexpr std::array<Runtime::SandboxEditorMeshDenoiseStage, 1>
+            Runtime::EditorPointCloudVertexNormalsCommand{}.Orientation);
+        constexpr std::array<Runtime::EditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
-                Runtime::SandboxEditorMeshDenoiseStage::FullBilateral,
+                Runtime::EditorMeshDenoiseStage::FullBilateral,
             }};
-        constexpr std::array<Runtime::SandboxEditorMeshCurvatureOutput, 4>
+        constexpr std::array<Runtime::EditorMeshCurvatureOutput, 4>
             kMeshCurvatureOutputs{{
-                Runtime::SandboxEditorMeshCurvatureOutput::All,
-                Runtime::SandboxEditorMeshCurvatureOutput::Mean,
-                Runtime::SandboxEditorMeshCurvatureOutput::Gaussian,
-                Runtime::SandboxEditorMeshCurvatureOutput::PrincipalDirections,
+                Runtime::EditorMeshCurvatureOutput::All,
+                Runtime::EditorMeshCurvatureOutput::Mean,
+                Runtime::EditorMeshCurvatureOutput::Gaussian,
+                Runtime::EditorMeshCurvatureOutput::PrincipalDirections,
             }};
-        constexpr std::array<Runtime::SandboxEditorMeshRemeshMode, 2>
+        constexpr std::array<Runtime::EditorMeshRemeshMode, 2>
             kMeshRemeshModes{{
-                Runtime::SandboxEditorMeshRemeshMode::Uniform,
-                Runtime::SandboxEditorMeshRemeshMode::Adaptive,
+                Runtime::EditorMeshRemeshMode::Uniform,
+                Runtime::EditorMeshRemeshMode::Adaptive,
             }};
-        constexpr std::array<Runtime::SandboxEditorMeshRemeshSizingLaw, 2>
+        constexpr std::array<Runtime::EditorMeshRemeshSizingLaw, 2>
             kMeshRemeshSizingLaws{{
-                Runtime::SandboxEditorMeshRemeshSizingLaw::MeanCurvature,
-                Runtime::SandboxEditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
+                Runtime::EditorMeshRemeshSizingLaw::MeanCurvature,
+                Runtime::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
             }};
-        constexpr std::array<Runtime::SandboxEditorMeshSubdivideOperator, 3>
+        constexpr std::array<Runtime::EditorMeshSubdivideOperator, 3>
             kMeshSubdivideOperators{{
-                Runtime::SandboxEditorMeshSubdivideOperator::Loop,
-                Runtime::SandboxEditorMeshSubdivideOperator::CatmullClark,
-                Runtime::SandboxEditorMeshSubdivideOperator::Sqrt3,
+                Runtime::EditorMeshSubdivideOperator::Loop,
+                Runtime::EditorMeshSubdivideOperator::CatmullClark,
+                Runtime::EditorMeshSubdivideOperator::Sqrt3,
             }};
-        constexpr std::array<Runtime::SandboxEditorMeshSimplifyMetric, 2>
+        constexpr std::array<Runtime::EditorMeshSimplifyMetric, 2>
             kMeshSimplifyMetrics{{
-                Runtime::SandboxEditorMeshSimplifyMetric::ClassicalQEM,
-                Runtime::SandboxEditorMeshSimplifyMetric::FA_QEM,
+                Runtime::EditorMeshSimplifyMetric::ClassicalQEM,
+                Runtime::EditorMeshSimplifyMetric::FA_QEM,
             }};
-        constexpr std::array<Runtime::SandboxEditorICPVariant, 2>
+        constexpr std::array<Runtime::EditorICPVariant, 2>
             kIcpVariants{{
-                Runtime::SandboxEditorICPVariant::PointToPoint,
-                Runtime::SandboxEditorICPVariant::PointToPlane,
+                Runtime::EditorICPVariant::PointToPoint,
+                Runtime::EditorICPVariant::PointToPlane,
             }};
         constexpr std::array<MeshNormalWeighting, 4> kMeshNormalWeightings{{
             static_cast<MeshNormalWeighting>(0),
@@ -138,39 +141,39 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         [[nodiscard]] bool DomainWindowReady(
-            const Runtime::SandboxEditorDomainWindowModel& model) noexcept
+            const Runtime::EditorDomainWindowModel& model) noexcept
         {
             return model.HasSelectedEntity && model.DomainMatches;
         }
 
         [[nodiscard]] const char* MeshDenoiseStageName(
-            const Runtime::SandboxEditorMeshDenoiseStage stage) noexcept
+            const Runtime::EditorMeshDenoiseStage stage) noexcept
         {
             return stage ==
-                    Runtime::SandboxEditorMeshDenoiseStage::FullBilateral
+                    Runtime::EditorMeshDenoiseStage::FullBilateral
                 ? "Full bilateral"
                 : "Unknown";
         }
 
         void DrawDiagnostics(
-            const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics)
+            const std::vector<Runtime::EditorDiagnostic>& diagnostics)
         {
-            for (const Runtime::SandboxEditorDiagnostic& diagnostic : diagnostics)
+            for (const Runtime::EditorDiagnostic& diagnostic : diagnostics)
             {
                 ImGui::TextDisabled(
                     "%s: %s",
-                    Runtime::DebugNameForSandboxEditorDiagnosticCode(
+                    Runtime::DebugNameForEditorDiagnosticCode(
                         diagnostic.Code),
                     diagnostic.Message.c_str());
             }
         }
 
         void DrawDomainWindowHeader(
-            const Runtime::SandboxEditorDomainWindowModel& model)
+            const Runtime::EditorDomainWindowModel& model)
         {
             ImGui::Text(
                 "Expected domain: %s",
-                Runtime::DebugNameForSandboxEditorGeometryDomain(
+                Runtime::DebugNameForEditorGeometryDomain(
                     model.ExpectedDomain));
             if (model.HasSelectedEntity)
             {
@@ -180,7 +183,7 @@ namespace Extrinsic::Sandbox::Editor
                     model.SelectedStableId);
                 ImGui::Text(
                     "Selected domain: %s",
-                    Runtime::DebugNameForSandboxEditorGeometryDomain(
+                    Runtime::DebugNameForEditorGeometryDomain(
                         model.SelectedDomain));
             }
             else
@@ -215,7 +218,7 @@ namespace Extrinsic::Sandbox::Editor
     {
         struct DenoiseState
         {
-            std::optional<Runtime::SandboxEditorMeshDenoiseResult> LastResult{};
+            std::optional<Runtime::EditorMeshDenoiseResult> LastResult{};
             std::int32_t Stage{0};
             std::int32_t NormalIterations{5};
             std::int32_t VertexIterations{10};
@@ -226,14 +229,14 @@ namespace Extrinsic::Sandbox::Editor
 
         struct CurvatureState
         {
-            std::optional<Runtime::SandboxEditorMeshCurvatureResult> LastResult{};
+            std::optional<Runtime::EditorMeshCurvatureResult> LastResult{};
             std::int32_t Output{0};
             bool PublishPrincipalDirections{true};
         };
 
         struct RemeshState
         {
-            std::optional<Runtime::SandboxEditorMeshRemeshResult> LastResult{};
+            std::optional<Runtime::EditorMeshRemeshResult> LastResult{};
             std::int32_t Mode{0};
             std::int32_t SizingLaw{0};
             std::int32_t Iterations{1};
@@ -243,7 +246,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct SubdivideState
         {
-            std::optional<Runtime::SandboxEditorMeshSubdivideResult> LastResult{};
+            std::optional<Runtime::EditorMeshSubdivideResult> LastResult{};
             std::int32_t Operator{0};
             std::int32_t Iterations{1};
             bool PreserveLoopFeatures{false};
@@ -251,7 +254,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct SimplifyState
         {
-            std::optional<Runtime::SandboxEditorMeshSimplifyResult> LastResult{};
+            std::optional<Runtime::EditorMeshSimplifyResult> LastResult{};
             std::int32_t Metric{1};
             std::int32_t TargetFaces{0};
             float MaxError{0.0f};
@@ -266,7 +269,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct MeshNormalsState
         {
-            std::optional<Runtime::SandboxEditorMeshVertexNormalsResult>
+            std::optional<Runtime::EditorMeshVertexNormalsResult>
                 LastResult{};
             std::int32_t Weighting{1};
             glm::vec3 Fallback{0.0f, 1.0f, 0.0f};
@@ -274,7 +277,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct GraphNormalsState
         {
-            std::optional<Runtime::SandboxEditorGraphVertexNormalsResult>
+            std::optional<Runtime::EditorGraphVertexNormalsResult>
                 LastResult{};
             glm::vec3 Fallback{0.0f, 0.0f, 1.0f};
             bool OrientTowardFallback{true};
@@ -282,7 +285,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct PointNormalsState
         {
-            std::optional<Runtime::SandboxEditorPointCloudVertexNormalsResult>
+            std::optional<Runtime::EditorPointCloudVertexNormalsResult>
                 LastResult{};
             std::int32_t KNeighbors{15};
             std::int32_t MinimumNeighbors{2};
@@ -294,7 +297,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct RegistrationState
         {
-            std::optional<Runtime::SandboxEditorRegistrationResult> LastResult{};
+            std::optional<Runtime::EditorRegistrationResult> LastResult{};
             std::int32_t Variant{0};
             std::int32_t MaxIterations{50};
             float MaxCorrespondenceDistance{0.0f};
@@ -305,16 +308,16 @@ namespace Extrinsic::Sandbox::Editor
 
         using DrawWindow = void (Impl::*)(
             bool&,
-            const Runtime::SandboxEditorContext&);
+            const SandboxEditorContext&);
         using DrawDomainControls = void (Impl::*)(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
 
         EditorShell* Shell{nullptr};
         std::vector<Runtime::EditorWindowHandle> Handles{};
         int CachedModelFrame{-1};
         std::array<
-            std::optional<Runtime::SandboxEditorDomainWindowModel>,
+            std::optional<Runtime::EditorDomainWindowModel>,
             3u>
             CachedDomainModels{};
         DenoiseState Denoise{};
@@ -335,51 +338,51 @@ namespace Extrinsic::Sandbox::Editor
             std::string title,
             DrawWindow draw);
         void ResetModelCache();
-        [[nodiscard]] const Runtime::SandboxEditorDomainWindowModel&
+        [[nodiscard]] const Runtime::EditorDomainWindowModel&
         GetDomainWindowModel(
-            const Runtime::SandboxEditorContext& context,
-            Runtime::SandboxEditorDomainWindowKind kind);
+            const SandboxEditorContext& context,
+            Runtime::EditorDomainWindowKind kind);
         void DrawDomainWindow(
             bool& open,
-            const Runtime::SandboxEditorContext& context,
-            Runtime::SandboxEditorDomainWindowKind kind,
+            const SandboxEditorContext& context,
+            Runtime::EditorDomainWindowKind kind,
             const char* title,
             DrawDomainControls draw);
 
-        void DrawDenoiseWindow(bool&, const Runtime::SandboxEditorContext&);
-        void DrawCurvatureWindow(bool&, const Runtime::SandboxEditorContext&);
-        void DrawRemeshWindow(bool&, const Runtime::SandboxEditorContext&);
-        void DrawSubdivideWindow(bool&, const Runtime::SandboxEditorContext&);
-        void DrawSimplifyWindow(bool&, const Runtime::SandboxEditorContext&);
-        void DrawMeshNormalsWindow(bool&, const Runtime::SandboxEditorContext&);
-        void DrawGraphNormalsWindow(bool&, const Runtime::SandboxEditorContext&);
-        void DrawPointNormalsWindow(bool&, const Runtime::SandboxEditorContext&);
-        void DrawRegistrationWindow(bool&, const Runtime::SandboxEditorContext&);
+        void DrawDenoiseWindow(bool&, const SandboxEditorContext&);
+        void DrawCurvatureWindow(bool&, const SandboxEditorContext&);
+        void DrawRemeshWindow(bool&, const SandboxEditorContext&);
+        void DrawSubdivideWindow(bool&, const SandboxEditorContext&);
+        void DrawSimplifyWindow(bool&, const SandboxEditorContext&);
+        void DrawMeshNormalsWindow(bool&, const SandboxEditorContext&);
+        void DrawGraphNormalsWindow(bool&, const SandboxEditorContext&);
+        void DrawPointNormalsWindow(bool&, const SandboxEditorContext&);
+        void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
 
         void DrawDenoiseControls(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
         void DrawCurvatureControls(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
         void DrawRemeshControls(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
         void DrawSubdivideControls(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
         void DrawSimplifyControls(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
         void DrawMeshNormalsControls(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
         void DrawGraphNormalsControls(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
         void DrawPointNormalsControls(
-            const Runtime::SandboxEditorDomainWindowModel&,
-            const Runtime::SandboxEditorContext&);
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
     };
 
     void MeshProcessingPanels::Impl::Register(
@@ -452,7 +455,7 @@ namespace Extrinsic::Sandbox::Editor
                 .Draw =
                     [this, draw](
                         bool& open,
-                        const Runtime::SandboxEditorContext& context)
+                        const SandboxEditorContext& context)
                     {
                         (this->*draw)(open, context);
                     },
@@ -471,10 +474,10 @@ namespace Extrinsic::Sandbox::Editor
             model.reset();
     }
 
-    const Runtime::SandboxEditorDomainWindowModel&
+    const Runtime::EditorDomainWindowModel&
     MeshProcessingPanels::Impl::GetDomainWindowModel(
-        const Runtime::SandboxEditorContext& context,
-        const Runtime::SandboxEditorDomainWindowKind kind)
+        const SandboxEditorContext& context,
+        const Runtime::EditorDomainWindowKind kind)
     {
         const int frame = ImGui::GetFrameCount();
         if (CachedModelFrame != frame)
@@ -486,7 +489,7 @@ namespace Extrinsic::Sandbox::Editor
         auto& model = CachedDomainModels[static_cast<std::size_t>(kind)];
         if (!model.has_value())
         {
-            model = Runtime::BuildSandboxEditorDomainWindowModel(context, kind);
+            model = Runtime::BuildEditorDomainWindowModel(context.SnapshotQueries, kind);
         }
         else if (context.ModelBuildStats != nullptr)
         {
@@ -497,8 +500,8 @@ namespace Extrinsic::Sandbox::Editor
 
     void MeshProcessingPanels::Impl::DrawDomainWindow(
         bool& open,
-        const Runtime::SandboxEditorContext& context,
-        const Runtime::SandboxEditorDomainWindowKind kind,
+        const SandboxEditorContext& context,
+        const Runtime::EditorDomainWindowKind kind,
         const char* title,
         const DrawDomainControls draw)
     {
@@ -506,7 +509,7 @@ namespace Extrinsic::Sandbox::Editor
             ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
         if (ImGui::Begin(title, &open))
         {
-            const Runtime::SandboxEditorDomainWindowModel& model =
+            const Runtime::EditorDomainWindowModel& model =
                 GetDomainWindowModel(context, kind);
             DrawDomainWindowHeader(model);
             DrawDiagnostics(model.Processing.Diagnostics);
@@ -525,80 +528,80 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawDenoiseWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
         DrawDomainWindow(
-            open, context, Runtime::SandboxEditorDomainWindowKind::Mesh,
+            open, context, Runtime::EditorDomainWindowKind::Mesh,
             "Mesh / Processing / Denoise", &Impl::DrawDenoiseControls);
     }
 
     void MeshProcessingPanels::Impl::DrawCurvatureWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
         DrawDomainWindow(
-            open, context, Runtime::SandboxEditorDomainWindowKind::Mesh,
+            open, context, Runtime::EditorDomainWindowKind::Mesh,
             "Mesh / Processing / Curvature", &Impl::DrawCurvatureControls);
     }
 
     void MeshProcessingPanels::Impl::DrawRemeshWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
         DrawDomainWindow(
-            open, context, Runtime::SandboxEditorDomainWindowKind::Mesh,
+            open, context, Runtime::EditorDomainWindowKind::Mesh,
             "Mesh / Processing / Remesh", &Impl::DrawRemeshControls);
     }
 
     void MeshProcessingPanels::Impl::DrawSubdivideWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
         DrawDomainWindow(
-            open, context, Runtime::SandboxEditorDomainWindowKind::Mesh,
+            open, context, Runtime::EditorDomainWindowKind::Mesh,
             "Mesh / Processing / Subdivide", &Impl::DrawSubdivideControls);
     }
 
     void MeshProcessingPanels::Impl::DrawSimplifyWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
         DrawDomainWindow(
-            open, context, Runtime::SandboxEditorDomainWindowKind::Mesh,
+            open, context, Runtime::EditorDomainWindowKind::Mesh,
             "Mesh / Processing / Simplify", &Impl::DrawSimplifyControls);
     }
 
     void MeshProcessingPanels::Impl::DrawMeshNormalsWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
         DrawDomainWindow(
-            open, context, Runtime::SandboxEditorDomainWindowKind::Mesh,
+            open, context, Runtime::EditorDomainWindowKind::Mesh,
             "Mesh / Processing / Vertices / Normals",
             &Impl::DrawMeshNormalsControls);
     }
 
     void MeshProcessingPanels::Impl::DrawGraphNormalsWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
         DrawDomainWindow(
-            open, context, Runtime::SandboxEditorDomainWindowKind::Graph,
+            open, context, Runtime::EditorDomainWindowKind::Graph,
             "Graph / Processing / Vertices / Normals",
             &Impl::DrawGraphNormalsControls);
     }
 
     void MeshProcessingPanels::Impl::DrawPointNormalsWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
         DrawDomainWindow(
-            open, context, Runtime::SandboxEditorDomainWindowKind::PointCloud,
+            open, context, Runtime::EditorDomainWindowKind::PointCloud,
             "PointCloud / Processing / Vertices / Normals",
             &Impl::DrawPointNormalsControls);
     }
 
     void MeshProcessingPanels::Impl::DrawDenoiseControls(
-        const Runtime::SandboxEditorDomainWindowModel& model,
-        const Runtime::SandboxEditorContext& context)
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
     {
-        const Runtime::SandboxEditorGeometryProcessingModel& processing =
+        const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.LastMeshDenoiseResult != nullptr)
-            Denoise.LastResult = *context.LastMeshDenoiseResult;
+        if (context.GeometryResults.LastMeshDenoiseResult.has_value())
+            Denoise.LastResult = *context.GeometryResults.LastMeshDenoiseResult;
         ImGui::SeparatorText("Denoise");
         if (!processing.MeshDenoiseAvailable)
         {
@@ -610,7 +613,7 @@ namespace Extrinsic::Sandbox::Editor
         Denoise.Stage = std::clamp(
             Denoise.Stage, 0,
             static_cast<std::int32_t>(kMeshDenoiseStages.size() - 1u));
-        const Runtime::SandboxEditorMeshDenoiseStage stage =
+        const Runtime::EditorMeshDenoiseStage stage =
             FromIndex(kMeshDenoiseStages, Denoise.Stage);
         if (ImGui::BeginCombo(
                 "Stage##MeshDenoise",
@@ -659,9 +662,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             PublishCommandResult(
                 Denoise.LastResult,
-                Runtime::ApplySandboxEditorMeshDenoiseCommand(
-                    context,
-                    Runtime::SandboxEditorMeshDenoiseCommand{
+                Runtime::ApplyEditorMeshDenoiseCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorMeshDenoiseCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Stage = stage,
                         .NormalIterations = static_cast<std::uint32_t>(
@@ -686,7 +689,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::Text(
             "Last denoise run: %s",
-            Runtime::DebugNameForSandboxEditorCommandStatus(result->Status));
+            Runtime::DebugNameForEditorCommandStatus(result->Status));
         ImGui::Text(
             "Geometry status: %s",
             IndexedName(result->DenoiseStatus, kDenoiseStatusNames));
@@ -718,13 +721,13 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawCurvatureControls(
-        const Runtime::SandboxEditorDomainWindowModel& model,
-        const Runtime::SandboxEditorContext& context)
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
     {
-        const Runtime::SandboxEditorGeometryProcessingModel& processing =
+        const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.LastMeshCurvatureResult != nullptr)
-            Curvature.LastResult = *context.LastMeshCurvatureResult;
+        if (context.GeometryResults.LastMeshCurvatureResult.has_value())
+            Curvature.LastResult = *context.GeometryResults.LastMeshCurvatureResult;
         ImGui::SeparatorText("Curvature");
         if (!processing.MeshCurvatureAvailable)
         {
@@ -736,18 +739,18 @@ namespace Extrinsic::Sandbox::Editor
         Curvature.Output = std::clamp(
             Curvature.Output, 0,
             static_cast<std::int32_t>(kMeshCurvatureOutputs.size() - 1u));
-        const Runtime::SandboxEditorMeshCurvatureOutput output =
+        const Runtime::EditorMeshCurvatureOutput output =
             FromIndex(kMeshCurvatureOutputs, Curvature.Output);
         if (ImGui::BeginCombo(
                 "Output##MeshCurvature",
-                Runtime::DebugNameForSandboxEditorMeshCurvatureOutput(output)))
+                Runtime::DebugNameForEditorMeshCurvatureOutput(output)))
         {
             for (std::size_t i = 0u; i < kMeshCurvatureOutputs.size(); ++i)
             {
                 const bool selected =
                     Curvature.Output == static_cast<std::int32_t>(i);
                 if (ImGui::Selectable(
-                        Runtime::DebugNameForSandboxEditorMeshCurvatureOutput(
+                        Runtime::DebugNameForEditorMeshCurvatureOutput(
                             kMeshCurvatureOutputs[i]),
                         selected))
                 {
@@ -770,9 +773,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             PublishCommandResult(
                 Curvature.LastResult,
-                Runtime::ApplySandboxEditorMeshCurvatureCommand(
-                    context,
-                    Runtime::SandboxEditorMeshCurvatureCommand{
+                Runtime::ApplyEditorMeshCurvatureCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorMeshCurvatureCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Output = output,
                         .PublishPrincipalDirections =
@@ -790,10 +793,10 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::Text(
             "Last curvature run: %s",
-            Runtime::DebugNameForSandboxEditorCommandStatus(result->Status));
+            Runtime::DebugNameForEditorCommandStatus(result->Status));
         ImGui::Text(
             "Output: %s",
-            Runtime::DebugNameForSandboxEditorMeshCurvatureOutput(
+            Runtime::DebugNameForEditorMeshCurvatureOutput(
                 result->Output));
         if (result->Succeeded())
         {
@@ -812,13 +815,13 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawRemeshControls(
-        const Runtime::SandboxEditorDomainWindowModel& model,
-        const Runtime::SandboxEditorContext& context)
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
     {
-        const Runtime::SandboxEditorGeometryProcessingModel& processing =
+        const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.LastMeshRemeshResult != nullptr)
-            Remesh.LastResult = *context.LastMeshRemeshResult;
+        if (context.GeometryResults.LastMeshRemeshResult.has_value())
+            Remesh.LastResult = *context.GeometryResults.LastMeshRemeshResult;
         ImGui::SeparatorText("Remesh");
         if (!processing.MeshRemeshAvailable)
         {
@@ -837,17 +840,17 @@ namespace Extrinsic::Sandbox::Editor
         Remesh.TargetEdgeLength =
             std::clamp(Remesh.TargetEdgeLength, 0.0f, 1.0e6f);
 
-        const Runtime::SandboxEditorMeshRemeshMode mode =
+        const Runtime::EditorMeshRemeshMode mode =
             FromIndex(kMeshRemeshModes, Remesh.Mode);
         if (ImGui::BeginCombo(
                 "Mode##MeshRemesh",
-                Runtime::DebugNameForSandboxEditorMeshRemeshMode(mode)))
+                Runtime::DebugNameForEditorMeshRemeshMode(mode)))
         {
             for (std::size_t i = 0u; i < kMeshRemeshModes.size(); ++i)
             {
                 const auto option = kMeshRemeshModes[i];
                 const bool available =
-                    option == Runtime::SandboxEditorMeshRemeshMode::Uniform
+                    option == Runtime::EditorMeshRemeshMode::Uniform
                     ? processing.MeshRemeshUniformAvailable
                     : processing.MeshRemeshAdaptiveAvailable;
                 if (!available)
@@ -855,7 +858,7 @@ namespace Extrinsic::Sandbox::Editor
                 const bool selected =
                     Remesh.Mode == static_cast<std::int32_t>(i);
                 if (ImGui::Selectable(
-                        Runtime::DebugNameForSandboxEditorMeshRemeshMode(option),
+                        Runtime::DebugNameForEditorMeshRemeshMode(option),
                         selected))
                 {
                     Remesh.Mode = static_cast<std::int32_t>(i);
@@ -874,21 +877,21 @@ namespace Extrinsic::Sandbox::Editor
             0.01f, 0.0f, 1.0e6f);
 
         const bool adaptive =
-            mode == Runtime::SandboxEditorMeshRemeshMode::Adaptive;
+            mode == Runtime::EditorMeshRemeshMode::Adaptive;
         if (!adaptive)
             ImGui::BeginDisabled();
-        const Runtime::SandboxEditorMeshRemeshSizingLaw sizingLaw =
+        const Runtime::EditorMeshRemeshSizingLaw sizingLaw =
             FromIndex(kMeshRemeshSizingLaws, Remesh.SizingLaw);
         if (ImGui::BeginCombo(
                 "Sizing law##MeshRemesh",
-                Runtime::DebugNameForSandboxEditorMeshRemeshSizingLaw(
+                Runtime::DebugNameForEditorMeshRemeshSizingLaw(
                     sizingLaw)))
         {
             for (std::size_t i = 0u; i < kMeshRemeshSizingLaws.size(); ++i)
             {
                 const auto option = kMeshRemeshSizingLaws[i];
                 const bool available =
-                    option != Runtime::SandboxEditorMeshRemeshSizingLaw::
+                    option != Runtime::EditorMeshRemeshSizingLaw::
                                   ErrorBoundedTaubin ||
                     processing.MeshRemeshErrorBoundedSizingAvailable;
                 if (!available)
@@ -896,7 +899,7 @@ namespace Extrinsic::Sandbox::Editor
                 const bool selected =
                     Remesh.SizingLaw == static_cast<std::int32_t>(i);
                 if (ImGui::Selectable(
-                        Runtime::DebugNameForSandboxEditorMeshRemeshSizingLaw(
+                        Runtime::DebugNameForEditorMeshRemeshSizingLaw(
                             option),
                         selected))
                 {
@@ -920,11 +923,11 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndDisabled();
 
         const bool modeAvailable =
-            mode == Runtime::SandboxEditorMeshRemeshMode::Uniform
+            mode == Runtime::EditorMeshRemeshMode::Uniform
             ? processing.MeshRemeshUniformAvailable
             : processing.MeshRemeshAdaptiveAvailable;
         const bool sizingAvailable =
-            sizingLaw != Runtime::SandboxEditorMeshRemeshSizingLaw::
+            sizingLaw != Runtime::EditorMeshRemeshSizingLaw::
                              ErrorBoundedTaubin ||
             processing.MeshRemeshErrorBoundedSizingAvailable;
         const bool projectionAvailable =
@@ -938,9 +941,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             PublishCommandResult(
                 Remesh.LastResult,
-                Runtime::ApplySandboxEditorMeshRemeshCommand(
-                    context,
-                    Runtime::SandboxEditorMeshRemeshCommand{
+                Runtime::ApplyEditorMeshRemeshCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorMeshRemeshCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Mode = mode,
                         .SizingLaw = sizingLaw,
@@ -965,11 +968,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::Text(
             "Last remesh run: %s",
-            Runtime::DebugNameForSandboxEditorCommandStatus(result->Status));
+            Runtime::DebugNameForEditorCommandStatus(result->Status));
         ImGui::Text(
             "Mode: %s  sizing: %s",
-            Runtime::DebugNameForSandboxEditorMeshRemeshMode(result->Mode),
-            Runtime::DebugNameForSandboxEditorMeshRemeshSizingLaw(
+            Runtime::DebugNameForEditorMeshRemeshMode(result->Mode),
+            Runtime::DebugNameForEditorMeshRemeshSizingLaw(
                 result->SizingLaw));
         if (result->Succeeded())
         {
@@ -987,13 +990,13 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawSubdivideControls(
-        const Runtime::SandboxEditorDomainWindowModel& model,
-        const Runtime::SandboxEditorContext& context)
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
     {
-        const Runtime::SandboxEditorGeometryProcessingModel& processing =
+        const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.LastMeshSubdivideResult != nullptr)
-            Subdivide.LastResult = *context.LastMeshSubdivideResult;
+        if (context.GeometryResults.LastMeshSubdivideResult.has_value())
+            Subdivide.LastResult = *context.GeometryResults.LastMeshSubdivideResult;
         ImGui::SeparatorText("Subdivide");
         if (!processing.MeshSubdivideAvailable)
         {
@@ -1006,19 +1009,19 @@ namespace Extrinsic::Sandbox::Editor
             Subdivide.Operator, 0,
             static_cast<std::int32_t>(kMeshSubdivideOperators.size() - 1u));
         Subdivide.Iterations = std::clamp(Subdivide.Iterations, 1, 10);
-        const Runtime::SandboxEditorMeshSubdivideOperator op =
+        const Runtime::EditorMeshSubdivideOperator op =
             FromIndex(kMeshSubdivideOperators, Subdivide.Operator);
         if (ImGui::BeginCombo(
                 "Operator##MeshSubdivide",
-                Runtime::DebugNameForSandboxEditorMeshSubdivideOperator(op)))
+                Runtime::DebugNameForEditorMeshSubdivideOperator(op)))
         {
             for (std::size_t i = 0u; i < kMeshSubdivideOperators.size(); ++i)
             {
                 const auto option = kMeshSubdivideOperators[i];
                 const bool available =
-                    option == Runtime::SandboxEditorMeshSubdivideOperator::Loop
+                    option == Runtime::EditorMeshSubdivideOperator::Loop
                     ? processing.MeshSubdivideLoopAvailable
-                    : option == Runtime::SandboxEditorMeshSubdivideOperator::
+                    : option == Runtime::EditorMeshSubdivideOperator::
                                     CatmullClark
                           ? processing.MeshSubdivideCatmullClarkAvailable
                           : processing.MeshSubdivideSqrt3Available;
@@ -1027,7 +1030,7 @@ namespace Extrinsic::Sandbox::Editor
                 const bool selected =
                     Subdivide.Operator == static_cast<std::int32_t>(i);
                 if (ImGui::Selectable(
-                        Runtime::DebugNameForSandboxEditorMeshSubdivideOperator(
+                        Runtime::DebugNameForEditorMeshSubdivideOperator(
                             option),
                         selected))
                 {
@@ -1044,7 +1047,7 @@ namespace Extrinsic::Sandbox::Editor
             "Iterations##MeshSubdivide", &Subdivide.Iterations,
             1.0f, 1, 10);
         const bool loop =
-            op == Runtime::SandboxEditorMeshSubdivideOperator::Loop;
+            op == Runtime::EditorMeshSubdivideOperator::Loop;
         if (!loop)
             Subdivide.PreserveLoopFeatures = false;
         const bool featureToggleAvailable =
@@ -1058,9 +1061,9 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndDisabled();
 
         const bool operatorAvailable =
-            op == Runtime::SandboxEditorMeshSubdivideOperator::Loop
+            op == Runtime::EditorMeshSubdivideOperator::Loop
             ? processing.MeshSubdivideLoopAvailable
-            : op == Runtime::SandboxEditorMeshSubdivideOperator::CatmullClark
+            : op == Runtime::EditorMeshSubdivideOperator::CatmullClark
                   ? processing.MeshSubdivideCatmullClarkAvailable
                   : processing.MeshSubdivideSqrt3Available;
         const bool canRun =
@@ -1073,9 +1076,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             PublishCommandResult(
                 Subdivide.LastResult,
-                Runtime::ApplySandboxEditorMeshSubdivideCommand(
-                    context,
-                    Runtime::SandboxEditorMeshSubdivideCommand{
+                Runtime::ApplyEditorMeshSubdivideCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorMeshSubdivideCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Operator = op,
                         .Iterations = static_cast<std::uint32_t>(
@@ -1098,10 +1101,10 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::Text(
             "Last subdivide run: %s",
-            Runtime::DebugNameForSandboxEditorCommandStatus(result->Status));
+            Runtime::DebugNameForEditorCommandStatus(result->Status));
         ImGui::Text(
             "Operator: %s",
-            Runtime::DebugNameForSandboxEditorMeshSubdivideOperator(
+            Runtime::DebugNameForEditorMeshSubdivideOperator(
                 result->Operator));
         if (result->Succeeded())
         {
@@ -1119,13 +1122,13 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawSimplifyControls(
-        const Runtime::SandboxEditorDomainWindowModel& model,
-        const Runtime::SandboxEditorContext& context)
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
     {
-        const Runtime::SandboxEditorGeometryProcessingModel& processing =
+        const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.LastMeshSimplifyResult != nullptr)
-            Simplify.LastResult = *context.LastMeshSimplifyResult;
+        if (context.GeometryResults.LastMeshSimplifyResult.has_value())
+            Simplify.LastResult = *context.GeometryResults.LastMeshSimplifyResult;
         ImGui::SeparatorText("Simplify");
         if (!processing.MeshSimplifyAvailable)
         {
@@ -1139,18 +1142,18 @@ namespace Extrinsic::Sandbox::Editor
             static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
         Simplify.TargetFaces = std::max(Simplify.TargetFaces, 0);
         Simplify.MaxError = std::max(Simplify.MaxError, 0.0f);
-        const Runtime::SandboxEditorMeshSimplifyMetric metric =
+        const Runtime::EditorMeshSimplifyMetric metric =
             FromIndex(kMeshSimplifyMetrics, Simplify.Metric);
         if (ImGui::BeginCombo(
                 "Metric##MeshSimplify",
-                Runtime::DebugNameForSandboxEditorMeshSimplifyMetric(metric)))
+                Runtime::DebugNameForEditorMeshSimplifyMetric(metric)))
         {
             for (std::size_t i = 0u; i < kMeshSimplifyMetrics.size(); ++i)
             {
                 const bool selected =
                     Simplify.Metric == static_cast<std::int32_t>(i);
                 if (ImGui::Selectable(
-                        Runtime::DebugNameForSandboxEditorMeshSimplifyMetric(
+                        Runtime::DebugNameForEditorMeshSimplifyMetric(
                             kMeshSimplifyMetrics[i]),
                         selected))
                 {
@@ -1172,7 +1175,7 @@ namespace Extrinsic::Sandbox::Editor
             "Preserve boundary##MeshSimplify", &Simplify.PreserveBoundary);
 
         const bool faQem =
-            metric == Runtime::SandboxEditorMeshSimplifyMetric::FA_QEM;
+            metric == Runtime::EditorMeshSimplifyMetric::FA_QEM;
         if (!faQem)
             ImGui::BeginDisabled();
         if (ImGui::CollapsingHeader(
@@ -1209,9 +1212,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             PublishCommandResult(
                 Simplify.LastResult,
-                Runtime::ApplySandboxEditorMeshSimplifyCommand(
-                    context,
-                    Runtime::SandboxEditorMeshSimplifyCommand{
+                Runtime::ApplyEditorMeshSimplifyCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorMeshSimplifyCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Metric = metric,
                         .TargetFaces = static_cast<std::size_t>(
@@ -1245,10 +1248,10 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::Text(
             "Last simplify run: %s",
-            Runtime::DebugNameForSandboxEditorCommandStatus(result->Status));
+            Runtime::DebugNameForEditorCommandStatus(result->Status));
         ImGui::Text(
             "Metric: %s",
-            Runtime::DebugNameForSandboxEditorMeshSimplifyMetric(
+            Runtime::DebugNameForEditorMeshSimplifyMetric(
                 result->Metric));
         if (result->Succeeded())
         {
@@ -1273,13 +1276,13 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawMeshNormalsControls(
-        const Runtime::SandboxEditorDomainWindowModel& model,
-        const Runtime::SandboxEditorContext& context)
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
     {
-        const Runtime::SandboxEditorGeometryProcessingModel& processing =
+        const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.LastMeshVertexNormalsResult != nullptr)
-            MeshNormals.LastResult = *context.LastMeshVertexNormalsResult;
+        if (context.GeometryResults.LastMeshVertexNormalsResult.has_value())
+            MeshNormals.LastResult = *context.GeometryResults.LastMeshVertexNormalsResult;
         ImGui::SeparatorText("Normals");
         if (!processing.MeshVertexNormalsAvailable)
         {
@@ -1321,9 +1324,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             PublishCommandResult(
                 MeshNormals.LastResult,
-                Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
-                    context,
-                    Runtime::SandboxEditorMeshVertexNormalsCommand{
+                Runtime::ApplyEditorMeshVertexNormalsCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorMeshVertexNormalsCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Weighting = weighting,
                         .FallbackNormal = MeshNormals.Fallback,
@@ -1341,7 +1344,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::Text(
             "Last normals run: %s",
-            Runtime::DebugNameForSandboxEditorCommandStatus(result->Status));
+            Runtime::DebugNameForEditorCommandStatus(result->Status));
         ImGui::Text(
             "Geometry status: %s",
             IndexedName(result->NormalStatus, kMeshNormalStatusNames));
@@ -1373,13 +1376,13 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawGraphNormalsControls(
-        const Runtime::SandboxEditorDomainWindowModel& model,
-        const Runtime::SandboxEditorContext& context)
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
     {
-        const Runtime::SandboxEditorGeometryProcessingModel& processing =
+        const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.LastGraphVertexNormalsResult != nullptr)
-            GraphNormals.LastResult = *context.LastGraphVertexNormalsResult;
+        if (context.GeometryResults.LastGraphVertexNormalsResult.has_value())
+            GraphNormals.LastResult = *context.GeometryResults.LastGraphVertexNormalsResult;
         ImGui::SeparatorText("Normals");
         if (!processing.GraphVertexNormalsAvailable)
         {
@@ -1398,9 +1401,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             PublishCommandResult(
                 GraphNormals.LastResult,
-                Runtime::ApplySandboxEditorGraphVertexNormalsCommand(
-                    context,
-                    Runtime::SandboxEditorGraphVertexNormalsCommand{
+                Runtime::ApplyEditorGraphVertexNormalsCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorGraphVertexNormalsCommand{
                         .StableEntityId = model.SelectedStableId,
                         .FallbackNormal = GraphNormals.Fallback,
                         .OrientTowardFallback =
@@ -1419,7 +1422,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::Text(
             "Last normals run: %s",
-            Runtime::DebugNameForSandboxEditorCommandStatus(result->Status));
+            Runtime::DebugNameForEditorCommandStatus(result->Status));
         ImGui::Text(
             "Geometry status: %s",
             IndexedName(result->NormalStatus, kGraphNormalStatusNames));
@@ -1450,15 +1453,15 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawPointNormalsControls(
-        const Runtime::SandboxEditorDomainWindowModel& model,
-        const Runtime::SandboxEditorContext& context)
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
     {
-        const Runtime::SandboxEditorGeometryProcessingModel& processing =
+        const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.LastPointCloudVertexNormalsResult != nullptr)
+        if (context.GeometryResults.LastPointCloudVertexNormalsResult.has_value())
         {
             PointNormals.LastResult =
-                *context.LastPointCloudVertexNormalsResult;
+                *context.GeometryResults.LastPointCloudVertexNormalsResult;
         }
         ImGui::SeparatorText("Normals");
         if (!processing.PointCloudVertexNormalsAvailable)
@@ -1522,9 +1525,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             PublishCommandResult(
                 PointNormals.LastResult,
-                Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
-                    context,
-                    Runtime::SandboxEditorPointCloudVertexNormalsCommand{
+                Runtime::ApplyEditorPointCloudVertexNormalsCommand(
+                    context.GeometryCommands,
+                    Runtime::EditorPointCloudVertexNormalsCommand{
                         .StableEntityId = model.SelectedStableId,
                         .KNeighbors = static_cast<std::uint32_t>(
                             PointNormals.KNeighbors),
@@ -1548,7 +1551,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::Text(
             "Last normals run: %s",
-            Runtime::DebugNameForSandboxEditorCommandStatus(result->Status));
+            Runtime::DebugNameForEditorCommandStatus(result->Status));
         ImGui::Text(
             "Geometry status: %s",
             IndexedName(result->NormalStatus, kPointNormalStatusNames));
@@ -1587,10 +1590,10 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     void MeshProcessingPanels::Impl::DrawRegistrationWindow(
-        bool& open, const Runtime::SandboxEditorContext& context)
+        bool& open, const SandboxEditorContext& context)
     {
-        if (context.LastRegistrationResult != nullptr)
-            Registration.LastResult = *context.LastRegistrationResult;
+        if (context.GeometryResults.LastRegistrationResult.has_value())
+            Registration.LastResult = *context.GeometryResults.LastRegistrationResult;
         ImGui::SetNextWindowSize(
             ImVec2(360.0f, 320.0f), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("ICP Registration", &open))
@@ -1607,7 +1610,7 @@ namespace Extrinsic::Sandbox::Editor
         if (context.Selection != nullptr)
         {
             for (const std::uint32_t id :
-                 context.Selection->SelectedStableIds())
+                 context.Selection->SelectedStableIds)
             {
                 selected.push_back(id);
             }
@@ -1632,18 +1635,18 @@ namespace Extrinsic::Sandbox::Editor
             Registration.Variant = std::clamp(
                 Registration.Variant, 0,
                 static_cast<std::int32_t>(kIcpVariants.size() - 1u));
-            const Runtime::SandboxEditorICPVariant variant =
+            const Runtime::EditorICPVariant variant =
                 FromIndex(kIcpVariants, Registration.Variant);
             if (ImGui::BeginCombo(
                     "Variant##ICP",
-                    Runtime::DebugNameForSandboxEditorICPVariant(variant)))
+                    Runtime::DebugNameForEditorICPVariant(variant)))
             {
                 for (std::size_t i = 0u; i < kIcpVariants.size(); ++i)
                 {
                     const bool selectedOption =
                         Registration.Variant == static_cast<std::int32_t>(i);
                     std::string label =
-                        Runtime::DebugNameForSandboxEditorICPVariant(
+                        Runtime::DebugNameForEditorICPVariant(
                             kIcpVariants[i]);
                     label += "##ICPVariant" + std::to_string(i);
                     if (ImGui::Selectable(label.c_str(), selectedOption))
@@ -1697,9 +1700,9 @@ namespace Extrinsic::Sandbox::Editor
             {
                 PublishCommandResult(
                     Registration.LastResult,
-                    Runtime::ApplySandboxEditorRegistrationCommand(
-                        context,
-                        Runtime::SandboxEditorRegistrationCommand{
+                    Runtime::ApplyEditorRegistrationCommand(
+                        context.GeometryCommands,
+                        Runtime::EditorRegistrationCommand{
                             .SourceStableEntityId = sourceId,
                             .TargetStableEntityId = targetId,
                             .Variant = variant,
@@ -1721,17 +1724,17 @@ namespace Extrinsic::Sandbox::Editor
         }
         else
         {
-            const Runtime::SandboxEditorRegistrationResult& result =
+            const Runtime::EditorRegistrationResult& result =
                 *Registration.LastResult;
             ImGui::Text(
                 "Last ICP run: %s",
-                Runtime::DebugNameForSandboxEditorCommandStatus(
+                Runtime::DebugNameForEditorCommandStatus(
                     result.Status));
             if (result.Succeeded() && result.HasResult)
             {
                 ImGui::Text(
                     "Variant: %s  points: %zu -> %zu",
-                    Runtime::DebugNameForSandboxEditorICPVariant(
+                    Runtime::DebugNameForEditorICPVariant(
                         result.Variant),
                     result.SourcePointCount, result.TargetPointCount);
                 ImGui::Text(
@@ -1770,5 +1773,5 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     // The app owns panel registration, ImGui state, and draw controllers.
-    // Runtime retains the model, command, undo, derived-job, and result facades.
+    // Runtime retains snapshots, typed operations, undo, jobs, and results.
 }

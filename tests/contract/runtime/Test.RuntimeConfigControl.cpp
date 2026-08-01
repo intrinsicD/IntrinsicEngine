@@ -13,6 +13,8 @@
 
 #include "RuntimeTestModule.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -24,7 +26,12 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Graphics = Extrinsic::Graphics;
@@ -241,7 +248,7 @@ namespace
     }
 }
 
-TEST(RuntimeConfigControlFacade, AgentCliControlsRecipeAndEngineConfigWithoutUi)
+TEST(RuntimeConfigControl, AgentCliControlsRecipeAndEngineConfigWithoutUi)
 {
     const std::filesystem::path recipePath =
         TempPath("intrinsic_runtime_config_control_agent_recipe");
@@ -309,7 +316,7 @@ TEST(RuntimeConfigControlFacade, AgentCliControlsRecipeAndEngineConfigWithoutUi)
     engine.Shutdown();
 }
 
-TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
+TEST(RuntimeConfigControl, BootOnlyEngineConfigDifferencesAreRejected)
 {
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
                                                std::make_unique<OneFrameApplication>());
@@ -345,7 +352,7 @@ TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
     engine.Shutdown();
 }
 
-TEST(RuntimeConfigControlFacade,
+TEST(RuntimeConfigControl,
      GpuProfilingHotApplyIsSynchronousForEditorAndAgentCli)
 {
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
@@ -414,7 +421,7 @@ TEST(RuntimeConfigControlFacade,
     engine.Shutdown();
 }
 
-TEST(RuntimeConfigControlFacade,
+TEST(RuntimeConfigControl,
      BootGpuProfilingConfigReachesRendererWithoutControlOrEditor)
 {
     CoreConfig::EngineConfig config = HeadlessConfig();
@@ -434,7 +441,7 @@ TEST(RuntimeConfigControlFacade,
     engine.Shutdown();
 }
 
-TEST(RuntimeConfigControlFacade,
+TEST(RuntimeConfigControl,
      UiEndHotToggleControlsTheSameFramesImmutableRenderSnapshot)
 {
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
@@ -462,7 +469,7 @@ TEST(RuntimeConfigControlFacade,
     engine.Shutdown();
 }
 
-TEST(RuntimeConfigControlFacade,
+TEST(RuntimeConfigControl,
      GenericSectionChangesAreLexicallyReportedAndCallbacksObserveCommit)
 {
     Runtime::Engine* engineAddress = nullptr;
@@ -585,7 +592,7 @@ TEST(RuntimeConfigControlFacade,
     engine.Shutdown();
 }
 
-TEST(RuntimeConfigControlFacade,
+TEST(RuntimeConfigControl,
      SectionCallbacksDoNotRunForPreviewNoChangeOrRejectedApply)
 {
     std::uint32_t callbackCount = 0u;
@@ -683,7 +690,7 @@ TEST(RuntimeConfigControlFacade,
     engine.Shutdown();
 }
 
-TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
+TEST(RuntimeConfigControl, InvalidHotRecipeConfigPreservesActiveOverride)
 {
     const std::filesystem::path invalidPath =
         TempPath("intrinsic_runtime_config_control_invalid_recipe");
@@ -735,7 +742,7 @@ TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
     engine.Shutdown();
 }
 
-TEST(RuntimeConfigControlFacade,
+TEST(RuntimeConfigControl,
      ShutdownAndReinitializeWithdrawRebindAndResetExactControl)
 {
     const std::filesystem::path recipePath =
@@ -906,7 +913,7 @@ TEST(RuntimeConfigControlFacade,
     std::filesystem::remove(recipePath);
 }
 
-TEST(RuntimeConfigControlFacade, EditorAndAgentPreviewUseSameFacadeResult)
+TEST(RuntimeConfigControl, EditorAndAgentPreviewUseSameResult)
 {
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
                                                std::make_unique<OneFrameApplication>());
@@ -928,8 +935,8 @@ TEST(RuntimeConfigControlFacade, EditorAndAgentPreviewUseSameFacadeResult)
 
     Graphics::RenderRecipeConfigContext recipeContext =
         configControl.CreateRenderRecipeConfigContext();
-    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
-    Runtime::SandboxEditorContext context{};
+    Runtime::EditorRenderRecipeEditorState editorState{};
+    Intrinsic::Tests::EditorFeatureTestContext context{};
     context.RenderRecipeContext = &recipeContext;
     context.RenderRecipeEditorState = &editorState;
     context.RenderRecipeRuntimeState = &configControl.GetRenderRecipeState();
@@ -949,11 +956,11 @@ TEST(RuntimeConfigControlFacade, EditorAndAgentPreviewUseSameFacadeResult)
         };
     context.RenderRecipeCommandsAvailable = true;
 
-    Runtime::SandboxEditorRenderRecipeCommandResult editorResult =
-        Runtime::ApplySandboxEditorRenderRecipeCommand(
+    Runtime::EditorRenderRecipeCommandResult editorResult =
+        Runtime::ApplyEditorRenderRecipeCommand(
             context,
-            Runtime::SandboxEditorRenderRecipeCommand{
-                .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::PreviewDraft,
+            Runtime::EditorRenderRecipeCommand{
+                .Kind = Runtime::EditorRenderRecipeCommandKind::PreviewDraft,
                 .Document = document,
                 .SourceId = "shared-preview.json",
             });
@@ -965,10 +972,10 @@ TEST(RuntimeConfigControlFacade, EditorAndAgentPreviewUseSameFacadeResult)
     EXPECT_EQ(editorState.LastPreview.Preview.DisabledExtensionSlots,
               agentPreview.Preview.DisabledExtensionSlots);
 
-    editorResult = Runtime::ApplySandboxEditorRenderRecipeCommand(
+    editorResult = Runtime::ApplyEditorRenderRecipeCommand(
         context,
-        Runtime::SandboxEditorRenderRecipeCommand{
-            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::ActivatePreview,
+        Runtime::EditorRenderRecipeCommand{
+            .Kind = Runtime::EditorRenderRecipeCommandKind::ActivatePreview,
         });
     ASSERT_TRUE(editorResult.Succeeded());
     EXPECT_EQ(configControl.GetRenderRecipeState().ActiveSource,

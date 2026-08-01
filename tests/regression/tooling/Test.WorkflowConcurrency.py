@@ -61,7 +61,7 @@ CPU_ENGINE_CONFIG_ROOTS = (
     ("tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.RenderExtractionContract.cpp", "HeadlessConfig"),
-    ("tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.RuntimeConfigControl.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.RuntimeInputActions.cpp", "InputActionConfig"),
     ("tests/contract/runtime/Test.RuntimeJobService.cpp", "NullWindowHeadlessConfig"),
     ("tests/contract/runtime/Test.RuntimeKernelEvents.cpp", "NullWindowHeadlessConfig"),

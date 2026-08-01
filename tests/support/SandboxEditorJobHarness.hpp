@@ -1,6 +1,6 @@
 #pragma once
 
-// Test-side stand-in for the piece of `SandboxEditorSession` that owns editor
+// Test-side stand-in for the piece of `EditorWorkspaceSession` that owns editor
 // job identity, added by RUNTIME-194 Slice B5d.
 //
 // `JobService` deliberately stores no domain identity, so the editor records
@@ -21,15 +21,22 @@
 #include <utility>
 #include <vector>
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 
 namespace Extrinsic::Tests
 {
-    class SandboxEditorJobHarness
+    class EditorJobHarness
     {
     public:
         [[nodiscard]] Runtime::JobService& Jobs() noexcept { return m_Jobs; }
@@ -40,11 +47,11 @@ namespace Extrinsic::Tests
 
         // Installs the `JobService` submit path on `context`, recording the
         // editor identity the service does not keep.
-        void Attach(Runtime::SandboxEditorContext& context)
+        void Attach(Intrinsic::Tests::EditorFeatureTestContext& context)
         {
             context.JobCommands.Submit =
                 [this](Runtime::JobDesc desc,
-                       Runtime::SandboxEditorJobIdentity identity)
+                       Runtime::EditorJobIdentity identity)
                     -> Runtime::JobToken
             {
                 const Runtime::JobToken token = m_Jobs.Submit(std::move(desc));
@@ -53,14 +60,14 @@ namespace Extrinsic::Tests
                 return token;
             };
             context.JobCommands.FindActive =
-                [this](const Runtime::SandboxEditorJobIdentity& requested)
-                    -> std::optional<Runtime::SandboxEditorJobRecord>
+                [this](const Runtime::EditorJobIdentity& requested)
+                    -> std::optional<Runtime::EditorJobRecord>
             {
-                for (const Runtime::SandboxEditorJobRecord& job :
+                for (const Runtime::EditorJobRecord& job :
                      Snapshot().Entries)
                 {
-                    if (Runtime::IsActiveSandboxEditorJobState(job.State) &&
-                        Runtime::SameSandboxEditorJobOutput(
+                    if (Runtime::IsActiveEditorJobState(job.State) &&
+                        Runtime::SameEditorJobOutput(
                             job.Identity,
                             requested))
                     {
@@ -72,8 +79,8 @@ namespace Extrinsic::Tests
             context.JobCommands.SnapshotEntity =
                 [this](const std::uint32_t stableEntityId)
             {
-                std::vector<Runtime::SandboxEditorJobRecord> rows{};
-                for (const Runtime::SandboxEditorJobRecord& job :
+                std::vector<Runtime::EditorJobRecord> rows{};
+                for (const Runtime::EditorJobRecord& job :
                      Snapshot().Entries)
                 {
                     if (job.Identity.EntityId == stableEntityId)
@@ -84,16 +91,16 @@ namespace Extrinsic::Tests
         }
 
         // The queue view the editor's dedup guard and panels read.
-        [[nodiscard]] Runtime::SandboxEditorJobQueueSnapshot Snapshot() const
+        [[nodiscard]] Runtime::EditorJobQueueSnapshot Snapshot() const
         {
-            Runtime::SandboxEditorJobQueueSnapshot snapshot{};
+            Runtime::EditorJobQueueSnapshot snapshot{};
             for (const Runtime::JobSnapshot& job : m_Jobs.SnapshotAll())
             {
                 const auto identity = m_Identities.find(job.Token);
                 if (identity == m_Identities.end())
                     continue;
 
-                snapshot.Entries.push_back(Runtime::SandboxEditorJobRecord{
+                snapshot.Entries.push_back(Runtime::EditorJobRecord{
                     .Token = job.Token,
                     .Identity = identity->second,
                     .Name = job.DebugName,
@@ -181,7 +188,7 @@ namespace Extrinsic::Tests
         Runtime::JobService m_Jobs{};
         Runtime::KernelEventBus m_Events{};
         std::unordered_map<Runtime::JobToken,
-                           Runtime::SandboxEditorJobIdentity,
+                           Runtime::EditorJobIdentity,
                            Core::StrongHandleHash<Runtime::JobTokenTag>>
             m_Identities{};
         SchedulerScope m_Scheduler{};

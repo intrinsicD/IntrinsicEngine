@@ -123,6 +123,16 @@ default policies:
   the app-private handles while both required registries remain live, and
   reverse AsyncWork/AssetWorkflow teardown follows.
 
+## Implementation update: RUNTIME-202
+
+RUNTIME-202 completed the later facade retirement. The four descriptor
+factories and remaining editor/config behavior now live with focused runtime
+feature modules, while Sandbox owns registration and default aggregation. The
+`Extrinsic.Runtime.SandboxEditorFacades` and
+`Extrinsic.Runtime.SandboxDefaultPolicies` module surfaces and their
+implementation files are deleted; this supersedes the intermediate RUNTIME-168
+layout described above without changing the ADR's right-sizing rule.
+
 No new owner, wrapper, registry, service, lifecycle abstraction, or Engine
 surface is introduced. The exact Engine snapshot remains 22 plain imports /
 0 domain imports / 2 re-exports / 10 public getter names.

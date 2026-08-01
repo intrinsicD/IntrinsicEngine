@@ -25,7 +25,7 @@ module;
 
 #include "ProgressivePoissonReference.hpp"
 
-module Extrinsic.Runtime.SandboxEditorFacades;
+module Extrinsic.Runtime.Private.EditorFeatures;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
@@ -67,10 +67,11 @@ import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
-import Extrinsic.Runtime.SandboxConfigSections;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
@@ -101,9 +102,9 @@ import Geometry.UvAtlas;
 
 
 #include "Runtime.EditorMutation.Internal.hpp"
-#include "Runtime.SandboxEditorFacades.Internal.hpp"
+#include "internal/Runtime.EditorFeatures.Detail.hpp"
 
-namespace Extrinsic::Runtime
+namespace Extrinsic::Runtime::EditorFeatureDetail
 {
     namespace
     {
@@ -122,7 +123,7 @@ namespace Extrinsic::Runtime
         // the diagnostic the retired `DerivedJobOutput` exposed — and exists at
         // all because an empty envelope is how `JobService` reports a dropped
         // job.
-        struct SandboxMethodJobResult
+        struct EditorGeometryJobResult
         {
             std::string Diagnostic{};
         };
@@ -131,35 +132,35 @@ namespace Extrinsic::Runtime
             const entt::registry& raw,
             const std::uint32_t stableId)
         {
-            return Detail::ResolveSandboxMethodStableEntity(raw, stableId);
+            return Detail::ResolveEditorStableEntity(raw, stableId);
         }
 
-        void InvalidateSelectedModelCache(const SandboxEditorContext& context)
+        void InvalidateSelectedModelCache(const EditorFeatureBindings& context)
         {
-            Detail::InvalidateSandboxMethodSelectedModelCache(context);
+            Detail::InvalidateEditorSelectedModelCache(context);
         }
 
-        [[nodiscard]] std::optional<SandboxEditorJobRecord>
+        [[nodiscard]] std::optional<EditorJobRecord>
         FindActiveEditorJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorJobIdentity& identity)
+            const EditorFeatureBindings& context,
+            const EditorJobIdentity& identity)
         {
-            return Detail::FindActiveSandboxMethodJob(context, identity);
+            return Detail::FindActiveEditorGeometryJob(context, identity);
         }
 
         [[nodiscard]] std::string BuildActiveDerivedJobMessage(
             const std::string_view label,
-            const SandboxEditorJobRecord& job)
+            const EditorJobRecord& job)
         {
-            return Detail::BuildActiveSandboxMethodDerivedJobMessage(
+            return Detail::BuildActiveEditorGeometryJobMessage(
                 label,
                 job);
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
+        [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
             const EditorCommandHistoryStatus status) noexcept
         {
-            return Detail::ToSandboxMethodCommandStatus(status);
+            return Detail::ToEditorMethodCommandStatus(status);
         }
 
         [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
@@ -206,56 +207,56 @@ namespace Extrinsic::Runtime
             "Vulkan compute";
 
         [[nodiscard]] const char* ProgressivePoissonBackendId(
-            const SandboxEditorProgressivePoissonBackend backend) noexcept
+            const EditorProgressivePoissonBackend backend) noexcept
         {
             switch (backend)
             {
-            case SandboxEditorProgressivePoissonBackend::CpuReference:
+            case EditorProgressivePoissonBackend::CpuReference:
                 return PPR::kBackendId;
-            case SandboxEditorProgressivePoissonBackend::VulkanCompute:
+            case EditorProgressivePoissonBackend::VulkanCompute:
                 return kProgressivePoissonGpuBackendId;
             }
             return PPR::kBackendId;
         }
 
         [[nodiscard]] const char* ProgressivePoissonBackendDisplayName(
-            const SandboxEditorProgressivePoissonBackend backend) noexcept
+            const EditorProgressivePoissonBackend backend) noexcept
         {
             switch (backend)
             {
-            case SandboxEditorProgressivePoissonBackend::CpuReference:
+            case EditorProgressivePoissonBackend::CpuReference:
                 return kProgressivePoissonCpuBackendDisplayName;
-            case SandboxEditorProgressivePoissonBackend::VulkanCompute:
+            case EditorProgressivePoissonBackend::VulkanCompute:
                 return kProgressivePoissonGpuBackendDisplayName;
             }
             return kProgressivePoissonCpuBackendDisplayName;
         }
 
         [[nodiscard]] const char* ProgressivePoissonChannelPropertyName(
-            const SandboxEditorProgressivePoissonChannel channel) noexcept
+            const EditorProgressivePoissonChannel channel) noexcept
         {
             switch (channel)
             {
-            case SandboxEditorProgressivePoissonChannel::Level:
+            case EditorProgressivePoissonChannel::Level:
                 return kProgressivePoissonLevelProperty;
-            case SandboxEditorProgressivePoissonChannel::Phase:
+            case EditorProgressivePoissonChannel::Phase:
                 return kProgressivePoissonPhaseProperty;
-            case SandboxEditorProgressivePoissonChannel::SplatRadius:
+            case EditorProgressivePoissonChannel::SplatRadius:
                 return kProgressivePoissonSplatRadiusProperty;
-            case SandboxEditorProgressivePoissonChannel::PrefixVisible:
+            case EditorProgressivePoissonChannel::PrefixVisible:
                 return kProgressivePoissonPrefixVisibleProperty;
             }
             return kProgressivePoissonLevelProperty;
         }
 
-        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        [[nodiscard]] EditorProgressivePoissonResult
         MakeProgressivePoissonResult(
-            const SandboxEditorCommandStatus status,
-            const SandboxEditorProgressivePoissonChannel channel,
+            const EditorCommandStatus status,
+            const EditorProgressivePoissonChannel channel,
             const Core::ErrorCode error,
             std::string message)
         {
-            return SandboxEditorProgressivePoissonResult{
+            return EditorProgressivePoissonResult{
                 .Status = status,
                 .Channel = channel,
                 .Error = error,
@@ -264,7 +265,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool IsValidProgressivePoissonConfig(
-            const SandboxEditorProgressivePoissonConfig& config) noexcept
+            const EditorProgressivePoissonConfig& config) noexcept
         {
             return (config.Dimension == 2u || config.Dimension == 3u) &&
                    config.GridWidth > 0u &&
@@ -275,7 +276,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool IsValidProgressivePoissonMeshSurfaceConfig(
-            const SandboxEditorProgressivePoissonConfig& config) noexcept
+            const EditorProgressivePoissonConfig& config) noexcept
         {
             return config.MeshSurfaceSampleCount > 0u &&
                    std::isfinite(config.MeshSurfaceMinTriangleArea) &&
@@ -291,7 +292,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] PPR::Config ToProgressivePoissonReferenceConfig(
-            const SandboxEditorProgressivePoissonConfig& config) noexcept
+            const EditorProgressivePoissonConfig& config) noexcept
         {
             PPR::Config out{};
             out.Dimension = config.Dimension;
@@ -307,7 +308,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SurfaceSampling::Params ToProgressivePoissonSurfaceParams(
-            const SandboxEditorProgressivePoissonConfig& config) noexcept
+            const EditorProgressivePoissonConfig& config) noexcept
         {
             SurfaceSampling::Params out{};
             out.SampleCount =
@@ -331,7 +332,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool PublishProgressivePoissonProperties(
             Geometry::PropertySet& properties,
             const PPR::Result& method,
-            const SandboxEditorProgressivePoissonConfig& config,
+            const EditorProgressivePoissonConfig& config,
             const std::uint32_t prefixCount)
         {
             const std::size_t pointCount = properties.Size();
@@ -406,15 +407,15 @@ namespace Extrinsic::Runtime
 
         struct ProgressivePoissonBackendResolution
         {
-            SandboxEditorProgressivePoissonBackend Requested{
-                SandboxEditorProgressivePoissonBackend::CpuReference};
-            SandboxEditorProgressivePoissonBackend Actual{
-                SandboxEditorProgressivePoissonBackend::CpuReference};
+            EditorProgressivePoissonBackend Requested{
+                EditorProgressivePoissonBackend::CpuReference};
+            EditorProgressivePoissonBackend Actual{
+                EditorProgressivePoissonBackend::CpuReference};
             std::string FallbackReason{};
         };
 
         [[nodiscard]] ProgressivePoissonGpuConfig ToProgressivePoissonGpuConfig(
-            const SandboxEditorProgressivePoissonConfig& config) noexcept
+            const EditorProgressivePoissonConfig& config) noexcept
         {
             return ProgressivePoissonGpuConfig{
                 .Dimension = config.Dimension,
@@ -431,20 +432,20 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] ProgressivePoissonBackendResolution
         ResolveProgressivePoissonBackend(
-            const SandboxEditorProgressivePoissonBackend requested,
-            const SandboxEditorProgressivePoissonConfig& config,
+            const EditorProgressivePoissonBackend requested,
+            const EditorProgressivePoissonConfig& config,
             const std::uint32_t inputCount,
             RHI::IDevice* device)
         {
             ProgressivePoissonBackendResolution resolved{};
             resolved.Requested = requested;
-            if (requested == SandboxEditorProgressivePoissonBackend::CpuReference)
+            if (requested == EditorProgressivePoissonBackend::CpuReference)
             {
-                resolved.Actual = SandboxEditorProgressivePoissonBackend::CpuReference;
+                resolved.Actual = EditorProgressivePoissonBackend::CpuReference;
                 return resolved;
             }
 
-            resolved.Actual = SandboxEditorProgressivePoissonBackend::CpuReference;
+            resolved.Actual = EditorProgressivePoissonBackend::CpuReference;
             const ProgressivePoissonGpuResolveResult gpu =
                 ResolveProgressivePoissonGpuRequest(
                     ProgressivePoissonGpuResolveDesc{
@@ -457,7 +458,7 @@ namespace Extrinsic::Runtime
             if (gpu.GpuExecutionAvailable)
             {
                 resolved.Actual =
-                    SandboxEditorProgressivePoissonBackend::VulkanCompute;
+                    EditorProgressivePoissonBackend::VulkanCompute;
                 return resolved;
             }
 
@@ -477,16 +478,16 @@ namespace Extrinsic::Runtime
         struct ProgressivePoissonComputedResult
         {
             PPR::Result Method{};
-            SandboxEditorProgressivePoissonResult Result{};
+            EditorProgressivePoissonResult Result{};
         };
 
-        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        [[nodiscard]] EditorProgressivePoissonResult
         BuildProgressivePoissonResultFromMethod(
             const PPR::Result& method,
-            const SandboxEditorProgressivePoissonConfig& config,
+            const EditorProgressivePoissonConfig& config,
             const ProgressivePoissonBackendResolution& backend)
         {
-            SandboxEditorProgressivePoissonResult result{};
+            EditorProgressivePoissonResult result{};
             result.Channel = config.Channel;
             result.InputCount = method.Diag.InputCount;
             result.AcceptedCount = method.Diag.AcceptedCount;
@@ -504,7 +505,7 @@ namespace Extrinsic::Runtime
             result.FellBackToCpu =
                 backend.Requested != backend.Actual &&
                 backend.Actual ==
-                    SandboxEditorProgressivePoissonBackend::CpuReference;
+                    EditorProgressivePoissonBackend::CpuReference;
             result.BackendFallbackReason = backend.FallbackReason;
             result.LevelAcceptedCounts = method.Diag.LevelCounts;
             result.BaseRadius = method.BaseRadius;
@@ -516,7 +517,7 @@ namespace Extrinsic::Runtime
             if (method.Diag.Code != PPR::ValidationCode::Valid)
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error =
                     method.Diag.Code == PPR::ValidationCode::InvalidDimension
                     ? Core::ErrorCode::InvalidArgument
@@ -529,7 +530,7 @@ namespace Extrinsic::Runtime
             result.PrefixCount = ClampProgressivePoissonPrefix(
                 config.PrefixCount,
                 result.AcceptedCount);
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             return result;
         }
@@ -537,7 +538,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] ProgressivePoissonComputedResult
         ComputeProgressivePoissonCpuReference(
             const std::span<const glm::vec3> positions,
-            const SandboxEditorProgressivePoissonConfig& config,
+            const EditorProgressivePoissonConfig& config,
             const ProgressivePoissonBackendResolution& backend)
         {
             const PPR::Config methodConfig =
@@ -551,12 +552,12 @@ namespace Extrinsic::Runtime
             return out;
         }
 
-        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        [[nodiscard]] EditorProgressivePoissonResult
         PublishProgressivePoissonComputedResult(
             Geometry::PropertySet& properties,
-            const SandboxEditorProgressivePoissonConfig& config,
+            const EditorProgressivePoissonConfig& config,
             const PPR::Result& method,
-            SandboxEditorProgressivePoissonResult result)
+            EditorProgressivePoissonResult result)
         {
             if (!result.Succeeded())
                 return result;
@@ -568,23 +569,23 @@ namespace Extrinsic::Runtime
                     result.PrefixCount))
             {
                 result.Status =
-                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
                     "Progressive Poisson property publication failed.";
                 return result;
             }
 
-            result.Status = SandboxEditorCommandStatus::Applied;
+            result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             return result;
         }
 
-        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        [[nodiscard]] EditorProgressivePoissonResult
         RunProgressivePoissonAndPublish(
             const std::span<const glm::vec3> positions,
             Geometry::PropertySet& properties,
-            const SandboxEditorProgressivePoissonConfig& config,
+            const EditorProgressivePoissonConfig& config,
             RHI::IDevice* device)
         {
             const ProgressivePoissonBackendResolution backend =
@@ -603,7 +604,7 @@ namespace Extrinsic::Runtime
         }
 
         void AppendProgressivePoissonSuccessMessage(
-            SandboxEditorProgressivePoissonResult& result)
+            EditorProgressivePoissonResult& result)
         {
             result.Message =
                 "Progressive Poisson (requested " +
@@ -621,7 +622,7 @@ namespace Extrinsic::Runtime
                 " levels; prefix=" +
                 std::to_string(result.PrefixCount) +
                 ", channel=" +
-                DebugNameForSandboxEditorProgressivePoissonChannel(
+                DebugNameForEditorProgressivePoissonChannelImpl(
                     result.Channel);
             if (!result.LevelAcceptedCounts.empty())
             {
@@ -1097,7 +1098,7 @@ namespace Extrinsic::Runtime
 
         void ApplyProgressivePoissonVisualization(
             ProgressivePoissonEntityState& state,
-            const SandboxEditorProgressivePoissonChannel channel)
+            const EditorProgressivePoissonChannel channel)
         {
             G::RenderPoints points =
                 state.RenderPoints.value_or(G::RenderPoints{});
@@ -1123,7 +1124,7 @@ namespace Extrinsic::Runtime
         MakeProgressivePoissonPointCloudState(
             const ProgressivePoissonEntityState& before,
             const Geometry::PointCloud::Cloud& cloud,
-            const SandboxEditorProgressivePoissonChannel channel)
+            const EditorProgressivePoissonChannel channel)
         {
             ProgressivePoissonEntityState after = before;
             entt::registry staged{};
@@ -1177,9 +1178,9 @@ namespace Extrinsic::Runtime
             Dirty::MarkVertexAttributesDirty(raw, *entity);
         }
 
-        [[nodiscard]] SandboxEditorCommandStatus
+        [[nodiscard]] EditorCommandStatus
         CommitProgressivePoissonMutation(
-            const SandboxEditorContext& context,
+            const EditorFeatureBindings& context,
             const std::uint32_t stableEntityId,
             const ProgressivePoissonMutationScope scope,
             ProgressivePoissonEntityState before,
@@ -1266,45 +1267,45 @@ namespace Extrinsic::Runtime
                         validate,
                         apply,
                         stamp);
-                return ToSandboxEditorCommandStatus(history.Status);
+                return ToEditorCommandStatus(history.Status);
             }
 
             const EditorCommandHistoryStatus validation =
                 validate(identity, beforeState, afterState);
             if (validation != EditorCommandHistoryStatus::Applied)
-                return ToSandboxEditorCommandStatus(validation);
+                return ToEditorCommandStatus(validation);
             const EditorCommandHistoryStatus applied =
                 apply(identity, afterState);
             if (applied != EditorCommandHistoryStatus::Applied)
-                return ToSandboxEditorCommandStatus(applied);
+                return ToEditorCommandStatus(applied);
             (void)stamp(identity, beforeState, afterState);
-            return SandboxEditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
         }
 
-        enum class SandboxEditorProgressivePoissonCpuJobSource : std::uint8_t
+        enum class EditorProgressivePoissonCpuJobSource : std::uint8_t
         {
             PointCloud,
             MeshSurface,
         };
 
-        [[nodiscard]] SandboxEditorJobScope
+        [[nodiscard]] EditorJobScope
         ToProgressivePoissonJobScope(
-            const SandboxEditorProgressivePoissonCpuJobSource source) noexcept
+            const EditorProgressivePoissonCpuJobSource source) noexcept
         {
             return source ==
-                       SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
-                ? SandboxEditorJobScope::MeshSurface
-                : SandboxEditorJobScope::PointCloudPoint;
+                       EditorProgressivePoissonCpuJobSource::MeshSurface
+                ? EditorJobScope::MeshSurface
+                : EditorJobScope::PointCloudPoint;
         }
 
         [[nodiscard]] const char* ProgressivePoissonOutputName(
-            const SandboxEditorProgressivePoissonConfig& config) noexcept
+            const EditorProgressivePoissonConfig& config) noexcept
         {
             return ProgressivePoissonChannelPropertyName(config.Channel);
         }
 
         [[nodiscard]] Core::ErrorCode ProgressivePoissonResultError(
-            const SandboxEditorProgressivePoissonResult& result) noexcept
+            const EditorProgressivePoissonResult& result) noexcept
         {
             return result.Error == Core::ErrorCode::Success
                 ? Core::ErrorCode::Unknown
@@ -1312,7 +1313,7 @@ namespace Extrinsic::Runtime
         }
 
         void SetProgressivePoissonMeshSurfaceStats(
-            SandboxEditorProgressivePoissonResult& result,
+            EditorProgressivePoissonResult& result,
             const SurfaceSampling::Diagnostics& info)
         {
             result.MeshSurfaceSamplingUsed = true;
@@ -1329,13 +1330,13 @@ namespace Extrinsic::Runtime
             result.MeshSurfaceArea = info.TotalSurfaceArea;
         }
 
-        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        [[nodiscard]] EditorProgressivePoissonResult
         MakeProgressivePoissonMeshSurfaceSamplingResult(
-            const SandboxEditorProgressivePoissonConfig& config,
+            const EditorProgressivePoissonConfig& config,
             const ProgressivePoissonBackendResolution& backend,
             const SurfaceSampling::Result& sampled)
         {
-            SandboxEditorProgressivePoissonResult result{};
+            EditorProgressivePoissonResult result{};
             result.Channel = config.Channel;
             result.RequestedBackend = backend.Requested;
             result.ActualBackend = backend.Actual;
@@ -1349,7 +1350,7 @@ namespace Extrinsic::Runtime
             result.FellBackToCpu =
                 backend.Requested != backend.Actual &&
                 backend.Actual ==
-                    SandboxEditorProgressivePoissonBackend::CpuReference;
+                    EditorProgressivePoissonBackend::CpuReference;
             result.BackendFallbackReason = backend.FallbackReason;
             SetProgressivePoissonMeshSurfaceStats(result, sampled.Info);
             if (sampled.Succeeded())
@@ -1357,8 +1358,8 @@ namespace Extrinsic::Runtime
 
             result.Status =
                 sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
-                    ? SandboxEditorCommandStatus::InvalidProcessingParameters
-                    : SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    ? EditorCommandStatus::InvalidProcessingParameters
+                    : EditorCommandStatus::GeometryProcessingFailed;
             result.Error =
                 sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
                     ? Core::ErrorCode::InvalidArgument
@@ -1370,16 +1371,16 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        [[nodiscard]] EditorProgressivePoissonResult
         MakePendingProgressivePoissonCpuJobResult(
-            const SandboxEditorProgressivePoissonCommand& command,
+            const EditorProgressivePoissonCommand& command,
             const JobToken handle,
             const std::uint32_t inputCount,
             const ProgressivePoissonBackendResolution& backend,
-            const SandboxEditorProgressivePoissonCpuJobSource source)
+            const EditorProgressivePoissonCpuJobSource source)
         {
-            SandboxEditorProgressivePoissonResult result{};
-            result.Status = SandboxEditorCommandStatus::Pending;
+            EditorProgressivePoissonResult result{};
+            result.Status = EditorCommandStatus::Pending;
             result.Channel = command.Config.Channel;
             result.InputCount = inputCount;
             result.RequestedBackend = backend.Requested;
@@ -1394,16 +1395,16 @@ namespace Extrinsic::Runtime
             result.FellBackToCpu =
                 backend.Requested != backend.Actual &&
                 backend.Actual ==
-                    SandboxEditorProgressivePoissonBackend::CpuReference;
+                    EditorProgressivePoissonBackend::CpuReference;
             result.BackendFallbackReason = backend.FallbackReason;
             result.Error = Core::ErrorCode::Success;
-            if (source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface)
+            if (source == EditorProgressivePoissonCpuJobSource::MeshSurface)
             {
                 result.MeshSurfaceSamplingUsed = true;
                 result.MeshSurfaceSampleCount =
                     command.Config.MeshSurfaceSampleCount;
             }
-            result.Message = source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+            result.Message = source == EditorProgressivePoissonCpuJobSource::MeshSurface
                 ? "Progressive Poisson mesh CPU job queued"
                 : "Progressive Poisson CPU job queued";
             if (handle.IsValid())
@@ -1419,31 +1420,31 @@ namespace Extrinsic::Runtime
         }
 
         void PublishProgressivePoissonResultSink(
-            const SandboxEditorContext& context,
-            SandboxEditorProgressivePoissonResult result)
+            const EditorFeatureBindings& context,
+            EditorProgressivePoissonResult result)
         {
             if (context.MethodResultSinks.ProgressivePoisson)
                 context.MethodResultSinks.ProgressivePoisson(std::move(result));
         }
 
-        struct SandboxEditorProgressivePoissonCpuJobState
+        struct EditorProgressivePoissonCpuJobState
         {
-            SandboxEditorProgressivePoissonCommand Command{};
-            SandboxEditorProgressivePoissonCpuJobSource Source{
-                SandboxEditorProgressivePoissonCpuJobSource::PointCloud};
+            EditorProgressivePoissonCommand Command{};
+            EditorProgressivePoissonCpuJobSource Source{
+                EditorProgressivePoissonCpuJobSource::PointCloud};
             ProgressivePoissonBackendResolution Backend{};
             std::vector<glm::vec3> SnapshotPositions{};
             ProgressivePoissonEntitySnapshot BeforeState{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             std::optional<PPR::Result> Method{};
             std::optional<SurfaceSampling::Result> Sampled{};
-            SandboxEditorProgressivePoissonResult Result{};
+            EditorProgressivePoissonResult Result{};
         };
 
         [[nodiscard]] JobApplyValidation
         ValidateProgressivePoissonApply(
-            const SandboxEditorContext& context,
-            const SandboxEditorProgressivePoissonCpuJobState& job)
+            const EditorFeatureBindings& context,
+            const EditorProgressivePoissonCpuJobState& job)
         {
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
@@ -1462,7 +1463,7 @@ namespace Extrinsic::Runtime
                 GS::BuildSourceAvailability(view);
             const GS::Domain expectedDomain =
                 job.Source ==
-                        SandboxEditorProgressivePoissonCpuJobSource::
+                        EditorProgressivePoissonCpuJobSource::
                             MeshSurface
                     ? GS::Domain::Mesh
                     : GS::Domain::PointCloud;
@@ -1482,8 +1483,8 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishProgressivePoissonPointCloudCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorProgressivePoissonCpuJobState& job)
+            const EditorFeatureBindings& context,
+            const EditorProgressivePoissonCpuJobState& job)
         {
             if (!job.Method.has_value())
                 return Core::Err(Core::ErrorCode::Unknown);
@@ -1502,7 +1503,7 @@ namespace Extrinsic::Runtime
             }
 
             ProgressivePoissonEntityState after = *job.BeforeState;
-            SandboxEditorProgressivePoissonResult result =
+            EditorProgressivePoissonResult result =
                 PublishProgressivePoissonComputedResult(
                     after.Vertices->Properties,
                     job.Command.Config,
@@ -1513,14 +1514,14 @@ namespace Extrinsic::Runtime
                 ApplyProgressivePoissonVisualization(
                     after,
                     job.Command.Config.Channel);
-                const SandboxEditorCommandStatus committed =
+                const EditorCommandStatus committed =
                     CommitProgressivePoissonMutation(
                         context,
                         job.Command.StableEntityId,
                         ProgressivePoissonMutationScope::PointAttributes,
                         *job.BeforeState,
                         std::move(after));
-                if (committed != SandboxEditorCommandStatus::Applied)
+                if (committed != EditorCommandStatus::Applied)
                 {
                     result.Status = committed;
                     result.Error = Core::ErrorCode::InvalidState;
@@ -1541,8 +1542,8 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishProgressivePoissonMeshSurfaceCpuJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorProgressivePoissonCpuJobState& job)
+            const EditorFeatureBindings& context,
+            const EditorProgressivePoissonCpuJobState& job)
         {
             if (!job.Result.Succeeded())
             {
@@ -1556,20 +1557,20 @@ namespace Extrinsic::Runtime
             if (job.BeforeState == nullptr)
                 return Core::Err(Core::ErrorCode::InvalidState);
 
-            SandboxEditorProgressivePoissonResult result = job.Result;
+            EditorProgressivePoissonResult result = job.Result;
             ProgressivePoissonEntityState after =
                 MakeProgressivePoissonPointCloudState(
                     *job.BeforeState,
                     job.Sampled->Cloud,
                     job.Command.Config.Channel);
-            const SandboxEditorCommandStatus publishStatus =
+            const EditorCommandStatus publishStatus =
                 CommitProgressivePoissonMutation(
                     context,
                     job.Command.StableEntityId,
                     ProgressivePoissonMutationScope::MeshToPointCloud,
                     *job.BeforeState,
                     std::move(after));
-            if (publishStatus != SandboxEditorCommandStatus::Applied)
+            if (publishStatus != EditorCommandStatus::Applied)
             {
                 result.Status = publishStatus;
                 result.Error = Core::ErrorCode::Unknown;
@@ -1587,7 +1588,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] JobResultEnvelope
         RunProgressivePoissonPointCloudCpuWorker(
-            const std::shared_ptr<SandboxEditorProgressivePoissonCpuJobState>& state)
+            const std::shared_ptr<EditorProgressivePoissonCpuJobState>& state)
         {
             ProgressivePoissonComputedResult computed =
                 ComputeProgressivePoissonCpuReference(
@@ -1598,8 +1599,8 @@ namespace Extrinsic::Runtime
                     state->Backend);
             state->Method = std::move(computed.Method);
             state->Result = std::move(computed.Result);
-            return JobResultEnvelope::Make<SandboxMethodJobResult>(
-                SandboxMethodJobResult{
+            return JobResultEnvelope::Make<EditorGeometryJobResult>(
+                EditorGeometryJobResult{
                     .Diagnostic = state->Result.Succeeded()
                         ? "Progressive Poisson CPU result ready"
                         : state->Result.Message,
@@ -1608,7 +1609,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] JobResultEnvelope
         RunProgressivePoissonMeshSurfaceCpuWorker(
-            const std::shared_ptr<SandboxEditorProgressivePoissonCpuJobState>& state)
+            const std::shared_ptr<EditorProgressivePoissonCpuJobState>& state)
         {
             SurfaceSampling::Result sampled =
                 SurfaceSampling::SampleTriangleMeshSurface(
@@ -1621,8 +1622,8 @@ namespace Extrinsic::Runtime
             if (!sampled.Succeeded())
             {
                 state->Sampled = std::move(sampled);
-                return JobResultEnvelope::Make<SandboxMethodJobResult>(
-                    SandboxMethodJobResult{
+                return JobResultEnvelope::Make<EditorGeometryJobResult>(
+                    EditorGeometryJobResult{
                         .Diagnostic = state->Result.Message,
                     });
             }
@@ -1635,7 +1636,7 @@ namespace Extrinsic::Runtime
                     state->Command.Config,
                     state->Backend);
             state->Method = std::move(computed.Method);
-            SandboxEditorProgressivePoissonResult result =
+            EditorProgressivePoissonResult result =
                 std::move(computed.Result);
             SetProgressivePoissonMeshSurfaceStats(result, sampled.Info);
             result = PublishProgressivePoissonComputedResult(
@@ -1645,19 +1646,19 @@ namespace Extrinsic::Runtime
                 std::move(result));
             state->Result = std::move(result);
             state->Sampled = std::move(sampled);
-            return JobResultEnvelope::Make<SandboxMethodJobResult>(
-                SandboxMethodJobResult{
+            return JobResultEnvelope::Make<EditorGeometryJobResult>(
+                EditorGeometryJobResult{
                     .Diagnostic = state->Result.Succeeded()
                         ? "Progressive Poisson mesh CPU result ready"
                         : state->Result.Message,
                 });
         }
 
-        [[nodiscard]] SandboxEditorProgressivePoissonResult
+        [[nodiscard]] EditorProgressivePoissonResult
         SubmitProgressivePoissonCpuDerivedJob(
-            const SandboxEditorContext& context,
-            const SandboxEditorProgressivePoissonCommand& command,
-            const SandboxEditorProgressivePoissonCpuJobSource source,
+            const EditorFeatureBindings& context,
+            const EditorProgressivePoissonCommand& command,
+            const EditorProgressivePoissonCpuJobSource source,
             std::vector<glm::vec3> snapshotPositions,
             Geometry::HalfedgeMesh::Mesh mesh,
             ProgressivePoissonEntityState beforeState,
@@ -1665,7 +1666,7 @@ namespace Extrinsic::Runtime
             ProgressivePoissonBackendResolution backend)
         {
             auto state =
-                std::make_shared<SandboxEditorProgressivePoissonCpuJobState>();
+                std::make_shared<EditorProgressivePoissonCpuJobState>();
             state->Command = command;
             state->Source = source;
             state->Backend = std::move(backend);
@@ -1675,14 +1676,14 @@ namespace Extrinsic::Runtime
                     std::move(beforeState));
             state->Mesh = std::move(mesh);
 
-            const SandboxEditorJobIdentity identity{
+            const EditorJobIdentity identity{
                 .EntityId = command.StableEntityId,
                 .Scope = ToProgressivePoissonJobScope(source),
                 .OutputSemantic = GeometryPresentationSlotSemantic::PointScalarField,
                 .OutputName = ProgressivePoissonOutputName(command.Config),
             };
             JobDesc desc{
-                .DebugName = source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                .DebugName = source == EditorProgressivePoissonCpuJobSource::MeshSurface
                     ? "Sandbox.ProgressivePoisson.MeshCPU"
                     : "Sandbox.ProgressivePoisson.CPU",
                 .Scope = context.World,
@@ -1695,7 +1696,7 @@ namespace Extrinsic::Runtime
                     [state](const JobCancellation&) -> JobResultEnvelope
                     {
                         return state->Source ==
-                                   SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                                   EditorProgressivePoissonCpuJobSource::MeshSurface
                             ? RunProgressivePoissonMeshSurfaceCpuWorker(state)
                             : RunProgressivePoissonPointCloudCpuWorker(state);
                     },
@@ -1710,11 +1711,11 @@ namespace Extrinsic::Runtime
                     [context, state](KernelEventBus&,
                                      const JobResultEnvelope& result) -> bool
                     {
-                        if (result.TryGet<SandboxMethodJobResult>() == nullptr)
+                        if (result.TryGet<EditorGeometryJobResult>() == nullptr)
                             return false;
                         const Core::Result published =
                             state->Source ==
-                                    SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                                    EditorProgressivePoissonCpuJobSource::MeshSurface
                                 ? PublishProgressivePoissonMeshSurfaceCpuJob(
                                       context,
                                       *state)
@@ -1725,10 +1726,10 @@ namespace Extrinsic::Runtime
                     },
             };
 
-            if (const std::optional<SandboxEditorJobRecord> active =
+            if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                SandboxEditorProgressivePoissonResult pending =
+                EditorProgressivePoissonResult pending =
                     MakePendingProgressivePoissonCpuJobResult(
                         command,
                         active->Token,
@@ -1736,7 +1737,7 @@ namespace Extrinsic::Runtime
                         state->Backend,
                         source);
                 pending.Message = BuildActiveDerivedJobMessage(
-                    source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                    source == EditorProgressivePoissonCpuJobSource::MeshSurface
                         ? "Progressive Poisson mesh CPU"
                         : "Progressive Poisson CPU",
                     *active);
@@ -1749,7 +1750,7 @@ namespace Extrinsic::Runtime
             if (!handle.IsValid())
             {
                 return MakeProgressivePoissonResult(
-                    SandboxEditorCommandStatus::GeometryProcessingFailed, command.Config.Channel,
+                    EditorCommandStatus::GeometryProcessingFailed, command.Config.Channel,
                     Core::ErrorCode::InvalidState,
                     "Progressive Poisson CPU job submission was rejected by the runtime "
                     "job lane.");
@@ -1765,32 +1766,32 @@ namespace Extrinsic::Runtime
 
     }
 
-    std::vector<SandboxEditorGeometryProcessingDomain>
-    GetAvailableSandboxEditorKMeansDomains(const ECS::Scene::Registry& registry,
+    std::vector<EditorGeometryProcessingDomain>
+    GetAvailableEditorKMeansDomainsImpl(const ECS::Scene::Registry& registry,
                                            const ECS::EntityHandle entity)
     {
-        using Domain = SandboxEditorGeometryProcessingDomain;
+        using Domain = EditorGeometryProcessingDomain;
         const Domain domains =
-            GetSandboxEditorGeometryProcessingCapabilities(registry, entity)
+            GetEditorGeometryProcessingCapabilitiesImpl(registry, entity)
                 .Domains &
-            GetSandboxEditorSupportedGeometryProcessingDomains(
-                SandboxEditorGeometryProcessingAlgorithm::KMeans);
+            GetEditorSupportedGeometryProcessingDomainsImpl(
+                EditorGeometryProcessingAlgorithm::KMeans);
 
         std::vector<Domain> result{};
         result.reserve(3u);
-        if (HasAnySandboxEditorGeometryProcessingDomain(
+        if (HasAnyEditorGeometryProcessingDomain(
                 domains,
                 Domain::MeshVertices))
         {
             result.push_back(Domain::MeshVertices);
         }
-        if (HasAnySandboxEditorGeometryProcessingDomain(
+        if (HasAnyEditorGeometryProcessingDomain(
                 domains,
                 Domain::GraphVertices))
         {
             result.push_back(Domain::GraphVertices);
         }
-        if (HasAnySandboxEditorGeometryProcessingDomain(
+        if (HasAnyEditorGeometryProcessingDomain(
                 domains,
                 Domain::PointCloudPoints))
         {
@@ -1799,102 +1800,102 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    const char* DebugNameForSandboxEditorProgressivePoissonChannel(
-        const SandboxEditorProgressivePoissonChannel channel) noexcept
+    const char* DebugNameForEditorProgressivePoissonChannelImpl(
+        const EditorProgressivePoissonChannel channel) noexcept
     {
         switch (channel)
         {
-        case SandboxEditorProgressivePoissonChannel::Level:
+        case EditorProgressivePoissonChannel::Level:
             return "Level";
-        case SandboxEditorProgressivePoissonChannel::Phase:
+        case EditorProgressivePoissonChannel::Phase:
             return "Phase";
-        case SandboxEditorProgressivePoissonChannel::SplatRadius:
+        case EditorProgressivePoissonChannel::SplatRadius:
             return "Splat radius";
-        case SandboxEditorProgressivePoissonChannel::PrefixVisible:
+        case EditorProgressivePoissonChannel::PrefixVisible:
             return "Prefix visible";
         }
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorProgressivePoissonBackend(
-        const SandboxEditorProgressivePoissonBackend backend) noexcept
+    const char* DebugNameForEditorProgressivePoissonBackendImpl(
+        const EditorProgressivePoissonBackend backend) noexcept
     {
         switch (backend)
         {
-        case SandboxEditorProgressivePoissonBackend::CpuReference:
+        case EditorProgressivePoissonBackend::CpuReference:
             return "CPU reference";
-        case SandboxEditorProgressivePoissonBackend::VulkanCompute:
+        case EditorProgressivePoissonBackend::VulkanCompute:
             return "Vulkan compute";
         }
         return "Unknown";
     }
 
-    SandboxEditorProgressivePoissonChannel MakeSandboxEditorProgressivePoissonChannel(
+    EditorProgressivePoissonChannel MakeEditorProgressivePoissonChannelImpl(
         const ProgressivePoissonPlaygroundChannel channel) noexcept
     {
         switch (channel)
         {
         case ProgressivePoissonPlaygroundChannel::Level:
-            return SandboxEditorProgressivePoissonChannel::Level;
+            return EditorProgressivePoissonChannel::Level;
         case ProgressivePoissonPlaygroundChannel::Phase:
-            return SandboxEditorProgressivePoissonChannel::Phase;
+            return EditorProgressivePoissonChannel::Phase;
         case ProgressivePoissonPlaygroundChannel::SplatRadius:
-            return SandboxEditorProgressivePoissonChannel::SplatRadius;
+            return EditorProgressivePoissonChannel::SplatRadius;
         case ProgressivePoissonPlaygroundChannel::PrefixVisible:
-            return SandboxEditorProgressivePoissonChannel::PrefixVisible;
+            return EditorProgressivePoissonChannel::PrefixVisible;
         }
-        return SandboxEditorProgressivePoissonChannel::Level;
+        return EditorProgressivePoissonChannel::Level;
     }
 
     ProgressivePoissonPlaygroundChannel
     MakeProgressivePoissonPlaygroundChannel(
-        const SandboxEditorProgressivePoissonChannel channel) noexcept
+        const EditorProgressivePoissonChannel channel) noexcept
     {
         switch (channel)
         {
-        case SandboxEditorProgressivePoissonChannel::Level:
+        case EditorProgressivePoissonChannel::Level:
             return ProgressivePoissonPlaygroundChannel::Level;
-        case SandboxEditorProgressivePoissonChannel::Phase:
+        case EditorProgressivePoissonChannel::Phase:
             return ProgressivePoissonPlaygroundChannel::Phase;
-        case SandboxEditorProgressivePoissonChannel::SplatRadius:
+        case EditorProgressivePoissonChannel::SplatRadius:
             return ProgressivePoissonPlaygroundChannel::SplatRadius;
-        case SandboxEditorProgressivePoissonChannel::PrefixVisible:
+        case EditorProgressivePoissonChannel::PrefixVisible:
             return ProgressivePoissonPlaygroundChannel::PrefixVisible;
         }
         return ProgressivePoissonPlaygroundChannel::Level;
     }
 
-    SandboxEditorProgressivePoissonBackend MakeSandboxEditorProgressivePoissonBackend(
+    EditorProgressivePoissonBackend MakeEditorProgressivePoissonBackendImpl(
         const ProgressivePoissonPlaygroundBackend backend) noexcept
     {
         switch (backend)
         {
         case ProgressivePoissonPlaygroundBackend::CpuReference:
-            return SandboxEditorProgressivePoissonBackend::CpuReference;
+            return EditorProgressivePoissonBackend::CpuReference;
         case ProgressivePoissonPlaygroundBackend::VulkanCompute:
-            return SandboxEditorProgressivePoissonBackend::VulkanCompute;
+            return EditorProgressivePoissonBackend::VulkanCompute;
         }
-        return SandboxEditorProgressivePoissonBackend::CpuReference;
+        return EditorProgressivePoissonBackend::CpuReference;
     }
 
     ProgressivePoissonPlaygroundBackend
     MakeProgressivePoissonPlaygroundBackend(
-        const SandboxEditorProgressivePoissonBackend backend) noexcept
+        const EditorProgressivePoissonBackend backend) noexcept
     {
         switch (backend)
         {
-        case SandboxEditorProgressivePoissonBackend::CpuReference:
+        case EditorProgressivePoissonBackend::CpuReference:
             return ProgressivePoissonPlaygroundBackend::CpuReference;
-        case SandboxEditorProgressivePoissonBackend::VulkanCompute:
+        case EditorProgressivePoissonBackend::VulkanCompute:
             return ProgressivePoissonPlaygroundBackend::VulkanCompute;
         }
         return ProgressivePoissonPlaygroundBackend::CpuReference;
     }
 
-    SandboxEditorProgressivePoissonConfig MakeSandboxEditorProgressivePoissonConfig(
+    EditorProgressivePoissonConfig MakeEditorProgressivePoissonConfigImpl(
         const ProgressivePoissonPlaygroundConfig& config) noexcept
     {
-        return SandboxEditorProgressivePoissonConfig{
+        return EditorProgressivePoissonConfig{
             .Dimension = config.Dimension,
             .GridWidth = config.GridWidth,
             .MaxLevels = config.MaxLevels,
@@ -1905,8 +1906,8 @@ namespace Extrinsic::Runtime
             .ShuffleWithinLevels = config.ShuffleWithinLevels,
             .ShuffleSeed = config.ShuffleSeed,
             .PrefixCount = config.PrefixCount,
-            .Channel = MakeSandboxEditorProgressivePoissonChannel(config.Channel),
-            .Backend = MakeSandboxEditorProgressivePoissonBackend(config.Backend),
+            .Channel = MakeEditorProgressivePoissonChannelImpl(config.Channel),
+            .Backend = MakeEditorProgressivePoissonBackendImpl(config.Backend),
             .MeshSurfaceSampleCount = config.MeshSurfaceSampleCount,
             .MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed,
             .MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea,
@@ -1918,7 +1919,7 @@ namespace Extrinsic::Runtime
 
     ProgressivePoissonPlaygroundConfig
     MakeProgressivePoissonPlaygroundConfig(
-        const SandboxEditorProgressivePoissonConfig& config,
+        const EditorProgressivePoissonConfig& config,
         const ProgressivePoissonPlaygroundConfig& defaults) noexcept
     {
         ProgressivePoissonPlaygroundConfig out = defaults;
@@ -1944,15 +1945,15 @@ namespace Extrinsic::Runtime
     }
 
 
-    SandboxEditorProgressivePoissonResult
-    ApplySandboxEditorProgressivePoissonCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorProgressivePoissonCommand& command)
+    EditorProgressivePoissonResult
+    ApplyEditorProgressivePoissonCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorProgressivePoissonCommand& command)
     {
         if (context.Scene == nullptr)
         {
             return MakeProgressivePoissonResult(
-                SandboxEditorCommandStatus::MissingScene,
+                EditorCommandStatus::MissingScene,
                 command.Config.Channel,
                 Core::ErrorCode::InvalidState,
                 "Progressive Poisson sampling requires an attached scene.");
@@ -1960,7 +1961,7 @@ namespace Extrinsic::Runtime
         if (!IsValidProgressivePoissonConfig(command.Config))
         {
             return MakeProgressivePoissonResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
+                EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
                 "Progressive Poisson sampling requires dimension 2 or 3, positive "
                 "grid/max-level/hash settings, and finite radius alpha.");
@@ -1972,7 +1973,7 @@ namespace Extrinsic::Runtime
         if (!entity.has_value())
         {
             return MakeProgressivePoissonResult(
-                SandboxEditorCommandStatus::StaleEntity,
+                EditorCommandStatus::StaleEntity,
                 command.Config.Channel,
                 Core::ErrorCode::ResourceNotFound,
                 "Progressive Poisson target entity is stale or no longer live.");
@@ -1985,7 +1986,7 @@ namespace Extrinsic::Runtime
             availability.ProvenanceDomain != GS::Domain::Mesh)
         {
             return MakeProgressivePoissonResult(
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
+                EditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
                 "Progressive Poisson sampling requires selected point-cloud or mesh "
                 "GeometrySources.");
@@ -1998,7 +1999,7 @@ namespace Extrinsic::Runtime
             if (view.VertexSource == nullptr)
             {
                 return MakeProgressivePoissonResult(
-                    SandboxEditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
+                    EditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
                     Core::ErrorCode::InvalidArgument,
                     "Progressive Poisson sampling requires selected point-cloud "
                     "vertices.");
@@ -2009,7 +2010,7 @@ namespace Extrinsic::Runtime
             if (!positions.has_value())
             {
                 return MakeProgressivePoissonResult(
-                    SandboxEditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
+                    EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
                     Core::ErrorCode::InvalidArgument,
                     "Progressive Poisson sampling requires a non-empty finite v:position "
                     "property.");
@@ -2028,7 +2029,7 @@ namespace Extrinsic::Runtime
                 return SubmitProgressivePoissonCpuDerivedJob(
                     context,
                     command,
-                    SandboxEditorProgressivePoissonCpuJobSource::PointCloud,
+                    EditorProgressivePoissonCpuJobSource::PointCloud,
                     std::move(*positions),
                     Geometry::HalfedgeMesh::Mesh{},
                     beforeState,
@@ -2040,12 +2041,12 @@ namespace Extrinsic::Runtime
             if (!afterState.Vertices.has_value())
             {
                 return MakeProgressivePoissonResult(
-                    SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                    EditorCommandStatus::UnsupportedGeometryDomain,
                     command.Config.Channel,
                     Core::ErrorCode::InvalidState,
                     "Progressive Poisson point source state is unavailable.");
             }
-            SandboxEditorProgressivePoissonResult result =
+            EditorProgressivePoissonResult result =
                 RunProgressivePoissonAndPublish(
                     std::span<const glm::vec3>{
                         positions->data(),
@@ -2059,14 +2060,14 @@ namespace Extrinsic::Runtime
             ApplyProgressivePoissonVisualization(
                 afterState,
                 command.Config.Channel);
-            const SandboxEditorCommandStatus committed =
+            const EditorCommandStatus committed =
                 CommitProgressivePoissonMutation(
                     context,
                     command.StableEntityId,
                     ProgressivePoissonMutationScope::PointAttributes,
                     beforeState,
                     std::move(afterState));
-            if (committed != SandboxEditorCommandStatus::Applied)
+            if (committed != EditorCommandStatus::Applied)
             {
                 result.Status = committed;
                 result.Error = Core::ErrorCode::InvalidState;
@@ -2083,7 +2084,7 @@ namespace Extrinsic::Runtime
         if (!IsValidProgressivePoissonMeshSurfaceConfig(command.Config))
         {
             return MakeProgressivePoissonResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
+                EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
                 "Progressive Poisson mesh sampling requires a positive surface sample "
                 "count and finite positive minimum triangle area.");
@@ -2091,9 +2092,9 @@ namespace Extrinsic::Runtime
 
         const GS::ConstSourceView constView =
             GS::BuildConstView(raw, *entity);
-        Detail::SandboxEditorMeshSourceSnapshot source =
-            Detail::BuildSandboxEditorMeshSourceSnapshot(constView);
-        if (source.Status != SandboxEditorCommandStatus::Applied)
+        Detail::EditorMeshSourceSnapshot source =
+            Detail::BuildEditorMeshSourceSnapshot(constView);
+        if (source.Status != EditorCommandStatus::Applied)
         {
             return MakeProgressivePoissonResult(source.Status, command.Config.Channel, source.Error,
                                                 source.Diagnostic.empty()
@@ -2113,7 +2114,7 @@ namespace Extrinsic::Runtime
             return SubmitProgressivePoissonCpuDerivedJob(
                 context,
                 command,
-                SandboxEditorProgressivePoissonCpuJobSource::MeshSurface,
+                EditorProgressivePoissonCpuJobSource::MeshSurface,
                 std::move(source.BeforePositions),
                 std::move(source.Mesh),
                 beforeState,
@@ -2125,7 +2126,7 @@ namespace Extrinsic::Runtime
             SurfaceSampling::SampleTriangleMeshSurface(
                 source.Mesh,
                 ToProgressivePoissonSurfaceParams(command.Config));
-        SandboxEditorProgressivePoissonResult result{};
+        EditorProgressivePoissonResult result{};
         result.Channel = command.Config.Channel;
         result.MeshSurfaceSamplingUsed = true;
         result.MeshSurfaceSampleCount =
@@ -2143,8 +2144,8 @@ namespace Extrinsic::Runtime
         {
             result.Status =
                 sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
-                    ? SandboxEditorCommandStatus::InvalidProcessingParameters
-                    : SandboxEditorCommandStatus::GeometryProcessingFailed;
+                    ? EditorCommandStatus::InvalidProcessingParameters
+                    : EditorCommandStatus::GeometryProcessingFailed;
             result.Error =
                 sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
                     ? Core::ErrorCode::InvalidArgument
@@ -2183,14 +2184,14 @@ namespace Extrinsic::Runtime
                 beforeState,
                 sampled.Cloud,
                 command.Config.Channel);
-        const SandboxEditorCommandStatus publishStatus =
+        const EditorCommandStatus publishStatus =
             CommitProgressivePoissonMutation(
                 context,
                 command.StableEntityId,
                 ProgressivePoissonMutationScope::MeshToPointCloud,
                 beforeState,
                 std::move(afterState));
-        if (publishStatus != SandboxEditorCommandStatus::Applied)
+        if (publishStatus != EditorCommandStatus::Applied)
         {
             result.Status = publishStatus;
             result.Error = Core::ErrorCode::Unknown;
@@ -2204,8 +2205,8 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    RuntimeEngineConfigApplyResult ApplySandboxEditorClusteringConfig(
-        const SandboxEditorContext& context,
+    RuntimeEngineConfigApplyResult ApplyEditorClusteringConfigImpl(
+        const EditorFeatureBindings& context,
         const ClusteringConfig& config,
         std::string sourceId)
     {
@@ -2234,8 +2235,8 @@ namespace Extrinsic::Runtime
         return context.ApplyEngineConfigHotSubset(result.LoadResult);
     }
 
-    std::optional<ClusteringConfig> GetSandboxEditorClusteringConfig(
-        const SandboxEditorContext& context) noexcept
+    std::optional<ClusteringConfig> GetEditorClusteringConfigImpl(
+        const EditorFeatureBindings& context) noexcept
     {
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
@@ -2243,21 +2244,21 @@ namespace Extrinsic::Runtime
             context.EngineConfigControlState->ActiveConfig);
     }
 
-    SandboxEditorProgressivePoissonConfigResult
-    ApplySandboxEditorProgressivePoissonConfigCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorProgressivePoissonConfigCommand& command)
+    EditorProgressivePoissonConfigResult
+    ApplyEditorProgressivePoissonConfigCommandImpl(
+        const EditorFeatureBindings& context,
+        const EditorProgressivePoissonConfigCommand& command)
     {
-        SandboxEditorProgressivePoissonConfigResult result{};
+        EditorProgressivePoissonConfigResult result{};
         if (context.EngineConfigControlState == nullptr ||
             !context.PreviewEngineConfigDocument ||
             !context.ApplyEngineConfigHotSubset ||
             !context.EngineConfigCommandsAvailable)
         {
             result.Status =
-                SandboxEditorProgressivePoissonConfigStatus::MissingConfigFacade;
+                EditorProgressivePoissonConfigStatus::MissingConfigControl;
             result.Message =
-                "Progressive Poisson config requires the engine config-control facade.";
+                "Progressive Poisson config requires the engine config-control module.";
             return result;
         }
 
@@ -2279,7 +2280,7 @@ namespace Extrinsic::Runtime
         if (!Core::Config::IsConfigUsable(result.Preview))
         {
             result.Status =
-                SandboxEditorProgressivePoissonConfigStatus::PreviewRejected;
+                EditorProgressivePoissonConfigStatus::PreviewRejected;
             result.Message =
                 "Progressive Poisson config preview was rejected.";
             return result;
@@ -2289,7 +2290,7 @@ namespace Extrinsic::Runtime
         if (!result.Apply.Succeeded())
         {
             result.Status =
-                SandboxEditorProgressivePoissonConfigStatus::ApplyRejected;
+                EditorProgressivePoissonConfigStatus::ApplyRejected;
             result.Message =
                 "Progressive Poisson config hot-apply was rejected.";
             return result;
@@ -2297,18 +2298,18 @@ namespace Extrinsic::Runtime
 
         result.Status =
             result.Apply.Status == RuntimeEngineConfigApplyStatus::NoChange
-                ? SandboxEditorProgressivePoissonConfigStatus::NoChange
-                : SandboxEditorProgressivePoissonConfigStatus::Applied;
+                ? EditorProgressivePoissonConfigStatus::NoChange
+                : EditorProgressivePoissonConfigStatus::Applied;
         result.Message =
-            result.Status == SandboxEditorProgressivePoissonConfigStatus::NoChange
+            result.Status == EditorProgressivePoissonConfigStatus::NoChange
                 ? "Progressive Poisson config unchanged."
                 : "Progressive Poisson config applied.";
         return result;
     }
 
-    std::optional<SandboxEditorProgressivePoissonConfig>
-    GetSandboxEditorProgressivePoissonConfig(
-        const SandboxEditorContext& context) noexcept
+    std::optional<EditorProgressivePoissonConfig>
+    GetEditorProgressivePoissonConfigImpl(
+        const EditorFeatureBindings& context) noexcept
     {
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
@@ -2316,7 +2317,7 @@ namespace Extrinsic::Runtime
             context.EngineConfigControlState->ActiveConfig);
         if (!config.has_value())
             return std::nullopt;
-        return MakeSandboxEditorProgressivePoissonConfig(*config);
+        return MakeEditorProgressivePoissonConfigImpl(*config);
     }
 
 }

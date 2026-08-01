@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -25,14 +26,20 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.SandboxEditorFacades;
-import Extrinsic.Runtime.SandboxConfigSections;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Sandbox.Editor.MethodPanels;
@@ -46,7 +53,7 @@ namespace ECS = Extrinsic::ECS;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Runtime = Extrinsic::Runtime;
 namespace Sandbox = Extrinsic::Sandbox;
-namespace SandboxEditor = Extrinsic::Sandbox::Editor;
+namespace Editor = Extrinsic::Sandbox::Editor;
 
 namespace
 {
@@ -76,7 +83,7 @@ namespace
     {
         Intrinsic::Tests::RuntimeTestKernel Kernel{HeadlessConfig(),
                                                    std::make_unique<OneFrameApplication>()};
-        SandboxEditor::EditorShell Shell{};
+        Editor::EditorShell Shell{};
 
         EditorUiShellHarness()
         {
@@ -130,12 +137,11 @@ namespace
         ECS::Scene::Registry Scene{};
         Runtime::SelectionController Selection{};
         Runtime::EditorCommandHistory History{};
-        Runtime::SandboxEditorSelectedModelCache ModelCache{};
         std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> ConfigEngine{};
         Runtime::EngineConfigControl* ConfigControl{};
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         std::uint32_t StableEntityId{0u};
-        Runtime::SandboxEditorContext Context{};
+        Editor::SandboxEditorContext Context{};
 
         ParameterizationPanelHarness()
         {
@@ -166,31 +172,35 @@ namespace
             EXPECT_TRUE(Selection.SetSelectedEntity(Scene, Entity));
             StableEntityId =
                 Runtime::SelectionController::ToStableEntityId(Entity);
-            Context.Scene = &Scene;
-            Context.Selection = &Selection;
-            Context.CommandHistory = &History;
-            Context.SelectedModelCache = &ModelCache;
-            Context.EngineConfigControlState =
-                ConfigControl != nullptr
-                    ? &ConfigControl->GetEngineConfigControlState()
-                    : nullptr;
-            Context.EngineConfigCommandsAvailable =
-                ConfigControl != nullptr;
-            Context.PreviewEngineConfigDocument =
-                [this](const std::string& document,
-                       const std::string& sourceId)
-                {
-                    return ConfigControl->PreviewEngineConfigControlDocument(
-                        document,
-                        sourceId);
-                };
-            Context.ApplyEngineConfigHotSubset =
-                [this](const Config::EngineConfigLoadResult& preview)
-                {
-                    return ConfigControl->ApplyEngineConfigHotSubset(
-                        preview,
-                        Runtime::RuntimeConfigControlSource::Editor);
-                };
+            Runtime::EditorGeometryProcessingContext geometry{
+                .Scene = &Scene,
+                .Selection = &Selection,
+                .CommandHistory = &History,
+                .EngineConfigControlState =
+                    ConfigControl != nullptr
+                        ? &ConfigControl->GetEngineConfigControlState()
+                        : nullptr,
+                .PreviewEngineConfigDocument =
+                    [this](const std::string& document,
+                           const std::string& sourceId)
+                    {
+                        return ConfigControl->PreviewEngineConfigControlDocument(
+                            document,
+                            sourceId);
+                    },
+                .ApplyEngineConfigHotSubset =
+                    [this](const Config::EngineConfigLoadResult& preview)
+                    {
+                        return ConfigControl->ApplyEngineConfigHotSubset(
+                            preview,
+                            Runtime::RuntimeConfigControlSource::Editor);
+                    },
+                .EngineConfigCommandsAvailable = ConfigControl != nullptr,
+            };
+            Context.GeometryCommands =
+                Runtime::BindEditorGeometryProcessingCommands(
+                    std::move(geometry));
+            Context.GeometryConfigCommandsAvailable = ConfigControl != nullptr;
         }
 
         ~ParameterizationPanelHarness()
@@ -234,7 +244,7 @@ namespace
 TEST(SandboxParameterizationPanel, RegistrationIsStableAndIdempotent)
 {
     EditorUiShellHarness harness;
-    SandboxEditor::MethodPanels panels;
+    Editor::MethodPanels panels;
     panels.Register(harness.Shell);
     panels.Register(harness.Shell);
 
@@ -272,7 +282,7 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
     };
     constexpr std::array<std::string_view, 4u> expectedTokens{
         "lscm", "harmonic_cotangent", "tutte_uniform", "bff"};
-    const auto options = SandboxEditor::SandboxParameterizationStrategyOptions();
+    const auto options = Editor::SandboxParameterizationStrategyOptions();
     static_assert(options.size() == 4u);
     for (std::size_t index = 0u; index < options.size(); ++index)
     {
@@ -280,7 +290,7 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
         EXPECT_EQ(options[index].StableToken, expectedTokens[index]);
         EXPECT_FALSE(options[index].Label.empty());
         EXPECT_EQ(
-            Runtime::StableTokenForSandboxEditorParameterizationStrategy(
+            Runtime::StableTokenForEditorParameterizationStrategy(
                 options[index].Strategy),
             expectedTokens[index]);
     }
@@ -311,7 +321,7 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
     config.View.ShowDistortionHeatmap = true;
 
     const auto request =
-        SandboxEditor::BuildSandboxParameterizationPanelApplyRequest(
+        Editor::BuildSandboxParameterizationPanelApplyRequest(
             91u,
             config);
     ASSERT_TRUE(request.has_value());
@@ -352,13 +362,13 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
               config.View.ShowDistortionHeatmap);
 
     EXPECT_FALSE(
-        SandboxEditor::BuildSandboxParameterizationPanelApplyRequest(
+        Editor::BuildSandboxParameterizationPanelApplyRequest(
             0u,
             config)
             .has_value());
     config.Strategy = static_cast<Strategy>(999u);
     EXPECT_FALSE(
-        SandboxEditor::BuildSandboxParameterizationPanelApplyRequest(
+        Editor::BuildSandboxParameterizationPanelApplyRequest(
             91u,
             config)
             .has_value());
@@ -366,7 +376,7 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
 
 TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
 {
-    Runtime::SandboxEditorParameterizationViewModel model{};
+    Runtime::EditorParameterizationViewModel model{};
     model.HasUvCoordinates = true;
     model.HasFiniteUvBounds = true;
     model.UVs = {
@@ -378,13 +388,13 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
     model.UvBoundsMin = {-2.0f, -1.0f};
     model.UvBoundsMax = {2.0f, 1.0f};
     model.Triangles = {{0u, 1u, 2u}, {0u, 2u, 3u}};
-    const SandboxEditor::SandboxParameterizationUvPane pane{
+    const Editor::SandboxParameterizationUvPane pane{
         .Min = {10.0f, 20.0f},
         .Max = {410.0f, 220.0f},
         .Padding = 10.0f,
     };
     const auto projection =
-        SandboxEditor::BuildSandboxParameterizationUvProjection(model, pane);
+        Editor::BuildSandboxParameterizationUvProjection(model, pane);
     ASSERT_TRUE(projection.Valid) << projection.Message;
     EXPECT_TRUE(projection.FitsPane);
     EXPECT_EQ(projection.Vertices.size(), model.UVs.size());
@@ -406,9 +416,9 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
     compactIsland.UvBoundsMin = {0.45f, 0.45f};
     compactIsland.UvBoundsMax = {0.55f, 0.55f};
     const auto compactProjection =
-        SandboxEditor::BuildSandboxParameterizationUvProjection(
+        Editor::BuildSandboxParameterizationUvProjection(
             compactIsland,
-            SandboxEditor::SandboxParameterizationUvPane{
+            Editor::SandboxParameterizationUvPane{
                 .Min = pane.Min,
                 .Max = pane.Max,
                 .Padding = pane.Padding,
@@ -416,11 +426,11 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
             });
     ASSERT_TRUE(compactProjection.Valid) << compactProjection.Message;
     const glm::vec2 unitMin =
-        SandboxEditor::ProjectSandboxParameterizationUvPoint(
+        Editor::ProjectSandboxParameterizationUvPoint(
             compactProjection,
             {0.0f, 0.0f});
     const glm::vec2 unitMax =
-        SandboxEditor::ProjectSandboxParameterizationUvPoint(
+        Editor::ProjectSandboxParameterizationUvPoint(
             compactProjection,
             {1.0f, 1.0f});
     EXPECT_GE(unitMin.x, pane.Min.x + pane.Padding - 0.5f);
@@ -436,7 +446,7 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
     transformedPane.Zoom = 2.0f;
     transformedPane.Pan = {17.0f, -9.0f};
     const auto transformed =
-        SandboxEditor::BuildSandboxParameterizationUvProjection(
+        Editor::BuildSandboxParameterizationUvProjection(
             model,
             transformedPane);
     ASSERT_TRUE(transformed.Valid);
@@ -450,7 +460,7 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
     degenerate.UvBoundsMax = {3.0f, 4.0f};
     degenerate.Triangles = {{0u, 1u, 2u}};
     EXPECT_TRUE(
-        SandboxEditor::BuildSandboxParameterizationUvProjection(
+        Editor::BuildSandboxParameterizationUvProjection(
             degenerate,
             pane)
             .Valid);
@@ -458,7 +468,7 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
     auto invalid = model;
     invalid.Triangles = {{0u, 1u, 99u}};
     const auto rejected =
-        SandboxEditor::BuildSandboxParameterizationUvProjection(invalid, pane);
+        Editor::BuildSandboxParameterizationUvProjection(invalid, pane);
     EXPECT_FALSE(rejected.Valid);
     EXPECT_FALSE(rejected.Message.empty());
 
@@ -475,7 +485,7 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
     auto extremePane = pane;
     extremePane.Zoom = std::numeric_limits<float>::max();
     const auto overflowRejected =
-        SandboxEditor::BuildSandboxParameterizationUvProjection(
+        Editor::BuildSandboxParameterizationUvProjection(
             extreme,
             extremePane);
     EXPECT_FALSE(overflowRejected.Valid);
@@ -484,8 +494,8 @@ TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)
 
 TEST(SandboxParameterizationPanel, ResultSummaryCarriesAggregateDiagnostics)
 {
-    Runtime::SandboxEditorParameterizationResult result{};
-    result.Status = Runtime::SandboxEditorCommandStatus::Applied;
+    Runtime::EditorParameterizationResult result{};
+    result.Status = Runtime::EditorCommandStatus::Applied;
     result.Strategy = Runtime::ParameterizationStrategyKind::TutteUniform;
     result.StrategyToken = "tutte_uniform";
     result.ParameterizationStatus =
@@ -501,7 +511,7 @@ TEST(SandboxParameterizationPanel, ResultSummaryCarriesAggregateDiagnostics)
     result.Diagnostics.MeanStretch = 1.5;
 
     const auto summary =
-        SandboxEditor::BuildSandboxParameterizationResultSummary(result);
+        Editor::BuildSandboxParameterizationResultSummary(result);
     EXPECT_TRUE(summary.Succeeded);
     EXPECT_TRUE(summary.HasDiagnostics);
     EXPECT_EQ(summary.StrategyToken, "tutte_uniform");
@@ -515,11 +525,11 @@ TEST(SandboxParameterizationPanel, ResultSummaryCarriesAggregateDiagnostics)
     EXPECT_DOUBLE_EQ(summary.MeanAreaDistortion, 0.125);
     EXPECT_DOUBLE_EQ(summary.MeanStretch, 1.5);
 
-    result.Status = Runtime::SandboxEditorCommandStatus::StaleEntity;
+    result.Status = Runtime::EditorCommandStatus::StaleEntity;
     result.ParameterizationStatus =
         Geometry::Parameterization::ParameterizationStatus::InvalidInput;
     const auto invalidSummary =
-        SandboxEditor::BuildSandboxParameterizationResultSummary(result);
+        Editor::BuildSandboxParameterizationResultSummary(result);
     EXPECT_FALSE(invalidSummary.Succeeded);
     EXPECT_EQ(invalidSummary.SolverStatus, "invalid input");
     EXPECT_NE(invalidSummary.CommandStatus, summary.CommandStatus);
@@ -530,8 +540,8 @@ TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
     ParameterizationPanelHarness harness{};
     Runtime::ParameterizationConfig config{};
     config.Strategy = Runtime::ParameterizationStrategyKind::TutteUniform;
-    const SandboxEditor::SandboxParameterizationPanelActionResult action =
-        SandboxEditor::ApplySandboxParameterizationPanelAction(
+    const Editor::SandboxParameterizationPanelActionResult action =
+        Editor::ApplySandboxParameterizationPanelAction(
             harness.Context,
             harness.StableEntityId,
             config);
@@ -546,9 +556,9 @@ TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
                                                std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
-    SandboxEditor::EditorShell shell;
+    Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
-    SandboxEditor::MethodPanels panels;
+    Editor::MethodPanels panels;
     panels.Register(shell);
     ASSERT_TRUE(shell.SetEditorWindowOpen(
         "mesh.processing.parameterize_uv",

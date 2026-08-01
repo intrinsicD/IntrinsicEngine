@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 64 |
+| `runtime` | 73 |
 
 ## Modules
 
@@ -343,6 +343,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GizmoFrameService` | `src/runtime/Gizmos/Runtime.GizmoFrameService.cppm` | `runtime` |
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
+| `Extrinsic.Runtime.ClusteringConfig` | `src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | `src/runtime/Runtime.AssetIngestStateMachine.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowGeometryMaterialization` | `src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cppm` | `runtime` |
@@ -357,6 +358,9 @@ Root scanned: `src`
 | `Extrinsic.Runtime.DeviceBootstrap` | `src/runtime/Runtime.DeviceBootstrap.cppm` | `runtime` |
 | `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
+| `Extrinsic.Runtime.EditorCommon` | `src/runtime/Runtime.EditorCommon.cppm` | `runtime` |
+| `Extrinsic.Runtime.EditorJobProjection` | `src/runtime/Runtime.EditorJobProjection.cppm` | `runtime` |
+| `Extrinsic.Runtime.EditorWorkspaceSnapshots` | `src/runtime/Runtime.EditorWorkspaceSnapshots.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
 | `Extrinsic.Runtime.EngineConfigBoot` | `src/runtime/Runtime.EngineConfigBoot.cppm` | `runtime` |
 | `Extrinsic.Runtime.EngineConfigControl` | `src/runtime/Runtime.EngineConfigControl.cppm` | `runtime` |
@@ -364,6 +368,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPlanBuilders` | `src/runtime/Runtime.GeometryPlanBuilders.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPresentation` | `src/runtime/Runtime.GeometryPresentation.cppm` | `runtime` |
+| `Extrinsic.Runtime.GeometryProcessingOperations` | `src/runtime/Runtime.GeometryProcessingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.InputActions` | `src/runtime/Runtime.InputActions.cppm` | `runtime` |
 | `Extrinsic.Runtime.JobService` | `src/runtime/Runtime.JobService.cppm` | `runtime` |
 | `Extrinsic.Runtime.JobServiceGpuQueueBridge` | `src/runtime/Runtime.JobServiceGpuQueueBridge.cppm` | `runtime` |
@@ -372,17 +377,18 @@ Root scanned: `src`
 | `Extrinsic.Runtime.MeshSurfaceTopology` | `src/runtime/Runtime.MeshSurfaceTopology.cppm` | `runtime` |
 | `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
 | `Extrinsic.Runtime.ModuleSchedule` | `src/runtime/Runtime.ModuleSchedule.cppm` | `runtime` |
+| `Extrinsic.Runtime.ParameterizationConfig` | `src/runtime/Runtime.ParameterizationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
+| `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
-| `Extrinsic.Runtime.RegistrationAlignment` | `src/runtime/Runtime.RegistrationAlignment.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Runtime.RenderArtifactPublication.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderRecipeActivation` | `src/runtime/Runtime.RenderRecipeActivation.cppm` | `runtime` |
+| `Extrinsic.Runtime.RenderRecipeEditingOperations` | `src/runtime/Runtime.RenderRecipeEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Runtime.RenderWorldPool.cppm` | `runtime` |
-| `Extrinsic.Runtime.SandboxConfigSections` | `src/runtime/Runtime.SandboxConfigSections.cppm` | `runtime` |
-| `Extrinsic.Runtime.SandboxEditorFacades` | `src/runtime/Runtime.SandboxEditorFacades.cppm` | `runtime` |
+| `Extrinsic.Runtime.SceneEditingOperations` | `src/runtime/Runtime.SceneEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Runtime.SelectionController.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionReadback` | `src/runtime/Runtime.SelectionReadback.cppm` | `runtime` |
@@ -392,10 +398,13 @@ Root scanned: `src`
 | `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/Runtime.VertexAttributeBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/Runtime.VertexChannelBindings.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelStreams` | `src/runtime/Runtime.VertexChannelStreams.cppm` | `runtime` |
+| `Extrinsic.Runtime.VisualizationEditingOperations` | `src/runtime/Runtime.VisualizationEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.WorldHandle` | `src/runtime/Runtime.WorldHandle.cppm` | `runtime` |
 | `Extrinsic.Runtime.WorldRegistry` | `src/runtime/Runtime.WorldRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneDocumentModule` | `src/runtime/Scene/Runtime.SceneDocumentModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
+| `Extrinsic.Runtime.Private.EditorFeatures` | `src/runtime/internal/Runtime.EditorFeatures.Detail.cppm` | `runtime` |
+| `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **371**
+Total modules: **380**

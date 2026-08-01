@@ -9,6 +9,8 @@
 
 #include "RuntimeTestModule.hpp"
 
+#include "EditorFeatureTestContext.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -19,7 +21,12 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
 
 namespace Core = Extrinsic::Core;
 namespace CoreConfig = Extrinsic::Core::Config;
@@ -524,8 +531,8 @@ TEST(RuntimeRenderRecipeActivation, EditorActivationCommandRoutesThroughRuntimeA
 
     Graphics::RenderRecipeConfigContext recipeContext =
         configControl->CreateRenderRecipeConfigContext();
-    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
-    Runtime::SandboxEditorContext context{};
+    Runtime::EditorRenderRecipeEditorState editorState{};
+    Intrinsic::Tests::EditorFeatureTestContext context{};
     context.RenderRecipeContext = &recipeContext;
     context.RenderRecipeEditorState = &editorState;
     context.RenderRecipeRuntimeState = &configControl->GetRenderRecipeState();
@@ -546,27 +553,27 @@ TEST(RuntimeRenderRecipeActivation, EditorActivationCommandRoutesThroughRuntimeA
         };
     context.RenderRecipeCommandsAvailable = true;
 
-    Runtime::SandboxEditorRenderRecipeCommandResult result =
-        Runtime::ApplySandboxEditorRenderRecipeCommand(
+    Runtime::EditorRenderRecipeCommandResult result =
+        Runtime::ApplyEditorRenderRecipeCommand(
             context,
-            Runtime::SandboxEditorRenderRecipeCommand{
-                .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::PreviewDraft,
+            Runtime::EditorRenderRecipeCommand{
+                .Kind = Runtime::EditorRenderRecipeCommandKind::PreviewDraft,
                 .Document =
                     RenderRecipeConfigDisablingPostprocess("runtime.editor.disable-post"),
                 .SourceId = "editor-preview.json",
             });
     ASSERT_TRUE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorRenderRecipeCommandStatus::Previewed);
+              Runtime::EditorRenderRecipeCommandStatus::Previewed);
 
-    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+    result = Runtime::ApplyEditorRenderRecipeCommand(
         context,
-        Runtime::SandboxEditorRenderRecipeCommand{
-            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::ActivatePreview,
+        Runtime::EditorRenderRecipeCommand{
+            .Kind = Runtime::EditorRenderRecipeCommandKind::ActivatePreview,
         });
     ASSERT_TRUE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::SandboxEditorRenderRecipeCommandStatus::Activated);
+              Runtime::EditorRenderRecipeCommandStatus::Activated);
 
     const Runtime::RuntimeRenderRecipeState& recipeState =
         configControl->GetRenderRecipeState();
@@ -576,8 +583,8 @@ TEST(RuntimeRenderRecipeActivation, EditorActivationCommandRoutesThroughRuntimeA
     EXPECT_EQ(recipeState.ActiveConfig.Preview.Recipe.RecipeId,
               "runtime.editor.disable-post");
 
-    const Runtime::SandboxEditorRenderRecipeEditorModel model =
-        Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    const Runtime::EditorRenderRecipeEditorModel model =
+        Runtime::BuildEditorRenderRecipeEditorModel(context);
     EXPECT_EQ(model.ActiveRecipeId, "runtime.editor.disable-post");
 
     engine.Run();

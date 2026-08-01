@@ -5,6 +5,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-125` — Queued-import contracts race asynchronous state transitions](BUG-125-queued-import-contract-state-observation-races.md):
+  the active-world-switch case can apply one ready result before the deferred
+  switch, while the manual model/texture case can leave `Decoding` before its
+  immediate `CanCancel` snapshot. Both exact failures passed 20/20 alone after
+  one hash-bound full-gate failure; add deterministic test-only interlocks and
+  retain the terminal/materialization assertions without quarantine.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all

@@ -18,7 +18,9 @@ import Extrinsic.Core.Config.Window;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.SandboxConfigSections;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Sandbox.ConfigSections;
 
 namespace CoreConfig = Extrinsic::Core::Config;
@@ -127,7 +129,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     const ScopedConfigFile file{CoreConfig::SerializeEngineConfig(fileConfig)};
     const std::string filePath = file.Path().string();
     const std::array<std::string_view, 3u> args{
-        "IntrinsicSandboxEditorIntegrationTests",
+        "IntrinsicEditorIntegrationTests",
         "--engine-config",
         filePath,
     };
