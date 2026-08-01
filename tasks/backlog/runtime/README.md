@@ -9,16 +9,20 @@ another backlog directory.
 
 ### Runtime abstraction consolidation (seeded 2026-07-24)
 
-The source-complete runtime surface audit re-gated `REVIEW-003`. Each task
-lands and tests the general path, migrates real production workflows, proves
-parity, and only then deletes the specialized/forwarding path in a separate
-cleanup slice:
+The source-complete runtime surface audit re-gated `REVIEW-003`. Each remaining
+task is scoped to one concrete production owner: it preserves public behavior
+first and deletes only the shallow exported helper surface.
 
 #### Open tasks
 
-- [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
-  removes public BMIs for Engine/SceneInteraction/config/device helpers after
-  their owner-level behavior tests are in place.
+- [`RUNTIME-203` — Internalize Engine composition helpers](RUNTIME-203-internalize-engine-composition-helpers.md)
+  removes the one-consumer ModuleSchedule, EcsSystemBundle, and
+  JobServiceGpuQueueBridge BMIs after Engine-level behavior coverage exists.
+- [`RUNTIME-205` — Internalize SceneInteraction helpers](RUNTIME-205-internalize-scene-interaction-helpers.md)
+  separately removes GizmoFrameService and SelectionReadback after interaction-
+  owner behavior/lifetime coverage exists. RenderRecipeActivation and
+  DeviceBootstrap remain outside both tasks because their current production
+  census has multiple load-bearing consumers.
 
 #### Retired prerequisites and completed paths
 
@@ -552,9 +556,12 @@ as normals/colors. This series fixes that incrementally.
 
 `RUNTIME-125` is retired at `CPUContracted`: it added the PR-fast
 SoA-vs-interleaved probe benchmark and planning-only storage/promotion
-contracts without adopting an AoS lane. `RUNTIME-139` owns the optional
-operational AoS storage path, shader variants, promote-on-edit behavior, and
-`gpu;vulkan` parity evidence.
+contracts without adopting an AoS lane. The probe still records
+`adoption_claim=false`; no qualifying result exists.
+[`RUNTIME-139`](RUNTIME-139-remove-speculative-aos-storage-planning.md)
+therefore removes the dormant AoS hint/plan/promotion API and preserves the
+implemented uniform SoA path. A future alternate layout requires a new task
+after claim-eligible GPU profiling proves a material vertex-fetch bottleneck.
 
 Storage model is fixed by
 [`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
