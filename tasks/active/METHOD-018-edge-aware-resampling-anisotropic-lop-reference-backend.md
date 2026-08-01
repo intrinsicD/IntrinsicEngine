@@ -2,12 +2,29 @@
 id: METHOD-018
 theme: I
 depends_on: [METHOD-016, GEOM-062]
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner: "Codex-GeometryE2E"
+branch: "feature/lop-consolidation-e2e"
+worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
+claimed_at: "2026-08-01T15:56:46Z"
 maturity_target: CPUContracted
 ---
 # METHOD-018 — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend
 
+## Status
+- Active on 2026-08-01. Literature intake covers the original 2013 EAR
+  equations and code lineage plus later L0, graph-uniformity, intrinsic/
+  isotropic, EC-Net, and cross-field upsampling improvements. The original
+  deterministic two-phase EAR algorithm remains the correctness oracle; later
+  objectives are comparison/deferred backends, not silent substitutions.
+
 ## Goal
-- Add the feature-preserving members of the LOP family — Edge-Aware Resampling and an anisotropic (normal-aware) WLOP weighting mode — to the shared consolidation surface so sharp edges and corners survive projection instead of being rounded off, giving the family a state-of-the-art edge-preserving option alongside isotropic WLOP/CLOP.
+- Add a literature-faithful deterministic CPU reference for the original
+  two-phase Edge-Aware Resampling algorithm and its anisotropic LOP operator to
+  the shared consolidation surface, so sharp edges and corners have a bounded
+  classical baseline alongside isotropic WLOP/CLOP.
 
 ## Non-goals
 - No new consolidation module — EAR and anisotropic weighting are `Strategy` variants / a weighting mode on the `Geometry.PointCloud.Consolidation` surface from `METHOD-016`.
@@ -16,11 +33,25 @@ maturity_target: CPUContracted
 - No GPU/optimized backend before reference parity (owned by `METHOD-019`/`METHOD-020`).
 
 ## Context
-- Paper/method: Huang, Wu, Gong, Cohen-Or, Ascher, Zhang — "Edge-Aware Point Set Resampling", ACM TOG 2013. EAR first resamples away from edges to obtain reliable normals (bilateral normal smoothing), then progressively upsamples toward edges under an anisotropic, normal-aware projection that preserves sharp features. The anisotropic WLOP weighting mode is the same normal-aware kernel applied to fixed-count consolidation.
+- Paper/method: Huang, Wu, Gong, Cohen-Or, Ascher, Zhang — "Edge-Aware Point Set Resampling", ACM TOG 32(1), 2013,
+  DOI `10.1145/2421636.2421645`. EAR first resamples away from edges
+  through alternating bilateral-normal refinement and anisotropic LOP, then
+  progressively inserts oriented samples toward edges through midpoint
+  clearance, edge-priority, bilateral projection-distance, and candidate-normal
+  selection.
 - Method package: `methods/geometry/edge_aware_resampling/` (manifest-only; id `geometry.edge_aware_resampling`), `signed_heat` pattern — reference lives in the shared `src/geometry` module.
-- Requires oriented normals: `Geometry.PointCloud.Normals` (PCA + MST orientation) supplies them when `v:normal` is absent; the bilateral normal refinement reuses the normal-aware weighting already present in `Geometry.PointCloud.Utils::BilateralFilter`.
+- Requires oriented normals: `Geometry.PointCloud.Normals` (PCA + MST
+  orientation) supplies them when the point cloud's built-in `p:normal`
+  property is absent. Bilateral refinement operates on a private copy and uses
+  the paper's signed normal-similarity equation; it never mutates authored
+  normals.
 - Weighting gate: `GEOM-062` (`Geometry.PointCloud.Kernels`) — EAR's anisotropic weight is a normal-aware extension of the shared radial kernel; add the anisotropic/directional weight to that kernel seam so it stays reusable rather than private to EAR. `Geometry::PCA::SymmetricEigen3` covers any local frame/anisotropy eigendecomposition without new linear algebra.
-- Extends `METHOD-016`: `Ear` (and the anisotropic weighting flag) join the same `Strategy` axis so the feature-preserving option is chosen through one API/config/UI/agent surface. Isotropic WLOP is the contrast oracle — on a sharp-edge fixture EAR must retain the edge where isotropic WLOP demonstrably rounds it.
+- Extends `METHOD-016`: `Ear` and anisotropic `Wlop` join the same `Strategy`
+  axis so the feature-preserving option is chosen through one API/config/UI/
+  agent surface. Isotropic WLOP is the contrast oracle on the same analytic
+  dihedral fixture. This task makes no global state-of-the-art claim: later L0,
+  graph/intrinsic, and learned resamplers address different robustness,
+  uniformity, or data-prior trade-offs.
 
 ## Control surfaces
 - Config/UI/Agent: none new in this task — exposed as an additional `Strategy` value plus an edge-sensitivity parameter on the existing consolidation params. Runtime/config-lane and editor exposure are owned by `RUNTIME-175` / `UI-035`.
