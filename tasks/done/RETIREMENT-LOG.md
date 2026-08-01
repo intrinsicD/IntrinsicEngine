@@ -8,6 +8,26 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-018`](METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md) —
+Edge-Aware Resampling completed on 2026-08-01 at `CPUContracted`.
+`Geometry.PointCloud.Consolidation` now exposes anisotropic WLOP and the
+original EAR two-stage reference on the shared typed strategy surface. It
+consumes immutable authored `p:normal` values or uses the deterministic shared
+normal estimator, alternates bilateral normal refinement with anisotropic
+projection for the paper's fixed rounds, and progressively inserts oriented
+samples using deterministic midpoint clearance and edge-priority ordering.
+Focused equation, edge-preservation, flat-region denoising, exact-count,
+normal-policy, resource, failure, serial-repeat, and concurrent-call cases
+pass; the complete 4,035-test CPU selector and serial grouped ASan/UBSan
+geometry cohorts pass. The confirmation smoke reports quality-error L2
+`0.007731229`, retains all eight inserted samples near the feature, and binds
+the authored-normal and `normals_required` paths. The literature record covers
+the original EAR oracle and later L0, graph-uniformity, intrinsic/isotropic,
+EC-Net, and cross-field improvements without substituting them into the
+reference. Runtime/config and editor integration remain owned by
+`RUNTIME-175`/`UI-035`; no performance or scanner-data generalization claim is
+made.
+
 [`METHOD-017`](METHOD-017-continuous-lop-clop-reference-backend.md) —
 Continuous LOP completed on 2026-08-01 at `CPUContracted`.
 `Geometry.PointCloud.Consolidation` now exposes a typed `ClopStrategy` beside

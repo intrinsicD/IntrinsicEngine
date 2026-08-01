@@ -40,9 +40,6 @@ map.
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
   (rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
-- [METHOD-018 — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend](METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
-  (adds the `Ear`/anisotropic strategies; gated on `METHOD-016` and
-  `geometry/GEOM-062`; consumes `Geometry.PointCloud.Normals`).
 - [METHOD-019 — LOP-family optimized CPU backend and comparison benchmark](METHOD-019-lop-family-optimized-cpu-backend.md)
   (adds the first concrete backend selector plus `cpu_optimized` with paired
   parity/baseline evidence; gated on `METHOD-016`/`017`/`018` and the delivered
@@ -208,6 +205,11 @@ split; narratives live in the retirement log.
   original CLOP Gaussian-product attraction through
   `Geometry.GaussianMixture::FitEM` and reuses `geometry/GEOM-062` repulsion
   kernels.
+- [METHOD-018 — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend](../../done/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
+  (done, 2026-08-01, `CPUContracted`): the shared strategy exposes anisotropic
+  WLOP and the original two-stage EAR reference with authored-or-estimated
+  oriented normals, deterministic progressive insertion, and explicit
+  fail-closed diagnostics.
 - [METHOD-002 — Signed Heat Method reference backend](../../archive/METHOD-002-signed-heat-method-reference-backend.md)
   (done, 2026-06-28, `CPUContracted`): pathfinder method package for
   `geometry.signed_heat`, with surface Variant A CPU reference, correctness

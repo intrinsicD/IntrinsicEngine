@@ -1390,3 +1390,22 @@ observations:
     promoted_to: "logic/claims.md:C18"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O90
+    timestamp: "2026-08-01T19:11+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-018 now has a deterministic CPU reference for anisotropic WLOP
+      and the original two-stage Edge-Aware Resampling algorithm, including
+      oriented-normal policy, bilateral refinement, anisotropic projection,
+      progressive insertion, and explicit failure diagnostics.
+    context: >
+      Unit screening and the raw disjoint confirmation preflight pass the
+      frozen edge, flat-region, exact-count, uniformity, normal-source, and
+      failure gates. Promotion from hypothesis to supported remains contingent
+      on the claim-grade sealed run and independent custody audit.
+    potential_type: claim
+    bound_to: [N312, N313]
+    promoted: true
+    promoted_to: "logic/claims.md:C19"
+    crystallized_via: artifact-commitment
+    stale: false

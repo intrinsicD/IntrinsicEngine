@@ -500,3 +500,32 @@
 - **Tags**: geometry, point cloud, CLOP, Gaussian mixture, CPU reference,
   deterministic
 - **From staging**: O89
+
+## C19: Edge-Aware Resampling has a deterministic original-equation CPU reference
+- **Statement**: On the checked-in analytic screening fixtures and disjoint
+  built-in confirmation cohort, METHOD-018 implements deterministic
+  anisotropic WLOP and the original two-stage EAR reference, consumes valid
+  oriented normals without mutation or estimates them through the shared
+  normal contract, preserves the declared dihedral feature contrast, and
+  returns the requested progressive-insertion count with explicit fail-closed
+  states.
+- **Status**: hypothesis — Clang 23 CPU correctness and serial ASan/UBSan
+  geometry groups pass; frozen claim-grade confirmation and independent audit
+  are pending
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The directional-weight or signed bilateral-normal
+  equation oracle diverges; identical seeded calls differ under repetition or
+  concurrent callers; authored normals are mutated; unsupported or invalid
+  normal/input/resource states publish positions; the confirmation cohort
+  exceeds quality-error L2 `0.03`, fails its edge/flat-region/count/uniformity
+  gates, or places fewer than all eight inserted samples near the feature.
+- **Proof**: [tasks/done/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md,
+  src/geometry/Geometry.PointCloud.Consolidation.cpp,
+  src/geometry/Geometry.PointCloud.Kernels.cpp,
+  tests/unit/geometry/Test.PointCloudConsolidation.cpp,
+  benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml]
+- **Dependencies**: [C17]
+- **Tags**: geometry, point cloud, EAR, anisotropic WLOP, CPU reference,
+  deterministic
+- **From staging**: O90
