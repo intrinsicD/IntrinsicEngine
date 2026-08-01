@@ -1,0 +1,178 @@
+schema_version: 1
+task_id: UI-035
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T19:45:18Z'
+claim_eligible: false
+source:
+  base_ref: 6f846f2d
+  base_revision: 6f846f2d6433e21f396dde6ca41de6300c2e9f02
+  head_revision: 7d3236f3f8f6fb89c4c2d54009a8f21d7625bbce
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: docs/architecture/runtime-config-control.md
+    sha256: 9f7023bd7eb5f78040e5d2456548aae5b49fb06bb846cf14a20cca440b929db2
+  - path: docs/architecture/sandbox-editor-feature-boundaries.md
+    sha256: 809fb1aa8e3e7af77b23b5a004819067fd0bcd1982e4f762bc154d30be9ae6fa
+  - path: methods/geometry/continuous_lop/README.md
+    sha256: c47979d032dfdee4ec8bf4bd70e8f9d95725df9d4b961043a12a483a7651ad8d
+  - path: methods/geometry/edge_aware_resampling/README.md
+    sha256: 542b3be9178a8d1423e22902f8dfb98e8071c0e33656b9c28eaae17ea88d7903
+  - path: methods/geometry/locally_optimal_projection/README.md
+    sha256: 0cd024c35059c5e5279537aa410f3861938db05b3d6d959d6671916a2222e626
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+    sha256: acecd883dcb02a71d1a3a14ebc628f49ca2091fcd6748f924cf148c597c8bc09
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: f7d8884094c98fe162f6253e69f2646e4ce25ec6092f27cffc2cabb09df4d87e
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: 3588d3c86701952ccd815cec905bef34e2cb99e8737f8edc8b2e3e3b75b1c713
+  - path: src/app/Sandbox/README.md
+    sha256: e4fb8dcf60025cb227a0e57a508492fe49192247d0677405e7e598ccab27dab4
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cpp
+    sha256: 90ba1647e13b57225d8586397c60798410b807b526a5e3600311fd6c886309de
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cppm
+    sha256: a1653effbbe81c5c3d55a993bd65565a765bc632dd5e7f4fd4d3de47c8be4ab7
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 682548b3cc8318e62aa1f2a5cd3da3c18926640f1098bc77bf5dd0f5bb0591fc
+  - path: tasks/backlog/ui/README.md
+    sha256: 0213fb7b8ba9a50177519d322674277ce773217b1f5fc42bf6f21832c462e39a
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: c1337e59883b5c2e0a841b24415d7090501dbf58018e85bb14679262b3a1e605
+  - path: tasks/done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md
+    sha256: f6be56d7a8b398289297bf536a80b02a4a4f893899fb885f40994f992d280ed2
+  - path: tests/CMakeLists.txt
+    sha256: 987cef08be65d50c9cf8b42dfeeaf3b5e450a0f99f6a621d233985fbfc7bab2e
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 913d8e8cc2ca3d307ff76b02c8aa9bbe8e2793198a6a10e6d53372bf624f9eca
+  - path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+    sha256: 909d18a5bd6ef9a610478f82ff368adbd3d11f61e1944ce0305439878530308f
+  content_digest: f1c0704345897fc0f90c66f94a2e4ffb2830402aabf30849794ce120c29191ce
+touched:
+  paths:
+  - docs/architecture/runtime-config-control.md
+  - docs/architecture/sandbox-editor-feature-boundaries.md
+  - methods/geometry/continuous_lop/README.md
+  - methods/geometry/edge_aware_resampling/README.md
+  - methods/geometry/locally_optimal_projection/README.md
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/README.md
+  - src/runtime/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/ui/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md
+  - tests/CMakeLists.txt
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+  layers:
+  - app
+  - runtime
+  - tests
+  modules:
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Sandbox.Editor.MethodPanels
+  - Extrinsic.Sandbox.Editor.Shell
+extension_seam: The app consumes the runtime-owned strategy/config/service records through one registered
+  panel; future proven backends extend that typed surface rather than adding panel-private execution.
+future_change_plan: Expose only evidence-gated backend choices through the canonical runtime config/result
+  metadata, then project those choices through the existing strategy table and result model.
+acceptance:
+- criterion: Selecting a point cloud, choosing a strategy, and applying consolidates
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The panel drives the `RUNTIME-175` validated typed operation (no private
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Strategy/implementation identity and convergence feedback are shown;
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: '`app -> runtime` only; the panel owns no engine state.'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/UI-035/commands/canonical-editor-suite.json
+- receipt: tasks/evidence/UI-035/commands/canonical-panel-tests.json
+- receipt: tasks/evidence/UI-035/commands/canonical-ui-build.json
+- receipt: tasks/evidence/UI-035/commands/diff-check.json
+- receipt: tasks/evidence/UI-035/commands/doc-links.json
+- receipt: tasks/evidence/UI-035/commands/final-canonical-editor-suite.json
+- receipt: tasks/evidence/UI-035/commands/final-canonical-ui-build.json
+- receipt: tasks/evidence/UI-035/commands/final-diff-check.json
+- receipt: tasks/evidence/UI-035/commands/final-doc-links.json
+- receipt: tasks/evidence/UI-035/commands/final-strict-layering.json
+- receipt: tasks/evidence/UI-035/commands/final-strict-test-layout.json
+- receipt: tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.json
+- receipt: tasks/evidence/UI-035/commands/final-vulkan-sandbox-launch.json
+- receipt: tasks/evidence/UI-035/commands/focused-app-build.json
+- receipt: tasks/evidence/UI-035/commands/focused-panel-tests.json
+- receipt: tasks/evidence/UI-035/commands/module-inventory-refresh.json
+- receipt: tasks/evidence/UI-035/commands/retired-diff-check.json
+- receipt: tasks/evidence/UI-035/commands/retired-doc-links.json
+- receipt: tasks/evidence/UI-035/commands/retired-session-brief-refresh.json
+- receipt: tasks/evidence/UI-035/commands/retired-task-policy.json
+- receipt: tasks/evidence/UI-035/commands/strict-layering.json
+- receipt: tasks/evidence/UI-035/commands/strict-task-policy-active.json
+- receipt: tasks/evidence/UI-035/commands/strict-task-policy-final-active.json
+- receipt: tasks/evidence/UI-035/commands/strict-test-layout.json
+- receipt: tasks/evidence/UI-035/commands/vulkan-configure.json
+- receipt: tasks/evidence/UI-035/commands/vulkan-host-probe.json
+- receipt: tasks/evidence/UI-035/commands/vulkan-sandbox-build.json
+- receipt: tasks/evidence/UI-035/commands/vulkan-sandbox-launch.json
+- receipt: tasks/evidence/UI-035/commands/workflow-evidence-scan-active.json
+changed_public_contracts:
+- SandboxEditorContext now copies PointCloudConsolidationAvailable from the prepared runtime geometry
+  frame.
+- Sandbox.MethodPanels exports pointer-free strategy, request, action-result, and diagnostics-summary
+  helpers for headless presentation tests.
+- Runtime.GeometryProcessingOperations owns the bool validation seam that keeps Core config result types
+  out of the app layer.
+diagnostics_and_previews:
+- The panel reports actual implementation id, strategy token, status, counts, convergence/displacement,
+  normal provenance/refinement, insertions, and runtime failure text.
+- The prepared-workspace test applies the Editor-sourced canonical section, queues the async service,
+  observes 25-to-16 ECS publication, projects the completion, and restores 25 points through undo.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- The Vulkan-capable host session was screen-locked, so the real Sandbox build/launch/render path was
+  exercised but pointer-driven ImGui interaction was not bypassed through the lock; canonical model/action
+  integration supplies the deterministic workflow proof.
+skipped_checks:
+- check: pointer-driven-vulkan-panel
+  reason: GNOME ScreenSaver reported active and intercepted synthetic desktop input; bypassing the user
+    lock was out of scope, while the promoted executable build/launch and 40-case canonical app suite
+    passed.
+artifacts:
+- path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+  sha256: 909d18a5bd6ef9a610478f82ff368adbd3d11f61e1944ce0305439878530308f
+  kind: file
+- path: tasks/evidence/UI-035/commands/final-canonical-editor-suite.json
+  sha256: b547e29f0ba8078e43a1e59e1f4e7eeac0407471d37fc1581e5025b21c9ce317
+  kind: file
+- path: tasks/evidence/UI-035/commands/final-vulkan-sandbox-launch.json
+  sha256: 53b730e67e353f831303f984657190d59163186d8aa0e9f019602355257f9a1c
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
