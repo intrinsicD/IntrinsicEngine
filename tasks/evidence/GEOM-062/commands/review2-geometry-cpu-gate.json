@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-L",
+    "geometry",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -L geometry -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 13498,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:40:12Z",
+  "label": "review2-geometry-cpu-gate",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:39:59Z",
+  "stderr_path": "tasks/evidence/GEOM-062/commands/review2-geometry-cpu-gate.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-062/commands/review2-geometry-cpu-gate.stdout.log",
+  "stdout_sha256": "90b45edeffeaef6cd8d6a7c650006b7e6a5757d767dce0c1883f367e73a890d3",
+  "task_id": "GEOM-062"
+}

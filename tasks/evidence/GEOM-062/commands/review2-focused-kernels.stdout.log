@@ -1,0 +1,28 @@
+Internal ctest changing into directory: /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+Test project /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+    Start 2344: PointCloudKernels.RadialWeightsMatchDocumentedClosedForms
+1/9 Test #2344: PointCloudKernels.RadialWeightsMatchDocumentedClosedForms ...................   Passed    0.00 sec
+    Start 2345: PointCloudKernels.RadialWeightsFailClosed
+2/9 Test #2345: PointCloudKernels.RadialWeightsFailClosed ...................................   Passed    0.00 sec
+    Start 2346: PointCloudKernels.RadialWeightsPreserveZeroDistanceAtExtremeSupportScales
+3/9 Test #2346: PointCloudKernels.RadialWeightsPreserveZeroDistanceAtExtremeSupportScales ...   Passed    0.00 sec
+    Start 2347: PointCloudKernels.LinearRepulsionHasFiniteZeroLimit
+4/9 Test #2347: PointCloudKernels.LinearRepulsionHasFiniteZeroLimit .........................   Passed    0.00 sec
+    Start 2348: PointCloudKernels.DensityDistinguishesDenseClusterFromSparseTail
+5/9 Test #2348: PointCloudKernels.DensityDistinguishesDenseClusterFromSparseTail ............   Passed    0.00 sec
+    Start 2349: PointCloudKernels.UniformGridInteriorHasConstantDensity
+6/9 Test #2349: PointCloudKernels.UniformGridInteriorHasConstantDensity .....................   Passed    0.00 sec
+    Start 2350: PointCloudKernels.SuppliedIndexAndRepeatedRunsAreBitwiseDeterministic
+7/9 Test #2350: PointCloudKernels.SuppliedIndexAndRepeatedRunsAreBitwiseDeterministic .......   Passed    0.00 sec
+    Start 2351: PointCloudKernels.DensityBroadPhaseIncludesDoubleSupportBoundary
+8/9 Test #2351: PointCloudKernels.DensityBroadPhaseIncludesDoubleSupportBoundary ............   Passed    0.00 sec
+    Start 2352: PointCloudKernels.DensityFailuresPublishNoWeights
+9/9 Test #2352: PointCloudKernels.DensityFailuresPublishNoWeights ...........................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 9
+
+Label Time Summary:
+geometry    =   0.04 sec*proc (9 tests)
+unit        =   0.04 sec*proc (9 tests)
+
+Total Test time (real) =   0.17 sec

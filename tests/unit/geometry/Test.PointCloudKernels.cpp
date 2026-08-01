@@ -98,6 +98,23 @@ TEST(PointCloudKernels, RadialWeightsFailClosed)
         static_cast<Kernels::KernelType>(255)));
 }
 
+TEST(PointCloudKernels, RadialWeightsPreserveZeroDistanceAtExtremeSupportScales)
+{
+    for (const double supportRadius : {1.0e-200, 1.0e200})
+    {
+        for (const Kernels::KernelType kernel : {
+                 Kernels::KernelType::Gaussian,
+                 Kernels::KernelType::ThetaLop,
+                 Kernels::KernelType::WendlandC2})
+        {
+            const auto value = Kernels::Weight(
+                0.0, supportRadius, kernel);
+            ASSERT_TRUE(value.has_value());
+            EXPECT_DOUBLE_EQ(*value, 1.0);
+        }
+    }
+}
+
 TEST(PointCloudKernels, LinearRepulsionHasFiniteZeroLimit)
 {
     const auto atZero = Kernels::Repulsion(0.0, 2.0);
@@ -203,6 +220,34 @@ TEST(PointCloudKernels, SuppliedIndexAndRepeatedRunsAreBitwiseDeterministic)
     EXPECT_EQ(first.Weights, supplied.Weights);
     EXPECT_FALSE(first.Diagnostics.UsedSuppliedIndex);
     EXPECT_TRUE(supplied.Diagnostics.UsedSuppliedIndex);
+}
+
+TEST(PointCloudKernels, DensityBroadPhaseIncludesDoubleSupportBoundary)
+{
+    constexpr float x = 7.776026636602611e-19f;
+    constexpr float y = 9.225870040194345e-19f;
+    const double distance = std::hypot(
+        static_cast<double>(x), static_cast<double>(y));
+    const double supportRadius = std::nextafter(
+        distance, std::numeric_limits<double>::infinity());
+    ASSERT_LT(distance, supportRadius);
+    ASSERT_LT(
+        static_cast<double>(static_cast<float>(supportRadius)),
+        supportRadius);
+
+    const std::vector<glm::vec3> points{
+        {0.0f, 0.0f, 0.0f},
+        {x, y, 0.0f},
+    };
+    const auto result = Kernels::ComputeDensityWeights(
+        points,
+        supportRadius,
+        Kernels::KernelType::ThetaLop);
+    ASSERT_TRUE(result.Succeeded())
+        << Kernels::DebugName(result.Status);
+    ASSERT_EQ(result.Weights.size(), points.size());
+    EXPECT_GT(result.Weights[0], 1.0f);
+    EXPECT_EQ(result.Diagnostics.EmptyNeighborhoodCount, 0u);
 }
 
 TEST(PointCloudKernels, DensityFailuresPublishNoWeights)

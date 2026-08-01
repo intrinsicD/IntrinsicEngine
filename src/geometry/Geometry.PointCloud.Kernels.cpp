@@ -165,10 +165,16 @@ namespace Geometry::PointCloud::Kernels
             std::vector<Geometry::KDTree::ElementIndex> neighbors{};
             for (std::size_t i = 0u; i < points.size(); ++i)
             {
+                float queryRadius =
+                    static_cast<float>(supportRadius);
+                if (static_cast<double>(queryRadius) < supportRadius)
+                {
+                    queryRadius = std::nextafter(
+                        queryRadius,
+                        std::numeric_limits<float>::infinity());
+                }
                 const auto query = index.QueryRadius(
-                    points[i],
-                    static_cast<float>(supportRadius),
-                    neighbors);
+                    points[i], queryRadius, neighbors);
                 ++result.Diagnostics.QueryCount;
                 if (!query.has_value())
                 {
@@ -294,15 +300,17 @@ namespace Geometry::PointCloud::Kernels
             return std::nullopt;
         }
 
-        const double supportSquared =
-            supportRadius * supportRadius;
-        if (!std::isfinite(supportSquared))
-            return std::nullopt;
-        if (distanceSquared >= supportSquared)
+        if (distanceSquared == 0.0)
+            return 1.0;
+
+        const double distance = std::sqrt(distanceSquared);
+        if (distance >= supportRadius)
             return 0.0;
 
+        const double normalizedDistance =
+            distance / supportRadius;
         const double normalizedSquared =
-            distanceSquared / supportSquared;
+            normalizedDistance * normalizedDistance;
         double value = 0.0;
         switch (kernel)
         {
@@ -314,11 +322,10 @@ namespace Geometry::PointCloud::Kernels
             break;
         case KernelType::WendlandC2:
         {
-            const double t =
-                1.0 - std::sqrt(normalizedSquared);
+            const double t = 1.0 - normalizedDistance;
             const double t2 = t * t;
             value = t2 * t2 *
-                (1.0 + 4.0 * std::sqrt(normalizedSquared));
+                (1.0 + 4.0 * normalizedDistance);
             break;
         }
         }
