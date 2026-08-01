@@ -213,9 +213,15 @@ def _update_task_front_matter(
     retained = [line for line in front_lines if not key_re.match(line)]
     insertion = len(retained)
     for index, line in enumerate(retained):
-        if line.startswith("depends_on:"):
-            insertion = index + 1
-            break
+        if not line.startswith("depends_on:"):
+            continue
+        insertion = index + 1
+        while insertion < len(retained):
+            candidate = retained[insertion]
+            if candidate and not candidate[0].isspace() and not candidate.startswith("#"):
+                break
+            insertion += 1
+        break
     added = [f"{key}: {value}" for key, value in values.items()]
     new_front = retained[:insertion] + added + retained[insertion:]
     new_content = "---\n" + "\n".join(new_front) + content[end:]

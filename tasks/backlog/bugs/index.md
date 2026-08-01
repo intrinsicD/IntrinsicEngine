@@ -5,11 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-127` — Task claim corrupts multiline dependency front matter](../../active/BUG-127-task-claim-multiline-dependency-front-matter.md):
-  `task_claim.py acquire` inserts workflow/custody keys immediately after the
-  `depends_on:` key even when its YAML sequence continues on following lines,
-  leaving a successful claim with invalid task metadata; retain the complete
-  dependency value before inserting claim fields and cover the multiline case.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
@@ -70,6 +65,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-01: [`BUG-127` — Task claim corrupts multiline dependency
+  front matter](../../done/BUG-127-task-claim-multiline-dependency-front-matter.md).
+  Claim metadata insertion now advances past the complete multiline
+  `depends_on` sequence before writing workflow fields; the eight-case
+  regression suite preserves inline and multiline dependencies plus every
+  existing concurrency contract.
 
 - Closed 2026-08-01: [`BUG-126` — Claim custody validates historical source
   seals against the current worktree](../../done/BUG-126-claim-custody-historical-source-seals.md).

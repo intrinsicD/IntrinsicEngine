@@ -8,6 +8,8 @@ import time
 import unittest
 from pathlib import Path
 
+import yaml
+
 TOOL = Path(__file__).resolve().parents[3] / "tools/agents/task_claim.py"
 
 
@@ -120,6 +122,26 @@ class ClaimFixture:
 
 
 class TaskClaimTests(unittest.TestCase):
+    def test_claim_preserves_multiline_dependencies(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ClaimFixture(Path(tmp))
+            task_path = fixture.main / "tasks/active/TEST-003-fixture.md"
+            task_path.write_text(
+                task_path.read_text(encoding="utf-8").replace(
+                    "depends_on: []",
+                    "depends_on:\n  - TEST-001\n  - TEST-002",
+                ),
+                encoding="utf-8",
+            )
+            acquired = fixture.acquire(fixture.main, "TEST-003", "driver-a")
+            content = task_path.read_text(encoding="utf-8")
+            front_matter = content.split("---\n", 2)[1]
+            metadata = yaml.safe_load(front_matter)
+        self.assertEqual(acquired.returncode, 0, acquired.stdout)
+        self.assertEqual(metadata["depends_on"], ["TEST-001", "TEST-002"])
+        self.assertEqual(metadata["owner"], "driver-a")
+        self.assertLess(content.index("  - TEST-002"), content.index("workflow_schema:"))
+
     def test_atomic_task_claim_has_one_winner(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ClaimFixture(Path(tmp))

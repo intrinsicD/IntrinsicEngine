@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-127`](BUG-127-task-claim-multiline-dependency-front-matter.md) — task
+claim multiline-dependency preservation retired on 2026-08-01. The textual
+front-matter updater now advances past the complete indented `depends_on`
+sequence before inserting workflow and claim custody keys, while leaving the
+compact inline-list path and unrelated metadata unchanged. The dedicated
+regression parses and checks a two-entry dependency sequence after acquisition;
+all eight atomic claim, one-writer, overlap, release, and stale-recovery cases
+pass, together with strict task schema and policy validation.
+
 [`RUNTIME-175`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md) —
 point-cloud consolidation runtime/config integration completed on 2026-08-01
 at `Operational`. The runtime-owned registered config, module, service, and

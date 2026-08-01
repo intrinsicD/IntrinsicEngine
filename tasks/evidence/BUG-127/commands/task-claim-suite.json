@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.TaskClaim.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.TaskClaim.py",
+  "cwd": ".",
+  "duration_ms": 2176,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T20:24:55Z",
+  "label": "task-claim-suite",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T20:24:53Z",
+  "stderr_path": "tasks/evidence/BUG-127/commands/task-claim-suite.stderr.log",
+  "stderr_sha256": "3eef106c531c14f6ff75c36b8a5fadd4bd907452f33d86cc63d84dfe22b71986",
+  "stdout_path": "tasks/evidence/BUG-127/commands/task-claim-suite.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-127"
+}
