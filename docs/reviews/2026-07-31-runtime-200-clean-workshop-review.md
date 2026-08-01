@@ -42,7 +42,7 @@
 - No RUNTIME-200 findings.
 - The unrelated intermittent retired-scene-save terminal-event loss observed
   under ASan remains tracked by
-  [`BUG-123`](../../tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md).
+  [`BUG-123`](../../tasks/done/BUG-123-retired-scene-save-terminal-event-race.md).
 - The unrelated stale geometry-presentation Vulkan assertion remains tracked
   by
   [`BUG-124`](../../tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md).
