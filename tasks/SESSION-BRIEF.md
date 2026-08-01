@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-126` — Claim custody validates historical source seals against the current worktree (tasks/active/BUG-126-claim-custody-historical-source-seals.md)
+- none
 
 ## Theme B — Rendering modernization
 

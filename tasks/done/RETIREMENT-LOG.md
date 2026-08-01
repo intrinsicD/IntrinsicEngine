@@ -6256,3 +6256,15 @@ unrelated complete-ASan runtime-asset test-lifetime defects already present on
 quarantined. Strict retired-symbol, layering, test-layout, task-policy,
 docs-link, root-hygiene, ARA, generated-inventory, and whitespace checks close
 the evidence; C14 records the capability scope without a performance claim.
+
+[`BUG-126`](BUG-126-claim-custody-historical-source-seals.md) — historical
+claim-custody source-seal validation retired on 2026-08-01. Clean
+claim-eligible datasets, config, environment, and implementation inputs now
+validate lexically at their exact 40-hex source revision, so later method
+extensions do not invalidate older evidence. Bundle fallback is restricted to
+links that name those declared source inputs; raw rows, results, receipts,
+previews, audits, and other post-run evidence remain current-only. A regression
+commits all sealed inputs forward and proves the historical run still passes,
+then tampers a current evidence link and proves the gate still rejects it. Both
+28-case tooling suites, global METHOD-016/METHOD-017 custody/workflow
+validation, skill-mirror sync, task policy, task schema, and docs links pass.

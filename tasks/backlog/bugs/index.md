@@ -5,11 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-126` — Claim custody validates historical source seals against the current worktree](../../active/BUG-126-claim-custody-historical-source-seals.md):
-  global custody validation hashes METHOD-016's exact-revision datasets and
-  implementation against METHOD-017's later current-tree extensions. Validate
-  clean claim-eligible inputs at their sealed revision while keeping post-run
-  evidence artifacts current-only and fail-closed.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
@@ -70,6 +65,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-01: [`BUG-126` — Claim custody validates historical source
+  seals against the current worktree](../../done/BUG-126-claim-custody-historical-source-seals.md).
+  Clean claim-grade inputs now validate at their exact source revision, while
+  post-run evidence remains current-only. Both 28-case tooling suites and the
+  global METHOD-016/METHOD-017 custody/workflow gates pass.
 
 - Closed 2026-08-01: [`BUG-125` — Queued-import contracts raced asynchronous state transitions](../../done/BUG-125-queued-import-contract-state-observation-races.md).
   Test-only decode/read interlocks now order the active-world transition and

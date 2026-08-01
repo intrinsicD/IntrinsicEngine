@@ -13,10 +13,12 @@ claimed_at: "2026-08-01T15:37:57Z"
 # BUG-126 — Claim custody validates historical source seals against the current worktree
 
 ## Status
-- Fixed locally. Clean claim-grade protocol/run inputs now resolve at the
+- Completed on 2026-08-01 in implementation commit `b98e5817`. Clean
+  claim-grade protocol/run inputs now resolve at the
   sealed Git revision, only declared source-input bundle links receive that
   fallback, and all post-run evidence remains current-only. The 28 custody and
   28 workflow-evidence regressions plus global custody/workflow validation pass.
+- Commit: `b98e5817`.
 
 ## Goal
 - Keep a clean claim-eligible experiment auditable after a later commit changes
