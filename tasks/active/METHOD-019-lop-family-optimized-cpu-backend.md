@@ -2,6 +2,13 @@
 id: METHOD-019
 theme: I
 depends_on: [METHOD-016, METHOD-017, METHOD-018, RUNTIME-175, UI-035]
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner: "Codex-GeometryE2E"
+branch: "feature/lop-consolidation-e2e"
+worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
+claimed_at: "2026-08-01T20:29:31Z"
 maturity_target: ParityProven
 ---
 # METHOD-019 — LOP-family optimized CPU backend and comparison benchmark
