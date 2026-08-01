@@ -504,8 +504,8 @@ consumer lives here because `runtime` owns composition over `geometry`.
 `Extrinsic.Runtime.SpatialDebugClosestFace`. Editor method windows for the
 ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
-- [`RUNTIME-175 — Point-cloud consolidation runtime operation and config lane`](../../done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-  is the retired engine-integration leaf for the LOP consolidation method family
+- Retired `RUNTIME-175` is the engine-integration leaf for the LOP
+  consolidation method family
   (`methods/METHOD-016..018`): a runtime-owned
   `sandbox.point_cloud_consolidation` section registered by Sandbox on the
   generic CORE-009 config lane, an `EngineConfigControl` hot-apply path, and a
