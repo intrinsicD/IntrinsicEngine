@@ -18,11 +18,12 @@ safeguarded fixed-point mixer. EM reuses the new seeded D²
 likelihood, regularization, and acceleration diagnostics, and accepts an
 accelerated proposal only after model and monotonic-likelihood validation.
 Focused two-/three-component recovery, monotonicity, acceleration,
-determinism, and degenerate-input coverage passed 8/8, and the full geometry
-CPU label gate passed 1,604/1,604. The aggregate `IntrinsicTests` target and
-strict layering check pass. Both modules stay narrow imports with no public
-Eigen types or umbrella re-export. Optimized/GPU variants remain future
-method-workflow work only when a concrete consumer justifies them; no
+determinism, adversarial-state, extreme-value, covariance, and degenerate-input
+coverage passed 13/13 under the normal, ASan, and UBSan builds, and the full
+CPU-only geometry label gate passed 1,721/1,721. The aggregate `IntrinsicTests`
+target and strict layering check pass. Both modules stay narrow imports with
+no public Eigen types or umbrella re-export. Optimized/GPU variants remain
+future method-workflow work only when a concrete consumer justifies them; no
 performance claim is made.
 
 [`RUNTIME-205`](RUNTIME-205-internalize-scene-interaction-helpers.md) — scene-

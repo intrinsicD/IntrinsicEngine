@@ -69,13 +69,28 @@ namespace Geometry::GaussianMixture
         {
             if (!IsFinite(covariance))
                 return std::nullopt;
-            constexpr double kSymmetryTolerance = 1.0e-10;
-            if (std::abs(covariance[1][0] - covariance[0][1]) >
-                    kSymmetryTolerance ||
-                std::abs(covariance[2][0] - covariance[0][2]) >
-                    kSymmetryTolerance ||
-                std::abs(covariance[2][1] - covariance[1][2]) >
-                    kSymmetryTolerance)
+            const auto symmetricPair = [&covariance](
+                                           const std::size_t lhs,
+                                           const std::size_t rhs) noexcept
+            {
+                const double forward = covariance[lhs][rhs];
+                const double reverse = covariance[rhs][lhs];
+                const double scale = std::max({
+                    std::abs(forward),
+                    std::abs(reverse),
+                    std::sqrt(
+                        std::abs(covariance[lhs][lhs]) *
+                        std::abs(covariance[rhs][rhs])),
+                    std::numeric_limits<double>::min(),
+                });
+                constexpr double kRelativeTolerance =
+                    64.0 * std::numeric_limits<double>::epsilon();
+                return std::abs(forward - reverse) <=
+                    kRelativeTolerance * scale;
+            };
+            if (!symmetricPair(0u, 1u) ||
+                !symmetricPair(0u, 2u) ||
+                !symmetricPair(1u, 2u))
             {
                 return std::nullopt;
             }
@@ -85,8 +100,14 @@ namespace Geometry::GaussianMixture
                 return std::nullopt;
             Cholesky3 result{};
             result.L00 = std::sqrt(a00);
-            result.L10 = covariance[0][1] / result.L00;
-            result.L20 = covariance[0][2] / result.L00;
+            const double a01 =
+                0.5 * (covariance[0][1] + covariance[1][0]);
+            const double a02 =
+                0.5 * (covariance[0][2] + covariance[2][0]);
+            const double a12 =
+                0.5 * (covariance[1][2] + covariance[2][1]);
+            result.L10 = a01 / result.L00;
+            result.L20 = a02 / result.L00;
 
             const double diagonal11 =
                 covariance[1][1] - result.L10 * result.L10;
@@ -94,7 +115,7 @@ namespace Geometry::GaussianMixture
                 return std::nullopt;
             result.L11 = std::sqrt(diagonal11);
             result.L21 =
-                (covariance[1][2] -
+                (a12 -
                  result.L20 * result.L10) /
                 result.L11;
 

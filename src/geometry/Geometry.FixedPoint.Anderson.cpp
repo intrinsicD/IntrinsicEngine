@@ -23,13 +23,32 @@ namespace Geometry::FixedPoint
                 { return std::isfinite(value); });
         }
 
-        [[nodiscard]] double Norm(
+        [[nodiscard]] double StableNorm(
             const std::span<const double> values) noexcept
         {
-            double squaredNorm = 0.0;
+            double scale = 0.0;
+            double scaledSquares = 1.0;
             for (const double value : values)
-                squaredNorm += value * value;
-            return std::sqrt(squaredNorm);
+            {
+                const double magnitude = std::abs(value);
+                if (magnitude == 0.0)
+                    continue;
+                if (scale < magnitude)
+                {
+                    const double ratio = scale / magnitude;
+                    scaledSquares =
+                        1.0 + scaledSquares * ratio * ratio;
+                    scale = magnitude;
+                }
+                else
+                {
+                    const double ratio = magnitude / scale;
+                    scaledSquares += ratio * ratio;
+                }
+            }
+            return scale == 0.0
+                ? 0.0
+                : scale * std::sqrt(scaledSquares);
         }
 
         [[nodiscard]] double Dot(
@@ -171,18 +190,39 @@ namespace Geometry::FixedPoint
 
         std::vector<double> residual(current.size(), 0.0);
         for (std::size_t i = 0u; i < current.size(); ++i)
+        {
             residual[i] = mapped[i] - current[i];
-        result.PlainResidualNorm = Norm(residual);
+            if (!std::isfinite(residual[i]))
+            {
+                result.Status =
+                    AndersonStepStatus::NumericalFailure;
+                return result;
+            }
+        }
+        result.PlainResidualNorm = StableNorm(residual);
+        if (!std::isfinite(result.PlainResidualNorm))
+        {
+            result.Status = AndersonStepStatus::NumericalFailure;
+            return result;
+        }
         result.MixedResidualNorm = result.PlainResidualNorm;
         result.Value.assign(mapped.begin(), mapped.end());
 
-        if ((!state.MappedHistory.empty() &&
-             state.MappedHistory.front().size() != current.size()) ||
-            (!state.ResidualHistory.empty() &&
-             state.ResidualHistory.front().size() != current.size()))
+        bool historyValid =
+            state.MappedHistory.size() ==
+            state.ResidualHistory.size();
+        for (std::size_t i = 0u;
+             historyValid && i < state.MappedHistory.size();
+             ++i)
         {
-            ResetAnderson(state);
+            historyValid =
+                state.MappedHistory[i].size() == current.size() &&
+                state.ResidualHistory[i].size() == current.size() &&
+                IsFinite(state.MappedHistory[i]) &&
+                IsFinite(state.ResidualHistory[i]);
         }
+        if (!historyValid)
+            ResetAnderson(state);
 
         state.MappedHistory.emplace_back(
             mapped.begin(), mapped.end());
@@ -233,7 +273,7 @@ namespace Geometry::FixedPoint
                                                 [valueIndex];
             }
         }
-        result.MixedResidualNorm = Norm(mixedResidual);
+        result.MixedResidualNorm = StableNorm(mixedResidual);
         if (!IsFinite(mixed) ||
             !std::isfinite(result.MixedResidualNorm))
         {

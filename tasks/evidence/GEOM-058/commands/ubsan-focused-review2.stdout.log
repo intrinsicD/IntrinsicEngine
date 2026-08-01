@@ -1,0 +1,964 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="Debug"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+  CMAKE_TOOLCHAIN_FILE:FILEPATH="/tmp/intrinsic-geometry-e2e.GJlhXS/external/vcpkg/scripts/buildsystems/vcpkg.cmake"
+  EXTRINSIC_BACKEND="Vulkan"
+  EXTRINSIC_PLATFORM="Linux"
+  INTRINSIC_BUILD_SANDBOX="OFF"
+  INTRINSIC_BUILD_TESTS="ON"
+  INTRINSIC_ENABLE_CUDA="OFF"
+  INTRINSIC_ENABLE_SANITIZERS="ON"
+  INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN="OFF"
+  INTRINSIC_SANITIZER_MODE="undefined"
+  VCPKG_CHAINLOAD_TOOLCHAIN_FILE="/tmp/intrinsic-geometry-e2e.GJlhXS/cmake/IntrinsicClangToolchain.cmake"
+  VCPKG_INSTALLED_DIR="/tmp/intrinsic-geometry-e2e.GJlhXS/external/vcpkg-installed/ci-ubsan"
+  VCPKG_MANIFEST_MODE="ON"
+
+-- IntrinsicEngine selected Clang 23: /bin/clang-23, /bin/clang++-23, /bin/clang-scan-deps-23
+-- Running vcpkg install
+Detecting compiler hash for triplet x64-linux...
+Compiler found: /usr/bin/c++
+The following packages are already installed:
+    draco:x64-linux@1.5.7
+    eigen3:x64-linux@5.0.1
+    entt:x64-linux@3.16.0
+    glfw3:x64-linux@3.4#1
+    glm:x64-linux@1.0.3
+    gtest:x64-linux@1.17.0#2
+    imgui[core,docking-experimental]:x64-linux@1.92.8
+    imguizmo:x64-linux@1.10
+    implot:x64-linux@1.0
+    nlohmann-json:x64-linux@3.12.0#2
+    stb:x64-linux@2024-07-29#1
+    tinygltf:x64-linux@3.0.0
+  * vcpkg-cmake:x64-linux@2024-04-23
+  * vcpkg-cmake-config:x64-linux@2024-05-23
+    volk:x64-linux@1.4.350.0
+  * vulkan-headers:x64-linux@1.4.350.0
+    vulkan-memory-allocator:x64-linux@3.4.0
+    xatlas:x64-linux@f700c779
+draco provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(draco CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE draco::draco)
+
+draco provides pkg-config modules:
+
+  # Draco geometry de(com)pression library.
+  draco
+
+eigen3 provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(Eigen3 CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Eigen3::Eigen)
+
+eigen3 provides pkg-config modules:
+
+  # A C++ template library for linear algebra: vectors, matrices, and related algorithms
+  eigen3
+
+entt provides CMake targets:
+
+    find_package(EnTT CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE EnTT::EnTT)
+
+The package glm provides CMake targets:
+
+    find_package(glm CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glm::glm)
+
+    # Or use the header-only version
+    find_package(glm CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glm::glm-header-only)
+
+The package gtest is compatible with built-in CMake targets:
+
+    enable_testing()
+    
+    find_package(GTest CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE GTest::gtest GTest::gtest_main GTest::gmock GTest::gmock_main)
+    
+    add_test(AllTestsInMain main)
+
+imgui provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(imgui CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE imgui::imgui)
+
+implot provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(implot CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE implot::implot)
+
+The package nlohmann-json provides CMake targets:
+
+    find_package(nlohmann_json CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE nlohmann_json::nlohmann_json)
+
+The package nlohmann-json can be configured to not provide implicit conversions via a custom triplet file:
+
+    set(nlohmann-json_IMPLICIT_CONVERSIONS OFF)
+
+For more information, see the docs here:
+    
+    https://json.nlohmann.me/api/macros/json_use_implicit_conversions/
+
+The package stb provides CMake targets:
+
+    find_package(Stb REQUIRED)
+    target_include_directories(main PRIVATE ${Stb_INCLUDE_DIR})
+tinygltf is header-only and can be used from CMake via:
+
+  find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
+  target_include_directories(main PRIVATE ${TINYGLTF_INCLUDE_DIRS})
+
+xatlas provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(xatlas CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE xatlas::xatlas)
+
+glfw3 provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(glfw3 CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE glfw)
+
+glfw3 provides pkg-config modules:
+
+  # A multi-platform library for OpenGL, window and input
+  glfw3
+
+imguizmo provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(imguizmo CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE imguizmo::imguizmo)
+
+volk provides CMake targets:
+
+    find_package(volk CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE volk::volk volk::volk_headers)
+
+VulkanMemoryAllocator provides official find_package support. However, it requires the user to provide the include directory containing `vulkan/vulkan.h`. There are multiple ways to achieve this and VulkanMemoryAllocator is compatible with all of them.
+
+    find_package(Vulkan) # https://cmake.org/cmake/help/latest/module/FindVulkan.html, CMake 3.21+
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator)
+
+or
+
+    find_package(Vulkan) # CMake 3.21+
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Headers GPUOpen::VulkanMemoryAllocator)
+
+or
+
+    find_package(VulkanHeaders CONFIG) # From the vulkan-headers port
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Headers GPUOpen::VulkanMemoryAllocator)
+
+See the documentation for more information on setting up your project: https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/index.html
+
+All requested installations completed successfully in: 98.5 us
+-- Running vcpkg install - done
+-- IntrinsicEngine using auto-selected compilers: /bin/clang-23, /bin/clang++-23
+-- The CXX compiler identification is Clang 23.0.0
+-- The C compiler identification is Clang 23.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /bin/clang++-23 - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /bin/clang-23 - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- IntrinsicEngine Clang requirement: using C=23.0.0 and CXX=23.0.0; minimum is 20.0
+-- Performing Test INTRINSIC_ASAN_AVAILABLE
+-- Performing Test INTRINSIC_ASAN_AVAILABLE - Success
+-- Performing Test INTRINSIC_UBSAN_AVAILABLE
+-- Performing Test INTRINSIC_UBSAN_AVAILABLE - Success
+-- Sanitizers ENABLED (ubsan; undefined) for Debug/RelWithDebInfo builds
+-- Clang source coverage instrumentation DISABLED
+-- Using CCache: /usr/bin/ccache
+-- Intrinsic dependencies: using vcpkg manifest packages
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- Found nlohmann_json: /tmp/intrinsic-geometry-e2e.GJlhXS/external/vcpkg-installed/ci-ubsan/x64-linux/share/nlohmann_json/nlohmann_jsonConfig.cmake (found version "3.12.0") 
+-- Found Stb: /tmp/intrinsic-geometry-e2e.GJlhXS/external/vcpkg-installed/ci-ubsan/x64-linux/include  
+-- Found Vulkan: /home/alex/Documents/vulkansdk-linux-x86_64-1.4.309.0/1.4.309.0/x86_64/lib/libvulkan.so (found version "1.4.350") found components: glslc glslangValidator 
+-- CUDA compute backend DISABLED
+-- IntrinsicEngine configure identity: platform=Linux; graphics_backend=Vulkan; platform_backend_request=Auto; platform_backend_selected=Glfw; headless_no_glfw=OFF
+-- Found Python3: /home/alex/miniconda3/bin/python3 (found version "3.12.9") found components: Interpreter 
+-- Configuring done (8.1s)
+-- Generating done (0.1s)
+-- Build files have been written to: /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci-ubsan
+[0/2] Re-checking globbed directories...
+[1/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameLoop.cpp for CXX dependencies
+[2/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Stats.cpp for CXX dependencies
+[3/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Job.cpp for CXX dependencies
+[4/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.IOBackend.cpp for CXX dependencies
+[5/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameGraph.cpp for CXX dependencies
+[6/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Filesystem.PathResolver.cpp for CXX dependencies
+[7/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Hazards.cpp for CXX dependencies
+[8/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Telemetry.cpp for CXX dependencies
+[9/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Logging.cpp for CXX dependencies
+[10/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Filesystem.cpp for CXX dependencies
+[11/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Lifecycle.cpp for CXX dependencies
+[12/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.WaitToken.cpp for CXX dependencies
+[13/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.cpp for CXX dependencies
+[14/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.TaskGraph.cpp for CXX dependencies
+[15/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Worker.cpp for CXX dependencies
+[16/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.EngineLoad.cpp for CXX dependencies
+[17/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Dispatch.cpp for CXX dependencies
+[18/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.CounterEvent.cpp for CXX dependencies
+[19/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.BoundedHeap.cppm for CXX dependencies
+[20/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Policy.cppm for CXX dependencies
+[21/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.Simulation.cppm for CXX dependencies
+[22/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Process.cpp for CXX dependencies
+[23/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.IndexedHeap.cppm for CXX dependencies
+[24/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.Window.cppm for CXX dependencies
+[25/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.Render.cppm for CXX dependencies
+[26/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.EngineLoad.cppm for CXX dependencies
+[27/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.Engine.cppm for CXX dependencies
+[28/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.cppm for CXX dependencies
+[29/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Types.cppm for CXX dependencies
+[30/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.IOBackend.cppm for CXX dependencies
+[31/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Compiler.cppm for CXX dependencies
+[32/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.RingBuffer.cppm for CXX dependencies
+[33/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Error.cppm for CXX dependencies
+[34/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Hazards.cppm for CXX dependencies
+[35/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.ResourcePool.cppm for CXX dependencies
+[36/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.DomainGraph.cppm for CXX dependencies
+[37/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.CallbackRegistry.cppm for CXX dependencies
+[38/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameLoop.cppm for CXX dependencies
+[39/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Geometry2D.cppm for CXX dependencies
+[40/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameGraph.cppm for CXX dependencies
+[41/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.cppm for CXX dependencies
+[42/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.TaskGraph.cppm for CXX dependencies
+[43/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Telemetry.cppm for CXX dependencies
+[44/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Hash.cppm for CXX dependencies
+[45/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Process.cppm for CXX dependencies
+[46/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameClock.cppm for CXX dependencies
+[47/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.Common.cppm for CXX dependencies
+[48/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.HandleLease.cppm for CXX dependencies
+[49/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.Polymorphic.cppm for CXX dependencies
+[50/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Logging.cppm for CXX dependencies
+[51/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.LockFreeQueue.cppm for CXX dependencies
+[52/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Filesystem.PathResolver.cppm for CXX dependencies
+[53/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.ScopeStack.cppm for CXX dependencies
+[54/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.LinearArena.cppm for CXX dependencies
+[55/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Filesystem.cppm for CXX dependencies
+[56/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.StrongHandle.cppm for CXX dependencies
+[57/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.cppm for CXX dependencies
+[58/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.LocalTask.cppm for CXX dependencies
+[59/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.ScopeStack.cpp for CXX dependencies
+[60/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.Polymorphic.cpp for CXX dependencies
+[61/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.CounterEvent.cppm for CXX dependencies
+[62/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.LocalTask.cpp for CXX dependencies
+[63/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.DomainViews.cpp for CXX dependencies
+[64/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.LinearArena.cpp for CXX dependencies
+[65/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Internal.cppm for CXX dependencies
+[66/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.BVH.cpp for CXX dependencies
+[67/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Capsule.cpp for CXX dependencies
+[68/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Internal.cpp for CXX dependencies
+[69/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ContactManifold.cpp for CXX dependencies
+[70/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Containment.cpp for CXX dependencies
+[71/697] Generating CXX dyndep file src/core/CMakeFiles/ExtrinsicCore.dir/CXX.dd
+[72/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ConvexHull.cpp for CXX dependencies
+[73/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.AABB.cpp for CXX dependencies
+[74/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Curve.cpp for CXX dependencies
+[75/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Cylinder.cpp for CXX dependencies
+[76/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.EPA.cpp for CXX dependencies
+[77/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ConvexHullBuilder.cpp for CXX dependencies
+[78/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.FixedPoint.Anderson.cpp for CXX dependencies
+[79/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.GJK.cpp for CXX dependencies
+[80/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Ellipsoid.cpp for CXX dependencies
+[81/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.GaussianMixture.cpp for CXX dependencies
+[82/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.Simulation.cppm.o
+[83/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Frustum.cpp for CXX dependencies
+[84/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Utils.cpp for CXX dependencies
+[85/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.IO.cpp for CXX dependencies
+[86/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Grid.cpp for CXX dependencies
+[87/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.ShortestPath.cpp for CXX dependencies
+[88/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Geometry2D.cppm.o
+[89/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameLoop.cppm.o
+[90/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.cpp for CXX dependencies
+[91/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Vertex.Normals.cpp for CXX dependencies
+[92/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cpp for CXX dependencies
+[93/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.HandleLease.cppm.o
+[94/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Analysis.cpp for CXX dependencies
+[95/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameLoop.cpp.o
+[96/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Boolean.cpp for CXX dependencies
+[97/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Boundary.cpp for CXX dependencies
+[98/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Builder.cpp for CXX dependencies
+[99/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.CatmullClark.cpp for CXX dependencies
+[100/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Hash.cppm.o
+[101/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Error.cppm.o
+[102/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Curvature.cpp for CXX dependencies
+[103/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.RingBuffer.cppm.o
+[104/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp for CXX dependencies
+[105/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.DEC.cpp for CXX dependencies
+[106/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Geodesic.cpp for CXX dependencies
+[107/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.IO.cpp for CXX dependencies
+[108/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.BoundedHeap.cppm.o
+[109/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Quality.cpp for CXX dependencies
+[110/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Remeshing.cpp for CXX dependencies
+[111/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.Window.cppm.o
+[112/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IndexedHeap.cppm.o
+[113/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.Render.cppm.o
+[114/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Repair.cpp for CXX dependencies
+[115/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp for CXX dependencies
+[116/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Subdivision.cpp for CXX dependencies
+[117/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.StrongHandle.cppm.o
+[118/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Simplification.cpp for CXX dependencies
+[119/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp for CXX dependencies
+[120/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cpp for CXX dependencies
+[121/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cpp for CXX dependencies
+[122/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Utils.cpp for CXX dependencies
+[123/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.Common.cppm.o
+[124/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cpp for CXX dependencies
+[125/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.cpp for CXX dependencies
+[126/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HtexPatch.cpp for CXX dependencies
+[127/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ImplicitPlaneField.cpp for CXX dependencies
+[128/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.KDTree.cpp for CXX dependencies
+[129/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.ResourcePool.cppm.o
+[130/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.KMeans.cpp for CXX dependencies
+[131/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Linalg.cpp for CXX dependencies
+[132/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MarchingCubes.cpp for CXX dependencies
+[133/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IOBackend.cppm.o
+[134/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshClosestFace.cpp for CXX dependencies
+[135/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Mesh.Conversion.cpp for CXX dependencies
+[136/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Octree.cpp for CXX dependencies
+[137/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshSoup.cpp for CXX dependencies
+[138/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Overlap.cpp for CXX dependencies
+[139/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.OBB.cpp for CXX dependencies
+[140/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PCA.cpp for CXX dependencies
+[141/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Bff.cpp for CXX dependencies
+[142/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Plane.cpp for CXX dependencies
+[143/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Harmonic.cpp for CXX dependencies
+[144/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Diagnostics.cpp for CXX dependencies
+[145/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Conversion.cpp for CXX dependencies
+[146/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.IO.cpp for CXX dependencies
+[147/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Types.cppm.o
+[148/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.QualityMetrics.cpp for CXX dependencies
+[149/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Normals.cpp for CXX dependencies
+[150/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Features.cpp for CXX dependencies
+[151/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.SurfaceSampling.cpp for CXX dependencies
+[152/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Policy.cppm.o
+[153/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Utils.cpp for CXX dependencies
+[154/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Properties.cpp for CXX dependencies
+[155/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Quadric.cpp for CXX dependencies
+[156/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.cpp for CXX dependencies
+[157/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.CallbackRegistry.cppm.o
+[158/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Queries.cpp for CXX dependencies
+[159/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.Engine.cppm.o
+[160/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Robust.cpp for CXX dependencies
+[161/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Raycast.cpp for CXX dependencies
+[162/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.RobustPredicates.cpp for CXX dependencies
+[163/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Registration.cpp for CXX dependencies
+[164/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Rotation.cpp for CXX dependencies
+[165/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.RotationAveraging.cpp for CXX dependencies
+[166/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sampling.cpp for CXX dependencies
+[167/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SDF.cpp for CXX dependencies
+[168/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Segment.cpp for CXX dependencies
+[169/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sphere.cpp for CXX dependencies
+[170/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Statistics.cpp for CXX dependencies
+[171/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sphere.Sampling.cpp for CXX dependencies
+[172/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Support.cpp for CXX dependencies
+[173/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Hazards.cppm.o
+[174/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sparse.cpp for CXX dependencies
+[175/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SurfaceReconstruction.cpp for CXX dependencies
+[176/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.AABB.cppm for CXX dependencies
+[177/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Triangle.cpp for CXX dependencies
+[178/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Validation.cpp for CXX dependencies
+[179/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Logging.cppm.o
+[180/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.UvAtlas.cpp for CXX dependencies
+[181/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Compiler.cppm.o
+[182/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Circulators.cppm for CXX dependencies
+[183/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.BVH.cppm for CXX dependencies
+[184/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Capsule.cppm for CXX dependencies
+[185/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ContactManifold.cppm for CXX dependencies
+[186/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.LockFreeQueue.cppm.o
+[187/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.LocalTask.cppm.o
+[188/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ConvexHull.cppm for CXX dependencies
+[189/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Containment.cppm for CXX dependencies
+[190/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ConvexHullBuilder.cppm for CXX dependencies
+[191/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Cylinder.cppm for CXX dependencies
+[192/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Curve.cppm for CXX dependencies
+[193/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.DomainViews.cppm for CXX dependencies
+[194/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.EPA.cppm for CXX dependencies
+[195/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.FixedPoint.Anderson.cppm for CXX dependencies
+[196/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Ellipsoid.cppm for CXX dependencies
+[197/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.IO.cppm for CXX dependencies
+[198/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.GJK.cppm for CXX dependencies
+[199/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.GaussianMixture.cppm for CXX dependencies
+[200/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Frustum.cppm for CXX dependencies
+[201/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.ShortestPath.cppm for CXX dependencies
+[202/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Utils.cppm for CXX dependencies
+[203/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Grid.cppm for CXX dependencies
+[204/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Vertex.Normals.cppm for CXX dependencies
+[205/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm for CXX dependencies
+[206/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Analysis.cppm for CXX dependencies
+[207/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Boolean.cppm for CXX dependencies
+[208/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.cppm for CXX dependencies
+[209/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Builder.cppm for CXX dependencies
+[210/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.DEC.cppm for CXX dependencies
+[211/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.CatmullClark.cppm for CXX dependencies
+[212/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Boundary.cppm for CXX dependencies
+[213/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Process.cppm.o
+[214/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Curvature.cppm for CXX dependencies
+[215/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm for CXX dependencies
+[216/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm for CXX dependencies
+[217/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Quality.cppm for CXX dependencies
+[218/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.IO.cppm for CXX dependencies
+[219/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameClock.cppm.o
+[220/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Remeshing.cppm for CXX dependencies
+[221/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cppm for CXX dependencies
+[222/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm for CXX dependencies
+[223/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm for CXX dependencies
+[224/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Simplification.cppm for CXX dependencies
+[225/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Utils.cppm for CXX dependencies
+[226/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm for CXX dependencies
+[227/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Repair.cppm for CXX dependencies
+[228/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cppm for CXX dependencies
+[229/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Handle.cppm for CXX dependencies
+[230/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm for CXX dependencies
+[231/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HtexPatch.cppm for CXX dependencies
+[232/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm for CXX dependencies
+[233/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.cppm for CXX dependencies
+[234/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IntersectionClassification.cppm for CXX dependencies
+[235/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ImplicitPlaneField.cppm for CXX dependencies
+[236/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.KDTree.cppm for CXX dependencies
+[237/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.EngineLoad.cppm.o
+[238/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.LinearSolver.cppm for CXX dependencies
+[239/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.KMeans.cppm for CXX dependencies
+[240/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.PathResolver.cppm.o
+[241/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Mesh.Conversion.cppm for CXX dependencies
+[242/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshOperator.cppm for CXX dependencies
+[243/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Linalg.cppm for CXX dependencies
+[244/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshSoup.cppm for CXX dependencies
+[245/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshClosestFace.cppm for CXX dependencies
+[246/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MarchingCubes.cppm for CXX dependencies
+[247/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Telemetry.cppm.o
+[248/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Octree.cppm for CXX dependencies
+[249/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Overlap.cppm for CXX dependencies
+[250/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.OBB.cppm for CXX dependencies
+[251/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PCA.cppm for CXX dependencies
+[252/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Diagnostics.cppm for CXX dependencies
+[253/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Bff.cppm for CXX dependencies
+[254/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Conversion.cppm for CXX dependencies
+[255/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Harmonic.cppm for CXX dependencies
+[256/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Plane.cppm for CXX dependencies
+[257/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.IO.cppm for CXX dependencies
+[258/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Features.cppm for CXX dependencies
+[259/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Normals.cppm for CXX dependencies
+[260/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.QualityMetrics.cppm for CXX dependencies
+[261/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.SurfaceSampling.cppm for CXX dependencies
+[262/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Utils.cppm for CXX dependencies
+[263/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Primitives.cppm for CXX dependencies
+[264/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Quadric.cppm for CXX dependencies
+[265/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.LinearArena.cppm.o
+[266/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Raycast.cppm for CXX dependencies
+[267/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Properties.cppm for CXX dependencies
+[268/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Queries.cppm for CXX dependencies
+[269/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.cppm for CXX dependencies
+[270/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Ray.cppm for CXX dependencies
+[271/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Registration.cppm for CXX dependencies
+[272/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Robust.cppm for CXX dependencies
+[273/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.RobustPredicates.cppm for CXX dependencies
+[274/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Rotation.cppm for CXX dependencies
+[275/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SDF.cppm for CXX dependencies
+[276/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sampling.cppm for CXX dependencies
+[277/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.RotationAveraging.cppm for CXX dependencies
+[278/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.cppm.o
+[279/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SpatialQueries.cppm for CXX dependencies
+[280/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Segment.cppm for CXX dependencies
+[281/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SDFContact.cppm for CXX dependencies
+[282/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IOBackend.cpp.o
+[283/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sparse.cppm for CXX dependencies
+[284/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Support.cppm for CXX dependencies
+[285/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sphere.Sampling.cppm for CXX dependencies
+[286/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Statistics.cppm for CXX dependencies
+[287/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sphere.cppm for CXX dependencies
+[288/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Triangle.cppm for CXX dependencies
+[289/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SurfaceReconstruction.cppm for CXX dependencies
+[290/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.cppm for CXX dependencies
+[291/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Fwd.cppm for CXX dependencies
+[292/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Fwd.cppm for CXX dependencies
+[293/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.UvAtlas.cppm for CXX dependencies
+[294/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Fwd.cppm for CXX dependencies
+[295/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Validation.cppm for CXX dependencies
+[296/697] Generating CXX dyndep file src/geometry/CMakeFiles/IntrinsicGeometry.dir/CXX.dd
+[297/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_RobustKernels.cpp for CXX dependencies
+[298/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_BezierCurve.cpp for CXX dependencies
+[299/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.LocalTask.cpp.o
+[300/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_AABBCubify.cpp for CXX dependencies
+[301/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Statistics.cpp for CXX dependencies
+[302/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Curve.cpp for CXX dependencies
+[303/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Handle.cppm.o
+[304/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.Polymorphic.cppm.o
+[305/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.Polymorphic.cpp.o
+[306/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Logging.cpp.o
+[307/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.IO.cppm.o
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:149:21: warning: TU local entity 'NormalizeExtension' is exposed [-WTU-local-entity-exposure]
+  149 |         extension = NormalizeExtension(extension);
+      |                     ^
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:157:17: warning: TU local entity 'ExtensionEquals' is exposed [-WTU-local-entity-exposure]
+  157 |             if (ExtensionEquals(extension, format.CanonicalExtension))
+      |                 ^
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:163:21: warning: TU local entity 'ExtensionEquals' is exposed [-WTU-local-entity-exposure]
+  163 |                 if (ExtensionEquals(extension, alias))
+      |                     ^
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:196:16: warning: TU local entity 'HasDomain' is exposed [-WTU-local-entity-exposure]
+  196 |         return HasDomain(ImportDomainsForExtension(extension), domain);
+      |                ^
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:201:16: warning: TU local entity 'HasDomain' is exposed [-WTU-local-entity-exposure]
+  201 |         return HasDomain(ExportDomainsForExtension(extension), domain);
+      |                ^
+5 warnings generated.
+[308/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.FixedPoint.Anderson.cppm.o
+[309/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Process.cpp.o
+[310/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.cppm.o
+[311/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.DomainGraph.cppm.o
+[312/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshOperator.cppm.o
+[313/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.LinearSolver.cppm.o
+[314/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Curve.cppm.o
+[315/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.AABB.cppm.o
+[316/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Cylinder.cppm.o
+[317/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Capsule.cppm.o
+[318/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Ellipsoid.cppm.o
+[319/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.PathResolver.cpp.o
+[320/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Internal.cppm.o
+[321/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.FixedPoint.Anderson.cpp.o
+[322/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.ScopeStack.cppm.o
+[323/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.GaussianMixture.cppm.o
+[324/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PCA.cppm.o
+[325/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.AABB.cpp.o
+[326/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Curve.cpp.o
+[327/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Plane.cppm.o
+[328/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.cppm.o
+[329/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.LinearArena.cpp.o
+[330/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.OBB.cppm.o
+[331/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.ScopeStack.cpp.o
+[332/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Quadric.cppm.o
+[333/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Stats.cpp.o
+[334/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Telemetry.cpp.o
+[335/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Job.cpp.o
+[336/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Robust.cppm.o
+[337/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.CounterEvent.cppm.o
+[338/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Dispatch.cpp.o
+[339/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.cppm.o
+[340/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.cpp.o
+[341/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Plane.cpp.o
+[342/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Ellipsoid.cpp.o
+[343/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Robust.cpp.o
+[344/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Ray.cppm.o
+[345/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PCA.cpp.o
+[346/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ConvexHull.cppm.o
+[347/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Frustum.cppm.o
+[348/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Worker.cpp.o
+[349/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.WaitToken.cpp.o
+[350/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.OBB.cpp.o
+[351/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.CounterEvent.cpp.o
+[352/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Lifecycle.cpp.o
+[353/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cppm.o
+[354/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.cppm.o
+[355/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Hazards.cpp.o
+[356/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Rotation.cpp for CXX dependencies
+[357/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sampling.cppm.o
+[358/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_RotationAveraging.cpp for CXX dependencies
+[359/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.RotationAveraging.cppm.o
+[360/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Rotation.cppm.o
+[361/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.RobustPredicates.cppm.o
+[362/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MeshQuantities.cpp for CXX dependencies
+[363/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MeshClosestFace.cpp for CXX dependencies
+[364/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Segment.cppm.o
+[365/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Frustum.cpp.o
+[366/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sphere.cppm.o
+[367/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Statistics.cppm.o
+[368/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ConvexHull.cpp.o
+[369/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Triangle.cppm.o
+[370/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Internal.cpp.o
+[371/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Primitives.cppm.o
+[372/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Statistics.cpp.o
+[373/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.RobustPredicates.cpp.o
+[374/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.EngineLoad.cpp.o
+[375/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Capsule.cpp.o
+[376/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.IntersectionClassification.cppm.o
+[377/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_LinalgEigenMap.cpp for CXX dependencies
+[378/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Cylinder.cpp.o
+[379/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Rotation.cpp.o
+[380/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_RuntimeGraph.cpp for CXX dependencies
+[381/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_RuntimeGraphKNN.cpp for CXX dependencies
+[382/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Segment.cpp.o
+[383/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sampling.cpp.o
+[384/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.GeometryProperties.cpp for CXX dependencies
+[385/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sphere.cpp.o
+[386/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_KDTree.cpp for CXX dependencies
+[387/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.GraphQueries.cpp for CXX dependencies
+[388/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.RotationAveraging.cpp.o
+[389/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Octree.cpp for CXX dependencies
+[390/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_DEC.cpp for CXX dependencies
+[391/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.MeshSoup.cpp for CXX dependencies
+[392/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MeshOperations.cpp for CXX dependencies
+[393/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_BVH.cpp for CXX dependencies
+[394/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.PointCloudConversion.cpp for CXX dependencies
+[395/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.TaskGraph.cppm.o
+[396/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.MeshConversion.cpp for CXX dependencies
+[397/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MeshBuilder.cpp for CXX dependencies
+[398/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Triangle.cpp.o
+[399/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_GeometryProcessing.cpp for CXX dependencies
+[400/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.GaussianMixture.cpp for CXX dependencies
+[401/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MeshAnalysis.cpp for CXX dependencies
+[402/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MeshQuality.cpp for CXX dependencies
+[403/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_SurfaceReconstruction.cpp for CXX dependencies
+[404/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.ParameterizationDiagnostics.cpp for CXX dependencies
+[405/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.HarmonicParameterization.cpp for CXX dependencies
+[406/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.ParameterizationDispatch.cpp for CXX dependencies
+[407/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Parameterization.cpp for CXX dependencies
+[408/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.BoundaryFirstFlattening.cpp for CXX dependencies
+[409/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.UvAtlas.cpp for CXX dependencies
+[410/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_AdaptiveRemeshing.cpp for CXX dependencies
+[411/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_PointCloud.cpp for CXX dependencies
+[412/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.cpp.o
+[413/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_TriangleMetrics.cpp for CXX dependencies
+[414/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_ConvexHull.cpp for CXX dependencies
+[415/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_SphereFitting.cpp for CXX dependencies
+[416/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Boolean.cpp for CXX dependencies
+[417/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sphere.Sampling.cppm.o
+[418/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MeshBoundary.cpp for CXX dependencies
+[419/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_GeometryAttributePropagation.cpp for CXX dependencies
+[420/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.HalfedgeMeshVertexNormals.cpp for CXX dependencies
+[421/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.GraphVertexNormals.cpp for CXX dependencies
+[422/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_HalfedgeMeshTopology.cpp for CXX dependencies
+[423/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp for CXX dependencies
+[424/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.MeshTopologyUtilities.cpp for CXX dependencies
+[425/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Validation.cpp for CXX dependencies
+[426/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Queries.cppm.o
+[427/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Curvature.cpp for CXX dependencies
+[428/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.CurvatureTensor.cpp for CXX dependencies
+[429/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Raycast.cpp for CXX dependencies
+[430/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_GeometryQueries.cpp for CXX dependencies
+[431/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_PcaPrimitives.cpp for CXX dependencies
+[432/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Overlap.cpp for CXX dependencies
+[433/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Grid.cpp for CXX dependencies
+[434/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MarchingCubes.cpp for CXX dependencies
+[435/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Containment.cpp for CXX dependencies
+[436/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Simplification.cpp for CXX dependencies
+[437/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_ImplicitPlaneField.cpp for CXX dependencies
+[438/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Subdivision.cpp for CXX dependencies
+[439/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_ShortestPath.cpp for CXX dependencies
+[440/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Geodesic.cpp for CXX dependencies
+[441/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_VectorHeatMethod.cpp for CXX dependencies
+[442/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Support.cpp for CXX dependencies
+[443/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Smoothing.cpp for CXX dependencies
+[444/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Properties.cppm.o
+[445/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.Sampling.cpp for CXX dependencies
+[446/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.QualityMetrics.cpp for CXX dependencies
+[447/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.SurfaceSampling.cpp for CXX dependencies
+[448/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.PointCloudNormals.cpp for CXX dependencies
+[449/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_Registration.cpp for CXX dependencies
+[450/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.PointCloudOutlierRemoval.cpp for CXX dependencies
+[451/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_PointCloudRobustness.cpp for CXX dependencies
+[452/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.PointCloudFeatures.cpp for CXX dependencies
+[453/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Fwd.cppm.o
+[454/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Fwd.cppm.o
+[455/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Fwd.cppm.o
+[456/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sparse.cppm.o
+[457/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.IntersectionClassification.cpp for CXX dependencies
+[458/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.RaycastClassify.cpp for CXX dependencies
+[459/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.RobustPredicates.cpp for CXX dependencies
+[460/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.LinearAlgebra.cpp for CXX dependencies
+[461/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Circulators.cppm.o
+[462/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.Sparse.cpp for CXX dependencies
+[463/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.SparseFactorization.cpp for CXX dependencies
+[464/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.SparseNonsymmetric.cpp for CXX dependencies
+[465/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Queries.cpp.o
+[466/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.IO.cppm.o
+[467/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.SignedHeatMethod.cpp for CXX dependencies
+[468/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_SubmeshView.cpp for CXX dependencies
+[469/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/support/Test_SanitizerConfig.cpp for CXX dependencies
+[470/697] Generating CXX dyndep file tests/CMakeFiles/TestSupportObjs.dir/CXX.dd
+[471/697] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp for CXX dependencies
+[472/697] Generating CXX dyndep file tests/CMakeFiles/GeometryTestObjs.dir/CXX.dd
+[473/697] Building CXX object tests/CMakeFiles/TestSupportObjs.dir/support/Test_SanitizerConfig.cpp.o
+[474/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sphere.Sampling.cpp.o
+[475/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Properties.cpp.o
+[476/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Validation.cppm.o
+[477/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Support.cppm.o
+[478/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Grid.cppm.o
+[479/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SDF.cppm.o
+[480/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshSoup.cppm.o
+[481/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Grid.cpp.o
+[482/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameGraph.cppm.o
+[483/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Support.cpp.o
+[484/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Quadric.cpp.o
+[485/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SDF.cpp.o
+[486/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Statistics.cpp.o
+[487/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_RobustKernels.cpp.o
+[488/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.cppm.o
+[489/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.cppm.o
+[490/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameGraph.cpp.o
+[491/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Validation.cpp.o
+[492/697] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.TaskGraph.cpp.o
+[493/697] Linking CXX static library lib/libExtrinsicCore.a
+[494/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.cppm.o
+[495/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Octree.cppm.o
+[496/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshSoup.cpp.o
+[497/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_AABBCubify.cpp.o
+[498/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_BezierCurve.cpp.o
+[499/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.IO.cppm.o
+[500/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.IO.cpp.o
+[501/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Boolean.cppm.o
+[502/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.ShortestPath.cppm.o
+[503/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Analysis.cppm.o
+[504/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Vertex.Normals.cppm.o
+[505/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Utils.cppm.o
+[506/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Builder.cppm.o
+[507/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Boundary.cppm.o
+[508/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CatmullClark.cppm.o
+[509/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Containment.cppm.o
+[510/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.DomainViews.cppm.o
+[511/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.cpp.o
+[512/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.DEC.cppm.o
+[513/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Curve.cpp.o
+[514/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.DomainViews.cpp.o
+[515/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Boundary.cpp.o
+[516/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.cpp.o
+[517/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Remeshing.cppm.o
+[518/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.GJK.cppm.o
+[519/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Raycast.cppm.o
+[520/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Rotation.cpp.o
+[521/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Geodesic.cppm.o
+[522/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.IO.cpp.o
+[523/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.SignedHeatMethod.cppm.o
+[524/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Quality.cppm.o
+[525/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Curvature.cppm.o
+[526/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sparse.cpp.o
+[527/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm.o
+[528/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Containment.cpp.o
+[529/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.ShortestPath.cpp.o
+[530/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Simplification.cppm.o
+[531/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Vertex.Normals.cpp.o
+[532/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Subdivision.cppm.o
+[533/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Diagnostics.cppm.o
+[534/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.GJK.cpp.o
+[535/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Repair.cppm.o
+[536/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Overlap.cppm.o
+[537/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Raycast.cpp.o
+[538/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Mesh.Conversion.cppm.o
+[539/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.cpp.o
+[540/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Smoothing.cppm.o
+[541/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Conversion.cppm.o
+[542/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ConvexHullBuilder.cppm.o
+[543/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Vertices.Normals.cppm.o
+[544/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HtexPatch.cppm.o
+[545/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.VectorHeatMethod.cppm.o
+[546/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.IO.cppm.o
+[547/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MarchingCubes.cppm.o
+[548/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Features.cppm.o
+[549/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.SurfaceSampling.cppm.o
+[550/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SpatialQueries.cppm.o
+[551/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Bff.cppm.o
+[552/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Harmonic.cppm.o
+[553/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Overlap.cpp.o
+[554/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Builder.cpp.o
+[555/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.QualityMetrics.cppm.o
+[556/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Mesh.Conversion.cpp.o
+[557/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HtexPatch.cpp.o
+[558/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Utils.cppm.o
+[559/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Conversion.cpp.o
+[560/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Vertices.Normals.cpp.o
+[561/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MarchingCubes.cpp.o
+[562/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ConvexHullBuilder.cpp.o
+[563/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.EPA.cppm.o
+[564/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Harmonic.cpp.o
+[565/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Octree.cpp.o
+[566/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SurfaceReconstruction.cppm.o
+[567/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.BVH.cppm.o
+[568/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.QualityMetrics.cpp.o
+[569/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Parameterization.cppm.o
+[570/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.IO.cpp.o
+[571/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.EPA.cpp.o
+[572/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.UvAtlas.cppm.o
+[573/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_LinalgEigenMap.cpp.o
+[574/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.BVH.cpp.o
+[575/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Utils.cpp.o
+[576/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.MeshConversion.cpp.o
+[577/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_RotationAveraging.cpp.o
+[578/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_TriangleMetrics.cpp.o
+[579/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.MeshSoup.cpp.o
+[580/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.KDTree.cppm.o
+[581/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.PointCloudConversion.cpp.o
+[582/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ImplicitPlaneField.cppm.o
+[583/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.HalfedgeMeshVertexNormals.cpp.o
+[584/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cpp.o
+[585/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.GraphVertexNormals.cpp.o
+[586/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.QualityMetrics.cpp.o
+[587/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.Sampling.cpp.o
+[588/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ContactManifold.cppm.o
+[589/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_PointCloudRobustness.cpp.o
+[590/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.PointCloudOutlierRemoval.cpp.o
+[591/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SurfaceSampling.cpp.o
+[592/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.KDTree.cpp.o
+[593/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.PointCloudFeatures.cpp.o
+[594/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.IntersectionClassification.cpp.o
+[595/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Utils.cpp.o
+[596/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ContactManifold.cpp.o
+[597/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.cpp.o
+[598/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.RobustPredicates.cpp.o
+[599/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.Sparse.cpp.o
+[600/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.LinearAlgebra.cpp.o
+[601/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.RaycastClassify.cpp.o
+[602/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshClosestFace.cppm.o
+[603/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SparseNonsymmetric.cpp.o
+[604/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SparseFactorization.cpp.o
+[605/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Features.cpp.o
+[606/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.KMeans.cppm.o
+[607/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Utils.cppm.o
+[608/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SDFContact.cppm.o
+[609/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Normals.cppm.o
+[610/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshClosestFace.cpp.o
+[611/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ImplicitPlaneField.cpp.o
+[612/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Quality.cpp.o
+[613/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.GaussianMixture.cpp.o
+[614/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Boolean.cpp.o
+[615/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm.o
+[616/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.KMeans.cpp.o
+[617/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CatmullClark.cpp.o
+[618/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.DEC.cpp.o
+[619/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Curvature.cpp.o
+[620/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp.o
+[621/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Simplification.cpp.o
+[622/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Subdivision.cpp.o
+[623/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Smoothing.cpp.o
+[624/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.cppm.o
+[625/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.SignedHeatMethod.cpp.o
+[626/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Geodesic.cpp.o
+[627/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Repair.cpp.o
+[628/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Analysis.cpp.o
+[629/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Parameterization.cpp.o
+[630/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Remeshing.cpp.o
+[631/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Diagnostics.cpp.o
+[632/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.GaussianMixture.cpp.o
+[633/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.AdaptiveRemeshing.cpp.o
+[634/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.SurfaceSampling.cpp.o
+[635/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Bff.cpp.o
+[636/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SurfaceReconstruction.cpp.o
+[637/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Normals.cpp.o
+[638/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.VectorHeatMethod.cpp.o
+[639/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Utils.cpp.o
+[640/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.PointCloudNormals.cpp.o
+[641/697] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.UvAtlas.cpp.o
+[642/697] Linking CXX static library lib/libIntrinsicGeometry.a
+[643/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.GraphQueries.cpp.o
+[644/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_BVH.cpp.o
+[645/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_RuntimeGraphKNN.cpp.o
+[646/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshBuilder.cpp.o
+[647/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_KDTree.cpp.o
+[648/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshClosestFace.cpp.o
+[649/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshQuality.cpp.o
+[650/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_DEC.cpp.o
+[651/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Parameterization.cpp.o
+[652/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshQuantities.cpp.o
+[653/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.GeometryProperties.cpp.o
+[654/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Octree.cpp.o
+[655/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshOperations.cpp.o
+[656/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_SurfaceReconstruction.cpp.o
+/tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_SurfaceReconstruction.cpp:63:34: warning: unused function 'MakeSphereSDF' [-Wunused-function]
+   63 | static Geometry::Grid::DenseGrid MakeSphereSDF(
+      |                                  ^~~~~~~~~~~~~
+/tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_SurfaceReconstruction.cpp:96:34: warning: unused function 'MakePlaneSDF' [-Wunused-function]
+   96 | static Geometry::Grid::DenseGrid MakePlaneSDF(
+      |                                  ^~~~~~~~~~~~
+2 warnings generated.
+[657/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_RuntimeGraph.cpp.o
+[658/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_GeometryProcessing.cpp.o
+[659/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.ParameterizationDiagnostics.cpp.o
+[660/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.ParameterizationDispatch.cpp.o
+[661/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.HarmonicParameterization.cpp.o
+[662/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshAnalysis.cpp.o
+[663/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_AdaptiveRemeshing.cpp.o
+[664/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.BoundaryFirstFlattening.cpp.o
+[665/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Boolean.cpp.o
+[666/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_HalfedgeMeshTopology.cpp.o
+[667/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.MeshTopologyUtilities.cpp.o
+[668/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_ConvexHull.cpp.o
+[669/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Validation.cpp.o
+[670/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_SphereFitting.cpp.o
+[671/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Curvature.cpp.o
+[672/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Raycast.cpp.o
+[673/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_GeometryQueries.cpp.o
+[674/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp.o
+[675/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_GeometryAttributePropagation.cpp.o
+[676/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.UvAtlas.cpp.o
+[677/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.CurvatureTensor.cpp.o
+[678/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshBoundary.cpp.o
+[679/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MarchingCubes.cpp.o
+/tmp/intrinsic-geometry-e2e.GJlhXS/tests/unit/geometry/Test_MarchingCubes.cpp:56:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+   56 |     grid.AddProperty<float>("scalar", 10.0f);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[680/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_ImplicitPlaneField.cpp.o
+[681/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Overlap.cpp.o
+[682/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_PcaPrimitives.cpp.o
+[683/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Grid.cpp.o
+[684/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_PointCloud.cpp.o
+[685/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Containment.cpp.o
+[686/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Geodesic.cpp.o
+[687/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Simplification.cpp.o
+[688/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Support.cpp.o
+[689/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SignedHeatMethod.cpp.o
+[690/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_ShortestPath.cpp.o
+[691/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Subdivision.cpp.o
+[692/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_SubmeshView.cpp.o
+[693/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_VectorHeatMethod.cpp.o
+[694/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SubmeshViewDomainBorrows.cpp.o
+[695/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Smoothing.cpp.o
+[696/697] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Registration.cpp.o
+[697/697] Linking CXX executable bin/IntrinsicGeometryTests
+Internal ctest changing into directory: /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci-ubsan
+Test project /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci-ubsan
+      Start 370: AndersonAcceleration.ContractionUsesFiniteSafeguardedMix
+ 1/13 Test #370: AndersonAcceleration.ContractionUsesFiniteSafeguardedMix ...................   Passed    0.01 sec
+      Start 371: AndersonAcceleration.DimensionChangesResetPrivateHistory
+ 2/13 Test #371: AndersonAcceleration.DimensionChangesResetPrivateHistory ...................   Passed    0.01 sec
+      Start 372: AndersonAcceleration.ExtremeFiniteInputsFailClosedWithoutHistoryMutation
+ 3/13 Test #372: AndersonAcceleration.ExtremeFiniteInputsFailClosedWithoutHistoryMutation ...   Passed    0.01 sec
+      Start 373: AndersonAcceleration.SafeguardAndSingularMixFallBackToPlainStep
+ 4/13 Test #373: AndersonAcceleration.SafeguardAndSingularMixFallBackToPlainStep ............   Passed    0.01 sec
+      Start 374: AndersonAcceleration.ZeroDampingPublishesThePlainMappedValue
+ 5/13 Test #374: AndersonAcceleration.ZeroDampingPublishesThePlainMappedValue ...............   Passed    0.01 sec
+      Start 375: GaussianMixture.KMeansPlusPlusInitializationIsSeedDeterministic
+ 6/13 Test #375: GaussianMixture.KMeansPlusPlusInitializationIsSeedDeterministic ............   Passed    0.01 sec
+      Start 376: GaussianMixture.IdentityLogPdfAndSeededSampleAreDeterministic
+ 7/13 Test #376: GaussianMixture.IdentityLogPdfAndSeededSampleAreDeterministic ..............   Passed    0.01 sec
+      Start 377: GaussianMixture.CovarianceSymmetryCheckIsScaleAware
+ 8/13 Test #377: GaussianMixture.CovarianceSymmetryCheckIsScaleAware ........................   Passed    0.01 sec
+      Start 378: GaussianMixture.RecoversSeparatedComponentsAndMonotonicLikelihood
+ 9/13 Test #378: GaussianMixture.RecoversSeparatedComponentsAndMonotonicLikelihood ..........   Passed    0.01 sec
+      Start 379: GaussianMixture.RecoversThreeSeparatedComponents
+10/13 Test #379: GaussianMixture.RecoversThreeSeparatedComponents ...........................   Passed    0.01 sec
+      Start 380: GaussianMixture.AndersonMatchesPlainEmWithoutMoreIterations
+11/13 Test #380: GaussianMixture.AndersonMatchesPlainEmWithoutMoreIterations ................   Passed    0.08 sec
+      Start 381: GaussianMixture.CoincidentPointsUseCovarianceFloorDeterministically
+12/13 Test #381: GaussianMixture.CoincidentPointsUseCovarianceFloorDeterministically ........   Passed    0.01 sec
+      Start 382: GaussianMixture.InvalidInputsFailClosed
+13/13 Test #382: GaussianMixture.InvalidInputsFailClosed ....................................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 13
+
+Label Time Summary:
+geometry    =   0.20 sec*proc (13 tests)
+unit        =   0.20 sec*proc (13 tests)
+
+Total Test time (real) =   0.39 sec

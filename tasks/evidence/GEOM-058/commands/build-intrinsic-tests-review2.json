@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 12671,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T11:55:57Z",
+  "label": "build-intrinsic-tests-review2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T11:55:44Z",
+  "stderr_path": "tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.stdout.log",
+  "stdout_sha256": "348adf6ea71625176a7d36fe64a05c37cc71e7040ab8f91ff7a2b551fe4fdfd6",
+  "task_id": "GEOM-058"
+}

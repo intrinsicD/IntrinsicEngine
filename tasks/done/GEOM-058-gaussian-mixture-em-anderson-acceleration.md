@@ -76,8 +76,11 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Completed 2026-08-01. Implementation commit: `79044265`. The deterministic
   CPU reference, narrow Anderson utility, seeded k-means++ initialization,
   public diagnostics, two-/three-component recovery, degeneracy coverage, and
-  1,604-case geometry CPU gate are complete. Optimized/GPU variants remain
-  method-workflow follow-ups only when a concrete consumer justifies them.
+  1,721-case geometry CPU gate are complete. Independent-review hardening made
+  Anderson history private, added overflow-safe residual diagnostics, and made
+  covariance symmetry validation scale-relative. The 13 focused cases also
+  pass under task-local ASan and UBSan. Optimized/GPU variants remain method-
+  workflow follow-ups only when a concrete consumer justifies them.
 
 ## Maturity
 - Target: `CPUContracted`; no `Operational` follow-up is owed — optimized/GPU variants open per the method workflow only when a consumer needs them.

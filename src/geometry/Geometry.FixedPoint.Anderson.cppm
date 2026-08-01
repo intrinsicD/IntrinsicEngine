@@ -26,14 +26,24 @@ export namespace Geometry::FixedPoint
         double SafeguardFactor{1.0};
     };
 
+    struct AndersonStepResult;
+
     // Caller-owned history for deterministic, windowed Anderson mixing.
     // The utility stores only fixed-point outputs and residuals; it owns no
     // objective, convergence, or domain-specific validity policy.
     struct AndersonState
     {
         AndersonParams Params{};
+
+    private:
         std::vector<std::vector<double>> MappedHistory{};
         std::vector<std::vector<double>> ResidualHistory{};
+
+        friend AndersonStepResult AndersonStep(
+            AndersonState& state,
+            std::span<const double> current,
+            std::span<const double> mapped);
+        friend void ResetAnderson(AndersonState& state) noexcept;
     };
 
     struct AndersonStepResult

@@ -133,6 +133,112 @@ TEST(AndersonAcceleration, ContractionUsesFiniteSafeguardedMix)
     EXPECT_NEAR(current[0], 2.0, 1.0e-8);
 }
 
+TEST(AndersonAcceleration, DimensionChangesResetPrivateHistory)
+{
+    FixedPoint::AndersonState state{};
+    const auto first = FixedPoint::AndersonStep(
+        state,
+        std::vector<double>{0.0},
+        std::vector<double>{1.0});
+    ASSERT_EQ(first.Status, FixedPoint::AndersonStepStatus::Plain);
+
+    const auto resized = FixedPoint::AndersonStep(
+        state,
+        std::vector<double>{0.0, 0.0},
+        std::vector<double>{1.0, 1.0});
+    EXPECT_EQ(resized.Status, FixedPoint::AndersonStepStatus::Plain);
+    EXPECT_EQ(resized.Value, (std::vector<double>{1.0, 1.0}));
+}
+
+TEST(AndersonAcceleration, ExtremeFiniteInputsFailClosedWithoutHistoryMutation)
+{
+    FixedPoint::AndersonState state{};
+    const double maximum = std::numeric_limits<double>::max();
+    const auto overflow = FixedPoint::AndersonStep(
+        state,
+        std::vector<double>{-maximum},
+        std::vector<double>{maximum});
+    EXPECT_EQ(
+        overflow.Status,
+        FixedPoint::AndersonStepStatus::NumericalFailure);
+    EXPECT_TRUE(overflow.Value.empty());
+    EXPECT_TRUE(std::isfinite(overflow.PlainResidualNorm));
+
+    const auto next = FixedPoint::AndersonStep(
+        state,
+        std::vector<double>{0.0},
+        std::vector<double>{1.0});
+    EXPECT_EQ(next.Status, FixedPoint::AndersonStepStatus::Plain);
+
+    FixedPoint::AndersonState stableState{};
+    const auto stableLarge = FixedPoint::AndersonStep(
+        stableState,
+        std::vector<double>{0.0, 0.0},
+        std::vector<double>{maximum / 4.0, maximum / 4.0});
+    EXPECT_EQ(
+        stableLarge.Status,
+        FixedPoint::AndersonStepStatus::Plain);
+    EXPECT_TRUE(std::isfinite(stableLarge.PlainResidualNorm));
+}
+
+TEST(AndersonAcceleration, SafeguardAndSingularMixFallBackToPlainStep)
+{
+    FixedPoint::AndersonState safeguardedState{};
+    safeguardedState.Params.Regularization = 1.0e12;
+    ASSERT_EQ(
+        FixedPoint::AndersonStep(
+            safeguardedState,
+            std::vector<double>{0.0},
+            std::vector<double>{100.0}).Status,
+        FixedPoint::AndersonStepStatus::Plain);
+    const auto rejected = FixedPoint::AndersonStep(
+        safeguardedState,
+        std::vector<double>{0.0},
+        std::vector<double>{1.0});
+    EXPECT_EQ(
+        rejected.Status,
+        FixedPoint::AndersonStepStatus::Safeguarded);
+    EXPECT_EQ(rejected.Value, (std::vector<double>{1.0}));
+    EXPECT_GT(
+        rejected.MixedResidualNorm,
+        rejected.PlainResidualNorm);
+
+    FixedPoint::AndersonState singularState{};
+    singularState.Params.Regularization = 0.0;
+    ASSERT_EQ(
+        FixedPoint::AndersonStep(
+            singularState,
+            std::vector<double>{0.0},
+            std::vector<double>{1.0}).Status,
+        FixedPoint::AndersonStepStatus::Plain);
+    EXPECT_EQ(
+        FixedPoint::AndersonStep(
+            singularState,
+            std::vector<double>{0.0},
+            std::vector<double>{1.0}).Status,
+        FixedPoint::AndersonStepStatus::Safeguarded);
+}
+
+TEST(AndersonAcceleration, ZeroDampingPublishesThePlainMappedValue)
+{
+    FixedPoint::AndersonState state{};
+    state.Params.Damping = 0.0;
+    state.Params.SafeguardFactor = 2.0;
+    ASSERT_EQ(
+        FixedPoint::AndersonStep(
+            state,
+            std::vector<double>{0.0},
+            std::vector<double>{1.0}).Status,
+        FixedPoint::AndersonStepStatus::Plain);
+    const std::vector<double> mapped{1.5};
+    const auto step = FixedPoint::AndersonStep(
+        state,
+        std::vector<double>{1.0},
+        mapped);
+    ASSERT_TRUE(step.UsedAcceleration());
+    EXPECT_EQ(step.Value, mapped);
+}
+
 TEST(GaussianMixture, KMeansPlusPlusInitializationIsSeedDeterministic)
 {
     const std::vector<glm::vec3> points = TwoClusterFixture();
@@ -168,6 +274,33 @@ TEST(GaussianMixture, IdentityLogPdfAndSeededSampleAreDeterministic)
     ASSERT_TRUE(first.has_value());
     ASSERT_TRUE(second.has_value());
     EXPECT_EQ(*first, *second);
+}
+
+TEST(GaussianMixture, CovarianceSymmetryCheckIsScaleAware)
+{
+    Gmm::MultivariateGaussian asymmetric{};
+    asymmetric.Covariance = glm::dmat3{0.0};
+    asymmetric.Covariance[0][0] = 1.0e-12;
+    asymmetric.Covariance[1][1] = 1.0e-12;
+    asymmetric.Covariance[2][2] = 1.0e-12;
+    asymmetric.Covariance[0][1] = 0.0;
+    asymmetric.Covariance[1][0] = 9.0e-11;
+    EXPECT_FALSE(Gmm::LogPdf(asymmetric, glm::dvec3{0.0}));
+
+    Gmm::MultivariateGaussian tinySpd{};
+    tinySpd.Covariance = glm::dmat3{0.0};
+    tinySpd.Covariance[0][0] = 1.0e-12;
+    tinySpd.Covariance[1][1] = 1.0e-12;
+    tinySpd.Covariance[2][2] = 1.0e-12;
+    tinySpd.Covariance[0][1] = 1.0e-13;
+    tinySpd.Covariance[1][0] = 1.0e-13;
+    const auto logPdf = Gmm::LogPdf(tinySpd, glm::dvec3{0.0});
+    ASSERT_TRUE(logPdf.has_value());
+    EXPECT_TRUE(std::isfinite(*logPdf));
+
+    tinySpd.Covariance[0][1] = 1.0e-12;
+    tinySpd.Covariance[1][0] = 1.0e-12;
+    EXPECT_FALSE(Gmm::LogPdf(tinySpd, glm::dvec3{0.0}));
 }
 
 TEST(GaussianMixture, RecoversSeparatedComponentsAndMonotonicLikelihood)

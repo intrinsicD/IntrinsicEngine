@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=OFF && cmake --build --preset ci-ubsan --target IntrinsicGeometryTests && ctest --test-dir build/ci-ubsan --output-on-failure -R '^(AndersonAcceleration|GaussianMixture)\\.' --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "bash -lc 'cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=OFF && cmake --build --preset ci-ubsan --target IntrinsicGeometryTests && ctest --test-dir build/ci-ubsan --output-on-failure -R '\"'\"'^(AndersonAcceleration|GaussianMixture)\\.'\"'\"' --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 89183,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T11:55:34Z",
+  "label": "ubsan-focused-review2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T11:54:05Z",
+  "stderr_path": "tasks/evidence/GEOM-058/commands/ubsan-focused-review2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-058/commands/ubsan-focused-review2.stdout.log",
+  "stdout_sha256": "a27372e2cc0821d39bc05c0fcf2e83a59b1b8bf602a162d5f49e1f4e03ca06fd",
+  "task_id": "GEOM-058"
+}

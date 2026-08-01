@@ -1,0 +1,143 @@
+schema_version: 1
+task_id: GEOM-058
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T11:37:25Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: fb494cfc7cdc319fcb050a73b2e291ff73cc6d1d
+  head_revision: 79806d29098c0a5626383c1a802a9c6aabb392b8
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: 59bc113f738e05e0ca2d74c97f6fca01c0f643b2da5fb7d62465f23aecd7ee7e
+  - path: docs/architecture/geometry.md
+    sha256: 47358cf4894dae307ae098fed629818baaf1bb09f26271babf43a82f9a150d59
+  - path: src/geometry/CMakeLists.txt
+    sha256: 6592b3fbb31ed113f49da8cae8ba568a225ec0c325ff24b293ce2024887a6770
+  - path: src/geometry/Geometry.FixedPoint.Anderson.cpp
+    sha256: 0e28664918113f7ad3fc7a0299b5d0b255fc263303d4bb580c5c74d272cf3568
+  - path: src/geometry/Geometry.FixedPoint.Anderson.cppm
+    sha256: 453cbf4d58bab0f0f36c1a70d46af50f051947b2a897759a3ca00b34b65efff5
+  - path: src/geometry/Geometry.GaussianMixture.cpp
+    sha256: c1ab51dfb21a0ab5672f83c0394182eaa81f4cbb76d2a44bbbdd13d9ae1d0ce5
+  - path: src/geometry/Geometry.GaussianMixture.cppm
+    sha256: 2ac493058efd783f8385664c80e3ee0dd91f326b3bfe58795030f1b21310f77c
+  - path: src/geometry/Geometry.KMeans.cpp
+    sha256: b6ca51c9e49593cfa06845c6a0bb946b08fd8c935e260886bdc4abd5ad55af5b
+  - path: src/geometry/Geometry.KMeans.cppm
+    sha256: 3304d60b0143a432854a3d74c4bc7970185f0957edecb36580fade188f04c2eb
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 0c6684ded93113dde4e974130302631e60f5995eda1d207c58efadcfa48e7f26
+  - path: tasks/backlog/geometry/README.md
+    sha256: 771ac279790f427b706d5139f40f7d9ebcbd25f343d0eff5e07a0cec57dcfe7b
+  - path: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
+    sha256: 8adbf81c29be54e6aef053741ae56c26af14843b5674be6b2971c565d463cb80
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: a75aff5b9d58fe3f6f993091d0094d677982c47337fd2ffe61f7c9a2a19d483a
+  - path: tests/CMakeLists.txt
+    sha256: f4ccb0a52df241b73ce5962a5fc93199fb7012c3dfb236db4df221da18725ce6
+  - path: tests/unit/geometry/Test.GaussianMixture.cpp
+    sha256: 185d7c9656af34a6597a52d4a089a9488c5229036915a8554f90094f21bebb90
+  content_digest: bbb0934db0b771c8fc34fc2d716fefc2336ca76c56f782966e8221f0952953ca
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/geometry.md
+  - src/geometry/CMakeLists.txt
+  - src/geometry/Geometry.FixedPoint.Anderson.cpp
+  - src/geometry/Geometry.FixedPoint.Anderson.cppm
+  - src/geometry/Geometry.GaussianMixture.cpp
+  - src/geometry/Geometry.GaussianMixture.cppm
+  - src/geometry/Geometry.KMeans.cpp
+  - src/geometry/Geometry.KMeans.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/geometry/README.md
+  - tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/CMakeLists.txt
+  - tests/unit/geometry/Test.GaussianMixture.cpp
+  layers:
+  - geometry
+  modules:
+  - Geometry.FixedPoint.Anderson
+  - Geometry.GaussianMixture
+  - Geometry.KMeans
+extension_seam: Narrow std/GLM fixed-point and Gaussian-mixture records consumed by method packages through
+  public module imports
+future_change_plan: Add optimized or GPU implementations only through method-workflow parity tasks with
+  a present consumer; keep the CPU reference canonical
+acceptance:
+- criterion: Public surface exposes only `std`/`glm`/scalar types.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: All listed tests pass in the default CPU gate.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: '`METHOD-015` can express its E-step against this surface without private includes.'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Layering check passes (`geometry -> core` only).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.json
+- receipt: tasks/evidence/GEOM-058/commands/build-intrinsic-tests.json
+- receipt: tasks/evidence/GEOM-058/commands/doc-links.json
+- receipt: tasks/evidence/GEOM-058/commands/focused-numerics-final.json
+- receipt: tasks/evidence/GEOM-058/commands/focused-numerics.json
+- receipt: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-final.json
+- receipt: tasks/evidence/GEOM-058/commands/geometry-cpu-gate.json
+- receipt: tasks/evidence/GEOM-058/commands/layering.json
+- receipt: tasks/evidence/GEOM-058/commands/task-policy.json
+changed_public_contracts:
+- Deterministic 3D Gaussian evaluation, responsibilities, likelihood, regularized EM, seeded k-means++
+  initialization, and residual-safeguarded Anderson proposals with structured diagnostics
+diagnostics_and_previews:
+- FitStatus, convergence and iteration state, likelihood history, accepted/safeguarded acceleration counts,
+  and covariance-regularization counts fail closed without publishing NaN or Inf
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Bitwise seeded sampling is documented only within one supported standard-library/toolchain implementation;
+  the numerical contract otherwise uses tolerance-based recovery and likelihood checks
+skipped_checks:
+- check: gpu-vulkan
+  reason: CPU-reference geometry numerics add no RHI, shader, device, or runtime behavior
+- check: task-local-sanitizers
+  reason: Final integrated LOP method/runtime/UI chain will run the repository ASan and UBSan gates; GEOM-058
+    itself passed the aggregate build and 1,604-test geometry CPU gate
+artifacts:
+- path: tests/unit/geometry/Test.GaussianMixture.cpp
+  sha256: 185d7c9656af34a6597a52d4a089a9488c5229036915a8554f90094f21bebb90
+  kind: file
+- path: src/geometry/Geometry.GaussianMixture.cppm
+  sha256: 2ac493058efd783f8385664c80e3ee0dd91f326b3bfe58795030f1b21310f77c
+  kind: file
+- path: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
+  sha256: 8adbf81c29be54e6aef053741ae56c26af14843b5674be6b2971c565d463cb80
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GEOM-058/handoff.jsonl
+review: tasks/evidence/GEOM-058/reviews.jsonl
