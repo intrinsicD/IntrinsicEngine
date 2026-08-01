@@ -3,12 +3,12 @@ task_id: METHOD-017
 workflow_profile: claim-grade
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T15:20:13Z'
+generated_at: '2026-08-01T15:28:30Z'
 claim_eligible: true
 source:
   base_ref: f2ba8242
   base_revision: f2ba8242dc7a80378cd53cfa3a622294eff7d538
-  head_revision: f3babc0749599fc345b0b39ece33c956fc26b543
+  head_revision: f969c5f03cbee87a7f19fdd3c8d736cf155f9772
   branch: feature/lop-consolidation-e2e
   worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
   dirty: false
@@ -52,14 +52,14 @@ source:
   - path: tasks/SESSION-BRIEF.md
     sha256: 6652e524246bfc381c4c23dd0f62ef9881361c3137cf83165b85127c4ec862a1
   - path: tasks/backlog/methods/README.md
-    sha256: c41e87cff1d7baecb29d95509bb399cf94cf4d4aede7ad6387da9d7c9b8e146f
+    sha256: ac0be3bb521e56360aafd3b47365ea3d2cae1c7df2de198f10227b2a24a6a5e5
   - path: tasks/done/METHOD-017-continuous-lop-clop-reference-backend.md
-    sha256: 694bf66bf1383ace12c9015414a59d3883ff9d05fb36fae586caa638a6212aa5
+    sha256: 7b92759a9b80e2f316c99eb221a41f728ccf233e4bb8c4ccd034cbe1ebc21fbb
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: e7d46d1ebe3a61737c464d125087869ccee3a87a5f5fd1534fc54bb3aa6b7817
   - path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
     sha256: c83ca9f02295b681d885244b3460f68d243fd858b23a75f1b491c5832e06d490
-  content_digest: f8b878426e50fa567a3b110128c963c49fc030faef3e505b977594407d7c4045
+  content_digest: 66a25e94eeffd4af0b07bae62849f9b02258bda2f5bdf6ec7bc0546edfd926ed
 touched:
   paths:
   - ara/logic/claims.md
