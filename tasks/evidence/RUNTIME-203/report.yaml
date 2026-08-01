@@ -1,0 +1,184 @@
+schema_version: 1
+task_id: RUNTIME-203
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T09:31:56Z'
+claim_eligible: false
+source:
+  base_ref: 8cb0985d
+  base_revision: 8cb0985d812d08f81ec389869d26d027816b630d
+  head_revision: 9e9549180e6f6a644b7bab41dcc47c062801c025
+  branch: cleanup/runtime-139-203-205
+  worktree: /tmp/intrinsic-runtime-cleanup.ae4UkC
+  dirty: true
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: 491805991f945b89d0f6c539ae7c5a5def7538973656703d077011901c3294ac
+  - path: src/ecs/Systems/README.md
+    sha256: f4d2436d276ce8cbbdb59fdeaf87565a09ee5237bd3afc49d2a9c10f8dff567e
+  - path: src/runtime/CMakeLists.txt
+    sha256: 01afd19ff209a09d21ac9632cacc9050db398f613f918398152a523e067f63d9
+  - path: src/runtime/README.md
+    sha256: 7346fc07d576b13d24b12179020a3d9a446f7c5f6562718d25747e15c8a06ab5
+  - path: src/runtime/Runtime.EcsSystemBundle.cpp
+    sha256: null
+  - path: src/runtime/Runtime.EcsSystemBundle.cppm
+    sha256: null
+  - path: src/runtime/Runtime.Engine.FrameLoop.Internal.hpp
+    sha256: 9f8832622c05bc7427e6f6cba44707da99c5b5fbbd3518c2e530a1f8f91bcf96
+  - path: src/runtime/Runtime.Engine.cpp
+    sha256: 97590e9a6cc9c012cea750ab74ebd0054f94f27d2a3832e8f0e6bb2fbc9d7027
+  - path: src/runtime/Runtime.JobServiceGpuQueueBridge.cpp
+    sha256: null
+  - path: src/runtime/Runtime.JobServiceGpuQueueBridge.cppm
+    sha256: null
+  - path: src/runtime/Runtime.ModuleSchedule.cpp
+    sha256: null
+  - path: src/runtime/Runtime.ModuleSchedule.cppm
+    sha256: null
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 799ef2e06e51f2c50f64604da5380aa87b82fef2c288e739988ffd0a4ae110ab
+  - path: tasks/backlog/runtime/README.md
+    sha256: 0d83d72e7a924331464d3f47ef5f20da50f521f05285810cb4104136af022477
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 5920c30a9dffcdc078d02bf75cbbd2fa2a6c6e24407982a1976aed636c7605e5
+  - path: tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md
+    sha256: b4fca15061b3a52a99be2294a029e3bee4026114a6e7ca563b1baa9d8e19d885
+  - path: tests/CMakeLists.txt
+    sha256: 6743aad0e98491393392e867a818bdc201a77ca68ffe83aff25dc506da8b4d82
+  - path: tests/contract/runtime/Test.RuntimeEcsSystemBundle.cpp
+    sha256: null
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: 61550797bd50874297d28ed7d6f502ca1b2314b36d7fd11084e254912ed4f304
+  - path: tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+    sha256: de6f3a1ddb81daa9e72f3dcbe90828104ca97e3ed66c94c45e98f5bfa9ca7c5b
+  - path: tests/contract/runtime/Test.RuntimeModule.cpp
+    sha256: 7f55f8034d99505aa24c8a86ae9a02ac17880480dc9874a49f4dcfdb0c01e355
+  - path: tests/integration/runtime/Test.RuntimeRenderExtraction.cpp
+    sha256: 70e5178fd3ee54d1a57daa626d47b23454da868811cb8d4687963fc2c3c25126
+  - path: tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+    sha256: 1f5e679bde1a488c94fe30f56385e0de3ddb134318f5b951decc9d3f176028ed
+  content_digest: db89014f23272a716ebf0e044758991428dfb15a865823fc807577151e44c7f4
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - src/ecs/Systems/README.md
+  - src/runtime/CMakeLists.txt
+  - src/runtime/README.md
+  - src/runtime/Runtime.EcsSystemBundle.cpp
+  - src/runtime/Runtime.EcsSystemBundle.cppm
+  - src/runtime/Runtime.Engine.FrameLoop.Internal.hpp
+  - src/runtime/Runtime.Engine.cpp
+  - src/runtime/Runtime.JobServiceGpuQueueBridge.cpp
+  - src/runtime/Runtime.JobServiceGpuQueueBridge.cppm
+  - src/runtime/Runtime.ModuleSchedule.cpp
+  - src/runtime/Runtime.ModuleSchedule.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.RuntimeEcsSystemBundle.cpp
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  - tests/contract/runtime/Test.RuntimeModule.cpp
+  - tests/integration/runtime/Test.RuntimeRenderExtraction.cpp
+  - tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+  layers:
+  - ecs
+  - runtime
+  modules:
+  - Extrinsic.ECS.System.BoundsPropagation
+  - Extrinsic.ECS.System.RenderSync
+  - Extrinsic.ECS.System.TransformHierarchy
+  - Extrinsic.Runtime.Engine
+  - Extrinsic.Runtime.JobService
+  - Extrinsic.Runtime.Module
+extension_seam: IRuntimeModule frame/viewport registration and the three existing promoted ECS system
+  contracts
+future_change_plan: Add a new helper only when a present second production owner or test-double boundary
+  requires an independently reusable contract
+acceptance:
+- criterion: Engine preserves identical hook ordering, ECS execution/flush, GPU
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Production and tests no longer import or name `ModuleSchedule`,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No replacement wrapper, service, registry, schedule interface, or Engine
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: SceneInteraction, recipe activation, and device bootstrap are unchanged.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-203/commands/ara-claims.json
+- receipt: tasks/evidence/RUNTIME-203/commands/asan-build.json
+- receipt: tasks/evidence/RUNTIME-203/commands/asan-configure.json
+- receipt: tasks/evidence/RUNTIME-203/commands/asan-tests.json
+- receipt: tasks/evidence/RUNTIME-203/commands/ci-build.json
+- receipt: tasks/evidence/RUNTIME-203/commands/ci-configure.json
+- receipt: tasks/evidence/RUNTIME-203/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-203/commands/cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-203/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-203/commands/docs-sync.json
+- receipt: tasks/evidence/RUNTIME-203/commands/focused-tests.json
+- receipt: tasks/evidence/RUNTIME-203/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-203/commands/module-inventory.json
+- receipt: tasks/evidence/RUNTIME-203/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-203/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-203/commands/task-state-links.json
+- receipt: tasks/evidence/RUNTIME-203/commands/task-validation.json
+- receipt: tasks/evidence/RUNTIME-203/commands/test-layout.json
+- receipt: tasks/evidence/RUNTIME-203/commands/ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-203/commands/ubsan-configure.json
+- receipt: tasks/evidence/RUNTIME-203/commands/ubsan-tests.json
+changed_public_contracts:
+- Engine lifecycle preserves deterministic module hook order, promoted ECS execution/flush, and JobService
+  GPU participant recording/shutdown
+diagnostics_and_previews:
+- Structural ratchets prove the three retired helper BMIs, CMake entries, direct imports, and helper-only
+  test target are absent
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Promoted Vulkan command submission was not executed; lifecycle/order are covered structurally and through
+  CPU/sanitizer Engine tests
+skipped_checks:
+- check: gpu-vulkan
+  reason: No backend or command-recording behavior changed; this slice only moved the existing renderer-hook
+    lifecycle into its sole production owner
+artifacts:
+- path: tests/contract/runtime/Test.RuntimeModule.cpp
+  sha256: 7f55f8034d99505aa24c8a86ae9a02ac17880480dc9874a49f4dcfdb0c01e355
+  kind: file
+- path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  sha256: 61550797bd50874297d28ed7d6f502ca1b2314b36d7fd11084e254912ed4f304
+  kind: file
+- path: tests/integration/runtime/Test.RuntimeRenderExtraction.cpp
+  sha256: 70e5178fd3ee54d1a57daa626d47b23454da868811cb8d4687963fc2c3c25126
+  kind: file
+- path: tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md
+  sha256: b4fca15061b3a52a99be2294a029e3bee4026114a6e7ca563b1baa9d8e19d885
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-203/handoff.jsonl
+review: tasks/evidence/RUNTIME-203/reviews.jsonl
