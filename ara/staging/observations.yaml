@@ -1370,3 +1370,23 @@ observations:
     promoted_to: "logic/claims.md:C17"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O89
+    timestamp: "2026-08-01T17:19+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-017 now has a deterministic CPU reference for Continuous LOP that
+      evaluates the original three-term Gaussian-product attraction against a
+      fitted Gaussian mixture, retains the shared repulsion contract, and
+      exposes bounded component work and fail-closed diagnostics.
+    context: >
+      The independently audited confirmation cohort exercises disjoint plane
+      and sphere samples, WLOP parity, compact/rich mixture work, outliers, and
+      invalid component counts. It binds the exact original CLOP equations;
+      hierarchical EM, scanner-data generalization, and the later
+      incomplete-gamma kernels remain outside this claim.
+    potential_type: claim
+    bound_to: [N312, N313]
+    promoted: true
+    promoted_to: "logic/claims.md:C18"
+    crystallized_via: artifact-commitment
+    stale: false

@@ -469,3 +469,34 @@
 - **Dependencies**: []
 - **Tags**: geometry, point cloud, LOP, WLOP, CPU reference, deterministic
 - **From staging**: O88
+
+## C18: Continuous LOP has a deterministic original-equation CPU reference
+- **Statement**: On the checked-in analytic screening fixtures and disjoint
+  built-in confirmation cohort, METHOD-017 fits a deterministic Gaussian
+  mixture and evaluates the original CLOP three-Gaussian-product attraction
+  with the shared finite repulsion contract, bounded component work, and
+  fail-closed invalid-input handling.
+- **Status**: supported — Clang 23 CPU correctness, serial ASan/UBSan geometry
+  groups, and independently accepted schema-v2 claim-grade confirmation
+  evidence; no hierarchical-EM equivalence, scanner-data generalization,
+  incomplete-gamma extension, runtime/UI, GPU, optimized-backend, or
+  performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The Gaussian-product equation oracle diverges;
+  identical seeded calls differ under repetition or concurrent callers;
+  finite supported fixtures produce non-finite output; invalid mixture bounds
+  publish positions; or the disjoint confirmation cohort exceeds
+  quality-error L2 `0.03` or loses its plane/sphere denoising, WLOP-parity,
+  component-work, uniformity, outlier, convergence, or failure-state gates.
+- **Proof**: [tasks/done/METHOD-017-continuous-lop-clop-reference-backend.md,
+  src/geometry/Geometry.PointCloud.Consolidation.cpp,
+  tests/unit/geometry/Test.PointCloudConsolidation.cpp,
+  benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml,
+  tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json,
+  tasks/evidence/METHOD-017/experiment/runs/run-001/bundle.yaml,
+  tasks/evidence/METHOD-017/experiment/runs/run-001/audit.json]
+- **Dependencies**: [C17]
+- **Tags**: geometry, point cloud, CLOP, Gaussian mixture, CPU reference,
+  deterministic
+- **From staging**: O89
