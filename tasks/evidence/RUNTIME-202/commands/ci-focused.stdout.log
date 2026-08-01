@@ -1,0 +1,401 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+        Start  568: ParameterizationOperations.ConfiguredPathReadsActiveEngineConfig
+  1/194 Test  #568: ParameterizationOperations.ConfiguredPathReadsActiveEngineConfig .................................   Passed    0.01 sec
+        Start  667: RuntimeConfigControl.AgentCliControlsRecipeAndEngineConfigWithoutUi
+  2/194 Test  #667: RuntimeConfigControl.AgentCliControlsRecipeAndEngineConfigWithoutUi ..............................   Passed    0.04 sec
+        Start  668: RuntimeConfigControl.BootOnlyEngineConfigDifferencesAreRejected
+  3/194 Test  #668: RuntimeConfigControl.BootOnlyEngineConfigDifferencesAreRejected ..................................   Passed    0.04 sec
+        Start  677: RuntimeEngineConfigBoot.CommandLineConfigOverridesReferenceDefaults
+  4/194 Test  #677: RuntimeEngineConfigBoot.CommandLineConfigOverridesReferenceDefaults ..............................   Passed    0.00 sec
+        Start  678: RuntimeEngineConfigBoot.MissingExplicitPathFallsBackToReferenceConfig
+  5/194 Test  #678: RuntimeEngineConfigBoot.MissingExplicitPathFallsBackToReferenceConfig ............................   Passed    0.00 sec
+        Start  679: RuntimeEngineConfigBoot.RegistryDefaultsAndFileSectionsFlowThroughBoot
+  6/194 Test  #679: RuntimeEngineConfigBoot.RegistryDefaultsAndFileSectionsFlowThroughBoot ...........................   Passed    0.00 sec
+        Start  696: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine
+  7/194 Test  #696: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine ......................   Passed    0.00 sec
+        Start  699: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface
+  8/194 Test  #699: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface ................................   Passed    0.00 sec
+        Start  877: SandboxEditorUi.EmptyContextProducesDeterministicDisabledDiagnostics
+  9/194 Test  #877: SandboxEditorUi.EmptyContextProducesDeterministicDisabledDiagnostics .............................   Passed    0.00 sec
+        Start  878: SandboxEditorUi.RenderGraphPanelModelCopiesRendererStats
+ 10/194 Test  #878: SandboxEditorUi.RenderGraphPanelModelCopiesRendererStats .........................................   Passed    0.00 sec
+        Start  879: SandboxEditorUi.GpuProfilingToggleUsesConfigPreviewApplyAndPreservesRejectedState
+ 11/194 Test  #879: SandboxEditorUi.GpuProfilingToggleUsesConfigPreviewApplyAndPreservesRejectedState ................   Passed    0.00 sec
+        Start  880: SandboxEditorUi.AssetImportQueueModelCopiesRowsProgressAndCommands
+ 12/194 Test  #880: SandboxEditorUi.AssetImportQueueModelCopiesRowsProgressAndCommands ...............................   Passed    0.00 sec
+        Start  881: SandboxEditorUi.DocumentModelReportsRuntimeHistoryDirtyState
+ 13/194 Test  #881: SandboxEditorUi.DocumentModelReportsRuntimeHistoryDirtyState .....................................   Passed    0.00 sec
+        Start  882: SandboxEditorUi.HierarchyInspectorModelReportsSelectionRenderHintsAndDomain
+ 14/194 Test  #882: SandboxEditorUi.HierarchyInspectorModelReportsSelectionRenderHintsAndDomain ......................   Passed    0.00 sec
+        Start  883: SandboxEditorUi.HiddenPanelBuildRequestSkipsSelectedEntityModels
+ 15/194 Test  #883: SandboxEditorUi.HiddenPanelBuildRequestSkipsSelectedEntityModels .................................   Passed    0.00 sec
+        Start  884: SandboxEditorUi.InspectorOnlyBuildRequestAvoidsSiblingPanelWork
+ 16/194 Test  #884: SandboxEditorUi.InspectorOnlyBuildRequestAvoidsSiblingPanelWork ..................................   Passed    0.00 sec
+        Start  885: SandboxEditorUi.DomainWindowBuildReportsTimingDiagnostics
+ 17/194 Test  #885: SandboxEditorUi.DomainWindowBuildReportsTimingDiagnostics ........................................   Passed    0.00 sec
+        Start  886: SandboxEditorUi.SelectedModelCacheReusesInspectorAnalysis
+ 18/194 Test  #886: SandboxEditorUi.SelectedModelCacheReusesInspectorAnalysis ........................................   Passed    0.00 sec
+        Start  887: SandboxEditorUi.SelectedModelCachePartitionsAnalysisByVisibleWindow
+ 19/194 Test  #887: SandboxEditorUi.SelectedModelCachePartitionsAnalysisByVisibleWindow ..............................   Passed    0.00 sec
+        Start  888: SandboxEditorUi.SelectedModelCacheInvalidatesOnSelectionGeneration
+ 20/194 Test  #888: SandboxEditorUi.SelectedModelCacheInvalidatesOnSelectionGeneration ...............................   Passed    0.00 sec
+        Start  889: SandboxEditorUi.SelectedModelCacheInvalidatesOnPrimitiveGeneration
+ 21/194 Test  #889: SandboxEditorUi.SelectedModelCacheInvalidatesOnPrimitiveGeneration ...............................   Passed    0.00 sec
+        Start  890: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryPresentationRecipeGeneration
+ 22/194 Test  #890: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryPresentationRecipeGeneration ..............   Passed    0.00 sec
+        Start  891: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryMetadataSignature
+ 23/194 Test  #891: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryMetadataSignature .........................   Passed    0.00 sec
+        Start  892: SandboxEditorUi.SelectedModelCacheInvalidatesOnRenderHintSignature
+ 24/194 Test  #892: SandboxEditorUi.SelectedModelCacheInvalidatesOnRenderHintSignature ...............................   Passed    0.00 sec
+        Start  893: SandboxEditorUi.SelectedModelCacheReusesVisualizationModel
+ 25/194 Test  #893: SandboxEditorUi.SelectedModelCacheReusesVisualizationModel .......................................   Passed    0.00 sec
+        Start  894: SandboxEditorUi.VisualizationModelCacheInvalidatesOnGeometryMetadataSignature
+ 26/194 Test  #894: SandboxEditorUi.VisualizationModelCacheInvalidatesOnGeometryMetadataSignature ....................   Passed    0.00 sec
+        Start  895: SandboxEditorUi.VisualizationModelCacheInvalidatesOnConfigSignature
+ 27/194 Test  #895: SandboxEditorUi.VisualizationModelCacheInvalidatesOnConfigSignature ..............................   Passed    0.00 sec
+        Start  896: SandboxEditorUi.VisualizationModelCacheInvalidatesOnLaneOverrideSignature
+ 28/194 Test  #896: SandboxEditorUi.VisualizationModelCacheInvalidatesOnLaneOverrideSignature ........................   Passed    0.00 sec
+        Start  897: SandboxEditorUi.VisualizationModelCacheInvalidatesOnRecipeRevision
+ 29/194 Test  #897: SandboxEditorUi.VisualizationModelCacheInvalidatesOnRecipeRevision ...............................   Passed    0.00 sec
+        Start  898: SandboxEditorUi.GeometryProcessingSupportedDomainsMatchPromotedEditorContract
+ 30/194 Test  #898: SandboxEditorUi.GeometryProcessingSupportedDomainsMatchPromotedEditorContract ....................   Passed    0.00 sec
+        Start  899: SandboxEditorUi.GeometrySourcesReportProcessingCapabilitiesAndStableEntries
+ 31/194 Test  #899: SandboxEditorUi.GeometrySourcesReportProcessingCapabilitiesAndStableEntries ......................   Passed    0.00 sec
+        Start  900: SandboxEditorUi.VisualizationModelEnumeratesPromotedGeometryProperties
+ 32/194 Test  #900: SandboxEditorUi.VisualizationModelEnumeratesPromotedGeometryProperties ...........................   Passed    0.00 sec
+        Start  901: SandboxEditorUi.PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection
+ 33/194 Test  #901: SandboxEditorUi.PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection ........................   Passed    0.00 sec
+        Start  902: SandboxEditorUi.PropertyCatalogReportsGraphAndPointCloudDomains
+ 34/194 Test  #902: SandboxEditorUi.PropertyCatalogReportsGraphAndPointCloudDomains ..................................   Passed    0.00 sec
+        Start  903: SandboxEditorUi.VisualizationPresetPreservesConfiguredScalarStyling
+ 35/194 Test  #903: SandboxEditorUi.VisualizationPresetPreservesConfiguredScalarStyling ..............................   Passed    0.00 sec
+        Start  904: SandboxEditorUi.DomainWindowModelsReportSelectedMeshGraphAndPointCloudState
+ 36/194 Test  #904: SandboxEditorUi.DomainWindowModelsReportSelectedMeshGraphAndPointCloudState ......................   Passed    0.00 sec
+        Start  905: SandboxEditorUi.DomainVisualizationTargetsFollowLaneSourcePresence
+ 37/194 Test  #905: SandboxEditorUi.DomainVisualizationTargetsFollowLaneSourcePresence ...............................   Passed    0.00 sec
+        Start  906: SandboxEditorUi.DomainWindowModelsReportNoSelectionStaleAndWrongDomain
+ 38/194 Test  #906: SandboxEditorUi.DomainWindowModelsReportNoSelectionStaleAndWrongDomain ...........................   Passed    0.00 sec
+        Start  907: SandboxEditorUi.SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds
+ 39/194 Test  #907: SandboxEditorUi.SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds .........................   Passed    0.01 sec
+        Start  908: SandboxEditorUi.GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
+ 40/194 Test  #908: SandboxEditorUi.GeometryPresentationInspectorReportsSlotsPropertiesAndJobs .......................   Passed    0.01 sec
+        Start  909: SandboxEditorUi.GeometryPresentationInspectorInfersGraphPointCloudAndComposition
+ 41/194 Test  #909: SandboxEditorUi.GeometryPresentationInspectorInfersGraphPointCloudAndComposition .................   Passed    0.01 sec
+        Start  910: SandboxEditorUi.GeometryPresentationCompositionReportsCorruptHierarchyWithoutPartialSummary
+ 42/194 Test  #910: SandboxEditorUi.GeometryPresentationCompositionReportsCorruptHierarchyWithoutPartialSummary ......   Passed    0.01 sec
+        Start  911: SandboxEditorUi.RenderRecipeEditorModelListsDeclaredRecipeControls
+ 43/194 Test  #911: SandboxEditorUi.RenderRecipeEditorModelListsDeclaredRecipeControls ...............................   Passed    0.01 sec
+        Start  912: SandboxEditorUi.FileImportPrerequisitesAreDeterministic
+ 44/194 Test  #912: SandboxEditorUi.FileImportPrerequisitesAreDeterministic ..........................................   Passed    0.01 sec
+        Start  913: SandboxEditorUi.FileImportDispatchRejectsInvalidPrerequisitesBeforeCallback
+ 45/194 Test  #913: SandboxEditorUi.FileImportDispatchRejectsInvalidPrerequisitesBeforeCallback ......................   Passed    0.01 sec
+        Start  914: SandboxEditorUi.FileImportCommandRoutesThroughRuntimeOwnedSurface
+ 46/194 Test  #914: SandboxEditorUi.FileImportCommandRoutesThroughRuntimeOwnedSurface ................................   Passed    0.01 sec
+        Start  915: SandboxEditorUi.FileImportCommandTreatsAsyncPendingAsNonFailure
+ 47/194 Test  #915: SandboxEditorUi.FileImportCommandTreatsAsyncPendingAsNonFailure ..................................   Passed    0.01 sec
+        Start  916: SandboxEditorUi.SceneFileCommandRoutesThroughRuntimeOwnedSurface
+ 48/194 Test  #916: SandboxEditorUi.SceneFileCommandRoutesThroughRuntimeOwnedSurface .................................   Passed    0.01 sec
+        Start  917: SandboxEditorUi.SceneLoadCommandTreatsAsyncPendingAsNonFailure
+ 49/194 Test  #917: SandboxEditorUi.SceneLoadCommandTreatsAsyncPendingAsNonFailure ...................................   Passed    0.01 sec
+        Start  918: SandboxEditorUi.SceneSaveCommandTreatsAsyncPendingAsNonFailure
+ 50/194 Test  #918: SandboxEditorUi.SceneSaveCommandTreatsAsyncPendingAsNonFailure ...................................   Passed    0.01 sec
+        Start  919: SandboxEditorUi.AssetWorkflowReportsMissingFile
+ 51/194 Test  #919: SandboxEditorUi.AssetWorkflowReportsMissingFile ..................................................   Passed    0.05 sec
+        Start  920: SandboxEditorUi.AssetWorkflowMaterializesStandaloneGeometryDomains
+ 52/194 Test  #920: SandboxEditorUi.AssetWorkflowMaterializesStandaloneGeometryDomains ...............................   Passed    0.04 sec
+        Start  921: SandboxEditorUi.AssetWorkflowMaterializesNonManifoldObjAsRenderableMesh
+ 53/194 Test  #921: SandboxEditorUi.AssetWorkflowMaterializesNonManifoldObjAsRenderableMesh ..........................   Passed    0.05 sec
+        Start  922: SandboxEditorUi.AssetWorkflowMaterializesObjWithoutAuthoredTexcoordsAsRenderableMesh
+ 54/194 Test  #922: SandboxEditorUi.AssetWorkflowMaterializesObjWithoutAuthoredTexcoordsAsRenderableMesh .............   Passed    0.04 sec
+        Start  923: SandboxEditorUi.QueuedManualGeometryImportsRemainResponsiveAndApplyOnce
+ 55/194 Test  #923: SandboxEditorUi.QueuedManualGeometryImportsRemainResponsiveAndApplyOnce ..........................   Passed    0.11 sec
+        Start  924: SandboxEditorUi.QueuedManualGeometryCancellationPreventsApply
+ 56/194 Test  #924: SandboxEditorUi.QueuedManualGeometryCancellationPreventsApply ....................................   Passed    0.07 sec
+        Start  925: SandboxEditorUi.ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown
+ 57/194 Test  #925: SandboxEditorUi.ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown ........................   Passed    0.08 sec
+        Start  926: SandboxEditorUi.QueuedManualGeometryDecodeFailureIsFailClosed
+ 58/194 Test  #926: SandboxEditorUi.QueuedManualGeometryDecodeFailureIsFailClosed ....................................   Passed    0.04 sec
+        Start  927: SandboxEditorUi.DuplicateDroppedGeometryImportUsesSingleIngestRecord
+ 59/194 Test  #927: SandboxEditorUi.DuplicateDroppedGeometryImportUsesSingleIngestRecord .............................   Passed    0.07 sec
+        Start  928: SandboxEditorUi.DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
+ 60/194 Test  #928: SandboxEditorUi.DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted .......................   Passed    0.07 sec
+        Start  929: SandboxEditorUi.DroppedGeometryQueueCancellationPreventsMainThreadApply
+ 61/194 Test  #929: SandboxEditorUi.DroppedGeometryQueueCancellationPreventsMainThreadApply ..........................   Passed    0.04 sec
+        Start  930: SandboxEditorUi.DroppedGeometryAssetReimportWaitReportsDeadlineAndCancellationPhase
+ 62/194 Test  #930: SandboxEditorUi.DroppedGeometryAssetReimportWaitReportsDeadlineAndCancellationPhase ..............   Passed    0.30 sec
+        Start  931: SandboxEditorUi.DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity
+ 63/194 Test  #931: SandboxEditorUi.DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity ...............   Passed    0.28 sec
+        Start  932: SandboxEditorUi.PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderComponents
+ 64/194 Test  #932: SandboxEditorUi.PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderComponents ...............   Passed    0.05 sec
+        Start  933: SandboxEditorUi.PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProcess
+ 65/194 Test  #933: SandboxEditorUi.PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProcess ....................   Passed    0.04 sec
+        Start  934: SandboxEditorUi.DroppedFileImportFailureLogsDiagnostics
+ 66/194 Test  #934: SandboxEditorUi.DroppedFileImportFailureLogsDiagnostics ..........................................   Passed    0.04 sec
+        Start  935: SandboxEditorUi.PlatformDropEventImportsOffMesh
+ 67/194 Test  #935: SandboxEditorUi.PlatformDropEventImportsOffMesh ..................................................   Passed    0.05 sec
+        Start  936: SandboxEditorUi.ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic
+ 68/194 Test  #936: SandboxEditorUi.ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic ............................   Passed    0.01 sec
+        Start  937: SandboxEditorUi.PlatformCloseEventStopsEngineRunState
+ 69/194 Test  #937: SandboxEditorUi.PlatformCloseEventStopsEngineRunState ............................................   Passed    0.04 sec
+        Start  938: SandboxEditorUi.RenderRecipeEditorDraftValidationPreviewActivationAndCancel
+ 70/194 Test  #938: SandboxEditorUi.RenderRecipeEditorDraftValidationPreviewActivationAndCancel ......................   Passed    0.00 sec
+        Start  939: SandboxEditorUi.RenderRecipeEditorUnchangedDraftIsNoOp
+ 71/194 Test  #939: SandboxEditorUi.RenderRecipeEditorUnchangedDraftIsNoOp ...........................................   Passed    0.00 sec
+        Start  940: SandboxEditorUi.RenderRecipeEditorArtifactPublishAndApplyUseRegistry
+ 72/194 Test  #940: SandboxEditorUi.RenderRecipeEditorArtifactPublishAndApplyUseRegistry .............................   Passed    0.00 sec
+        Start  941: SandboxEditorUi.ProgressivePoissonCommandPublishesPointPropertiesAndVisualization
+ 73/194 Test  #941: SandboxEditorUi.ProgressivePoissonCommandPublishesPointPropertiesAndVisualization ................   Passed    0.01 sec
+        Start  942: SandboxEditorUi.ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState
+ 74/194 Test  #942: SandboxEditorUi.ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState ...........   Passed    0.00 sec
+        Start  943: SandboxEditorUi.ProgressivePoissonVulkanRequestFallsBackToCpuReference
+ 75/194 Test  #943: SandboxEditorUi.ProgressivePoissonVulkanRequestFallsBackToCpuReference ...........................   Passed    0.01 sec
+        Start  944: SandboxEditorUi.ProgressivePoissonCommandMatchesDirectMethodConfig
+ 76/194 Test  #944: SandboxEditorUi.ProgressivePoissonCommandMatchesDirectMethodConfig ...............................   Passed    0.00 sec
+        Start  945: SandboxEditorUi.ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply
+ 77/194 Test  #945: SandboxEditorUi.ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply ..................   Passed    0.02 sec
+        Start  946: SandboxEditorUi.ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply
+ 78/194 Test  #946: SandboxEditorUi.ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply ................   Passed    0.01 sec
+        Start  947: SandboxEditorUi.ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply
+ 79/194 Test  #947: SandboxEditorUi.ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply ..............   Passed    0.01 sec
+        Start  948: SandboxEditorUi.ProgressivePoissonConfigCommandRoutesThroughConfigControl
+ 80/194 Test  #948: SandboxEditorUi.ProgressivePoissonConfigCommandRoutesThroughConfigControl ........................   Passed    0.01 sec
+        Start  949: SandboxEditorUi.ClusteringSectionValidationKeepsPerFieldReferenceFallback
+ 81/194 Test  #949: SandboxEditorUi.ClusteringSectionValidationKeepsPerFieldReferenceFallback ........................   Passed    0.00 sec
+        Start  950: SandboxEditorUi.ProgressivePoissonSectionValidationKeepsPerFieldReferenceFallback
+ 82/194 Test  #950: SandboxEditorUi.ProgressivePoissonSectionValidationKeepsPerFieldReferenceFallback ................   Passed    0.00 sec
+        Start  951: SandboxEditorUi.ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud
+ 83/194 Test  #951: SandboxEditorUi.ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud ..........................   Passed    0.01 sec
+        Start  952: SandboxEditorUi.ProgressivePoissonMeshConversionHistoryRestoresDomainAndPresentation
+ 84/194 Test  #952: SandboxEditorUi.ProgressivePoissonMeshConversionHistoryRestoresDomainAndPresentation .............   Passed    0.01 sec
+        Start  953: SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo
+ 85/194 Test  #953: SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo .....................   Passed    0.01 sec
+        Start  954: SandboxEditorUi.RegistrationRequestQueuesDerivedJobAndPublishesOnApply
+ 86/194 Test  #954: SandboxEditorUi.RegistrationRequestQueuesDerivedJobAndPublishesOnApply ...........................   Passed    0.02 sec
+        Start  955: SandboxEditorUi.RegistrationDerivedJobDiscardsStaleSourceBeforeApply
+ 87/194 Test  #955: SandboxEditorUi.RegistrationDerivedJobDiscardsStaleSourceBeforeApply .............................   Passed    0.02 sec
+        Start  956: SandboxEditorUi.RegistrationCommandFailsClosedForInvalidSelectionAndParameters
+ 88/194 Test  #956: SandboxEditorUi.RegistrationCommandFailsClosedForInvalidSelectionAndParameters ...................   Passed    0.00 sec
+        Start  957: SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms
+ 89/194 Test  #957: SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms ..................................   Passed    0.00 sec
+        Start  958: SandboxEditorUi.MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo
+ 90/194 Test  #958: SandboxEditorUi.MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo ..........................   Passed    0.01 sec
+        Start  959: SandboxEditorUi.MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply
+ 91/194 Test  #959: SandboxEditorUi.MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply ............................   Passed    0.02 sec
+        Start  960: SandboxEditorUi.MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply
+ 92/194 Test  #960: SandboxEditorUi.MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply ................................   Passed    0.02 sec
+        Start  961: SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo
+ 93/194 Test  #961: SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo ...............   Passed    0.00 sec
+        Start  962: SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply
+ 94/194 Test  #962: SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply ...............   Passed    0.02 sec
+        Start  963: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource
+ 95/194 Test  #963: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource ............................   Passed    0.02 sec
+        Start  964: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty
+ 96/194 Test  #964: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty ..........................   Passed    0.02 sec
+        Start  965: SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed
+ 97/194 Test  #965: SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed ............................   Passed    0.01 sec
+        Start  966: SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties
+ 98/194 Test  #966: SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties ........................   Passed    0.00 sec
+        Start  967: SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots
+ 99/194 Test  #967: SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots .....................................   Passed    0.00 sec
+        Start  968: SandboxEditorUi.MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+100/194 Test  #968: SandboxEditorUi.MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel ...............   Passed    0.00 sec
+        Start  969: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo
+101/194 Test  #969: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo ..............   Passed    0.00 sec
+        Start  970: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply
+102/194 Test  #970: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply ..........................   Passed    0.01 sec
+        Start  971: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply
+103/194 Test  #971: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply ........................   Passed    0.02 sec
+        Start  972: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable
+104/194 Test  #972: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable ...............   Passed    0.00 sec
+        Start  973: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts
+105/194 Test  #973: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts .....................   Passed    0.00 sec
+        Start  974: SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo
+106/194 Test  #974: SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo .............................   Passed    0.01 sec
+        Start  975: SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply
+107/194 Test  #975: SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply .............................   Passed    0.02 sec
+        Start  976: SandboxEditorUi.MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo
+108/194 Test  #976: SandboxEditorUi.MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo ...........   Passed    0.01 sec
+        Start  977: SandboxEditorUi.MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply
+109/194 Test  #977: SandboxEditorUi.MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply ..........................   Passed    0.01 sec
+        Start  978: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply
+110/194 Test  #978: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply ..............................   Passed    0.02 sec
+        Start  979: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply
+111/194 Test  #979: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply ..........................   Passed    0.01 sec
+        Start  980: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo
+112/194 Test  #980: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo ...........................   Passed    0.01 sec
+        Start  981: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply
+113/194 Test  #981: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply ...........................   Passed    0.02 sec
+        Start  982: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+114/194 Test  #982: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel ..............   Passed    0.00 sec
+        Start  983: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent
+115/194 Test  #983: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent .................................   Passed    0.01 sec
+        Start  984: SandboxEditorUi.MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels
+116/194 Test  #984: SandboxEditorUi.MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels ...   Passed    0.00 sec
+        Start  985: SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings
+117/194 Test  #985: SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings ................   Passed    0.00 sec
+        Start  986: SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply
+118/194 Test  #986: SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply ......................   Passed    0.01 sec
+        Start  987: SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply
+119/194 Test  #987: SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply .........   Passed    0.01 sec
+        Start  988: SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply
+120/194 Test  #988: SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply ...........................   Passed    0.03 sec
+        Start  989: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit
+121/194 Test  #989: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit .........................   Passed    0.04 sec
+        Start  990: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties
+122/194 Test  #990: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties .........................   Passed    0.04 sec
+        Start  991: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterBindingChange
+123/194 Test  #991: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterBindingChange ........................   Passed    0.04 sec
+        Start  992: SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions
+124/194 Test  #992: SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions ............................   Passed    0.04 sec
+        Start  993: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterWorldSwitch
+125/194 Test  #993: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterWorldSwitch ..........................   Passed    0.04 sec
+        Start  994: SandboxEditorUi.DirectMeshPostProcessWorldDestructionIsLifetimeSafe
+126/194 Test  #994: SandboxEditorUi.DirectMeshPostProcessWorldDestructionIsLifetimeSafe ..............................   Passed    0.04 sec
+        Start  995: SandboxEditorUi.DirectMeshPostProcessRejectsRecycledEntityTarget
+127/194 Test  #995: SandboxEditorUi.DirectMeshPostProcessRejectsRecycledEntityTarget .................................   Passed    0.04 sec
+        Start  996: SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets
+128/194 Test  #996: SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets .............................   Passed    0.00 sec
+        Start  997: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals
+129/194 Test  #997: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals ...................   Passed    0.00 sec
+        Start  998: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets
+130/194 Test  #998: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets ...............   Passed    0.00 sec
+        Start  999: SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords
+131/194 Test  #999: SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords ................................   Passed    0.00 sec
+        Start 1000: SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply
+132/194 Test #1000: SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply .........................   Passed    0.01 sec
+        Start 1001: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+133/194 Test #1001: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...............................   Passed    0.02 sec
+        Start 1002: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource
+134/194 Test #1002: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource ......................................   Passed    0.01 sec
+        Start 1003: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty
+135/194 Test #1003: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty ............................   Passed    0.01 sec
+        Start 1004: SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache
+136/194 Test #1004: SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache ........................   Passed    0.01 sec
+        Start 1005: SandboxEditorUi.TextureBakeControlsReportUvSourcesAndRequireRuntimeModule
+137/194 Test #1005: SandboxEditorUi.TextureBakeControlsReportUvSourcesAndRequireRuntimeModule ........................   Passed    0.00 sec
+        Start 1006: SandboxEditorUi.AttachedEngineContextWiresTextureBakeModule
+138/194 Test #1006: SandboxEditorUi.AttachedEngineContextWiresTextureBakeModule ......................................   Passed    0.04 sec
+        Start 1007: SandboxEditorUi.TextureBakeOperationDoesNotBypassUnavailableRuntimeModule
+139/194 Test #1007: SandboxEditorUi.TextureBakeOperationDoesNotBypassUnavailableRuntimeModule ........................   Passed    0.00 sec
+        Start 1008: SandboxEditorUi.UnavailableTextureBakeModuleHasNoCpuFallback
+140/194 Test #1008: SandboxEditorUi.UnavailableTextureBakeModuleHasNoCpuFallback .....................................   Passed    0.00 sec
+        Start 1009: SandboxEditorUi.TextureBakeModuleAvailabilityPrecedesAssetCreation
+141/194 Test #1009: SandboxEditorUi.TextureBakeModuleAvailabilityPrecedesAssetCreation ...............................   Passed    0.00 sec
+        Start 1010: SandboxEditorUi.TextureBakeRequiresOperationalGpuBackend
+142/194 Test #1010: SandboxEditorUi.TextureBakeRequiresOperationalGpuBackend .........................................   Passed    0.00 sec
+        Start 1011: SandboxEditorUi.VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud
+143/194 Test #1011: SandboxEditorUi.VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud ...............   Passed    0.00 sec
+        Start 1012: SandboxEditorUi.VertexChannelBindingCommandBindsColorAndDisablesCleanly
+144/194 Test #1012: SandboxEditorUi.VertexChannelBindingCommandBindsColorAndDisablesCleanly ..........................   Passed    0.00 sec
+        Start 1013: SandboxEditorUi.VertexChannelBindingHistoryRestoresExactlyAndRejectsInterveningState
+145/194 Test #1013: SandboxEditorUi.VertexChannelBindingHistoryRestoresExactlyAndRejectsInterveningState .............   Passed    0.00 sec
+        Start 1014: SandboxEditorUi.VisualizationPropertyPresetCommandRoutesThroughConfig
+146/194 Test #1014: SandboxEditorUi.VisualizationPropertyPresetCommandRoutesThroughConfig ............................   Passed    0.00 sec
+        Start 1015: SandboxEditorUi.RenderHintCommandEditsDomainComponentsAndHistory
+147/194 Test #1015: SandboxEditorUi.RenderHintCommandEditsDomainComponentsAndHistory .................................   Passed    0.00 sec
+        Start 1016: SandboxEditorUi.RenderHintCommandRepackagesGraphLaneResidency
+148/194 Test #1016: SandboxEditorUi.RenderHintCommandRepackagesGraphLaneResidency ....................................   Passed    0.04 sec
+        Start 1017: SandboxEditorUi.SelectEntityCommandRoutesThroughSelectionController
+149/194 Test #1017: SandboxEditorUi.SelectEntityCommandRoutesThroughSelectionController ..............................   Passed    0.00 sec
+        Start 1018: SandboxEditorUi.TransformEditCommandMutatesLocalTransformAndMarksDirty
+150/194 Test #1018: SandboxEditorUi.TransformEditCommandMutatesLocalTransformAndMarksDirty ...........................   Passed    0.00 sec
+        Start 1019: SandboxEditorUi.TransformEditHistoryRejectsInterveningStateAndRestoresExactly
+151/194 Test #1019: SandboxEditorUi.TransformEditHistoryRejectsInterveningStateAndRestoresExactly ....................   Passed    0.00 sec
+        Start 1020: SandboxEditorUi.CameraControllerCommandReplacesMainController
+152/194 Test #1020: SandboxEditorUi.CameraControllerCommandReplacesMainController ....................................   Passed    0.00 sec
+        Start 1021: SandboxEditorUi.PrimitiveViewCommandTranslatesToRenderHintComponents
+153/194 Test #1021: SandboxEditorUi.PrimitiveViewCommandTranslatesToRenderHintComponents .............................   Passed    0.00 sec
+        Start 1022: SandboxEditorUi.PrimitiveViewHistoryRejectsInterveningRenderHints
+154/194 Test #1022: SandboxEditorUi.PrimitiveViewHistoryRejectsInterveningRenderHints ................................   Passed    0.00 sec
+        Start 1023: SandboxEditorUi.VisualizationConfigCommandRoutesThroughSelectedEntity
+155/194 Test #1023: SandboxEditorUi.VisualizationConfigCommandRoutesThroughSelectedEntity ............................   Passed    0.00 sec
+        Start 1024: SandboxEditorUi.VisualizationConfigCommandTargetsPointLaneOverride
+156/194 Test #1024: SandboxEditorUi.VisualizationConfigCommandTargetsPointLaneOverride ...............................   Passed    0.00 sec
+        Start 1025: SandboxEditorUi.VisualizationConfigHistoryRejectsInterveningStateAndRestoresExactly
+157/194 Test #1025: SandboxEditorUi.VisualizationConfigHistoryRejectsInterveningStateAndRestoresExactly ..............   Passed    0.00 sec
+        Start 1026: SandboxEditorUi.VisualizationRecipeCommandRoutesThroughRuntimeSurface
+158/194 Test #1026: SandboxEditorUi.VisualizationRecipeCommandRoutesThroughRuntimeSurface ............................   Passed    0.00 sec
+        Start 1027: SandboxEditorUi.GeometryPresentationSlotCommandsUseCommandHistory
+159/194 Test #1027: SandboxEditorUi.GeometryPresentationSlotCommandsUseCommandHistory ................................   Passed    0.00 sec
+        Start 1028: SandboxEditorUi.GeometryPresentationHistoryRejectsInterveningGenerationWithoutMutation
+160/194 Test #1028: SandboxEditorUi.GeometryPresentationHistoryRejectsInterveningGenerationWithoutMutation ...........   Passed    0.00 sec
+        Start 1029: SandboxEditorSession.UnattachedPrepareFrameFailsClosed
+161/194 Test #1029: SandboxEditorSession.UnattachedPrepareFrameFailsClosed ...........................................   Passed    0.00 sec
+        Start 1030: SandboxEditorSession.AttachPrepareDetachBoundsPreparedFrameLifetime
+162/194 Test #1030: SandboxEditorSession.AttachPrepareDetachBoundsPreparedFrameLifetime ..............................   Passed    0.04 sec
+        Start 1031: SandboxEditorSession.StaleCopiedCommandSurfacesFailAfterDetachAndReattach
+163/194 Test #1031: SandboxEditorSession.StaleCopiedCommandSurfacesFailAfterDetachAndReattach ........................   Passed    0.04 sec
+        Start 1032: SandboxEditorSession.ReattachObservesEqualSequenceFromDifferentEngine
+164/194 Test #1032: SandboxEditorSession.ReattachObservesEqualSequenceFromDifferentEngine ............................   Passed    0.07 sec
+        Start 1177: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+165/194 Test #1177: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ................................   Passed    0.04 sec
+        Start 1178: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+166/194 Test #1178: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ....................   Passed    0.04 sec
+        Start 1179: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+167/194 Test #1179: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication ..................   Passed    0.00 sec
+        Start 1180: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+168/194 Test #1180: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ...............   Passed    0.00 sec
+        Start 1181: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+169/194 Test #1181: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ....................................   Passed    0.02 sec
+        Start 1182: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+170/194 Test #1182: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell ..................   Passed    0.11 sec
+        Start 1183: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+171/194 Test #1183: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus .....................   Passed    0.00 sec
+        Start 1184: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+172/194 Test #1184: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame .........................   Passed    0.04 sec
+        Start 1185: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+173/194 Test #1185: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ...............   Passed    0.23 sec
+        Start 1186: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+174/194 Test #1186: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls ........   Passed    0.01 sec
+        Start 1187: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+175/194 Test #1187: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel ............................   Passed    0.04 sec
+        Start 1188: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+176/194 Test #1188: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ................................   Passed    0.04 sec
+        Start 1189: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+177/194 Test #1189: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy .......................   Passed    0.08 sec
+        Start 1190: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+178/194 Test #1190: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ................................   Passed    0.04 sec
+        Start 1191: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+179/194 Test #1191: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ...................   Passed    0.01 sec
+        Start 1192: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+180/194 Test #1192: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry .....................   Passed    0.04 sec
+        Start 1193: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+181/194 Test #1193: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext .......................   Passed    0.04 sec
+        Start 1194: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+182/194 Test #1194: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath .....................   Passed    0.04 sec
+        Start 1195: SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow
+183/194 Test #1195: SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow ............................   Passed    0.05 sec
+        Start 2992: CoreEngineConfigSections.UpsertKeepsNameOrderAndReplacesByName
+184/194 Test #2992: CoreEngineConfigSections.UpsertKeepsNameOrderAndReplacesByName ...................................   Passed    0.00 sec
+        Start 2993: CoreEngineConfigSections.RegistryValidatesDefaultsAndKeepsNameOrder
+185/194 Test #2993: CoreEngineConfigSections.RegistryValidatesDefaultsAndKeepsNameOrder ..............................   Passed    0.00 sec
+        Start 2994: CoreEngineConfigSections.PopulateDefaultsPreservesExplicitValues
+186/194 Test #2994: CoreEngineConfigSections.PopulateDefaultsPreservesExplicitValues .................................   Passed    0.00 sec
+        Start 2995: CoreEngineConfigLoad.CoreAndRegisteredSectionRoundTrip
+187/194 Test #2995: CoreEngineConfigLoad.CoreAndRegisteredSectionRoundTrip ...........................................   Passed    0.00 sec
+        Start 2996: CoreEngineConfigLoad.GpuProfilingDefaultsFalseWhenOmitted
+188/194 Test #2996: CoreEngineConfigLoad.GpuProfilingDefaultsFalseWhenOmitted ........................................   Passed    0.00 sec
+        Start 2997: CoreEngineConfigLoad.UnknownSectionFallsBackWithOrWithoutRegistry
+189/194 Test #2997: CoreEngineConfigLoad.UnknownSectionFallsBackWithOrWithoutRegistry ................................   Passed    0.00 sec
+        Start 2998: CoreEngineConfigLoad.DuplicateSectionNamesRetainReference
+190/194 Test #2998: CoreEngineConfigLoad.DuplicateSectionNamesRetainReference ........................................   Passed    0.00 sec
+        Start 2999: CoreEngineConfigLoad.SectionMetadataMismatchRetainsReference
+191/194 Test #2999: CoreEngineConfigLoad.SectionMetadataMismatchRetainsReference .....................................   Passed    0.00 sec
+        Start 3000: CoreEngineConfigLoad.ValidatorFallbackCanonicalIsAcceptedAndMalformedOutputRetainsReference
+192/194 Test #3000: CoreEngineConfigLoad.ValidatorFallbackCanonicalIsAcceptedAndMalformedOutputRetainsReference ......   Passed    0.00 sec
+        Start 3001: CoreEngineConfigLoad.MalformedStoredPayloadSerializesFailClosed
+193/194 Test #3001: CoreEngineConfigLoad.MalformedStoredPayloadSerializesFailClosed ..................................   Passed    0.00 sec
+        Start 3002: CoreEngineConfigLoad.InvalidCoreFieldsRetainReferenceWithDiagnostics
+194/194 Test #3002: CoreEngineConfigLoad.InvalidCoreFieldsRetainReferenceWithDiagnostics .............................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 194
+
+Label Time Summary:
+contract       =   3.02 sec*proc (164 tests)
+core           =   0.02 sec*proc (11 tests)
+integration    =   0.88 sec*proc (19 tests)
+runtime        =   3.91 sec*proc (183 tests)
+unit           =   0.02 sec*proc (11 tests)
+
+Total Test time (real) =   4.10 sec
