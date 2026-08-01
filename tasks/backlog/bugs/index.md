@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-126` — Claim custody validates historical source seals against the current worktree](../../active/BUG-126-claim-custody-historical-source-seals.md):
+  global custody validation hashes METHOD-016's exact-revision datasets and
+  implementation against METHOD-017's later current-tree extensions. Validate
+  clean claim-eligible inputs at their sealed revision while keeping post-run
+  evidence artifacts current-only and fail-closed.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
