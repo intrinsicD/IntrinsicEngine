@@ -155,7 +155,7 @@ family*, not a universal DAG engine.
 | Data-driven **param schema** (key/type/default/label/range) | **geometry-local** initially; promote to `core` on a second consumer | new `Geometry.Registration` descriptor types |
 | GPU-capable overloads + `IDevice::IsOperational()` fallback | **runtime** | `Runtime.RegistrationBackend`; a feature-owned typed service with private backend state should follow the `ClusteringModule` pattern when registration gains a durable runtime owner |
 | Heavy/async execution (large clouds, coarse RANSAC, BVH builds) | **runtime** | `Runtime.JobService` (do not invent another graph system) |
-| Runtime geometry snapshot + typed operation | **runtime** | `Extrinsic.Runtime.GeometryProcessingOperations`; attachment/snapshot lifetime comes from `Extrinsic.Runtime.EditorWorkspaceSnapshots` |
+| Runtime geometry snapshot + typed operation | **runtime** | `Extrinsic.Runtime.GeometryProcessingOperations`; attachment lifetime comes from `Extrinsic.Runtime.EditorWorkspaceAttachment`, while copied workspace snapshots/queries come from `Extrinsic.Runtime.EditorWorkspaceSnapshots` |
 | UI (thin schema-reflecting adapter) | **app** | `Extrinsic.Sandbox.Editor.MeshProcessingPanels`, registered through `Extrinsic.Sandbox.Editor.Shell` |
 | Serializable pipeline config (files/CLI/agent lane) | **runtime** | route through the `Engine` preview→apply facade with `RuntimeConfigControlSource` |
 | Named papers (TEASER, FGR, CPD, non-rigid) | **methods** | `methods/geometry/…` + `method.yaml`, under the method contract |

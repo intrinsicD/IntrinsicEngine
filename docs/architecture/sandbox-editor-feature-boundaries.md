@@ -40,7 +40,8 @@ facade.
 
 | Area | Current owner |
 |---|---|
-| Workspace attachment and copied snapshots | `Extrinsic.Runtime.EditorWorkspaceSnapshots` |
+| Workspace attachment lifecycle | `Extrinsic.Runtime.EditorWorkspaceAttachment` |
+| Copied workspace snapshots and queries | `Extrinsic.Runtime.EditorWorkspaceSnapshots` |
 | Job identity/progress projection | `Extrinsic.Runtime.EditorJobProjection` |
 | Selection, import, scene-file, transform, camera, primitive-view operations | `Extrinsic.Runtime.SceneEditingOperations` |
 | Geometry methods, texture/UV, clustering, registration, parameterization | `Extrinsic.Runtime.GeometryProcessingOperations` |

@@ -1,14 +1,14 @@
 schema_version: 1
 task_id: RUNTIME-202
 workflow_profile: high-risk
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T05:22:03Z'
+generated_at: '2026-08-01T05:40:25Z'
 claim_eligible: false
 source:
   base_ref: af381c0e
   base_revision: af381c0e1043ea2a0c31e9e4017aa1bdea513ca4
-  head_revision: d09d689365a342bc1210d352fc721faa5200a430
+  head_revision: 5ae75fdbed5fd7971b32520e0c898e3cff9e03ee
   branch: codex/runtime-202-retire-sandbox-facade
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
@@ -16,9 +16,9 @@ source:
   - path: ara/logic/claims.md
     sha256: b1dbefc118253a5a91c7a7564d1ac508920e5bb68cddd2187d59b3f9f65d0474
   - path: ara/logic/solution/architecture.md
-    sha256: 2105375a41240343a381076f744149d5dd5adc516bef64ce807caf9fe1c54045
+    sha256: feed6d2833e8d0ed05627085f4da8de893fe9ca76008f93b9b34581e124e548a
   - path: ara/logic/solution/constraints.md
-    sha256: ebb39083e60b6aa9aabebbd95ba4e0349862b09c5e3592e2c04fee8d7d5b2c16
+    sha256: 5604b972217625ea02a8ba650402f354f670cced7ce9cbc4b3279dea0c42a6e7
   - path: ara/logic/solution/heuristics.md
     sha256: 0760f5dc8568bf969e97cfd5bcb35a2cdac79865ab3a194a59977daf923907d8
   - path: ara/staging/observations.yaml
@@ -44,11 +44,11 @@ source:
   - path: docs/architecture/index.md
     sha256: 7f15d83d07b76cfc700d7ebc1ff3019db8e1c5e23a356ea21db248119eead750
   - path: docs/architecture/runtime-config-control.md
-    sha256: cd9791b3deec05afa502a9c6f731ce2f0538a8a0deacfc5f02c4fab5bef746e5
+    sha256: d26ef46638aad0612d16c50eb90cc7b52e97662c0516e5f464efc0bbe9fce53c
   - path: docs/architecture/runtime.md
     sha256: fd0739a726de62ab6e48943f4149d9a002d72600c6198ab9072fb7aec7ab7439
   - path: docs/architecture/sandbox-editor-feature-boundaries.md
-    sha256: eee8190654454fdab0b8c8992af787ac499c388a06a91946b97e97b69ba78ea4
+    sha256: 8f00fe4f5a28ddaccc13b79bc301beaf2ee3e392cd3d28db707b7cb06689c8c5
   - path: docs/benchmarking/ci-policy.md
     sha256: 23f49bedb8a9b65e954e3836513c0f7c8f49f68ffea405dabafa730441e625c4
   - path: docs/migration/nonlegacy-parity-matrix.md
@@ -88,7 +88,7 @@ source:
   - path: src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm
     sha256: 3e4b09b7086ac95dd9507a71994010ac77cd64737c537220c0956492ecd02c5a
   - path: src/runtime/README.md
-    sha256: c751e08c4a79cc2eced48d21d7a22a40c4cdff3ecf062c34053b92b344e6c162
+    sha256: 8a7452dfcecf8b4bd3826b5000c0dee2f8a1d2a1c9ff5ae1fe2b2cadbb39f19d
   - path: src/runtime/Runtime.EditorCommon.Public.cpp
     sha256: 5dc7d4069e858965de1cf8a418498c6436f0e05127e26468c4e61ac6fc4df2c5
   - path: src/runtime/Runtime.EditorCommon.cppm
@@ -179,20 +179,24 @@ source:
     sha256: 973427abdea9c0a99f32dd9668ad3aaba43c048dbb97a327193c7a57777c68e0
   - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
     sha256: 6031e3f0f7678f09f3eadac12a1f03c609135048abeed5cfb2dc0b56b416ebd4
-  - path: tasks/active/RUNTIME-202-retire-sandbox-runtime-facade.md
-    sha256: fe4802e546b909258463d590c85c0e0339a0ff13e1a79e58f67900f043a4eae0
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 4cb0d5b4ccf9da28482bcf39debbb5f59eea057aea05d0a34a24b4d6eaeea470
+  - path: tasks/active/README.md
+    sha256: 21086954992e59188d218ea0846e82b5f40f61219e116e842695ba98b0b82a5b
   - path: tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md
     sha256: 000e708d24b13fe5e1e8eedc73f8298cec217114fbbf207748714f5aac8505e0
   - path: tasks/backlog/bugs/index.md
     sha256: d67938cd536c4e8a587bc9ef11afe42ec4a36186fc84a1f5798be8b8e1e9a9a8
   - path: tasks/backlog/runtime/README.md
-    sha256: 752f067240bbc46fabe89b4ad466d8b073807373ebe209f7171c7f2bbc28fc40
+    sha256: 99a6a2bd59880b24fe2a3567bbb80d5dff553a9a7a1b70aa2a8e65dfad16d1fb
   - path: tasks/backlog/ui/README.md
     sha256: 81f802db1c1db091b87253ed3949a1bbae216bec8309f53745523b461d8287d0
   - path: tasks/done/BUG-125-queued-import-contract-state-observation-races.md
     sha256: 75a77571ff4d1545a67c000fed9a64ee30a39936fb5ead28643f055eef7f2ff5
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: 3af53c59a552aa35d42a1850ad6fe0dc28a7df1f61debbffc388d1af50f8f6dc
+    sha256: 1b787e9328a83a3514074eef136c5c71dc07ae14a19526639f8244d7c629a073
+  - path: tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md
+    sha256: 752e9dd6571a8d152298c2887cdb893657fdfa7cce4760ccb907f0ae1ac4a380
   - path: tasks/evidence/BUG-125/commands/ci-build.json
     sha256: 2edd39e6dce07ee11535c8e2f3c46ea4b8e5954a4afa18802f3081f49a30bd7b
   - path: tasks/evidence/BUG-125/commands/ci-build.stderr.log
@@ -361,7 +365,7 @@ source:
     sha256: 9182c152c1f290d46d5d93b1aeda2c0da027988e6ce338d81d846904857cce18
   - path: tools/analysis/compile_hotspot_baseline.json
     sha256: 1f3efa3c440a147fed13951e7f0c1ca78669da2fe0296000b3335d6f948a0b84
-  content_digest: e28205c047352cac0a6ff712545211d24a55ba24934611da6b0790020e79f758
+  content_digest: c0e1c2e514e32d020aa2c1122a914a33f38e77f0a492e138e8c737567366fa23
 touched:
   paths:
   - ara/logic/claims.md
@@ -447,13 +451,15 @@ touched:
   - src/runtime/internal/Runtime.EditorWorkspaceSession.cpp
   - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
   - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
-  - tasks/active/RUNTIME-202-retire-sandbox-runtime-facade.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
   - tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md
   - tasks/backlog/bugs/index.md
   - tasks/backlog/runtime/README.md
   - tasks/backlog/ui/README.md
   - tasks/done/BUG-125-queued-import-contract-state-observation-races.md
   - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md
   - tasks/evidence/BUG-125/commands/ci-build.json
   - tasks/evidence/BUG-125/commands/ci-build.stderr.log
   - tasks/evidence/BUG-125/commands/ci-build.stdout.log
@@ -544,7 +550,8 @@ touched:
   - tests
   modules:
   - Runtime feature operations and Sandbox app composition
-extension_seam: Feature-owned typed operations and copied snapshots composed by the app-owned SandboxEditorContext
+extension_seam: Feature-owned typed operations and copied prepared records composed by the app-private
+  SandboxPreparedFrame
 future_change_plan: Add future editor workflows beside their owning runtime feature and expose only the
   narrow operation or snapshot the app actually consumes
 acceptance:
@@ -567,9 +574,11 @@ commands:
 - receipt: tasks/evidence/RUNTIME-202/commands/ci-build.json
 - receipt: tasks/evidence/RUNTIME-202/commands/ci-focused.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-ara-claims-rerun.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-asan-build-final.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-asan-full-cpu.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-build.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-full-cpu.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-ubsan-build-final.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-ci-ubsan-full-cpu.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-doc-links.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-ara-claims.json
@@ -581,6 +590,16 @@ commands:
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-task-state-links.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-final-test-layout.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-module-inventory.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-diff-check.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-doc-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-layering.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-session-brief.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-task-maturity.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-task-policy.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-test-layout.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-root-hygiene.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-strict-layering.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-task-maturity.json
@@ -614,7 +633,7 @@ diagnostics_and_previews:
   exact test passed 20/20 and the complete ASan selector passed on rerun
 benchmark_or_parity_evidence: []
 docs_sync:
-  task_file: tasks/active/RUNTIME-202-retire-sandbox-runtime-facade.md
+  task_file: tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md
   session_brief_present: true
   canonical_docs_changed: true
   skill_mirrors_checked: false
@@ -628,7 +647,7 @@ skipped_checks:
   reason: No Vulkan backend behavior, RHI contract, shader, or promoted-device composition changed.
 artifacts:
 - path: docs/architecture/sandbox-editor-feature-boundaries.md
-  sha256: eee8190654454fdab0b8c8992af787ac499c388a06a91946b97e97b69ba78ea4
+  sha256: 8f00fe4f5a28ddaccc13b79bc301beaf2ee3e392cd3d28db707b7cb06689c8c5
   kind: file
 self_review:
   completed: true

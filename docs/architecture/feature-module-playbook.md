@@ -244,8 +244,9 @@ execution.
 
 - **Runtime feature snapshots + typed operations:** a focused
   `src/runtime/Runtime.<Feature>Operations.*` module, or an existing durable
-  feature service. `EditorWorkspaceSnapshots` owns only the attachment and
-  copied workspace snapshot lifecycle.
+  feature service. `EditorWorkspaceAttachment` owns the opaque attachment
+  lifecycle; `EditorWorkspaceSnapshots` owns copied workspace snapshot/query
+  preparation only.
 - **Algorithm UI state + widgets:**
   `src/app/Sandbox/Editor/Sandbox.*Panels.*` (or the corresponding owning
   application editor module).
