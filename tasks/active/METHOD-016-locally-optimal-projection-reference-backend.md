@@ -2,6 +2,13 @@
 id: METHOD-016
 theme: I
 depends_on: [GEOM-062]
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner: "Codex-GeometryE2E"
+branch: "feature/lop-consolidation-e2e"
+worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
+claimed_at: "2026-08-01T12:49:16Z"
 maturity_target: CPUContracted
 ---
 # METHOD-016 — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend
