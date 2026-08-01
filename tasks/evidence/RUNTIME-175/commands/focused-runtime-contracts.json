@@ -1,0 +1,20 @@
+{
+  "command": [
+    "build/ci/bin/IntrinsicRuntimeContractTests",
+    "--gtest_filter=PointCloudConsolidationConfig.*:PointCloudConsolidationModule.*"
+  ],
+  "command_display": "build/ci/bin/IntrinsicRuntimeContractTests '--gtest_filter=PointCloudConsolidationConfig.*:PointCloudConsolidationModule.*'",
+  "cwd": ".",
+  "duration_ms": 105,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:50:47Z",
+  "label": "focused-runtime-contracts",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:50:47Z",
+  "stderr_path": "tasks/evidence/RUNTIME-175/commands/focused-runtime-contracts.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-175/commands/focused-runtime-contracts.stdout.log",
+  "stdout_sha256": "10391afe7bdf8f68b28106082691275b15d7d0514dfa219748e552c268ced8c5",
+  "task_id": "RUNTIME-175"
+}

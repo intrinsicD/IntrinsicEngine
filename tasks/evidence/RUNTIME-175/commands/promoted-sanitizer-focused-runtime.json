@@ -1,0 +1,20 @@
+{
+  "command": [
+    "build/ci-vulkan/bin/IntrinsicRuntimeContractTests",
+    "--gtest_filter=PointCloudConsolidationConfig.*:PointCloudConsolidationModule.*"
+  ],
+  "command_display": "build/ci-vulkan/bin/IntrinsicRuntimeContractTests '--gtest_filter=PointCloudConsolidationConfig.*:PointCloudConsolidationModule.*'",
+  "cwd": ".",
+  "duration_ms": 484,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:56:49Z",
+  "label": "promoted-sanitizer-focused-runtime",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:56:48Z",
+  "stderr_path": "tasks/evidence/RUNTIME-175/commands/promoted-sanitizer-focused-runtime.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-175/commands/promoted-sanitizer-focused-runtime.stdout.log",
+  "stdout_sha256": "cbd2869854e65f6daec1958313ed285b2e443b0002a2727696400c25cdeed90b",
+  "task_id": "RUNTIME-175"
+}
