@@ -3,20 +3,18 @@ task_id: BUG-125
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T01:24:23Z'
+generated_at: '2026-08-01T01:26:44Z'
 claim_eligible: false
 source:
   base_ref: 08bc589e
   base_revision: 08bc589e3abffe8e1208b72bb99eccb6c4e17433
-  head_revision: 08bc589e3abffe8e1208b72bb99eccb6c4e17433
+  head_revision: ffc239cbde7c765c2706efebd70d268448c7fffa
   branch: codex/bug-125-queued-import-contract-races
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: tasks/SESSION-BRIEF.md
     sha256: 8e8aa21f40d77d93244fb06a7886de539c1c1faeae7e274dbca4e2e5d9258896
-  - path: tasks/backlog/bugs/BUG-125-queued-import-contract-state-observation-races.md
-    sha256: null
   - path: tasks/backlog/bugs/index.md
     sha256: d67938cd536c4e8a587bc9ef11afe42ec4a36186fc84a1f5798be8b8e1e9a9a8
   - path: tasks/done/BUG-125-queued-import-contract-state-observation-races.md
@@ -29,11 +27,10 @@ source:
     sha256: f45f51c0bf5bfbf16fc9e1aae707d0f638fc4440cd47830ad990e1019a6d2718
   - path: tests/regression/tooling/Test.WorkflowConcurrency.py
     sha256: 29dee3ddde0baaa38ac3d5e7bb2d3c320134c96a81423ad70ad908d93f0c8afb
-  content_digest: 68441f2b0632f855353fd759c28c707710682761f37717201e86084684a43fe3
+  content_digest: c954d4ea6d6a75bc1135a83043e11cf497e7d4962442c2fdb376c47f5673ed83
 touched:
   paths:
   - tasks/SESSION-BRIEF.md
-  - tasks/backlog/bugs/BUG-125-queued-import-contract-state-observation-races.md
   - tasks/backlog/bugs/index.md
   - tasks/done/BUG-125-queued-import-contract-state-observation-races.md
   - tasks/done/RETIREMENT-LOG.md
