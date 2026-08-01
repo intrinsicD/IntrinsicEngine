@@ -1231,9 +1231,9 @@ observations:
       claim, not a performance claim.
     potential_type: architecture
     bound_to: [N268, N269, N288]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A19"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O82
     timestamp: "2026-08-01T01:15+02:00"
@@ -1346,7 +1346,7 @@ observations:
       implementation-owned cache and the renamed private implementation remains
       essentially the same size as the former facade implementation.
     potential_type: architecture
-    bound_to: [N312, N313]
+    bound_to: [N312, N313, N315, N316]
     promoted: false
     promoted_to: null
     crystallized_via: null

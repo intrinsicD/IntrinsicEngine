@@ -248,3 +248,21 @@
   tools/agents/skills/intrinsicengine-draw-architecture/references/view-guide.md,
   tests/regression/tooling/Test.ArchitectureDiagramSkill.py]
 - **From staging**: O79
+
+## A19: One Published Asset Workflow Executes One Copied Import Recipe
+- **Decision**: Production asset import enters through the sole published
+  `AssetWorkflowModule` service and carries one copied seven-stage recipe from
+  route selection through completion. Decode/materialization, ECS authoring,
+  postprocess, texture bake/residency, and completion policy remain private
+  runtime implementation details; assets and geometry retain ordinary CPU
+  payload and codec ownership.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.AssetWorkflowModule.cppm,
+  src/runtime/Runtime.AssetWorkflowModule.cpp,
+  src/runtime/Runtime.AssetWorkflowImportExecutor.cpp,
+  src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp,
+  tests/contract/runtime/Test.AssetWorkflowModule.cpp,
+  tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md,
+  tasks/evidence/RUNTIME-200/report.yaml, N268, N269, N288]
+- **From staging**: O81

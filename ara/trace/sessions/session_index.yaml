@@ -204,8 +204,8 @@ sessions:
     open_threads: 4
   - id: "2026-08-01_001"
     date: "2026-08-01"
-    summary: "Audited the six remaining runtime tasks: the formal DAG and layering pass, but five tasks need withdrawal or scope correction and RUNTIME-202 needs a stronger locality closure."
-    turn_count: 1
-    events_count: 8
-    claims_touched: []
+    summary: "Audited the remaining runtime tasks, then retired and merged RUNTIME-202 after physically localizing editor features and passing independent review plus the 4,010-case CPU gate."
+    turn_count: 2
+    events_count: 12
+    claims_touched: [C11, C16]
     open_threads: 6

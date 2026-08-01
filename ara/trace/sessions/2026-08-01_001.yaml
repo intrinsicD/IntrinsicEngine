@@ -2,9 +2,9 @@ session:
   id: "2026-08-01_001"
   date: "2026-08-01"
   started: "2026-08-01T01:15+02:00"
-  last_turn: "2026-08-01T01:15+02:00"
-  turn_count: 1
-  summary: "Audited the six remaining runtime tasks: the formal DAG and layering pass, but five tasks need withdrawal or scope correction and RUNTIME-202 needs a stronger locality closure."
+  last_turn: "2026-08-01T08:10+02:00"
+  turn_count: 2
+  summary: "Audited the remaining runtime tasks, then retired and merged RUNTIME-202 after physically localizing editor features and passing independent review plus the 4,010-case CPU gate."
 
 events_logged:
   - turn: 1
@@ -55,33 +55,82 @@ events_logged:
     routing: staged
     provenance: ai-suggested
     summary: "Keep RUNTIME-202 but require private cache ownership and honest implementation-locality closure."
+  - turn: 2
+    type: decision
+    id: "N314"
+    routing: direct
+    provenance: user
+    summary: "Directed completed backlog/runtime cleanup to be committed, merged into main, and pushed."
+  - turn: 2
+    type: dead_end
+    id: "N315"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected rename-only facade retirement after independent review exposed retained all-feature ownership and unsafe context escape."
+  - turn: 2
+    type: experiment
+    id: "N316"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-202 on a 176-path independently accepted surface and passed the merged 1,194-step build plus 4,010-case CPU selector."
+  - turn: 2
+    type: architecture
+    id: "O81"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the single published asset-workflow service and copied seven-stage import recipe as A19 through mainline artifact commitment."
 
 ai_actions:
   - turn: 1
     action: "Read the runtime task set and governing architecture/right-sizing records, ran task policy, task validation, session-brief freshness, and strict layering checks, and performed source/import/consumer censuses."
     provenance: ai-executed
     files_changed: []
+  - turn: 2
+    action: "Localized the Sandbox editor implementation across five feature owners, bounded the private workspace session, retired RUNTIME-202 with exact high-risk evidence, and corrected attachment-versus-snapshot ownership records."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.*EditingOperations*"
+      - "src/runtime/Runtime.EditorWorkspaceSnapshots*"
+      - "src/runtime/internal/Runtime.Editor*"
+      - "src/app/Sandbox/Editor/"
+      - "docs/architecture/"
+      - "tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md"
+      - "tasks/evidence/RUNTIME-202/"
+  - turn: 2
+    action: "Merged the accepted cleanup branch into main, rebuilt IntrinsicTests with Clang 23, ran the complete CPU-supported selector, and pushed main to origin."
+    provenance: ai-executed
+    files_changed: []
 
-claims_touched: []
+claims_touched:
+  - id: C11
+    action: advanced
+    turn: 2
+  - id: C16
+    action: advanced
+    turn: 2
 
 key_context:
   - turn: 1
     excerpt: "All formal checks pass; the defects are semantic scope and evidence errors that current validators do not detect."
   - turn: 1
     excerpt: "RUNTIME-202 and a corrected RUNTIME-175 form the useful spine; speculative performance/debug leaves should not remain selectable work."
+  - turn: 2
+    excerpt: "continue with the cleanup tasks in backlog/runtime. when youre done then commit, merge and push to remote"
+  - turn: 2
+    excerpt: "Independent round-four review accepted 176/176 source hashes and all 54 required receipts after a repository-wide attachment/snapshot ownership audit."
 
 open_threads:
-  - "The user has not yet accepted or rejected the proposed task dispositions."
-  - "RUNTIME-202 remains active and its final public/private locality surface is not settled."
   - "RUNTIME-138 and RUNTIME-189 are proposed withdrawals, not yet retired task artifacts."
   - "RUNTIME-139 is proposed for replacement by dormant planning-surface deletion or a future measured gate."
   - "RUNTIME-175 requires config ownership and non-destructive apply corrections before promotion."
   - "RUNTIME-203 requires an owner/consumer re-census and split before implementation."
+  - "The user has not yet accepted or rejected the proposed RUNTIME-138, RUNTIME-139, RUNTIME-175, RUNTIME-189, and RUNTIME-203 dispositions."
+  - "O87's stronger non-public selected-model-cache suggestion remains staged: RUNTIME-202 retired the universal operation owner, but explicit runtime test seams still construct the exported cache record."
 
 ai_suggestions_pending:
-  - "Retire RUNTIME-138 at the delivered baseline and internalize its cache during RUNTIME-202."
+  - "Retire RUNTIME-138 at the delivered cache/visibility baseline; any future expensive derivation should be feature-local."
   - "Rewrite RUNTIME-139 as removal of unproven AoS planning state; re-open optimization only after GPU profiling."
   - "Correct RUNTIME-175 and split UI-035's presentation proof from runtime integration."
   - "Withdraw RUNTIME-189 until METHOD-032 has positive evidence and a production consumer."
   - "Split RUNTIME-203 and retain RenderRecipeActivation plus DeviceBootstrap."
-  - "Keep RUNTIME-202 but enforce a no-renamed-facade locality check before retirement."
+  - "Revisit O87's selected-model-cache API only as a scoped follow-up that preserves explicit test coverage without recreating an editor facade."

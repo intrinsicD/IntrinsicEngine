@@ -7486,3 +7486,72 @@ tree:
       one-consumer premise. RUNTIME-202 remains the necessary convergence task
       but its in-progress surface still requires a deletion/locality check.
     status: resolved
+  - id: N314
+    type: decision
+    title: "Retire RUNTIME-202 and integrate the cleanup sequence into main"
+    provenance: user
+    timestamp: "2026-08-01T08:10+02:00"
+    also_depends_on: [N312, N313]
+    choice: >
+      Complete the backlog/runtime cleanup, commit the accepted task surface,
+      merge it directly into main, and publish main to the configured remote.
+    alternatives:
+      - "Leave RUNTIME-202 active after the implementation correction."
+      - "Publish only a feature branch or stop before main integration."
+    evidence:
+      - "User direction: continue with the cleanup tasks in backlog/runtime; when done, commit, merge, and push."
+      - "tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md"
+      - "merge commit c3efbc98288e0472e3a727fc9bfd36569673b374"
+    status: resolved
+  - id: N315
+    type: dead_end
+    title: "Reject rename-only Sandbox facade retirement"
+    provenance: ai-executed
+    timestamp: "2026-08-01T08:10+02:00"
+    also_depends_on: [N313, N314]
+    hypothesis: >
+      Deleting the public Sandbox facade names while retaining one universal
+      private editor implementation and one all-feature prepared aggregate is
+      sufficient facade retirement.
+    failure_mode: >
+      Independent review found a replacement all-feature aggregate, a
+      19,376-line private operation owner, raw-context escape after attachment
+      expiry, stale documentation fields, and missing sanitizer evidence.
+      Later review rounds also found cross-document ownership records that
+      assigned attachment lifecycle to the snapshot module.
+    lesson: >
+      Facade retirement requires physical feature ownership, narrow guarded
+      prepared handles, and repository-wide factual ownership records; renamed
+      private concentration is not locality.
+    status: resolved
+  - id: N316
+    type: experiment
+    title: "Retire and verify the feature-local Sandbox editor surface"
+    provenance: ai-executed
+    timestamp: "2026-08-01T08:10+02:00"
+    also_depends_on: [N313, N314, N315]
+    evidence:
+      - "source revision 641b18ea593661d7e425e5c90a016ce481cef3ef"
+      - "merge commit c3efbc98288e0472e3a727fc9bfd36569673b374"
+      - "tasks/evidence/RUNTIME-202/report.yaml"
+      - "tasks/evidence/RUNTIME-202/reviews.jsonl"
+      - "src/runtime/Runtime.SceneEditingOperations.Actions.cpp"
+      - "src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp"
+      - "src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp"
+      - "src/runtime/Runtime.RenderRecipeEditingOperations.Debug.cpp"
+      - "src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp"
+      - "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp"
+      - "cmake --build --preset ci --target IntrinsicTests: 1,194/1,194 steps"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60: 4,010/4,010 passed"
+    result: >
+      Scene, geometry, visualization, render-recipe, and workspace-model bodies
+      now compile in their owning feature units. The app privately composes
+      five prepared records around one opaque attachment, and the 733-line
+      private session retains bounded attachment/job-result lifecycle rather
+      than feature operations. The high-risk report binds 176 changed paths;
+      independent round-four review matched every hash and all 54 required
+      receipts. The final Clang 23 aggregate build and all 4,010 selected CPU
+      tests passed with the expected GLFW/LSan control skip; prior exact ASan
+      and UBSan selectors passed 2,664/2,664 each. No GPU/Vulkan or performance
+      claim is made.
+    status: resolved
