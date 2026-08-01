@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan",
+    "--target",
+    "ExtrinsicSandbox",
+    "-j4"
+  ],
+  "command_display": "cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4",
+  "cwd": ".",
+  "duration_ms": 21867,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:38:47Z",
+  "label": "final-vulkan-sandbox-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:38:26Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/final-vulkan-sandbox-build.stdout.log",
+  "stdout_sha256": "eb18561922d649e9c0d1b8b5c12401d9f17339afd428c74efb790675b8aee8bb",
+  "task_id": "UI-035"
+}

@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicSandboxEditorIntegrationTests",
+    "-j4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j4",
+  "cwd": ".",
+  "duration_ms": 20400,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:38:24Z",
+  "label": "final-canonical-ui-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:38:04Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/final-canonical-ui-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/final-canonical-ui-build.stdout.log",
+  "stdout_sha256": "05491153cb4a21f1115cd191193f9ae4f1ca46a9bc22cdb4858bcda9fb88fec8",
+  "task_id": "UI-035"
+}

@@ -1,0 +1,152 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+[==========] Running 40 tests from 7 test suites.
+[----------] Global test environment set-up.
+[----------] 4 tests from SandboxDomainPanels
+[ RUN      ] SandboxDomainPanels.RegistersTheTenAppOwnedWindowsWithStableMenuMetadata
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxDomainPanels.RegistersTheTenAppOwnedWindowsWithStableMenuMetadata (49 ms)
+[ RUN      ] SandboxDomainPanels.RegistrationIsIdempotentAndLifetimeUnregistersEveryWindow
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxDomainPanels.RegistrationIsIdempotentAndLifetimeUnregistersEveryWindow (57 ms)
+[ RUN      ] SandboxDomainPanels.ClosedRegisteredWindowsBuildNoDomainModels
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxDomainPanels.ClosedRegisteredWindowsBuildNoDomainModels (22 ms)
+[ RUN      ] SandboxDomainPanels.OpenSameDomainWindowsShareOneModelBuildPerFrame
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxDomainPanels.OpenSameDomainWindowsShareOneModelBuildPerFrame (20 ms)
+[----------] 4 tests from SandboxDomainPanels (149 ms total)
+
+[----------] 2 tests from SandboxConfigSections
+[ RUN      ] SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun (23 ms)
+[ RUN      ] SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState (57 ms)
+[----------] 2 tests from SandboxConfigSections (81 ms total)
+
+[----------] 6 tests from SandboxAppComposition
+[ RUN      ] SandboxAppComposition.MissingAssetWorkflowStillComposesIndependentFocusAction
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxAppComposition.MissingAssetWorkflowStillComposesIndependentFocusAction (18 ms)
+[ RUN      ] SandboxAppComposition.PipelineSelectionDoesNotRequireCamera
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/runtime168_without_camera.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/runtime168_without_camera.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[       OK ] SandboxAppComposition.PipelineSelectionDoesNotRequireCamera (20 ms)
+[ RUN      ] SandboxAppComposition.MaterializationAndAutofocusDoNotRequireSelection
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/runtime168_without_selection.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/runtime168_without_selection.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[       OK ] SandboxAppComposition.MaterializationAndAutofocusDoNotRequireSelection (17 ms)
+[ RUN      ] SandboxAppComposition.ReinitializeAndRepeatedShutdownDoNotDuplicateState
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/runtime168_reinitialize_first.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/runtime168_reinitialize_first.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/runtime168_reinitialize_second.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/runtime168_reinitialize_second.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[       OK ] SandboxAppComposition.ReinitializeAndRepeatedShutdownDoNotDuplicateState (35 ms)
+[ RUN      ] SandboxAppComposition.BlockedImportShutdownCancelsBeforeRealSandboxUnregister
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued geometry import: source=ManualImport path='/tmp/runtime168_blocked_shutdown.obj' payload=Mesh candidate_count=1[0m
+[33m[WARN] [Runtime] Asset import failed: path='/tmp/runtime168_blocked_shutdown.obj' requested_payload=Mesh ingest_diagnostic=Cancelled error=InvalidState[0m
+[       OK ] SandboxAppComposition.BlockedImportShutdownCancelsBeforeRealSandboxUnregister (18 ms)
+[ RUN      ] SandboxAppComposition.DefaultFocusLifecycleIsPrivateAndTransactional
+[       OK ] SandboxAppComposition.DefaultFocusLifecycleIsPrivateAndTransactional (0 ms)
+[----------] 6 tests from SandboxAppComposition (110 ms total)
+
+[----------] 18 tests from SandboxEditorPresentation
+[ RUN      ] SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible (19 ms)
+[ RUN      ] SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows (19 ms)
+[ RUN      ] SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+[       OK ] SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication (2 ms)
+[ RUN      ] SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+[       OK ] SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication (1 ms)
+[ RUN      ] SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+[       OK ] SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly (15 ms)
+[ RUN      ] SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+[       OK ] SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell (112 ms)
+[ RUN      ] SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+[       OK ] SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus (0 ms)
+[ RUN      ] SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame (20 ms)
+[ RUN      ] SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl (211 ms)
+[ RUN      ] SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+[       OK ] SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls (4 ms)
+[ RUN      ] SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[33m[WARN] [Runtime] Asset import failed: path='/tmp/intrinsic-arch-006-missing.ply' requested_payload=PointCloud ingest_diagnostic=MissingFile error=FileNotFound[0m
+[       OK ] SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel (20 ms)
+[ RUN      ] SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback (19 ms)
+[ RUN      ] SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy (46 ms)
+[ RUN      ] SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows (18 ms)
+[ RUN      ] SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+[       OK ] SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow (3 ms)
+[ RUN      ] SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry (18 ms)
+[ RUN      ] SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext (19 ms)
+[ RUN      ] SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath (20 ms)
+[----------] 18 tests from SandboxEditorPresentation (575 ms total)
+
+[----------] 1 test from SandboxEditorUi
+[ RUN      ] SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Dropped ambiguous geometry file routed to deferred import: path='/tmp/runtime_dragdrop_event_cloud.ply' candidate_count=2[0m
+[32m[INFO] [Runtime] Queued dropped geometry import: path='/tmp/runtime_dragdrop_event_cloud.ply' payload=Mesh candidate_count=2[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/runtime_dragdrop_event_cloud.ply' requested_payload=PointCloud result_payload=PointCloud ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[       OK ] SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow (23 ms)
+[----------] 1 test from SandboxEditorUi (23 ms total)
+
+[----------] 5 tests from SandboxParameterizationPanel
+[ RUN      ] SandboxParameterizationPanel.RegistrationIsStableAndIdempotent
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxParameterizationPanel.RegistrationIsStableAndIdempotent (19 ms)
+[ RUN      ] SandboxParameterizationPanel.StrategiesAndTypedRequestAreExact
+[       OK ] SandboxParameterizationPanel.StrategiesAndTypedRequestAreExact (0 ms)
+[ RUN      ] SandboxParameterizationPanel.ProjectionFitsAndFailsClosed
+[       OK ] SandboxParameterizationPanel.ProjectionFitsAndFailsClosed (0 ms)
+[ RUN      ] SandboxParameterizationPanel.ResultSummaryCarriesAggregateDiagnostics
+[       OK ] SandboxParameterizationPanel.ResultSummaryCarriesAggregateDiagnostics (0 ms)
+[ RUN      ] SandboxParameterizationPanel.RealWindowAndTypedActionAreOperational
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxParameterizationPanel.RealWindowAndTypedActionAreOperational (37 ms)
+[----------] 5 tests from SandboxParameterizationPanel (56 ms total)
+
+[----------] 4 tests from SandboxPointCloudConsolidationPanel
+[ RUN      ] SandboxPointCloudConsolidationPanel.RegistrationIsStableAndIdempotent
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxPointCloudConsolidationPanel.RegistrationIsStableAndIdempotent (19 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed
+[       OK ] SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed (0 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure
+[       OK ] SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure (0 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace (21 ms)
+[----------] 4 tests from SandboxPointCloudConsolidationPanel (41 ms total)
+
+[----------] Global test environment tear-down
+[==========] 40 tests from 7 test suites ran. (1038 ms total)
+[  PASSED  ] 40 tests.

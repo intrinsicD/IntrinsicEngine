@@ -1,0 +1,19 @@
+{
+  "command": [
+    "build/ci/bin/IntrinsicSandboxEditorIntegrationTests"
+  ],
+  "command_display": "build/ci/bin/IntrinsicSandboxEditorIntegrationTests",
+  "cwd": ".",
+  "duration_ms": 1034,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:38:26Z",
+  "label": "final-canonical-editor-suite",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:38:25Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/final-canonical-editor-suite.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/final-canonical-editor-suite.stdout.log",
+  "stdout_sha256": "4c10a9acee5c6f7dde80e3a34ce6e243053b5031016b184957f39a26ae78fd29",
+  "task_id": "UI-035"
+}
