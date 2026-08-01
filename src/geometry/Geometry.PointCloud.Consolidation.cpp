@@ -91,7 +91,8 @@ namespace Geometry::PointCloud::Consolidation
                 result.State = Status::TooFewPoints;
                 return result;
             }
-            if (positions.size() > static_cast<std::size_t>(
+            if (positions.size() > params.MaxInputPointCount ||
+                positions.size() > static_cast<std::size_t>(
                     std::numeric_limits<std::uint32_t>::max()))
             {
                 result.State = Status::ResourceLimit;

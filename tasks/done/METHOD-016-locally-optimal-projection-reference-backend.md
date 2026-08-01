@@ -84,6 +84,13 @@ reserved.
   package, executable schema-v2 smoke, and architecture/module documentation
   are complete.
 - Implementation commit: `d7c58028`; completion-evidence commit: pending.
+- The first claim-grade custody audit requested revision because screening and
+  confirmation reused the same analytic fixtures, replay only validated an
+  existing payload, and the coverage did not directly exercise a one-step
+  equation oracle, in-support outliers, the resource guard, or concurrent
+  callers. The replacement revision uses a distinct 8x8/84-point confirmation
+  cohort with different scale/noise/seed, executes the benchmark during replay,
+  and adds those four missing contracts before evidence is re-frozen.
 - The framework24 comparison checkout named by the backlog seed was not
   retained in this repository and its URL, revision, and license could not be
   recovered from repository history or public code search. It is therefore
@@ -109,7 +116,9 @@ reserved.
       `cpu_reference` identity, but expose no request/fallback selector until
       `METHOD-019` adds the second implementation.
 - [x] Consume the shared `Geometry.PointCloud.Kernels` (`GEOM-062`) for the attraction/repulsion weights and WLOP density weights; no private weight math.
-- [x] Deterministic: seeded initialization and fixed iteration order; identical `(seed, input, params)` produce bitwise-identical output across runs and thread counts.
+- [x] Deterministic: seeded initialization and fixed iteration order; identical
+      `(seed, input, params)` produces bitwise-identical output across serial
+      repetition and concurrent callers (the reference itself is serial).
 - [x] Fail-closed on empty or too-small clouds, non-finite positions, `mu` outside [0, 0.5), and non-positive `h`, with explicit failure states.
 - [x] Register the module in `src/geometry/CMakeLists.txt` (single `IntrinsicGeometry` target; alphabetical placement, no new link dependency).
 
@@ -180,9 +189,10 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 ## Verification evidence
 
 - Default Clang 23 build completed for `IntrinsicTests` and
-  `IntrinsicBenchmarkSmoke`; the eight focused consolidation cases passed.
+  `IntrinsicBenchmarkSmoke`; all ten focused consolidation cases passed.
 - The opt-in benchmark fixture ran and strict schema-v2 validation passed for
-  the complete emitted result set. The LOP/WLOP payload reported `passed` and
+  the complete emitted result set. Its disjoint confirmation cohort reported
+  `passed`, quality-error L2 `0.020443686` against the frozen `0.03` limit, and
   bound the declared manifest/parameters/thresholds.
 - Replacement-only `IntrinsicGeometryTests.Grouped` passed under both ASan and
   UBSan with serial CTest execution.

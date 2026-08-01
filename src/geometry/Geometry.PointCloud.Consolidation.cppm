@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
 #include <string_view>
 #include <variant>
@@ -69,6 +70,11 @@ export namespace Geometry::PointCloud::Consolidation
         // Zero preserves the input count. LOP/WLOP otherwise downsample only.
         std::size_t TargetPointCount{0u};
         std::uint32_t Seed{42u};
+        // Deterministic caller-controlled guard for the serial reference's
+        // input-sized allocations. The default preserves the API's natural
+        // platform limit; callers with a fixed memory budget can lower it.
+        std::size_t MaxInputPointCount{
+            std::numeric_limits<std::size_t>::max()};
     };
 
     struct Diagnostics

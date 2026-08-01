@@ -23,7 +23,10 @@ namespace Intrinsic::Bench::Geometry
         constexpr int kWarmupIterations = 1;
         constexpr int kMeasuredIterations = 8;
 
-        [[nodiscard]] std::vector<glm::vec3> NoisyPlane(const int side = 7)
+        // Confirmation fixtures deliberately differ from the unit-test
+        // screening grid, noise sequence, scale, and sample count.
+        [[nodiscard]] std::vector<glm::vec3> ConfirmationPlane(
+            const int side = 8)
         {
             std::vector<glm::vec3> points{};
             points.reserve(static_cast<std::size_t>(side * side));
@@ -32,29 +35,30 @@ namespace Intrinsic::Bench::Geometry
                 for (int x = 0; x < side; ++x)
                 {
                     const float noise =
-                        ((x * 13 + y * 7) % 5 - 2) * 0.025f;
+                        ((x * 17 + y * 11 + 3) % 7 - 3) * 0.018f;
                     points.emplace_back(
-                        (static_cast<float>(x) - 0.5f * (side - 1)) * 0.2f,
-                        (static_cast<float>(y) - 0.5f * (side - 1)) * 0.2f,
+                        (static_cast<float>(x) - 0.5f * (side - 1)) * 0.17f,
+                        (static_cast<float>(y) - 0.5f * (side - 1)) * 0.17f,
                         noise);
                 }
             }
             return points;
         }
 
-        [[nodiscard]] std::vector<glm::vec3> NoisySphere()
+        [[nodiscard]] std::vector<glm::vec3> ConfirmationSphere()
         {
             std::vector<glm::vec3> points{};
             constexpr double pi = 3.14159265358979323846;
-            for (int latitude = 1; latitude <= 5; ++latitude)
+            for (int latitude = 1; latitude <= 6; ++latitude)
             {
-                const double phi = pi * latitude / 6.0;
-                for (int longitude = 0; longitude < 12; ++longitude)
+                const double phi = pi * latitude / 7.0;
+                for (int longitude = 0; longitude < 14; ++longitude)
                 {
-                    const double theta = 2.0 * pi * longitude / 12.0;
+                    const double theta = 2.0 * pi * longitude / 14.0;
                     const std::size_t index = points.size();
                     const double noise =
-                        (static_cast<int>((index * 11u) % 7u) - 3) * 0.012;
+                        (static_cast<int>((index * 19u + 5u) % 9u) - 4) *
+                        0.008;
                     const double radius = 1.0 + noise;
                     points.emplace_back(
                         static_cast<float>(radius * std::sin(phi) *
@@ -118,17 +122,17 @@ namespace Intrinsic::Bench::Geometry
         [[nodiscard]] PointCloudConsolidationReferenceSmokeMetrics Tick()
         {
             PointCloudConsolidationReferenceSmokeMetrics metrics{};
-            const auto plane = NoisyPlane();
-            const auto sphere = NoisySphere();
+            const auto plane = ConfirmationPlane();
+            const auto sphere = ConfirmationSphere();
 
             Consolidation::Params planeParams{
                 .Method = Consolidation::WlopStrategy{},
-                .SupportRadius = 0.65,
+                .SupportRadius = 0.58,
                 .RepulsionWeight = 0.0,
                 .MaxIterations = 1u,
                 .ConvergenceTolerance = 1.0,
-                .TargetPointCount = 25u,
-                .Seed = 17u,
+                .TargetPointCount = 36u,
+                .Seed = 29u,
             };
             const auto wlopPlane =
                 Consolidation::Consolidate(plane, planeParams);
@@ -138,30 +142,31 @@ namespace Intrinsic::Bench::Geometry
 
             Consolidation::Params sphereParams{
                 .Method = Consolidation::WlopStrategy{},
-                .SupportRadius = 0.9,
+                .SupportRadius = 0.82,
                 .RepulsionWeight = 0.0,
                 .MaxIterations = 50u,
                 .ConvergenceTolerance = 2.0e-3,
                 .TargetPointCount = 0u,
-                .Seed = 17u,
+                .Seed = 29u,
             };
             const auto wlopSphere =
                 Consolidation::Consolidate(sphere, sphereParams);
 
             std::vector<glm::vec3> compressed{};
-            for (int y = 0; y < 5; ++y)
+            for (int y = 0; y < 4; ++y)
             {
-                for (int x = 0; x < 5; ++x)
-                    compressed.emplace_back(0.035f * x * x, 0.15f * y, 0.0f);
+                for (int x = 0; x < 6; ++x)
+                    compressed.emplace_back(
+                        0.028f * x * x, 0.18f * y, 0.0f);
             }
             Consolidation::Params uniformityParams{
                 .Method = Consolidation::LopStrategy{},
-                .SupportRadius = 0.65,
+                .SupportRadius = 0.70,
                 .RepulsionWeight = 0.0,
                 .MaxIterations = 40u,
                 .ConvergenceTolerance = 5.0e-4,
-                .TargetPointCount = 16u,
-                .Seed = 17u,
+                .TargetPointCount = 15u,
+                .Seed = 29u,
             };
             const auto withoutRepulsion =
                 Consolidation::Consolidate(compressed, uniformityParams);
@@ -169,18 +174,18 @@ namespace Intrinsic::Bench::Geometry
             const auto withRepulsion =
                 Consolidation::Consolidate(compressed, uniformityParams);
 
-            const auto patch = NoisyPlane(4);
+            const auto patch = ConfirmationPlane(5);
             auto patchWithOutliers = patch;
-            patchWithOutliers.emplace_back(10.0f, 0.0f, 0.0f);
-            patchWithOutliers.emplace_back(10.1f, 0.0f, 0.0f);
+            patchWithOutliers.emplace_back(-0.05f, 0.05f, 0.40f);
+            patchWithOutliers.emplace_back(0.12f, -0.04f, 0.48f);
             Consolidation::Params outlierParams{
                 .Method = Consolidation::WlopStrategy{},
-                .SupportRadius = 0.65,
+                .SupportRadius = 0.58,
                 .RepulsionWeight = 0.2,
                 .MaxIterations = 12u,
                 .ConvergenceTolerance = 0.0,
                 .TargetPointCount = 0u,
-                .Seed = 17u,
+                .Seed = 29u,
             };
             const auto patchBaseline =
                 Consolidation::Consolidate(patch, outlierParams);
@@ -214,12 +219,13 @@ namespace Intrinsic::Bench::Geometry
                 wlopSphere.Succeeded() && Finite(wlopPlane.Positions) &&
                 Finite(lopPlane.Positions) && Finite(wlopSphere.Positions) &&
                 metrics.WlopPlaneError < metrics.RawPlaneError &&
-                metrics.WlopPlaneError < 0.024 &&
+                metrics.WlopPlaneError < 0.030 &&
                 metrics.WlopSphereError < metrics.RawSphereError &&
                 metrics.WlopSphereError < 0.025 &&
                 metrics.UniformityWithRepulsion >
                     metrics.UniformityWithoutRepulsion * 1.05 &&
-                metrics.OutlierPatchMaxDisplacement < 1.0e-5;
+                metrics.OutlierPatchMaxDisplacement <
+                    outlierParams.SupportRadius * 0.30;
             return metrics;
         }
     }

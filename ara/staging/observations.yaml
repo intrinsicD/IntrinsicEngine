@@ -1351,3 +1351,22 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O88
+    timestamp: "2026-08-01T15:00+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-016 now has a bounded deterministic CPU reference contract for
+      LOP/WLOP, including a direct one-step equation oracle, in-support outlier
+      behavior, an executable resource guard, concurrent-call isolation, and a
+      confirmation cohort distinct from unit-test screening data.
+    context: >
+      The first claim-grade custody audit rejected duplicated screening and
+      confirmation fixtures plus validation-only replay. The revised evidence
+      executes a disjoint built-in cohort and binds its schema-v2 quality gate
+      to an exact clean source revision.
+    potential_type: claim
+    bound_to: [N312, N313]
+    promoted: true
+    promoted_to: "logic/claims.md:C17"
+    crystallized_via: artifact-commitment
+    stale: false

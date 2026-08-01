@@ -10,7 +10,7 @@ paper:
   url: "https://www.cs.ubc.ca/~ascher/papers/hlzac.pdf"
 inputs:
   - "Finite point positions with at least two samples"
-  - "LopStrategy or WlopStrategy, world-unit support radius h, repulsion weight mu in [0, 0.5), iteration/tolerance controls, target count, and seed"
+  - "LopStrategy or WlopStrategy, world-unit support radius h, repulsion weight mu in [0, 0.5), iteration/tolerance controls, target count, seed, and an optional input-count resource guard"
 outputs:
   - "Projected point positions"
   - "Consolidation diagnostics with strategy, convergence, displacement, and neighborhood contribution counts"

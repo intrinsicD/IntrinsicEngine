@@ -10,7 +10,7 @@ namespace Intrinsic::Bench::Geometry
     inline constexpr const char* kPointCloudConsolidationReferenceSmokeMethod =
         "geometry.locally_optimal_projection";
     inline constexpr const char* kPointCloudConsolidationReferenceSmokeDataset =
-        "builtin.noisy_plane_sphere.lop_family.v1";
+        "builtin.noisy_plane_sphere.lop_family.confirmation.v2";
 
     struct PointCloudConsolidationReferenceSmokeMetrics
     {

@@ -442,3 +442,29 @@
 - **Dependencies**: [C06, C11, C12, C14]
 - **Tags**: runtime, editor, mutation, history, undo, redo, CPU, retirement
 - **From staging**: O76
+
+## C17: LOP and WLOP have a deterministic CPU reference contract
+- **Statement**: On the checked-in analytic screening fixtures and the
+  independently parameterized built-in confirmation cohort, the METHOD-016
+  CPU reference implements finite deterministic LOP/WLOP consolidation,
+  improves the declared plane/sphere error and repulsion-uniformity measures,
+  and fails closed for invalid or resource-bounded requests.
+- **Status**: supported — Clang 23 CPU correctness, serial ASan/UBSan geometry
+  groups, and schema-v2 claim-eligible confirmation evidence; no scanner-data
+  generalization, runtime/UI, GPU, optimized-backend, or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The one-step equation oracle diverges; identical
+  seeded calls differ under repetition or concurrent callers; finite supported
+  fixtures produce non-finite output; invalid/resource-bounded requests publish
+  positions; or the disjoint confirmation cohort exceeds quality-error L2
+  `0.03` or loses its denoising/uniformity/outlier gates.
+- **Proof**: [tasks/done/METHOD-016-locally-optimal-projection-reference-backend.md,
+  src/geometry/Geometry.PointCloud.Consolidation.cpp,
+  tests/unit/geometry/Test.PointCloudConsolidation.cpp,
+  benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml,
+  tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json,
+  tasks/evidence/METHOD-016/experiment/bundle.json]
+- **Dependencies**: []
+- **Tags**: geometry, point cloud, LOP, WLOP, CPU reference, deterministic
+- **From staging**: O88

@@ -26,6 +26,9 @@ source/projected density weights.
 - `TargetPointCount == 0` preserves the input count. A smaller value uses the
   existing deterministic seeded point-cloud subsampler before projection.
 - `ConvergenceTolerance` is an absolute world-unit maximum-displacement bound.
+- `MaxInputPointCount` is a caller-controlled allocation guard for the serial
+  reference. Requests above it fail with `ResourceLimit` before building an
+  index or allocating method work buffers.
 
 ## Known limitations
 

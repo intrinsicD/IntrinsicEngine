@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <future>
 #include <limits>
 #include <span>
 #include <vector>
@@ -181,6 +182,66 @@ TEST(PointCloudConsolidation, LopRepulsionImprovesMinimumSpacing)
               MinimumPairwiseDistance(without.Positions) * 1.05);
 }
 
+TEST(PointCloudConsolidation, LopOneStepMatchesPaperEquationOracle)
+{
+    const std::vector<glm::vec3> points{
+        {-0.25f, 0.0f, 0.0f},
+        {0.45f, 0.0f, 0.0f},
+    };
+    constexpr double h = 1.0;
+    constexpr double distanceFloor = 0.01 * h;
+    const auto theta = [](const double distance)
+    {
+        return std::exp(-16.0 * distance * distance / (h * h));
+    };
+    const auto expectedOneStep = [&](const std::size_t seedIndex)
+    {
+        double l2Weight = 0.0;
+        double l2Numerator = 0.0;
+        for (const glm::vec3 point : points)
+        {
+            const double distance = std::abs(
+                static_cast<double>(points[seedIndex].x) - point.x);
+            const double weight = theta(distance);
+            l2Weight += weight;
+            l2Numerator += static_cast<double>(point.x) * weight;
+        }
+        // The implementation deliberately stores each finite L2 iterate in
+        // its public float coordinate type before evaluating the L1 step.
+        const float initialized = static_cast<float>(l2Numerator / l2Weight);
+
+        double l1Weight = 0.0;
+        double l1Numerator = 0.0;
+        for (const glm::vec3 point : points)
+        {
+            const double distance = std::abs(
+                static_cast<double>(initialized) - point.x);
+            const double weight = theta(distance) /
+                std::max(distance, distanceFloor);
+            l1Weight += weight;
+            l1Numerator += static_cast<double>(point.x) * weight;
+        }
+        return l1Numerator / l1Weight;
+    };
+
+    auto params = ReferenceParams();
+    params.Method = Consolidation::LopStrategy{};
+    params.SupportRadius = h;
+    params.RepulsionWeight = 0.0;
+    params.MaxIterations = 1u;
+    params.ConvergenceTolerance = 1.0;
+    params.TargetPointCount = points.size();
+    const auto result = Consolidation::Consolidate(points, params);
+
+    ASSERT_TRUE(result.Succeeded())
+        << Consolidation::DebugName(result.State);
+    ASSERT_EQ(result.Positions.size(), points.size());
+    EXPECT_NEAR(result.Positions[0].x, expectedOneStep(0u), 1.0e-6);
+    EXPECT_NEAR(result.Positions[1].x, expectedOneStep(1u), 1.0e-6);
+    EXPECT_FLOAT_EQ(result.Positions[0].y, 0.0f);
+    EXPECT_FLOAT_EQ(result.Positions[1].z, 0.0f);
+}
+
 TEST(PointCloudConsolidation, WlopCorrectsNonUniformDensityMoreThanLop)
 {
     const std::vector<glm::vec3> points{
@@ -208,12 +269,12 @@ TEST(PointCloudConsolidation, WlopCorrectsNonUniformDensityMoreThanLop)
     EXPECT_GT(wlop.Diagnostics.DensityContributionCount, 0u);
 }
 
-TEST(PointCloudConsolidation, SeparatedOutlierClusterDoesNotPullPlanePatch)
+TEST(PointCloudConsolidation, InSupportOutliersHaveBoundedInfluenceOnPlanePatch)
 {
     const std::vector<glm::vec3> plane = NoisyPlane(4);
     std::vector<glm::vec3> withOutliers = plane;
-    withOutliers.emplace_back(10.0f, 0.0f, 0.0f);
-    withOutliers.emplace_back(10.1f, 0.0f, 0.0f);
+    withOutliers.emplace_back(0.0f, 0.0f, 0.45f);
+    withOutliers.emplace_back(0.1f, 0.0f, 0.50f);
 
     auto params = ReferenceParams();
     params.MaxIterations = 12u;
@@ -222,10 +283,18 @@ TEST(PointCloudConsolidation, SeparatedOutlierClusterDoesNotPullPlanePatch)
     const auto outlierRun = Consolidation::Consolidate(withOutliers, params);
     ASSERT_FALSE(baseline.Positions.empty());
     ASSERT_GE(outlierRun.Positions.size(), plane.size());
+    double maxDisplacement = 0.0;
     for (std::size_t i = 0u; i < plane.size(); ++i)
-        EXPECT_LT(glm::distance(
-                      outlierRun.Positions[i], baseline.Positions[i]),
-                  1.0e-5f);
+    {
+        maxDisplacement = std::max(
+            maxDisplacement,
+            static_cast<double>(glm::distance(
+                outlierRun.Positions[i], baseline.Positions[i])));
+    }
+    // Both outliers are inside h of the patch center. Density weighting need
+    // not erase their influence, but must keep the original patch stable to
+    // less than one quarter of the 0.65 world-unit support radius.
+    EXPECT_LT(maxDisplacement, params.SupportRadius * 0.25);
 }
 
 TEST(PointCloudConsolidation, StrategyAndSeedAreBitwiseDeterministic)
@@ -250,6 +319,34 @@ TEST(PointCloudConsolidation, StrategyAndSeedAreBitwiseDeterministic)
     ASSERT_EQ(lop.Positions.size(), 24u);
     EXPECT_NEAR(MeanPlaneError(lop.Positions),
                 0.032516757084522396, 1.0e-8);
+}
+
+TEST(PointCloudConsolidation, ConcurrentCallersAreBitwiseDeterministic)
+{
+    const auto points = NoisyPlane(6);
+    auto params = ReferenceParams();
+    params.TargetPointCount = 20u;
+    params.MaxIterations = 16u;
+    params.ConvergenceTolerance = 0.0;
+
+    auto firstFuture = std::async(std::launch::async, [&]
+    {
+        return Consolidation::Consolidate(points, params);
+    });
+    auto secondFuture = std::async(std::launch::async, [&]
+    {
+        return Consolidation::Consolidate(points, params);
+    });
+    const auto serial = Consolidation::Consolidate(points, params);
+    const auto first = firstFuture.get();
+    const auto second = secondFuture.get();
+
+    ASSERT_EQ(first.State, serial.State);
+    ASSERT_EQ(second.State, serial.State);
+    EXPECT_EQ(first.Positions, serial.Positions);
+    EXPECT_EQ(second.Positions, serial.Positions);
+    EXPECT_EQ(first.Diagnostics.Iterations, serial.Diagnostics.Iterations);
+    EXPECT_EQ(second.Diagnostics.Iterations, serial.Diagnostics.Iterations);
 }
 
 TEST(PointCloudConsolidation, InvalidRequestsFailWithoutPublishingPositions)
@@ -294,6 +391,10 @@ TEST(PointCloudConsolidation, InvalidRequestsFailWithoutPublishingPositions)
     params.TargetPointCount = 3u;
     expectFailure(Consolidation::Consolidate(points, params),
                   Consolidation::Status::InvalidTargetCount);
+    params = ReferenceParams();
+    params.MaxInputPointCount = 1u;
+    expectFailure(Consolidation::Consolidate(points, params),
+                  Consolidation::Status::ResourceLimit);
 
     auto nonFinite = points;
     nonFinite[1].z = std::numeric_limits<float>::quiet_NaN();

@@ -44,7 +44,8 @@ interpretation, inverse-distance terms clamp distance to `epsilon = 0.01 h`.
 
 - Input: at least two finite positions, a typed LOP/WLOP strategy, positive
   finite `h`, valid `mu`, positive iteration limit, non-negative finite
-  tolerance, optional downsample target, and seed.
+  tolerance, optional downsample target, seed, and an optional input-count
+  resource guard.
 - Output: projected positions plus strategy/backend identity, convergence,
   iteration count, average/maximum displacement, and attraction, repulsion,
   density, and empty-neighborhood contribution counts.
@@ -54,9 +55,10 @@ interpretation, inverse-distance terms clamp distance to `epsilon = 0.01 h`.
 ## Degenerate and failure behavior
 
 Empty/one-point clouds, invalid or garbage cloud storage, non-finite positions,
-invalid controls, failed spatial indexing/querying, empty compact-support
-neighborhoods, density failures, and non-finite arithmetic return explicit
-statuses. Coincident samples remain finite. The routine never mutates input.
+invalid controls, requests above the caller's input-count resource guard,
+failed spatial indexing/querying, empty compact-support neighborhoods, density
+failures, and non-finite arithmetic return explicit statuses. Coincident
+samples remain finite. The routine never mutates input.
 
 ## Provenance and translation notes
 
