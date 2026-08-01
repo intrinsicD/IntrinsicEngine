@@ -3,12 +3,12 @@ task_id: GEOM-058
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T11:58:47Z'
+generated_at: '2026-08-01T12:08:58Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: fb494cfc7cdc319fcb050a73b2e291ff73cc6d1d
-  head_revision: feffc6fe0fbc6ef0ece355e74a1fddcc928e03c3
+  head_revision: edaff414c2d9c25dcaaf2617cda423e19f04659a
   branch: feature/lop-consolidation-e2e
   worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
   dirty: false
@@ -24,7 +24,7 @@ source:
   - path: src/geometry/Geometry.FixedPoint.Anderson.cppm
     sha256: c2a4f44c04a52c6746d80e7c07b462f349d9221102808d9808a7a6e1346434b2
   - path: src/geometry/Geometry.GaussianMixture.cpp
-    sha256: bde2d9084289e2cd0c67ec982bc46528a425fbe42f09dc00222579946702d0ae
+    sha256: 2fd1334d770322e4742a2904f62ab767a6040a4212eb03f3d06e23f1252e9dcf
   - path: src/geometry/Geometry.GaussianMixture.cppm
     sha256: 2ac493058efd783f8385664c80e3ee0dd91f326b3bfe58795030f1b21310f77c
   - path: src/geometry/Geometry.KMeans.cpp
@@ -36,14 +36,14 @@ source:
   - path: tasks/backlog/geometry/README.md
     sha256: 771ac279790f427b706d5139f40f7d9ebcbd25f343d0eff5e07a0cec57dcfe7b
   - path: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
-    sha256: 9697f58b02873f8256d76509a5d38ab160082a208a95357e8da9b7b3248bf1cf
+    sha256: 043ecf83e9d1776b37ab03f7474ce6e4e394e0666db14d6942a7086c8e062740
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: a3dc1faeec69a9461664d46dc5a8a683b9b54fe5c48bdb30a4068fe7a99c5b6e
+    sha256: 9e55450bd3263e831005fbcd072b87fa2ddae38ae542fb3dd285fd1f69faa2a9
   - path: tests/CMakeLists.txt
     sha256: f4ccb0a52df241b73ce5962a5fc93199fb7012c3dfb236db4df221da18725ce6
   - path: tests/unit/geometry/Test.GaussianMixture.cpp
-    sha256: b44b9db15af3ac747f792ee8aad7102eaa633266bec38c871d1d61114e8eff1c
-  content_digest: a25f73481e5fd3affc00b878b08806f0e92ddae7a7b754d3b8aca836d621bfde
+    sha256: 72ee70a9241b8bb7397044f7159bbe9d3ecd3cbe3a506b0b1ee3aead36de61f4
+  content_digest: 9f719e9ba9265aec468784858cb75032ae87a893d1b0ebd552ae23d05f037626
 touched:
   paths:
   - docs/api/generated/module_inventory.md
@@ -93,12 +93,15 @@ acceptance:
   evidence: []
   reason: null
 commands:
+- receipt: tasks/evidence/GEOM-058/commands/aggregate-geometry-review3.json
+- receipt: tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.json
 - receipt: tasks/evidence/GEOM-058/commands/asan-focused-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.json
 - receipt: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/build-intrinsic-tests.json
 - receipt: tasks/evidence/GEOM-058/commands/doc-links-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/doc-links.json
+- receipt: tasks/evidence/GEOM-058/commands/focused-extreme-scale-review3.json
 - receipt: tasks/evidence/GEOM-058/commands/focused-numerics-final.json
 - receipt: tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.json
 - receipt: tasks/evidence/GEOM-058/commands/focused-numerics.json
@@ -112,6 +115,7 @@ commands:
 - receipt: tasks/evidence/GEOM-058/commands/task-policy-review2.json
 - receipt: tasks/evidence/GEOM-058/commands/task-policy.json
 - receipt: tasks/evidence/GEOM-058/commands/test-layout-review2.json
+- receipt: tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.json
 - receipt: tasks/evidence/GEOM-058/commands/ubsan-focused-review2.json
 changed_public_contracts:
 - Deterministic 3D Gaussian evaluation, responsibilities, likelihood, regularized EM, seeded k-means++
@@ -133,13 +137,13 @@ skipped_checks:
   reason: CPU-reference geometry numerics add no RHI, shader, device, or runtime behavior
 artifacts:
 - path: tests/unit/geometry/Test.GaussianMixture.cpp
-  sha256: b44b9db15af3ac747f792ee8aad7102eaa633266bec38c871d1d61114e8eff1c
+  sha256: 72ee70a9241b8bb7397044f7159bbe9d3ecd3cbe3a506b0b1ee3aead36de61f4
   kind: file
 - path: src/geometry/Geometry.GaussianMixture.cppm
   sha256: 2ac493058efd783f8385664c80e3ee0dd91f326b3bfe58795030f1b21310f77c
   kind: file
 - path: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
-  sha256: 9697f58b02873f8256d76509a5d38ab160082a208a95357e8da9b7b3248bf1cf
+  sha256: 043ecf83e9d1776b37ab03f7474ce6e4e394e0666db14d6942a7086c8e062740
   kind: file
 self_review:
   completed: true
