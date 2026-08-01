@@ -1,0 +1,32 @@
+id: geometry.locally_optimal_projection
+name: Locally Optimal Projection Point-Cloud Consolidation
+domain: geometry
+status: reference
+paper:
+  title: "Parameterization-free Projection for Geometry Reconstruction; Consolidation of Unorganized Point Clouds for Surface Reconstruction"
+  authors: "Yaron Lipman, Daniel Cohen-Or, David Levin, Hillel Tal-Ezer; Hui Huang, Dan Li, Hao Zhang, Uri Ascher, Daniel Cohen-Or"
+  year: 2009
+  doi: "10.1145/1618452.1618522"
+  url: "https://www.cs.ubc.ca/~ascher/papers/hlzac.pdf"
+inputs:
+  - "Finite point positions with at least two samples"
+  - "LopStrategy or WlopStrategy, world-unit support radius h, repulsion weight mu in [0, 0.5), iteration/tolerance controls, target count, and seed"
+outputs:
+  - "Projected point positions"
+  - "Consolidation diagnostics with strategy, convergence, displacement, and neighborhood contribution counts"
+backends:
+  - cpu_reference
+metrics:
+  - "mean_distance_to_reference_surface"
+  - "uniformity_min_pairwise_distance"
+  - "iterations"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
+benchmarks:
+  - "../../../benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml"
+known_limitations:
+  - "Compact support h must connect every projected sample to at least one source sample; isolated neighborhoods fail closed."
+  - "Thin structures and strongly anisotropic sampling can merge across sheets when h is too large."
+  - "The serial CPU reference prioritizes deterministic correctness and exposes no backend selector until a second implementation exists."
+  - "Inverse-distance terms use a scale-relative distance floor of 0.01 h for coincident samples."

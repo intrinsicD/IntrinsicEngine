@@ -17,6 +17,7 @@
 #include "../core/Bench.TaskGraphPlanReuseSmoke.hpp"
 #include "../geometry/Bench.GeometrySmoke.hpp"
 #include "../geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
+#include "../geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp"
 #include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
@@ -591,6 +592,60 @@ auto EmitSignedHeatReferenceSmoke(const std::string &commit)
 
   return EmittedBenchmark{kSignedHeatReferenceSmokeBenchmarkId, out.str(),
                           metrics.Succeeded};
+}
+
+auto EmitPointCloudConsolidationReferenceSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunPointCloudConsolidationReferenceSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kPointCloudConsolidationReferenceSmokeBenchmarkId)
+      << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kPointCloudConsolidationReferenceSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kPointCloudConsolidationReferenceSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"correctness_smoke\",\n"
+      << "    \"warmup_iterations\": 1,\n"
+      << "    \"measured_iterations\": 8,\n"
+      << "    \"strategies\": [\"lop\", \"wlop\"],\n"
+      << "    \"raw_plane_error\": " << metrics.RawPlaneError << ",\n"
+      << "    \"wlop_plane_error\": " << metrics.WlopPlaneError << ",\n"
+      << "    \"raw_sphere_error\": " << metrics.RawSphereError << ",\n"
+      << "    \"wlop_sphere_error\": " << metrics.WlopSphereError << ",\n"
+      << "    \"uniformity_without_repulsion\": "
+      << metrics.UniformityWithoutRepulsion << ",\n"
+      << "    \"uniformity_with_repulsion\": "
+      << metrics.UniformityWithRepulsion << ",\n"
+      << "    \"outlier_patch_max_displacement\": "
+      << metrics.OutlierPatchMaxDisplacement << ",\n"
+      << "    \"lop_iterations\": " << metrics.LopIterations << ",\n"
+      << "    \"wlop_plane_iterations\": "
+      << metrics.WlopPlaneIterations << ",\n"
+      << "    \"wlop_sphere_iterations\": "
+      << metrics.WlopSphereIterations << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{
+      kPointCloudConsolidationReferenceSmokeBenchmarkId,
+      out.str(), metrics.Succeeded};
 }
 
 auto EmitSurfaceSamplingSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -1511,6 +1566,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitUvAtlasEdgeGroupingScaling(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
+  emitted.push_back(EmitPointCloudConsolidationReferenceSmoke(commit));
   emitted.push_back(EmitBoundaryFirstFlatteningReferenceSmoke(commit));
   emitted.push_back(EmitSimplificationQualitySmoke(commit));
   emitted.push_back(EmitSurfaceSamplingSmoke(commit));

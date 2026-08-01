@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 106 |
+| `geometry` | 107 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 71 |
@@ -182,6 +182,7 @@ Root scanned: `src`
 | `Geometry.Parameterization.Diagnostics` | `src/geometry/Geometry.Parameterization.Diagnostics.cppm` | `geometry` |
 | `Geometry.Parameterization.Harmonic` | `src/geometry/Geometry.Parameterization.Harmonic.cppm` | `geometry` |
 | `Geometry.Plane` | `src/geometry/Geometry.Plane.cppm` | `geometry` |
+| `Geometry.PointCloud.Consolidation` | `src/geometry/Geometry.PointCloud.Consolidation.cppm` | `geometry` |
 | `Geometry.PointCloud.Conversion` | `src/geometry/Geometry.PointCloud.Conversion.cppm` | `geometry` |
 | `Geometry.PointCloud.Features` | `src/geometry/Geometry.PointCloud.Features.cppm` | `geometry` |
 | `Geometry.PointCloud.Fwd` | `src/geometry/Geometry.PointCloud.Fwd.cppm` | `geometry` |
@@ -407,4 +408,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **380**
+Total modules: **381**

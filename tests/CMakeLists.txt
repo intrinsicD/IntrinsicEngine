@@ -486,6 +486,7 @@ set(_geometry_test_files
     Test.Sampling.cpp
     Test.SurfaceSampling.cpp
     Test.PointCloudNormals.cpp
+    Test.PointCloudConsolidation.cpp
     Test.PointCloudFeatures.cpp
     Test.PointCloudKernels.cpp
     Test_Registration.cpp
