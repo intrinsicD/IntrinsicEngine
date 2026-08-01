@@ -317,6 +317,13 @@ double precision:
   `exp(-r² / (h/4)²)` inside the support.
 - `WendlandC2` is `(1-r/h)^4 (1+4r/h)` inside the support.
 
+`DirectionalWeight` is the reusable edge-aware attraction factor from Huang
+et al. 2013: `exp(-(dot(n,d)^2/h^2))` for `||d|| < h`, and zero outside that
+support. It normalizes a finite non-degenerate direction internally and fails
+closed for invalid inputs. Unlike a radial kernel, it attenuates normal-height
+variation while retaining tangential support; projection owners decide when
+that anisotropy is scientifically appropriate.
+
 The companion repulsion primitive is the WLOP linear potential
 `eta(r,h) = -r/h`, with derivative `-1/h`; both stay finite as `r` approaches
 zero and leave directional normalization to the consolidation owner.
@@ -331,22 +338,39 @@ re-exported through the broad `Geometry` umbrella.
 
 `Geometry.PointCloud.Consolidation` is the deterministic serial CPU-reference
 owner for the LOP method family. Its typed `Strategy` exposes plain LOP,
-density-corrected WLOP, and continuous CLOP. LOP/WLOP consume the shared
+density-corrected WLOP, continuous CLOP, and two-phase edge-aware resampling
+(EAR). WLOP can also select the anisotropic attraction without progressive
+insertion. LOP/WLOP consume the shared
 compact-support kernel and density seam above. CLOP fits a seeded
 `Geometry.GaussianMixture` through the existing ordinary-EM reference and
 evaluates the governing paper's three-Gaussian closed-form attraction in fixed
 component order; it reuses the same repulsion kernel and reports mixture
-resolution, EM convergence, and component-bounded attraction work.
-`Consolidate` accepts either an immutable position span
+resolution, EM convergence, and component-bounded attraction work. EAR follows
+Huang et al. 2013: it alternates signed bilateral-normal refinement with
+anisotropic WLOP, then inserts oriented points at deterministic
+clearance-prioritized midpoints using bilateral projection distance. Its edge
+sensitivity defaults to `rho = 5`, normal angle to 15 degrees, and normal
+refinement to three rounds.
+
+`Consolidate` accepts an immutable position span, position-plus-normal spans,
 or a valid, garbage-free `PointCloud::Cloud`, uses the existing seeded random
-subsampler plus a theta-weighted L2 initializer, and returns owned projected
-positions with strategy, convergence, displacement, and contribution-count
-diagnostics. Support radius and convergence tolerance are world-unit values;
+subsampler, and returns owned projected positions with strategy, convergence,
+displacement, and contribution-count diagnostics. Isotropic strategies use
+the theta-weighted L2 initializer; anisotropic strategies begin from the
+seeded oriented subset prescribed by EAR. A cloud's built-in `p:normal`
+property is consumed without mutation. `AuthoredOrEstimate` falls back to the
+existing deterministic PCA/MST normal estimator, while `RequireAuthored`
+returns `NormalsRequired`; anisotropic/EAR results carry the private refined
+unit-normal copy. Support radius and isotropic convergence tolerance are
+world-unit values; anisotropic WLOP/EAR complete their declared fixed number
+of alternating rounds,
 `mu` is constrained to `[0, 0.5)`, and coincident inverse-distance terms use a
 documented `0.01 h` floor. Hard failures publish no output, while
 `NotConverged` retains only the last finite iterate for caller preview. CLOP
 also fails closed for invalid mixture controls, failed/non-converged EM, or an
-empty/non-finite continuous attraction. Runtime
+empty/non-finite continuous attraction. EAR alone permits a target larger than
+the input, bounded by `MaxOutputPointCount`; impossible insertions and invalid
+normal/edge controls are explicit failures. Runtime
 configuration, ECS writeback/history, editor controls, and future optimized
 backend selection remain higher-layer responsibilities.
 

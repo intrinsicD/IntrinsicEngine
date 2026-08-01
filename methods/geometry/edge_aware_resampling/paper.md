@@ -103,7 +103,7 @@ clearance from an oriented sample `s_l`:
 
 ```text
 D(b,s_l) = ||(b-p_l) - dot(n_l,b-p_l)n_l||
-C(b) = min_l D(b,s_l)
+C(b) = min_{l in the local h-neighborhood} D(b,s_l)
 P(s_i) = max_j (2-dot(n_i,n_j))^rho C((p_i+p_j)/2), rho=5.
 ```
 

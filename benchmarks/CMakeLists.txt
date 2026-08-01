@@ -26,6 +26,7 @@ add_executable(IntrinsicBenchmarkSmoke
     core/Bench_TaskGraphPlanReuseSmoke.cpp
     geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp
     geometry/Bench_ContinuousLopReferenceSmoke.cpp
+    geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp
     geometry/Bench_ExampleSmoke.cpp
     geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
     geometry/Bench_PointCloudFilteringSmoke.cpp

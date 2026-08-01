@@ -132,6 +132,80 @@ namespace
         return points;
     }
 
+    struct DihedralFixture
+    {
+        std::vector<glm::vec3> Positions{};
+        std::vector<glm::vec3> Normals{};
+        std::size_t PointsPerSide{0u};
+        int RadialCount{0};
+    };
+
+    [[nodiscard]] DihedralFixture NoisyDihedral(
+        const int radialCount = 5,
+        const int creaseCount = 5)
+    {
+        DihedralFixture fixture{};
+        constexpr double angle = 1.0471975511965976; // 60 degrees.
+        const std::array<glm::vec3, 2u> tangents{
+            glm::vec3{-1.0f, 0.0f, 0.0f},
+            glm::vec3{
+                static_cast<float>(std::cos(angle)), 0.0f,
+                static_cast<float>(std::sin(angle))},
+        };
+        const std::array<glm::vec3, 2u> normals{
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{
+                static_cast<float>(-std::sin(angle)), 0.0f,
+                static_cast<float>(std::cos(angle))},
+        };
+        fixture.PointsPerSide = static_cast<std::size_t>(
+            radialCount * creaseCount);
+        fixture.RadialCount = radialCount;
+        fixture.Positions.reserve(2u * fixture.PointsPerSide);
+        fixture.Normals.reserve(2u * fixture.PointsPerSide);
+        for (std::size_t side = 0u; side < 2u; ++side)
+        {
+            for (int y = 0; y < creaseCount; ++y)
+            {
+                for (int radial = 0; radial < radialCount; ++radial)
+                {
+                    const float distance = 0.08f + 0.13f * radial;
+                    const float creasePosition =
+                        (static_cast<float>(y) -
+                         0.5f * static_cast<float>(creaseCount - 1)) *
+                        0.16f;
+                    const int noiseCode =
+                        (radial * 11 + y * 7 + static_cast<int>(side) * 3) %
+                            5 -
+                        2;
+                    const float noise = 0.0075f * noiseCode;
+                    fixture.Positions.push_back(
+                        distance * tangents[side] +
+                        glm::vec3{0.0f, creasePosition, 0.0f} +
+                        noise * normals[side]);
+                    fixture.Normals.push_back(normals[side]);
+                }
+            }
+        }
+        return fixture;
+    }
+
+    [[nodiscard]] double MeanExpectedPlaneError(
+        const std::span<const glm::vec3> points,
+        const std::span<const glm::vec3> expectedNormals)
+    {
+        EXPECT_EQ(points.size(), expectedNormals.size());
+        if (points.size() != expectedNormals.size() || points.empty())
+            return std::numeric_limits<double>::infinity();
+        double sum = 0.0;
+        for (std::size_t i = 0u; i < points.size(); ++i)
+        {
+            sum += std::abs(glm::dot(
+                glm::dvec3(points[i]), glm::dvec3(expectedNormals[i])));
+        }
+        return sum / static_cast<double>(points.size());
+    }
+
     [[nodiscard]] double MeanPlaneError(
         const std::span<const glm::vec3> points)
     {
@@ -164,6 +238,26 @@ namespace
             }
         }
         return minimum;
+    }
+
+    [[nodiscard]] double MaximumNearestNeighborDistance(
+        const std::span<const glm::vec3> points)
+    {
+        double maximum = 0.0;
+        for (std::size_t i = 0u; i < points.size(); ++i)
+        {
+            double nearest = std::numeric_limits<double>::infinity();
+            for (std::size_t j = 0u; j < points.size(); ++j)
+            {
+                if (i == j)
+                    continue;
+                nearest = std::min(
+                    nearest,
+                    static_cast<double>(glm::distance(points[i], points[j])));
+            }
+            maximum = std::max(maximum, nearest);
+        }
+        return maximum;
     }
 
     void ExpectFiniteOutput(const Consolidation::Result& result)
@@ -209,6 +303,268 @@ TEST(PointCloudConsolidation, WlopDenoisesPlaneAndSphere)
     EXPECT_LT(MeanSphereError(projectedSphere.Positions),
               MeanSphereError(sphere));
     EXPECT_LT(MeanSphereError(projectedSphere.Positions), 0.025);
+}
+
+TEST(PointCloudConsolidation, AnisotropicWlopPreservesDihedralContrast)
+{
+    const DihedralFixture fixture = NoisyDihedral();
+    auto isotropicParams = ReferenceParams();
+    isotropicParams.SupportRadius = 0.22;
+    isotropicParams.RepulsionWeight = 0.0;
+    isotropicParams.MaxIterations = 3u;
+    isotropicParams.ConvergenceTolerance = 0.0;
+    const auto isotropic = Consolidation::Consolidate(
+        fixture.Positions, fixture.Normals, isotropicParams);
+    ASSERT_FALSE(isotropic.Positions.empty())
+        << Consolidation::DebugName(isotropic.State);
+
+    auto anisotropicParams = isotropicParams;
+    anisotropicParams.Method = Consolidation::WlopStrategy{
+        .Weighting = Consolidation::WeightingMode::Anisotropic,
+        .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored,
+        .NormalAngleRadians = 3.14159265358979323846 / 12.0,
+        .NormalRefinementRounds = 3u,
+    };
+    const auto anisotropic = Consolidation::Consolidate(
+        fixture.Positions, fixture.Normals, anisotropicParams);
+    ASSERT_FALSE(anisotropic.Positions.empty())
+        << Consolidation::DebugName(anisotropic.State);
+    ASSERT_EQ(anisotropic.Normals.size(), anisotropic.Positions.size());
+
+    const double inputError = MeanExpectedPlaneError(
+        fixture.Positions, fixture.Normals);
+    const double isotropicError = MeanExpectedPlaneError(
+        isotropic.Positions, fixture.Normals);
+    const double anisotropicError = MeanExpectedPlaneError(
+        anisotropic.Positions, fixture.Normals);
+    EXPECT_LT(anisotropicError, inputError);
+    // Frozen contrast bound for this scale-normalized 60-degree fixture:
+    // replacing isotropic attraction reduces expected-plane error by at
+    // least 15 percent after the same three fixed-order iterations.
+    EXPECT_LT(anisotropicError, isotropicError * 0.85)
+        << "input=" << inputError << " isotropic=" << isotropicError
+        << " anisotropic=" << anisotropicError;
+
+    double flatInputError = 0.0;
+    double flatOutputError = 0.0;
+    std::size_t flatCount = 0u;
+    for (std::size_t i = 0u; i < fixture.Positions.size(); ++i)
+    {
+        if (static_cast<int>(i % fixture.PointsPerSide) %
+                fixture.RadialCount < 2)
+        {
+            continue;
+        }
+        flatInputError += std::abs(glm::dot(
+            glm::dvec3(fixture.Positions[i]),
+            glm::dvec3(fixture.Normals[i])));
+        flatOutputError += std::abs(glm::dot(
+            glm::dvec3(anisotropic.Positions[i]),
+            glm::dvec3(fixture.Normals[i])));
+        ++flatCount;
+    }
+    ASSERT_GT(flatCount, 0u);
+    EXPECT_LT(flatOutputError / static_cast<double>(flatCount),
+              flatInputError / static_cast<double>(flatCount));
+    EXPECT_TRUE(anisotropic.Diagnostics.UsedAnisotropicWeighting);
+    EXPECT_TRUE(anisotropic.Diagnostics.UsedAuthoredNormals);
+    EXPECT_EQ(anisotropic.Diagnostics.NormalRefinementIterations, 3u);
+
+    glm::dvec3 firstNormal{0.0};
+    glm::dvec3 secondNormal{0.0};
+    for (std::size_t i = 0u; i < fixture.PointsPerSide; ++i)
+    {
+        firstNormal += glm::dvec3(anisotropic.Normals[i]);
+        secondNormal += glm::dvec3(
+            anisotropic.Normals[i + fixture.PointsPerSide]);
+    }
+    firstNormal = glm::normalize(firstNormal);
+    secondNormal = glm::normalize(secondNormal);
+    const double retainedAngle = std::acos(std::clamp(
+        glm::dot(firstNormal, secondNormal), -1.0, 1.0));
+    EXPECT_NEAR(retainedAngle, 1.0471975511965976, 1.0e-5);
+}
+
+TEST(PointCloudConsolidation, EarUpsamplesTowardDihedralFeature)
+{
+    const DihedralFixture fixture = NoisyDihedral(3, 3);
+    auto params = ReferenceParams();
+    params.Method = Consolidation::EarStrategy{
+        .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored,
+        .NormalAngleRadians = 3.14159265358979323846 / 12.0,
+        .EdgeSensitivity = 5.0,
+        .NormalRefinementRounds = 3u,
+    };
+    params.SupportRadius = 0.65;
+    params.RepulsionWeight = 0.1;
+    params.MaxIterations = 3u;
+    params.ConvergenceTolerance = 1.0;
+    params.TargetPointCount = fixture.Positions.size() + 6u;
+    params.MaxOutputPointCount = params.TargetPointCount;
+    auto firstFuture = std::async(std::launch::async, [&]
+    {
+        return Consolidation::Consolidate(
+            fixture.Positions, fixture.Normals, params);
+    });
+    auto secondFuture = std::async(std::launch::async, [&]
+    {
+        return Consolidation::Consolidate(
+            fixture.Positions, fixture.Normals, params);
+    });
+    const auto result = Consolidation::Consolidate(
+        fixture.Positions, fixture.Normals, params);
+    const auto repeated = firstFuture.get();
+    const auto concurrent = secondFuture.get();
+    ASSERT_TRUE(result.Succeeded())
+        << Consolidation::DebugName(result.State);
+    ASSERT_EQ(repeated.State, result.State);
+    EXPECT_EQ(repeated.Positions, result.Positions);
+    EXPECT_EQ(repeated.Normals, result.Normals);
+    EXPECT_EQ(concurrent.State, result.State);
+    EXPECT_EQ(concurrent.Positions, result.Positions);
+    EXPECT_EQ(concurrent.Normals, result.Normals);
+    ASSERT_EQ(result.Positions.size(), params.TargetPointCount);
+    ASSERT_EQ(result.Normals.size(), result.Positions.size());
+    EXPECT_EQ(result.Diagnostics.InsertedPointCount, 6u);
+    EXPECT_GT(result.Diagnostics.EdgePriorityEvaluations, 0u);
+    EXPECT_EQ(result.Diagnostics.Strategy, Consolidation::StrategyKind::Ear);
+
+    std::size_t nearCrease = 0u;
+    for (std::size_t i = fixture.Positions.size();
+         i < result.Positions.size(); ++i)
+    {
+        const double distanceToCrease = std::hypot(
+            static_cast<double>(result.Positions[i].x),
+            static_cast<double>(result.Positions[i].z));
+        if (distanceToCrease < 0.30)
+            ++nearCrease;
+    }
+    EXPECT_GE(nearCrease, 4u);
+    EXPECT_LT(MaximumNearestNeighborDistance(result.Positions), 0.30);
+    EXPECT_GT(MinimumPairwiseDistance(result.Positions), 1.0e-5);
+}
+
+TEST(PointCloudConsolidation, AnisotropicNormalPolicyIsExplicitAndImmutable)
+{
+    const auto points = NoisyPlane(5);
+    auto params = ReferenceParams();
+    params.Method = Consolidation::WlopStrategy{
+        .Weighting = Consolidation::WeightingMode::Anisotropic,
+        .NormalSource = Consolidation::NormalSourcePolicy::AuthoredOrEstimate,
+        .NormalRefinementRounds = 1u,
+    };
+    params.MaxIterations = 1u;
+    params.ConvergenceTolerance = 1.0;
+    const auto estimated = Consolidation::Consolidate(points, params);
+    const auto estimatedAgain = Consolidation::Consolidate(points, params);
+    ASSERT_TRUE(estimated.Succeeded())
+        << Consolidation::DebugName(estimated.State);
+    ASSERT_EQ(estimatedAgain.State, estimated.State);
+    EXPECT_EQ(estimatedAgain.Positions, estimated.Positions);
+    EXPECT_EQ(estimatedAgain.Normals, estimated.Normals);
+    EXPECT_TRUE(estimated.Diagnostics.EstimatedNormals);
+    EXPECT_FALSE(estimated.Diagnostics.UsedAuthoredNormals);
+    EXPECT_EQ(estimated.Normals.size(), points.size());
+
+    std::get<Consolidation::WlopStrategy>(params.Method).NormalSource =
+        Consolidation::NormalSourcePolicy::RequireAuthored;
+    const auto required = Consolidation::Consolidate(points, params);
+    EXPECT_EQ(required.State, Consolidation::Status::NormalsRequired);
+    EXPECT_TRUE(required.Positions.empty());
+
+    Geometry::PointCloud::Cloud cloud{};
+    cloud.EnableNormals();
+    std::vector<glm::vec3> authored{};
+    authored.reserve(points.size());
+    for (const glm::vec3 point : points)
+    {
+        const auto handle = cloud.AddPoint(point);
+        cloud.Normal(handle) = {0.0f, 0.0f, 2.0f};
+        authored.push_back(cloud.Normal(handle));
+    }
+    const auto withAuthored = Consolidation::Consolidate(cloud, params);
+    ASSERT_TRUE(withAuthored.Succeeded())
+        << Consolidation::DebugName(withAuthored.State);
+    EXPECT_TRUE(withAuthored.Diagnostics.UsedAuthoredNormals);
+    EXPECT_FALSE(withAuthored.Diagnostics.EstimatedNormals);
+    EXPECT_EQ(std::vector<glm::vec3>(
+                  cloud.Normals().begin(), cloud.Normals().end()),
+              authored);
+    for (const glm::vec3 normal : withAuthored.Normals)
+        EXPECT_NEAR(glm::length(normal), 1.0f, 1.0e-6f);
+}
+
+TEST(PointCloudConsolidation, EarAndAnisotropicFailuresPublishNoPayload)
+{
+    const DihedralFixture fixture = NoisyDihedral(3, 3);
+    auto params = ReferenceParams();
+    params.Method = Consolidation::EarStrategy{
+        .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored,
+        .NormalRefinementRounds = 1u,
+    };
+    params.MaxIterations = 1u;
+    params.ConvergenceTolerance = 1.0;
+    const auto expectFailure = [&fixture](
+        const Consolidation::Params& invalid,
+        const Consolidation::Status expected,
+        const std::span<const glm::vec3> normals)
+    {
+        const auto result = Consolidation::Consolidate(
+            fixture.Positions, normals, invalid);
+        EXPECT_EQ(result.State, expected)
+            << Consolidation::DebugName(result.State);
+        EXPECT_TRUE(result.Positions.empty());
+        EXPECT_TRUE(result.Normals.empty());
+    };
+
+    auto invalid = params;
+    std::get<Consolidation::EarStrategy>(invalid.Method)
+        .NormalAngleRadians = 0.0;
+    expectFailure(invalid, Consolidation::Status::InvalidNormalAngle,
+                  fixture.Normals);
+
+    invalid = params;
+    std::get<Consolidation::EarStrategy>(invalid.Method)
+        .EdgeSensitivity = -1.0;
+    expectFailure(invalid, Consolidation::Status::InvalidEdgeSensitivity,
+                  fixture.Normals);
+
+    invalid = params;
+    std::get<Consolidation::EarStrategy>(invalid.Method)
+        .NormalRefinementRounds = 0u;
+    expectFailure(
+        invalid, Consolidation::Status::InvalidNormalRefinementRounds,
+        fixture.Normals);
+
+    invalid = params;
+    invalid.TargetPointCount = fixture.Positions.size() + 1u;
+    invalid.MaxOutputPointCount = fixture.Positions.size();
+    expectFailure(invalid, Consolidation::Status::InvalidTargetCount,
+                  fixture.Normals);
+
+    std::vector<glm::vec3> invalidNormals = fixture.Normals;
+    invalidNormals[0] = {0.0f, 0.0f, 0.0f};
+    expectFailure(params, Consolidation::Status::InvalidNormals,
+                  invalidNormals);
+    invalidNormals = fixture.Normals;
+    invalidNormals[0].x = std::numeric_limits<float>::quiet_NaN();
+    expectFailure(params, Consolidation::Status::InvalidNormals,
+                  invalidNormals);
+    expectFailure(
+        params, Consolidation::Status::InvalidNormals,
+        std::span<const glm::vec3>{fixture.Normals.data(),
+                                   fixture.Normals.size() - 1u});
+
+    invalid = params;
+    std::get<Consolidation::EarStrategy>(invalid.Method).NormalSource =
+        Consolidation::NormalSourcePolicy::AuthoredOrEstimate;
+    const std::vector<glm::vec3> coincident(
+        6u, glm::vec3{0.0f, 0.0f, 0.0f});
+    const auto degenerate = Consolidation::Consolidate(coincident, invalid);
+    EXPECT_EQ(degenerate.State,
+              Consolidation::Status::NormalEstimationFailed);
+    EXPECT_TRUE(degenerate.Positions.empty());
+    EXPECT_TRUE(degenerate.Normals.empty());
 }
 
 TEST(PointCloudConsolidation, LopRepulsionImprovesMinimumSpacing)

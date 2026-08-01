@@ -18,6 +18,7 @@
 #include "../geometry/Bench.GeometrySmoke.hpp"
 #include "../geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
 #include "../geometry/Bench.ContinuousLopReferenceSmoke.hpp"
+#include "../geometry/Bench.EdgeAwareResamplingReferenceSmoke.hpp"
 #include "../geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp"
 #include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
@@ -721,6 +722,77 @@ auto EmitContinuousLopReferenceSmoke(const std::string &commit)
 
   return EmittedBenchmark{kContinuousLopReferenceSmokeBenchmarkId, out.str(),
                           metrics.Succeeded};
+}
+
+auto EmitEdgeAwareResamplingReferenceSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunEdgeAwareResamplingReferenceSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kEdgeAwareResamplingReferenceSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kEdgeAwareResamplingReferenceSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kEdgeAwareResamplingReferenceSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"correctness_smoke\",\n"
+      << "    \"warmup_iterations\": 1,\n"
+      << "    \"measured_iterations\": 4,\n"
+      << "    \"strategies\": [\"wlop_isotropic\", "
+         "\"wlop_anisotropic\", \"ear\"],\n"
+      << "    \"normal_source\": \"authored\",\n"
+      << "    \"raw_expected_plane_error\": "
+      << metrics.RawExpectedPlaneError << ",\n"
+      << "    \"isotropic_expected_plane_error\": "
+      << metrics.IsotropicExpectedPlaneError << ",\n"
+      << "    \"anisotropic_expected_plane_error\": "
+      << metrics.AnisotropicExpectedPlaneError << ",\n"
+      << "    \"edge_sharpness_preservation\": "
+      << metrics.EdgeSharpnessPreservation << ",\n"
+      << "    \"normal_angular_error_radians\": "
+      << metrics.NormalAngularErrorRadians << ",\n"
+      << "    \"uniformity_min_pairwise_distance\": "
+      << metrics.UniformityMinimumPairwiseDistance << ",\n"
+      << "    \"input_point_count\": " << metrics.InputPointCount << ",\n"
+      << "    \"output_point_count\": " << metrics.OutputPointCount << ",\n"
+      << "    \"inserted_point_count\": " << metrics.InsertedPointCount
+      << ",\n"
+      << "    \"inserted_near_feature_count\": "
+      << metrics.InsertedNearFeatureCount << ",\n"
+      << "    \"edge_priority_evaluations\": "
+      << metrics.EdgePriorityEvaluations << ",\n"
+      << "    \"anisotropic_iterations\": "
+      << metrics.AnisotropicIterations << ",\n"
+      << "    \"normal_refinement_iterations\": "
+      << metrics.NormalRefinementIterations << ",\n"
+      << "    \"used_authored_normals\": "
+      << (metrics.UsedAuthoredNormals ? "true" : "false") << ",\n"
+      << "    \"deterministic\": "
+      << (metrics.Deterministic ? "true" : "false") << ",\n"
+      << "    \"failure_status\": \""
+      << (metrics.NormalsRequiredFailedClosed ? "normals_required"
+                                              : "unexpected")
+      << "\"\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kEdgeAwareResamplingReferenceSmokeBenchmarkId,
+                          out.str(), metrics.Succeeded};
 }
 
 auto EmitSurfaceSamplingSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -1643,6 +1715,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
   emitted.push_back(EmitPointCloudConsolidationReferenceSmoke(commit));
   emitted.push_back(EmitContinuousLopReferenceSmoke(commit));
+  emitted.push_back(EmitEdgeAwareResamplingReferenceSmoke(commit));
   emitted.push_back(EmitBoundaryFirstFlatteningReferenceSmoke(commit));
   emitted.push_back(EmitSimplificationQualitySmoke(commit));
   emitted.push_back(EmitSurfaceSamplingSmoke(commit));

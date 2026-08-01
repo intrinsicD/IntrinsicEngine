@@ -83,6 +83,16 @@ export namespace Geometry::PointCloud::Kernels
         double supportRadius,
         KernelType kernel) noexcept;
 
+    // Huang et al.'s edge-aware attraction factor
+    // phi(n, d)=exp(-(dot(n,d)^2/h^2)) inside the compact support r<h.
+    // The supplied direction is normalized internally; a non-finite or
+    // degenerate direction fails closed. The result is exactly zero at and
+    // beyond h so callers can share the radial broad phase.
+    [[nodiscard]] std::optional<double> DirectionalWeight(
+        glm::vec3 offset,
+        glm::vec3 direction,
+        double supportRadius) noexcept;
+
     // Stable WLOP linear repulsion potential eta(r,h)=-r/h and derivative
     // d eta/dr=-1/h. Both have finite r->0 limits. Projection owners combine
     // the derivative magnitude with their directional term; no 1/r is hidden

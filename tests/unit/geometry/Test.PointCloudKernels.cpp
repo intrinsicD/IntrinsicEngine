@@ -115,6 +115,42 @@ TEST(PointCloudKernels, RadialWeightsPreserveZeroDistanceAtExtremeSupportScales)
     }
 }
 
+TEST(PointCloudKernels, DirectionalWeightMatchesEdgeAwareEquation)
+{
+    constexpr double h = 2.0;
+    const auto tangent = Kernels::DirectionalWeight(
+        {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 3.0f}, h);
+    const auto normal = Kernels::DirectionalWeight(
+        {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 3.0f}, h);
+    const auto oblique = Kernels::DirectionalWeight(
+        {1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, h);
+    ASSERT_TRUE(tangent.has_value());
+    ASSERT_TRUE(normal.has_value());
+    ASSERT_TRUE(oblique.has_value());
+    EXPECT_DOUBLE_EQ(*tangent, 1.0);
+    EXPECT_NEAR(*normal, std::exp(-0.25), 1.0e-15);
+    EXPECT_NEAR(*oblique, std::exp(-0.25), 1.0e-15);
+    EXPECT_GT(*tangent, *normal);
+
+    EXPECT_DOUBLE_EQ(*Kernels::DirectionalWeight(
+        {2.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, h), 0.0);
+    EXPECT_DOUBLE_EQ(*Kernels::DirectionalWeight(
+        {3.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, h), 0.0);
+}
+
+TEST(PointCloudKernels, DirectionalWeightFailsClosed)
+{
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    EXPECT_FALSE(Kernels::DirectionalWeight(
+        {nan, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 1.0));
+    EXPECT_FALSE(Kernels::DirectionalWeight(
+        {0.0f, 0.0f, 0.0f}, {nan, 0.0f, 1.0f}, 1.0));
+    EXPECT_FALSE(Kernels::DirectionalWeight(
+        {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, 1.0));
+    EXPECT_FALSE(Kernels::DirectionalWeight(
+        {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 0.0));
+}
+
 TEST(PointCloudKernels, LinearRepulsionHasFiniteZeroLimit)
 {
     const auto atZero = Kernels::Repulsion(0.0, 2.0);

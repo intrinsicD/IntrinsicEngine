@@ -1,7 +1,7 @@
 id: geometry.edge_aware_resampling
 name: Edge-Aware Point Set Resampling
 domain: geometry
-status: proposed
+status: reference
 paper:
   title: "Edge-Aware Point Set Resampling"
   authors: "Hui Huang, Shihao Wu, Minglun Gong, Daniel Cohen-Or, Uri Ascher, Hao Zhang"
@@ -28,7 +28,7 @@ correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
   - "../../../tests/unit/geometry/Test.PointCloudKernels.cpp"
 benchmarks:
-  - "TODO: ../../../benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml"
 known_limitations:
   - "The original fixed support and normal-angle controls require scale/noise-aware tuning and do not handle open boundaries explicitly."
   - "Severe noise, under-sampling, close sheets, or erroneous normal orientation can over-smooth or over-sharpen features."

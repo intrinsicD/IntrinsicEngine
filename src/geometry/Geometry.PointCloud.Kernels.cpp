@@ -334,6 +334,40 @@ namespace Geometry::PointCloud::Kernels
         return value;
     }
 
+    std::optional<double> DirectionalWeight(
+        const glm::vec3 offset,
+        const glm::vec3 direction,
+        const double supportRadius) noexcept
+    {
+        if (!IsFinite(offset) || !IsFinite(direction) ||
+            !std::isfinite(supportRadius) || !(supportRadius > 0.0))
+        {
+            return std::nullopt;
+        }
+
+        const glm::dvec3 delta{offset};
+        const glm::dvec3 normal{direction};
+        const double distanceSquared = glm::dot(delta, delta);
+        const double normalLengthSquared = glm::dot(normal, normal);
+        if (!std::isfinite(distanceSquared) || distanceSquared < 0.0 ||
+            !std::isfinite(normalLengthSquared) ||
+            !(normalLengthSquared > std::numeric_limits<double>::epsilon()))
+        {
+            return std::nullopt;
+        }
+        if (distanceSquared >= supportRadius * supportRadius)
+            return 0.0;
+
+        const double projection =
+            glm::dot(normal, delta) / std::sqrt(normalLengthSquared);
+        const double normalizedProjection = projection / supportRadius;
+        const double value = std::exp(
+            -normalizedProjection * normalizedProjection);
+        if (!std::isfinite(value) || value < 0.0)
+            return std::nullopt;
+        return value;
+    }
+
     std::optional<double> Repulsion(
         const double distance,
         const double supportRadius) noexcept

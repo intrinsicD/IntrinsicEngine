@@ -1,6 +1,6 @@
 # Edge-Aware Point Set Resampling
 
-Method ID: `geometry.edge_aware_resampling`. Status: **paper intake**.
+Method ID: `geometry.edge_aware_resampling`. Status: **CPU reference**.
 
 This package records the original EAR CPU-reference contract. Executable code
 extends `Geometry.PointCloud.Consolidation` and the shared point-cloud kernels;
@@ -10,7 +10,7 @@ it does not create a method-owned engine module, registry, or normal service.
 
 | Backend | Status | Owner |
 | --- | --- | --- |
-| `cpu_reference` | in progress | METHOD-018 |
+| `cpu_reference` | implemented | METHOD-018 |
 | optimized CPU | planned | METHOD-019 |
 | Vulkan compute | planned | METHOD-020 |
 
@@ -46,3 +46,8 @@ a method-local copy and never overwrites the source property.
 - Correctness: `tests/unit/geometry/Test.PointCloudConsolidation.cpp` and
   `tests/unit/geometry/Test.PointCloudKernels.cpp`
 - Smoke: `benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml`
+
+The confirmation smoke uses a distinct built-in noisy dihedral cohort and
+records the isotropic WLOP contrast, expected-plane error, retained normal
+angle, output count, feature-directed insertions, spacing, normal source,
+determinism, and fail-closed identity. Its runtime is descriptive only.
