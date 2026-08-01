@@ -91,6 +91,16 @@
   `Weight` is the finite `Psi(u)/u` IRLS weight on scaled residual
   `u = residual / scale`. Non-finite residuals and non-positive or non-finite
   scales fail closed with `std::nullopt`.
+- `Geometry.GaussianMixture` is the narrow CPU-reference surface for 3D
+  multivariate-Gaussian evaluation, seeded sampling, posterior
+  responsibilities, and deterministic expectation-maximization fitting. EM
+  initializes through `Geometry.KMeans`' seeded `KMeansPlusPlus` policy,
+  applies a caller-visible covariance floor, and reports explicit iteration,
+  convergence, likelihood-history, regularization, and acceleration
+  diagnostics. Optional Anderson proposals reuse the domain-neutral
+  `Geometry.FixedPoint.Anderson` mixer and are accepted only after Gaussian
+  invariants and non-decreasing likelihood are verified; both modules remain
+  narrow imports rather than broad `Geometry` umbrella exports.
 - `Geometry.Registration` keeps percentile trimming (`InlierRatio`) as the
   default ICP outlier policy. Optional robust weighting is explicit through
   `RegistrationParams::RobustKernelKind` plus `RobustScale`; when selected, ICP

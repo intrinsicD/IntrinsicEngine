@@ -441,6 +441,7 @@ set(_geometry_test_files
     Test.PointCloudConversion.cpp
     Test_MeshBuilder.cpp
     Test_GeometryProcessing.cpp
+    Test.GaussianMixture.cpp
     Test_SurfaceReconstruction.cpp
     Test_MeshQuality.cpp
     Test_MeshAnalysis.cpp

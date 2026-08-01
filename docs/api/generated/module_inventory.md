@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 103 |
+| `geometry` | 105 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 71 |
@@ -125,8 +125,10 @@ Root scanned: `src`
 | `Geometry.DomainViews` | `src/geometry/Geometry.DomainViews.cppm` | `geometry` |
 | `Geometry.EPA` | `src/geometry/Geometry.EPA.cppm` | `geometry` |
 | `Geometry.Ellipsoid` | `src/geometry/Geometry.Ellipsoid.cppm` | `geometry` |
+| `Geometry.FixedPoint.Anderson` | `src/geometry/Geometry.FixedPoint.Anderson.cppm` | `geometry` |
 | `Geometry.Frustum` | `src/geometry/Geometry.Frustum.cppm` | `geometry` |
 | `Geometry.GJK` | `src/geometry/Geometry.GJK.cppm` | `geometry` |
+| `Geometry.GaussianMixture` | `src/geometry/Geometry.GaussianMixture.cppm` | `geometry` |
 | `Geometry.Graph.Fwd` | `src/geometry/Geometry.Graph.Fwd.cppm` | `geometry` |
 | `Geometry.Graph.IO` | `src/geometry/Geometry.Graph.IO.cppm` | `geometry` |
 | `Geometry.Graph.ShortestPath` | `src/geometry/Geometry.Graph.ShortestPath.cppm` | `geometry` |
@@ -404,4 +406,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **377**
+Total modules: **379**

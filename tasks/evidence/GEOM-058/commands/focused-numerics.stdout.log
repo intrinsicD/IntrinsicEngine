@@ -1,0 +1,26 @@
+Internal ctest changing into directory: /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+Test project /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+    Start 1638: AndersonAcceleration.ContractionUsesFiniteSafeguardedMix
+1/8 Test #1638: AndersonAcceleration.ContractionUsesFiniteSafeguardedMix ..............   Passed    0.00 sec
+    Start 1639: GaussianMixture.KMeansPlusPlusInitializationIsSeedDeterministic
+2/8 Test #1639: GaussianMixture.KMeansPlusPlusInitializationIsSeedDeterministic .......   Passed    0.00 sec
+    Start 1640: GaussianMixture.IdentityLogPdfAndSeededSampleAreDeterministic
+3/8 Test #1640: GaussianMixture.IdentityLogPdfAndSeededSampleAreDeterministic .........   Passed    0.00 sec
+    Start 1641: GaussianMixture.RecoversSeparatedComponentsAndMonotonicLikelihood
+4/8 Test #1641: GaussianMixture.RecoversSeparatedComponentsAndMonotonicLikelihood .....   Passed    0.00 sec
+    Start 1642: GaussianMixture.RecoversThreeSeparatedComponents
+5/8 Test #1642: GaussianMixture.RecoversThreeSeparatedComponents ......................   Passed    0.00 sec
+    Start 1643: GaussianMixture.AndersonMatchesPlainEmWithoutMoreIterations
+6/8 Test #1643: GaussianMixture.AndersonMatchesPlainEmWithoutMoreIterations ...........   Passed    0.03 sec
+    Start 1644: GaussianMixture.CoincidentPointsUseCovarianceFloorDeterministically
+7/8 Test #1644: GaussianMixture.CoincidentPointsUseCovarianceFloorDeterministically ...   Passed    0.00 sec
+    Start 1645: GaussianMixture.InvalidInputsFailClosed
+8/8 Test #1645: GaussianMixture.InvalidInputsFailClosed ...............................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 8
+
+Label Time Summary:
+geometry    =   0.05 sec*proc (8 tests)
+unit        =   0.05 sec*proc (8 tests)
+
+Total Test time (real) =   0.58 sec

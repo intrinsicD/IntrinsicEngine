@@ -17,7 +17,9 @@ target_sources(${target_name}
         Geometry.DomainViews.cppm
         Geometry.EPA.cppm
         Geometry.Ellipsoid.cppm
+        Geometry.FixedPoint.Anderson.cppm
         Geometry.Frustum.cppm
+        Geometry.GaussianMixture.cppm
         Geometry.GJK.cppm
         Geometry.Graph.IO.cppm
         Geometry.Graph.ShortestPath.cppm
@@ -117,7 +119,9 @@ target_sources(${target_name}
         Geometry.DomainViews.cpp
         Geometry.Ellipsoid.cpp
         Geometry.EPA.cpp
+        Geometry.FixedPoint.Anderson.cpp
         Geometry.Frustum.cpp
+        Geometry.GaussianMixture.cpp
         Geometry.GJK.cpp
         Geometry.Graph.IO.cpp
         Geometry.Graph.ShortestPath.cpp
