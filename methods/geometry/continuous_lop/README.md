@@ -1,6 +1,6 @@
 # Continuous Locally Optimal Projection
 
-Method ID: `geometry.continuous_lop`. Status: **intake frozen**.
+Method ID: `geometry.continuous_lop`. Status: **CPU reference**.
 
 This package records the CLOP CPU-reference contract. The executable strategy
 extends `Geometry.PointCloud.Consolidation`; it does not create a parallel
@@ -10,7 +10,7 @@ method module or backend registry.
 
 | Backend | Status | Owner |
 | --- | --- | --- |
-| `cpu_reference` | in progress | METHOD-017 |
+| `cpu_reference` | implemented | METHOD-017 |
 | optimized CPU | planned | METHOD-019 |
 | Vulkan compute | planned | METHOD-020 |
 
@@ -26,9 +26,12 @@ work; lowering it can blur thin sheets.
 
 - Ordinary EM is used instead of the paper's hierarchical constrained fit.
 - The mixture covariance floor and resolution can bias thin structures.
+- The reference intentionally preserves CLOP's published three-Gaussian
+  approximation. Stotko, Weinmann, and Klein's 2024 incomplete-gamma kernel
+  is a documented accuracy extension, not an unreviewed change to this oracle.
 - The reference is serial and makes no throughput claim.
 
 ## Verification targets
 
 - Correctness: `tests/unit/geometry/Test.PointCloudConsolidation.cpp`
-- Smoke: added with the CPU reference before task retirement
+- Smoke: `benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml`

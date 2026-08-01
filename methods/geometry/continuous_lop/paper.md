@@ -18,6 +18,43 @@ uses the existing deterministic ordinary-EM implementation, not the paper's
 hierarchical EM accelerator, and makes no scanner-data, runtime, optimized, or
 GPU generalization.
 
+## Literature lineage and extension review
+
+The implementation was checked against the primary LOP-family lineage rather
+than treating CLOP in isolation:
+
+- Lipman et al., [Parameterization-Free Projection for Geometry
+  Reconstruction](https://www.wisdom.weizmann.ac.il/~ylipman/lop/lop.htm)
+  (SIGGRAPH 2007), introduced the normal-free localized L1 projection and
+  repulsion structure. This remains the semantic base of the shared strategy.
+- Huang et al., [Consolidation of Unorganized Point Clouds for Surface
+  Reconstruction](https://www.cs.ubc.ca/~ascher/papers/hlzac.pdf) (SIGGRAPH
+  Asia 2009), added WLOP density correction and a separate robust normal
+  pipeline. METHOD-016 implements the density-corrected positional reference;
+  METHOD-018, not CLOP, owns normal-aware behavior.
+- Liao, Xiao, and Jin, [Efficient Feature-preserving Local Projection Operator
+  for Geometry Reconstruction](https://diglib.eg.org/bitstream/handle/10.2312/EG2011.short.013-016/013-016.pdf)
+  (Eurographics 2011), combined bilateral normal weighting with stochastic KDE
+  sampling. Its directional weighting informs the METHOD-018 comparison, but
+  its randomized approximation is excluded from this deterministic reference.
+- Preiner et al. (2014), the governing CLOP paper above, replaced the discrete
+  attraction sum with an analytic integral over a Gaussian mixture and used a
+  hierarchical EM construction for acceleration. The reference adopts the
+  analytic Gaussian-product equation while deliberately reusing the existing
+  seeded ordinary `FitEM` seam.
+- Stotko, Weinmann, and Klein, [Incomplete Gamma Kernels: Generalizing Locally
+  Optimal Projection Operators](https://doi.org/10.1109/TPAMI.2024.3349967)
+  (TPAMI 2024), relates LOP to mean shift and derives improved WLOP density
+  weighting and a more accurate CLOP kernel approximation. Those are valuable
+  follow-up variants, but substituting either would invalidate the frozen
+  original-paper equation oracle; they require a separately named strategy and
+  parity evidence.
+
+This review fixes the adoption boundary: original CLOP equations are the
+reference, deterministic existing mixture fitting is the repository-sized
+substitution, and later accuracy/acceleration variants remain explicit future
+work rather than hidden implementation drift.
+
 ## Mathematical formulation
 
 The input density is a normalized Gaussian mixture

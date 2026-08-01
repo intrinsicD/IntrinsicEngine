@@ -27,12 +27,22 @@ export namespace Geometry::PointCloud::Consolidation
     {
     };
 
-    using Strategy = std::variant<LopStrategy, WlopStrategy>;
+    struct ClopStrategy
+    {
+        std::uint32_t MixtureComponentCount{16u};
+        std::uint32_t MixtureMaxIterations{100u};
+        double MixtureRelativeTolerance{1.0e-6};
+        // Positive diagonal covariance floor in squared world units.
+        double CovarianceFloor{1.0e-6};
+    };
+
+    using Strategy = std::variant<LopStrategy, WlopStrategy, ClopStrategy>;
 
     enum class StrategyKind : std::uint8_t
     {
         Lop = 0,
         Wlop,
+        Clop,
     };
 
     enum class Status : std::uint8_t
@@ -47,11 +57,16 @@ export namespace Geometry::PointCloud::Consolidation
         InvalidIterationLimit,
         InvalidConvergenceTolerance,
         InvalidTargetCount,
+        InvalidMixtureComponentCount,
+        InvalidMixtureParameters,
         ResourceLimit,
         SpatialIndexBuildFailed,
         SpatialQueryFailed,
         EmptyNeighborhood,
         DensityEstimationFailed,
+        MixtureFitFailed,
+        MixtureNotConverged,
+        EmptyContinuousAttraction,
         NumericalFailure,
         NotConverged,
     };
@@ -59,15 +74,15 @@ export namespace Geometry::PointCloud::Consolidation
     struct Params
     {
         Strategy Method{WlopStrategy{}};
-        // World-unit compact support shared by attraction, repulsion, and
-        // density estimation.
+        // World-unit kernel scale. LOP/WLOP use it as compact support;
+        // CLOP scales the paper's analytic Gaussian approximation by it.
         double SupportRadius{1.0};
         // LOP-family balance parameter, constrained to [0, 0.5).
         double RepulsionWeight{0.45};
         std::uint32_t MaxIterations{20u};
         // Absolute world-unit maximum displacement stopping tolerance.
         double ConvergenceTolerance{1.0e-4};
-        // Zero preserves the input count. LOP/WLOP otherwise downsample only.
+        // Zero preserves the input count; non-zero values downsample only.
         std::size_t TargetPointCount{0u};
         std::uint32_t Seed{42u};
         // Deterministic caller-controlled guard for the serial reference's
@@ -86,6 +101,10 @@ export namespace Geometry::PointCloud::Consolidation
         std::uint32_t Iterations{0u};
         bool Converged{false};
         bool UsedDensityWeighting{false};
+        bool UsedContinuousAttraction{false};
+        std::size_t MixtureComponentCount{0u};
+        std::uint32_t MixtureIterations{0u};
+        bool MixtureConverged{false};
         std::size_t AttractionContributionCount{0u};
         std::size_t RepulsionContributionCount{0u};
         std::size_t DensityContributionCount{0u};

@@ -330,16 +330,23 @@ point-cloud mutation, normal estimation, or backend selection, and is not
 re-exported through the broad `Geometry` umbrella.
 
 `Geometry.PointCloud.Consolidation` is the deterministic serial CPU-reference
-owner for the LOP method family. Its typed `Strategy` initially exposes plain
-LOP and density-corrected WLOP; both consume the shared compact-support kernel
-and density seam above. `Consolidate` accepts either an immutable position span
+owner for the LOP method family. Its typed `Strategy` exposes plain LOP,
+density-corrected WLOP, and continuous CLOP. LOP/WLOP consume the shared
+compact-support kernel and density seam above. CLOP fits a seeded
+`Geometry.GaussianMixture` through the existing ordinary-EM reference and
+evaluates the governing paper's three-Gaussian closed-form attraction in fixed
+component order; it reuses the same repulsion kernel and reports mixture
+resolution, EM convergence, and component-bounded attraction work.
+`Consolidate` accepts either an immutable position span
 or a valid, garbage-free `PointCloud::Cloud`, uses the existing seeded random
 subsampler plus a theta-weighted L2 initializer, and returns owned projected
 positions with strategy, convergence, displacement, and contribution-count
 diagnostics. Support radius and convergence tolerance are world-unit values;
 `mu` is constrained to `[0, 0.5)`, and coincident inverse-distance terms use a
 documented `0.01 h` floor. Hard failures publish no output, while
-`NotConverged` retains only the last finite iterate for caller preview. Runtime
+`NotConverged` retains only the last finite iterate for caller preview. CLOP
+also fails closed for invalid mixture controls, failed/non-converged EM, or an
+empty/non-finite continuous attraction. Runtime
 configuration, ECS writeback/history, editor controls, and future optimized
 backend selection remain higher-layer responsibilities.
 

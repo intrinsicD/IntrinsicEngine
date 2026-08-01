@@ -1,5 +1,8 @@
 # Benchmarks
 
-The frozen intake requires a deterministic built-in CLOP correctness smoke.
-Its executable manifest is added with the CPU reference before retirement; no
-performance claim is authorized by this package.
+The deterministic built-in CLOP correctness smoke is declared by
+`benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml` and executed
+by `IntrinsicBenchmarkSmoke`. It reports surface error, WLOP parity, mixture
+resolution and contribution counts, uniformity, outlier displacement,
+EM/projection convergence, and the fail-closed status. Runtime is diagnostic;
+no performance claim is authorized by this package.

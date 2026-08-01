@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +16,7 @@ module;
 
 module Geometry.PointCloud.Consolidation;
 
+import Geometry.GaussianMixture;
 import Geometry.KDTree;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Kernels;
@@ -25,12 +27,53 @@ namespace Geometry::PointCloud::Consolidation
     namespace
     {
         namespace Kernels = Geometry::PointCloud::Kernels;
+        namespace GMM = Geometry::GaussianMixture;
+
+        struct ContinuousAttractionModel
+        {
+            GMM::Model Mixture{};
+        };
+
+        struct ClopGaussianTerm
+        {
+            double Weight{0.0};
+            double Sigma{0.0};
+        };
+
+        // Figure 5 of Preiner et al. 2014. These normalized Gaussian terms
+        // approximate theta(r)/r over r/h in [0, 1].
+        inline constexpr std::array<ClopGaussianTerm, 3u>
+            kClopAttractionTerms{{
+                {11.453, 0.11772},
+                {29.886, 0.03287},
+                {97.761, 0.01010},
+            }};
 
         [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
         {
             return std::isfinite(value.x) &&
                    std::isfinite(value.y) &&
                    std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::dvec3 value) noexcept
+        {
+            return std::isfinite(value.x) &&
+                   std::isfinite(value.y) &&
+                   std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::dmat3& value) noexcept
+        {
+            for (std::size_t column = 0u; column < 3u; ++column)
+            {
+                for (std::size_t row = 0u; row < 3u; ++row)
+                {
+                    if (!std::isfinite(value[column][row]))
+                        return false;
+                }
+            }
+            return true;
         }
 
         [[nodiscard]] double DistanceSquared(
@@ -81,6 +124,8 @@ namespace Geometry::PointCloud::Consolidation
             result.Diagnostics.InputPointCount = positions.size();
             result.Diagnostics.UsedDensityWeighting =
                 std::holds_alternative<WlopStrategy>(params.Method);
+            result.Diagnostics.UsedContinuousAttraction =
+                std::holds_alternative<ClopStrategy>(params.Method);
             if (positions.empty())
             {
                 result.State = Status::EmptyInput;
@@ -98,7 +143,12 @@ namespace Geometry::PointCloud::Consolidation
                 result.State = Status::ResourceLimit;
                 return result;
             }
-            if (!std::ranges::all_of(positions, IsFinite))
+            if (!std::ranges::all_of(
+                    positions,
+                    [](const glm::vec3 value) noexcept
+                    {
+                        return IsFinite(value);
+                    }))
             {
                 result.State = Status::NonFiniteInput;
                 return result;
@@ -138,6 +188,27 @@ namespace Geometry::PointCloud::Consolidation
             {
                 result.State = Status::InvalidTargetCount;
                 return result;
+            }
+            if (const auto* clop =
+                    std::get_if<ClopStrategy>(&params.Method))
+            {
+                result.Diagnostics.MixtureComponentCount =
+                    clop->MixtureComponentCount;
+                if (clop->MixtureComponentCount == 0u ||
+                    clop->MixtureComponentCount > positions.size())
+                {
+                    result.State = Status::InvalidMixtureComponentCount;
+                    return result;
+                }
+                if (clop->MixtureMaxIterations == 0u ||
+                    !std::isfinite(clop->MixtureRelativeTolerance) ||
+                    clop->MixtureRelativeTolerance < 0.0 ||
+                    !std::isfinite(clop->CovarianceFloor) ||
+                    !(clop->CovarianceFloor > 0.0))
+                {
+                    result.State = Status::InvalidMixtureParameters;
+                    return result;
+                }
             }
             result.State = Status::Success;
             return result;
@@ -186,6 +257,166 @@ namespace Geometry::PointCloud::Consolidation
                 sample->Subsampled.Positions().begin(),
                 sample->Subsampled.Positions().end());
             return projected.size() == target;
+        }
+
+        [[nodiscard]] bool FitContinuousAttractionModel(
+            const std::span<const glm::vec3> positions,
+            const ClopStrategy& strategy,
+            const std::uint32_t seed,
+            ContinuousAttractionModel& out,
+            Diagnostics& diagnostics,
+            Status& failure)
+        {
+            GMM::FitParams fitParams{};
+            fitParams.MaxIterations = strategy.MixtureMaxIterations;
+            fitParams.RelativeTolerance =
+                strategy.MixtureRelativeTolerance;
+            fitParams.CovarianceFloor = strategy.CovarianceFloor;
+            fitParams.Seed = seed;
+            const auto fit = GMM::FitEM(
+                positions, strategy.MixtureComponentCount, fitParams);
+            diagnostics.MixtureIterations = fit.Diagnostics.Iterations;
+            diagnostics.MixtureConverged = fit.Diagnostics.Converged;
+            diagnostics.MixtureComponentCount = fit.Mixture.Components.size();
+            if (!fit.Succeeded())
+            {
+                failure = Status::MixtureFitFailed;
+                return false;
+            }
+            if (!fit.Diagnostics.Converged)
+            {
+                failure = Status::MixtureNotConverged;
+                return false;
+            }
+            out.Mixture = fit.Mixture;
+            return true;
+        }
+
+        [[nodiscard]] bool AccumulateGaussianProduct(
+            const GMM::MultivariateGaussian& gaussian,
+            const double mixtureWeight,
+            const glm::dvec3 query,
+            const double supportRadius,
+            const ClopGaussianTerm term,
+            glm::dvec3& weightedMeanSum,
+            double& weightSum,
+            std::size_t& contributionCount) noexcept
+        {
+            const double scaledSigma = term.Sigma * supportRadius;
+            const double variance = scaledSigma * scaledSigma;
+            if (!std::isfinite(variance) || !(variance > 0.0) ||
+                !std::isfinite(mixtureWeight) ||
+                !(mixtureWeight > 0.0) || !IsFinite(query))
+            {
+                return false;
+            }
+
+            const glm::dmat3 covarianceSum =
+                gaussian.Covariance + glm::dmat3{variance};
+            const double determinant = glm::determinant(covarianceSum);
+            if (!IsFinite(covarianceSum) || !std::isfinite(determinant) ||
+                !(determinant > 0.0))
+            {
+                return false;
+            }
+            const glm::dmat3 inverse = glm::inverse(covarianceSum);
+            if (!IsFinite(inverse))
+                return false;
+
+            const glm::dvec3 delta = gaussian.Mean - query;
+            double mahalanobisSquared = glm::dot(delta, inverse * delta);
+            if (!std::isfinite(mahalanobisSquared) ||
+                mahalanobisSquared < -1.0e-12)
+            {
+                return false;
+            }
+            mahalanobisSquared = std::max(0.0, mahalanobisSquared);
+            const double weight = mixtureWeight * term.Weight *
+                scaledSigma * scaledSigma * scaledSigma /
+                std::sqrt(determinant) *
+                std::exp(-0.5 * mahalanobisSquared);
+            if (!std::isfinite(weight) || weight < 0.0)
+                return false;
+            if (!(weight > 0.0))
+                return true;
+
+            const glm::dvec3 productMean =
+                query + variance * (inverse * delta);
+            if (!IsFinite(productMean))
+                return false;
+            weightedMeanSum += weight * productMean;
+            weightSum += weight;
+            ++contributionCount;
+            return IsFinite(weightedMeanSum) && std::isfinite(weightSum);
+        }
+
+        [[nodiscard]] bool ContinuousAttraction(
+            const ContinuousAttractionModel& model,
+            const glm::vec3 query,
+            const double supportRadius,
+            const std::span<const ClopGaussianTerm> terms,
+            glm::vec3& out,
+            Diagnostics& diagnostics,
+            Status& failure)
+        {
+            glm::dvec3 weightedMeanSum{0.0};
+            double weightSum = 0.0;
+            std::size_t contributionCount = 0u;
+            for (std::size_t component = 0u;
+                 component < model.Mixture.Components.size();
+                 ++component)
+            {
+                for (const ClopGaussianTerm term : terms)
+                {
+                    if (!AccumulateGaussianProduct(
+                            model.Mixture.Components[component],
+                            model.Mixture.Weights[component],
+                            glm::dvec3(query), supportRadius, term,
+                            weightedMeanSum, weightSum,
+                            contributionCount))
+                    {
+                        failure = Status::NumericalFailure;
+                        return false;
+                    }
+                }
+            }
+            diagnostics.AttractionContributionCount += contributionCount;
+            if (!(weightSum > 0.0) || !std::isfinite(weightSum))
+            {
+                ++diagnostics.EmptyNeighborhoodCount;
+                failure = Status::EmptyContinuousAttraction;
+                return false;
+            }
+            if (!ToFiniteVec3(weightedMeanSum / weightSum, out))
+            {
+                failure = Status::NumericalFailure;
+                return false;
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool ContinuousL2Initialize(
+            const ContinuousAttractionModel& model,
+            const double supportRadius,
+            std::vector<glm::vec3>& projected,
+            Diagnostics& diagnostics,
+            Status& failure)
+        {
+            constexpr ClopGaussianTerm thetaTerm{
+                1.0, 0.1767766952966369}; // sqrt(1/32)
+            std::vector<glm::vec3> initialized(projected.size());
+            for (std::size_t i = 0u; i < projected.size(); ++i)
+            {
+                if (!ContinuousAttraction(
+                        model, projected[i], supportRadius,
+                        std::span<const ClopGaussianTerm>{&thetaTerm, 1u},
+                        initialized[i], diagnostics, failure))
+                {
+                    return false;
+                }
+            }
+            projected = std::move(initialized);
+            return true;
         }
 
         [[nodiscard]] bool L2Initialize(
@@ -249,6 +480,7 @@ namespace Geometry::PointCloud::Consolidation
             const std::span<const glm::vec3> source,
             const Geometry::KDTree& sourceIndex,
             const std::span<const float> sourceWeights,
+            const ContinuousAttractionModel* continuousModel,
             const Params& params,
             std::vector<glm::vec3>& projected,
             Diagnostics& diagnostics,
@@ -295,45 +527,65 @@ namespace Geometry::PointCloud::Consolidation
 
             for (std::size_t i = 0u; i < projected.size(); ++i)
             {
-                if (!QueryNeighbors(sourceIndex, projected[i],
-                                    params.SupportRadius, neighbors))
-                {
-                    failure = Status::SpatialQueryFailed;
-                    return false;
-                }
-
                 glm::dvec3 attraction{0.0};
                 double attractionWeight = 0.0;
-                for (const auto neighbor : neighbors)
+                if (continuousModel != nullptr)
                 {
-                    if (neighbor >= source.size())
-                        continue;
-                    const double distanceSquared =
-                        DistanceSquared(projected[i], source[neighbor]);
-                    const auto radial = Kernels::Weight(
-                        distanceSquared,
-                        params.SupportRadius,
-                        Kernels::KernelType::ThetaLop);
-                    if (!radial.has_value())
+                    glm::vec3 continuousAttraction{0.0f};
+                    if (!ContinuousAttraction(
+                            *continuousModel, projected[i],
+                            params.SupportRadius,
+                            std::span<const ClopGaussianTerm>{
+                                kClopAttractionTerms},
+                            continuousAttraction, diagnostics, failure))
                     {
-                        failure = Status::NumericalFailure;
                         return false;
                     }
-                    const double distance = std::sqrt(distanceSquared);
-                    const double weight = *radial * sourceWeights[neighbor] /
-                        std::max(distance, distanceFloor);
-                    if (!(weight > 0.0) || !std::isfinite(weight))
-                        continue;
-                    attraction += glm::dvec3(source[neighbor]) * weight;
-                    attractionWeight += weight;
-                    ++diagnostics.AttractionContributionCount;
+                    attraction = glm::dvec3(continuousAttraction);
+                    attractionWeight = 1.0;
                 }
-                if (!(attractionWeight > 0.0) ||
-                    !std::isfinite(attractionWeight))
+                else
                 {
-                    ++diagnostics.EmptyNeighborhoodCount;
-                    failure = Status::EmptyNeighborhood;
-                    return false;
+                    if (!QueryNeighbors(sourceIndex, projected[i],
+                                        params.SupportRadius, neighbors))
+                    {
+                        failure = Status::SpatialQueryFailed;
+                        return false;
+                    }
+
+                    for (const auto neighbor : neighbors)
+                    {
+                        if (neighbor >= source.size())
+                            continue;
+                        const double distanceSquared =
+                            DistanceSquared(projected[i], source[neighbor]);
+                        const auto radial = Kernels::Weight(
+                            distanceSquared,
+                            params.SupportRadius,
+                            Kernels::KernelType::ThetaLop);
+                        if (!radial.has_value())
+                        {
+                            failure = Status::NumericalFailure;
+                            return false;
+                        }
+                        const double distance = std::sqrt(distanceSquared);
+                        const double weight =
+                            *radial * sourceWeights[neighbor] /
+                            std::max(distance, distanceFloor);
+                        if (!(weight > 0.0) || !std::isfinite(weight))
+                            continue;
+                        attraction +=
+                            glm::dvec3(source[neighbor]) * weight;
+                        attractionWeight += weight;
+                        ++diagnostics.AttractionContributionCount;
+                    }
+                    if (!(attractionWeight > 0.0) ||
+                        !std::isfinite(attractionWeight))
+                    {
+                        ++diagnostics.EmptyNeighborhoodCount;
+                        failure = Status::EmptyNeighborhood;
+                        return false;
+                    }
                 }
 
                 if (!QueryNeighbors(projectedIndex, projected[i],
@@ -406,6 +658,7 @@ namespace Geometry::PointCloud::Consolidation
         {
         case StrategyKind::Lop: return "lop";
         case StrategyKind::Wlop: return "wlop";
+        case StrategyKind::Clop: return "clop";
         }
         return "invalid";
     }
@@ -425,6 +678,10 @@ namespace Geometry::PointCloud::Consolidation
         case Status::InvalidConvergenceTolerance:
             return "invalid_convergence_tolerance";
         case Status::InvalidTargetCount: return "invalid_target_count";
+        case Status::InvalidMixtureComponentCount:
+            return "invalid_mixture_component_count";
+        case Status::InvalidMixtureParameters:
+            return "invalid_mixture_parameters";
         case Status::ResourceLimit: return "resource_limit";
         case Status::SpatialIndexBuildFailed:
             return "spatial_index_build_failed";
@@ -432,6 +689,11 @@ namespace Geometry::PointCloud::Consolidation
         case Status::EmptyNeighborhood: return "empty_neighborhood";
         case Status::DensityEstimationFailed:
             return "density_estimation_failed";
+        case Status::MixtureFitFailed: return "mixture_fit_failed";
+        case Status::MixtureNotConverged:
+            return "mixture_not_converged";
+        case Status::EmptyContinuousAttraction:
+            return "empty_continuous_attraction";
         case Status::NumericalFailure: return "numerical_failure";
         case Status::NotConverged: return "not_converged";
         }
@@ -440,9 +702,11 @@ namespace Geometry::PointCloud::Consolidation
 
     StrategyKind Kind(const Strategy& strategy) noexcept
     {
-        return std::holds_alternative<LopStrategy>(strategy)
-            ? StrategyKind::Lop
-            : StrategyKind::Wlop;
+        if (std::holds_alternative<LopStrategy>(strategy))
+            return StrategyKind::Lop;
+        if (std::holds_alternative<WlopStrategy>(strategy))
+            return StrategyKind::Wlop;
+        return StrategyKind::Clop;
     }
 
     Result Consolidate(
@@ -453,8 +717,24 @@ namespace Geometry::PointCloud::Consolidation
         if (!result.Succeeded())
             return result;
 
+        Status failure = Status::NumericalFailure;
+        ContinuousAttractionModel continuousModel{};
+        const ContinuousAttractionModel* continuousModelPtr = nullptr;
+        if (const auto* clop = std::get_if<ClopStrategy>(&params.Method))
+        {
+            if (!FitContinuousAttractionModel(
+                    positions, *clop, params.Seed, continuousModel,
+                    result.Diagnostics, failure))
+            {
+                result.State = failure;
+                return result;
+            }
+            continuousModelPtr = &continuousModel;
+        }
+
         Geometry::KDTree sourceIndex{};
-        if (!BuildIndex(positions, sourceIndex))
+        if (continuousModelPtr == nullptr &&
+            !BuildIndex(positions, sourceIndex))
         {
             result.State = Status::SpatialIndexBuildFailed;
             return result;
@@ -491,15 +771,15 @@ namespace Geometry::PointCloud::Consolidation
             return result;
         }
 
-        Status failure = Status::NumericalFailure;
-        if (!L2Initialize(
-                positions,
-                sourceIndex,
-                sourceWeights,
-                params.SupportRadius,
-                projected,
-                result.Diagnostics,
-                failure))
+        const bool initialized = continuousModelPtr != nullptr
+            ? ContinuousL2Initialize(
+                *continuousModelPtr, params.SupportRadius, projected,
+                result.Diagnostics, failure)
+            : L2Initialize(
+                positions, sourceIndex, sourceWeights,
+                params.SupportRadius, projected,
+                result.Diagnostics, failure);
+        if (!initialized)
         {
             result.State = failure;
             return result;
@@ -513,6 +793,7 @@ namespace Geometry::PointCloud::Consolidation
                     positions,
                     sourceIndex,
                     sourceWeights,
+                    continuousModelPtr,
                     params,
                     projected,
                     result.Diagnostics,
@@ -548,6 +829,14 @@ namespace Geometry::PointCloud::Consolidation
             result.Diagnostics.InputPointCount = cloud.VerticesSize();
             result.Diagnostics.UsedDensityWeighting =
                 std::holds_alternative<WlopStrategy>(params.Method);
+            result.Diagnostics.UsedContinuousAttraction =
+                std::holds_alternative<ClopStrategy>(params.Method);
+            if (const auto* clop =
+                    std::get_if<ClopStrategy>(&params.Method))
+            {
+                result.Diagnostics.MixtureComponentCount =
+                    clop->MixtureComponentCount;
+            }
             return result;
         }
         return Consolidate(cloud.Positions(), params);
