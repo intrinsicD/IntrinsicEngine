@@ -1,0 +1,33 @@
+id: geometry.continuous_lop
+name: Continuous Locally Optimal Projection
+domain: geometry
+status: proposed
+paper:
+  title: "Continuous Projection for Fast L1 Reconstruction"
+  authors: "Reinhold Preiner, Oliver Mattausch, Murat Arikan, Renato Pajarola, Michael Wimmer"
+  year: 2014
+  doi: "10.1145/2601097.2601172"
+  url: "https://www.cg.tuwien.ac.at/research/publications/2014/preiner2014clop/"
+inputs:
+  - "Finite point positions with at least two samples"
+  - "ClopStrategy with a valid mixture component count and seeded Gaussian-mixture EM controls"
+  - "World-unit support radius h, repulsion weight mu in [0, 0.5), iteration/tolerance controls, target count, and seed"
+outputs:
+  - "Projected point positions"
+  - "CPU-reference diagnostics with mixture resolution, EM convergence, projection convergence, displacement, and contribution counts"
+backends:
+  - cpu_reference
+metrics:
+  - "mean_distance_to_reference_surface"
+  - "uniformity_min_pairwise_distance"
+  - "mixture_component_count"
+  - "iterations"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
+benchmarks:
+  - "benchmarks/README.md"
+known_limitations:
+  - "A finite-component ordinary EM mixture can smooth thin structures; component count and covariance floor bound that trade-off."
+  - "The reference uses the paper's three-Gaussian analytic attraction approximation but not its hierarchical EM acceleration."
+  - "The serial CPU reference is correctness-oriented and makes no performance claim."
