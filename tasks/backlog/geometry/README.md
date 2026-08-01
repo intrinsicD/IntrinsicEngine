@@ -21,9 +21,6 @@ map.
 - [GEOM-061 — Point-cloud grid-downsampling reduction strategies](GEOM-061-grid-downsampling-reduction-strategies.md)
   (index-returning per-cell reduction extending retired GEOM-016's voxel
   downsampling; framework24 port-gap follow-up).
-- [GEOM-062 — Point-set projection and weighting kernels seam](../../active/GEOM-062-point-set-projection-weighting-kernels.md)
-  (reusable `Geometry.PointCloud.Kernels`: radial weights, LOP repulsion, WLOP
-  density weights; gates the `methods/METHOD-016..018` LOP consolidation family).
 - [GEOM-064 — Parameterization optimization kernels seam](GEOM-064-parameterization-optimization-kernels.md)
   (reusable `Geometry.Parameterization.Optimize`: local rotation fit,
   symmetric-Dirichlet energy/proxy, injective line search; gates ARAP
@@ -92,8 +89,8 @@ curvature ideas remain deliberately un-opened: current `METHOD-017` consumes
 the fitted density/closed-form attraction term, not those derivatives. No
 standalone Gaussian-differential or general constraint framework was opened.
 
-`GEOM-062` (`Geometry.PointCloud.Kernels`) is the follow-on shared-weighting
-seam factored out of the LOP consolidation family so `methods/METHOD-016`
+Retired `GEOM-062` (`Geometry.PointCloud.Kernels`) is the shared-weighting seam
+factored out of the LOP consolidation family so `methods/METHOD-016`
 (WLOP/LOP), `methods/METHOD-017` (CLOP), and `methods/METHOD-018`
 (EAR/anisotropic) reuse one tested radial-weight/repulsion/density-weight core
 instead of each re-deriving the bcg density and repulsion math privately.
@@ -203,6 +200,10 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [GEOM-062 — Point-set projection and weighting kernels seam](../../done/GEOM-062-point-set-projection-weighting-kernels.md)
+  (done, 2026-08-01, `CPUContracted`): adds compactly supported radial weights,
+  finite WLOP repulsion primitives, and deterministic direct/reciprocal local
+  density weights for `METHOD-016`/`017`/`018`.
 - [GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam](../../done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
   (done, 2026-08-01, `CPUContracted`): adds narrow deterministic
   `Geometry.GaussianMixture` and `Geometry.FixedPoint.Anderson` modules plus

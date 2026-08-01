@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "ctest --test-dir build/ci --output-on-failure -R '^PointCloudKernels\\.' --no-tests=error --timeout 60"
+  ],
+  "command_display": "bash -lc 'ctest --test-dir build/ci --output-on-failure -R '\"'\"'^PointCloudKernels\\.'\"'\"' --no-tests=error --timeout 60'",
+  "cwd": ".",
+  "duration_ms": 752,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:20:14Z",
+  "label": "focused-kernels",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:20:13Z",
+  "stderr_path": "tasks/evidence/GEOM-062/commands/focused-kernels.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-062/commands/focused-kernels.stdout.log",
+  "stdout_sha256": "6036754d9f719a10e4c0ca9d7ddd07e1d5df9fb873da478c30d3063cc7813a4d",
+  "task_id": "GEOM-062"
+}

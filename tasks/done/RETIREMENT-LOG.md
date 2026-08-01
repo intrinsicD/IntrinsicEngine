@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GEOM-062`](GEOM-062-point-set-projection-weighting-kernels.md) — point-cloud
+projection kernels completed on 2026-08-01 at `CPUContracted`.
+`Geometry.PointCloud.Kernels` now owns compactly supported Gaussian,
+LOP/WLOP theta, and Wendland C2 radial weights; the finite normalized linear
+repulsion potential and derivative; and deterministic KD-tree density weights
+in direct and reciprocal forms. Public inputs and diagnostics use only engine,
+`std`, `glm`, and scalar types, accumulation is double precision, and invalid
+support, non-finite points, mismatched spatial indices, query failures, and
+empty positive-weight neighborhoods fail closed without publishing partial
+weights. Focused normal, ASan, and UBSan selectors passed 7/7, and the full
+CPU-only geometry selector passed 1,616/1,616. The aggregate `IntrinsicTests`,
+strict layering, test-layout, task-policy, module-inventory, and documentation
+checks pass. Projection control flow remains with `METHOD-016`; CLOP and EAR
+reuse this seam through `METHOD-017`/`018`. No performance claim is made.
+
 [`GEOM-058`](GEOM-058-gaussian-mixture-em-anderson-acceleration.md) — Gaussian-
 mixture numerics completed on 2026-08-01 at `CPUContracted`.
 `Geometry.GaussianMixture` now owns deterministic 3D Gaussian evaluation,

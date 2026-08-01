@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check"
+  ],
+  "command_display": "bash -lc 'python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check'",
+  "cwd": ".",
+  "duration_ms": 43,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:21:41Z",
+  "label": "module-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:21:41Z",
+  "stderr_path": "tasks/evidence/GEOM-062/commands/module-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-062/commands/module-inventory.stdout.log",
+  "stdout_sha256": "29a4efaf5fc98a0fb820783a47cca8440c6a41334d2d3bb2d3a16916a5afbd94",
+  "task_id": "GEOM-062"
+}

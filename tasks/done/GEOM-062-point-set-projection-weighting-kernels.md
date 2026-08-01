@@ -30,31 +30,31 @@ maturity_target: CPUContracted
 - Reuses `Geometry.KDTree` radius/KNN queries for neighborhood assembly and `Geometry.PointCloud.Utils::ComputeStatistics` (`AverageSpacing`, `BoundingBoxDiagonal`) as the scale reference for a default support radius `h`. Weighted-covariance/eigendecomposition needs of anisotropic kernels are already served by `Geometry::PCA::SymmetricEigen3` — no new linear-algebra module.
 
 ## Required changes
-- [ ] Add module `Geometry.PointCloud.Kernels` (`.cppm` interface + `.cpp` implementation unit) in namespace `Geometry::PointCloud::Kernels`, exposing only `std`/`glm`/scalar types.
-- [ ] Radial weight functions with a selectable `KernelType { Gaussian, ThetaLop, WendlandC2 }`: a support-radius-parameterized weight `Weight(distanceSquared, h, kernel)` where `ThetaLop` is the LOP/WLOP fast-decaying `exp(-r²/(h/4)²)`; document each closed form and its scale convention.
-- [ ] LOP repulsion balancing function `Repulsion(r, h)` and its derivative used by the repulsion term, with the degenerate `r → 0` limit handled (finite, documented) rather than dividing by zero.
-- [ ] Local density-weight estimation `ComputeDensityWeights(points, h, kernel, neighborhood)` returning the per-point WLOP weight `1 + Σ_{i'≠i} θ(‖p_i − p_i'‖)` (and the reciprocal projected-set form), deterministic in output order, using a supplied or internally built `Geometry.KDTree`.
-- [ ] Compute weights in `double` internally; expose `float`/scalar results. Fail-closed on non-positive `h`, non-finite inputs, and empty neighborhoods (explicit status/`std::optional`, never NaN/Inf escape).
-- [ ] Register `Geometry.PointCloud.Kernels.cppm` / `.cpp` in the single `IntrinsicGeometry` module-library target lists in `src/geometry/CMakeLists.txt` (alphabetical placement; no new target or link dependency — `glm`/`Eigen3` are already linked).
+- [x] Add module `Geometry.PointCloud.Kernels` (`.cppm` interface + `.cpp` implementation unit) in namespace `Geometry::PointCloud::Kernels`, exposing only `std`/`glm`/scalar types.
+- [x] Radial weight functions with a selectable `KernelType { Gaussian, ThetaLop, WendlandC2 }`: a support-radius-parameterized weight `Weight(distanceSquared, h, kernel)` where `ThetaLop` is the LOP/WLOP fast-decaying `exp(-r²/(h/4)²)`; document each closed form and its scale convention.
+- [x] LOP repulsion balancing function `Repulsion(r, h)` and its derivative used by the repulsion term, with the degenerate `r → 0` limit handled (finite, documented) rather than dividing by zero.
+- [x] Local density-weight estimation `ComputeDensityWeights(points, h, kernel, neighborhood)` returning the per-point WLOP weight `1 + Σ_{i'≠i} θ(‖p_i − p_i'‖)` (and the reciprocal projected-set form), deterministic in output order, using a supplied or internally built `Geometry.KDTree`.
+- [x] Compute weights in `double` internally; expose `float`/scalar results. Fail-closed on non-positive `h`, non-finite inputs, and empty neighborhoods (explicit status/`std::optional`, never NaN/Inf escape).
+- [x] Register `Geometry.PointCloud.Kernels.cppm` / `.cpp` in the single `IntrinsicGeometry` module-library target lists in `src/geometry/CMakeLists.txt` (alphabetical placement; no new target or link dependency — `glm`/`Eigen3` are already linked).
 
 ## Tests
-- [ ] `tests/unit/geometry/Test.PointCloudKernels.cpp` with `unit;geometry` labels.
-- [ ] Analytic weight values: each `KernelType` matches its closed form at known radii (0, `h/4`, `h`, `>h`), is monotonically non-increasing in `r`, and reaches ~0 beyond the support radius.
-- [ ] Repulsion: `Repulsion`/derivative match hand-computed values at sample radii and stay finite at `r → 0`.
-- [ ] Density weights: on a crafted non-uniform fixture (dense cluster + sparse tail) dense points receive strictly larger weights than sparse points; a uniform grid yields near-constant weights.
-- [ ] Determinism: identical `(points, h, kernel)` produce bitwise-identical weights across two runs and across thread counts.
-- [ ] Fail-closed: non-positive `h`, non-finite input, and empty neighborhoods return explicit failure states with no NaN/Inf.
+- [x] `tests/unit/geometry/Test.PointCloudKernels.cpp` with `unit;geometry` labels.
+- [x] Analytic weight values: each `KernelType` matches its closed form at known radii (0, `h/4`, `h`, `>h`), is monotonically non-increasing in `r`, and reaches ~0 beyond the support radius.
+- [x] Repulsion: `Repulsion`/derivative match hand-computed values at sample radii and stay finite at `r → 0`.
+- [x] Density weights: on a crafted non-uniform fixture (dense cluster + sparse tail) dense points receive strictly larger weights than sparse points; a uniform grid yields near-constant weights.
+- [x] Determinism: identical `(points, h, kernel)` produce bitwise-identical weights across two runs and across thread counts.
+- [x] Fail-closed: non-positive `h`, non-finite input, and empty neighborhoods return explicit failure states with no NaN/Inf.
 
 ## Docs
-- [ ] Interface documentation per `docs/architecture/geometry-api-style.md`, including each kernel's closed form, the `h` scale convention, and the failure-state contract.
-- [ ] Regenerate `docs/api/generated/module_inventory.md`.
-- [ ] Update the port-gap cluster notes in `tasks/backlog/geometry/README.md` and record `METHOD-016`/`017`/`018` as the consumers.
+- [x] Interface documentation per `docs/architecture/geometry-api-style.md`, including each kernel's closed form, the `h` scale convention, and the failure-state contract.
+- [x] Regenerate `docs/api/generated/module_inventory.md`.
+- [x] Update the port-gap cluster notes in `tasks/backlog/geometry/README.md` and record `METHOD-016`/`017`/`018` as the consumers.
 
 ## Acceptance criteria
-- [ ] Public surface exposes only `std`/`glm`/scalar types (no Eigen).
-- [ ] All listed tests pass in the default CPU gate.
-- [ ] `METHOD-016` can express its attraction/repulsion/density weighting against this surface without private weight math.
-- [ ] Layering check passes (`geometry -> core` only).
+- [x] Public surface exposes only `std`/`glm`/scalar types (no Eigen).
+- [x] All listed tests pass in the default CPU gate.
+- [x] `METHOD-016` can express its attraction/repulsion/density weighting against this surface without private weight math.
+- [x] Layering check passes (`geometry -> core` only).
 
 ## Verification
 ```bash
@@ -71,6 +71,16 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No refactor of existing bilateral/KDE inline weights (named follow-up only).
 - No `std::rand` or global RNG state.
 - No public Eigen types on the module interface.
+
+## Completion
+
+- Completed 2026-08-01. Implementation commit: `b5e93e16`. The compactly
+  supported Gaussian, LOP theta, and Wendland C2 weights; finite normalized
+  linear repulsion potential; and deterministic direct/reciprocal KD-tree
+  density estimates are complete. Focused normal, ASan, and UBSan selectors
+  pass 7/7, and the CPU-only geometry selector passes 1,616/1,616. The module
+  remains a narrow `geometry -> core` import with no projection control flow,
+  backend axis, or unrelated point-cloud Gaussian migration.
 
 ## Maturity
 - Target: `CPUContracted`; no `Operational` follow-up is owed — this is a pure CPU numerics seam. GPU weight evaluation, if ever needed, opens with the family GPU backend (`METHOD-020`).

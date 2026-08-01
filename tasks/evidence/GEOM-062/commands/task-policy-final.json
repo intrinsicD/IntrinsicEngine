@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "python3 tools/agents/check_task_policy.py --root . --strict"
+  ],
+  "command_display": "bash -lc 'python3 tools/agents/check_task_policy.py --root . --strict'",
+  "cwd": ".",
+  "duration_ms": 209,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:24:17Z",
+  "label": "task-policy-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:24:16Z",
+  "stderr_path": "tasks/evidence/GEOM-062/commands/task-policy-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-062/commands/task-policy-final.stdout.log",
+  "stdout_sha256": "bdb11b468e15a211c1f1597aedd18d7ba78b6aeac614d9c926f4e406f8ee7bc4",
+  "task_id": "GEOM-062"
+}
