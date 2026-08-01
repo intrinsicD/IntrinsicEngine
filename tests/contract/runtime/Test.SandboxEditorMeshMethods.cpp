@@ -86,6 +86,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
@@ -4952,21 +4953,14 @@ TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeModule)
     EXPECT_FALSE(textureBake.Available())
         << "The wired service must remain fail-closed on the Null device.";
 
-    Runtime::EditorWorkspaceSession session{};
-    session.Attach(engine.Worlds(), engine.Services());
-    ASSERT_TRUE(session.PrepareFrame());
-    bool visited = false;
-    ASSERT_TRUE(
-        session.VisitPreparedFrame(
-            [&](const Runtime::EditorWorkspacePreparedFrame prepared)
-            {
-                visited = true;
-                EXPECT_TRUE(Runtime::IsEditorTextureBakeServiceAttached(
-                    prepared.VisualizationCommands));
-            }));
-    EXPECT_TRUE(visited);
+    Runtime::EditorWorkspaceAttachment attachment{};
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment).has_value());
+    const Runtime::EditorVisualizationEditingPreparedFrame prepared =
+        Runtime::PrepareEditorVisualizationEditingFrame(attachment);
+    EXPECT_TRUE(Runtime::IsEditorTextureBakeServiceAttached(prepared.Commands));
 
-    session.Detach();
+    attachment.Detach();
     engine.Shutdown();
 }
 TEST(SandboxEditorUi, TextureBakeOperationDoesNotBypassUnavailableRuntimeModule)

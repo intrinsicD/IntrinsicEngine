@@ -89,6 +89,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
@@ -931,14 +932,14 @@ struct ShutdownBlockedGeometryImportState
             ++m_State->ShutdownCalls;
         }
 
-        [[nodiscard]] Runtime::EditorWorkspaceSession& Editor() noexcept
+        [[nodiscard]] Runtime::EditorWorkspaceAttachment& Editor() noexcept
         {
             return m_Editor;
         }
 
     private:
         std::shared_ptr<ShutdownBlockedGeometryImportState> m_State{};
-        Runtime::EditorWorkspaceSession m_Editor{};
+        Runtime::EditorWorkspaceAttachment m_Editor{};
         std::uint32_t m_MaxFrames{1u};
         std::uint32_t m_ObservedFrames{0u};
         bool m_ExitRequested{false};
@@ -2190,25 +2191,24 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
                     }
                 });
 
-        Runtime::EditorWorkspaceSession session;
-        session.Attach(engine.Worlds(), engine.Services());
-        ASSERT_TRUE(session.PrepareFrame(
-            {},
-            importCase.Path.string(),
-            importCase.PayloadKind));
+        Runtime::EditorWorkspaceAttachment attachment;
+        attachment.Attach(engine.Worlds(), engine.Services());
+        ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                        attachment,
+                        {},
+                        importCase.Path.string(),
+                        importCase.PayloadKind)
+                        .has_value());
 
         std::optional<Runtime::EditorFileImportResult> commandResult{};
-        ASSERT_TRUE(session.VisitPreparedFrame(
-            [&](Runtime::EditorWorkspacePreparedFrame prepared)
-            {
-                commandResult = Runtime::ApplyEditorFileImportCommand(
-                    prepared.SceneCommands,
-                    Runtime::EditorFileImportCommand{
-                        .Path = importCase.Path.string(),
-                        .PayloadKind = importCase.PayloadKind,
-                    });
-                prepared.LastAssetImportResult = commandResult;
-            }));
+        const Runtime::EditorSceneEditingPreparedFrame prepared =
+            Runtime::PrepareEditorSceneEditingFrame(attachment);
+        commandResult = Runtime::ApplyEditorFileImportCommand(
+            prepared.Commands,
+            Runtime::EditorFileImportCommand{
+                .Path = importCase.Path.string(),
+                .PayloadKind = importCase.PayloadKind,
+            });
         ASSERT_TRUE(commandResult.has_value());
         EXPECT_EQ(commandResult->Status, Runtime::EditorCommandStatus::Pending);
         EXPECT_TRUE(commandResult->Operation.IsValid());
@@ -2282,7 +2282,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
         EXPECT_TRUE(event->Result->Asset.IsValid());
         EXPECT_TRUE(RequiredEngineService<Extrinsic::Assets::AssetService>(engine).IsAlive(event->Result->Asset));
 
-        session.Detach();
+        attachment.Detach();
         engine.Shutdown();
     }
 }
@@ -2331,25 +2331,24 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
                 }
             });
 
-    Runtime::EditorWorkspaceSession session;
-    session.Attach(engine.Worlds(), engine.Services());
-    ASSERT_TRUE(session.PrepareFrame(
-        {},
-        meshFile.Path.string(),
-        Assets::AssetPayloadKind::Mesh));
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                    attachment,
+                    {},
+                    meshFile.Path.string(),
+                    Assets::AssetPayloadKind::Mesh)
+                    .has_value());
 
     std::optional<Runtime::EditorFileImportResult> commandResult{};
-    ASSERT_TRUE(session.VisitPreparedFrame(
-        [&](Runtime::EditorWorkspacePreparedFrame prepared)
-        {
-            commandResult = Runtime::ApplyEditorFileImportCommand(
-                prepared.SceneCommands,
-                Runtime::EditorFileImportCommand{
-                    .Path = meshFile.Path.string(),
-                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                });
-            prepared.LastAssetImportResult = commandResult;
-        }));
+    const Runtime::EditorSceneEditingPreparedFrame prepared =
+        Runtime::PrepareEditorSceneEditingFrame(attachment);
+    commandResult = Runtime::ApplyEditorFileImportCommand(
+        prepared.Commands,
+        Runtime::EditorFileImportCommand{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
     ASSERT_TRUE(commandResult.has_value());
     ASSERT_EQ(commandResult->Status, Runtime::EditorCommandStatus::Pending);
     ASSERT_TRUE(commandResult->Operation.IsValid());
@@ -2404,7 +2403,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
     EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
     EXPECT_EQ(recorder->FocusCalls, 0u);
 
-    session.Detach();
+    attachment.Detach();
     engine.Shutdown();
 }
 
@@ -2447,24 +2446,23 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown)
                 }
             });
 
-    Runtime::EditorWorkspaceSession& session = applicationPtr->Editor();
-    ASSERT_TRUE(session.PrepareFrame(
-        {},
-        meshFile.Path.string(),
-        Assets::AssetPayloadKind::Mesh));
+    Runtime::EditorWorkspaceAttachment& attachment = applicationPtr->Editor();
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                    attachment,
+                    {},
+                    meshFile.Path.string(),
+                    Assets::AssetPayloadKind::Mesh)
+                    .has_value());
 
     std::optional<Runtime::EditorFileImportResult> commandResult{};
-    ASSERT_TRUE(session.VisitPreparedFrame(
-        [&](Runtime::EditorWorkspacePreparedFrame prepared)
-        {
-            commandResult = Runtime::ApplyEditorFileImportCommand(
-                prepared.SceneCommands,
-                Runtime::EditorFileImportCommand{
-                    .Path = meshFile.Path.string(),
-                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                });
-            prepared.LastAssetImportResult = commandResult;
-        }));
+    const Runtime::EditorSceneEditingPreparedFrame prepared =
+        Runtime::PrepareEditorSceneEditingFrame(attachment);
+    commandResult = Runtime::ApplyEditorFileImportCommand(
+        prepared.Commands,
+        Runtime::EditorFileImportCommand{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
     ASSERT_TRUE(commandResult.has_value());
     ASSERT_EQ(commandResult->Status, Runtime::EditorCommandStatus::Pending);
     ASSERT_TRUE(commandResult->Operation.IsValid());
@@ -2576,25 +2574,24 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
         Runtime::CameraControllerSlot::Main,
         std::move(recordingController));
 
-    Runtime::EditorWorkspaceSession session;
-    session.Attach(engine.Worlds(), engine.Services());
-    ASSERT_TRUE(session.PrepareFrame(
-        {},
-        malformedMeshFile.Path.string(),
-        Assets::AssetPayloadKind::Mesh));
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                    attachment,
+                    {},
+                    malformedMeshFile.Path.string(),
+                    Assets::AssetPayloadKind::Mesh)
+                    .has_value());
 
     std::optional<Runtime::EditorFileImportResult> commandResult{};
-    ASSERT_TRUE(session.VisitPreparedFrame(
-        [&](Runtime::EditorWorkspacePreparedFrame prepared)
-        {
-            commandResult = Runtime::ApplyEditorFileImportCommand(
-                prepared.SceneCommands,
-                Runtime::EditorFileImportCommand{
-                    .Path = malformedMeshFile.Path.string(),
-                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                });
-            prepared.LastAssetImportResult = commandResult;
-        }));
+    const Runtime::EditorSceneEditingPreparedFrame prepared =
+        Runtime::PrepareEditorSceneEditingFrame(attachment);
+    commandResult = Runtime::ApplyEditorFileImportCommand(
+        prepared.Commands,
+        Runtime::EditorFileImportCommand{
+            .Path = malformedMeshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
     ASSERT_TRUE(commandResult.has_value());
     ASSERT_EQ(commandResult->Status, Runtime::EditorCommandStatus::Pending);
     ASSERT_TRUE(commandResult->Operation.IsValid());
@@ -2643,7 +2640,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
     EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
     EXPECT_EQ(recorder->FocusCalls, 0u);
 
-    session.Detach();
+    attachment.Detach();
     engine.Shutdown();
 }
 

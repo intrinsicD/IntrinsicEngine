@@ -9,6 +9,7 @@ module;
 module Extrinsic.Runtime.VisualizationEditingOperations;
 
 import Extrinsic.Runtime.Private.EditorFeatures;
+import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 
 namespace Extrinsic::Runtime {
 struct EditorVisualizationEditingCommands::State {
@@ -27,17 +28,46 @@ bool EditorVisualizationEditingCommands::IsBound() const noexcept {
                                 m_State->Context.AttachmentActive());
 }
 
-EditorVisualizationEditingCommands::
-operator const EditorVisualizationEditingContext &() const noexcept {
-  static const EditorVisualizationEditingContext empty{};
-  return m_State != nullptr ? m_State->Context : empty;
+const EditorVisualizationEditingContext *
+EditorVisualizationEditingCommandsAccess::Resolve(
+    const EditorVisualizationEditingCommands &commands) noexcept {
+  return commands.IsBound() && commands.m_State != nullptr
+             ? &commands.m_State->Context
+             : nullptr;
 }
+
+namespace {
+const EditorVisualizationEditingContext &ContextOrEmpty(
+    const EditorVisualizationEditingCommands &commands) noexcept {
+  static const EditorVisualizationEditingContext empty{};
+  const EditorVisualizationEditingContext *context =
+      EditorVisualizationEditingCommandsAccess::Resolve(commands);
+  return context != nullptr ? *context : empty;
+}
+} // namespace
 
 EditorVisualizationEditingCommands BindEditorVisualizationEditingCommands(
     EditorVisualizationEditingContext context) {
   return EditorVisualizationEditingCommands{
       std::make_shared<EditorVisualizationEditingCommands::State>(
           std::move(context))};
+}
+
+EditorVisualizationEditingPreparedFrame PrepareEditorVisualizationEditingFrame(
+    const EditorWorkspaceAttachment &attachment) {
+  EditorVisualizationEditingPreparedFrame prepared{};
+  const auto state =
+      EditorFeatureDetail::ResolveEditorWorkspaceAttachmentState(attachment);
+  if (state == nullptr)
+    return prepared;
+
+  (void)state->Session.VisitPreparedFrame(
+      [&prepared](EditorFeatureDetail::EditorWorkspacePreparedFrame frame) {
+        prepared.Commands = BindEditorVisualizationEditingCommands(
+            EditorFeatureDetail::MakeEditorVisualizationEditingContext(
+                frame.Context));
+      });
+  return prepared;
 }
 
 bool IsEditorTextureBakeServiceAttached(
@@ -191,5 +221,87 @@ TextureBakeMutationResult SetEditorBakedTextureTargets(
     const EditorTextureBakeTargetUpdateRequest &request) {
   return EditorFeatureDetail::SetEditorBakedTextureTargetsImpl(
       EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), request);
+}
+
+bool IsEditorTextureBakeServiceAttached(
+    const EditorVisualizationEditingCommands &commands) noexcept {
+  return IsEditorTextureBakeServiceAttached(ContextOrEmpty(commands));
+}
+
+EditorCommandStatus ApplyEditorRenderHintCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorRenderHintCommand &command) {
+  return ApplyEditorRenderHintCommand(ContextOrEmpty(commands), command);
+}
+
+EditorCommandStatus ApplyEditorVisualizationConfigCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorVisualizationConfigCommand &command) {
+  return ApplyEditorVisualizationConfigCommand(ContextOrEmpty(commands),
+                                               command);
+}
+
+EditorCommandStatus ApplyEditorVisualizationPropertyCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorVisualizationPropertyCommand &command) {
+  return ApplyEditorVisualizationPropertyCommand(ContextOrEmpty(commands),
+                                                 command);
+}
+
+EditorCommandStatus ApplyEditorVisualizationRecipeCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorVisualizationRecipeCommand &command) {
+  return ApplyEditorVisualizationRecipeCommand(ContextOrEmpty(commands),
+                                               command);
+}
+
+EditorCommandStatus ApplyEditorVertexChannelBindingCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorVertexChannelBindingCommand &command) {
+  return ApplyEditorVertexChannelBindingCommand(ContextOrEmpty(commands),
+                                                command);
+}
+
+EditorCommandStatus ApplyEditorGeometryPresentationSlotDefaultCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorGeometryPresentationSlotDefaultCommand &command) {
+  return ApplyEditorGeometryPresentationSlotDefaultCommand(
+      ContextOrEmpty(commands), command);
+}
+
+EditorCommandStatus ApplyEditorGeometryPresentationSlotPropertyCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorGeometryPresentationSlotPropertyCommand &command) {
+  return ApplyEditorGeometryPresentationSlotPropertyCommand(
+      ContextOrEmpty(commands), command);
+}
+
+EditorTextureBakeCommandResult ApplyEditorTextureBakeCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorTextureBakeCommand &command) {
+  return ApplyEditorTextureBakeCommand(ContextOrEmpty(commands), command);
+}
+
+TextureBakeMutationResult RenameEditorBakedTexture(
+    const EditorVisualizationEditingCommands &commands,
+    std::uint32_t stableEntityId,
+    std::string_view currentName,
+    std::string_view newName) {
+  return RenameEditorBakedTexture(ContextOrEmpty(commands), stableEntityId,
+                                  currentName, newName);
+}
+
+TextureBakeMutationResult RemoveEditorBakedTexture(
+    const EditorVisualizationEditingCommands &commands,
+    std::uint32_t stableEntityId,
+    std::string_view outputName) {
+  return RemoveEditorBakedTexture(ContextOrEmpty(commands), stableEntityId,
+                                  outputName);
+}
+
+TextureBakeMutationResult SetEditorBakedTextureTargets(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorTextureBakeTargetUpdateRequest &request) {
+  return SetEditorBakedTextureTargets(ContextOrEmpty(commands), request);
 }
 } // namespace Extrinsic::Runtime

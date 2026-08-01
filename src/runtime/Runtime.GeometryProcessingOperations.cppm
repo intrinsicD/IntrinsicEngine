@@ -26,6 +26,7 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
@@ -41,6 +42,12 @@ import Geometry.PointCloud.Utils;
 import Geometry.Properties;
 import Geometry.Smoothing;
 import Geometry.UvAtlas;
+
+namespace Extrinsic::Runtime
+{
+    struct EditorGeometryProcessingCommandsAccess;
+}
+
 export namespace Extrinsic::Runtime
 {
     enum class EditorGeometryProcessingDomain : std::uint32_t
@@ -939,13 +946,13 @@ export namespace Extrinsic::Runtime
         EditorGeometryProcessingCommands() = default;
 
         [[nodiscard]] bool IsBound() const noexcept;
-        [[nodiscard]] operator const EditorGeometryProcessingContext&() const noexcept;
 
     private:
         struct State;
         std::shared_ptr<const State> m_State{};
 
         explicit EditorGeometryProcessingCommands(std::shared_ptr<const State> state);
+        friend struct EditorGeometryProcessingCommandsAccess;
         friend EditorGeometryProcessingCommands
         BindEditorGeometryProcessingCommands(EditorGeometryProcessingContext context);
     };
@@ -1183,6 +1190,87 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<EditorProgressivePoissonConfig>
     GetEditorProgressivePoissonConfig(const EditorGeometryProcessingContext& context) noexcept;
 
+    [[nodiscard]] KMeansRunCompleted
+    SubmitKMeansRun(const EditorGeometryProcessingCommands& commands,
+                    const RunKMeans& command);
+    [[nodiscard]] Geometry::ConstPropertySet
+    ResolveEditorSelectedMeshVertexProperties(
+        const EditorGeometryProcessingCommands& commands);
+    EditorUvRegenerationCommandResult ApplyEditorUvRegenerationCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorUvRegenerationCommand& command);
+    EditorParameterizationResult ApplyEditorParameterizationCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorParameterizationCommand& command);
+    EditorParameterizationResult ApplyEditorConfiguredParameterizationCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorConfiguredParameterizationCommand& command);
+    [[nodiscard]] EditorParameterizationConfigResult
+    ApplyEditorParameterizationConfigCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorParameterizationConfigCommand& command);
+    [[nodiscard]] std::optional<ParameterizationConfig>
+    GetEditorParameterizationConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept;
+    [[nodiscard]] EditorParameterizationViewModel
+    BuildEditorParameterizationViewModel(
+        const EditorGeometryProcessingCommands& commands);
+    [[nodiscard]] EditorParameterizationUvViewState
+    SubmitEditorParameterizationUvView(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorParameterizationViewModel& model,
+        std::uint32_t width,
+        std::uint32_t height);
+    void DisableEditorParameterizationUvView(
+        const EditorGeometryProcessingCommands& commands);
+    EditorMeshDenoiseResult ApplyEditorMeshDenoiseCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorMeshDenoiseCommand& command);
+    EditorMeshCurvatureResult ApplyEditorMeshCurvatureCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorMeshCurvatureCommand& command);
+    EditorMeshRemeshResult ApplyEditorMeshRemeshCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorMeshRemeshCommand& command);
+    EditorMeshSubdivideResult ApplyEditorMeshSubdivideCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorMeshSubdivideCommand& command);
+    EditorMeshSimplifyResult ApplyEditorMeshSimplifyCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorMeshSimplifyCommand& command);
+    EditorMeshVertexNormalsResult ApplyEditorMeshVertexNormalsCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorMeshVertexNormalsCommand& command);
+    EditorGraphVertexNormalsResult ApplyEditorGraphVertexNormalsCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorGraphVertexNormalsCommand& command);
+    EditorPointCloudVertexNormalsResult ApplyEditorPointCloudVertexNormalsCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorPointCloudVertexNormalsCommand& command);
+    EditorPointCloudOutlierRemovalResult ApplyEditorPointCloudOutlierRemovalCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorPointCloudOutlierRemovalCommand& command);
+    EditorRegistrationResult ApplyEditorRegistrationCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorRegistrationCommand& command);
+    EditorProgressivePoissonResult ApplyEditorProgressivePoissonCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorProgressivePoissonCommand& command);
+    [[nodiscard]] EditorProgressivePoissonConfigResult
+    ApplyEditorProgressivePoissonConfigCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorProgressivePoissonConfigCommand& command);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorClusteringConfig(
+        const EditorGeometryProcessingCommands& commands,
+        const ClusteringConfig& config,
+        std::string sourceId = "sandbox.clustering");
+    [[nodiscard]] std::optional<ClusteringConfig>
+    GetEditorClusteringConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept;
+    [[nodiscard]] std::optional<EditorProgressivePoissonConfig>
+    GetEditorProgressivePoissonConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept;
+
     struct EditorGeometryProcessingResultsSnapshot
     {
         std::optional<KMeansRunCompleted> LastKMeansResult{};
@@ -1200,4 +1288,26 @@ export namespace Extrinsic::Runtime
         std::optional<EditorProgressivePoissonResult> LastProgressivePoissonResult{};
         std::optional<EditorRegistrationResult> LastRegistrationResult{};
     };
+
+    struct EditorGeometryProcessingPreparedFrame
+    {
+        EditorGeometryProcessingCommands Commands{};
+        EditorMethodResultSinks ResultSinks{};
+        EditorGeometryProcessingResultsSnapshot Results{};
+        bool ConfigCommandsAvailable{false};
+        bool ClusteringAvailable{false};
+    };
+
+    [[nodiscard]] EditorGeometryProcessingPreparedFrame
+    PrepareEditorGeometryProcessingFrame(
+        const EditorWorkspaceAttachment& attachment);
 } // namespace Extrinsic::Runtime
+
+namespace Extrinsic::Runtime
+{
+    struct EditorGeometryProcessingCommandsAccess final
+    {
+        [[nodiscard]] static const EditorGeometryProcessingContext*
+        Resolve(const EditorGeometryProcessingCommands& commands) noexcept;
+    };
+}

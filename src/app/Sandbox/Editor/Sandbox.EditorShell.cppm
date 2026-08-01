@@ -39,26 +39,30 @@ export namespace Extrinsic::Sandbox::Editor
     {
         SandboxEditorContext() = default;
         SandboxEditorContext(
-            const Runtime::EditorWorkspacePreparedFrame& prepared,
+            const Runtime::EditorWorkspaceSnapshotPreparedFrame& workspace,
+            const Runtime::EditorSceneEditingPreparedFrame& scene,
+            const Runtime::EditorGeometryProcessingPreparedFrame& geometry,
+            const Runtime::EditorVisualizationEditingPreparedFrame& visualization,
+            const Runtime::EditorRenderRecipeEditingPreparedFrame& renderRecipe,
             SandboxEditorFrame& frame)
-            : SceneCommands(prepared.SceneCommands),
-              GeometryCommands(prepared.GeometryCommands),
-              VisualizationCommands(prepared.VisualizationCommands),
-              RenderRecipeCommands(prepared.RenderRecipeCommands),
-              SnapshotQueries(prepared.SnapshotQueries),
-              AssetImportQueueCommands(prepared.AssetImportQueueCommands),
-              DocumentCommands(prepared.DocumentCommands),
-              MethodResultSinks(prepared.MethodResultSinks),
-              GeometryResults(prepared.GeometryResults),
-              RenderRecipeDraft(prepared.RenderRecipeDraft),
-              SceneAvailable(prepared.SceneAvailable),
+            : SceneCommands(scene.Commands),
+              GeometryCommands(geometry.Commands),
+              VisualizationCommands(visualization.Commands),
+              RenderRecipeCommands(renderRecipe.Commands),
+              SnapshotQueries(workspace.SnapshotQueries),
+              AssetImportQueueCommands(scene.AssetImportQueueCommands),
+              DocumentCommands(scene.DocumentCommands),
+              MethodResultSinks(geometry.ResultSinks),
+              GeometryResults(geometry.Results),
+              RenderRecipeDraft(renderRecipe.Draft),
+              SceneAvailable(scene.SceneAvailable),
               GeometryConfigCommandsAvailable(
-                  prepared.GeometryConfigCommandsAvailable),
-              ClusteringAvailable(prepared.ClusteringAvailable),
+                  geometry.ConfigCommandsAvailable),
+              ClusteringAvailable(geometry.ClusteringAvailable),
               RenderRecipeCommandsAvailable(
-                  prepared.RenderRecipeCommandsAvailable),
+                  renderRecipe.CommandsAvailable),
               RenderArtifactCommandsAvailable(
-                  prepared.RenderArtifactCommandsAvailable),
+                  renderRecipe.ArtifactCommandsAvailable),
               Selection(&frame.Selection),
               Document(&frame.Document),
               ModelBuildStats(&frame.ModelBuildStats)

@@ -14,9 +14,15 @@ import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderRecipeActivation;
+
+namespace Extrinsic::Runtime
+{
+    struct EditorRenderRecipeEditingCommandsAccess;
+}
 
 export namespace Extrinsic::Runtime
 {
@@ -357,19 +363,31 @@ export namespace Extrinsic::Runtime
         EditorRenderRecipeEditingCommands() = default;
 
         [[nodiscard]] bool IsBound() const noexcept;
-        [[nodiscard]] operator const EditorRenderRecipeEditingContext&() const noexcept;
 
     private:
         struct State;
         std::shared_ptr<const State> m_State{};
 
         explicit EditorRenderRecipeEditingCommands(std::shared_ptr<const State> state);
+        friend struct EditorRenderRecipeEditingCommandsAccess;
         friend EditorRenderRecipeEditingCommands
         BindEditorRenderRecipeEditingCommands(EditorRenderRecipeEditingContext context);
     };
 
     [[nodiscard]] EditorRenderRecipeEditingCommands
     BindEditorRenderRecipeEditingCommands(EditorRenderRecipeEditingContext context);
+
+    struct EditorRenderRecipeEditingPreparedFrame
+    {
+        EditorRenderRecipeEditingCommands Commands{};
+        EditorRenderRecipeDraftSnapshot Draft{};
+        bool CommandsAvailable{false};
+        bool ArtifactCommandsAvailable{false};
+    };
+
+    [[nodiscard]] EditorRenderRecipeEditingPreparedFrame
+    PrepareEditorRenderRecipeEditingFrame(
+        const EditorWorkspaceAttachment& attachment);
 
     [[nodiscard]] EditorGpuProfilingConfigResult ApplyEditorGpuProfilingConfigCommand(
         const EditorRenderRecipeEditingContext& context, bool enabled,
@@ -380,4 +398,23 @@ export namespace Extrinsic::Runtime
     EditorRenderRecipeCommandResult
     ApplyEditorRenderRecipeCommand(const EditorRenderRecipeEditingContext& context,
                                    const EditorRenderRecipeCommand& command);
+
+    [[nodiscard]] EditorGpuProfilingConfigResult ApplyEditorGpuProfilingConfigCommand(
+        const EditorRenderRecipeEditingCommands& commands,
+        bool enabled,
+        std::string sourceId = "sandbox.frame_graph.gpu_profiling");
+    [[nodiscard]] EditorRenderRecipeEditorModel BuildEditorRenderRecipeEditorModel(
+        const EditorRenderRecipeEditingCommands& commands);
+    EditorRenderRecipeCommandResult ApplyEditorRenderRecipeCommand(
+        const EditorRenderRecipeEditingCommands& commands,
+        const EditorRenderRecipeCommand& command);
 } // namespace Extrinsic::Runtime
+
+namespace Extrinsic::Runtime
+{
+    struct EditorRenderRecipeEditingCommandsAccess final
+    {
+        [[nodiscard]] static const EditorRenderRecipeEditingContext*
+        Resolve(const EditorRenderRecipeEditingCommands& commands) noexcept;
+    };
+}

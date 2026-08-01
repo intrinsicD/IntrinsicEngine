@@ -26,6 +26,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderArtifactPublication;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
@@ -3155,7 +3156,16 @@ namespace Extrinsic::Sandbox::Editor
 
     struct EditorShell::Impl
     {
-        Runtime::EditorWorkspaceSession Session{};
+        struct SandboxPreparedFrame final
+        {
+            Runtime::EditorWorkspaceSnapshotPreparedFrame Workspace{};
+            Runtime::EditorSceneEditingPreparedFrame Scene{};
+            Runtime::EditorGeometryProcessingPreparedFrame Geometry{};
+            Runtime::EditorVisualizationEditingPreparedFrame Visualization{};
+            Runtime::EditorRenderRecipeEditingPreparedFrame RenderRecipe{};
+        };
+
+        Runtime::EditorWorkspaceAttachment Attachment{};
         Runtime::EditorUiHost* Host{nullptr};
         Runtime::EditorUiFrameContributionHandle FrameContribution{};
         BuiltinWindowHandles BuiltinHandles{};
@@ -3181,8 +3191,7 @@ namespace Extrinsic::Sandbox::Editor
         bool UvAtlasPreserveAuthored{false};
         SandboxEditorFrame LastFrame{};
         std::optional<SandboxEditorContext> ActiveContext{};
-        const Runtime::EditorWorkspacePreparedFrame* ActivePreparedFrame{
-            nullptr};
+        std::optional<SandboxPreparedFrame> ActivePreparedFrame{};
 
         void RegisterBuiltinWindows()
         {
@@ -3230,12 +3239,12 @@ namespace Extrinsic::Sandbox::Editor
             const std::string_view id,
             bool& open)
         {
-            if (ActivePreparedFrame == nullptr || !ActiveContext.has_value())
+            if (!ActivePreparedFrame.has_value() || !ActiveContext.has_value())
                 return;
 
             TextureBakeUiState textureBakeState{
                 .LastUvRegenerationResult =
-                    &ActivePreparedFrame->LastUvRegenerationResult,
+                    &ActivePreparedFrame->Geometry.Results.LastUvRegenerationResult,
                 .SourceIndex = &TextureBakeSourceIndex,
                 .TargetSemanticIndex = &TextureBakeTargetSemanticIndex,
                 .EncoderIndex = &TextureBakeEncoderIndex,
@@ -3261,41 +3270,57 @@ namespace Extrinsic::Sandbox::Editor
                 &ScenePathBuffer,
                 &RenderRecipeDraftBuffer,
                 &ImportPayloadKind,
-                &ActivePreparedFrame->LastAssetImportResult,
-                &ActivePreparedFrame->LastSceneFileResult,
+                &ActivePreparedFrame->Scene.LastAssetImportResult,
+                &ActivePreparedFrame->Scene.LastSceneFileResult,
                 &textureBakeState);
         }
 
         void DrawFrame()
         {
-            if (!Session.IsAttached() || Host == nullptr)
+            if (!Attachment.IsAttached() || Host == nullptr)
                 return;
 
-            if (!Session.PrepareFrame(
+            std::optional<Runtime::EditorWorkspaceSnapshotPreparedFrame>
+                workspace = Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                    Attachment,
                     BuildModelRequest(Host->Windows(), BuiltinHandles),
                     std::string{ImportPathBuffer.data()},
                     ImportPayloadKind,
-                    std::string{ScenePathBuffer.data()}))
+                    std::string{ScenePathBuffer.data()});
+            if (!workspace.has_value())
             {
                 return;
             }
 
-            (void)Session.VisitPreparedFrame(
-                [this](Runtime::EditorWorkspacePreparedFrame frame)
-                {
-                    LastFrame = SandboxEditorFrame{frame.Frame};
-                    ActiveContext.emplace(frame, LastFrame);
-                    ActivePreparedFrame = &frame;
-                    DrawMainMenuBar(&Host->Windows());
-                    (void)Host->Windows().DrawOpenWindows();
-                    const std::uint32_t domainWindowModelCacheHits =
-                        LastFrame.ModelBuildStats.DomainWindowModelCacheHits;
-                    LastFrame.ModelBuildStats = frame.Frame.ModelBuildStats;
-                    LastFrame.ModelBuildStats.DomainWindowModelCacheHits =
-                        domainWindowModelCacheHits;
-                    ActivePreparedFrame = nullptr;
-                    ActiveContext.reset();
-                });
+            ActivePreparedFrame.emplace(SandboxPreparedFrame{
+                .Workspace = std::move(*workspace),
+                .Scene = Runtime::PrepareEditorSceneEditingFrame(Attachment),
+                .Geometry =
+                    Runtime::PrepareEditorGeometryProcessingFrame(Attachment),
+                .Visualization =
+                    Runtime::PrepareEditorVisualizationEditingFrame(Attachment),
+                .RenderRecipe =
+                    Runtime::PrepareEditorRenderRecipeEditingFrame(Attachment),
+            });
+            SandboxPreparedFrame& prepared = *ActivePreparedFrame;
+            LastFrame = SandboxEditorFrame{prepared.Workspace.Frame};
+            ActiveContext.emplace(
+                prepared.Workspace,
+                prepared.Scene,
+                prepared.Geometry,
+                prepared.Visualization,
+                prepared.RenderRecipe,
+                LastFrame);
+            DrawMainMenuBar(&Host->Windows());
+            (void)Host->Windows().DrawOpenWindows();
+            const std::uint32_t domainWindowModelCacheHits =
+                LastFrame.ModelBuildStats.DomainWindowModelCacheHits;
+            LastFrame.ModelBuildStats =
+                prepared.Workspace.Frame.ModelBuildStats;
+            LastFrame.ModelBuildStats.DomainWindowModelCacheHits =
+                domainWindowModelCacheHits;
+            ActivePreparedFrame.reset();
+            ActiveContext.reset();
         }
 
         Runtime::EditorWindowHandle RegisterEditorWindow(
@@ -3338,8 +3363,8 @@ namespace Extrinsic::Sandbox::Editor
             }
 
             RegisterBuiltinWindows();
-            Session.Attach(worlds, services);
-            if (!Session.IsAttached())
+            Attachment.Attach(worlds, services);
+            if (!Attachment.IsAttached())
             {
                 Detach();
                 return;
@@ -3355,7 +3380,7 @@ namespace Extrinsic::Sandbox::Editor
 
         void Detach()
         {
-            ActivePreparedFrame = nullptr;
+            ActivePreparedFrame.reset();
             ActiveContext.reset();
             LastFrame = {};
             if (Host != nullptr && FrameContribution.IsValid())
@@ -3363,7 +3388,7 @@ namespace Extrinsic::Sandbox::Editor
             FrameContribution = {};
             UnregisterAllWindows();
             Host = nullptr;
-            Session.Detach();
+            Attachment.Detach();
         }
     };
 
@@ -3441,7 +3466,7 @@ namespace Extrinsic::Sandbox::Editor
         return m_Impl->Host != nullptr &&
                m_Impl->FrameContribution.IsValid() &&
                m_Impl->Host->IsOperational() &&
-               m_Impl->Session.IsAttached();
+               m_Impl->Attachment.IsAttached();
     }
 
     const SandboxEditorFrame&

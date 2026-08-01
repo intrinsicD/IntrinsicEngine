@@ -25,6 +25,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.JobService;
@@ -36,6 +37,11 @@ import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 import Geometry.UvAtlas;
+
+namespace Extrinsic::Runtime
+{
+    struct EditorVisualizationEditingCommandsAccess;
+}
 
 export namespace Extrinsic::Runtime
 {
@@ -601,19 +607,28 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] bool IsBound() const noexcept;
 
-        [[nodiscard]] operator const EditorVisualizationEditingContext&() const noexcept;
 
     private:
         struct State;
         std::shared_ptr<const State> m_State{};
 
         explicit EditorVisualizationEditingCommands(std::shared_ptr<const State> state);
+        friend struct EditorVisualizationEditingCommandsAccess;
         friend EditorVisualizationEditingCommands
         BindEditorVisualizationEditingCommands(EditorVisualizationEditingContext context);
     };
 
     [[nodiscard]] EditorVisualizationEditingCommands
     BindEditorVisualizationEditingCommands(EditorVisualizationEditingContext context);
+
+    struct EditorVisualizationEditingPreparedFrame
+    {
+        EditorVisualizationEditingCommands Commands{};
+    };
+
+    [[nodiscard]] EditorVisualizationEditingPreparedFrame
+    PrepareEditorVisualizationEditingFrame(
+        const EditorWorkspaceAttachment& attachment);
 
     [[nodiscard]] bool
     IsEditorTextureBakeServiceAttached(const EditorVisualizationEditingContext& context) noexcept;
@@ -662,4 +677,52 @@ export namespace Extrinsic::Runtime
     TextureBakeMutationResult
     SetEditorBakedTextureTargets(const EditorVisualizationEditingContext& context,
                                  const EditorTextureBakeTargetUpdateRequest& request);
+
+    [[nodiscard]] bool IsEditorTextureBakeServiceAttached(
+        const EditorVisualizationEditingCommands& commands) noexcept;
+    EditorCommandStatus ApplyEditorRenderHintCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorRenderHintCommand& command);
+    EditorCommandStatus ApplyEditorVisualizationConfigCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorVisualizationConfigCommand& command);
+    EditorCommandStatus ApplyEditorVisualizationPropertyCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorVisualizationPropertyCommand& command);
+    EditorCommandStatus ApplyEditorVisualizationRecipeCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorVisualizationRecipeCommand& command);
+    EditorCommandStatus ApplyEditorVertexChannelBindingCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorVertexChannelBindingCommand& command);
+    EditorCommandStatus ApplyEditorGeometryPresentationSlotDefaultCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorGeometryPresentationSlotDefaultCommand& command);
+    EditorCommandStatus ApplyEditorGeometryPresentationSlotPropertyCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorGeometryPresentationSlotPropertyCommand& command);
+    EditorTextureBakeCommandResult ApplyEditorTextureBakeCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorTextureBakeCommand& command);
+    TextureBakeMutationResult RenameEditorBakedTexture(
+        const EditorVisualizationEditingCommands& commands,
+        std::uint32_t stableEntityId,
+        std::string_view currentName,
+        std::string_view newName);
+    TextureBakeMutationResult RemoveEditorBakedTexture(
+        const EditorVisualizationEditingCommands& commands,
+        std::uint32_t stableEntityId,
+        std::string_view outputName);
+    TextureBakeMutationResult SetEditorBakedTextureTargets(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorTextureBakeTargetUpdateRequest& request);
 } // namespace Extrinsic::Runtime
+
+namespace Extrinsic::Runtime
+{
+    struct EditorVisualizationEditingCommandsAccess final
+    {
+        [[nodiscard]] static const EditorVisualizationEditingContext*
+        Resolve(const EditorVisualizationEditingCommands& commands) noexcept;
+    };
+}

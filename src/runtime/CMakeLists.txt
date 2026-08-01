@@ -26,6 +26,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.EditorCommon.cppm
+        Runtime.EditorWorkspaceAttachment.cppm
         Runtime.EditorWorkspaceSnapshots.cppm
         Runtime.EditorJobProjection.cppm
         Runtime.SceneEditingOperations.cppm
@@ -79,6 +80,7 @@ target_sources(${target_name}
         PRIVATE
         FILE_SET editor_feature_impl TYPE CXX_MODULES FILES
         internal/Runtime.EditorFeatures.Detail.cppm
+        internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
         PRIVATE
         FILE_SET asset_workflow_impl TYPE CXX_MODULES FILES
         Runtime.AssetWorkflowImportExecutor.cppm
@@ -118,6 +120,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.EditorCommon.Public.cpp
+        Runtime.EditorWorkspaceAttachment.cpp
         Runtime.EditorJobProjection.Public.cpp
         Runtime.SceneEditingOperations.Public.cpp
         Runtime.GeometryProcessingOperations.Public.cpp

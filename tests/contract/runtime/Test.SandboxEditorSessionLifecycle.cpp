@@ -80,6 +80,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
@@ -162,80 +163,68 @@ MakeNoEditorModelBuildRequest() {
 } // namespace
 TEST(SandboxEditorSession, UnattachedPrepareFrameFailsClosed)
 {
-    Runtime::EditorWorkspaceSession session;
-    bool visited = false;
+    Runtime::EditorWorkspaceAttachment attachment;
 
-    EXPECT_FALSE(session.IsAttached());
-    EXPECT_FALSE(session.PrepareFrame());
-    EXPECT_FALSE(session.VisitPreparedFrame(
-        [&visited](Runtime::EditorWorkspacePreparedFrame)
-        {
-            visited = true;
-        }));
-    EXPECT_FALSE(visited);
-    EXPECT_FALSE(session.LastFrame().FileImport.Enabled);
+    EXPECT_FALSE(attachment.IsAttached());
+    EXPECT_FALSE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment).has_value());
+    EXPECT_FALSE(Runtime::PrepareEditorSceneEditingFrame(attachment).Commands.IsBound());
+    EXPECT_FALSE(Runtime::PrepareEditorGeometryProcessingFrame(attachment).Commands.IsBound());
+    EXPECT_FALSE(Runtime::PrepareEditorVisualizationEditingFrame(attachment).Commands.IsBound());
+    EXPECT_FALSE(Runtime::PrepareEditorRenderRecipeEditingFrame(attachment).Commands.IsBound());
 }
 TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.Initialize();
 
-    Runtime::EditorWorkspaceSession session;
-    session.Attach(engine.Worlds(), engine.Services());
-    EXPECT_TRUE(session.IsAttached());
-    EXPECT_FALSE(session.VisitPreparedFrame(
-        [](Runtime::EditorWorkspacePreparedFrame)
-        {
-        }));
-    ASSERT_TRUE(session.PrepareFrame());
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+    EXPECT_TRUE(attachment.IsAttached());
+    EXPECT_FALSE(Runtime::PrepareEditorSceneEditingFrame(attachment).Commands.IsBound());
 
-    bool sawPreparedContext = false;
-    ASSERT_TRUE(session.VisitPreparedFrame(
-        [&sawPreparedContext](Runtime::EditorWorkspacePreparedFrame frame)
-        {
-            sawPreparedContext = frame.SceneAvailable;
-            EXPECT_FALSE(frame.RenderRecipeCommandsAvailable);
-            EXPECT_FALSE(frame.GeometryConfigCommandsAvailable);
-        frame.LastAssetImportResult = Runtime::EditorFileImportResult{
-            .Status = Runtime::EditorCommandStatus::Applied,
-            .PayloadKind = Assets::AssetPayloadKind::Mesh,
-        };
-        EXPECT_EQ(
-                frame.RenderRecipeDraft.DraftRevision, 0u);
-        const Runtime::EditorRenderRecipeCommandResult update =
-            Runtime::ApplyEditorRenderRecipeCommand(
-                frame.RenderRecipeCommands,
-                Runtime::EditorRenderRecipeCommand{
-                    .Kind = Runtime::EditorRenderRecipeCommandKind::UpdateDraft,
-                    .Document = "{}",
-                    .SourceId = "session-lifecycle-test",
-                });
-        EXPECT_TRUE(update.Succeeded());
-            EXPECT_EQ(update.Revision, 1u);
-        }));
-    EXPECT_TRUE(sawPreparedContext);
-    EXPECT_TRUE(session.LastFrame().FileImport.Enabled);
+    const auto workspace = Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment);
+    ASSERT_TRUE(workspace.has_value());
+    Runtime::EditorSceneEditingPreparedFrame scene =
+        Runtime::PrepareEditorSceneEditingFrame(attachment);
+    const Runtime::EditorGeometryProcessingPreparedFrame geometry =
+        Runtime::PrepareEditorGeometryProcessingFrame(attachment);
+    const Runtime::EditorRenderRecipeEditingPreparedFrame renderRecipe =
+        Runtime::PrepareEditorRenderRecipeEditingFrame(attachment);
+    EXPECT_TRUE(scene.SceneAvailable);
+    EXPECT_FALSE(renderRecipe.CommandsAvailable);
+    EXPECT_FALSE(geometry.ConfigCommandsAvailable);
+    scene.LastAssetImportResult = Runtime::EditorFileImportResult{
+        .Status = Runtime::EditorCommandStatus::Applied,
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    };
+    EXPECT_EQ(renderRecipe.Draft.DraftRevision, 0u);
+    const Runtime::EditorRenderRecipeCommandResult update =
+        Runtime::ApplyEditorRenderRecipeCommand(
+            renderRecipe.Commands,
+            Runtime::EditorRenderRecipeCommand{
+                .Kind = Runtime::EditorRenderRecipeCommandKind::UpdateDraft,
+                .Document = "{}",
+                .SourceId = "session-lifecycle-test",
+            });
+    EXPECT_TRUE(update.Succeeded());
+    EXPECT_EQ(update.Revision, 1u);
+    EXPECT_TRUE(workspace->Frame.FileImport.Enabled);
 
-    session.Detach();
-    EXPECT_FALSE(session.IsAttached());
-    EXPECT_FALSE(session.LastFrame().FileImport.Enabled);
-    EXPECT_FALSE(session.VisitPreparedFrame(
-        [](Runtime::EditorWorkspacePreparedFrame)
-        {
-        }));
-    EXPECT_FALSE(session.PrepareFrame());
+    attachment.Detach();
+    EXPECT_FALSE(attachment.IsAttached());
+    EXPECT_FALSE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment).has_value());
 
-    session.Attach(engine.Worlds(), engine.Services());
-    ASSERT_TRUE(session.PrepareFrame());
-    ASSERT_TRUE(session.VisitPreparedFrame(
-        [](Runtime::EditorWorkspacePreparedFrame frame)
-        {
-            EXPECT_FALSE(frame.LastAssetImportResult.has_value());
-        EXPECT_TRUE(frame.RenderRecipeDraft.DraftDocument.empty());
-            EXPECT_EQ(frame.RenderRecipeDraft.DraftRevision, 0u);
-        }));
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment).has_value());
+    const Runtime::EditorSceneEditingPreparedFrame reattachedScene =
+        Runtime::PrepareEditorSceneEditingFrame(attachment);
+    const Runtime::EditorRenderRecipeEditingPreparedFrame reattachedRecipe =
+        Runtime::PrepareEditorRenderRecipeEditingFrame(attachment);
+    EXPECT_FALSE(reattachedScene.LastAssetImportResult.has_value());
+    EXPECT_TRUE(reattachedRecipe.Draft.DraftDocument.empty());
+    EXPECT_EQ(reattachedRecipe.Draft.DraftRevision, 0u);
 
-    session.Detach();
+    attachment.Detach();
     engine.Shutdown();
 }
 TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
@@ -246,9 +235,11 @@ TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
 
-    Runtime::EditorWorkspaceSession session;
-    session.Attach(engine.Worlds(), engine.Services());
-    ASSERT_TRUE(session.PrepareFrame(MakeNoEditorModelBuildRequest()));
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                    attachment, MakeNoEditorModelBuildRequest())
+                    .has_value());
 
     Runtime::EditorSceneEditingCommands staleSceneCommands{};
     Runtime::EditorGeometryProcessingCommands staleGeometryCommands{};
@@ -256,16 +247,20 @@ TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
     Runtime::EditorRenderRecipeEditingCommands staleRenderRecipeCommands{};
     Runtime::EditorWorkspaceSnapshotQueries staleSnapshotQueries{};
     Runtime::EditorDocumentCommandSurface staleDocumentCommands{};
-    ASSERT_TRUE(session.VisitPreparedFrame(
-        [&](Runtime::EditorWorkspacePreparedFrame frame)
-        {
-            staleSceneCommands = frame.SceneCommands;
-            staleGeometryCommands = frame.GeometryCommands;
-            staleVisualizationCommands = frame.VisualizationCommands;
-            staleRenderRecipeCommands = frame.RenderRecipeCommands;
-            staleSnapshotQueries = frame.SnapshotQueries;
-            staleDocumentCommands = frame.DocumentCommands;
-        }));
+    staleSceneCommands =
+        Runtime::PrepareEditorSceneEditingFrame(attachment).Commands;
+    staleGeometryCommands =
+        Runtime::PrepareEditorGeometryProcessingFrame(attachment).Commands;
+    staleVisualizationCommands =
+        Runtime::PrepareEditorVisualizationEditingFrame(attachment).Commands;
+    staleRenderRecipeCommands =
+        Runtime::PrepareEditorRenderRecipeEditingFrame(attachment).Commands;
+    staleSnapshotQueries =
+        Runtime::PrepareEditorWorkspaceSnapshotFrame(
+            attachment, MakeNoEditorModelBuildRequest())
+            ->SnapshotQueries;
+    staleDocumentCommands =
+        Runtime::PrepareEditorSceneEditingFrame(attachment).DocumentCommands;
     ASSERT_TRUE(staleSceneCommands.IsBound());
     ASSERT_TRUE(staleGeometryCommands.IsBound());
     ASSERT_TRUE(staleVisualizationCommands.IsBound());
@@ -281,9 +276,11 @@ TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
     EXPECT_TRUE(activeImport.Operation.IsValid());
     EXPECT_EQ(activeImport.Error, Core::ErrorCode::Success);
 
-    session.Detach();
-    session.Attach(engine.Worlds(), engine.Services());
-    ASSERT_TRUE(session.PrepareFrame(MakeNoEditorModelBuildRequest()));
+    attachment.Detach();
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                    attachment, MakeNoEditorModelBuildRequest())
+                    .has_value());
 
     EXPECT_FALSE(staleSceneCommands.IsBound());
     EXPECT_FALSE(staleGeometryCommands.IsBound());
@@ -331,12 +328,12 @@ TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
     EXPECT_FALSE(staleUvState.GpuReady);
     EXPECT_NE(staleUvState.Message.find("attachment expired"), std::string::npos);
 
-    session.Detach();
+    attachment.Detach();
     engine.Shutdown();
 }
 TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
 {
-    Runtime::EditorWorkspaceSession session;
+    Runtime::EditorWorkspaceAttachment attachment;
     std::uint64_t firstSequence = 0u;
 
     {
@@ -358,17 +355,16 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         ASSERT_TRUE(event.has_value());
         firstSequence = event->Sequence;
 
-        session.Attach(firstEngine.Worlds(), firstEngine.Services());
-        ASSERT_TRUE(session.PrepareFrame(
-            MakeNoEditorModelBuildRequest()));
-        ASSERT_TRUE(session.VisitPreparedFrame(
-            [](Runtime::EditorWorkspacePreparedFrame frame)
-            {
-          ASSERT_TRUE(frame.LastAssetImportResult.has_value());
-                EXPECT_EQ(frame.LastAssetImportResult->PayloadKind,
-                          Assets::AssetPayloadKind::Mesh);
-            }));
-        session.Detach();
+        attachment.Attach(firstEngine.Worlds(), firstEngine.Services());
+        ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                        attachment, MakeNoEditorModelBuildRequest())
+                        .has_value());
+        const Runtime::EditorSceneEditingPreparedFrame scene =
+            Runtime::PrepareEditorSceneEditingFrame(attachment);
+        ASSERT_TRUE(scene.LastAssetImportResult.has_value());
+        EXPECT_EQ(scene.LastAssetImportResult->PayloadKind,
+                  Assets::AssetPayloadKind::Mesh);
+        attachment.Detach();
         firstEngine.Shutdown();
     }
 
@@ -391,17 +387,16 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         ASSERT_TRUE(event.has_value());
         ASSERT_EQ(event->Sequence, firstSequence);
 
-        session.Attach(secondEngine.Worlds(), secondEngine.Services());
-        ASSERT_TRUE(session.PrepareFrame(
-            MakeNoEditorModelBuildRequest()));
-        ASSERT_TRUE(session.VisitPreparedFrame(
-            [](Runtime::EditorWorkspacePreparedFrame frame)
-            {
-          ASSERT_TRUE(frame.LastAssetImportResult.has_value());
-                EXPECT_EQ(frame.LastAssetImportResult->PayloadKind,
-                          Assets::AssetPayloadKind::PointCloud);
-            }));
-        session.Detach();
+        attachment.Attach(secondEngine.Worlds(), secondEngine.Services());
+        ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                        attachment, MakeNoEditorModelBuildRequest())
+                        .has_value());
+        const Runtime::EditorSceneEditingPreparedFrame scene =
+            Runtime::PrepareEditorSceneEditingFrame(attachment);
+        ASSERT_TRUE(scene.LastAssetImportResult.has_value());
+        EXPECT_EQ(scene.LastAssetImportResult->PayloadKind,
+                  Assets::AssetPayloadKind::PointCloud);
+        attachment.Detach();
         secondEngine.Shutdown();
     }
 }

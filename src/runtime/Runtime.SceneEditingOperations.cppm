@@ -29,12 +29,18 @@ import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
+
+namespace Extrinsic::Runtime
+{
+    struct EditorSceneEditingCommandsAccess;
+}
 
 export namespace Extrinsic::Runtime
 {
@@ -402,13 +408,13 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] bool IsBound() const noexcept;
 
-        [[nodiscard]] operator const EditorSceneEditingContext&() const noexcept;
 
     private:
         struct State;
         std::shared_ptr<const State> m_State{};
 
         explicit EditorSceneEditingCommands(std::shared_ptr<const State> state);
+        friend struct EditorSceneEditingCommandsAccess;
         friend EditorSceneEditingCommands
         BindEditorSceneEditingCommands(EditorSceneEditingContext context);
     };
@@ -416,20 +422,59 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorSceneEditingCommands
     BindEditorSceneEditingCommands(EditorSceneEditingContext context);
 
+    struct EditorSceneEditingPreparedFrame
+    {
+        EditorSceneEditingCommands Commands{};
+        EditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
+        EditorDocumentCommandSurface DocumentCommands{};
+        bool SceneAvailable{false};
+        std::optional<EditorFileImportResult> LastAssetImportResult{};
+        std::optional<EditorSceneFileResult> LastSceneFileResult{};
+    };
+
+    [[nodiscard]] EditorSceneEditingPreparedFrame
+    PrepareEditorSceneEditingFrame(
+        const EditorWorkspaceAttachment& attachment);
+
     bool SelectEditorEntity(const EditorSceneEditingContext& context, std::uint32_t stableEntityId);
+    bool SelectEditorEntity(const EditorSceneEditingCommands& commands, std::uint32_t stableEntityId);
     EditorFileImportResult ApplyEditorFileImportCommand(const EditorSceneEditingContext& context,
+                                                        const EditorFileImportCommand& command);
+    EditorFileImportResult ApplyEditorFileImportCommand(const EditorSceneEditingCommands& commands,
                                                         const EditorFileImportCommand& command);
     EditorSceneFileResult ApplyEditorSceneSaveCommand(const EditorSceneEditingContext& context,
                                                       const EditorSceneFileCommand& command);
+    EditorSceneFileResult ApplyEditorSceneSaveCommand(const EditorSceneEditingCommands& commands,
+                                                      const EditorSceneFileCommand& command);
     EditorSceneFileResult ApplyEditorSceneLoadCommand(const EditorSceneEditingContext& context,
                                                       const EditorSceneFileCommand& command);
+    EditorSceneFileResult ApplyEditorSceneLoadCommand(const EditorSceneEditingCommands& commands,
+                                                      const EditorSceneFileCommand& command);
     EditorSceneFileResult ApplyEditorNewSceneCommand(const EditorSceneEditingContext& context);
+    EditorSceneFileResult ApplyEditorNewSceneCommand(const EditorSceneEditingCommands& commands);
     EditorSceneFileResult ApplyEditorCloseSceneCommand(const EditorSceneEditingContext& context);
+    EditorSceneFileResult ApplyEditorCloseSceneCommand(const EditorSceneEditingCommands& commands);
     EditorCommandStatus ApplyEditorTransformEdit(const EditorSceneEditingContext& context,
+                                                 const EditorTransformEditCommand& command);
+    EditorCommandStatus ApplyEditorTransformEdit(const EditorSceneEditingCommands& commands,
                                                  const EditorTransformEditCommand& command);
     EditorCommandStatus
     ApplyEditorCameraControllerCommand(const EditorSceneEditingContext& context,
                                        const EditorCameraControllerCommand& command);
+    EditorCommandStatus
+    ApplyEditorCameraControllerCommand(const EditorSceneEditingCommands& commands,
+                                       const EditorCameraControllerCommand& command);
     EditorCommandStatus ApplyEditorPrimitiveViewCommand(const EditorSceneEditingContext& context,
                                                         const EditorPrimitiveViewCommand& command);
+    EditorCommandStatus ApplyEditorPrimitiveViewCommand(const EditorSceneEditingCommands& commands,
+                                                        const EditorPrimitiveViewCommand& command);
 } // namespace Extrinsic::Runtime
+
+namespace Extrinsic::Runtime
+{
+    struct EditorSceneEditingCommandsAccess final
+    {
+        [[nodiscard]] static const EditorSceneEditingContext*
+        Resolve(const EditorSceneEditingCommands& commands) noexcept;
+    };
+}

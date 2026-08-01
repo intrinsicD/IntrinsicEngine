@@ -18,6 +18,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -27,6 +28,11 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.WorldRegistry;
+
+namespace Extrinsic::Runtime
+{
+    struct EditorWorkspaceSnapshotQueriesAccess;
+}
 
 export namespace Extrinsic::Runtime
 {
@@ -238,8 +244,6 @@ export namespace Extrinsic::Runtime
         EditorWorkspaceSnapshotQueries() = default;
 
         [[nodiscard]] bool IsBound() const noexcept;
-        [[nodiscard]] operator const EditorWorkspaceSnapshotContext&()
-            const noexcept;
 
     private:
         struct State;
@@ -247,6 +251,7 @@ export namespace Extrinsic::Runtime
 
         explicit EditorWorkspaceSnapshotQueries(
             std::shared_ptr<const State> state);
+        friend struct EditorWorkspaceSnapshotQueriesAccess;
         friend EditorWorkspaceSnapshotQueries
         BindEditorWorkspaceSnapshotQueries(
             EditorWorkspaceSnapshotContext context);
@@ -264,61 +269,36 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotContext& context,
         EditorDomainWindowKind kind);
+    [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
+        const EditorWorkspaceSnapshotQueries& queries);
+    [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
+        const EditorWorkspaceSnapshotQueries& queries,
+        const EditorWorkspaceSnapshotRequest& request);
+    [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
+        const EditorWorkspaceSnapshotQueries& queries,
+        EditorDomainWindowKind kind);
 
-    struct EditorWorkspacePreparedFrame
+    struct EditorWorkspaceSnapshotPreparedFrame
     {
-        const EditorWorkspaceSnapshot& Frame;
-        EditorSceneEditingCommands SceneCommands{};
-        EditorGeometryProcessingCommands GeometryCommands{};
-        EditorVisualizationEditingCommands VisualizationCommands{};
-        EditorRenderRecipeEditingCommands RenderRecipeCommands{};
+        EditorWorkspaceSnapshot Frame{};
         EditorWorkspaceSnapshotQueries SnapshotQueries{};
-        EditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
-        EditorDocumentCommandSurface DocumentCommands{};
-        EditorMethodResultSinks MethodResultSinks{};
-        EditorGeometryProcessingResultsSnapshot GeometryResults{};
-        EditorRenderRecipeDraftSnapshot RenderRecipeDraft{};
-        bool SceneAvailable{false};
-        bool GeometryConfigCommandsAvailable{false};
-        bool ClusteringAvailable{false};
-        bool RenderRecipeCommandsAvailable{false};
-        bool RenderArtifactCommandsAvailable{false};
-        std::optional<EditorFileImportResult>& LastAssetImportResult;
-        std::optional<EditorSceneFileResult>& LastSceneFileResult;
-        std::optional<EditorUvRegenerationCommandResult>&
-            LastUvRegenerationResult;
     };
 
-    using EditorWorkspacePreparedFrameVisitor =
-        std::function<void(EditorWorkspacePreparedFrame)>;
+    [[nodiscard]] std::optional<EditorWorkspaceSnapshotPreparedFrame>
+    PrepareEditorWorkspaceSnapshotFrame(
+        const EditorWorkspaceAttachment& attachment,
+        const EditorWorkspaceSnapshotRequest& request = {},
+        std::string pendingAssetImportPath = {},
+        EditorAssetPayloadKind pendingAssetImportPayloadKind =
+            EditorAssetPayloadKind::Unknown,
+        std::string pendingSceneFilePath = {});
+}
 
-    class EditorWorkspaceSession final
+namespace Extrinsic::Runtime
+{
+    struct EditorWorkspaceSnapshotQueriesAccess final
     {
-    public:
-        EditorWorkspaceSession();
-        ~EditorWorkspaceSession();
-
-        EditorWorkspaceSession(const EditorWorkspaceSession&) = delete;
-        EditorWorkspaceSession& operator=(const EditorWorkspaceSession&) = delete;
-        EditorWorkspaceSession(EditorWorkspaceSession&&) = delete;
-        EditorWorkspaceSession& operator=(EditorWorkspaceSession&&) = delete;
-
-        void Attach(WorldRegistry& worlds, ServiceRegistry& services);
-        void Detach();
-
-        [[nodiscard]] bool PrepareFrame(
-            const EditorWorkspaceSnapshotRequest& request = {},
-            std::string pendingAssetImportPath = {},
-            EditorAssetPayloadKind pendingAssetImportPayloadKind =
-                EditorAssetPayloadKind::Unknown,
-            std::string pendingSceneFilePath = {});
-        [[nodiscard]] bool VisitPreparedFrame(
-            const EditorWorkspacePreparedFrameVisitor& visitor);
-        [[nodiscard]] const EditorWorkspaceSnapshot& LastFrame() const noexcept;
-        [[nodiscard]] bool IsAttached() const noexcept;
-
-    private:
-        struct Impl;
-        std::unique_ptr<Impl> m_Impl;
+        [[nodiscard]] static const EditorWorkspaceSnapshotContext*
+        Resolve(const EditorWorkspaceSnapshotQueries& queries) noexcept;
     };
 }
