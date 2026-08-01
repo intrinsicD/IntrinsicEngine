@@ -3,12 +3,12 @@ task_id: RUNTIME-202
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-01T05:40:25Z'
+generated_at: '2026-08-01T05:49:33Z'
 claim_eligible: false
 source:
   base_ref: af381c0e
   base_revision: af381c0e1043ea2a0c31e9e4017aa1bdea513ca4
-  head_revision: 5ae75fdbed5fd7971b32520e0c898e3cff9e03ee
+  head_revision: 641b18ea593661d7e425e5c90a016ce481cef3ef
   branch: codex/runtime-202-retire-sandbox-facade
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
@@ -38,9 +38,9 @@ source:
   - path: docs/architecture/engine-config.md
     sha256: 665862bb6a04fdffba8eb3c9523cfa8471ed2b7a30e08e3c6ffeae57858576eb
   - path: docs/architecture/feature-module-playbook.md
-    sha256: c8e04344f65b95d4e1281b5901ca0efcff8a027f116ae204a876873f63349204
+    sha256: 4db205d73eeab83e5b4ae9f36d2e85d78b80a21add73e232ea2191c6e4a206d3
   - path: docs/architecture/geometry-pipeline-modularity.md
-    sha256: d84cdbfc72bf1bed11550f1e898e7ec232474ef26815ba7fae4147748e02c00f
+    sha256: 0b93bfd5f18fad0897c6d31d82bebc6e9511d6dbdaf92cda9c2b0e6b8bae3b01
   - path: docs/architecture/index.md
     sha256: 7f15d83d07b76cfc700d7ebc1ff3019db8e1c5e23a356ea21db248119eead750
   - path: docs/architecture/runtime-config-control.md
@@ -48,7 +48,7 @@ source:
   - path: docs/architecture/runtime.md
     sha256: fd0739a726de62ab6e48943f4149d9a002d72600c6198ab9072fb7aec7ab7439
   - path: docs/architecture/sandbox-editor-feature-boundaries.md
-    sha256: 8f00fe4f5a28ddaccc13b79bc301beaf2ee3e392cd3d28db707b7cb06689c8c5
+    sha256: b3251b0553847fc6167beff52f2d397b9df856dc917b67a64b63014aa18fe17f
   - path: docs/benchmarking/ci-policy.md
     sha256: 23f49bedb8a9b65e954e3836513c0f7c8f49f68ffea405dabafa730441e625c4
   - path: docs/migration/nonlegacy-parity-matrix.md
@@ -365,7 +365,7 @@ source:
     sha256: 9182c152c1f290d46d5d93b1aeda2c0da027988e6ce338d81d846904857cce18
   - path: tools/analysis/compile_hotspot_baseline.json
     sha256: 1f3efa3c440a147fed13951e7f0c1ca78669da2fe0296000b3335d6f948a0b84
-  content_digest: c0e1c2e514e32d020aa2c1122a914a33f38e77f0a492e138e8c737567366fa23
+  content_digest: e550047b77ad4e2cd9605c3da1b736e63025e2450cdfb9d869ed066085b7ab03
 touched:
   paths:
   - ara/logic/claims.md
@@ -600,6 +600,11 @@ commands:
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-task-policy.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-task-state-links.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-review2-test-layout.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-diff-check.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-doc-links.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-task-policy.json
+- receipt: tasks/evidence/RUNTIME-202/commands/corrected-review3-task-state-links.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-root-hygiene.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-strict-layering.json
 - receipt: tasks/evidence/RUNTIME-202/commands/corrected-task-maturity.json
@@ -647,7 +652,7 @@ skipped_checks:
   reason: No Vulkan backend behavior, RHI contract, shader, or promoted-device composition changed.
 artifacts:
 - path: docs/architecture/sandbox-editor-feature-boundaries.md
-  sha256: 8f00fe4f5a28ddaccc13b79bc301beaf2ee3e392cd3d28db707b7cb06689c8c5
+  sha256: b3251b0553847fc6167beff52f2d397b9df856dc917b67a64b63014aa18fe17f
   kind: file
 self_review:
   completed: true
