@@ -175,8 +175,6 @@ TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
               Extrinsic::Tests::GeometryFloat32Fingerprint(
                   {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}));
     EXPECT_EQ(residency.NormalFingerprint, 0u);
-    EXPECT_EQ(residency.StorageLane,
-              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

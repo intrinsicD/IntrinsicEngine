@@ -1,0 +1,194 @@
+schema_version: 1
+task_id: RUNTIME-139
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T09:36:41Z'
+claim_eligible: false
+source:
+  base_ref: 421b7477
+  base_revision: 421b74776ab81b174c61dfaac2d72641ac7bb924
+  head_revision: a76491497fc378a5b93b7910f77181a178de0f1c
+  branch: ''
+  worktree: /tmp/intrinsic-r139-fixed.W4dbcd
+  dirty: false
+  surface:
+  - path: benchmarks/rendering/README.md
+    sha256: 0c3367dabeb9631063ae68811c4633d5c9256ab22f98b268e4932d0d7be09a85
+  - path: docs/adr/0022-vertex-storage-soa-per-channel-streaming.md
+    sha256: d3f011fb9ca38f5db35fec2c2b78a4bbba3b4f21bf877bd65592db7760e9f8f7
+  - path: src/graphics/renderer/Graphics.GeometryResidency.cpp
+    sha256: 8d9722cbac05f7fe1be317e9963d1d2c1bddb04c79bd3916d4d96220f0d9ebfd
+  - path: src/graphics/renderer/Graphics.GeometryResidency.cppm
+    sha256: 3eeb2858de700769bc05e750e4782e9180e99930debfceb933b40641274d14aa
+  - path: src/graphics/renderer/Graphics.GpuWorld.cpp
+    sha256: 382c268f0cbe9e98ec4712fe8861e56a56bcd3ad9d2527bc48c3846abf15d13b
+  - path: src/graphics/renderer/Graphics.GpuWorld.cppm
+    sha256: 3136aee370507f6210c23d0a2aaf69054c2e57d7a4cf5de10ff0a6cc8d51feed
+  - path: src/graphics/renderer/README.md
+    sha256: ff6cf0abd8fda74f819a339999ce218a5013b7d6d1f8ed8d074df2bc96930200
+  - path: src/runtime/README.md
+    sha256: 7d6144ab33251dc47da1bf351d9e867bb5bbb675259d6cd6e7f1728231726a50
+  - path: src/runtime/Runtime.GeometryPlanBuilders.Graph.cpp
+    sha256: ed6afe7b2564f076f166997924a0979101ef8b978bf3952decb1d6446f598ee1
+  - path: src/runtime/Runtime.GeometryPlanBuilders.Mesh.cpp
+    sha256: 7f5620685f9fb819c59380fd0ec67e1bfde0c45f08b35bd5372537da9ba19939
+  - path: src/runtime/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp
+    sha256: 1e4f7905f758f349a261493e094a837511953cde3f4c66c559e3217ab1f96300
+  - path: src/runtime/Runtime.GeometryPlanBuilders.PointCloud.cpp
+    sha256: d3fb558436106531ee9784a8ff1aa9a5b36a0f85100562a9fd0483fae90de17b
+  - path: src/runtime/Runtime.GeometryPlanBuilders.Procedural.cpp
+    sha256: 99f85f8540f826e279200299b26ed82be809533fcf103c79b43a7db21377e791
+  - path: src/runtime/Runtime.GeometryPlanBuilders.cppm
+    sha256: 87504514e0ecc966bbe97105f04b1b496d24a4354e72d479fe5809b65022d93a
+  - path: src/runtime/Runtime.RenderExtraction.Geometry.cpp
+    sha256: 960e9fd51bcc324ffbd344eb584108eda1575c5f8fa2d7c550b72d5a49d40780
+  - path: tasks/SESSION-BRIEF.md
+    sha256: c4fc8f6a26542ccabd0f02de1b33b99ba25a47dcbf69ac2a70c7f095349e813d
+  - path: tasks/backlog/README.md
+    sha256: c0d4274673f876ac398c3adf3ed3e946cea20895ecdcf90eb1ce3832422983dc
+  - path: tasks/backlog/runtime/README.md
+    sha256: 75e9dec475c45453ff58eb6dfd3e7217761afc39b3c6e131723f1040ca2a1067
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: d9c52cbf99d9afe7ae4114debcfe7b120c05e9eeafc51c7bee41d270b52021fc
+  - path: tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md
+    sha256: a1887805fc22cbf387df01217bf4eb481aab89737c24f5e884ce9d5f32dccb36
+  - path: tests/CMakeLists.txt
+    sha256: 92879e37d169d3028b5ecae8ab7338f2ee174e017f2ff77f331817cc2abc5e34
+  - path: tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp
+    sha256: b5d25730ffa65a36c017f1bf535fadf08f726be4df66bd57de6c3e74519e9e89
+  - path: tests/contract/graphics/Test.GpuWorldStoragePlanContract.cpp
+    sha256: null
+  - path: tests/contract/graphics/Test.GpuWorldUniformSoAContract.cpp
+    sha256: 59fb39a64d95568e235059f06503274b243b27831bd2059feb94ffbebe05faa0
+  - path: tests/contract/runtime/Test.GraphGeometryExtraction.cpp
+    sha256: 0ab51353a567addacc0070bdbc242c9325ac0088c06842349ae23f5e0eb56969
+  - path: tests/contract/runtime/Test.MeshGeometryExtraction.cpp
+    sha256: 5a06e433312108e88fafa49971e73a5a4e87e62371cbfe9bad7a5d00aa43bb47
+  - path: tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp
+    sha256: 817b72a896fa8a13f03919d170ef89e6617adcc15fa53fff32002674db890efc
+  - path: tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
+    sha256: 0fd483e8cf66cb9e0fac657927e16737165670e9a6ed1a9f2b06bf7dcc3da5af
+  - path: tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp
+    sha256: f5002d755717faf58dbc9f51e4be7824ffbbeda9885beb0cc41664063b7c69fe
+  content_digest: 7210580f27de8a741bdf3d68ced7418c6014427b752291fbcdc51c12e35370c6
+touched:
+  paths:
+  - benchmarks/rendering/README.md
+  - docs/adr/0022-vertex-storage-soa-per-channel-streaming.md
+  - src/graphics/renderer/Graphics.GeometryResidency.cpp
+  - src/graphics/renderer/Graphics.GeometryResidency.cppm
+  - src/graphics/renderer/Graphics.GpuWorld.cpp
+  - src/graphics/renderer/Graphics.GpuWorld.cppm
+  - src/graphics/renderer/README.md
+  - src/runtime/README.md
+  - src/runtime/Runtime.GeometryPlanBuilders.Graph.cpp
+  - src/runtime/Runtime.GeometryPlanBuilders.Mesh.cpp
+  - src/runtime/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp
+  - src/runtime/Runtime.GeometryPlanBuilders.PointCloud.cpp
+  - src/runtime/Runtime.GeometryPlanBuilders.Procedural.cpp
+  - src/runtime/Runtime.GeometryPlanBuilders.cppm
+  - src/runtime/Runtime.RenderExtraction.Geometry.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md
+  - tests/CMakeLists.txt
+  - tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp
+  - tests/contract/graphics/Test.GpuWorldStoragePlanContract.cpp
+  - tests/contract/graphics/Test.GpuWorldUniformSoAContract.cpp
+  - tests/contract/runtime/Test.GraphGeometryExtraction.cpp
+  - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
+  - tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp
+  - tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
+  - tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp
+  layers:
+  - graphics/renderer
+  - runtime
+  modules:
+  - Extrinsic.Graphics.GeometryResidency
+  - Extrinsic.Graphics.GpuWorld
+  - Extrinsic.Runtime.GeometryPlanBuilders
+extension_seam: Uniform SoA channel descriptors and per-channel update masks
+future_change_plan: Open a new evidence-backed task only after claim-eligible GPU profiling crosses a
+  frozen alternate-layout adoption threshold
+acceptance:
+- criterion: No production or test source names `StaticInterleavedAoS` or exposes a
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: All live geometry residency is described directly by its uniform SoA
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The non-adoption benchmark remains reproducible and no performance or
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A future alternate layout requires a new, evidence-backed task rather
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-139/commands/ara-claims.json
+- receipt: tasks/evidence/RUNTIME-139/commands/benchmark-manifests.json
+- receipt: tasks/evidence/RUNTIME-139/commands/ci-build-final.json
+- receipt: tasks/evidence/RUNTIME-139/commands/ci-build.json
+- receipt: tasks/evidence/RUNTIME-139/commands/ci-configure-review-fix.json
+- receipt: tasks/evidence/RUNTIME-139/commands/clean-workshop-final.json
+- receipt: tasks/evidence/RUNTIME-139/commands/clean-workshop-frozen.json
+- receipt: tasks/evidence/RUNTIME-139/commands/clean-workshop-review-fix.json
+- receipt: tasks/evidence/RUNTIME-139/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-139/commands/cpu-tests-final.json
+- receipt: tasks/evidence/RUNTIME-139/commands/cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-139/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-139/commands/docs-sync-review-fix.json
+- receipt: tasks/evidence/RUNTIME-139/commands/focused-tests-final.json
+- receipt: tasks/evidence/RUNTIME-139/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-139/commands/module-inventory-review-fix.json
+- receipt: tasks/evidence/RUNTIME-139/commands/session-brief-review-fix.json
+- receipt: tasks/evidence/RUNTIME-139/commands/task-policy-final.json
+- receipt: tasks/evidence/RUNTIME-139/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-139/commands/task-state-links-review-fix.json
+- receipt: tasks/evidence/RUNTIME-139/commands/task-validation-final.json
+- receipt: tasks/evidence/RUNTIME-139/commands/task-validation.json
+- receipt: tasks/evidence/RUNTIME-139/commands/test-layout.json
+changed_public_contracts:
+- Uniform SoA is the sole live geometry upload and residency layout contract
+diagnostics_and_previews:
+- Dormant AoS planning tokens are absent from production and test source
+benchmark_or_parity_evidence:
+- rendering.vertex_fetch_layout.smoke remains a validated non-adoption probe with adoption_claim=false
+docs_sync:
+  task_file: tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- No GPU/Vulkan or performance behavior was exercised or claimed
+skipped_checks:
+- check: gpu-vulkan
+  reason: Cleanup does not change the implemented byte layout, shader inputs, or promoted backend
+artifacts:
+- path: tests/contract/graphics/Test.GpuWorldUniformSoAContract.cpp
+  sha256: 59fb39a64d95568e235059f06503274b243b27831bd2059feb94ffbebe05faa0
+  kind: file
+- path: benchmarks/rendering/manifests/rendering_vertex_fetch_layout_smoke.yaml
+  sha256: ad998176263d92d41156dcfd8592066c484fd0c4727b2f1d4a2b5a6570a8a657
+  kind: file
+- path: tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md
+  sha256: a1887805fc22cbf387df01217bf4eb481aab89737c24f5e884ce9d5f32dccb36
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-139/handoff.jsonl
+review: tasks/evidence/RUNTIME-139/reviews.jsonl

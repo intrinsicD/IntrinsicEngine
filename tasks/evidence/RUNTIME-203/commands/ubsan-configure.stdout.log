@@ -1,0 +1,203 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="Debug"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+  CMAKE_TOOLCHAIN_FILE:FILEPATH="/tmp/intrinsic-runtime-cleanup.ae4UkC/external/vcpkg/scripts/buildsystems/vcpkg.cmake"
+  EXTRINSIC_BACKEND="Vulkan"
+  EXTRINSIC_PLATFORM="Linux"
+  INTRINSIC_BUILD_SANDBOX="OFF"
+  INTRINSIC_BUILD_TESTS="ON"
+  INTRINSIC_ENABLE_CUDA="OFF"
+  INTRINSIC_ENABLE_SANITIZERS="ON"
+  INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN="OFF"
+  INTRINSIC_SANITIZER_MODE="undefined"
+  VCPKG_CHAINLOAD_TOOLCHAIN_FILE="/tmp/intrinsic-runtime-cleanup.ae4UkC/cmake/IntrinsicClangToolchain.cmake"
+  VCPKG_INSTALLED_DIR="/tmp/intrinsic-runtime-cleanup.ae4UkC/external/vcpkg-installed/ci-ubsan"
+  VCPKG_MANIFEST_MODE="ON"
+
+-- IntrinsicEngine selected Clang 23: /bin/clang-23, /bin/clang++-23, /bin/clang-scan-deps-23
+-- Running vcpkg install
+Detecting compiler hash for triplet x64-linux...
+Compiler found: /usr/bin/c++
+The following packages are already installed:
+    draco:x64-linux@1.5.7
+    eigen3:x64-linux@5.0.1
+    entt:x64-linux@3.16.0
+    glfw3:x64-linux@3.4#1
+    glm:x64-linux@1.0.3
+    gtest:x64-linux@1.17.0#2
+    imgui[core,docking-experimental]:x64-linux@1.92.8
+    imguizmo:x64-linux@1.10
+    implot:x64-linux@1.0
+    nlohmann-json:x64-linux@3.12.0#2
+    stb:x64-linux@2024-07-29#1
+    tinygltf:x64-linux@3.0.0
+  * vcpkg-cmake:x64-linux@2024-04-23
+  * vcpkg-cmake-config:x64-linux@2024-05-23
+    volk:x64-linux@1.4.350.0
+  * vulkan-headers:x64-linux@1.4.350.0
+    vulkan-memory-allocator:x64-linux@3.4.0
+    xatlas:x64-linux@f700c779
+draco provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(draco CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE draco::draco)
+
+draco provides pkg-config modules:
+
+  # Draco geometry de(com)pression library.
+  draco
+
+eigen3 provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(Eigen3 CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Eigen3::Eigen)
+
+eigen3 provides pkg-config modules:
+
+  # A C++ template library for linear algebra: vectors, matrices, and related algorithms
+  eigen3
+
+entt provides CMake targets:
+
+    find_package(EnTT CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE EnTT::EnTT)
+
+The package glm provides CMake targets:
+
+    find_package(glm CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glm::glm)
+
+    # Or use the header-only version
+    find_package(glm CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glm::glm-header-only)
+
+The package gtest is compatible with built-in CMake targets:
+
+    enable_testing()
+    
+    find_package(GTest CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE GTest::gtest GTest::gtest_main GTest::gmock GTest::gmock_main)
+    
+    add_test(AllTestsInMain main)
+
+imgui provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(imgui CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE imgui::imgui)
+
+implot provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(implot CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE implot::implot)
+
+The package nlohmann-json provides CMake targets:
+
+    find_package(nlohmann_json CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE nlohmann_json::nlohmann_json)
+
+The package nlohmann-json can be configured to not provide implicit conversions via a custom triplet file:
+
+    set(nlohmann-json_IMPLICIT_CONVERSIONS OFF)
+
+For more information, see the docs here:
+    
+    https://json.nlohmann.me/api/macros/json_use_implicit_conversions/
+
+The package stb provides CMake targets:
+
+    find_package(Stb REQUIRED)
+    target_include_directories(main PRIVATE ${Stb_INCLUDE_DIR})
+tinygltf is header-only and can be used from CMake via:
+
+  find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
+  target_include_directories(main PRIVATE ${TINYGLTF_INCLUDE_DIRS})
+
+xatlas provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(xatlas CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE xatlas::xatlas)
+
+glfw3 provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(glfw3 CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE glfw)
+
+glfw3 provides pkg-config modules:
+
+  # A multi-platform library for OpenGL, window and input
+  glfw3
+
+imguizmo provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(imguizmo CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE imguizmo::imguizmo)
+
+volk provides CMake targets:
+
+    find_package(volk CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE volk::volk volk::volk_headers)
+
+VulkanMemoryAllocator provides official find_package support. However, it requires the user to provide the include directory containing `vulkan/vulkan.h`. There are multiple ways to achieve this and VulkanMemoryAllocator is compatible with all of them.
+
+    find_package(Vulkan) # https://cmake.org/cmake/help/latest/module/FindVulkan.html, CMake 3.21+
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator)
+
+or
+
+    find_package(Vulkan) # CMake 3.21+
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Headers GPUOpen::VulkanMemoryAllocator)
+
+or
+
+    find_package(VulkanHeaders CONFIG) # From the vulkan-headers port
+    find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Vulkan::Headers GPUOpen::VulkanMemoryAllocator)
+
+See the documentation for more information on setting up your project: https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/index.html
+
+All requested installations completed successfully in: 168 us
+-- Running vcpkg install - done
+-- IntrinsicEngine using auto-selected compilers: /bin/clang-23, /bin/clang++-23
+-- The CXX compiler identification is Clang 23.0.0
+-- The C compiler identification is Clang 23.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /bin/clang++-23 - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /bin/clang-23 - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- IntrinsicEngine Clang requirement: using C=23.0.0 and CXX=23.0.0; minimum is 20.0
+-- Performing Test INTRINSIC_ASAN_AVAILABLE
+-- Performing Test INTRINSIC_ASAN_AVAILABLE - Success
+-- Performing Test INTRINSIC_UBSAN_AVAILABLE
+-- Performing Test INTRINSIC_UBSAN_AVAILABLE - Success
+-- Sanitizers ENABLED (ubsan; undefined) for Debug/RelWithDebInfo builds
+-- Clang source coverage instrumentation DISABLED
+-- Using CCache: /usr/bin/ccache
+-- Intrinsic dependencies: using vcpkg manifest packages
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- Found nlohmann_json: /tmp/intrinsic-runtime-cleanup.ae4UkC/external/vcpkg-installed/ci-ubsan/x64-linux/share/nlohmann_json/nlohmann_jsonConfig.cmake (found version "3.12.0") 
+-- Found Stb: /tmp/intrinsic-runtime-cleanup.ae4UkC/external/vcpkg-installed/ci-ubsan/x64-linux/include  
+-- Found Vulkan: /home/alex/Documents/vulkansdk-linux-x86_64-1.4.309.0/1.4.309.0/x86_64/lib/libvulkan.so (found version "1.4.350") found components: glslc glslangValidator 
+-- CUDA compute backend DISABLED
+-- IntrinsicEngine configure identity: platform=Linux; graphics_backend=Vulkan; platform_backend_request=Auto; platform_backend_selected=Glfw; headless_no_glfw=OFF
+-- Found Python3: /home/alex/miniconda3/bin/python3 (found version "3.12.9") found components: Interpreter 
+-- Configuring done (8.5s)
+-- Generating done (0.1s)
+-- Build files have been written to: /tmp/intrinsic-runtime-cleanup.ae4UkC/build/ci-ubsan

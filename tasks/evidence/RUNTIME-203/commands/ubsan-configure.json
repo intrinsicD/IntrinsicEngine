@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-ubsan",
+    "--fresh",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+  ],
+  "command_display": "cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+  "cwd": ".",
+  "duration_ms": 8623,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T09:14:48Z",
+  "label": "ubsan-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T09:14:40Z",
+  "stderr_path": "tasks/evidence/RUNTIME-203/commands/ubsan-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-203/commands/ubsan-configure.stdout.log",
+  "stdout_sha256": "457c848c4867219fdd31ec19a42d85bb73b0e7e2e3abd19c9c28476e53ce49fb",
+  "task_id": "RUNTIME-203"
+}

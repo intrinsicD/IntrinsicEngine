@@ -147,7 +147,6 @@ namespace
         EXPECT_EQ(lhs.NormalByteCount, rhs.NormalByteCount);
         EXPECT_EQ(lhs.VertexCount, rhs.VertexCount);
         EXPECT_EQ(lhs.SurfaceIndexCount, rhs.SurfaceIndexCount);
-        EXPECT_EQ(lhs.StorageLane, rhs.StorageLane);
         EXPECT_EQ(lhs.PositionFormat, rhs.PositionFormat);
         EXPECT_EQ(lhs.TexcoordFormat, rhs.TexcoordFormat);
         EXPECT_EQ(lhs.NormalFormat, rhs.NormalFormat);
@@ -380,8 +379,6 @@ TEST(GpuWorldLifetimeContract, ResidencyViewTracksCanonicalSoaContentAndSharedIn
                   std::span<const glm::vec3>{kSoaNormals}).size_bytes());
     EXPECT_EQ(before.VertexCount, kSoaPositions.size());
     EXPECT_EQ(before.SurfaceIndexCount, kTriangleIndices.size());
-    EXPECT_EQ(before.StorageLane,
-              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
     EXPECT_EQ(before.PositionFormat, Extrinsic::RHI::Format::RGB32_FLOAT);
     EXPECT_EQ(before.PositionElementBytes, sizeof(float) * 3u);
     EXPECT_EQ(before.PositionStrideBytes, sizeof(float) * 3u);

@@ -56,7 +56,10 @@ surface:
   own sidecars keyed by ECS identity.
 - Shared system-feature tokens and catalogs are not promoted into ECS.
   `CORE-002` retired the global catalog shape, and runtime activates promoted
-  ECS systems explicitly through `Extrinsic.Runtime.EcsSystemBundle`.
+  ECS systems explicitly from Engine's fixed-step composition by calling the
+  existing `TransformHierarchy`, `BoundsPropagation`, and `RenderSync`
+  registration contracts directly. `RUNTIME-203` retired the former
+  one-consumer `Extrinsic.Runtime.EcsSystemBundle` helper BMI.
 
 The bare legacy `import ECS` consumers have been retired with `LEGACY-012` and
 the final legacy subtree deletion sweep. Future ECS compatibility requests must

@@ -260,8 +260,6 @@ TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
                    0.0f, 0.0f, 1.0f}));
     EXPECT_EQ(residency.SurfaceIndexFingerprint,
               Extrinsic::Tests::GeometryUint32Fingerprint({1u, 2u, 0u}));
-    EXPECT_EQ(residency.StorageLane,
-              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

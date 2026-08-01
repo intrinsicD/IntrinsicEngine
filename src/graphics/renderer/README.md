@@ -1778,8 +1778,9 @@ Concretely:
   moving the bytes to the feature owner exactly once. Cancellation suppresses
   consumption but retains in-flight sink storage until delivery. Typed parsing
   stays with the K-Means, Poisson, or other feature owner; the transfer facade
-  contains no method semantics. Frame-correlated renderer picking remains on
-  `SelectionReadback` and is intentionally excluded from this operation.
+  contains no method semantics. Frame-correlated renderer picking remains in
+  runtime-owned `SceneInteractionModule` state and is intentionally excluded
+  from this operation.
 - Promoted visualization resolves material, uniform, scalar-field, and
   per-element RGBA color sources through `GpuEntityConfig` and the shared
   `assets/shaders/common/gpu_scene.glsl` helper in the promoted surface
@@ -1815,8 +1816,8 @@ Concretely:
   shader-facing `RHI::GpuGeometryRecord`. The view carries that current record,
   the actual managed index-buffer handle, exact byte/count metadata,
   deterministic position/surface-index/texcoord/normal fingerprints, and a
-  nonzero monotonic content revision. It also reports the current
-  `UniformSoA` lane with explicit `RGB32_FLOAT` position/normal,
+  nonzero monotonic content revision. The sole live/public layout is uniform
+  SoA, described directly by explicit `RGB32_FLOAT` position/normal,
   `RG32_FLOAT` texcoord, and `R32_UINT` surface-index element/stride layouts.
   Per-stream fingerprints use FNV-1a-64 (offset
   `14695981039346656037`, prime `1099511628211`) with no domain prefix:
@@ -1828,16 +1829,12 @@ Concretely:
   fingerprints and advances the revision without changing the geometry handle,
   while rejected/no-channel updates, compaction, and device-resource rebuild
   preserve content identity. Free or stale handles fail and clear the output.
-- `GpuWorld::PlanGeometryStorage(...)` and
-  `GpuWorld::PlanGeometryStoragePromotion(...)` are RUNTIME-125's planning-only
-  contract for the optional static AoS fast lane. `GeometryUploadPlan` carries
-  the hint and `GeometryResidencyCoordinator` reports/stores the proposed plan,
-  but the coordinator delegates execution to the existing
-  `GpuWorld::UploadGeometry(...)` path. The current live allocation and
-  `TryGetGeometryResidencyView(...)` therefore remain `UniformSoA`: complete
-  static surface data can be classified as `StaticInterleavedAoS`, but no AoS
-  buffer is allocated and no shader variant is selected. Changing that
-  operational policy requires a separate storage-lane task and proof.
+- RUNTIME-139 removed RUNTIME-125's planning-only alternate-layout enum, hint,
+  status, promotion, and copied-residency fields. `GeometryUploadPlan`,
+  `GeometryResidencyCoordinator`, and `GpuWorld::UploadGeometry(...)` now
+  expose only the implemented uniform-SoA channel contract. A future alternate
+  layout requires a new task backed by claim-eligible GPU evidence; the retained
+  vertex-fetch smoke remains non-adoption evidence.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes
   `Cull.LineQuads.NonIndexedArgs` / `Cull.LineQuads.Count`; the indexed
@@ -2476,20 +2473,17 @@ Concretely:
   read-only `GpuGeometryResidencyView` reports the live record and managed
   index buffer together with a monotonic content revision, canonical
   position/surface-index/texcoord/normal fingerprints, exact byte and element
-  counts, storage lane, and format/element/stride metadata. Upload assigns a
+  counts, and format/element/stride metadata. Upload assigns a
   fresh revision; a successful partial channel update refreshes the affected
   fingerprint and advances the revision without changing the
   `GpuGeometryHandle`. The runtime object-space normal-bake provider accepts
   only a view whose retained bytes exactly match its canonical identity and
-  whose current lane advertises tightly packed bake-readable channels. The
-  planned optional static-AoS lane in `RUNTIME-139` must either preserve and
-  truthfully advertise equivalent separate bake-readable channels or produce
-  the deterministic unsupported-lane result; it must not expose interleaved
-  addresses as tightly packed SoA.
+  whose format/element/stride descriptors advertise tightly packed
+  bake-readable channels.
 - `Extrinsic.Graphics.GeometryResidency` is the one runtime-authored geometry
   lifecycle above `GpuWorld`. Its owning `GeometryUploadPlan` contains a
   graphics-only stable key, generation, copied vertex/index/channel bytes,
-  fixed formats, update class/channel mask, storage hint, bounds, and debug
+  fixed formats, update class/channel mask, bounds, and debug
   name. `ValidateGeometryUploadPlan(...)` rejects invalid plans
   deterministically. The concrete `GeometryResidencyCoordinator` composes with
   `GpuWorld` for unique reconciliation, shared acquisition, stale-generation

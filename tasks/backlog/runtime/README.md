@@ -9,19 +9,25 @@ another backlog directory.
 
 ### Runtime abstraction consolidation (seeded 2026-07-24)
 
-The source-complete runtime surface audit re-gated `REVIEW-003`. Each task
-lands and tests the general path, migrates real production workflows, proves
-parity, and only then deletes the specialized/forwarding path in a separate
-cleanup slice:
-
-#### Open tasks
-
-- [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
-  removes public BMIs for Engine/SceneInteraction/config/device helpers after
-  their owner-level behavior tests are in place.
+The source-complete runtime surface audit re-gated `REVIEW-003`. `RUNTIME-203`
+and `RUNTIME-205` closed the one-consumer helper findings through their concrete
+production owners while preserving public behavior first.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-205` — Internalize SceneInteraction helpers](../../done/RUNTIME-205-internalize-scene-interaction-helpers.md)
+  moved gizmo frame orchestration/scratch and pick correlation/refinement state
+  directly into the sole production owner, `SceneInteractionModule`, then
+  deleted both helper BMIs and their direct tests after owner-level CPU and
+  sanitizer parity. Durable `GizmoInteraction`, `SelectionController`, copied
+  snapshots, and graphics selection contracts remain. `RenderRecipeActivation`
+  and `DeviceBootstrap` stay public because their current production census has
+  multiple load-bearing consumers.
+- [`RUNTIME-203` — Internalize Engine composition helpers](../../done/RUNTIME-203-internalize-engine-composition-helpers.md)
+  moved deterministic module-hook records, promoted ECS composition, and the
+  JobService renderer-hook lifecycle into Engine-private implementation state,
+  then deleted the three one-consumer helper BMIs and their direct tests after
+  owner-level CPU and sanitizer parity.
 - [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](../../done/RUNTIME-202-retire-sandbox-runtime-facade.md)
   deleted the public all-feature facade/config/default-policy family, moved
   presentation composition into the Sandbox app, and localized commands,
@@ -201,11 +207,14 @@ reference-scene lifecycle control now lives in
 reference-scene registry/state/camera-seed accessors as delegating facades.
 `RUNTIME-155` is retired; runtime input-action registration and dispatch policy
 now lives behind `Extrinsic.Runtime.InputActions`. `RUNTIME-156` is retired;
-registered runtime-module sim-system/frame-hook records, deterministic ordering,
-fixed-step pass insertion, and frame-hook dispatch now live behind
-`Extrinsic.Runtime.ModuleSchedule`. `RUNTIME-157` is retired; selection pick
-readback correlation state, refined primitive cache ownership, and the readback
-drain bridge now live behind `Extrinsic.Runtime.SelectionReadback`.
+it first extracted runtime-module scheduling from Engine, then `RUNTIME-185`
+deleted the unused sim-system/DAG lane and `RUNTIME-203` moved the remaining
+deterministic frame/viewport hook records and dispatch directly into
+Engine-private implementation state before deleting the one-consumer schedule
+BMI. `RUNTIME-157` is retired; it first extracted selection pick-readback
+correlation state, refined primitive cache ownership, and the readback drain
+bridge. `RUNTIME-205` later internalizes that one-consumer state directly in
+`SceneInteractionModule` and deletes the helper BMI.
 `RUNTIME-158` is retired; the exported frame-pacing diagnostics record and
 ImGui/render-graph counter-copy policy now live behind
 `Extrinsic.Runtime.FramePacingDiagnostics`.
@@ -217,16 +226,19 @@ deleted that bridge in the app-composed `EditorUiModule`, preserving the
 paired frame bracket through runtime-module hooks.
 `RUNTIME-160` is retired; the renderer frame-command hook token,
 `JobService::RecordGpuQueueFrameCommands(...)` delegation, and GPU-participant
-shutdown sequencing now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
+shutdown sequencing were first extracted behind a helper; `RUNTIME-203`
+subsequently internalized that one-consumer lifecycle directly in Engine and
+deleted the helper BMI.
 `RUNTIME-161` is retired; it originally extracted object-space-normal GPU queue
 ownership and shutdown sequencing from Engine. Retired `RUNTIME-129` closed
 that production Vulkan path, and retired `RUNTIME-191` subsequently absorbed
 its guarantees into the canonical property-texture participant and deleted
 the extracted specialized service.
-`RUNTIME-162` is retired; transform-gizmo frame state, selected-entity scratch,
-gizmo/selection pointer interlock, and transform-gizmo packet building now live
-behind `Extrinsic.Runtime.GizmoFrameService` while preserving the public Engine
-gizmo accessors.
+`RUNTIME-162` is retired; it first extracted transform-gizmo frame state,
+selected-entity scratch, the gizmo/selection pointer interlock, and packet
+building. `RUNTIME-205` later internalizes that one-consumer frame state
+directly in `SceneInteractionModule` and deletes the helper BMI; the durable
+`GizmoInteraction` contract remains.
 `RUNTIME-163` is retired; `RenderExtractionCache`, render-world pool, last
 extraction stats, frame-index ownership, and render-extraction facade delegation
 now live in an Engine-private `RenderExtractionService`.
@@ -552,9 +564,11 @@ as normals/colors. This series fixes that incrementally.
 
 `RUNTIME-125` is retired at `CPUContracted`: it added the PR-fast
 SoA-vs-interleaved probe benchmark and planning-only storage/promotion
-contracts without adopting an AoS lane. `RUNTIME-139` owns the optional
-operational AoS storage path, shader variants, promote-on-edit behavior, and
-`gpu;vulkan` parity evidence.
+contracts without adopting an AoS lane. The probe still records
+`adoption_claim=false`; no qualifying result exists.
+`RUNTIME-139` retired the dormant AoS hint/plan/promotion API and preserved the implemented
+uniform SoA path. A future alternate layout requires a new task after
+claim-eligible GPU profiling proves a material vertex-fetch bottleneck.
 
 Storage model is fixed by
 [`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
@@ -738,15 +752,18 @@ split; narratives live in the retirement log.
 - [RUNTIME-156 — Extract runtime-module schedule out of Engine](../../archive/RUNTIME-156-extract-runtime-module-schedule.md)
   (done, 2026-07-09, `Operational`): runtime-module sim-system/frame-hook
   records, deterministic dependency ordering, frame-hook ordering, fixed-step
-  pass insertion/context construction, and frame-hook dispatch now live in
-  `Extrinsic.Runtime.ModuleSchedule`. `Engine` still owns module objects,
-  built-in service provisioning, `OnRegister` / `OnResolve` sequencing, and
-  shutdown calls as delegating composition.
+  pass insertion/context construction, and frame-hook dispatch were extracted
+  into `Extrinsic.Runtime.ModuleSchedule`. `RUNTIME-185` later removed the
+  unused sim-system/DAG lane, and `RUNTIME-203` internalized the remaining
+  frame/viewport records in Engine-private state and deleted the helper BMI;
+  `Engine` continues to own module objects, built-in service provisioning,
+  `OnRegister` / `OnResolve` sequencing, and shutdown composition.
 - [RUNTIME-157 — Extract selection readback state out of Engine](../../archive/RUNTIME-157-extract-selection-readback-state.md)
   (done, 2026-07-09, `Operational`): selection pick readback correlation,
   completed readback draining, primitive refinement, and the editor-facing
-  refined primitive cache now live in `Extrinsic.Runtime.SelectionReadback`.
-  `Engine` keeps public accessors as delegating compatibility facades.
+  refined primitive cache were first extracted behind a dedicated helper.
+  `RUNTIME-205` later internalizes that one-consumer state directly in
+  `SceneInteractionModule` and deletes the helper BMI; Engine has no facade.
 - [RUNTIME-158 — Extract frame pacing diagnostics out of Engine](../../archive/RUNTIME-158-extract-frame-pacing-diagnostics.md)
   (done, 2026-07-09, `Operational`): `RuntimeFramePacingDiagnostics` and the
   ImGui/render-graph counter mirroring helpers now live behind
@@ -762,7 +779,9 @@ split; narratives live in the retirement log.
 - [RUNTIME-160 — Extract JobService GPU queue bridge out of Engine](../../archive/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md)
   (done, 2026-07-09, `Operational`): renderer runtime-frame hook ownership,
   JobService GPU-queue command recording, and participant shutdown sequencing
-  now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
+  were extracted behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
+  `RUNTIME-203` later internalized the one-consumer hook token and shutdown
+  ordering directly in Engine and deleted that helper BMI.
 - [RUNTIME-161 — Extract object-space normal bake service out of Engine](../../archive/RUNTIME-161-extract-object-space-normal-bake-service.md)
   (done, 2026-07-09, `Operational`): object-space normal bake GPU-queue
   ownership, dependency setup, ready-frame callback construction, JobService
@@ -774,9 +793,10 @@ split; narratives live in the retirement log.
 - [RUNTIME-162 — Extract gizmo frame service out of Engine](../../archive/RUNTIME-162-extract-gizmo-frame-service.md)
   (done, 2026-07-09, `Operational`): transform-gizmo interaction state, undo
   storage, selected-entity scratch, gizmo/selection pointer interlock, and
-  transform-gizmo packet building now live in
-  `Extrinsic.Runtime.GizmoFrameService`. `Engine` keeps frame ordering plus the
-  public gizmo interaction and undo-stack compatibility facades.
+  transform-gizmo packet building were first extracted behind a dedicated
+  helper. `RUNTIME-205` later internalizes that one-consumer frame state in
+  `SceneInteractionModule` and deletes the helper BMI; the public
+  `GizmoInteraction` behavior contract remains.
 - [RUNTIME-140 — Remove the global scheduler barrier from the import apply path](../../archive/RUNTIME-140-remove-global-waitforall-from-import-apply.md)
   (done, 2026-07-05, `CPUContracted`): runtime import materialization now
   drains only the specific `AssetId` load/event through
@@ -807,9 +827,9 @@ split; narratives live in the retirement log.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../archive/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an
-  AoS GPU lane or selecting shader variants. Operational AoS storage/shaders,
-  promote-on-edit behavior, and Vulkan parity remain owned by open follow-up
-  `RUNTIME-139`.
+  AoS GPU lane or selecting shader variants. Retired `RUNTIME-139` subsequently
+  removed those unimplemented planning contracts; any future alternate layout
+  requires a new evidence-backed task.
 - [RUNTIME-136 — Sandbox method backend selectors](../../archive/RUNTIME-136-sandbox-method-backend-selectors.md)
   (done, 2026-07-02, `CPUContracted`): the Sandbox exposes CPU/GPU backend
   selectors for K-Means and Progressive Poisson, with requested-vs-actual
@@ -974,11 +994,12 @@ split; narratives live in the retirement log.
   components rather than `MeshPrimitiveViewSettings`, and unsupported
   point-cloud surface/edge requests fail closed with diagnostics.
 - [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../archive/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
-  (done): runtime-owned activation of promoted ECS systems via
-  `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`, called
-  every fixed-step substep before `Core::FrameGraph::Compile` so
-  `TransformHierarchy` + `BoundsPropagation` run deterministically before
-  render extraction.
+  (done): runtime-owned activation of promoted ECS systems through an
+  intermediate bundle called every fixed-step substep before
+  `Core::FrameGraph::Compile` so `TransformHierarchy` +
+  `BoundsPropagation` + `RenderSync` run deterministically before render
+  extraction. `RUNTIME-203` preserved that direct order in Engine composition
+  and deleted the one-consumer bundle BMI.
 - [RUNTIME-096 — Runtime module implementation splits](../../archive/RUNTIME-096-runtime-module-implementation-splits.md):
   module-interface hygiene follow-up for promoted runtime `.cppm` targets found
   by the 2026-06-06 implementation-body audit, including camera controllers,

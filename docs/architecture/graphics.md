@@ -88,8 +88,9 @@ Graphics is organized into explicit sublayers:
   finalizer cancels the ticket during job or world teardown. The transport owns
   no method or geometry-property semantics.
 - Renderer picking remains deliberately outside this result lifecycle.
-  `SelectionReadback` owns frame correlation and selection-specific policy;
-  RUNTIME-195 does not fold it into compute-result batches.
+  `SceneInteractionModule` directly owns bounded frame-correlation records and
+  selection-specific policy; RUNTIME-195 does not fold them into compute-result
+  batches.
 
 ## Vulkan operational readiness and runtime fallback
 

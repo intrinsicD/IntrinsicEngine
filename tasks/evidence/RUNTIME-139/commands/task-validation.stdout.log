@@ -1,0 +1,2 @@
+[ERROR] tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md: done task must include PR/commit reference placeholder or value.
+Validated 180 task file(s); findings: 1; mode: strict.

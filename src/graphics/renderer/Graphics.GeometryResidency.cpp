@@ -69,8 +69,7 @@ namespace Extrinsic::Graphics
         const std::uint64_t generation,
         const GpuWorld::GeometryUploadDesc& upload,
         const GeometryUploadUpdateClass updateClass,
-        const GpuWorld::GeometryChannelUpdateMask updateChannels,
-        const GpuWorld::GeometryStorageHint storageHint)
+        const GpuWorld::GeometryChannelUpdateMask updateChannels)
     {
         GeometryUploadPlan plan{};
         plan.Key = key;
@@ -97,7 +96,6 @@ namespace Extrinsic::Graphics
         }
         plan.UpdateClass = updateClass;
         plan.UpdateChannels = updateChannels;
-        plan.StorageHint = storageHint;
         return plan;
     }
 
@@ -219,7 +217,6 @@ namespace Extrinsic::Graphics
             GpuGeometryHandle Handle{};
             std::uint64_t Generation = 0u;
             std::uint32_t RefCount = 0u;
-            GpuWorld::GeometryStoragePlan StoragePlan{};
             bool PendingRetire = false;
         };
 
@@ -281,9 +278,6 @@ namespace Extrinsic::Graphics
             }
 
             const GpuWorld::GeometryUploadDesc upload = plan.UploadDesc();
-            const GpuWorld::GeometryStoragePlan proposedStoragePlan =
-                GpuWorld::PlanGeometryStorage(upload, plan.StorageHint);
-            result.StoragePlan = proposedStoragePlan;
 
             auto found = Entries.find(plan.Key);
             if (found == Entries.end())
@@ -300,7 +294,6 @@ namespace Extrinsic::Graphics
                     .Handle = handle,
                     .Generation = plan.Generation,
                     .RefCount = 1u,
-                    .StoragePlan = result.StoragePlan,
                 });
                 result.Status = GeometryResidencyStatus::Uploaded;
                 result.Handle = handle;
@@ -311,7 +304,6 @@ namespace Extrinsic::Graphics
 
             Entry& entry = found->second;
             result.Handle = entry.Handle;
-            result.StoragePlan = entry.StoragePlan;
             if (plan.Generation < entry.Generation)
             {
                 result.Status = GeometryResidencyStatus::StalePlan;
@@ -356,8 +348,6 @@ namespace Extrinsic::Graphics
                 if (update.Succeeded())
                 {
                     entry.Generation = plan.Generation;
-                    entry.StoragePlan = proposedStoragePlan;
-                    result.StoragePlan = proposedStoragePlan;
                     result.Status = GeometryResidencyStatus::PartiallyUpdated;
                     result.Handle = entry.Handle;
                     result.Diagnostic = "updated resident channels";
@@ -380,8 +370,6 @@ namespace Extrinsic::Graphics
             QueueReplacement(plan.Key, retiring);
             entry.Handle = replacement;
             entry.Generation = plan.Generation;
-            entry.StoragePlan = proposedStoragePlan;
-            result.StoragePlan = proposedStoragePlan;
             entry.PendingRetire = false;
             if (entry.RefCount == 0u)
             {
@@ -533,7 +521,6 @@ namespace Extrinsic::Graphics
             .Handle = found->second.Handle,
             .Generation = found->second.Generation,
             .RefCount = found->second.RefCount,
-            .StoragePlan = found->second.StoragePlan,
             .PendingRetire = found->second.PendingRetire,
         };
     }
