@@ -550,6 +550,10 @@ TEST(PointCloudConsolidation, EarAndAnisotropicFailuresPublishNoPayload)
     invalidNormals[0].x = std::numeric_limits<float>::quiet_NaN();
     expectFailure(params, Consolidation::Status::InvalidNormals,
                   invalidNormals);
+    invalidNormals = fixture.Normals;
+    invalidNormals[4] = -invalidNormals[4];
+    expectFailure(params, Consolidation::Status::InvalidNormals,
+                  invalidNormals);
     expectFailure(
         params, Consolidation::Status::InvalidNormals,
         std::span<const glm::vec3>{fixture.Normals.data(),

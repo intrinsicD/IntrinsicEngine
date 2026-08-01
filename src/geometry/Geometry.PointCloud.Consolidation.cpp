@@ -391,6 +391,44 @@ namespace Geometry::PointCloud::Consolidation
             return ToFiniteVec3(normal / std::sqrt(lengthSquared), output);
         }
 
+        [[nodiscard]] bool HasLocallyConsistentOrientation(
+            const std::span<const glm::vec3> positions,
+            const std::span<const glm::vec3> normals,
+            const double supportRadius) noexcept
+        {
+            if (positions.size() != normals.size())
+                return false;
+            const double supportSquared = supportRadius * supportRadius;
+            for (std::size_t i = 0u; i < positions.size(); ++i)
+            {
+                bool hasNeighbor = false;
+                bool hasCompatibleNeighbor = false;
+                for (std::size_t j = 0u; j < positions.size(); ++j)
+                {
+                    if (i == j ||
+                        !(DistanceSquared(positions[i], positions[j]) <
+                          supportSquared))
+                    {
+                        continue;
+                    }
+                    hasNeighbor = true;
+                    if (glm::dot(
+                            glm::dvec3(normals[i]),
+                            glm::dvec3(normals[j])) >= 0.0)
+                    {
+                        hasCompatibleNeighbor = true;
+                        break;
+                    }
+                }
+                // An oriented local surface gives every supported sample at
+                // least one normal in the same hemisphere. Isolated points
+                // are left to the existing empty-neighborhood contract.
+                if (hasNeighbor && !hasCompatibleNeighbor)
+                    return false;
+            }
+            return true;
+        }
+
         [[nodiscard]] bool PrepareSourceNormals(
             const std::span<const glm::vec3> positions,
             const std::span<const glm::vec3> authoredNormals,
@@ -415,6 +453,13 @@ namespace Geometry::PointCloud::Consolidation
                         failure = Status::InvalidNormals;
                         return false;
                     }
+                }
+                if (!HasLocallyConsistentOrientation(
+                        positions, normals, params.SupportRadius))
+                {
+                    normals.clear();
+                    failure = Status::InvalidNormals;
+                    return false;
                 }
                 diagnostics.UsedAuthoredNormals = true;
                 return true;
@@ -452,6 +497,13 @@ namespace Geometry::PointCloud::Consolidation
                     failure = Status::NormalEstimationFailed;
                     return false;
                 }
+            }
+            if (!HasLocallyConsistentOrientation(
+                    positions, normals, params.SupportRadius))
+            {
+                normals.clear();
+                failure = Status::NormalEstimationFailed;
+                return false;
             }
             diagnostics.EstimatedNormals = true;
             return true;
