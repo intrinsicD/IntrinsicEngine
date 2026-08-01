@@ -22,7 +22,8 @@ Completed and retired on 2026-08-01 at `Retired`. The unimplemented AoS
 hint/plan/promotion vocabulary and its copied residency fields are gone; the
 existing per-channel uniform-SoA descriptors and update masks are now the sole
 live geometry-storage contract. Focused graphics/runtime coverage passed
-103/103, the full default CPU selector passed 4,006/4,006 with its expected
+108/108 (103 contract plus 5 integration), the full default CPU selector
+passed 4,006/4,006 with its expected
 environmental GLFW/LSan skip, and the retained non-adoption benchmark manifest
 validated strictly. No GPU/Vulkan, byte-layout, or performance claim is made.
 The completion report and accepted fixed-surface review live under

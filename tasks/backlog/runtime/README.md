@@ -558,8 +558,7 @@ as normals/colors. This series fixes that incrementally.
 SoA-vs-interleaved probe benchmark and planning-only storage/promotion
 contracts without adopting an AoS lane. The probe still records
 `adoption_claim=false`; no qualifying result exists.
-[`RUNTIME-139`](../../done/RUNTIME-139-remove-speculative-aos-storage-planning.md)
-retired the dormant AoS hint/plan/promotion API and preserved the implemented
+`RUNTIME-139` retired the dormant AoS hint/plan/promotion API and preserved the implemented
 uniform SoA path. A future alternate layout requires a new task after
 claim-eligible GPU profiling proves a material vertex-fetch bottleneck.
 
