@@ -10,6 +10,13 @@ depends_on:
   - RUNTIME-194
   - RUNTIME-201
   - RUNTIME-202
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner: "Codex-GeometryE2E"
+branch: "feature/lop-consolidation-e2e"
+worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
+claimed_at: "2026-08-01T17:25:45Z"
 maturity_target: Operational
 ---
 # RUNTIME-175 — Point-cloud consolidation runtime operation and config lane
@@ -61,16 +68,19 @@ maturity_target: Operational
   for diagnostics but exposes no requested-backend field or selector.
 
 ## Right-sizing
-- Add one config value record and one feature-owned typed operation using the
-  canonical JobService and mutation transaction. Do not add a service, backend
-  interface, registry, RHI dependency, or feature queue for a single CPU
-  implementation.
+- Add one config value record and one feature-owned typed `IRuntimeModule`
+  operation using the canonical `JobService`, service registry, kernel events,
+  existing `GeometrySources` ECS components, and mutation transaction. Do not
+  add a backend interface, registry, RHI dependency, feature queue, or new ECS
+  authoring component for a single CPU implementation.
 - The reintroduction trigger is concrete evidence: a strategy passes
   METHOD-019's optimized-CPU gates or METHOD-020's Vulkan parity gate.
 
 ## Required changes
-- [ ] Add an app-owned `PointCloudConsolidationConfig` value struct and register
-      its schema/default/validator through the generic CORE-009 section lane:
+- [ ] Add a runtime-owned `PointCloudConsolidationConfig` value struct and let
+      Sandbox own only registration of its schema/default/validator through
+      the generic CORE-009 section lane, matching the existing clustering,
+      Progressive Poisson, and parameterization sections:
       plain `enum`/`std::uint32_t`/`double`/`bool` fields for strategy and the
       shared/per-strategy parameters, including the EAR normal-source policy;
       deterministic defaults. Do not add the type or its fields to
@@ -79,7 +89,9 @@ maturity_target: Operational
       let generic `Core.Config.EngineLoad` round-trip the opaque payload and
       generic `EngineConfigControl` report/dispatch the changed stable name.
 - [ ] Add feature-owned `PointCloudConsolidationRequest` /
-      `PointCloudConsolidationResult` records and one typed submit operation:
+      `PointCloudConsolidationResult` records plus a narrow
+      `PointCloudConsolidationService` / `PointCloudConsolidationModule` typed
+      submit operation:
       capture the selected point cloud on the main thread, execute the requested
       CPU-reference strategy through `JobService`, then write current positions
       back via `GeometrySources`/`PopulateFromCloud` +
@@ -89,16 +101,18 @@ maturity_target: Operational
       `PointCloudConsolidationResult` record with stable
       `cpu_reference` implementation identity, the chosen strategy token, and
       convergence diagnostics (iterations, converged flag, moved distance).
-- [ ] Register the typed operation/config handler through the existing runtime
-      command/config composition so it is reachable from `Engine::Run()`
-      without restoring a Sandbox facade.
+- [ ] Register the typed operation through `IRuntimeModule` bindings
+      (`CommandBus`, `KernelEventBus`, `JobService`, `WorldRegistry`, and the
+      optional `EditorCommandHistory`) and compose the module/config handler in
+      Sandbox so it is reachable from `Engine::Run()` without restoring a
+      Sandbox facade.
 
 ## Tests
 - [ ] `tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp`
       (`contract;runtime`): the runtime-owned section codec round-trips through
       the generic engine-config lane (parse → serialize → parse is stable) and
       rejects out-of-range values with explicit diagnostics.
-- [ ] `tests/contract/runtime/Test.PointCloudConsolidationOperation.cpp`
+- [ ] `tests/contract/runtime/Test.PointCloudConsolidationModule.cpp`
       (`contract;runtime`, Null device): the typed operation on a selected point
       cloud runs the selected CPU-reference strategy through `JobService`,
       updates positions, marks vertices dirty, rejects stale completion, and

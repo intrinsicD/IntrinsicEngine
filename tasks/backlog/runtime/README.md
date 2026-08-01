@@ -504,20 +504,17 @@ consumer lives here because `runtime` owns composition over `geometry`.
 `Extrinsic.Runtime.SpatialDebugClosestFace`. Editor method windows for the
 ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
-- [`RUNTIME-175 — Point-cloud consolidation runtime operation and config lane`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+- [`RUNTIME-175 — Point-cloud consolidation runtime operation and config lane`](../../active/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
   is the engine-integration leaf for the LOP consolidation method family
-  (`methods/METHOD-016..018`): an app-owned
-  `sandbox.point_cloud_consolidation` section on the generic CORE-009 config
-  lane, an `EngineConfigControl` hot-apply path, a post-`RUNTIME-202` typed
-  operation using canonical `JobService` plus the common mutation transaction,
-  `GeometrySources` writeback, and CPU-reference result diagnostics. It is
-  gated on `CORE-009` for the section substrate and on
-  `methods/METHOD-016..018` for the four reference strategies. No placeholder
-  backend selector or RHI adapter lands here; METHOD-019/020 extend the
-  delivered surface only for backends that pass their evidence gates. Mirrors
-  retired `RUNTIME-134` progressive-Poisson playground; the Sandbox panel is
-  `ui/UI-035`; coordinate with the app-owned editor structure retired by
-  `ARCH-006`.
+  (`methods/METHOD-016..018`): a runtime-owned
+  `sandbox.point_cloud_consolidation` section registered by Sandbox on the
+  generic CORE-009 config lane, an `EngineConfigControl` hot-apply path, and a
+  post-`RUNTIME-202` typed `IRuntimeModule` operation using canonical
+  `JobService` plus the common mutation transaction and existing
+  `GeometrySources` ECS components. The four CPU-reference strategies are now
+  accepted prerequisites. No placeholder backend selector or RHI adapter
+  lands here; METHOD-019/020 extend the delivered surface only for backends
+  that pass their evidence gates. The Sandbox panel is `ui/UI-035`.
 
 ### Normal-orientation diagnostics (Theme I, seeded 2026-07-20)
 

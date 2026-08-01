@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/active/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
 
 ## Theme B — Rendering modernization
 
@@ -88,7 +88,6 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
-- unblocked: `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
 - blocked by `METHOD-032`: `RUNTIME-189` — Sandbox debug-draw view for orientation parity diagnostics (tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 
