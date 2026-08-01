@@ -21,7 +21,7 @@ map.
 - [GEOM-061 — Point-cloud grid-downsampling reduction strategies](GEOM-061-grid-downsampling-reduction-strategies.md)
   (index-returning per-cell reduction extending retired GEOM-016's voxel
   downsampling; framework24 port-gap follow-up).
-- [GEOM-062 — Point-set projection and weighting kernels seam](GEOM-062-point-set-projection-weighting-kernels.md)
+- [GEOM-062 — Point-set projection and weighting kernels seam](../../active/GEOM-062-point-set-projection-weighting-kernels.md)
   (reusable `Geometry.PointCloud.Kernels`: radial weights, LOP repulsion, WLOP
   density weights; gates the `methods/METHOD-016..018` LOP consolidation family).
 - [GEOM-064 — Parameterization optimization kernels seam](GEOM-064-parameterization-optimization-kernels.md)

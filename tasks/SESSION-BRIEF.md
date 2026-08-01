@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GEOM-062` — Point-set projection and weighting kernels seam (tasks/active/GEOM-062-point-set-projection-weighting-kernels.md)
 
 ## Theme B — Rendering modernization
 
@@ -56,7 +56,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-059` — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam (tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
 - unblocked: `GEOM-060` — Permutohedral lattice fast high-dimensional filtering seam (tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md)
 - blocked by `BUG-109`: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
-- unblocked: `GEOM-062` — Point-set projection and weighting kernels seam (tasks/backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md)
 - unblocked: `GEOM-064` — Parameterization optimization kernels seam (tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md)
 - blocked by `REVIEW-003`: `GEOM-065` — Invariant-aware scientific-field mip pyramids (tasks/backlog/geometry/GEOM-065-invariant-aware-scientific-field-mip-pyramids.md)
 - unblocked: `GEOM-068` — Weighted Dijkstra edge-cost contract (tasks/backlog/geometry/GEOM-068-weighted-dijkstra-edge-cost-contract.md)

@@ -2,6 +2,13 @@
 id: GEOM-062
 theme: I
 depends_on: []
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner: "Codex-GeometryE2E"
+branch: "feature/lop-consolidation-e2e"
+worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
+claimed_at: "2026-08-01T12:12:05Z"
 maturity_target: CPUContracted
 ---
 # GEOM-062 — Point-set projection and weighting kernels seam
