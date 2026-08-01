@@ -11,7 +11,7 @@ method module or backend registry.
 | Backend | Status | Owner |
 | --- | --- | --- |
 | `cpu_reference` | implemented | METHOD-017 |
-| optimized CPU | planned | METHOD-019 |
+| optimized CPU candidate | parity passed; ratio 0.998818 missed the 0.80 gate; not selectable | METHOD-019 |
 | Vulkan compute | planned | METHOD-020 |
 
 ## Selection guidance
@@ -30,11 +30,17 @@ work; lowering it can blur thin sheets.
   approximation. Stotko, Weinmann, and Klein's 2024 incomplete-gamma kernel
   is a documented accuracy extension, not an unreviewed change to this oracle.
 - The reference is serial and makes no throughput claim.
+- METHOD-019's exact factor-cache/underflow-only candidate remains a
+  benchmark validation seam; it does not add a method-manifest backend,
+  runtime config token, or UI choice.
 
 ## Verification targets
 
 - Correctness: `tests/unit/geometry/Test.PointCloudConsolidation.cpp`
 - Smoke: `benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml`
+- Paired candidate comparison:
+  `benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml`; see
+  `../locally_optimal_projection/reports/METHOD-019-result.md`
 
 ## Runtime integration
 

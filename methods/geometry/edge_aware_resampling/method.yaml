@@ -29,8 +29,10 @@ correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudKernels.cpp"
 benchmarks:
   - "../../../benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml"
 known_limitations:
   - "The original fixed support and normal-angle controls require scale/noise-aware tuning and do not handle open boundaries explicitly."
   - "Severe noise, under-sampling, close sheets, or erroneous normal orientation can over-smooth or over-sharpen features."
   - "The deterministic CPU reference implements original EAR, not later L0, graph/intrinsic, or learned resampling objectives."
   - "The serial CPU reference is correctness-oriented and makes no performance claim."
+  - "METHOD-019's exact optimized EAR candidate preserved parity but missed the frozen useful-acceleration gate; no optimized backend is selectable."

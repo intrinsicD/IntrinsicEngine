@@ -25,8 +25,9 @@ correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
 benchmarks:
   - "../../../benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml"
 known_limitations:
   - "Compact support h must connect every projected sample to at least one source sample; isolated neighborhoods fail closed."
   - "Thin structures and strongly anisotropic sampling can merge across sheets when h is too large."
-  - "The serial CPU reference prioritizes deterministic correctness and exposes no backend selector until a second implementation exists."
+  - "METHOD-019's exact optimized candidates preserved parity but missed the frozen useful-acceleration gate for both LOP and WLOP; no optimized backend is selectable."
   - "Inverse-distance terms use a scale-relative distance floor of 0.01 h for coincident samples."

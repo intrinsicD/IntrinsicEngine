@@ -11,7 +11,7 @@ it does not create a method-owned engine module, registry, or normal service.
 | Backend | Status | Owner |
 | --- | --- | --- |
 | `cpu_reference` | implemented | METHOD-018 |
-| optimized CPU | planned | METHOD-019 |
+| optimized CPU candidate | parity passed; ratio 1.037145 missed the 0.80 gate; not selectable | METHOD-019 |
 | Vulkan compute | planned | METHOD-020 |
 
 ## Selection guidance
@@ -40,12 +40,18 @@ a method-local copy and never overwrites the source property.
 - Later L0, graph/intrinsic, and learned resamplers improve different regimes;
   they are documented comparisons, not silently folded into this oracle.
 - The reference is serial and makes no throughput claim.
+- METHOD-019's exact local-scan candidate remains a benchmark validation seam;
+  it does not add a method-manifest backend, runtime config token, or UI
+  choice.
 
 ## Verification targets
 
 - Correctness: `tests/unit/geometry/Test.PointCloudConsolidation.cpp` and
   `tests/unit/geometry/Test.PointCloudKernels.cpp`
 - Smoke: `benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml`
+- Paired candidate comparison:
+  `benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml`; see
+  `../locally_optimal_projection/reports/METHOD-019-result.md`
 
 The confirmation smoke uses a distinct built-in noisy dihedral cohort and
 records the isotropic WLOP contrast, expected-plane error, retained normal

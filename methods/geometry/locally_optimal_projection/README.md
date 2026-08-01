@@ -12,6 +12,7 @@ kept out of the method backend.
 | Backend | Strategies | Status | Owner |
 | --- | --- | --- | --- |
 | `cpu_reference` | LOP, WLOP | implemented | METHOD-016 |
+| optimized CPU candidate | LOP, WLOP | parity passed; ratios 0.961824 / 0.966845 missed the 0.80 gate; not selectable | METHOD-019 |
 
 WLOP is the default strategy. Plain LOP follows the same update but uses unit
 source/projected density weights.
@@ -38,11 +39,17 @@ source/projected density weights.
   connectivity or reconstruct a surface.
 - The reference is serial and correctness-oriented. Optimized CPU and GPU
   backends are separate parity tasks.
+- METHOD-019 retained its exact execution candidates as benchmark-only
+  negative evidence. They do not add a backend token, config value, or UI
+  choice.
 
 ## Verification
 
 - Correctness: `tests/unit/geometry/Test.PointCloudConsolidation.cpp`
 - Smoke: `benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml`
+- Paired candidate comparison:
+  `benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml`; see
+  `reports/METHOD-019-result.md`
 
 ## Runtime integration
 

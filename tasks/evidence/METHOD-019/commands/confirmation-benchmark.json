@@ -1,0 +1,32 @@
+{
+  "command": [
+    "env",
+    "GIT_COMMIT=cfd0d9bdebe6c46969394d61593bf4305365ebec",
+    "python3",
+    "tools/benchmark/run_and_seal.py",
+    "--executable",
+    "build/ci/bin/IntrinsicBenchmarkSmoke",
+    "--output",
+    "build/ci/custody/METHOD-019/confirmation-raw",
+    "--manifests-root",
+    "benchmarks",
+    "--run-id",
+    "method-019-confirmation-v1",
+    "--attempt-id",
+    "attempt-001"
+  ],
+  "command_display": "env GIT_COMMIT=cfd0d9bdebe6c46969394d61593bf4305365ebec python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicBenchmarkSmoke --output build/ci/custody/METHOD-019/confirmation-raw --manifests-root benchmarks --run-id method-019-confirmation-v1 --attempt-id attempt-001",
+  "cwd": ".",
+  "duration_ms": 14079,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T21:25:47Z",
+  "label": "confirmation-benchmark",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T21:25:33Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/confirmation-benchmark.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/confirmation-benchmark.stdout.log",
+  "stdout_sha256": "729b8ccd37d7f4d0d66a58df25ecd05fcbccb70b9f807f30e1a9c9b8909f0f06",
+  "task_id": "METHOD-019"
+}

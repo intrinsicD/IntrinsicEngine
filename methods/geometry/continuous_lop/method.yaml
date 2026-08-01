@@ -27,8 +27,10 @@ correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
 benchmarks:
   - "../../../benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml"
 known_limitations:
   - "A finite-component ordinary EM mixture can smooth thin structures; component count and covariance floor bound that trade-off."
   - "The reference uses the paper's three-Gaussian analytic attraction approximation but not its hierarchical EM acceleration."
   - "The 2024 incomplete-gamma CLOP kernel is recorded as a more accurate extension but is not substituted into this original-paper oracle."
   - "The serial CPU reference is correctness-oriented and makes no performance claim."
+  - "METHOD-019's exact optimized CLOP candidate preserved parity but missed the frozen useful-acceleration gate; no optimized backend is selectable."

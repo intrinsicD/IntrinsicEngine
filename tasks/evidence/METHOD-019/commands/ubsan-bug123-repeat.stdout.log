@@ -1,0 +1,47 @@
+Internal ctest changing into directory: /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci-ubsan
+Test project /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci-ubsan
+    Start 832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+    Test #832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ...   Passed    0.08 sec
+    Start 832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+    Test #832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ...   Passed    0.08 sec
+    Start 832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+    Test #832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ...   Passed    0.08 sec
+    Start 832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+    Test #832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ...   Passed    0.08 sec
+    Start 832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+    Test #832: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ...***Failed    0.07 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeSceneLifecycle
+[ RUN      ] RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] [Runtime] Queued scene save: path='/tmp/runtime179_retired_scene_save.json'[0m
+/tmp/intrinsic-geometry-e2e.GJlhXS/tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp:854: Failure
+Value of: event.has_value()
+  Actual: false
+Expected: true
+
+[  FAILED  ] RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent (45 ms)
+[----------] 1 test from RuntimeSceneLifecycle (45 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (45 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+
+ 1 FAILED TEST
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+contract    =   0.07 sec*proc (1 test)
+runtime     =   0.07 sec*proc (1 test)
+
+Total Test time (real) =   0.45 sec
+
+The following tests FAILED:
+	832 - RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent (Failed)

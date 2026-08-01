@@ -533,3 +533,29 @@
 - **Tags**: geometry, point cloud, EAR, anisotropic WLOP, CPU reference,
   deterministic
 - **From staging**: O90
+
+## C20: Exact execution-only LOP-family candidates provide useful CPU acceleration
+- **Statement**: Exact traversal-scratch, sorted-neighborhood reuse,
+  Gaussian-product cache, underflow-only pruning, and local EAR scan changes
+  were expected to preserve the LOP/WLOP/CLOP/EAR reference results while
+  reducing at least one strategy's paired median runtime ratio to `<= 0.80`.
+- **Status**: refuted — on the preregistered single-thread Clang 23 confirmation
+  run at clean implementation revision `cfd0d9bd`, all four candidates passed
+  parity but the LOP/WLOP/CLOP/EAR ratios were respectively `0.961823997`,
+  `0.966844794`, `0.998817796`, and `1.037145476`; no strategy was adopted and
+  no public optimized backend/config/UI token was added
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The hypothesis required at least one strategy to
+  retain the frozen parity, determinism, identity, and no-fallback contract
+  while reporting a paired median optimized/reference runtime ratio `<= 0.80`
+  on the fixed confirmation suite.
+- **Proof**: [methods/geometry/locally_optimal_projection/reports/METHOD-019-result.md,
+  benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml,
+  tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json,
+  tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl,
+  tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml]
+- **Dependencies**: [C17, C18, C19]
+- **Tags**: geometry, point cloud, LOP, WLOP, CLOP, EAR, optimized CPU,
+  negative result
+- **From staging**: O91

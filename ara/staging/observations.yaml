@@ -1409,3 +1409,24 @@ observations:
     promoted_to: "logic/claims.md:C19"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O91
+    timestamp: "2026-08-01T21:31+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-019's four execution-only optimized CPU candidates preserve the
+      frozen LOP/WLOP/CLOP/EAR reference parity and deterministic identity,
+      but none reaches the preregistered 0.80 paired-median runtime ratio; no
+      optimized strategy is adopted or exposed through method, runtime, config,
+      or UI surfaces.
+    context: >
+      The claim-eligible clean-commit confirmation reports exact position and
+      normal RMS deltas of zero and LOP/WLOP/CLOP/EAR ratios 0.961823997,
+      0.966844794, 0.998817796, and 1.037145476. The result retains the
+      candidates as negative benchmark evidence and does not retune the
+      fixtures, threshold, or literature-derived method boundary.
+    potential_type: claim
+    bound_to: [N312, N313]
+    promoted: true
+    promoted_to: "logic/claims.md:C20"
+    crystallized_via: artifact-commitment
+    stale: false

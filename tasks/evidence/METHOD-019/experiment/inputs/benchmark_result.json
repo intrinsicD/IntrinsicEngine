@@ -1,0 +1,329 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_optimized",
+  "benchmark_id": "geometry.lop_family.comparison.smoke",
+  "claim_eligible": true,
+  "commit": "cfd0d9bdebe6c46969394d61593bf4305365ebec",
+  "config_digest": "29171b88645e9eeef97a3b08c48bd01fd093d05021b0c54500647e383d9d8f8f",
+  "dataset": "builtin.lop_family.comparison.v1",
+  "diagnostics": {
+    "adopted_strategy_count": 0,
+    "backend_runtime_statistic": "median_individual_runtime_ms",
+    "baseline_backend": "cpu_reference",
+    "evaluated_strategy_count": 4,
+    "measured_pairs": 5,
+    "measurement_order": "alternating_reference_optimized_optimized_reference",
+    "mode": "paired_backend_comparison",
+    "normal_linf_delta_max": 2e-06,
+    "normal_rms_delta_max": 1e-06,
+    "position_linf_delta_max": 2e-06,
+    "position_rms_delta_max": 1e-06,
+    "probe_backend": "cpu_optimized",
+    "runner": "IntrinsicBenchmarkSmoke",
+    "strategies": [
+      {
+        "acceleration_passed": false,
+        "adopted": false,
+        "input_point_count": 1024,
+        "median_runtime_ratio": 0.961823997,
+        "normal_linf_delta": 0.0,
+        "normal_rms_delta": 0.0,
+        "optimized_backend": "cpu_optimized",
+        "optimized_deterministic": true,
+        "optimized_identity_matched": true,
+        "optimized_median_runtime_ms": 36.838666,
+        "optimized_runtime_samples_ms": [
+          36.85299,
+          36.891609,
+          36.838666,
+          36.50977,
+          36.687853
+        ],
+        "optimized_status": "not_converged",
+        "optimized_used_fallback": false,
+        "output_point_count": 256,
+        "output_shape_matched": true,
+        "paired_runtime_ratio_samples": [
+          0.960715553,
+          0.96688679,
+          0.96604233,
+          0.943993356,
+          0.961823997
+        ],
+        "parity_passed": true,
+        "position_linf_delta": 0.0,
+        "position_rms_delta": 0.0,
+        "reference_backend": "cpu_reference",
+        "reference_deterministic": true,
+        "reference_identity_matched": true,
+        "reference_median_runtime_ms": 38.155045,
+        "reference_runtime_samples_ms": [
+          38.359939,
+          38.155045,
+          38.133594,
+          38.675876,
+          38.14404
+        ],
+        "reference_status": "not_converged",
+        "state_matched": true,
+        "strategy": "lop"
+      },
+      {
+        "acceleration_passed": false,
+        "adopted": false,
+        "input_point_count": 960,
+        "median_runtime_ratio": 0.966844794,
+        "normal_linf_delta": 0.0,
+        "normal_rms_delta": 0.0,
+        "optimized_backend": "cpu_optimized",
+        "optimized_deterministic": true,
+        "optimized_identity_matched": true,
+        "optimized_median_runtime_ms": 16.867073,
+        "optimized_runtime_samples_ms": [
+          16.867073,
+          16.932784,
+          16.794144,
+          16.842685,
+          16.990876
+        ],
+        "optimized_status": "empty_neighborhood",
+        "optimized_used_fallback": false,
+        "output_point_count": 0,
+        "output_shape_matched": true,
+        "paired_runtime_ratio_samples": [
+          0.968554084,
+          0.968352323,
+          0.964170693,
+          0.956724002,
+          0.966844794
+        ],
+        "parity_passed": true,
+        "position_linf_delta": 0.0,
+        "position_rms_delta": 0.0,
+        "reference_backend": "cpu_reference",
+        "reference_deterministic": true,
+        "reference_identity_matched": true,
+        "reference_median_runtime_ms": 17.486181,
+        "reference_runtime_samples_ms": [
+          17.414694,
+          17.486181,
+          17.418227,
+          17.604539,
+          17.57353
+        ],
+        "reference_status": "empty_neighborhood",
+        "state_matched": true,
+        "strategy": "wlop"
+      },
+      {
+        "acceleration_passed": false,
+        "adopted": false,
+        "input_point_count": 720,
+        "median_runtime_ratio": 0.998817796,
+        "normal_linf_delta": 0.0,
+        "normal_rms_delta": 0.0,
+        "optimized_backend": "cpu_optimized",
+        "optimized_deterministic": true,
+        "optimized_identity_matched": true,
+        "optimized_median_runtime_ms": 259.425509,
+        "optimized_runtime_samples_ms": [
+          259.425509,
+          258.921286,
+          260.83893,
+          259.151795,
+          259.901407
+        ],
+        "optimized_status": "mixture_not_converged",
+        "optimized_used_fallback": false,
+        "output_point_count": 0,
+        "output_shape_matched": true,
+        "paired_runtime_ratio_samples": [
+          0.998817796,
+          0.994422367,
+          1.003798166,
+          0.998860644,
+          0.997637956
+        ],
+        "parity_passed": true,
+        "position_linf_delta": 0.0,
+        "position_rms_delta": 0.0,
+        "reference_backend": "cpu_reference",
+        "reference_deterministic": true,
+        "reference_identity_matched": true,
+        "reference_median_runtime_ms": 259.851969,
+        "reference_runtime_samples_ms": [
+          259.732566,
+          260.373554,
+          259.851969,
+          259.447398,
+          260.516759
+        ],
+        "reference_status": "mixture_not_converged",
+        "state_matched": true,
+        "strategy": "clop"
+      },
+      {
+        "acceleration_passed": false,
+        "adopted": false,
+        "input_point_count": 112,
+        "median_runtime_ratio": 1.037145476,
+        "normal_linf_delta": 0.0,
+        "normal_rms_delta": 0.0,
+        "optimized_backend": "cpu_optimized",
+        "optimized_deterministic": true,
+        "optimized_identity_matched": true,
+        "optimized_median_runtime_ms": 301.978827,
+        "optimized_runtime_samples_ms": [
+          300.78721,
+          301.978827,
+          301.630849,
+          303.503616,
+          302.79533
+        ],
+        "optimized_status": "success",
+        "optimized_used_fallback": false,
+        "output_point_count": 120,
+        "output_shape_matched": true,
+        "paired_runtime_ratio_samples": [
+          1.026033105,
+          1.040428935,
+          1.037145476,
+          1.039223142,
+          1.036153681
+        ],
+        "parity_passed": true,
+        "position_linf_delta": 0.0,
+        "position_rms_delta": 0.0,
+        "reference_backend": "cpu_reference",
+        "reference_deterministic": true,
+        "reference_identity_matched": true,
+        "reference_median_runtime_ms": 292.048554,
+        "reference_runtime_samples_ms": [
+          293.155463,
+          290.244549,
+          290.827908,
+          292.048554,
+          292.230135
+        ],
+        "reference_status": "success",
+        "state_matched": true,
+        "strategy": "ear"
+      }
+    ],
+    "supported_cpu_threads": [
+      1
+    ],
+    "timing_statistic": "median_paired_runtime_ratio",
+    "useful_runtime_ratio_max": 0.8,
+    "warmup_pairs": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml",
+    "sha256": "72807a914d77045a9996e9f4ba96ce300f3e70b0dac009ba13ce5b12c3fb7825"
+  },
+  "method": "geometry.lop_family.backend_comparison",
+  "metrics": {
+    "quality_error_l2": 0.0,
+    "runtime_ms": 615.110075
+  },
+  "resolved_params": {
+    "backend_runtime_statistic": "median_individual_runtime_ms",
+    "baseline_backend": "cpu_reference",
+    "fixture_version": 1,
+    "fixtures": {
+      "clop": {
+        "covariance_floor": 1e-06,
+        "id": "deterministic_noisy_plane_30x24",
+        "input_points": 720,
+        "mixture_components": 24,
+        "mixture_iterations": 40,
+        "mixture_relative_tolerance": 1e-05,
+        "projection_iterations": 6,
+        "repulsion_weight": 0.35,
+        "seed": 1903,
+        "support_radius": 0.22,
+        "target_points": 240
+      },
+      "ear": {
+        "edge_sensitivity": 5,
+        "id": "deterministic_oriented_dihedral_8x7x2",
+        "input_points": 112,
+        "normal_angle_degrees": 15,
+        "normal_refinement_rounds": 3,
+        "repulsion_weight": 0.1,
+        "seed": 1904,
+        "support_radius": 0.52,
+        "target_points": 120
+      },
+      "lop": {
+        "id": "deterministic_noisy_plane_32x32",
+        "input_points": 1024,
+        "projection_iterations": 8,
+        "repulsion_weight": 0.35,
+        "seed": 1901,
+        "support_radius": 0.18,
+        "target_points": 256
+      },
+      "wlop": {
+        "id": "deterministic_density_plane_40x24",
+        "input_points": 960,
+        "projection_iterations": 8,
+        "repulsion_weight": 0.35,
+        "seed": 1902,
+        "support_radius": 0.2,
+        "target_points": 240
+      }
+    },
+    "intent": "performance",
+    "measured_pairs": 5,
+    "measurement_order": "alternating_reference_optimized_optimized_reference",
+    "normal_linf_delta_max": 2e-06,
+    "normal_rms_delta_max": 1e-06,
+    "position_linf_delta_max": 2e-06,
+    "position_rms_delta_max": 1e-06,
+    "probe_backend": "cpu_optimized_candidate",
+    "strategies": [
+      "lop",
+      "wlop",
+      "clop",
+      "ear"
+    ],
+    "timing_statistic": "median_paired_runtime_ratio",
+    "useful_runtime_ratio_max": 0.8,
+    "warmup_pairs": 1
+  },
+  "run_id": "method-019-confirmation-v1",
+  "schema_version": 2,
+  "source": {
+    "revision": "cfd0d9bdebe6c46969394d61593bf4305365ebec",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 30000,
+      "metric": "runtime_ms",
+      "observed": 615.110075,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 1e-06,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 1e-06,
+    "smoke_runtime_ms_max": 30000
+  },
+  "warmup_policy": {
+    "measured_pairs": 5,
+    "warmup_pairs": 1
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-R",
+    "^RuntimeSceneLifecycle\\.RetiredQueuedSceneSavePublishesTerminalEvent$",
+    "--repeat",
+    "until-fail:100",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -R '^RuntimeSceneLifecycle\\.RetiredQueuedSceneSavePublishesTerminalEvent$' --repeat until-fail:100 --timeout 60",
+  "cwd": ".",
+  "duration_ms": 453,
+  "exit_code": 8,
+  "finished_at": "2026-08-01T22:06:19Z",
+  "label": "ubsan-bug123-repeat",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T22:06:19Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/ubsan-bug123-repeat.stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/ubsan-bug123-repeat.stdout.log",
+  "stdout_sha256": "277402057aec81da81cdedf8e3c75ccf8018c175c19d91c84e8e3f372e8d39eb",
+  "task_id": "METHOD-019"
+}

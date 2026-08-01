@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "python3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-019/experiment/inputs --strict"
+  ],
+  "command_display": "bash -lc 'python3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-019/experiment/inputs --strict'",
+  "cwd": ".",
+  "duration_ms": 73,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T21:38:14Z",
+  "label": "benchmark-results",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T21:38:14Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/benchmark-results.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/benchmark-results.stdout.log",
+  "stdout_sha256": "a806b163d505e492f471c36ffc20357118b68a9e796734da3bfcc9b8cb6740fe",
+  "task_id": "METHOD-019"
+}

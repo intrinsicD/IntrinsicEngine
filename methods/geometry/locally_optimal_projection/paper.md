@@ -85,7 +85,8 @@ and [10.1016/j.cad.2013.02.003](https://doi.org/10.1016/j.cad.2013.02.003))
 adds bilateral feature weighting and stochastic KDE sampling. Stotko,
 Weinmann, and Klein's 2024 incomplete-gamma formulation changes WLOP density
 and CLOP approximation accuracy. Both are useful named extensions, but neither
-is an optimized implementation of the frozen LOP/WLOP oracle. The adopted
-candidate is consequently limited to exact neighborhood/scratch reuse under
+is an optimized implementation of the frozen LOP/WLOP oracle. The evaluated
+candidate was consequently limited to exact neighborhood/scratch reuse under
 the preregistered comparison in
-[`reports/METHOD-019-protocol.md`](reports/METHOD-019-protocol.md).
+[`reports/METHOD-019-protocol.md`](reports/METHOD-019-protocol.md); it preserved
+parity but missed the fixed acceleration gate and was not adopted.

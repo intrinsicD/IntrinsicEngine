@@ -7,3 +7,5 @@ original EAR oracle in place.
 
 The exact METHOD-019 CPU-candidate evaluation is preregistered in
 [`../../locally_optimal_projection/reports/METHOD-019-protocol.md`](../../locally_optimal_projection/reports/METHOD-019-protocol.md).
+The measured parity-preserving but non-accelerating candidate is recorded in
+[`../../locally_optimal_projection/reports/METHOD-019-result.md`](../../locally_optimal_projection/reports/METHOD-019-result.md).
