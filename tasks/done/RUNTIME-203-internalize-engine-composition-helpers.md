@@ -29,8 +29,12 @@ maturity_target: Retired
   passed 2,650/2,650 (UBSan carries the same policy-defined skip). The first
   focused iteration exposed a stale generated inventory and a test harness
   that retained event subscriptions across reinitialization; both were fixed
-  before the complete focused and broad reruns. No GPU/Vulkan, byte-layout,
-  or performance claim is made.
+  before the complete focused and broad reruns. The first independent review
+  verified the implementation, counts, layering, right-sizing, receipts, and
+  digest, then requested correction of canonical architecture/ADR/current-
+  index prose that still described the intermediate helpers as live; the
+  retirement surface now includes that semantic docs-sync correction. No
+  GPU/Vulkan, byte-layout, or performance claim is made.
 - Commit: the implementation/retirement commit plus the generated completion
   report and accepted revision-bound review provide the exact source binding.
 

@@ -78,11 +78,13 @@ responsibilities plus the Sandbox-local optional frame-pacing capture module.
 They register exactly seven generic frame hooks (Editor UI: three, texture
 bake: one, scene interaction: two, frame-pacing capture: one) and two typed
 viewport-input hooks (camera and scene interaction). `RuntimeModuleSchedule`
-therefore owns only deterministic frame-hook and viewport-hook records, sorted
-by phase/module/registration sequence or module/registration sequence. There
-is no module sim-system registrar, descriptor/context, causal signal DAG, or
-fixed-step schedule branch. The promoted ECS bundle is the complete current
-fixed-step contribution.
+was the intermediate owner established by that audit. `RUNTIME-203`
+subsequently retired its one-consumer BMI: `Engine::Impl` now owns only the
+same deterministic frame-hook and viewport-hook records, sorted by
+phase/module/registration sequence or module/registration sequence. There is
+no module sim-system registrar, descriptor/context, causal signal DAG, helper
+schedule object, or fixed-step schedule branch. Engine directly registers the
+three promoted ECS systems as the complete current fixed-step contribution.
 
 Two-phase `Provide`/`Require`/`OnResolve` remains behavior-backed: texture bake,
 asset workflow, scene document, editor UI, camera, interaction, and config
@@ -681,8 +683,9 @@ then routes it to a controller slot via `ICameraController::Focus(...)` and mark
 an explicit camera transition. `FocusCameraOnEntities(...)` focuses any object
 set; `FocusCameraOnSelection(...)` focuses the current `SelectionController`
 selection. Phase 8 of `RunFrame` dispatches registered input actions after the
-pre-render transform/bounds flush (`FlushPreRenderTransformState`, BUG-024), so
-focus actions read `World::Bounds` already refreshed for this frame's transform
+pre-render transform/bounds flush (direct
+`TransformHierarchy` → `BoundsPropagation` → `RenderSync`, BUG-024), so focus
+actions read `World::Bounds` already refreshed for this frame's transform
 edits. The sandbox default action binds the `F` ("focus") key edge to the
 selection wrapper for the `Main` slot only when Sandbox supplied an optional
 camera registry during policy registration. Its callback captures that exact
@@ -705,8 +708,9 @@ the initialized-state borrow false and publishes/pumps
 providers, renderer, device, and world are still live. Modules use that early
 boundary to cancel imports, invalidate bindings, detach provider borrows, and
 release strong participant handles. Engine then detaches window callbacks and
-runs the one generic `JobServiceGpuQueueBridge` participant-shutdown/device-idle
-boundary. Application shutdown follows while the persistent
+runs the Engine-private renderer-hook removal followed by the sole
+`JobService::ShutdownGpuQueueParticipants(...)` participant-shutdown/device-
+idle boundary. Application shutdown follows while the persistent
 `AssetWorkflowModule` and `RuntimeInputActionRegistry` still exist; Sandbox
 unregisters its optional `F` action. Ordinary
 reverse name-sorted module teardown then shuts down AsyncWork before

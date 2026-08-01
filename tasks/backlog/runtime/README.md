@@ -207,9 +207,11 @@ reference-scene lifecycle control now lives in
 reference-scene registry/state/camera-seed accessors as delegating facades.
 `RUNTIME-155` is retired; runtime input-action registration and dispatch policy
 now lives behind `Extrinsic.Runtime.InputActions`. `RUNTIME-156` is retired;
-registered runtime-module sim-system/frame-hook records, deterministic ordering,
-fixed-step pass insertion, and frame-hook dispatch now live behind
-`Extrinsic.Runtime.ModuleSchedule`. `RUNTIME-157` is retired; selection pick
+it first extracted runtime-module scheduling from Engine, then `RUNTIME-185`
+deleted the unused sim-system/DAG lane and `RUNTIME-203` moved the remaining
+deterministic frame/viewport hook records and dispatch directly into
+Engine-private implementation state before deleting the one-consumer schedule
+BMI. `RUNTIME-157` is retired; selection pick
 readback correlation state, refined primitive cache ownership, and the readback
 drain bridge now live behind `Extrinsic.Runtime.SelectionReadback`.
 `RUNTIME-158` is retired; the exported frame-pacing diagnostics record and
@@ -223,7 +225,9 @@ deleted that bridge in the app-composed `EditorUiModule`, preserving the
 paired frame bracket through runtime-module hooks.
 `RUNTIME-160` is retired; the renderer frame-command hook token,
 `JobService::RecordGpuQueueFrameCommands(...)` delegation, and GPU-participant
-shutdown sequencing now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
+shutdown sequencing were first extracted behind a helper; `RUNTIME-203`
+subsequently internalized that one-consumer lifecycle directly in Engine and
+deleted the helper BMI.
 `RUNTIME-161` is retired; it originally extracted object-space-normal GPU queue
 ownership and shutdown sequencing from Engine. Retired `RUNTIME-129` closed
 that production Vulkan path, and retired `RUNTIME-191` subsequently absorbed
@@ -746,10 +750,12 @@ split; narratives live in the retirement log.
 - [RUNTIME-156 — Extract runtime-module schedule out of Engine](../../archive/RUNTIME-156-extract-runtime-module-schedule.md)
   (done, 2026-07-09, `Operational`): runtime-module sim-system/frame-hook
   records, deterministic dependency ordering, frame-hook ordering, fixed-step
-  pass insertion/context construction, and frame-hook dispatch now live in
-  `Extrinsic.Runtime.ModuleSchedule`. `Engine` still owns module objects,
-  built-in service provisioning, `OnRegister` / `OnResolve` sequencing, and
-  shutdown calls as delegating composition.
+  pass insertion/context construction, and frame-hook dispatch were extracted
+  into `Extrinsic.Runtime.ModuleSchedule`. `RUNTIME-185` later removed the
+  unused sim-system/DAG lane, and `RUNTIME-203` internalized the remaining
+  frame/viewport records in Engine-private state and deleted the helper BMI;
+  `Engine` continues to own module objects, built-in service provisioning,
+  `OnRegister` / `OnResolve` sequencing, and shutdown composition.
 - [RUNTIME-157 — Extract selection readback state out of Engine](../../archive/RUNTIME-157-extract-selection-readback-state.md)
   (done, 2026-07-09, `Operational`): selection pick readback correlation,
   completed readback draining, primitive refinement, and the editor-facing
@@ -770,7 +776,9 @@ split; narratives live in the retirement log.
 - [RUNTIME-160 — Extract JobService GPU queue bridge out of Engine](../../archive/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md)
   (done, 2026-07-09, `Operational`): renderer runtime-frame hook ownership,
   JobService GPU-queue command recording, and participant shutdown sequencing
-  now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
+  were extracted behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
+  `RUNTIME-203` later internalized the one-consumer hook token and shutdown
+  ordering directly in Engine and deleted that helper BMI.
 - [RUNTIME-161 — Extract object-space normal bake service out of Engine](../../archive/RUNTIME-161-extract-object-space-normal-bake-service.md)
   (done, 2026-07-09, `Operational`): object-space normal bake GPU-queue
   ownership, dependency setup, ready-frame callback construction, JobService
@@ -982,11 +990,12 @@ split; narratives live in the retirement log.
   components rather than `MeshPrimitiveViewSettings`, and unsupported
   point-cloud surface/edge requests fail closed with diagnostics.
 - [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../archive/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
-  (done): runtime-owned activation of promoted ECS systems via
-  `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`, called
-  every fixed-step substep before `Core::FrameGraph::Compile` so
-  `TransformHierarchy` + `BoundsPropagation` run deterministically before
-  render extraction.
+  (done): runtime-owned activation of promoted ECS systems through an
+  intermediate bundle called every fixed-step substep before
+  `Core::FrameGraph::Compile` so `TransformHierarchy` +
+  `BoundsPropagation` + `RenderSync` run deterministically before render
+  extraction. `RUNTIME-203` preserved that direct order in Engine composition
+  and deleted the one-consumer bundle BMI.
 - [RUNTIME-096 — Runtime module implementation splits](../../archive/RUNTIME-096-runtime-module-implementation-splits.md):
   module-interface hygiene follow-up for promoted runtime `.cppm` targets found
   by the 2026-06-06 implementation-body audit, including camera controllers,
