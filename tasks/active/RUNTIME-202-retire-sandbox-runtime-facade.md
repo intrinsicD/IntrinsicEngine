@@ -16,22 +16,20 @@ evidence: required
 owner: "Codex-RuntimeCleanup"
 branch: "codex/runtime-202-retire-sandbox-facade"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-07-31T20:10:33Z"
+claimed_at: "2026-08-01T01:27:35Z"
 maturity_target: Retired
 ---
 # RUNTIME-202 — Retire the Sandbox runtime facade and localize feature models
 
 ## Status
 
-- Implementation complete on 2026-08-01. The task remains claimed on
-  `codex/runtime-202-retire-sandbox-facade`. The aggregate `IntrinsicTests`
-  build, 194/194 focused Sandbox/runtime/config tests, and one 4010/4010
-  default CPU sweep pass. A later hash-bound sweep and combined repetition
-  reproduced two pre-existing queued-import test races now tracked by
-  `BUG-125`; fixed-surface review waits for that dependency to restore a
-  deterministic canonical gate. Strict layering/task/ARA/test-layout/root-
-  hygiene checks pass, and the policy-defined GLFW/LSan process test is skipped
-  by the CPU selector.
+- Implementation complete on 2026-08-01. `BUG-125` retired the two diagnosed
+  queued-import scheduling races and its merged 4,010-case CPU gate passes.
+  The task remains claimed on `codex/runtime-202-retire-sandbox-facade` while
+  final hash-bound verification and independent fixed-surface review run.
+  The aggregate `IntrinsicTests` build, 194/194 focused Sandbox/runtime/config
+  tests, and the pre-merge structural checks already pass; the policy-defined
+  GLFW/LSan process test is skipped by the CPU selector.
 - Re-gated on 2026-07-30: `RUNTIME-138` is no longer a prerequisite. Facade
   retirement must preserve the current selected-model cache and diagnostic
   behavior, migrate existing selection/property behavior to its feature
