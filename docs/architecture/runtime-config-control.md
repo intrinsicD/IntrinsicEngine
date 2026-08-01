@@ -113,11 +113,12 @@ unchanged.
 ## UI And Agent Parity
 
 `Extrinsic.Sandbox.Editor.Shell` keeps the ImGui widget and draft-buffer
-state. Its `Runtime::EditorWorkspaceSession` prepares attachment-guarded
-feature command/query handles and a copied `EditorWorkspaceSnapshot`; the shell
-owns the `SandboxEditorContext`/`SandboxEditorFrame` composition. Its preview
-and activation handlers call the same typed runtime operations carried by that
-context after the session resolves `EngineConfigControl` from
+state. Its `Runtime::EditorWorkspaceAttachment` carries the opaque attachment
+epoch. `PrepareEditorWorkspaceSnapshotFrame(...)` and the four feature-owned
+preparation functions produce attachment-guarded command/query handles and
+copied snapshots; the shell composes them into its private `SandboxPreparedFrame`.
+Its preview and activation handlers call the same typed runtime operations
+after feature preparation resolves `EngineConfigControl` from
 `Engine::Services()`:
 
 - preview routes to

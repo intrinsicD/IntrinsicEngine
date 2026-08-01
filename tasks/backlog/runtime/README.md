@@ -20,10 +20,13 @@ cleanup slice:
   removes public BMIs for Engine/SceneInteraction/config/device helpers after
   their owner-level behavior tests are in place.
 
-`RUNTIME-202` is active under [`tasks/active/`](../../active/RUNTIME-202-retire-sandbox-runtime-facade.md).
-
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](../../done/RUNTIME-202-retire-sandbox-runtime-facade.md)
+  deleted the public all-feature facade/config/default-policy family, moved
+  presentation composition into the Sandbox app, and localized commands,
+  snapshots, models, config, and implementation bodies with their runtime
+  feature owners behind an opaque attachment lifecycle.
 - [`RUNTIME-200` — Staged asset-import and materialization recipe](../../done/RUNTIME-200-staged-asset-import-materialization-recipe.md)
   converged every production route on the seven-stage recipe behind the sole
   published `AssetWorkflowModule`, made recipe policy and executors private,

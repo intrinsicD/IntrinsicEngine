@@ -23,7 +23,7 @@ maturity_target: Retired
 
 ## Status
 
-- Implementation and final verification are complete on 2026-08-01.
+- Completed and retired on 2026-08-01 at `Retired`.
   `BUG-125` retired the two diagnosed queued-import scheduling races. The
   corrected implementation physically owns scene, geometry, visualization,
   render-recipe, and workspace-model bodies in their feature units; the
@@ -34,9 +34,14 @@ maturity_target: Retired
   contain the policy-defined GLFW/LSan self-skip; ASan executes that control.
   An initial ASan pass reproduced the already-tracked `BUG-123` terminal-event
   race once on an untouched scene-document path; the exact test then passed
-  20/20 and the complete ASan selector passed on rerun. The task remains
-  claimed on `codex/runtime-202-retire-sandbox-facade` for independent
-  fixed-surface review and retirement bookkeeping.
+  20/20 and the complete ASan selector passed on rerun. The first independent
+  review rejected the replacement all-feature aggregate and misplaced private
+  operation bodies; the corrected implementation is `d09d6893`. The second
+  review closed every code finding and requested only factual ownership-record
+  corrections. This retirement source plus the generated report and final
+  append-only review record provide the exact completion binding.
+- Commit: corrected implementation `d09d6893`; this retirement-state commit
+  plus the generated report provide the final exact task-state binding.
 - Re-gated on 2026-07-30: `RUNTIME-138` is no longer a prerequisite. Facade
   retirement must preserve the current selected-model cache and diagnostic
   behavior, migrate existing selection/property behavior to its feature
@@ -139,8 +144,8 @@ maturity_target: Retired
 - [x] Update runtime and Sandbox architecture docs with the app aggregation /
       feature-owner split and a mapping from every removed facade area.
 - [x] Regenerate module inventory and remove all old facade/config examples.
-- [ ] Refresh task indexes, session brief, and retirement records after the
-      independent review accepts the frozen implementation surface.
+- [x] Refresh task indexes, session brief, and retirement records on the exact
+      frozen surface used by the final independent review.
 
 ## Acceptance criteria
 

@@ -11,11 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature
-  models](RUNTIME-202-retire-sandbox-runtime-facade.md) is in progress on
-  `codex/runtime-202-retire-sandbox-facade`. Next: land the export-to-owner
-  inventory and app context boundary, then run the focused Sandbox/runtime
-  contract build.
+No tasks are currently active.
 
 ## History
 

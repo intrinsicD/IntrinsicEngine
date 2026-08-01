@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models (tasks/active/RUNTIME-202-retire-sandbox-runtime-facade.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -32,12 +32,12 @@ the authoritative open/unblocked view.
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- blocked by `RUNTIME-202`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+- blocked by `RUNTIME-203`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-203` — Internalize one-consumer runtime composition helpers (tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
-- blocked by `RUNTIME-202`: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
+- unblocked: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 
 ## Theme G — Active bugs
 
@@ -73,7 +73,7 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-006` — Surface cross-field design CPU reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-- blocked by `RUNTIME-202`: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
+- unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - blocked by `GEOM-058`: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
 - blocked by `GEOM-062`: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
 - blocked by `METHOD-016`: `METHOD-017` — Continuous LOP (CLOP) reference backend (tasks/backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md)

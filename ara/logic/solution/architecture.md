@@ -56,12 +56,14 @@
 - **Decision**: Sandbox-specific windows, menus, ImGui state, and draw
   controllers live in app-owned `EditorShell`, method, mesh-processing, and
   domain-panel modules. Runtime owns only generic editor host/registry/widgets
-  and presentation-free Sandbox engine contexts, commands, models, jobs,
-  result records, and attachment/session wiring.
+  plus the opaque editor-workspace attachment lifecycle and presentation-free,
+  feature-owned commands, queries, models, jobs, and result records. The app
+  owns the Sandbox contexts and prepared-frame composition.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.EditorShell.cpp,
   src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp,
+  src/runtime/Runtime.EditorWorkspaceAttachment.cppm,
   src/runtime/Runtime.EditorWorkspaceSnapshots.cppm,
   docs/architecture/runtime.md,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md,

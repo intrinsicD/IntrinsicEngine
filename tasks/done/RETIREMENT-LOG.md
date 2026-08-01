@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-202`](RUNTIME-202-retire-sandbox-runtime-facade.md) — Sandbox editor
+facade retirement completed on 2026-08-01 at `Retired`. The public all-feature
+facade, shared Sandbox config/default-policy modules, thin method wrappers,
+compatibility routes, and 174 exported facade symbols are gone. The Sandbox app
+now privately composes five attachment-guarded prepared records while runtime
+feature owners directly implement scene, geometry, visualization, render-recipe,
+and workspace snapshot behavior; the private session retains only attachment
+epochs, job identity/results, and bounded lifecycle state. Compile/source
+ratchets forbid a replacement facade and keep feature bodies out of the private
+session. The aggregate build and all 4,010 default CPU tests pass, as do
+2,664/2,664 ASan and 2,664/2,664 UBSan tests plus strict repository validators.
+The initial ASan observation reproduced already-open `BUG-123` once; its exact
+case passed 20/20 and the complete ASan selector passed on rerun. The first two
+independent review rounds requested and then closed implementation-locality,
+lifetime, sanitizer, accounting, and factual ownership-record corrections; the
+final disposition is hash-bound to this retirement surface in the append-only
+evidence. No GPU/Vulkan or performance claim is made.
+
 [`BUG-125`](BUG-125-queued-import-contract-state-observation-races.md) — queued
 asset-import contract stabilization retired on 2026-08-01 at `CPUContracted`.
 The active-world-switch case now holds both geometry and model decode until the

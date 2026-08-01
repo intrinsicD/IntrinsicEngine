@@ -244,9 +244,9 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorParameterizationConfigCommand` | `EditorParameterizationConfigCommand` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorParameterizationConfigResult` | `EditorParameterizationConfigResult` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorParameterizationViewModel` | `EditorParameterizationViewModel` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorPreparedFrameView` | `EditorWorkspacePreparedFrame` | `Runtime.EditorWorkspaceSnapshots.cppm` | callback-scoped prepared snapshot |
-| `SandboxEditorPreparedFrameVisitor` | `EditorWorkspacePreparedFrameVisitor` | `Runtime.EditorWorkspaceSnapshots.cppm` | workspace visitor |
-| `SandboxEditorSession` | `EditorWorkspaceSession` | `Runtime.EditorWorkspaceSnapshots.cppm` | workspace attachment lifecycle |
+| `SandboxEditorPreparedFrameView` | app-private `SandboxPreparedFrame` over five feature-owned `Editor*PreparedFrame` records | `Sandbox.EditorShell.cpp` plus the workspace/scene/geometry/visualization/render-recipe operation modules | app-private aggregate; no public all-feature prepared frame |
+| `SandboxEditorPreparedFrameVisitor` | — | deleted | direct app-owned calls to the five feature preparation functions; no replacement visitor |
+| `SandboxEditorSession` | `EditorWorkspaceAttachment` | `Runtime.EditorWorkspaceAttachment.cppm` | opaque attachment lifecycle only; each feature owner prepares its own surface |
 | `EngineConfigSectionRegistry` | `Core::Config::EngineConfigSectionRegistry` | `runtime feature config modules` | shared Core alias; app aggregates registrations |
 | `EngineConfigSectionRegistration` | `Core::Config::EngineConfigSectionRegistration` | `runtime feature config modules` | shared Core alias; feature factory returns it |
 | `EngineConfigSectionChangedCallback` | `Core::Config::EngineConfigSectionChangedCallback` | `runtime feature config modules` | shared Core alias; app supplies callbacks |
