@@ -7856,3 +7856,54 @@ tree:
       here is a stable-reference cross-check, not sealed A24 intake. No engine
       behavior changed in this process slice.
     status: resolved
+  - id: N331
+    type: decision
+    title: "Execute HARDEN-087 as the next dependency-ready geometry task"
+    provenance: ai-executed
+    timestamp: "2026-08-02T22:50+02:00"
+    also_depends_on: [N329, N330]
+    choice: >
+      Select HARDEN-087 from the generated task DAG because it is the
+      foundational unblocked predecessor for graph-capable runtime method
+      integration, and implement it as one bounded ECS-to-runtime-to-Sandbox
+      contract slice before RUNTIME-206 through RUNTIME-209.
+    alternatives:
+      - "Start a downstream runtime/UI method task while its physical graph-source dependency remains open."
+      - "Select unrelated ready work outside the geometry-method remediation chain."
+      - "Introduce a graph-to-point-cloud converter instead of repairing canonical ECS materialization."
+    evidence:
+      - "User direction: implement the next task from the task DAG."
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md at selection time"
+      - "N329"
+      - "N330"
+    status: resolved
+  - id: N332
+    type: experiment
+    title: "Implement and verify unified geometry element sources"
+    provenance: ai-executed
+    timestamp: "2026-08-02T22:50+02:00"
+    also_depends_on: [N330, N331]
+    evidence:
+      - "tasks/done/HARDEN-087-unified-geometry-element-source-components.md"
+      - "tasks/evidence/HARDEN-087/report.yaml"
+      - "tasks/evidence/HARDEN-087/reviews.jsonl: accepted independent revision-2 fixed-surface review"
+      - "source revision ed689adc0a92dde49cead904159924ae846b94d9"
+      - "completion content digest 4b84e0703f0bb474ae0733c17c26f968ea9e4123495998c284afa2babbd5ffd7"
+      - "focused CTest selection: 188/188 passed"
+      - "default CPU selector: 3,998 passed with the policy-expected GLFW/LSan control skipped"
+      - "fresh ASan grouped selector: 2,651/2,651 passed"
+      - "fresh UBSan grouped retry: 2,650 passed with the policy-expected control skipped"
+      - "workflow_evidence.py validate --require-complete HARDEN-087: 0 errors"
+      - "origin/main revision 982f485871258907ba1b340150b2742be978167e"
+    result: >
+      HARDEN-087 is retired, independently accepted, fast-forwarded, and
+      published on main. Point clouds, graphs, and meshes now materialize the
+      canonical Vertices/Halfedges/Edges/Faces matrix; graph halfedges retain
+      reciprocal star connectivity, scene v2 rejects malformed topology, and
+      GraphHalfedge is a first-class runtime/UI property domain. Focused,
+      complete CPU, ASan, and unchanged-retry UBSan gates passed. The initial
+      fresh UBSan run reproduced tracked BUG-123 before the unchanged retry;
+      promoted Vulkan was not run because no graphics/RHI/backend surface
+      changed, and no GPU/Vulkan or performance claim is made.
+    status: resolved

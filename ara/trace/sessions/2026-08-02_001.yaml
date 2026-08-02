@@ -2,9 +2,9 @@ session:
   id: "2026-08-02_001"
   date: "2026-08-02"
   started: "2026-08-02T00:53+02:00"
-  last_turn: "2026-08-02T15:12+02:00"
-  turn_count: 5
-  summary: "Affirmed literature and method architecture, reconciled runtime cleanup, and operationalized reusable-contract enrollment with a source-audited geometry-method remediation backlog."
+  last_turn: "2026-08-02T22:50+02:00"
+  turn_count: 6
+  summary: "Affirmed literature and method architecture, operationalized reusable-contract enrollment, and published the canonical geometry element-source matrix with accepted fixed-surface evidence."
 
 events_logged:
   - turn: 1
@@ -109,6 +109,24 @@ events_logged:
     routing: crystallized
     provenance: ai-suggested
     summary: "Bound the scoped five-gap geometry method inventory and its foundational ECS drift to one dependency-correct remediation task chain."
+  - turn: 6
+    type: decision
+    id: "N331"
+    routing: direct
+    provenance: ai-executed
+    summary: "Selected foundational HARDEN-087 as the next dependency-ready geometry-method remediation task."
+  - turn: 6
+    type: experiment
+    id: "N332"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented, independently reviewed, verified, retired, merged, and published unified geometry element sources."
+  - turn: 6
+    type: claim
+    id: "C18"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Bound the implemented Vertices/Halfedges/Edges/Faces matrix and runtime/UI consumption to fixed source and CPU/sanitizer evidence."
 
 ai_actions:
   - turn: 1
@@ -184,11 +202,39 @@ ai_actions:
       - "ara/trace/sessions/2026-08-02_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 6
+    action: "Implemented HARDEN-087 from the task DAG; reviewed the original halfedge and generic-polyhedron literature; corrected graph garbage collection and topology validation after fixed-surface review; ran focused, complete CPU, ASan, and UBSan gates; retired the task; fast-forwarded and pushed main; and released its task claim."
+    provenance: ai-executed
+    files_changed:
+      - "src/ecs/Components/ECS.Component.GeometrySources.cppm"
+      - "src/ecs/Components/ECS.Component.GeometrySources.cpp"
+      - "src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp"
+      - "src/geometry/Geometry.Graph.cpp"
+      - "src/runtime/Runtime.GeometryAvailability.cpp"
+      - "src/runtime/Runtime.SceneSerialization.cpp"
+      - "src/app/sandbox/Runtime.Sandbox.EditorModels.cpp"
+      - "tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp"
+      - "tests/unit/geometry/Test_RuntimeGraph.cpp"
+      - "tests/contract/runtime/Test.RuntimeSceneSerialization.cpp"
+      - "docs/architecture/ecs.md"
+      - "docs/architecture/runtime.md"
+      - "tasks/done/HARDEN-087-unified-geometry-element-source-components.md"
+      - "tasks/evidence/HARDEN-087/report.yaml"
+      - "tasks/evidence/HARDEN-087/reviews.jsonl"
+      - "ara/logic/claims.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-08-02_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
 claims_touched:
   - id: C17
     action: crystallized
     turn: 5
+  - id: C18
+    action: crystallized
+    turn: 6
 
 key_context:
   - turn: 1
@@ -213,6 +259,12 @@ key_context:
     excerpt: "Source inspection found graph ECS materialization still uses Nodes plus Edges without Halfedges; this contradicts the target physical element matrix and is now the dependency of graph-capable method refactors."
   - turn: 5
     excerpt: "The scoped audit found five method-integration gaps and created RUNTIME-206 through RUNTIME-210 plus UI-038 through UI-042, with original-paper and extension/improvement intake required in every implementation task."
+  - turn: 6
+    excerpt: "HARDEN-087 was the foundational ready node: downstream graph-capable method integrations depend on canonical Vertices, Halfedges, and Edges rather than duplicate Nodes or a converter."
+  - turn: 6
+    excerpt: "The accepted revision-2 review verified repaired reciprocal graph-star connectivity, fail-closed scene-v2 topology validation, and first-class GraphHalfedge runtime/UI discovery."
+  - turn: 6
+    excerpt: "Local and origin/main both resolve to 982f485871258907ba1b340150b2742be978167e after the fast-forward push."
 
 open_threads:
   - "Choose whether temporal enforcement uses a separate intake child task or a sealed phase transition inside one METHOD/GEOM task."
@@ -220,7 +272,7 @@ open_threads:
   - "HARDEN-084 still needs canonical method-package links and an explicit in-house/direct-literature provenance decision before promotion."
   - "Specify the typed prepare/execute/commit checklist and decide which existing property-resolution, JobService, and mutation helpers are reused without creating a universal MethodRuntime framework."
   - "Implement the machine-validated literature-intake artifact/schema gate affirmed by A24; PROC-030 requires original-plus-extension review in task policy but does not claim that sealed artifact yet."
-  - "Execute HARDEN-087 before graph-capable RUNTIME-206 through RUNTIME-209, then close each paired UI task with per-domain end-to-end proof."
+  - "Execute the now-unblocked graph-capable RUNTIME-206 through RUNTIME-209 slices, then close each paired UI task with per-domain end-to-end proof."
 
 ai_suggestions_pending:
   - "Implement intrinsicengine-literature-intake and route published/mixed METHOD/GEOM work through it before the implementation skill."

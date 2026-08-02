@@ -1259,3 +1259,11 @@ entries:
       - "Kept O93 staged: PROC-030 requires complete integration dispositions but does not standardize the full prepare/execute/revalidate/commit operation envelope across all methods."
       - "Did not mark other observations stale; their topics remain active on the same session-day."
       - "Bound C17 to exact audit revisions and excluded method correctness, parity, performance, sanitizer, and Vulkan interpretations."
+  - turn: "2026-08-02_001#6"
+    notes:
+      - "Routed task selection as decision N331 and the fixed-revision implementation/verification result as experiment N332; commit, merge, push, and claim-release mechanics remain in the session AI action."
+      - "Recorded O96/C18 as crystallized through artifact commitment because merged ECS/runtime/UI code and the retired task now depend on the canonical element-source matrix."
+      - "Rebound O96 to N330-N332 while leaving revision-bounded C17 intact: the earlier audit accurately records the pre-HARDEN-087 drift and is not contradicted by its later repair."
+      - "Recorded the initial UBSan BUG-123 reproduction and unchanged successful retry without misclassifying the known unrelated lifecycle defect as HARDEN-087 evidence."
+      - "Kept O93 staged: this implementation reuses typed domain resolution but does not commit the repository to one universal prepare/execute/revalidate/commit framework."
+      - "Did not stale current observations or add GPU/Vulkan/performance claims; promoted Vulkan was proportionately skipped because the slice changes no graphics/RHI/backend surface."

@@ -1548,7 +1548,7 @@ observations:
       scene serialization, and Sandbox models. Focused, complete CPU, ASan,
       and UBSan contracts passed; no GPU/Vulkan or performance claim is made.
     potential_type: claim
-    bound_to: [N330]
+    bound_to: [N330, N331, N332]
     promoted: true
     promoted_to: "logic/claims.md:C18"
     crystallized_via: artifact-commitment
