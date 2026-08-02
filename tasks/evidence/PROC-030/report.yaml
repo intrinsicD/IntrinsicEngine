@@ -3,12 +3,12 @@ task_id: PROC-030
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-02T13:24:23Z'
+generated_at: '2026-08-02T14:03:48Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 577b45837d47e731f4495c8ab4ea1570bdc63911
-  head_revision: 06680c57fa910977f0217e58f096909543742dd2
+  head_revision: d0a1e1c4d4d181ff3e449473c718ae8a1f0c7859
   branch: process/contract-applicability
   worktree: /tmp/intrinsic-proc030.lxl95I
   dirty: false
@@ -16,13 +16,13 @@ source:
   - path: AGENTS.md
     sha256: ec68491c54abbaa041d285541b5412ec603af0971fbee2fc3ae29f8b8984a275
   - path: ara/logic/claims.md
-    sha256: a800a59e32704cb147422e65eda899050506377d2054eb5b3bf97fea1c96d896
+    sha256: ab238b9153798b05f78454852f17e2f1a1b76a5b70faaf35e71e2ad0efdcb469
   - path: ara/logic/solution/architecture.md
     sha256: da623009617a2c3565e14605e43e1d9ad1a40cd5c00b554b1be766706d62a026
   - path: ara/staging/observations.yaml
-    sha256: 6ca563ba78ac8286d1fa14f8b568ce0570d7b1a9624a61de8c89fbd7786de3ca
+    sha256: 319f682c50f82a48a793286a8a8c84a1db37a8270d7dd3d95a1a32c6dbae100d
   - path: ara/trace/exploration_tree.yaml
-    sha256: 1d0f99492e68bdd8583a8dde918c01f47d33f4c29d0717d31c0f24e7f793f610
+    sha256: 9d0d3cca93c55884930710c63bbd49326c3e836b447054b17c2e63cc817f24b3
   - path: ara/trace/pm_reasoning_log.yaml
     sha256: c0a6ccbc227a87667e619c99697cb72e982914b3901aa1c4020dbc90b9e7e31e
   - path: ara/trace/sessions/2026-08-02_001.yaml
@@ -38,7 +38,7 @@ source:
   - path: docs/agent/review-checklist.md
     sha256: e5838a9d9d58c26660539bcbdfa7cdba4cc7f9b8d72bdd417e0a54e0175edfab
   - path: docs/agent/task-format.md
-    sha256: e7ff5ebeab1656420f455103d34f5df3d4a20d060709f5b185263629f5487dfb
+    sha256: ca2856f50591a6a9df0919a9304a08a057182cbae0125f790bd49738620e49be
   - path: docs/architecture/contract-catalog.yaml
     sha256: 8b61113d6efaea8ab31a97fe7f8e1ba6e306b6fad55a2b1eeb89aca7e7ef0da2
   - path: docs/architecture/geometry-api-style.md
@@ -48,7 +48,7 @@ source:
   - path: docs/architecture/method-api-contract.md
     sha256: 695665a3e5cc0990047b14ed40c09a4c5dfd6e51a13e2c6ae3130b173fba7ef5
   - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
-    sha256: ee348923a046fe5b3e1e535d1436822f05a8002dcea4bc133461a509b5054501
+    sha256: 3df2ef3f72584209fc8e6836427854f7a7da08ba381fe51721a677961c049013
   - path: tasks/SESSION-BRIEF.md
     sha256: 475a4002f42fc4a3f00a388a0f1a70ede0c0abd41f6b42f7cc43ae619220c2e0
   - path: tasks/active/README.md
@@ -56,7 +56,7 @@ source:
   - path: tasks/backlog/README.md
     sha256: 31a22d150a1bcfcfa81c5b32d36d73a7267048bb87d0fa502fb76c8a91ec95dd
   - path: tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md
-    sha256: 79a3d19ed649a70babb3eee3364f7d3f80dd9971e4c2472357dca7193df0b0fc
+    sha256: fb21159cea2ccf0c935728ed0c4bd9d77e4e25f4497716c019dd799336ce0655
   - path: tasks/backlog/ecs/README.md
     sha256: fd5ba69a22ecef47229934a82d3351faad863d118bebd9dc3477035c309c5619
   - path: tasks/backlog/methods/README.md
@@ -66,15 +66,15 @@ source:
   - path: tasks/backlog/runtime/README.md
     sha256: 0fdb7f1e735d32d9ccdd04ee5e7eed1c1b275d939b53f7f5fb78f36282f77092
   - path: tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md
-    sha256: 84416162e11eb21bd0d0ade545b8f72a7709ba91bc05189e18e5d26ff55723a5
+    sha256: 307ec0480ef0d3cc4a49d2982eb9e41b542345e79d46ddad916668818703b786
   - path: tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md
-    sha256: 16a85d77b505d034ab6a2a21550d9a69f5f94a5411c3226d9fcfa392fd207981
+    sha256: 1e188fa441c41dc6bbffe5b5bebdff261a8187f7df40b95b5ea1aaf084faeed3
   - path: tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md
-    sha256: 736ac6d271b6d6be59210d37353fd009da56fec341e5b91193b31127d3f39533
+    sha256: ce7a3298f016cbe3d88c3cc39bc4b8f75a9421bcba263859944f27dcc7a52878
   - path: tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md
-    sha256: 81bedcec02cbf7a1e9936d6648a5e932529551ab3922b2defd199856371d0263
+    sha256: d1ea35c2cc8c810461fbe2579b8cf8ee445599443febbcbd913e9262153739c1
   - path: tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md
-    sha256: 55f7742ab0dc51532b79ec08e43e644fd17fc0735f7ed7e2e4d32cd11f02741d
+    sha256: 08204aa83756918f491e648302c849c7370891ba93d48c739ca698b6240abea0
   - path: tasks/backlog/ui/README.md
     sha256: 2d108ca3afff1ee03becc2d41c845ea46849e7529a5f104e704cf152cc333031
   - path: tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md
@@ -90,9 +90,9 @@ source:
   - path: tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md
     sha256: b386804006a82872164002b74a246b6f147395f5170b2283dee9e722246c4dde
   - path: tasks/done/PROC-030-contract-applicability-and-method-integration.md
-    sha256: c3eabcf2c63fedb20f00486d42868c7d0f5f0df46e580f8b08ecb18c93ca552d
+    sha256: f71db480925d3978708f91f4fff9d717dfe10fffaffb9b469a1b8d30e434b4e2
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: d6996c33a4067251ef14476a6e9d72da85e9a4b3058314cbe2c82401ebc2e7b0
+    sha256: 080651cfe5c94cf1112ce5b00f94e8ef5302cb4dfe40d536293d8a7d3c824a80
   - path: tasks/templates/bug-task.md
     sha256: a980be7fa1e956767c1e37d34eb69b0797cc58ff95351d5194b568188ff60459
   - path: tasks/templates/method-task.md
@@ -104,9 +104,9 @@ source:
   - path: tasks/templates/task.md
     sha256: 19f1b06127234b51e1362d4a87d6ce8ed8771b7cf015a5039c68ae7c7012cc61
   - path: tests/regression/tooling/Test.ValidateTasks.py
-    sha256: 790ac602922cd18b8f86156e5bcfca30331aceae399954f632f2094ed871873a
+    sha256: 9a6f4fee8823749b8c5ec383f5b4ead7f4cba92d13d90101d3c4ddfe8e1b7212
   - path: tools/agents/contract_legacy_tasks.json
-    sha256: 68a7a9a7d067e4f957a01ec7c3a3b97c10503b4708c9b44047651c9fdde89026
+    sha256: 190d8085b819fdb61964de1a5df3f4cbd3259f85da203d1af2bea09a5024aad3
   - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
     sha256: a95430294f019e1bc5b1ecb988ba54f39f4bd0e5b03a6a636a49f23e44ba9fc3
   - path: tools/agents/skills/intrinsicengine-method/SKILL.md
@@ -120,12 +120,12 @@ source:
   - path: tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
     sha256: 8521f39e02d911b377a8a85a1f6d468377c5718b365b1db8432cdae242d8c98b
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
-    sha256: 3e995dd4caad40801690169c60b4c08386d5dd020b76fbd4943abffd65c3b5e6
+    sha256: de02e87b082390f29b2f2ccf22d2a74d6d712b24627dd0169db294b04530ce88
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
     sha256: 19f1b06127234b51e1362d4a87d6ce8ed8771b7cf015a5039c68ae7c7012cc61
   - path: tools/agents/validate_tasks.py
-    sha256: bb02b54c6cecc8465246a661a33480f7f835004a11cb4eb3214fd318d1c8be3a
-  content_digest: a60a1836c41b7adef3a972ee7d1bff40418fbcb0b7d221eafc80502bf6eb4bca
+    sha256: bd82f13242d05fe8739ef6bd51a015e5537e884ddddc0ae39cfe61a48918a247
+  content_digest: 43c1ca7c5c21d7762b102ce6080fde542fa889e7dfd480a8f84834d3897ec157
 touched:
   paths:
   - AGENTS.md
@@ -202,7 +202,7 @@ acceptance:
   disposition: satisfied
   evidence: []
   reason: null
-- criterion: Every new or materially changed claimed task declares known contracts or
+- criterion: Every new or materially changed task in any lifecycle declares known
   task_checked: true
   disposition: satisfied
   evidence: []
@@ -249,6 +249,28 @@ commands:
 - receipt: tasks/evidence/PROC-030/commands/final-task-state-links.json
 - receipt: tasks/evidence/PROC-030/commands/final-task-validator-regressions.json
 - receipt: tasks/evidence/PROC-030/commands/python-compile.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-ara-claims-check.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-doc-link-check.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-python-compile.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-root-hygiene.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-session-brief-check.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-skill-mirror-check.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-strict-task-policy.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-strict-task-validation.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-task-state-links.json
+- receipt: tasks/evidence/PROC-030/commands/review-fix-task-validator-regressions.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-ara-claims-check.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-diff-check.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-doc-link-check.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-postcommit-docs-sync.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-python-compile.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-root-hygiene.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-session-brief-check.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-skill-mirror-check.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-strict-task-policy.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-strict-task-validation.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-task-state-links.json
+- receipt: tasks/evidence/PROC-030/commands/revision2-task-validator-regressions.json
 - receipt: tasks/evidence/PROC-030/commands/root-hygiene.json
 - receipt: tasks/evidence/PROC-030/commands/session-brief-check.json
 - receipt: tasks/evidence/PROC-030/commands/skill-mirror-check.json
@@ -260,21 +282,24 @@ commands:
 changed_public_contracts:
 - AGENTS.md now requires task authors and implementers to discover, declare, preserve, and dispose every
   applicable catalog contract; task wording cannot silently narrow canonical semantics
-- New or materially changed open tasks use contract_schema 1 with unique known contract IDs or a justified
-  empty review; byte-identical historical open tasks alone are grandfathered
+- Every new or materially changed task in active, backlog, done, or archive uses contract_schema 1 with
+  unique known contract IDs or a justified empty review; only exact unconsumed snapshots at the immutable
+  pre-policy revision are grandfathered
 - Method-backed tasks dispose the least-structured input, compatible ECS sources, RuntimeModule, config/agent,
   UI, publication, and end-to-end-test matrix and review original papers plus relevant extensions and
   improvements
 - The target ECS element-domain matrix is Vertices for point cloud/graph/mesh, Halfedges and Edges for
   graph/mesh, and Faces for mesh; HARDEN-087 owns the documented current graph storage mismatch
 diagnostics_and_previews:
-- Focused task-validator regressions pass 16/16; strict validation accepts 191 task files with zero findings
+- Focused task-validator regressions pass 21/21; strict validation accepts 191 task files with zero findings,
+  including lifecycle and consumed-snapshot negative coverage
 - Clang aggregate IntrinsicTests build passed and the default CPU selector passed 3,991/3,991 selected
-  tests
+  tests on revision one; revision-two repairs touch only Python task tooling, policy, evidence, and literature
+  metadata
 - Strict task policy/state, skill mirror, documentation-link, ARA, root-hygiene, Python compile, and post-commit
-  docs-sync gates pass
-- The scoped source/literature audit found one physical ECS source drift and five method-integration gaps,
-  each assigned to a bounded dependency-linked ECS/runtime/UI task chain
+  docs-sync gates pass on revision two
+- The scoped source and stable-reference bibliographic audit found one physical ECS source drift and five
+  method-integration gaps, each assigned to a bounded dependency-linked ECS/runtime/UI task chain
 benchmark_or_parity_evidence: []
 docs_sync:
   task_file: tasks/done/PROC-030-contract-applicability-and-method-integration.md
@@ -297,16 +322,16 @@ artifacts:
   sha256: 8b61113d6efaea8ab31a97fe7f8e1ba6e306b6fad55a2b1eeb89aca7e7ef0da2
   kind: file
 - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
-  sha256: ee348923a046fe5b3e1e535d1436822f05a8002dcea4bc133461a509b5054501
+  sha256: 3df2ef3f72584209fc8e6836427854f7a7da08ba381fe51721a677961c049013
   kind: file
 - path: tools/agents/contract_legacy_tasks.json
-  sha256: 68a7a9a7d067e4f957a01ec7c3a3b97c10503b4708c9b44047651c9fdde89026
+  sha256: 190d8085b819fdb61964de1a5df3f4cbd3259f85da203d1af2bea09a5024aad3
   kind: file
 - path: tests/regression/tooling/Test.ValidateTasks.py
-  sha256: 790ac602922cd18b8f86156e5bcfca30331aceae399954f632f2094ed871873a
+  sha256: 9a6f4fee8823749b8c5ec383f5b4ead7f4cba92d13d90101d3c4ddfe8e1b7212
   kind: file
 - path: tasks/done/PROC-030-contract-applicability-and-method-integration.md
-  sha256: c3eabcf2c63fedb20f00486d42868c7d0f5f0df46e580f8b08ecb18c93ca552d
+  sha256: f71db480925d3978708f91f4fff9d717dfe10fffaffb9b469a1b8d30e434b4e2
   kind: file
 self_review:
   completed: true
