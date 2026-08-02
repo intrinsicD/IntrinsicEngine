@@ -2696,6 +2696,9 @@ TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
     auto& graphEdges = registry.Raw().get<GS::Edges>(graph);
     graphEdges.Properties.GetOrAdd<glm::vec4>("e:color", glm::vec4{1.0f})
         .Vector() = {glm::vec4{1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
+    auto& graphHalfedges = registry.Raw().get<GS::Halfedges>(graph);
+    graphHalfedges.Properties.GetOrAdd<float>("h:weight", 0.0f)
+        .Vector() = {1.0f, 2.0f, 3.0f, 4.0f};
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
     Runtime::EditorWorkspaceSnapshot frame =
@@ -2704,6 +2707,13 @@ TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
         frame.Inspector.PropertyCatalog;
     EXPECT_NE(FindCatalogProperty(graphCatalog, Domain::GraphVertices, "v:centrality"),
               nullptr);
+    const auto* graphVertexConnectivity = FindCatalogProperty(
+        graphCatalog,
+        Domain::GraphVertices,
+        std::string{PN::kVertexConnectivity});
+    ASSERT_NE(graphVertexConnectivity, nullptr);
+    EXPECT_TRUE(graphVertexConnectivity->Internal);
+    EXPECT_TRUE(graphVertexConnectivity->Connectivity);
     const auto* graphEdgeColor =
         FindCatalogProperty(graphCatalog, Domain::GraphEdges, "e:color");
     ASSERT_NE(graphEdgeColor, nullptr);
@@ -2712,6 +2722,22 @@ TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
                                   Domain::GraphEdges,
                                   std::string{PN::kEdgeV0}),
               nullptr);
+    const auto* graphHalfedgeWeight =
+        FindCatalogProperty(graphCatalog, Domain::GraphHalfedges, "h:weight");
+    ASSERT_NE(graphHalfedgeWeight, nullptr);
+    EXPECT_EQ(graphHalfedgeWeight->Descriptor.Domain,
+              Runtime::GeometryElementDomain::GraphHalfedge);
+    EXPECT_EQ(graphHalfedgeWeight->ValueKind, Kind::Float);
+    const auto* graphConnectivity = FindCatalogProperty(
+        graphCatalog,
+        Domain::GraphHalfedges,
+        std::string{PN::kHalfedgeConnectivity});
+    ASSERT_NE(graphConnectivity, nullptr);
+    EXPECT_TRUE(graphConnectivity->Internal);
+    EXPECT_TRUE(graphConnectivity->Connectivity);
+    EXPECT_STREQ(Runtime::DebugNameForEditorPropertyCatalogDomain(
+                     Domain::GraphHalfedges),
+                 "GraphHalfedges");
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "CatalogCloud");
     AddPointCloudSource(registry, cloud, 2u);

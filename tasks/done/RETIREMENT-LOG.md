@@ -16,13 +16,18 @@ meshes expose `Faces`. Graph provenance remains an independent marker, and
 graph materialization copies its real halfedge connectivity and all custom
 element properties without a converter, fabricated faces, or duplicate
 `Nodes` storage. A new deletion/compaction regression also corrected the
-graph garbage collector's transient-map double-swap so surviving connectivity
-is remapped into compact ranges before publication. Runtime availability,
-method bindings, graph normals, extraction, selection, editing/history, scene
-JSON v2, and Sandbox domain
-models consume the unified source matrix. Focused contracts passed 177/177,
-the default CPU selector passed 3,996/3,996, and the grouped ASan and UBSan
-selectors each passed 2,649/2,649. The first unchanged final UBSan attempt
+graph garbage collector's transient-map double-swap and rebuilds vertex
+representatives plus reciprocal multi-edge star rings from surviving compacted
+edges. Runtime availability, method bindings, graph normals, extraction,
+selection, editing/history, scene JSON v2, and Sandbox domain models consume
+the unified source matrix. `GraphHalfedge` is now a canonical property/catalog
+domain, and scene v2 validates graph counts, endpoint pairing, handle ranges,
+reciprocity, and successor continuity before publication. The corrected-
+revision focused selector passed 188/188. The default CPU
+selector chose 3,999 cases: 3,998 passed and the expected environment-gated
+GLFW/LSan case skipped. Grouped ASan selected and passed 2,649/2,649; grouped
+UBSan selected 2,649 cases, with 2,648 passing and the same expected case
+skipped. The first unchanged pre-review UBSan attempt
 reproduced the already-open `BUG-123` retired-scene-save terminal-event race;
 its failed receipt is preserved and the unchanged retry passed without a gate
 exclusion. Strict repository checks and independent fixed-surface review close

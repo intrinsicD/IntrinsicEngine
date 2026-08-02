@@ -475,6 +475,69 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
     EXPECT_EQ(badGeometry.error(), Core::ErrorCode::InvalidFormat);
 }
 
+TEST(RuntimeSceneSerialization, MalformedGraphTopologyFailsClosed)
+{
+    const nlohmann::json valid = nlohmann::json::parse(
+        R"({"version":2,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
+
+    {
+        ECS::Scene::Registry scene;
+        EXPECT_TRUE(Runtime::DeserializeSceneDocument(scene, valid.dump()).has_value());
+    }
+
+    const auto expectInvalid = [](nlohmann::json document)
+    {
+        ECS::Scene::Registry scene;
+        const auto result =
+            Runtime::DeserializeSceneDocument(scene, document.dump());
+        EXPECT_FALSE(result.has_value());
+        if (!result.has_value())
+            EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+    };
+
+    nlohmann::json outOfRangeVertex = valid;
+    outOfRangeVertex["entities"][0]["geometrySources"]["halfedges"]
+                    ["toVertex"][0] = 2u;
+    expectInvalid(std::move(outOfRangeVertex));
+
+    nlohmann::json outOfRangeNext = valid;
+    outOfRangeNext["entities"][0]["geometrySources"]["halfedges"]
+                  ["next"][0] = 2u;
+    expectInvalid(std::move(outOfRangeNext));
+
+    nlohmann::json inconsistentPrev = valid;
+    inconsistentPrev["entities"][0]["geometrySources"]["halfedges"]
+                    ["prev"] = {0u, 1u};
+    expectInvalid(std::move(inconsistentPrev));
+
+    nlohmann::json disconnectedSuccessors = valid;
+    disconnectedSuccessors["entities"][0]["geometrySources"]["halfedges"]
+                          ["next"] = {0u, 1u};
+    disconnectedSuccessors["entities"][0]["geometrySources"]["halfedges"]
+                          ["prev"] = {0u, 1u};
+    expectInvalid(std::move(disconnectedSuccessors));
+
+    nlohmann::json wrongHalfedgeCount = valid;
+    auto& wrongHalfedges =
+        wrongHalfedgeCount["entities"][0]["geometrySources"]["halfedges"];
+    wrongHalfedges["toVertex"] = {1u, 0u, 1u, 0u};
+    wrongHalfedges["next"] = {1u, 0u, 3u, 2u};
+    wrongHalfedges["prev"] = {1u, 0u, 3u, 2u};
+    expectInvalid(std::move(wrongHalfedgeCount));
+
+    nlohmann::json outOfRangeEndpoint = valid;
+    outOfRangeEndpoint["entities"][0]["geometrySources"]["edges"]
+                      ["v1"][0] = 2u;
+    expectInvalid(std::move(outOfRangeEndpoint));
+
+    nlohmann::json mismatchedEndpoints = valid;
+    mismatchedEndpoints["entities"][0]["geometrySources"]["edges"]
+                       ["v0"][0] = 1u;
+    mismatchedEndpoints["entities"][0]["geometrySources"]["edges"]
+                       ["v1"][0] = 0u;
+    expectInvalid(std::move(mismatchedEndpoints));
+}
+
 
 // ============================================================================
 // RUNTIME-192 Slice B2 — property value-kind wire-format compatibility.
@@ -775,6 +838,8 @@ TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
                            Runtime::GeometryElementDomain::GraphNode),
             slotWithDomain(Runtime::GeometryPresentationSlotSemantic::Albedo,
                            Runtime::GeometryElementDomain::PointCloudPoint),
+            slotWithDomain(Runtime::GeometryPresentationSlotSemantic::LineWidth,
+                           Runtime::GeometryElementDomain::GraphHalfedge),
         },
     });
     source.Raw().emplace<Runtime::GeometryPresentationRecipe>(
@@ -789,6 +854,7 @@ TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
         << "GraphNode must persist under its legacy name GraphVertex";
     EXPECT_NE(text.find("\"Point\""), std::string::npos)
         << "PointCloudPoint must persist under its legacy name Point";
+    EXPECT_NE(text.find("\"GraphHalfedge\""), std::string::npos);
     EXPECT_EQ(text.find("\"domain\":\"GraphNode\""), std::string::npos);
     EXPECT_EQ(text.find("\"domain\":\"PointCloudPoint\""), std::string::npos);
 
@@ -801,11 +867,13 @@ TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
         loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(loadedEntity);
     ASSERT_NE(roundTripped, nullptr);
     ASSERT_FALSE(roundTripped->Presentations.empty());
-    ASSERT_EQ(roundTripped->Presentations.front().Slots.size(), 2u);
+    ASSERT_EQ(roundTripped->Presentations.front().Slots.size(), 3u);
     EXPECT_EQ(roundTripped->Presentations.front().Slots[0].Property.Domain,
               Runtime::GeometryElementDomain::GraphNode);
     EXPECT_EQ(roundTripped->Presentations.front().Slots[1].Property.Domain,
               Runtime::GeometryElementDomain::PointCloudPoint);
+    EXPECT_EQ(roundTripped->Presentations.front().Slots[2].Property.Domain,
+              Runtime::GeometryElementDomain::GraphHalfedge);
 }
 
 TEST(RuntimeSceneSerialization, LegacyMeshSurfaceDomainLoadsAsUnknown)

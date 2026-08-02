@@ -93,6 +93,7 @@ namespace Extrinsic::Runtime
             case GeometryElementDomain::MeshFace:
                 return Graphics::VisualizationAttributeDomain::Face;
             case GeometryElementDomain::MeshHalfedge:
+            case GeometryElementDomain::GraphHalfedge:
             case GeometryElementDomain::Unknown:
                 return std::nullopt;
             }

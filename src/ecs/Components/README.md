@@ -152,17 +152,18 @@ implemented in the matching `.cpp`):
   `h:face`, `f:halfedge`.
 - `PopulateFromGraph(registry, entity, graph)` — emplaces `Vertices`,
   `Halfedges`, and `Edges` plus the `HasGraphTopology` provenance marker.
-  The graph's real count-matched `h:connectivity` halfedge property is copied
-  with all custom properties; no face adjacency or `Faces` component is
-  invented. Calls `graph.GarbageCollection()` if `HasGarbage()` so the
-  resulting PropertySets are contiguous.
+  The graph's real count-matched `v:connectivity` vertex representatives and
+  `h:connectivity` halfedge rings are copied with all custom properties; no
+  face adjacency or `Faces` component is invented. Calls
+  `graph.GarbageCollection()` if `HasGarbage()` so the resulting PropertySets
+  are contiguous and all surviving vertex-star links are rebuilt in-range.
 - `PopulateFromCloud(registry, entity, cloud)` — emplaces `Vertices` with
   canonical `v:position` (and `v:normal` when `HasNormals()`), preserving
   the full `PointProperties()` PropertySet.
 
 Canonical key constants live in
 `Extrinsic.ECS.Components.GeometrySources::PropertyNames`
-(`kPosition`, `kNormal`, `kMeanCurvature`, `kGaussianCurvature`,
+(`kPosition`, `kNormal`, `kVertexConnectivity`, `kMeanCurvature`, `kGaussianCurvature`,
 `kPrincipalDir1`, `kPrincipalDir2`, `kEdgeV0`, `kEdgeV1`,
 `kHalfedgeToVertex`, `kHalfedgeNext`, `kHalfedgeFace`,
 `kHalfedgeConnectivity`, `kFaceHalfedge`);

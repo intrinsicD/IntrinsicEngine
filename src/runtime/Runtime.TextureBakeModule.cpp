@@ -1087,6 +1087,7 @@ namespace Extrinsic::Runtime
             case GeometryElementDomain::Unknown:
             case GeometryElementDomain::MeshHalfedge:
             case GeometryElementDomain::GraphNode:
+            case GeometryElementDomain::GraphHalfedge:
             case GeometryElementDomain::GraphEdge:
             case GeometryElementDomain::PointCloudPoint:
                 return PrepareFailure(

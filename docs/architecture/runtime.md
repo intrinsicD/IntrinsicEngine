@@ -774,12 +774,22 @@ separate: mesh vertices, graph nodes, and point-cloud points all resolve through
 `VertexSource`, while logical `GraphNode` publication additionally requires
 graph provenance. Graph algorithms that need adjacency read the real
 `HalfedgeSource` `h:connectivity` property; runtime does not reconstruct it from
-edge endpoints or convert the entity into another geometry kind.
+edge endpoints or convert the entity into another geometry kind. The canonical
+property vocabulary includes `GraphHalfedge` alongside `GraphNode` and
+`GraphEdge`; availability, job scopes, property catalogs, scene wire values,
+and Sandbox graph-domain models all resolve that domain to the graph entity's
+physical `Halfedges` source. Connectivity properties remain visible as
+catalogued internal/connectivity rows and are not offered as visualization
+attributes.
 
 Scene JSON version 2 remains backend-neutral. Version 2 makes graph halfedge
 connectivity mandatory so a loaded graph satisfies the same
 `Vertices + Halfedges + Edges` source contract as a freshly materialized one.
-Version 1 is rejected rather than upgraded by synthesizing topology. Supported
+The reader and writer reject non-compact graph sources, endpoint indices outside
+the vertex range, halfedge counts other than twice the edge count, endpoint/
+halfedge-pair disagreement, out-of-range next/previous handles, non-reciprocal
+next/previous links, and successor links that do not continue at the target
+vertex. Version 1 is rejected rather than upgraded by synthesizing topology. Supported
 persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
 selection eligibility, render hints, visualization configs, authored

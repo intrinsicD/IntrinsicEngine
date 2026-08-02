@@ -32,6 +32,7 @@ export namespace Extrinsic::Runtime
         MeshHalfedge,
         MeshFace,
         GraphNode,
+        GraphHalfedge,
         GraphEdge,
         PointCloudPoint,
     };

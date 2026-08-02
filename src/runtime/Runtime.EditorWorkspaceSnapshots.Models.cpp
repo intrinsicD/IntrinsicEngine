@@ -557,11 +557,13 @@ namespace {
         {
             return name == GS::PropertyNames::kPosition ||
                    name == GS::PropertyNames::kNormal ||
+                   name == GS::PropertyNames::kVertexConnectivity ||
                    name == GS::PropertyNames::kEdgeV0 ||
                    name == GS::PropertyNames::kEdgeV1 ||
                    name == GS::PropertyNames::kHalfedgeToVertex ||
                    name == GS::PropertyNames::kHalfedgeNext ||
                    name == GS::PropertyNames::kHalfedgeFace ||
+                   name == GS::PropertyNames::kHalfedgeConnectivity ||
                    name == GS::PropertyNames::kFaceHalfedge ||
                    name == "v:point" ||
                    name == "v:tex" ||
@@ -574,11 +576,13 @@ namespace {
             const std::string& name) noexcept
         {
             return name == GS::PropertyNames::kPosition ||
+                   name == GS::PropertyNames::kVertexConnectivity ||
                    name == GS::PropertyNames::kEdgeV0 ||
                    name == GS::PropertyNames::kEdgeV1 ||
                    name == GS::PropertyNames::kHalfedgeToVertex ||
                    name == GS::PropertyNames::kHalfedgeNext ||
                    name == GS::PropertyNames::kHalfedgeFace ||
+                   name == GS::PropertyNames::kHalfedgeConnectivity ||
                    name == GS::PropertyNames::kFaceHalfedge ||
                    name == "v:point" ||
                    name == "v:tex" ||
@@ -829,6 +833,10 @@ namespace {
                 return ResolveGeometryPropertySet(
                     availability,
                     GeometryElementDomain::GraphNode);
+            case Domain::GraphHalfedges:
+                return ResolveGeometryPropertySet(
+                    availability,
+                    GeometryElementDomain::GraphHalfedge);
             case Domain::GraphEdges:
                 return ResolveGeometryPropertySet(
                     availability,
@@ -857,6 +865,8 @@ namespace {
                 return GeometryElementDomain::MeshFace;
             case Domain::GraphVertices:
                 return GeometryElementDomain::GraphNode;
+            case Domain::GraphHalfedges:
+                return GeometryElementDomain::GraphHalfedge;
             case Domain::GraphEdges:
                 return GeometryElementDomain::GraphEdge;
             case Domain::PointCloudPoints:
@@ -1045,6 +1055,7 @@ namespace {
                     return primitive->PointId;
                 break;
             case Domain::MeshHalfedges:
+            case Domain::GraphHalfedges:
                 break;
             }
             return std::nullopt;
@@ -1120,6 +1131,7 @@ namespace {
             append(EditorPropertyCatalogDomain::MeshHalfedges);
             append(EditorPropertyCatalogDomain::MeshFaces);
             append(EditorPropertyCatalogDomain::GraphVertices);
+            append(EditorPropertyCatalogDomain::GraphHalfedges);
             append(EditorPropertyCatalogDomain::GraphEdges);
             append(EditorPropertyCatalogDomain::PointCloudPoints);
         }

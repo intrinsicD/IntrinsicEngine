@@ -70,8 +70,14 @@ graph's existing vertex, halfedge, and edge property sets as `Vertices`,
 `Halfedges`, and `Edges`, then stamps `HasGraphTopology` as provenance. Graph
 halfedges preserve the count-matched `h:connectivity` property
 (`Geometry::Graph::HalfedgeConnectivity`, containing target vertex plus
-next/previous halfedge handles); they do not fabricate mesh face adjacency or a
-`Faces` component. `HARDEN-087` explicitly supersedes the bounded graph-only
+next/previous halfedge handles), while graph vertices retain their
+`v:connectivity` representative. Garbage collection reconstructs the surviving
+vertex-star rings from compacted edge pairs, so neither representative nor
+next/previous links can retain a deleted edge. They do not fabricate mesh face
+adjacency or a `Faces` component. Runtime's canonical logical property domains
+therefore include `GraphNode`, `GraphHalfedge`, and `GraphEdge`, each gated by
+graph provenance and resolved to its corresponding shared physical source.
+`HARDEN-087` explicitly supersedes the bounded graph-only
 `Nodes` layout recorded by `HARDEN-065` and retains the provenance-versus-
 capability separation introduced by `HARDEN-083` with one physical `Vertices`
 capability.

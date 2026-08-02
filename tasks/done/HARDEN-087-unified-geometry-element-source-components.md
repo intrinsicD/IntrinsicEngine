@@ -25,15 +25,28 @@ maturity_target: Operational
   all custom vertex/halfedge/edge properties. Runtime method bindings,
   availability, extraction, selection, editing/history, scene JSON v2, and
   Sandbox domain models consume the same sources without a converter or
-  duplicate `Nodes` storage.
+  duplicate `Nodes` storage. `GraphHalfedge` is a canonical runtime property
+  domain and appears in the same Sandbox property-catalog pattern as the other
+  physical element domains.
 - The required garbage-compaction regression exposed a pre-existing
-  `Geometry::Graph::GarbageCollection` double-swap of transient remap
-  properties. The owning geometry implementation now lets those map rows move
-  once with their `PropertySet`, keeping surviving vertex/halfedge handles
-  in-range before ECS copies them.
-- Verification passed 177/177 focused contracts, 3,996/3,996 default CPU
-  cases, and 2,649/2,649 cases under each of ASan and UBSan. The first
-  unchanged final UBSan attempt reproduced the already-open `BUG-123`
+  `Geometry::Graph::GarbageCollection` double-swap of a transient vertex remap
+  property. Fixed-surface review then identified that remapping the old
+  per-vertex representatives and star links was itself unsafe after an incident
+  edge was deleted. The owning geometry implementation now lets map rows move
+  once with their `PropertySet`, remaps surviving endpoints, and reconstructs
+  all compact vertex representatives and next/previous rings from the surviving
+  edge pairs before ECS copies them.
+- Independent fixed-surface review also required scene-v2 topology validation
+  before publication and separate pass/skip reporting. Scene save/load now
+  rejects invalid graph endpoint, halfedge-pair, count, range, reciprocity, and
+  successor-continuity relationships; the review's four findings are preserved
+  in the evidence log with their corrected-revision disposition.
+- Corrected-revision verification passed 188/188 focused contracts. The
+  default CPU selector selected 3,999 cases: 3,998 passed and the expected
+  environment-gated GLFW/LSan case skipped. Grouped ASan selected and passed
+  2,649/2,649; grouped UBSan selected 2,649 cases, with 2,648 passing and the
+  same expected GLFW/LSan case skipped. The first unchanged UBSan attempt on
+  the pre-review revision reproduced the already-open `BUG-123`
   retired-scene-save terminal-event race; that failed receipt remains archived,
   and the unchanged selector then passed without weakening or excluding the
   test. The promoted Vulkan selector was not rerun because no
@@ -76,9 +89,11 @@ maturity_target: Operational
   ECS rather than synthesize a point cloud or copy graph data twice.
 - During verification, a graph with deleted vertices/edges proved that the
   existing graph garbage collector compacted rows but left connectivity at old
-  indices. Fixing that owner-level remap defect is required for this task's
-  promised valid post-compaction source matrix; no API or algorithm variant was
-  added.
+  indices. The first correction fixed transient-map ownership; independent
+  review then proved that deleted incident edges also made the pre-compaction
+  representative/star links unsuitable for remapping. Rebuilding those links
+  in the geometry owner is required for this task's promised valid
+  post-compaction source matrix; no API or algorithm variant was added.
 - Literature basis: Baumgart's original winged-edge representation established
   explicit oriented adjacency as topology rather than a face-only storage
   concern. Kettner's generic halfedge design and its CGAL realization make the
@@ -149,7 +164,14 @@ maturity_target: Operational
       types only), source generation/dirty behavior, custom properties, alive
       counts, and import/render/runtime behavior.
 - [x] Correct the graph garbage-collection remap double-swap so a populate call
-      after deletions publishes compact, in-range vertex and halfedge handles.
+      after deletions publishes compact, in-range endpoints, reconstructed
+      vertex representatives, and reciprocal surviving halfedge-star links.
+- [x] Promote graph halfedges to the canonical `GeometryElementDomain`, editor
+      job scope, and Sandbox property-catalog vocabulary while keeping their
+      connectivity rows internal/non-bindable.
+- [x] Validate scene-v2 graph counts, endpoints, halfedge pairing, ranges,
+      next/previous reciprocity, and successor continuity before save or load
+      publishes the graph source matrix.
 - [x] Update the geometry-source compatibility table and remove the temporary
       physical-layout caveat only after executable parity proves the migration.
 
@@ -168,6 +190,9 @@ maturity_target: Operational
 - [x] Add graph- and ECS-level regressions proving garbage collection preserves
       surviving custom properties and remaps all connectivity into compact
       ranges before materialization.
+- [x] Add multi-edge surviving-star, malformed scene-v2 topology, canonical
+      graph-halfedge resolution/wire, and Sandbox graph-halfedge catalog
+      regressions required by independent review.
 
 ## Docs
 
@@ -188,8 +213,8 @@ maturity_target: Operational
 
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicECSTests IntrinsicRuntimeContractTests
-ctest --test-dir build/ci --output-on-failure -R 'GeometrySources|GeometryAvailability|GraphGeometry|Clustering|GraphVertexNormals' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'ECSGeometrySourcesPopulate|RuntimeGraph.GarbageCollection|RuntimeGeometryAvailability|RuntimeGeometryProperty|GraphGeometryExtraction|GeometryPresentation|PrimitiveSelectionRefinement|RuntimeSceneSerialization|ClusteringModule|GraphVertexNormals|RuntimeRenderExtraction|RuntimeSandboxAcceptance|SandboxEditorUi.PropertyCatalog' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict

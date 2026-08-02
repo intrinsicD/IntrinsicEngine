@@ -21,7 +21,7 @@
 | 4 | Renderer member/subsystem growth is justified by an owning seam | n/a | No renderer member, graphics subsystem, GPU residency seam, or ownership rule changed. |
 | 5 | New passes use typed IDs, not string routing | n/a | No frame-graph pass or renderer command route changed. |
 | 6 | New frame-recipe dependencies resource-driven or explicitly justified | n/a | No frame recipe, resource declaration, or ordering edge changed. |
-| 7 | Scaffold/parity tasks have a follow-up maturity gate | pass | The task closes at `Operational`: exact element matrices, graph connectivity, custom properties, compaction, runtime bindings, scene round-trip, focused contracts, the complete CPU gate, and both required sanitizer gates are covered. No maturity follow-up is owed. |
+| 7 | Scaffold/parity tasks have a follow-up maturity gate | pass | The task closes at `Operational`: exact element matrices, graph connectivity, custom properties, compaction with reconstructed multi-edge vertex stars, canonical graph-halfedge runtime/UI discovery, fail-closed scene-v2 topology validation, focused contracts, the complete CPU gate, and both required sanitizer gates are covered. No maturity follow-up is owed. |
 | 8 | Legacy/temporary exceptions have a task ID and expiry | pass | No alias, converter, duplicate `Nodes` mirror, compatibility facade, allowlist row, warning-mode gate, or temporary exception was added. |
 
 ## Architecture checklist result
@@ -31,12 +31,23 @@
   `Edges`; meshes add `Faces`.
 - Runtime UI keeps logical `GraphNode` terminology while resolving the shared
   physical vertex source through the same availability/apply paths as other
-  domains.
+  domains, and exposes graph halfedge properties through the canonical
+  `GraphHalfedge` catalog domain.
 - `Geometry::Graph::GarbageCollection` owns its remap invariant before ECS
-  materialization; ECS does not compensate for invalid geometry connectivity.
+  materialization and reconstructs surviving representatives/star rings; ECS
+  does not compensate for invalid geometry connectivity.
+- Scene JSON v2 validates compact graph topology before either save or load can
+  publish it, including endpoint/halfedge alignment and reciprocal successor
+  relationships.
 - No dependency edge, backend axis, config-only path, byte layout, GPU claim,
   or performance claim was introduced.
 
 ## Findings → follow-ups
 
-- No findings.
+- Independent fixed-surface review revision 1 requested four corrections:
+  reconstruct stale graph representatives/star links after compaction, validate
+  scene-v2 graph topology fail-closed, add the missing canonical
+  `GraphHalfedge` runtime/UI domain, and separate selected counts from expected
+  skips in retirement evidence. All four are corrected on revision 2 and bound
+  to focused regressions plus refreshed full CPU/sanitizer receipts; the exact
+  review records remain under `tasks/evidence/HARDEN-087/reviews.jsonl`.

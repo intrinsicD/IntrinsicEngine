@@ -99,6 +99,7 @@ namespace Extrinsic::Runtime
                 {GeometryElementDomain::MeshHalfedge, "MeshHalfedge"},
                 {GeometryElementDomain::MeshFace, "MeshFace"},
                 {GeometryElementDomain::GraphNode, "GraphVertex"},
+                {GeometryElementDomain::GraphHalfedge, "GraphHalfedge"},
                 {GeometryElementDomain::GraphEdge, "GraphEdge"},
                 {GeometryElementDomain::PointCloudPoint, "Point"},
             };
@@ -1586,6 +1587,91 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] bool ValidateGraphSources(
+            const GS::Vertices& vertices,
+            const GS::Halfedges& halfedges,
+            const GS::Edges& edges) noexcept
+        {
+            // Serialized graphs are compact. Deleted-row counts without the
+            // corresponding per-row deletion properties would be ambiguous.
+            if (vertices.NumDeleted != 0u || edges.NumDeleted != 0u)
+                return false;
+
+            const std::size_t vertexCount = vertices.Properties.Size();
+            const std::size_t halfedgeCount = halfedges.Properties.Size();
+            const std::size_t edgeCount = edges.Properties.Size();
+            if ((halfedgeCount % 2u) != 0u ||
+                (halfedgeCount / 2u) != edgeCount)
+            {
+                return false;
+            }
+
+            const auto edgeV0 =
+                edges.Properties.Get<std::uint32_t>(PN::kEdgeV0);
+            const auto edgeV1 =
+                edges.Properties.Get<std::uint32_t>(PN::kEdgeV1);
+            const auto connectivity =
+                halfedges.Properties.Get<
+                    Geometry::Graph::HalfedgeConnectivity>(
+                    PN::kHalfedgeConnectivity);
+            if (!edgeV0 || !edgeV1 || !connectivity ||
+                edgeV0.Vector().size() != edgeCount ||
+                edgeV1.Vector().size() != edgeCount ||
+                connectivity.Vector().size() != halfedgeCount)
+            {
+                return false;
+            }
+
+            for (std::size_t edgeIndex = 0u;
+                 edgeIndex < edgeCount;
+                 ++edgeIndex)
+            {
+                const std::uint32_t v0 = edgeV0.Vector()[edgeIndex];
+                const std::uint32_t v1 = edgeV1.Vector()[edgeIndex];
+                if (v0 >= vertexCount || v1 >= vertexCount || v0 == v1)
+                    return false;
+
+                const std::size_t h0 = edgeIndex * 2u;
+                const std::size_t h1 = h0 + 1u;
+                if (connectivity.Vector()[h0].Vertex.Index != v1 ||
+                    connectivity.Vector()[h1].Vertex.Index != v0)
+                {
+                    return false;
+                }
+            }
+
+            for (std::size_t index = 0u;
+                 index < halfedgeCount;
+                 ++index)
+            {
+                const auto& item = connectivity.Vector()[index];
+                if (item.Vertex.Index >= vertexCount ||
+                    item.Next.Index >= halfedgeCount ||
+                    item.Prev.Index >= halfedgeCount)
+                {
+                    return false;
+                }
+
+                const std::size_t next = item.Next.Index;
+                const std::size_t prev = item.Prev.Index;
+                if (connectivity.Vector()[next].Prev.Index != index ||
+                    connectivity.Vector()[prev].Next.Index != index)
+                {
+                    return false;
+                }
+
+                // Next(h) must be outgoing from ToVertex(h); the opposite of
+                // an outgoing halfedge stores that source vertex.
+                const std::size_t nextOpposite = next ^ 1u;
+                if (nextOpposite >= halfedgeCount ||
+                    connectivity.Vector()[nextOpposite].Vertex != item.Vertex)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         [[nodiscard]] bool AddFaces(json& geometry, const GS::Faces& faces)
         {
             json out = json::object();
@@ -1635,7 +1721,10 @@ namespace Extrinsic::Runtime
                     view.HalfedgeSource == nullptr ||
                     view.EdgeSource == nullptr)
                     return false;
-                if (!AddNodes(geometry, *view.VertexSource) ||
+                if (!ValidateGraphSources(*view.VertexSource,
+                                          *view.HalfedgeSource,
+                                          *view.EdgeSource) ||
+                    !AddNodes(geometry, *view.VertexSource) ||
                     !AddGraphHalfedges(geometry, *view.HalfedgeSource) ||
                     !AddEdges(geometry, *view.EdgeSource))
                 {
@@ -1924,6 +2013,13 @@ namespace Extrinsic::Runtime
                 if (!ApplyGraphVertices(raw, entity, geometry["nodes"]) ||
                     !ApplyGraphHalfedges(raw, entity, geometry["halfedges"]) ||
                     !ApplyEdges(raw, entity, geometry["edges"]))
+                {
+                    return false;
+                }
+                if (!ValidateGraphSources(
+                        raw.get<GS::Vertices>(entity),
+                        raw.get<GS::Halfedges>(entity),
+                        raw.get<GS::Edges>(entity)))
                 {
                     return false;
                 }

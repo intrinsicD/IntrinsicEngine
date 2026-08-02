@@ -334,8 +334,9 @@ struct EditorJobResult { std::string Diagnostic{}; };
                         availability,
                         GeometryElementDomain::GraphEdge))
                     domains |= EditorGeometryProcessingDomain::GraphEdges;
-                if (availability.Sources.Has(
-                        GS::SourceCapability::Halfedges))
+                if (SupportsGeometryElementDomain(
+                        availability,
+                        GeometryElementDomain::GraphHalfedge))
                     domains |= EditorGeometryProcessingDomain::GraphHalfedges;
             }
             else if (availability.Sources.ProvenanceDomain == GS::Domain::PointCloud)

@@ -41,7 +41,8 @@ explicit owning operation and must not silently discard richer data.
 `HARDEN-087` closed foundational violation **V0** after this audit identified
 it. Graph population now exposes the existing graph vertex/halfedge/edge
 property sets as shared `Vertices + Halfedges + Edges` sources, with
-`HasGraphTopology` retained as separate provenance and no fabricated faces.
+`HasGraphTopology` retained as separate provenance, a canonical
+`GraphHalfedge` property-discovery domain, and no fabricated faces.
 The method findings below remain valid because exact point-cloud provenance is
 still narrower than the shared `Vertices` capability.
 
@@ -49,7 +50,7 @@ still narrower than the shared `Vertices` capability.
 
 | Method/integration | Evidence inspected | Disposition | Follow-up |
 | --- | --- | --- | --- |
-| ECS geometry materialization | `ECS.Component.GeometrySourcesPopulate.cpp`; `ECS.Component.GeometrySources.cppm`; retired `HARDEN-065`; `Geometry.Graph` | **V0 resolved by `HARDEN-087`.** Graph and mesh share the physical vertex/halfedge/edge source types; graph provenance remains explicit and graph halfedges preserve real `h:connectivity` without faces. | None; V1–V4 runtime tasks may proceed against the unified source contract. |
+| ECS geometry materialization | `ECS.Component.GeometrySourcesPopulate.cpp`; `ECS.Component.GeometrySources.cppm`; retired `HARDEN-065`; `Geometry.Graph` | **V0 resolved by `HARDEN-087`.** Graph and mesh share the physical vertex/halfedge/edge source types; graph provenance remains explicit, graph halfedges preserve real `h:connectivity` without faces, and runtime/UI expose them through the canonical `GraphHalfedge` property domain. | None; V1–V4 runtime tasks may proceed against the unified source contract. |
 | Boundary First Flattening / parameterization | `methods/geometry/boundary_first_flattening/method.yaml`; `src/runtime/Runtime.ParameterizationOperations.cpp`; `src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp` | Conforming. The public input genuinely requires connected triangle-mesh/disk topology; runtime and UI use the Mesh domain and publish same-count UVs. | None. |
 | K-Means | `GetEditorSupportedGeometryProcessingDomains`; three registrations in `Sandbox.MethodPanels.cpp`; runtime clustering contracts | Conforming. Mesh vertices, graph nodes, and point-cloud points are all advertised and registered. | None. |
 | Vertex normal estimation family | `GetEditorSupportedGeometryProcessingDomains`; Mesh/Graph/PointCloud normal registrations in `Sandbox.MeshProcessingPanels.cpp` | Conforming at the engine-integration level. Domain-specific kernels intentionally differ, but all compatible entity sources have a method path. | None. |

@@ -98,11 +98,17 @@ TEST(RuntimeGeometryAvailability, GraphSupportsUnifiedVertexHalfedgeAndEdgeSourc
     EXPECT_TRUE(Runtime::SupportsGeometryElementDomain(
         availability, Runtime::GeometryElementDomain::GraphNode));
     EXPECT_TRUE(Runtime::SupportsGeometryElementDomain(
+        availability, Runtime::GeometryElementDomain::GraphHalfedge));
+    EXPECT_TRUE(Runtime::SupportsGeometryElementDomain(
         availability, Runtime::GeometryElementDomain::GraphEdge));
     EXPECT_EQ(Runtime::ResolveGeometryPropertySet(
                   availability,
                   Runtime::GeometryElementDomain::GraphNode),
               &availability.SourceView.VertexSource->Properties);
+    EXPECT_EQ(Runtime::ResolveGeometryPropertySet(
+                  availability,
+                  Runtime::GeometryElementDomain::GraphHalfedge),
+              &availability.SourceView.HalfedgeSource->Properties);
 }
 
 TEST(RuntimeGeometryAvailability, SharedSourceMatrixDoesNotReplaceGraphProvenance)
@@ -343,6 +349,49 @@ TEST(RuntimeGeometryProperty, CatalogSnapshotIsDeterministicAndCarriesIdentity)
     EXPECT_EQ(Runtime::FindGeometryPropertyCatalogEntry(
                   snapshot, Runtime::GeometryElementDomain::MeshVertex, "v:absent"),
               nullptr);
+}
+
+TEST(RuntimeGeometryProperty, GraphHalfedgePropertiesUseCanonicalDomain)
+{
+    entt::registry registry;
+    const entt::entity entity = registry.create();
+    auto graph = MakeGraph();
+    graph.HalfedgeProperties()
+        .GetOrAdd<float>("h:weight", 0.0f)
+        .Vector() = {1.0f, 2.0f};
+    GS::PopulateFromGraph(registry, entity, graph);
+
+    const auto availability =
+        Runtime::BuildGeometryAvailability(registry, entity);
+    const auto* halfedges = Runtime::ResolveGeometryPropertySet(
+        availability,
+        Runtime::GeometryElementDomain::GraphHalfedge);
+    ASSERT_NE(halfedges, nullptr);
+    EXPECT_EQ(halfedges, &availability.SourceView.HalfedgeSource->Properties);
+    EXPECT_EQ(Runtime::ResolveGeometryElementCount(
+                  availability,
+                  Runtime::GeometryElementDomain::GraphHalfedge),
+              2u);
+    EXPECT_EQ(Runtime::ToString(
+                  Runtime::GeometryElementDomain::GraphHalfedge),
+              "GraphHalfedge");
+
+    const auto snapshot =
+        Runtime::BuildGeometryPropertyCatalogSnapshot(availability);
+    const auto* entry = Runtime::FindGeometryPropertyCatalogEntry(
+        snapshot,
+        Runtime::GeometryElementDomain::GraphHalfedge,
+        "h:weight");
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(entry->Ref.ValueKind, Geometry::PropertyValueKind::Float);
+    EXPECT_EQ(entry->ElementCount, 2u);
+    EXPECT_TRUE(Runtime::ResolveGeometryProperty(
+                    availability,
+                    Runtime::GeometryElementDomain::GraphHalfedge,
+                    "h:weight",
+                    Geometry::PropertyValueKind::Float,
+                    2u)
+                    .Resolved());
 }
 
 TEST(RuntimeGeometryProperty, ResolutionReportsEveryFailureModeDistinctly)

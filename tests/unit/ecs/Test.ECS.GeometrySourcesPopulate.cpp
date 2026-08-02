@@ -325,6 +325,22 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromGraphCompactsGarbageAndPreservesRea
         EXPECT_LT(item.Next.Index, 2u);
         EXPECT_LT(item.Prev.Index, 2u);
     }
+    const auto representatives =
+        vertices.Properties.Get<Geometry::Graph::VertexConnectivity>(
+            PropertyNames::kVertexConnectivity);
+    ASSERT_TRUE(representatives);
+    ASSERT_EQ(representatives.Vector().size(), 3u);
+    EXPECT_FALSE(representatives.Vector()[0].Halfedge.IsValid());
+    for (std::size_t i = 1u; i < representatives.Vector().size(); ++i)
+    {
+        const Geometry::HalfedgeHandle halfedge =
+            representatives.Vector()[i].Halfedge;
+        ASSERT_TRUE(halfedge.IsValid());
+        ASSERT_LT(halfedge.Index, connectivity.Vector().size());
+        const Geometry::HalfedgeHandle opposite{
+            static_cast<Geometry::PropertyIndex>(halfedge.Index ^ 1u)};
+        EXPECT_EQ(connectivity.Vector()[opposite.Index].Vertex.Index, i);
+    }
     EXPECT_EQ(edges.Properties.Get<std::uint32_t>(PropertyNames::kEdgeV0)
                   .Vector(),
               (std::vector<std::uint32_t>{2u}));

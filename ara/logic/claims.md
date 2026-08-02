@@ -489,9 +489,10 @@
   component types while `HasGraphTopology` and the provenance query distinguish
   graph semantics from mesh semantics. Graph
   halfedges carry the graph's real connectivity and custom element properties;
-  runtime method bindings, property lookup, extraction, scene serialization,
-  and Sandbox domain models consume those sources without a converter,
-  fabricated faces, or duplicate graph-node storage.
+  runtime method bindings, `GraphHalfedge` property lookup, extraction,
+  fail-closed topology-validated scene serialization, and Sandbox domain models
+  consume those sources without a converter, fabricated faces, or duplicate
+  graph-node storage.
 - **Status**: supported — focused and complete CPU plus ASan and UBSan
   contracts; no GPU/Vulkan or performance claim
 - **Provenance**: ai-executed
@@ -500,8 +501,10 @@
   different physical element-source matrix; graph and mesh vertices or
   halfedges use different component types; graph connectivity is reconstructed
   from edge endpoints or graph faces are fabricated; graph provenance is
-  inferred only from source presence; or a production runtime/UI consumer
-  requires duplicate `Nodes` storage or a domain converter.
+  inferred only from source presence; malformed graph topology is published by
+  scene load; graph-halfedge properties lack a canonical runtime/UI discovery
+  domain; or a production runtime/UI consumer requires duplicate `Nodes`
+  storage or a domain converter.
 - **Proof**: [tasks/done/HARDEN-087-unified-geometry-element-source-components.md,
   src/ecs/Components/ECS.Component.GeometrySources.cppm,
   src/ecs/Components/ECS.Component.GeometrySources.cpp,

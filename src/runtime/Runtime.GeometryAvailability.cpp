@@ -28,6 +28,7 @@ namespace Extrinsic::Runtime
         case GeometryElementDomain::MeshHalfedge:    return "MeshHalfedge";
         case GeometryElementDomain::MeshFace:        return "MeshFace";
         case GeometryElementDomain::GraphNode:       return "GraphNode";
+        case GeometryElementDomain::GraphHalfedge:   return "GraphHalfedge";
         case GeometryElementDomain::GraphEdge:       return "GraphEdge";
         case GeometryElementDomain::PointCloudPoint: return "PointCloudPoint";
         }
@@ -246,6 +247,10 @@ namespace Extrinsic::Runtime
             return sources.ProvenanceDomain == GS::Domain::Graph && view.VertexSource
                 ? &view.VertexSource->Properties
                 : nullptr;
+        case GeometryElementDomain::GraphHalfedge:
+            return sources.ProvenanceDomain == GS::Domain::Graph && view.HalfedgeSource
+                ? &view.HalfedgeSource->Properties
+                : nullptr;
         case GeometryElementDomain::GraphEdge:
             return sources.ProvenanceDomain == GS::Domain::Graph && view.EdgeSource
                 ? &view.EdgeSource->Properties
@@ -274,12 +279,13 @@ namespace Extrinsic::Runtime
     {
         // Every element domain a property can actually live on, in the
         // deterministic order the catalog reports them.
-        constexpr std::array<GeometryElementDomain, 7> kPropertyElementDomains{
+        constexpr std::array<GeometryElementDomain, 8> kPropertyElementDomains{
             GeometryElementDomain::MeshVertex,
             GeometryElementDomain::MeshEdge,
             GeometryElementDomain::MeshHalfedge,
             GeometryElementDomain::MeshFace,
             GeometryElementDomain::GraphNode,
+            GeometryElementDomain::GraphHalfedge,
             GeometryElementDomain::GraphEdge,
             GeometryElementDomain::PointCloudPoint,
         };

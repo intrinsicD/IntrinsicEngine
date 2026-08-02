@@ -44,6 +44,7 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     {
         constexpr std::string_view kPosition          = "v:position";
         constexpr std::string_view kNormal            = "v:normal";
+        constexpr std::string_view kVertexConnectivity = "v:connectivity";
         constexpr std::string_view kMeanCurvature     = "v:mean_curvature";
         constexpr std::string_view kGaussianCurvature = "v:gaussian_curvature";
         constexpr std::string_view kPrincipalDir1     = "v:principal_dir1";

@@ -134,6 +134,8 @@ const char*DebugNameForEditorPropertyCatalogDomain(
             return "MeshFaces";
         case Domain::GraphVertices:
             return "GraphVertices";
+        case Domain::GraphHalfedges:
+            return "GraphHalfedges";
         case Domain::GraphEdges:
             return "GraphEdges";
         case Domain::PointCloudPoints:

@@ -375,10 +375,8 @@ namespace Geometry::Graph
         assert(nh <= std::numeric_limits<PropertyIndex>::max());
 
         auto vmap = Geometry::VertexProperty<VertexHandle>(m_Vertices.Add<VertexHandle>("v:garbage-collection", {}));
-        auto hmap = Geometry::HalfedgeProperty<HalfedgeHandle>(m_Halfedges.Add<HalfedgeHandle>("h:garbage-collection", {}));
 
         for (std::size_t i = 0; i < nv; ++i) vmap[VertexHandle{static_cast<PropertyIndex>(i)}] = VertexHandle{static_cast<PropertyIndex>(i)};
-        for (std::size_t i = 0; i < nh; ++i) hmap[HalfedgeHandle{static_cast<PropertyIndex>(i)}] = HalfedgeHandle{static_cast<PropertyIndex>(i)};
 
         auto swap_vertex_slots = [&](std::size_t a, std::size_t b)
         {
@@ -430,25 +428,53 @@ namespace Geometry::Graph
             nh = 2 * ne;
         }
 
-        // Remap connectivity to new compacted indices.
-        for (std::size_t i = 0; i < nv; ++i)
-        {
-            const auto v = VertexHandle{static_cast<PropertyIndex>(i)};
-            if (!IsIsolated(v))
-            {
-                SetHalfedge(v, hmap[Halfedge(v)]);
-            }
-        }
-
+        // Remap surviving endpoints. DeleteEdge intentionally does not unlink
+        // the old vertex-star rings, so their representative/next/prev handles
+        // may still reference a deleted edge. Rebuild those redundant links
+        // from the compacted edge pairs instead of remapping stale handles.
         for (std::size_t i = 0; i < nh; ++i)
         {
             const auto h = HalfedgeHandle{static_cast<PropertyIndex>(i)};
             SetVertex(h, vmap[ToVertex(h)]);
-            SetNextHalfedge(h, hmap[NextHalfedge(h)]);
+        }
+
+        for (std::size_t i = 0; i < nv; ++i)
+        {
+            SetHalfedge(VertexHandle{static_cast<PropertyIndex>(i)}, {});
+        }
+
+        // Start every edge as its own two-halfedge boundary loop.
+        for (std::size_t i = 0; i < ne; ++i)
+        {
+            const auto edge = EdgeHandle{static_cast<PropertyIndex>(i)};
+            const HalfedgeHandle h0 = Halfedge(edge, 0u);
+            const HalfedgeHandle h1 = OppositeHalfedge(h0);
+            SetNextHalfedge(h0, h1);
+            SetNextHalfedge(h1, h0);
+        }
+
+        // Recreate the outgoing ring for each vertex using the same insertion
+        // convention as AddEdge. Every surviving halfedge is inserted exactly
+        // once, so isolated vertices retain an invalid representative and all
+        // representatives plus next/prev links are within the compact range.
+        for (std::size_t i = 0; i < nh; ++i)
+        {
+            const auto h = HalfedgeHandle{static_cast<PropertyIndex>(i)};
+            const VertexHandle from = FromVertex(h);
+            if (IsIsolated(from))
+            {
+                SetHalfedge(from, h);
+                continue;
+            }
+
+            const HalfedgeHandle representative = Halfedge(from);
+            const HalfedgeHandle next =
+                NextHalfedge(OppositeHalfedge(representative));
+            SetNextHalfedge(OppositeHalfedge(representative), h);
+            SetNextHalfedge(OppositeHalfedge(h), next);
         }
 
         m_Vertices.Remove(vmap);
-        m_Halfedges.Remove(hmap);
 
         m_Vertices.Resize(nv);
         m_Vertices.ShrinkToFit();

@@ -82,6 +82,18 @@ TEST(RuntimeGraph, GarbageCollectionRemapsSurvivingConnectivity)
     ASSERT_EQ(g.VertexCount(), 3u);
     ASSERT_EQ(g.EdgeCount(), 1u);
     ASSERT_EQ(g.HalfedgesSize(), 2u);
+    EXPECT_FALSE(g.Halfedge(Geometry::VertexHandle{0u}).IsValid());
+    for (std::size_t i = 0u; i < g.VertexCount(); ++i)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(i)};
+        const Geometry::HalfedgeHandle representative = g.Halfedge(vertex);
+        if (representative.IsValid())
+        {
+            EXPECT_LT(representative.Index, g.HalfedgesSize());
+            EXPECT_EQ(g.FromVertex(representative), vertex);
+        }
+    }
     for (std::size_t i = 0u; i < g.HalfedgesSize(); ++i)
     {
         const Geometry::HalfedgeHandle halfedge{
@@ -89,6 +101,57 @@ TEST(RuntimeGraph, GarbageCollectionRemapsSurvivingConnectivity)
         EXPECT_LT(g.ToVertex(halfedge).Index, g.VertexCount());
         EXPECT_LT(g.NextHalfedge(halfedge).Index, g.HalfedgesSize());
         EXPECT_LT(g.PrevHalfedge(halfedge).Index, g.HalfedgesSize());
+    }
+}
+
+TEST(RuntimeGraph, GarbageCollectionRebuildsSurvivingVertexStar)
+{
+    Geometry::Graph::Graph g;
+
+    const auto center = g.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto removed = g.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto survivorA = g.AddVertex({0.0f, 1.0f, 0.0f});
+    const auto survivorB = g.AddVertex({0.0f, 0.0f, 1.0f});
+    ASSERT_TRUE(g.AddEdge(center, removed).has_value());
+    ASSERT_TRUE(g.AddEdge(center, survivorA).has_value());
+    ASSERT_TRUE(g.AddEdge(center, survivorB).has_value());
+
+    g.DeleteVertex(removed);
+    g.GarbageCollection();
+
+    ASSERT_EQ(g.VertexCount(), 3u);
+    ASSERT_EQ(g.EdgeCount(), 2u);
+    ASSERT_EQ(g.HalfedgesSize(), 4u);
+    for (std::size_t i = 0u; i < g.VertexCount(); ++i)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(i)};
+        const Geometry::HalfedgeHandle representative = g.Halfedge(vertex);
+        ASSERT_TRUE(representative.IsValid());
+        EXPECT_LT(representative.Index, g.HalfedgesSize());
+        EXPECT_EQ(g.FromVertex(representative), vertex);
+
+        std::size_t incidentCount = 0u;
+        for (const Geometry::HalfedgeHandle halfedge :
+             g.HalfedgesAroundVertex(vertex))
+        {
+            EXPECT_EQ(g.FromVertex(halfedge), vertex);
+            ++incidentCount;
+        }
+        EXPECT_EQ(incidentCount, i == center.Index ? 2u : 1u);
+    }
+
+    for (std::size_t i = 0u; i < g.HalfedgesSize(); ++i)
+    {
+        const Geometry::HalfedgeHandle halfedge{
+            static_cast<Geometry::PropertyIndex>(i)};
+        const Geometry::HalfedgeHandle next = g.NextHalfedge(halfedge);
+        const Geometry::HalfedgeHandle prev = g.PrevHalfedge(halfedge);
+        ASSERT_LT(next.Index, g.HalfedgesSize());
+        ASSERT_LT(prev.Index, g.HalfedgesSize());
+        EXPECT_EQ(g.PrevHalfedge(next), halfedge);
+        EXPECT_EQ(g.NextHalfedge(prev), halfedge);
+        EXPECT_EQ(g.FromVertex(next), g.ToVertex(halfedge));
     }
 }
 
