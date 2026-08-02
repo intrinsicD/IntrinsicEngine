@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 99482,
+  "exit_code": 8,
+  "finished_at": "2026-08-02T20:27:51Z",
+  "label": "ubsan-tests-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T20:26:11Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/attempts/ubsan-tests-r2.stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/attempts/ubsan-tests-r2.stdout.log",
+  "stdout_sha256": "bec03560a8c0bd46c081f020a556f89a907b11031f6fe95d1222fd459c7ac48d",
+  "task_id": "HARDEN-087"
+}

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-ubsan",
+    "--fresh",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+  ],
+  "command_display": "cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+  "cwd": ".",
+  "duration_ms": 7584,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T20:15:47Z",
+  "label": "ubsan-configure-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T20:15:39Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/ubsan-configure-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/ubsan-configure-r2.stdout.log",
+  "stdout_sha256": "b2d36379003e7da84cd4cd2b7caf05cfdd6e33555552dd13c06de3ae23ac0e09",
+  "task_id": "HARDEN-087"
+}

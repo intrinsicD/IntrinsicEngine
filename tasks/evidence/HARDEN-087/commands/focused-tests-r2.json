@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "ECSGeometrySourcesPopulate|RuntimeGraph.GarbageCollection|RuntimeGeometryAvailability|RuntimeGeometryProperty|GraphGeometryExtraction|GeometryPresentation|PrimitiveSelectionRefinement|RuntimeSceneSerialization|ClusteringModule|GraphVertexNormals|RuntimeRenderExtraction|RuntimeSandboxAcceptance|SandboxEditorUi.PropertyCatalog",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'ECSGeometrySourcesPopulate|RuntimeGraph.GarbageCollection|RuntimeGeometryAvailability|RuntimeGeometryProperty|GraphGeometryExtraction|GeometryPresentation|PrimitiveSelectionRefinement|RuntimeSceneSerialization|ClusteringModule|GraphVertexNormals|RuntimeRenderExtraction|RuntimeSandboxAcceptance|SandboxEditorUi.PropertyCatalog' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 4435,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T19:59:59Z",
+  "label": "focused-tests-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T19:59:55Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/focused-tests-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/focused-tests-r2.stdout.log",
+  "stdout_sha256": "e9b14a879b3145c7a2c06d3a931cc37e90ce5686562ec044ab65843077424301",
+  "task_id": "HARDEN-087"
+}

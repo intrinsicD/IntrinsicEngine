@@ -1,0 +1,21 @@
+{
+  "command": [
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 1292,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T20:32:18Z",
+  "label": "clean-workshop-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T20:32:17Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/clean-workshop-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/clean-workshop-r2.stdout.log",
+  "stdout_sha256": "287d6ecbcd5eb7ef182c6767a15f88637e76e654fc18207d4485d9b60d996179",
+  "task_id": "HARDEN-087"
+}

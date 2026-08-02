@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_root_hygiene.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/repo/check_root_hygiene.py --root .",
+  "cwd": ".",
+  "duration_ms": 29,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T20:32:16Z",
+  "label": "root-hygiene-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T20:32:16Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/root-hygiene-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/root-hygiene-r2.stdout.log",
+  "stdout_sha256": "a0943f459bd78442fffbb4ce95dc6f25750322a49b0abb92d0ab9948576be9f6",
+  "task_id": "HARDEN-087"
+}

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-asan",
+    "--fresh",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+  ],
+  "command_display": "cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+  "cwd": ".",
+  "duration_ms": 7758,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T20:01:37Z",
+  "label": "asan-configure-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T20:01:29Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/asan-configure-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/asan-configure-r2.stdout.log",
+  "stdout_sha256": "32c6f2d1e32b563dab803177c2c69629d0b988f0e768cf341fd1907c55c41437",
+  "task_id": "HARDEN-087"
+}

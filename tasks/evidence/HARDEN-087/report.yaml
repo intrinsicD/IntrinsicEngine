@@ -3,62 +3,68 @@ task_id: HARDEN-087
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-02T19:12:04Z'
+generated_at: '2026-08-02T20:34:35Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 1481c3b13d960d1b68cde5ef8b6fbb2a34741426
-  head_revision: 71b09575e3bdb0dcbd8dd87c7aaae2e15dc2f46c
+  head_revision: 2ed66f6ceffb1f6c025d2c5d29787c84635da83f
   branch: ecs/harden-087-unified-geometry-sources
   worktree: /tmp/intrinsic-harden087.0mo5us
   dirty: true
   surface:
   - path: ara/logic/claims.md
-    sha256: 0f1ce2e1a7f06776acb80f8207776de01394f7b15cbfcee5c8860656b1c05175
+    sha256: d641789ce364b8dc215c6d9f1f5fd412317de41f7769bd6df1bec20c31e44b66
   - path: ara/staging/observations.yaml
     sha256: 75cf0a7964912cceb96876c8b441be595bb8b9272033e9994d6a42b820808be0
   - path: docs/architecture/ecs.md
-    sha256: c741121a90824c076a566527f0949ce02ecc2a38e3e43a5ffc019cf0bd5ff14d
+    sha256: a7ba833afaeceb08bb4b9d63bbbea2496a592c5017dd7da0dd6b23d20d5d00b3
   - path: docs/architecture/geometry-api-style.md
-    sha256: f1af57031084a5033e1e6cb012d6cf21d818804b94c35d232a0cf30649d98e2b
+    sha256: 7b0f0b366733207c9895d524fdb29ed99b805db69d4e4aaff57c6118287b1a34
   - path: docs/architecture/method-api-contract.md
     sha256: cfec612c81c40f1f6c7093e832e44c70bdb24e3ca156df4bdccf43149dbe07aa
   - path: docs/architecture/rendering-target-architecture.md
     sha256: fe41f12824ef5119ee85d64df97e664a1095baec5059eaea3a4c78041da1e48d
   - path: docs/architecture/runtime.md
-    sha256: 430b25d27efefeaa5dae3e27a80149c8adc242664f565503f4bc15060ad30514
+    sha256: 879aeb1a24a3bc9a1aa4d0a28a91256b637f8bcfc407b3a58af7ec4c810b5a32
   - path: docs/migration/nonlegacy-parity-matrix.md
     sha256: 1826446e96f554ec537e039e640acb7822a9f61ea8dd5a21210d4fe62083af69
   - path: docs/reviews/2026-08-02-harden-087-clean-workshop-review.md
-    sha256: 8f0a832857f5a6d79c746b75ae09716ecf02eb73238aab874c0a48401c4d4085
+    sha256: cee31fde7efb1c0569a79f0b67a141f55712bedf770188c117c6f9bed92a299c
   - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
-    sha256: 22716552c305291146102b766f623ea5488511f6893f9436bfd06ff3460e493a
+    sha256: 571666db2611c29a55a54177ec48d5554ac36ed914be34ea91a6ae76be4a291e
   - path: src/ecs/Components/ECS.Component.GeometrySources.cpp
     sha256: c19d63200cc7b92d0b57a3141341ee0b60902d114ccd8707ab157c1ab539cc20
   - path: src/ecs/Components/ECS.Component.GeometrySources.cppm
-    sha256: a0eece12928bec37571b210dd49e5f630d36cb3940d5189d90fc9319c3b41de6
+    sha256: c336a55e5faaeab51e0ca07ad4b175f6c9ce6d0d77206f72dbf100dc89b15b9b
   - path: src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp
     sha256: 830f92ff9d4cff78b9a3cdc2e9cdb2bfa2d97a74f05f3d37ee684b55a44abd48
   - path: src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cppm
     sha256: fb384becbac9d75f328bf59c54b36a8a0f9764e866df767c33f095369567b37f
   - path: src/ecs/Components/README.md
-    sha256: 09b0f6e9727e9df6a37c1363a67a09a6072089e6a83b501f3467864187337509
+    sha256: a94a7ffb1e3a34cb2f7327032df746170674a25f8096e084b6b498da6812e499
   - path: src/ecs/README.md
     sha256: 91e1ffe33cc7a2df753e0b12da9ffe96c529953146684d1d0137a7568ffda07c
   - path: src/geometry/Geometry.Graph.cpp
-    sha256: 40aff75c96ab4d6df87b2d39329883ed2b4e96ee2d0a1787e0a4472a3ccfac31
+    sha256: 1669ad4b0f7793346d61fc20a637b14e85423ae1b7af6966abbd29c302a05e80
   - path: src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp
     sha256: 34769b1469d80ac43608e3aded9df8e47c2c5b3cd87f86ee964552ce17e33726
   - path: src/runtime/README.md
     sha256: 892a638fc0723bdaf759c5d965d5884f0723185104e1227efd967e45052d85a1
+  - path: src/runtime/Runtime.EditorJobProjection.Public.cpp
+    sha256: f2114914073671074b8f45c164ca3cd6531a27416a8778615bc6dc59dbeed2b9
+  - path: src/runtime/Runtime.EditorJobProjection.cppm
+    sha256: b54568278d1db57b68b6304faf5ed42f20ec136db8177bb55fc0697e622be300
   - path: src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
-    sha256: f2668191a11c2204c3492ac94c2cf35150ac5043b96d9269632124a1912c9772
+    sha256: 8f08c2e21ef7dc64b0c0941bc20d6e5dbf0261b9998c68bfb1f491a4ba1f65ef
   - path: src/runtime/Runtime.GeometryAvailability.cpp
-    sha256: 772c7b34db8328e2f3ee6f886d314649ed9ea7fa2e8496cbbcb54ad3af4e5f9e
+    sha256: 10803ba4181137f6ea4ebe65fd48f3514f095821c03788407f5afc372b7ca7c8
+  - path: src/runtime/Runtime.GeometryAvailability.cppm
+    sha256: 25b2cc8a0f55704e3320b224e9aa34ffa13bac2ad92ab7ef0cb225cb0151a27f
   - path: src/runtime/Runtime.GeometryPlanBuilders.Graph.cpp
     sha256: c51951525b31d2eccd88c4681b9c1a7cbec0b21596bfa4e2c40d470de16a3812
   - path: src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp
-    sha256: 34dffdb9f07119fd62f10c665f00af3234660ce1ccc68a3d891d2c42b8df1298
+    sha256: c21a62d277083c047406ef388889e44506589cd2438b15462b75ad678957b051
   - path: src/runtime/Runtime.GeometryProcessingOperations.cpp
     sha256: b33d0c14bdc09d6592f247d012d357d22008b53f42328044d0c3c08c6b6c484c
   - path: src/runtime/Runtime.PrimitiveSelectionRefinement.cpp
@@ -68,11 +74,19 @@ source:
   - path: src/runtime/Runtime.SceneEditingOperations.Actions.cpp
     sha256: df1f2800bf547d6d49951e348e04978617d9180f2bd99dfe09b23a2c5091d50b
   - path: src/runtime/Runtime.SceneSerialization.cpp
-    sha256: c44c39095c24e52599a3b59e6e800a20b9f54013e6b2ea359e91e1df0cb00def
+    sha256: 294f014833ea8320c79b3ef942f7a254bd7a99145167d3b86c6f1db8ac46a41c
+  - path: src/runtime/Runtime.TextureBakeModule.cpp
+    sha256: 267dd914d0e7778acb89ad0dce53889e416b826d2be2949d4740f5dec4fd26af
   - path: src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp
-    sha256: 4827fa5bf9b057fe2f2932c3c032997a744764972078fc643f7fec0fd6f3e209
+    sha256: 6e932aac442dd4bce0e2752ab34d0b0fb78fe0166e9229b588e2dfe6f1e5037b
+  - path: src/runtime/Runtime.VisualizationEditingOperations.Debug.cpp
+    sha256: c6d50a3d90f2ede74838d2c8a950303d85fdc722f5d44f767c91b2dde9c59dc6
+  - path: src/runtime/Runtime.VisualizationEditingOperations.cppm
+    sha256: 3ab1164d7a76e76b0ca0a9fbcc7d66d650eeef03662405701ad65d9771ae96dd
   - path: src/runtime/Scene/Runtime.SceneDocumentModule.cpp
     sha256: 40d305bb9cb29a79f9dfc61ca4f1ad642bce1f3b42af7fb11ab640058223a1b7
+  - path: src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
+    sha256: cf95ca6ec53ec52b0ef8076b26918289d39790a17cbb5fd4c8400c9b11335c33
   - path: tasks/SESSION-BRIEF.md
     sha256: f70087cd688046c3ec9bf215c54285fc0fcc1a1beb7be2f624f695b33843aa80
   - path: tasks/active/README.md
@@ -84,11 +98,11 @@ source:
   - path: tasks/backlog/ecs/README.md
     sha256: d632c9b88ef728a8f2024482beca852d096efce974b9294715ce76688a18523b
   - path: tasks/done/HARDEN-087-unified-geometry-element-source-components.md
-    sha256: 88a4462c265a6a789b7d8fccc64bc3d5bfb130344ab30efbb5874e5c437089b0
+    sha256: 3b5b345aa6b31e9d055d2f78c421a9a1e9fadb4a1be4b9c499ce7e234116198e
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: d4a4a2c7ea9386f2e48b237644d0a2774d2a5923750e1d3b894337cb31a11a5b
+    sha256: 2285c541a42c9d594a873e3f0a421c77349375b2d104979ae3c065b492e1762c
   - path: tests/contract/runtime/Test.GeometryAvailability.cpp
-    sha256: dca88cb00750945366f2c0dd7a40e6cb8f6e4ea1b6898d4180161c186ddd9012
+    sha256: 5ef859625ee92a6e98ff3a8e63571c79fbb9294ad1813e3d796110283e2312f3
   - path: tests/contract/runtime/Test.GeometryPresentation.cpp
     sha256: d472a350d3e9ee63cc68d7dff24ff849092892c7da8a0e7205512033fceb6828
   - path: tests/contract/runtime/Test.GraphGeometryExtraction.cpp
@@ -100,11 +114,11 @@ source:
   - path: tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp
     sha256: 9711d81f8fc0340b1c6a5c79612b4af6bf65481f7dc214ae4b0ff1a6e0f8266b
   - path: tests/contract/runtime/Test.RuntimeSceneSerialization.cpp
-    sha256: 46a50f433f1790bf793fc3b62254ee0663cd7367561685967ac85a761b0686e4
+    sha256: 8c39f5698ba4dfa1eca7be12bc0ea95952a8346ec8e19a612243c1b651f26b18
   - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
     sha256: 65fcd749d2e78b479a48f598e094a185597b70dee928c99418bcb18bcaa65017
   - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
-    sha256: aaf83982d328147f014838cd85e2201c48c337b2da0adf8e4ba02a285c6c85af
+    sha256: 976b46bafe1db13ee97312f6034c53008d3b7a311d875cd459ede979a06d0b2e
   - path: tests/contract/runtime/Test.SandboxEditorVisualization.cpp
     sha256: dd4715c7dfc1df7d1fcf45197ceabdbbe3a21d13ba50b1007820ce8299b7739e
   - path: tests/contract/runtime/Test.SceneDocumentModule.cpp
@@ -116,10 +130,10 @@ source:
   - path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
     sha256: 3ae50e12065125450f6341e40f66114e82fb09f10c7e951ea3494a1e969a9a2f
   - path: tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp
-    sha256: 5b335741a54babbc29ce71c1f003f7e11eabdaadb85b6d9a12b8f22669bfce40
+    sha256: fb440fbe8d31716ea499486615814508faab256eee9accc266137b6274c97cef
   - path: tests/unit/geometry/Test_RuntimeGraph.cpp
-    sha256: c6f1238a273cd26e543b228891bf8ad537eb4f5ae61f720b71df1830e798b8e7
-  content_digest: d57d5779b5b82802a9b6e12c360419d2b26ce6d76322df6a64c864ba4deefad3
+    sha256: ca792800ae8e726ae6a3f93c6540f8774de29b4f381a062e573bcee4147faf8c
+  content_digest: 4b84e0703f0bb474ae0733c17c26f968ea9e4123495998c284afa2babbd5ffd7
 touched:
   paths:
   - ara/logic/claims.md
@@ -141,8 +155,11 @@ touched:
   - src/geometry/Geometry.Graph.cpp
   - src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp
   - src/runtime/README.md
+  - src/runtime/Runtime.EditorJobProjection.Public.cpp
+  - src/runtime/Runtime.EditorJobProjection.cppm
   - src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
   - src/runtime/Runtime.GeometryAvailability.cpp
+  - src/runtime/Runtime.GeometryAvailability.cppm
   - src/runtime/Runtime.GeometryPlanBuilders.Graph.cpp
   - src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp
   - src/runtime/Runtime.GeometryProcessingOperations.cpp
@@ -150,8 +167,12 @@ touched:
   - src/runtime/Runtime.PrimitiveSelectionRefinement.cppm
   - src/runtime/Runtime.SceneEditingOperations.Actions.cpp
   - src/runtime/Runtime.SceneSerialization.cpp
+  - src/runtime/Runtime.TextureBakeModule.cpp
   - src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp
+  - src/runtime/Runtime.VisualizationEditingOperations.Debug.cpp
+  - src/runtime/Runtime.VisualizationEditingOperations.cppm
   - src/runtime/Scene/Runtime.SceneDocumentModule.cpp
+  - src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
   - tasks/SESSION-BRIEF.md
   - tasks/active/README.md
   - tasks/backlog/README.md
@@ -182,8 +203,10 @@ touched:
   modules:
   - Extrinsic.ECS.Components.GeometrySources
   - Extrinsic.ECS.Components.GeometrySourcesPopulate
+  - Extrinsic.Runtime.EditorJobProjection
   - Extrinsic.Runtime.GeometryAvailability
   - Extrinsic.Runtime.SceneSerialization
+  - Extrinsic.Runtime.VisualizationEditingOperations
   - Geometry.Graph
 extension_seam: Owned PropertySet element-source components plus separate provenance query
 future_change_plan: Add element sources only through the geometry.element-domain-sources contract and
@@ -206,41 +229,67 @@ acceptance:
   reason: null
 commands:
 - receipt: tasks/evidence/HARDEN-087/commands/ara-claims-final.json
+- receipt: tasks/evidence/HARDEN-087/commands/ara-claims-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/ara-claims.json
+- receipt: tasks/evidence/HARDEN-087/commands/asan-build-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/asan-build.json
+- receipt: tasks/evidence/HARDEN-087/commands/asan-configure-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/asan-configure.json
+- receipt: tasks/evidence/HARDEN-087/commands/asan-tests-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/asan-tests.json
+- receipt: tasks/evidence/HARDEN-087/commands/ci-build-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/ci-build.json
+- receipt: tasks/evidence/HARDEN-087/commands/ci-configure-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/ci-configure.json
+- receipt: tasks/evidence/HARDEN-087/commands/clean-workshop-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/clean-workshop.json
+- receipt: tasks/evidence/HARDEN-087/commands/cpu-tests-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/cpu-tests.json
 - receipt: tasks/evidence/HARDEN-087/commands/diff-check-final.json
+- receipt: tasks/evidence/HARDEN-087/commands/diff-check-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/diff-check.json
 - receipt: tasks/evidence/HARDEN-087/commands/doc-links-final.json
+- receipt: tasks/evidence/HARDEN-087/commands/doc-links-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/doc-links.json
+- receipt: tasks/evidence/HARDEN-087/commands/docs-sync-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/docs-sync.json
+- receipt: tasks/evidence/HARDEN-087/commands/focused-tests-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/focused-tests.json
+- receipt: tasks/evidence/HARDEN-087/commands/layering-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/layering.json
+- receipt: tasks/evidence/HARDEN-087/commands/module-inventory-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/module-inventory.json
+- receipt: tasks/evidence/HARDEN-087/commands/root-hygiene-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/root-hygiene.json
 - receipt: tasks/evidence/HARDEN-087/commands/session-brief-final.json
+- receipt: tasks/evidence/HARDEN-087/commands/session-brief-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/session-brief.json
+- receipt: tasks/evidence/HARDEN-087/commands/skill-mirrors-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/skill-mirrors.json
 - receipt: tasks/evidence/HARDEN-087/commands/task-policy-final.json
+- receipt: tasks/evidence/HARDEN-087/commands/task-policy-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/task-policy.json
 - receipt: tasks/evidence/HARDEN-087/commands/task-state-links-final.json
+- receipt: tasks/evidence/HARDEN-087/commands/task-state-links-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/task-state-links.json
 - receipt: tasks/evidence/HARDEN-087/commands/task-validation-final.json
+- receipt: tasks/evidence/HARDEN-087/commands/task-validation-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/task-validation.json
+- receipt: tasks/evidence/HARDEN-087/commands/test-layout-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/test-layout.json
+- receipt: tasks/evidence/HARDEN-087/commands/ubsan-build-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/ubsan-build.json
+- receipt: tasks/evidence/HARDEN-087/commands/ubsan-configure-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/ubsan-configure.json
+- receipt: tasks/evidence/HARDEN-087/commands/ubsan-tests-r2.json
 - receipt: tasks/evidence/HARDEN-087/commands/ubsan-tests.json
 changed_public_contracts:
 - Point clouds expose Vertices; graphs expose Vertices, Halfedges, and Edges plus graph provenance; meshes
-  expose Vertices, Halfedges, Edges, and Faces
+  expose Vertices, Halfedges, Edges, and Faces; GraphHalfedge resolves canonically to the graph Halfedges
+  source
 diagnostics_and_previews:
-- Exact layouts fail closed as Unknown; graph halfedge connectivity must be present and count-matched
+- Exact layouts and malformed scene-v2 graph topology fail closed; graph connectivity properties remain
+  visible as internal catalog rows
 benchmark_or_parity_evidence: []
 docs_sync:
   task_file: tasks/done/HARDEN-087-unified-geometry-element-source-components.md
@@ -248,30 +297,27 @@ docs_sync:
   canonical_docs_changed: true
   skill_mirrors_checked: true
 residual_risks:
-- Known BUG-123 may intermittently fail the unrelated retired queued scene-save terminal-event test; the
-  failed unchanged UBSan attempt is preserved
+- Known BUG-123 may intermittently fail the unrelated retired queued scene-save terminal-event test; both
+  failed unchanged UBSan attempts are preserved
 skipped_checks:
 - check: gpu-vulkan
   reason: No graphics/RHI/backend/shader/byte-layout behavior changed; CPU, ASan, and UBSan cover the
     shared ECS/runtime path and the GPU smoke fixture materializes the same sources
 artifacts:
 - path: tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp
-  sha256: 5b335741a54babbc29ce71c1f003f7e11eabdaadb85b6d9a12b8f22669bfce40
+  sha256: fb440fbe8d31716ea499486615814508faab256eee9accc266137b6274c97cef
   kind: file
 - path: tests/unit/geometry/Test_RuntimeGraph.cpp
-  sha256: c6f1238a273cd26e543b228891bf8ad537eb4f5ae61f720b71df1830e798b8e7
+  sha256: ca792800ae8e726ae6a3f93c6540f8774de29b4f381a062e573bcee4147faf8c
+  kind: file
+- path: tests/contract/runtime/Test.GeometryAvailability.cpp
+  sha256: 5ef859625ee92a6e98ff3a8e63571c79fbb9294ad1813e3d796110283e2312f3
   kind: file
 - path: tests/contract/runtime/Test.RuntimeSceneSerialization.cpp
-  sha256: 46a50f433f1790bf793fc3b62254ee0663cd7367561685967ac85a761b0686e4
+  sha256: 8c39f5698ba4dfa1eca7be12bc0ea95952a8346ec8e19a612243c1b651f26b18
   kind: file
-- path: docs/reviews/2026-08-02-harden-087-clean-workshop-review.md
-  sha256: 8f0a832857f5a6d79c746b75ae09716ecf02eb73238aab874c0a48401c4d4085
-  kind: file
-- path: tasks/done/HARDEN-087-unified-geometry-element-source-components.md
-  sha256: 88a4462c265a6a789b7d8fccc64bc3d5bfb130344ab30efbb5874e5c437089b0
-  kind: file
-- path: tasks/evidence/HARDEN-087/commands/attempts/ubsan-tests.json
-  sha256: 316d8ce8dd1b379d72d19fd552183988594847fbd6b0db11ca4ccd0c611c1dcb
+- path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+  sha256: 976b46bafe1db13ee97312f6034c53008d3b7a311d875cd459ede979a06d0b2e
   kind: file
 self_review:
   completed: true

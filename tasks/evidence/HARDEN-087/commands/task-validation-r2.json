@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py",
+    "--root",
+    "tasks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py --root tasks --strict",
+  "cwd": ".",
+  "duration_ms": 396,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T20:31:59Z",
+  "label": "task-validation-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T20:31:59Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/task-validation-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/task-validation-r2.stdout.log",
+  "stdout_sha256": "e9dc42dfff49d9c9aaa02a5e4bb55ce78b2fcd4c5570e175724fcf2556a463e4",
+  "task_id": "HARDEN-087"
+}

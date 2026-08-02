@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 2606,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T19:56:41Z",
+  "label": "ci-configure-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T19:56:38Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/ci-configure-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/ci-configure-r2.stdout.log",
+  "stdout_sha256": "3e96200be3d7a84b856303e52c25482f7d6617858791a976aaabd812b6b77960",
+  "task_id": "HARDEN-087"
+}

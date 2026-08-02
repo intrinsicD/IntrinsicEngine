@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_layering.py",
+    "--root",
+    "src",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_layering.py --root src --strict",
+  "cwd": ".",
+  "duration_ms": 178,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T20:31:59Z",
+  "label": "layering-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T20:31:59Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/layering-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/layering-r2.stdout.log",
+  "stdout_sha256": "d6e7f61a02cd358ad718010721627a7816b8462cdbc0369fb3f173ac911c44fc",
+  "task_id": "HARDEN-087"
+}
