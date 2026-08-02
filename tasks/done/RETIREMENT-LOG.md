@@ -25,12 +25,13 @@ domain, and scene v2 validates graph counts, endpoint pairing, handle ranges,
 reciprocity, and successor continuity before publication. The corrected-
 revision focused selector passed 188/188. The default CPU
 selector chose 3,999 cases: 3,998 passed and the expected environment-gated
-GLFW/LSan case skipped. Grouped ASan selected and passed 2,649/2,649; grouped
-UBSan selected 2,649 cases, with 2,648 passing and the same expected case
-skipped. The first unchanged pre-review UBSan attempt
+GLFW/LSan case skipped. Grouped ASan selected and passed 2,651/2,651; grouped
+UBSan selected 2,651 cases, with 2,650 passing and the same expected case
+skipped. The first UBSan attempt on both the pre-review and corrected revisions
 reproduced the already-open `BUG-123` retired-scene-save terminal-event race;
-its failed receipt is preserved and the unchanged retry passed without a gate
-exclusion. Strict repository checks and independent fixed-surface review close
+both failed receipts are preserved and the unchanged corrected-revision retry
+passed without a gate exclusion. Strict repository checks and independent
+fixed-surface review close
 the high-risk evidence; C18 records the CPU and
 sanitizer-backed capability without a GPU/Vulkan or performance claim.
 Review:

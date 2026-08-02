@@ -44,12 +44,12 @@ maturity_target: Operational
 - Corrected-revision verification passed 188/188 focused contracts. The
   default CPU selector selected 3,999 cases: 3,998 passed and the expected
   environment-gated GLFW/LSan case skipped. Grouped ASan selected and passed
-  2,649/2,649; grouped UBSan selected 2,649 cases, with 2,648 passing and the
-  same expected GLFW/LSan case skipped. The first unchanged UBSan attempt on
-  the pre-review revision reproduced the already-open `BUG-123`
-  retired-scene-save terminal-event race; that failed receipt remains archived,
-  and the unchanged selector then passed without weakening or excluding the
-  test. The promoted Vulkan selector was not rerun because no
+  2,651/2,651; grouped UBSan selected 2,651 cases, with 2,650 passing and the
+  same expected GLFW/LSan case skipped. The first UBSan attempt on both the
+  pre-review and corrected revisions reproduced the already-open `BUG-123`
+  retired-scene-save terminal-event race; both failed receipts remain archived,
+  and the unchanged corrected-revision selector then passed without weakening
+  or excluding the test. The promoted Vulkan selector was not rerun because no
   graphics/RHI/backend/shader or GPU
   byte-layout behavior changed; its graph fixture now materializes the same
   tested ECS sources before entering the unchanged extraction path.
