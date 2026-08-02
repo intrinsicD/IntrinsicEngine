@@ -21,7 +21,7 @@ map.
 - [GEOM-061 — Point-cloud grid-downsampling reduction strategies](GEOM-061-grid-downsampling-reduction-strategies.md)
   (index-returning per-cell reduction extending retired GEOM-016's voxel
   downsampling; framework24 port-gap follow-up).
-- [GEOM-064 — Parameterization optimization kernels seam](GEOM-064-parameterization-optimization-kernels.md)
+- [GEOM-064 — Parameterization optimization kernels seam](../../active/GEOM-064-parameterization-optimization-kernels.md)
   (reusable `Geometry.Parameterization.Optimize`: local rotation fit,
   symmetric-Dirichlet energy/proxy, injective line search; gates ARAP
   `methods/METHOD-021` and SLIM `methods/METHOD-022`).
