@@ -149,9 +149,10 @@ schedule:
   callback registrar at the established post-capture, pre-gizmo insertion
   point; `FramePhase` remains six values and `RuntimeFrameHookContext` remains
   unchanged;
-- `RuntimeModuleSchedule` deterministically orders those typed hooks by module
-  name and shared registration sequence and clears them with the other
-  contribution records;
+- the intermediate `RuntimeModuleSchedule` owner deterministically ordered
+  those typed hooks by module name and shared registration sequence and
+  cleared them with the other contribution records (`RUNTIME-203` later
+  internalized those records and retired the one-consumer BMI);
 - Sandbox owns the exactly-once initial-world reference-content bootstrap,
   original-world teardown, and optional camera-seed handoff; generic Engine
   has no camera/reference ownership or facade; and
@@ -162,6 +163,22 @@ schedule:
 This is the deletion test in action: one production viewport consumer earns
 one typed callback context, not a seventh generic phase, widened generic
 context, camera wrapper service, or reference-provider framework.
+
+## Implementation update: RUNTIME-203
+
+`RUNTIME-203` repeated the deletion test after the full module cohort landed.
+`RuntimeModuleSchedule`, `EcsSystemBundle`, and `JobServiceGpuQueueBridge` each
+had exactly one production importer, `Runtime.Engine.cpp`; their direct tests
+were the only other executable consumers. Engine now privately owns the same
+frame/viewport hook records and sort/dispatch loops, directly composes the
+three promoted ECS systems, and owns the renderer hook token plus
+`JobService::ShutdownGpuQueueParticipants(...)` ordering. The three helper
+BMIs and their implementation units are deleted without a forwarding type.
+
+This update supersedes the live-owner wording in the historical RUNTIME-180 /
+RUNTIME-185 snapshots below. The demonstrated extension contract remains
+`IRuntimeModule` registration plus the typed hook contexts; the one-consumer
+storage and bridge mechanisms are ordinary Engine-private composition detail.
 
 ## Context
 
@@ -286,7 +303,7 @@ The amended target retains all of these outcomes:
 | `IRuntimeModule` | Clustering, async work, asset workflow, texture bake, document, interaction, camera, config control, and editor UI are runtime-owned production implementors composed by the Sandbox; the app also has one optional frame-pacing capture implementor. Stable name, registration, app optionality, Engine-owned lifetime, ordered shutdown, and order-independent exact dependency resolution are live. | **Keep, narrowed and optional.** It is the type-erased app-to-runtime seam that lets Engine own optional responsibilities without importing their types. Deleting it today recreates equivalent erased callbacks, domain-specific Engine entry points, or `Engine&` app wiring, so its core complexity does not vanish. It is not a required wrapper for every cohort. `Name`, registration, resolution, and shutdown have production callers. | Add surface only when a named production responsibility needs it; a test double is not evidence. |
 | `EngineSetup` and shutdown context | Production modules use commands, events, jobs, worlds, services, the active recipe/config borrow, the read-only initialized-state borrow, shutdown, the generic frame-hook registrar, and the typed viewport-input registrar without receiving `Engine&`. No production caller used the removed sim-system registrar. | **Keep the demonstrated capabilities only.** The context is load-bearing for D13 and concentrates validation. Hook registrars exist only during registration; resolution receives closed registrars. The typed viewport context stays separate from the five generic phases. | Add scheduling surface only with the first production behavior that the frame loop must iterate; use the smallest consumer-coherent context and do not add a generic registrar for a roadmap noun. |
 | `ServiceRegistry` | Engine and composed modules publish exact borrowed capabilities. Sandbox resolves optional asset, document/history, camera, interaction, and config services through `Find`; multiple modules use `Require` during `OnResolve` and fail closed on missing exact providers. Exactly six Engine-built-in provisions have production lookup consumers. | **Keep the typed discovery core and two-phase resolution used by production modules.** `Provide`/`Find`/`Require`, null and duplicate rejection, provider identity diagnostics, exact withdrawal, and locking after boot avoid domain getters and make registration order irrelevant. Unconsumed provisions, aggregate statistics, and copied diagnostic lists were removed. | Expand only when a named production responsibility depends on another provider and registration order must remain irrelevant. |
-| `RuntimeModuleSchedule` | Engine calls the schedule. Production registers seven generic hooks across Editor UI, texture bake, scene interaction, and Sandbox frame-pacing capture, plus two typed viewport hooks from camera and scene interaction. No production sim system or causal edge exists. | **Keep only the demonstrated hooks.** Generic hooks sort by phase/module/registration sequence; typed viewport hooks sort by module/registration sequence. `RUNTIME-185` removed sim records, fixed-step insertion, and the signal DAG rather than preserving them for tests. | A first real fixed-step contribution justifies designing its smallest seam. General causal DAG ordering is justified only when interacting production systems prove it; a second coherent viewport consumer may reuse the current typed context. |
+| Engine-private hook records (`RuntimeModuleSchedule` retired) | Production registers seven generic hooks across Editor UI, texture bake, scene interaction, and Sandbox frame-pacing capture, plus two typed viewport hooks from camera and scene interaction. No production sim-system or causal edge exists, and the former schedule BMI had no second production consumer. | **Keep the demonstrated hook behavior, not a helper abstraction.** Engine-private records sort generic hooks by phase/module/registration sequence and typed viewport hooks by module/registration sequence. `RUNTIME-185` removed sim records, fixed-step insertion, and the signal DAG; `RUNTIME-203` removed the remaining one-consumer schedule object/BMI. | A present second production owner or test-double boundary may justify the smallest reusable owner. General causal DAG ordering is justified only when interacting production systems prove it; a second coherent viewport consumer may reuse the current typed context without recreating a schedule service. |
 | D10 extension-pass registry and insertion slots | Zero production extension registrations; built-in recipe kinds cover the current renderer. | **Defer the registry and slot taxonomy.** Keep a closed core pass vocabulary expressed as recipe data, with schema, capability, named-resource, and dependency validation. Point-splat lighting and order-dependent transparency remain design probes, not blockers. | A named production pass that cannot be expressed as an existing built-in kind must bring its resource contract, required insertion semantics, Null/CPU contract evidence, and capability-appropriate backend evidence. Only that pass's demonstrated slot is added. |
 | D11 priority input-capture filter chain | One ImGui producer records one snapshot; several viewport consumers read it. There is no competing claimant. | **Replace the chain target with the proven snapshot contract.** One data-only kernel capture value is owned by the frame loop for the duration of a frame and resets to “unclaimed” once at frame start. Each ephemeral frame-hook context borrows that same value by reference. The EditorUi owner runs `BeginFrame` in `UiBegin`, preserves the application variable tick, draws registered app panels in `UiBuild`, then runs `EndFrame` and writes capture in `UiEndCapture`; later viewport behavior, any later hooks, and kernel input-action dispatch read that completed value. This carrier adds no registry, callback facade, or ImGui import to Engine. | A second independent simultaneous capture producer must demonstrate an actual conflicting claim that cannot be represented by extending the single snapshot. Only then is an explicit arbitration policy or chain justified. |
 | D12 `InlineModule` builder | No symbol, production experiment app, or first consumer. | **Defer.** A one-file experiment may first use a concrete app-owned responsibility and the existing narrow composition seam. | A named one-file experiment that needs runtime lifecycle, scheduling, removal, and headless testing may justify the smallest builder. Extract an experiment-app template only after bootstrap is repeated by a second production experiment app. |
@@ -372,8 +389,8 @@ scorecard measured by outcomes rather than wrapper counts:
   validated; it does not wait for a priority chain.
 - The experiment lane is conditional and does not block convergence while no
   production experiment consumer exists.
-- `IRuntimeModule`, `EngineSetup`, `ServiceRegistry`, or
-  `RuntimeModuleSchedule` counts are never scorecard outcomes. Only live
+- `IRuntimeModule`, `EngineSetup`, `ServiceRegistry`, or Engine-private hook
+  record counts are never scorecard outcomes. Only live
   behavior, ownership, interface coupling, and validated lifecycle count.
 
 The exact ratchet continues to fail on stale snapshots as well as growth.

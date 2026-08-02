@@ -76,8 +76,6 @@ export namespace Extrinsic::Graphics
         GeometryUploadUpdateClass UpdateClass =
             GeometryUploadUpdateClass::FullReplacement;
         GpuWorld::GeometryChannelUpdateMask UpdateChannels{};
-        GpuWorld::GeometryStorageHint StorageHint =
-            GpuWorld::GeometryStorageHint::DynamicSoA;
 
         [[nodiscard]] GpuWorld::GeometryUploadDesc UploadDesc() const noexcept;
     };
@@ -88,9 +86,7 @@ export namespace Extrinsic::Graphics
         const GpuWorld::GeometryUploadDesc& upload,
         GeometryUploadUpdateClass updateClass =
             GeometryUploadUpdateClass::FullReplacement,
-        GpuWorld::GeometryChannelUpdateMask updateChannels = {},
-        GpuWorld::GeometryStorageHint storageHint =
-            GpuWorld::GeometryStorageHint::DynamicSoA);
+        GpuWorld::GeometryChannelUpdateMask updateChannels = {});
 
     enum class GeometryUploadPlanStatus : std::uint8_t
     {
@@ -143,7 +139,6 @@ export namespace Extrinsic::Graphics
         GeometryUploadPlanValidation Validation{};
         GpuWorld::GeometryChannelUpdateStatus ChannelUpdateStatus =
             GpuWorld::GeometryChannelUpdateStatus::NoChannels;
-        GpuWorld::GeometryStoragePlan StoragePlan{};
         std::string_view Diagnostic{"invalid plan"};
 
         [[nodiscard]] bool Succeeded() const noexcept;
@@ -170,7 +165,6 @@ export namespace Extrinsic::Graphics
         GpuGeometryHandle Handle{};
         std::uint64_t Generation = 0u;
         std::uint32_t RefCount = 0u;
-        GpuWorld::GeometryStoragePlan StoragePlan{};
         bool PendingRetire = false;
     };
 

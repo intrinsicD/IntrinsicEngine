@@ -3,15 +3,15 @@ task_id: RUNTIME-138
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-02T08:50:10Z'
+generated_at: '2026-08-02T09:01:29Z'
 claim_eligible: false
 source:
   base_ref: 85449896b74e8d43a50ee848e04faff0972c1baa
   base_revision: 85449896b74e8d43a50ee848e04faff0972c1baa
-  head_revision: 85449896b74e8d43a50ee848e04faff0972c1baa
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  head_revision: 31d9d30efdf05928225a4600e34ae6ec19a89695
+  branch: ''
+  worktree: /tmp/intrinsic-runtime138-evidence.17tzuj/worktree
+  dirty: false
   surface:
   - path: ara/logic/solution/architecture.md
     sha256: f19ad2592156ad2863ce540d4518c756eee560312e611e1208eb04680fe91ee8

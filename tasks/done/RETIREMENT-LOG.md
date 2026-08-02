@@ -20,10 +20,10 @@ derivation belongs to a named feature only after its own measurement proves a
 material full-buffer cost. Because the task now records an administrative
 non-claim rather than the originally contemplated performance result, its
 workflow profile closes at `standard`, with the rationale and exact tracker/docs
-surface bound in its report. The same coherence pass converted RUNTIME-139 to
+surface bound in its report. The same coherence pass seeded RUNTIME-139's
 removal of speculative AoS planning, corrected RUNTIME-175's config/operation /
 UI sequencing, and split final helper cleanup into Engine-owned RUNTIME-203 and
-SceneInteraction-owned RUNTIME-205.
+SceneInteraction-owned RUNTIME-205; all three cleanup tasks have since retired.
 
 [`RUNTIME-189`](RUNTIME-189-withdraw-premature-orientation-debug-view.md) — the
 orientation-parity Sandbox view plan was withdrawn on 2026-08-01 before any
@@ -35,6 +35,55 @@ history under the RUNTIME-138 coherence review. A future view requires a new
 task based on a positive method verdict, the actual public diagnostics payload,
 and measured debugging demand; no config, runtime, graphics, UI, or Vulkan
 surface landed here.
+
+[`RUNTIME-205`](RUNTIME-205-internalize-scene-interaction-helpers.md) — scene-
+interaction helper internalization completed on 2026-08-01 at `Retired`.
+`SceneInteractionModule` now directly owns gizmo interaction/packet/scratch
+state and bounded world/epoch-qualified pick-correlation/refinement state. The
+one-consumer `GizmoFrameService` and `SelectionReadback` BMIs, implementations,
+CMake entries, and ten helper-only tests are deleted without a replacement
+wrapper; five owner-level cases preserve correlation bounds and ordering,
+stale-result rejection, capture/history gating, one undoable drag, and live-
+registry cancellation across world replacement. Focused interaction/layering
+coverage passed 70/70; the default CPU selector passed 3,991/3,991 with its
+expected environmental GLFW/LSan skip; grouped ASan and UBSan selectors each
+passed 2,645/2,645, with UBSan carrying the policy-defined skip. Strict
+structural and documentation gates plus an independent revision-bound review
+close the high-risk surface deletion. Durable `GizmoInteraction`,
+`SelectionController`, copied interaction snapshots, graphics readbacks, and
+primitive refinement remain unchanged. No GPU/Vulkan or performance claim is
+made.
+
+[`RUNTIME-203`](RUNTIME-203-internalize-engine-composition-helpers.md) — Engine
+composition-helper internalization completed on 2026-08-01 at `Retired`.
+Deterministic frame/viewport hook records and dispatch, promoted ECS fixed-step
+registration and pre-render transform flushing, and the JobService renderer
+hook token plus GPU-participant shutdown sequence now live directly in
+Engine-private implementation state. The one-consumer `ModuleSchedule`,
+`EcsSystemBundle`, and `JobServiceGpuQueueBridge` BMIs, implementations, CMake
+entries, and helper-only tests are deleted without a replacement wrapper.
+Focused Engine/runtime coverage passed 154/154; the default CPU selector passed
+3,996/3,996 with its expected environmental GLFW/LSan skip; grouped ASan and
+UBSan selectors each passed 2,650/2,650, with UBSan carrying the policy-defined
+skip. Strict structural and documentation gates plus an independent
+revision-bound review close the high-risk surface deletion. Shared
+`RenderRecipeActivation` and `DeviceBootstrap` contracts remain because their
+production census has multiple load-bearing consumers. No GPU/Vulkan or
+performance claim is made.
+
+[`RUNTIME-139`](RUNTIME-139-remove-speculative-aos-storage-planning.md) —
+speculative geometry-storage planning retired on 2026-08-01 at `Retired`. The
+public AoS hint, lane, plan, and promotion vocabulary plus copied runtime and
+residency state are gone because no allocator, shader, pipeline, or live
+residency path implemented the alternative. Uniform SoA channel descriptors
+and update masks remain the sole live contract, with existing extraction,
+partial-update, residency, and normal-bake behavior unchanged. Focused coverage
+passed 108/108 (103 contract plus 5 integration), and the full default CPU
+selector passed 4,006/4,006 with its expected environmental GLFW/LSan skip;
+strict benchmark validation confirms the
+retained layout probe remains explicitly non-adopting. No GPU/Vulkan,
+byte-layout, or performance claim is made. Any alternate layout now requires a
+new evidence-backed task and claim-eligible GPU profile.
 
 [`RUNTIME-202`](RUNTIME-202-retire-sandbox-runtime-facade.md) — Sandbox editor
 facade retirement completed on 2026-08-01 at `Retired`. The public all-feature

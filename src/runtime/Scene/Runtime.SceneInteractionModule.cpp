@@ -1,6 +1,9 @@
 module;
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -9,22 +12,28 @@ module;
 #include <utility>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 module Extrinsic.Runtime.SceneInteractionModule;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.GizmoFrameService;
+import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.WorldHandle;
@@ -42,12 +51,255 @@ namespace Extrinsic::Runtime
                     std::chrono::steady_clock::now() - start)
                     .count());
         }
+
+        constexpr int kGizmoMouseButton = 0;
+        constexpr int kSelectionMouseButton = 0;
+
+        [[nodiscard]] std::uint32_t ClampCursorPixel(
+            const float value,
+            const std::uint32_t extent) noexcept
+        {
+            if (extent == 0u || !std::isfinite(value))
+                return 0u;
+            const float clamped =
+                std::clamp(value, 0.0f, static_cast<float>(extent - 1u));
+            return static_cast<std::uint32_t>(clamped);
+        }
+
+        [[nodiscard]] bool CursorInsideViewport(
+            const Platform::Input::Context::XY cursor,
+            const Core::Extent2D viewport) noexcept
+        {
+            return viewport.Width > 0 &&
+                   viewport.Height > 0 &&
+                   std::isfinite(cursor.x) &&
+                   std::isfinite(cursor.y) &&
+                   cursor.x >= 0.0f &&
+                   cursor.y >= 0.0f &&
+                   cursor.x < static_cast<float>(viewport.Width) &&
+                   cursor.y < static_cast<float>(viewport.Height);
+        }
+
+        [[nodiscard]] Platform::Input::Context::XY
+        WindowToFramebufferCursor(
+            const Platform::Input::Context::XY cursor,
+            const Core::Extent2D windowExtent,
+            const Core::Extent2D framebufferExtent) noexcept
+        {
+            if (windowExtent.Width <= 0 || windowExtent.Height <= 0 ||
+                framebufferExtent.Width <= 0 ||
+                framebufferExtent.Height <= 0)
+            {
+                return cursor;
+            }
+            const float scaleX =
+                static_cast<float>(framebufferExtent.Width) /
+                static_cast<float>(windowExtent.Width);
+            const float scaleY =
+                static_cast<float>(framebufferExtent.Height) /
+                static_cast<float>(windowExtent.Height);
+            return Platform::Input::Context::XY{
+                cursor.x * scaleX,
+                cursor.y * scaleY,
+            };
+        }
+
+        void SubmitViewportSelectionClickForFrame(
+            SelectionController& selection,
+            const Platform::Input::Context& input,
+            const Core::Extent2D windowExtent,
+            const Core::Extent2D viewport,
+            const bool imguiCapturesMouse,
+            const bool gizmoCapturesMouse) noexcept
+        {
+            if (imguiCapturesMouse || gizmoCapturesMouse ||
+                Core::IsEmpty(viewport) ||
+                !input.IsMouseButtonJustPressed(kSelectionMouseButton))
+            {
+                return;
+            }
+
+            const Platform::Input::Context::XY cursor =
+                WindowToFramebufferCursor(
+                    input.GetMousePosition(),
+                    windowExtent,
+                    viewport);
+            if (!CursorInsideViewport(cursor, viewport))
+                return;
+
+            selection.RequestClickPick(
+                ClampCursorPixel(cursor.x, viewport.Width),
+                ClampCursorPixel(cursor.y, viewport.Height));
+        }
+
+        [[nodiscard]] std::uint32_t BuildGizmoModifierMask(
+            const Platform::Input::Context& input) noexcept
+        {
+            std::uint32_t mask = 0u;
+            if (input.IsKeyPressed(Platform::Input::Key::LeftShift))
+                mask |= static_cast<std::uint32_t>(GizmoModifier::Snap);
+            return mask;
+        }
+
+        void RebuildSelectedGizmoEntities(
+            const SelectionController& selection,
+            ECS::Scene::Registry& scene,
+            std::vector<ECS::EntityHandle>& outSelected)
+        {
+            outSelected.clear();
+            for (const std::uint32_t stableId :
+                 selection.SelectedStableIds())
+            {
+                const ECS::EntityHandle entity =
+                    SelectionController::ToEntityHandle(stableId);
+                if (scene.IsValid(entity))
+                    outSelected.push_back(entity);
+            }
+        }
+
+        void DriveGizmoInteractionForFrame(
+            GizmoInteraction& gizmo,
+            ECS::Scene::Registry& scene,
+            const WorldHandle world,
+            EditorCommandHistory* const history,
+            const Platform::Input::Context& input,
+            const Graphics::CameraViewInput& cameraInput,
+            const Core::Extent2D windowExtent,
+            const Core::Extent2D viewport,
+            const bool imguiCapturesInput,
+            std::span<const ECS::EntityHandle> selected)
+        {
+            if (!world.IsValid() || history == nullptr ||
+                imguiCapturesInput)
+            {
+                gizmo.SetModifierMask(0u);
+                if (gizmo.IsDragging())
+                    gizmo.DragCancel(scene);
+                return;
+            }
+
+            gizmo.SetModifierMask(BuildGizmoModifierMask(input));
+            if (Core::IsEmpty(viewport))
+            {
+                if (gizmo.IsDragging())
+                    gizmo.DragCancel(scene);
+                return;
+            }
+
+            const Platform::Input::Context::XY cursor =
+                WindowToFramebufferCursor(
+                    input.GetMousePosition(),
+                    windowExtent,
+                    viewport);
+            const std::uint32_t pixelX =
+                ClampCursorPixel(cursor.x, viewport.Width);
+            const std::uint32_t pixelY =
+                ClampCursorPixel(cursor.y, viewport.Height);
+            const Graphics::CameraViewSnapshot camera =
+                Graphics::BuildCameraViewSnapshot(
+                    cameraInput,
+                    viewport,
+                    Graphics::PickPixelRequest{
+                        .X = pixelX,
+                        .Y = pixelY,
+                        .Pending = true,
+                    });
+            if (!camera.Valid || !camera.HasPickRay)
+            {
+                if (!input.IsMouseButtonPressed(kGizmoMouseButton) &&
+                    gizmo.IsDragging())
+                {
+                    (void)gizmo.DragCommit(scene, world, *history);
+                }
+                return;
+            }
+
+            const PickRay ray{
+                .Origin = camera.PickRayOrigin,
+                .Direction = camera.PickRayDirection,
+            };
+
+            if (input.IsMouseButtonJustPressed(kGizmoMouseButton))
+            {
+                const GizmoHitResult hit =
+                    gizmo.HitTest(scene,
+                                  camera,
+                                  glm::vec2{cursor.x, cursor.y},
+                                  viewport,
+                                  selected);
+                if (hit.Hit)
+                    (void)gizmo.BeginDrag(scene, hit, ray, selected);
+            }
+            else if (input.IsMouseButtonPressed(kGizmoMouseButton) &&
+                     gizmo.IsDragging())
+            {
+                (void)gizmo.DragTick(scene, ray);
+            }
+            else if (!input.IsMouseButtonPressed(kGizmoMouseButton) &&
+                     gizmo.IsDragging())
+            {
+                (void)gizmo.DragCommit(scene, world, *history);
+            }
+        }
+
+        [[nodiscard]] std::optional<PickReadbackContext>
+        BuildPickReadbackContextForFrame(
+            const Graphics::RenderFrameInput& renderInput,
+            const Platform::Extent2D& viewport)
+        {
+            const Graphics::CameraViewSnapshot pickCamera =
+                Graphics::BuildCameraViewSnapshot(
+                    renderInput.Camera,
+                    viewport,
+                    renderInput.Pick);
+            if (!pickCamera.Valid)
+                return std::nullopt;
+
+            const std::uint32_t viewportWidth =
+                viewport.Width > 0
+                    ? static_cast<std::uint32_t>(viewport.Width)
+                    : 0u;
+            const std::uint32_t viewportHeight =
+                viewport.Height > 0
+                    ? static_cast<std::uint32_t>(viewport.Height)
+                    : 0u;
+            PickReadbackContext context{};
+            context.InverseViewProjection =
+                pickCamera.InverseViewProjection;
+            context.ViewportWidth = viewportWidth;
+            context.ViewportHeight = viewportHeight;
+            context.HasWorldRay = pickCamera.HasPickRay;
+            context.WorldRayOrigin = pickCamera.PickRayOrigin;
+            context.WorldRayDirection = pickCamera.PickRayDirection;
+            const float projectionScaleY =
+                std::abs(renderInput.Camera.Projection[1][1]);
+            if (projectionScaleY > 0.000001f &&
+                viewportHeight > 0u)
+            {
+                context.WorldUnitsPerPixelAtUnitDepth =
+                    2.0f /
+                    (projectionScaleY *
+                     static_cast<float>(viewportHeight));
+            }
+            context.OrthographicProjection =
+                IsOrthographicProjection(
+                    renderInput.Camera.Projection);
+            return context;
+        }
     }
 
     struct SceneInteractionModule::Impl
     {
         struct State
         {
+            struct InFlightPickContext
+            {
+                std::uint64_t Sequence{0u};
+                WorldHandle World{};
+                std::uint64_t InteractionEpoch{0u};
+                std::optional<PickReadbackContext> Context{};
+            };
+
             WorldRegistry* Worlds{nullptr};
             Platform::IWindow* Window{nullptr};
             Graphics::IRenderer* Renderer{nullptr};
@@ -58,8 +310,12 @@ namespace Extrinsic::Runtime
             SelectionController Selection{};
             StableEntityLookup Lookup{};
             StableEntityLookupSceneBinding LookupBinding{};
-            SelectionReadbackState Readback{};
-            GizmoFrameService Gizmo{};
+            GizmoInteraction Gizmo{};
+            TransformGizmoRenderPacketBuilder GizmoPacketBuilder{};
+            std::vector<ECS::EntityHandle> GizmoSelectedEntities{};
+            std::vector<InFlightPickContext> InFlightPickContexts{};
+            std::optional<PrimitiveSelectionResult> LastRefinedPrimitive{};
+            std::uint64_t LastRefinedPrimitiveGeneration{0u};
 
             WorldHandle BoundWorld{};
             ECS::Scene::Registry* BoundRegistry{nullptr};
@@ -107,10 +363,23 @@ namespace Extrinsic::Runtime
                 // BoundRegistry is cleared only while it is still known-live:
                 // world retirement and document replacement notify before
                 // destroying/clearing the outgoing registry.
-                Gizmo.ClearSceneState(BoundRegistry);
+                const GizmoConfig gizmoConfig = Gizmo.Config();
+                const GizmoMode gizmoMode = Gizmo.Mode();
+                const GizmoOrientation gizmoOrientation =
+                    Gizmo.Orientation();
+                if (BoundRegistry != nullptr && Gizmo.IsDragging())
+                    Gizmo.DragCancel(*BoundRegistry);
+                Gizmo = GizmoInteraction{gizmoConfig};
+                Gizmo.SetMode(gizmoMode);
+                Gizmo.SetOrientation(gizmoOrientation);
+                GizmoSelectedEntities.clear();
+                GizmoPacketBuilder =
+                    TransformGizmoRenderPacketBuilder{};
                 if (BoundRegistry != nullptr)
                     Selection.ClearSceneState(*BoundRegistry);
-                Readback.ClearSceneState();
+                InFlightPickContexts.clear();
+                LastRefinedPrimitive.reset();
+                ++LastRefinedPrimitiveGeneration;
                 Selection.SetStableEntityLookup(nullptr);
                 LookupBinding.Disconnect();
                 Lookup.Clear();
@@ -182,22 +451,34 @@ namespace Extrinsic::Runtime
                 if (Window == nullptr)
                     return;
 
-                Gizmo.DriveInputForFrame(
-                    GizmoFrameServiceInput{
-                        .Scene = *BoundRegistry,
-                        .World = BoundWorld,
-                        .Selection = Selection,
-                        .CommandHistory = History,
-                        .Window = *Window,
-                        .Viewport = context.Viewport,
-                        .ImGuiCapturesInput =
-                            context.EditorCapture
-                                .CapturesViewportInput(),
-                        .ImGuiCapturesMouse =
-                            context.EditorCapture.CapturedMouse ||
-                            context.EditorCapture.WidgetsActive,
-                        .Camera = context.RenderInput.Camera,
-                    });
+                RebuildSelectedGizmoEntities(
+                    Selection,
+                    *BoundRegistry,
+                    GizmoSelectedEntities);
+                const Platform::IWindow& inputWindow = *Window;
+                const Platform::Input::Context& input =
+                    inputWindow.GetInput();
+                const Platform::Extent2D windowExtent =
+                    inputWindow.GetWindowExtent();
+                DriveGizmoInteractionForFrame(
+                    Gizmo,
+                    *BoundRegistry,
+                    BoundWorld,
+                    History,
+                    input,
+                    context.RenderInput.Camera,
+                    windowExtent,
+                    context.Viewport,
+                    context.EditorCapture.CapturesViewportInput(),
+                    GizmoSelectedEntities);
+                SubmitViewportSelectionClickForFrame(
+                    Selection,
+                    input,
+                    windowExtent,
+                    context.Viewport,
+                    context.EditorCapture.CapturedMouse ||
+                        context.EditorCapture.WidgetsActive,
+                    Gizmo.IsDragging());
             }
 
             void RunBeforeExtraction(
@@ -220,13 +501,46 @@ namespace Extrinsic::Runtime
                     FrameWorld == BoundWorld &&
                     FrameEpoch == InteractionEpoch)
                 {
-                    Readback.DrainPendingPickForFrame(
-                        Selection,
-                        Renderer->GetSelectionSystem(),
-                        FrameViewport,
-                        *FrameRenderInput,
-                        BoundWorld,
-                        InteractionEpoch);
+                    const std::optional<PendingSelectionPick> pick =
+                        Selection.ConsumePendingPick();
+                    if (pick.has_value())
+                    {
+                        FrameRenderInput->HasPendingPick = true;
+                        FrameRenderInput->Pick =
+                            Graphics::PickPixelRequest{
+                                .X = pick->PixelX,
+                                .Y = pick->PixelY,
+                                .Pending = true,
+                                .Sequence = pick->Sequence,
+                            };
+                        Renderer->GetSelectionSystem().RequestPick(
+                            Graphics::PickRequest{
+                                .PixelX = pick->PixelX,
+                                .PixelY = pick->PixelY,
+                            });
+
+                        constexpr std::size_t
+                            kMaxInFlightPickContexts = 32u;
+                        if (InFlightPickContexts.size() >=
+                            kMaxInFlightPickContexts)
+                        {
+                            (void)Selection.DiscardInFlightPick(
+                                InFlightPickContexts.front().Sequence);
+                            InFlightPickContexts.erase(
+                                InFlightPickContexts.begin());
+                        }
+                        InFlightPickContexts.push_back(
+                            InFlightPickContext{
+                                .Sequence = pick->Sequence,
+                                .World = BoundWorld,
+                                .InteractionEpoch =
+                                    InteractionEpoch,
+                                .Context =
+                                    BuildPickReadbackContextForFrame(
+                                        *FrameRenderInput,
+                                        FrameViewport),
+                            });
+                    }
                 }
                 context.Pacing.SelectionPickDrainMicros +=
                     ElapsedInteractionMicros(pickBegin);
@@ -235,7 +549,12 @@ namespace Extrinsic::Runtime
                     std::chrono::steady_clock::now();
                 const std::span<const
                     Graphics::TransformGizmoRenderPacket> packets =
-                    Gizmo.BuildRenderPackets(*BoundRegistry);
+                    GizmoPacketBuilder.Build(
+                        *BoundRegistry,
+                        GizmoSelectedEntities,
+                        Gizmo.Mode(),
+                        Gizmo.Orientation(),
+                        Gizmo.Config().AxisLength);
 
                 RenderSnapshot.World = BoundWorld;
                 RenderSnapshot.SelectedRenderIds.assign(
@@ -269,12 +588,58 @@ namespace Extrinsic::Runtime
 
                 const auto begin =
                     std::chrono::steady_clock::now();
-                Readback.DrainCompletedReadbacksForFrame(
-                    Renderer->GetSelectionSystem(),
-                    Selection,
-                    *BoundRegistry,
-                    BoundWorld,
-                    InteractionEpoch);
+                Graphics::SelectionSystem& selectionSystem =
+                    Renderer->GetSelectionSystem();
+                while (const std::optional<
+                           Graphics::PickReadbackResult> result =
+                           selectionSystem.PopPickResult())
+                {
+                    // Never forward a zero/unknown sequence into the
+                    // controller's standalone convenience fallback.
+                    if (result->Sequence == 0u)
+                        continue;
+
+                    const auto contextIt = std::find_if(
+                        InFlightPickContexts.begin(),
+                        InFlightPickContexts.end(),
+                        [sequence = result->Sequence](
+                            const InFlightPickContext& entry)
+                        { return entry.Sequence == sequence; });
+                    if (contextIt == InFlightPickContexts.end())
+                        continue;
+
+                    InFlightPickContext pickContext =
+                        std::move(*contextIt);
+                    InFlightPickContexts.erase(contextIt);
+                    if (pickContext.World != BoundWorld ||
+                        pickContext.InteractionEpoch !=
+                            InteractionEpoch)
+                    {
+                        (void)Selection.DiscardInFlightPick(
+                            result->Sequence);
+                        continue;
+                    }
+
+                    const bool consumed = result->Hit
+                        ? Selection.ConsumeHit(
+                              *BoundRegistry,
+                              result->StableEntityId,
+                              result->Sequence)
+                        : Selection.ConsumeNoHit(
+                              *BoundRegistry,
+                              result->Sequence);
+                    if (!consumed)
+                        continue;
+
+                    LastRefinedPrimitive =
+                        RefinePickReadbackResult(
+                            *BoundRegistry,
+                            *result,
+                            pickContext.Context
+                                ? &*pickContext.Context
+                                : nullptr);
+                    ++LastRefinedPrimitiveGeneration;
+                }
                 context.Pacing.SelectionReadbackMicros +=
                     ElapsedInteractionMicros(begin);
             }
@@ -650,27 +1015,26 @@ namespace Extrinsic::Runtime
     GizmoInteraction&
     SceneInteractionModule::Interaction() noexcept
     {
-        return m_Impl->Shared->Gizmo.Interaction();
+        return m_Impl->Shared->Gizmo;
     }
 
     const GizmoInteraction&
     SceneInteractionModule::Interaction() const noexcept
     {
-        return m_Impl->Shared->Gizmo.Interaction();
+        return m_Impl->Shared->Gizmo;
     }
 
     const std::optional<PrimitiveSelectionResult>&
     SceneInteractionModule::LastRefinedPrimitive()
         const noexcept
     {
-        return m_Impl->Shared->Readback.LastRefinedPrimitive();
+        return m_Impl->Shared->LastRefinedPrimitive;
     }
 
     std::uint64_t
     SceneInteractionModule::
         LastRefinedPrimitiveGeneration() const noexcept
     {
-        return m_Impl->Shared->Readback
-            .LastRefinedPrimitiveGeneration();
+        return m_Impl->Shared->LastRefinedPrimitiveGeneration;
     }
 }

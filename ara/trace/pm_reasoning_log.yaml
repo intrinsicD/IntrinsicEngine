@@ -1243,3 +1243,11 @@ entries:
       - "Did not crystallize or stale any other observation; this same-day commit turn adds no new closure or contradiction for their topics."
       - "The workflow-evidence validator correctly rejected RUNTIME-138's pre-existing report after later ARA changes; the report is regenerated only after this final epilogue surface is stable."
       - "No C++/CMake/shader path changed, so the strict structural/documentation bundle is the proportionate gate; no CPU/GPU, performance, sanitizer, Vulkan, or claim-eligibility statement is added."
+  - turn: "2026-08-02_001#4"
+    notes:
+      - "Routed the semantic conflict choices as decision N327 and the build/test/validator result as experiment N328; routine status, generation, and formatting steps remain in the session AI action only."
+      - "Used landed code and done-task state as current truth while preserving local rationale and non-claim boundaries; choosing either side wholesale would have left stale planning prose or discarded valid context."
+      - "Updated A22 and K26 forensic paths from backlog to done and added fixed task-report/N327/N328 evidence because the merge physically retired their cited task artifacts."
+      - "Rebound the dirty RUNTIME-138 report to clean commit 31d9d30e rather than expanding that task's surface to include unrelated incoming implementation."
+      - "Did not crystallize O93 or stale other observations; the merge implements A22/K26 but does not adopt the pending universal typed-operation checklist or change the literature-workflow open threads."
+      - "Recorded the CPU/build result as bounded merge verification only; GPU/Vulkan execution was not rerun and no performance, parity, scientific, sanitizer, or claim-eligibility statement is added."

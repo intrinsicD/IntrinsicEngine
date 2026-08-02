@@ -125,8 +125,6 @@ namespace Extrinsic::Graphics
             std::uint64_t SurfaceIndexFingerprint = 0;
             std::uint64_t TexcoordFingerprint = 0;
             std::uint64_t NormalFingerprint = 0;
-            GpuWorld::GeometryStorageLane StorageLane =
-                GpuWorld::GeometryStorageLane::UniformSoA;
             std::vector<std::byte> VertexBytes;
             std::vector<std::uint32_t> SurfaceIndices;
             std::vector<std::uint32_t> LineIndices;
@@ -404,43 +402,6 @@ namespace Extrinsic::Graphics
                 static_cast<std::uint64_t>(vertexCount) * static_cast<std::uint64_t>(elemSize);
         }
 
-        [[nodiscard]] bool ExplicitChannelInvalid(
-            const std::span<const std::byte> bytes,
-            const std::uint32_t vertexCount,
-            const std::uint32_t elemSize) noexcept
-        {
-            return !bytes.empty() && !ChannelSizeMatches(bytes, vertexCount, elemSize);
-        }
-
-        [[nodiscard]] bool PackedVertexStrideCanProvide(
-            const GpuWorld::GeometryUploadDesc& desc,
-            const std::uint32_t channelOffset,
-            const std::uint32_t elemSize) noexcept
-        {
-            if (desc.VertexCount == 0u || desc.PackedVertexBytes.empty())
-            {
-                return false;
-            }
-            const std::uint64_t packedVertexSize = desc.PackedVertexBytes.size_bytes();
-            if ((packedVertexSize % desc.VertexCount) != 0u)
-            {
-                return false;
-            }
-            const std::uint32_t stride =
-                static_cast<std::uint32_t>(packedVertexSize / desc.VertexCount);
-            return stride >= channelOffset + elemSize;
-        }
-
-        [[nodiscard]] bool UploadProvidesChannel(
-            const GpuWorld::GeometryUploadDesc& desc,
-            const std::span<const std::byte> explicitBytes,
-            const std::uint32_t packedOffset,
-            const std::uint32_t elemSize) noexcept
-        {
-            return !explicitBytes.empty() ||
-                PackedVertexStrideCanProvide(desc, packedOffset, elemSize);
-        }
-
         [[nodiscard]] std::vector<std::byte> DeinterleaveChannel(
             const std::span<const std::byte> packed,
             const std::uint32_t vertexCount,
@@ -581,79 +542,6 @@ namespace Extrinsic::Graphics
                  ChannelSizeMatches(out.Color, desc.VertexCount, kColorElementBytes));
             return out;
         }
-    }
-
-    GpuWorld::GeometryStoragePlan GpuWorld::PlanGeometryStorage(
-        const GeometryUploadDesc& desc,
-        const GeometryStorageHint hint) noexcept
-    {
-        GeometryStoragePlan plan{};
-        if (hint == GeometryStorageHint::DynamicSoA)
-        {
-            plan.Status = GeometryStoragePlanStatus::DynamicHint;
-            return plan;
-        }
-
-        if (desc.VertexCount == 0u)
-        {
-            plan.Status = GeometryStoragePlanStatus::MissingStaticSurfaceChannels;
-            return plan;
-        }
-
-        if ((!desc.PackedVertexBytes.empty() &&
-             (desc.PackedVertexBytes.size_bytes() % desc.VertexCount) != 0u) ||
-            ExplicitChannelInvalid(desc.PositionBytes, desc.VertexCount, kPositionElementBytes) ||
-            ExplicitChannelInvalid(desc.TexcoordBytes, desc.VertexCount, kTexcoordElementBytes) ||
-            ExplicitChannelInvalid(desc.NormalBytes, desc.VertexCount, kNormalElementBytes) ||
-            (!desc.PackedVertexColors.empty() &&
-             desc.PackedVertexColors.size() != static_cast<std::size_t>(desc.VertexCount)))
-        {
-            plan.Status = GeometryStoragePlanStatus::InvalidInput;
-            return plan;
-        }
-
-        const bool hasSurface = !desc.SurfaceIndices.empty();
-        const bool hasPosition =
-            UploadProvidesChannel(desc, desc.PositionBytes, 0u, kPositionElementBytes);
-        const bool hasTexcoord =
-            UploadProvidesChannel(desc, desc.TexcoordBytes, kPositionElementBytes, kTexcoordElementBytes);
-        const bool hasNormal =
-            UploadProvidesChannel(desc,
-                                  desc.NormalBytes,
-                                  kPositionElementBytes + kTexcoordElementBytes,
-                                  kNormalElementBytes);
-
-        if (!hasSurface || !hasPosition || !hasTexcoord || !hasNormal)
-        {
-            plan.Status = GeometryStoragePlanStatus::MissingStaticSurfaceChannels;
-            return plan;
-        }
-
-        plan.Lane = GeometryStorageLane::StaticInterleavedAoS;
-        plan.Status = GeometryStoragePlanStatus::SelectedStaticInterleavedAoS;
-        plan.EligibleForStaticAoS = true;
-        plan.RequiresPromotionOnStreamingEdit = true;
-        return plan;
-    }
-
-    GpuWorld::GeometryStoragePromotionPlan GpuWorld::PlanGeometryStoragePromotion(
-        const GeometryStorageLane currentLane,
-        const GeometryChannelUpdateMask streamingChannels) noexcept
-    {
-        GeometryStoragePromotionPlan plan{};
-        plan.StreamingChannels = streamingChannels;
-        if (currentLane != GeometryStorageLane::StaticInterleavedAoS ||
-            !streamingChannels.Any())
-        {
-            return plan;
-        }
-
-        plan.Status = GeometryStoragePromotionStatus::PromoteStreamingEditToSoA;
-        plan.RequiresPromotion = true;
-        plan.RequiresSoAConversion = true;
-        plan.RequiresFullReupload = true;
-        plan.RequiresInstanceRebind = true;
-        return plan;
     }
 
     struct GpuWorld::Impl
@@ -1374,7 +1262,6 @@ namespace Extrinsic::Graphics
         allocation.LineIndexByteCount = lineSize;
         allocation.VertexCount = desc.VertexCount;
         allocation.VertexElementOffset = m_Impl->VertexElementBumpOffset;
-        allocation.StorageLane = GeometryStorageLane::UniformSoA;
         allocation.VertexBytes = std::move(managedVertexBytes);
         allocation.SurfaceIndices.assign(desc.SurfaceIndices.begin(), desc.SurfaceIndices.end());
         allocation.LineIndices.assign(desc.LineIndices.begin(), desc.LineIndices.end());
@@ -2102,7 +1989,6 @@ namespace Extrinsic::Graphics
         outView.SurfaceIndexCount =
             static_cast<std::uint32_t>(
                 allocation.SurfaceIndices.size());
-        outView.StorageLane = allocation.StorageLane;
         outView.SurfaceIndexFormat = RHI::Format::R32_UINT;
         outView.SurfaceIndexElementBytes = sizeof(std::uint32_t);
         outView.SurfaceIndexStrideBytes = sizeof(std::uint32_t);

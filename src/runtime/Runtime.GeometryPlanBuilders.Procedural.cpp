@@ -112,7 +112,6 @@ namespace Extrinsic::Runtime
             request.Generation,
             *upload,
             request.UpdateClass,
-            request.UpdateChannels,
-            request.StorageHint);
+            request.UpdateChannels);
     }
 }

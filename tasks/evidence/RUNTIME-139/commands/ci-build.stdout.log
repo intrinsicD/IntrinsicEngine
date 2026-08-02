@@ -1,0 +1,1521 @@
+[0/2] Re-checking globbed directories...
+[1/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.FrameLoop.cpp for CXX dependencies
+[2/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.Scheduler.Hazards.cpp for CXX dependencies
+[3/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.IOBackend.cpp for CXX dependencies
+[4/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp for CXX dependencies
+[5/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Filesystem.PathResolver.cpp for CXX dependencies
+[6/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Process.cpp for CXX dependencies
+[7/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.CounterEvent.cpp for CXX dependencies
+[8/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Telemetry.cpp for CXX dependencies
+[9/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Logging.cpp for CXX dependencies
+[10/1498] Generating CXX dyndep file CMakeFiles/IntrinsicProgressivePoissonReference.dir/CXX.dd
+[11/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.Dispatch.cpp for CXX dependencies
+[12/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.Job.cpp for CXX dependencies
+[13/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.Lifecycle.cpp for CXX dependencies
+[14/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Filesystem.cpp for CXX dependencies
+[15/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.TaskGraph.cpp for CXX dependencies
+[16/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.Stats.cpp for CXX dependencies
+[17/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.FrameGraph.cpp for CXX dependencies
+[18/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Config.EngineLoad.cpp for CXX dependencies
+[19/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.Scheduler.cpp for CXX dependencies
+[20/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/build/ci/generated/deps/tinygltf_impl.cpp for CXX dependencies
+[21/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.Scheduler.Policy.cppm for CXX dependencies
+[22/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.IndexedHeap.cppm for CXX dependencies
+[23/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Config.Window.cppm for CXX dependencies
+[24/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.BoundedHeap.cppm for CXX dependencies
+[25/1498] Generating CXX dyndep file CMakeFiles/tinygltf.dir/CXX.dd
+[26/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Config.Render.cppm for CXX dependencies
+[27/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.Scheduler.Compiler.cppm for CXX dependencies
+[28/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Config.Engine.cppm for CXX dependencies
+[29/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.WaitToken.cpp for CXX dependencies
+[30/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.Scheduler.Hazards.cppm for CXX dependencies
+[31/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.Scheduler.Types.cppm for CXX dependencies
+[32/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.Worker.cpp for CXX dependencies
+[33/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Config.EngineLoad.cppm for CXX dependencies
+[34/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.Scheduler.cppm for CXX dependencies
+[35/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.RingBuffer.cppm for CXX dependencies
+[36/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.Scheduler.DomainGraph.cppm for CXX dependencies
+[37/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.FrameLoop.cppm for CXX dependencies
+[38/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Geometry2D.cppm for CXX dependencies
+[39/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.IOBackend.cppm for CXX dependencies
+[40/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Error.cppm for CXX dependencies
+[41/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.ResourcePool.cppm for CXX dependencies
+[42/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.CallbackRegistry.cppm for CXX dependencies
+[43/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Process.cppm for CXX dependencies
+[44/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.HandleLease.cppm for CXX dependencies
+[45/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Dag.TaskGraph.cppm for CXX dependencies
+[46/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.FrameGraph.cppm for CXX dependencies
+[47/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Memory.Common.cppm for CXX dependencies
+[48/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Hash.cppm for CXX dependencies
+[49/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.FrameClock.cppm for CXX dependencies
+[50/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Memory.Polymorphic.cppm for CXX dependencies
+[51/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Telemetry.cppm for CXX dependencies
+[52/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.StrongHandle.cppm for CXX dependencies
+[53/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Filesystem.PathResolver.cppm for CXX dependencies
+[54/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.LockFreeQueue.cppm for CXX dependencies
+[55/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Logging.cppm for CXX dependencies
+[56/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Memory.ScopeStack.cpp for CXX dependencies
+[57/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Memory.Polymorphic.cpp for CXX dependencies
+[58/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Memory.ScopeStack.cppm for CXX dependencies
+[59/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.cppm for CXX dependencies
+[60/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Memory.LinearArena.cppm for CXX dependencies
+[61/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Filesystem.cppm for CXX dependencies
+[62/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.CounterEvent.cppm for CXX dependencies
+[63/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.LocalTask.cpp for CXX dependencies
+[64/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.Internal.cppm for CXX dependencies
+[65/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.AABB.cpp for CXX dependencies
+[66/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.LocalTask.cppm for CXX dependencies
+[67/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Memory.LinearArena.cpp for CXX dependencies
+[68/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.ContactManifold.cpp for CXX dependencies
+[69/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.BVH.cpp for CXX dependencies
+[70/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.ConvexHullBuilder.cpp for CXX dependencies
+[71/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/core/Core.Tasks.Internal.cpp for CXX dependencies
+[72/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Curve.cpp for CXX dependencies
+[73/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.ConvexHull.cpp for CXX dependencies
+[74/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Capsule.cpp for CXX dependencies
+[75/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Containment.cpp for CXX dependencies
+[76/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Cylinder.cpp for CXX dependencies
+[77/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Ellipsoid.cpp for CXX dependencies
+[78/1498] Generating CXX dyndep file src/core/CMakeFiles/ExtrinsicCore.dir/CXX.dd
+[79/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.GJK.cpp for CXX dependencies
+[80/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Grid.cpp for CXX dependencies
+[81/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.EPA.cpp for CXX dependencies
+[82/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Frustum.cpp for CXX dependencies
+[83/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.Vertex.Normals.cpp for CXX dependencies
+[84/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.ShortestPath.cpp for CXX dependencies
+[85/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.Utils.cpp for CXX dependencies
+[86/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.cpp for CXX dependencies
+[87/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Boolean.cpp for CXX dependencies
+[88/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Analysis.cpp for CXX dependencies
+[89/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.CatmullClark.cpp for CXX dependencies
+[90/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Builder.cpp for CXX dependencies
+[91/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Boundary.cpp for CXX dependencies
+[92/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.IO.cpp for CXX dependencies
+[93/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.DEC.cpp for CXX dependencies
+[94/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Geodesic.cpp for CXX dependencies
+[95/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cpp for CXX dependencies
+[96/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Quality.cpp for CXX dependencies
+[97/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp for CXX dependencies
+[98/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Remeshing.cpp for CXX dependencies
+[99/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.IO.cpp for CXX dependencies
+[100/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Curvature.cpp for CXX dependencies
+[101/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cpp for CXX dependencies
+[102/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Repair.cpp for CXX dependencies
+[103/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Simplification.cpp for CXX dependencies
+[104/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Subdivision.cpp for CXX dependencies
+[105/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp for CXX dependencies
+[106/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp for CXX dependencies
+[107/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cpp for CXX dependencies
+[108/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HtexPatch.cpp for CXX dependencies
+[109/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cpp for CXX dependencies
+[110/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.KMeans.cpp for CXX dependencies
+[111/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Utils.cpp for CXX dependencies
+[112/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.cpp for CXX dependencies
+[113/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.ImplicitPlaneField.cpp for CXX dependencies
+[114/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.KDTree.cpp for CXX dependencies
+[115/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.MeshClosestFace.cpp for CXX dependencies
+[116/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Mesh.Conversion.cpp for CXX dependencies
+[117/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.MeshSoup.cpp for CXX dependencies
+[118/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.OBB.cpp for CXX dependencies
+[119/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PCA.cpp for CXX dependencies
+[120/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.MarchingCubes.cpp for CXX dependencies
+[121/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Parameterization.Bff.cpp for CXX dependencies
+[122/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Overlap.cpp for CXX dependencies
+[123/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Linalg.cpp for CXX dependencies
+[124/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Parameterization.Harmonic.cpp for CXX dependencies
+[125/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Parameterization.Diagnostics.cpp for CXX dependencies
+[126/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Plane.cpp for CXX dependencies
+[127/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Octree.cpp for CXX dependencies
+[128/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.SurfaceSampling.cpp for CXX dependencies
+[129/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Conversion.cpp for CXX dependencies
+[130/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Robust.cpp for CXX dependencies
+[131/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Normals.cpp for CXX dependencies
+[132/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.QualityMetrics.cpp for CXX dependencies
+[133/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Quadric.cpp for CXX dependencies
+[134/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.IO.cpp for CXX dependencies
+[135/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Utils.cpp for CXX dependencies
+[136/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Queries.cpp for CXX dependencies
+[137/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Raycast.cpp for CXX dependencies
+[138/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Registration.cpp for CXX dependencies
+[139/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Properties.cpp for CXX dependencies
+[140/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Features.cpp for CXX dependencies
+[141/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Rotation.cpp for CXX dependencies
+[142/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.RotationAveraging.cpp for CXX dependencies
+[143/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Sampling.cpp for CXX dependencies
+[144/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.RobustPredicates.cpp for CXX dependencies
+[145/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.cpp for CXX dependencies
+[146/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Statistics.cpp for CXX dependencies
+[147/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Sphere.cpp for CXX dependencies
+[148/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.BVH.cppm for CXX dependencies
+[149/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Sphere.Sampling.cpp for CXX dependencies
+[150/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.SDF.cpp for CXX dependencies
+[151/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Support.cpp for CXX dependencies
+[152/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Circulators.cppm for CXX dependencies
+[153/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.AABB.cppm for CXX dependencies
+[154/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Validation.cpp for CXX dependencies
+[155/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.UvAtlas.cpp for CXX dependencies
+[156/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Capsule.cppm for CXX dependencies
+[157/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Segment.cpp for CXX dependencies
+[158/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.ContactManifold.cppm for CXX dependencies
+[159/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Triangle.cpp for CXX dependencies
+[160/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.SurfaceReconstruction.cpp for CXX dependencies
+[161/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.ConvexHull.cppm for CXX dependencies
+[162/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.ConvexHullBuilder.cppm for CXX dependencies
+[163/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.ShortestPath.cppm for CXX dependencies
+[164/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Cylinder.cppm for CXX dependencies
+[165/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Curve.cppm for CXX dependencies
+[166/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.DomainViews.cppm for CXX dependencies
+[167/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Containment.cppm for CXX dependencies
+[168/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.IO.cppm for CXX dependencies
+[169/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Boolean.cppm for CXX dependencies
+[170/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Sparse.cpp for CXX dependencies
+[171/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.GJK.cppm for CXX dependencies
+[172/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Frustum.cppm for CXX dependencies
+[173/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Ellipsoid.cppm for CXX dependencies
+[174/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Builder.cppm for CXX dependencies
+[175/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.Vertex.Normals.cppm for CXX dependencies
+[176/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Boundary.cppm for CXX dependencies
+[177/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.EPA.cppm for CXX dependencies
+[178/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Grid.cppm for CXX dependencies
+[179/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm for CXX dependencies
+[180/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.DEC.cppm for CXX dependencies
+[181/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm for CXX dependencies
+[182/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.CatmullClark.cppm for CXX dependencies
+[183/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Analysis.cppm for CXX dependencies
+[184/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.Utils.cppm for CXX dependencies
+[185/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Quality.cppm for CXX dependencies
+[186/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Remeshing.cppm for CXX dependencies
+[187/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.IO.cppm for CXX dependencies
+[188/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Curvature.cppm for CXX dependencies
+[189/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cppm for CXX dependencies
+[190/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.cppm for CXX dependencies
+[191/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm for CXX dependencies
+[192/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm for CXX dependencies
+[193/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Simplification.cppm for CXX dependencies
+[194/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.IO.cppm for CXX dependencies
+[195/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Utils.cppm for CXX dependencies
+[196/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Repair.cppm for CXX dependencies
+[197/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm for CXX dependencies
+[198/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm for CXX dependencies
+[199/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HtexPatch.cppm for CXX dependencies
+[200/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.LinearSolver.cppm for CXX dependencies
+[201/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cppm for CXX dependencies
+[202/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm for CXX dependencies
+[203/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.KDTree.cppm for CXX dependencies
+[204/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.ImplicitPlaneField.cppm for CXX dependencies
+[205/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.IntersectionClassification.cppm for CXX dependencies
+[206/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.MeshOperator.cppm for CXX dependencies
+[207/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Mesh.Conversion.cppm for CXX dependencies
+[208/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.KMeans.cppm for CXX dependencies
+[209/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.cppm for CXX dependencies
+[210/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.MarchingCubes.cppm for CXX dependencies
+[211/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Parameterization.Diagnostics.cppm for CXX dependencies
+[212/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.OBB.cppm for CXX dependencies
+[213/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Octree.cppm for CXX dependencies
+[214/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.MeshSoup.cppm for CXX dependencies
+[215/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.SurfaceSampling.cppm for CXX dependencies
+[216/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Overlap.cppm for CXX dependencies
+[217/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Parameterization.Bff.cppm for CXX dependencies
+[218/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Parameterization.Harmonic.cppm for CXX dependencies
+[219/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PCA.cppm for CXX dependencies
+[220/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.MeshClosestFace.cppm for CXX dependencies
+[221/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Linalg.cppm for CXX dependencies
+[222/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.QualityMetrics.cppm for CXX dependencies
+[223/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.IO.cppm for CXX dependencies
+[224/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Normals.cppm for CXX dependencies
+[225/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Conversion.cppm for CXX dependencies
+[226/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Robust.cppm for CXX dependencies
+[227/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Utils.cppm for CXX dependencies
+[228/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Features.cppm for CXX dependencies
+[229/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Quadric.cppm for CXX dependencies
+[230/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Queries.cppm for CXX dependencies
+[231/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Plane.cppm for CXX dependencies
+[232/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Ray.cppm for CXX dependencies
+[233/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Registration.cppm for CXX dependencies
+[234/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.cppm for CXX dependencies
+[235/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Raycast.cppm for CXX dependencies
+[236/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Properties.cppm for CXX dependencies
+[237/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.RobustPredicates.cppm for CXX dependencies
+[238/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.SpatialQueries.cppm for CXX dependencies
+[239/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.RotationAveraging.cppm for CXX dependencies
+[240/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Rotation.cppm for CXX dependencies
+[241/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Sampling.cppm for CXX dependencies
+[242/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.SDF.cppm for CXX dependencies
+[243/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Graph.Fwd.cppm for CXX dependencies
+[244/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.PointCloud.Fwd.cppm for CXX dependencies
+[245/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Sphere.Sampling.cppm for CXX dependencies
+[246/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.SDFContact.cppm for CXX dependencies
+[247/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Segment.cppm for CXX dependencies
+[248/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Statistics.cppm for CXX dependencies
+[249/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.HalfedgeMesh.Fwd.cppm for CXX dependencies
+[250/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Sphere.cppm for CXX dependencies
+[251/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.EventBus.cpp for CXX dependencies
+[252/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.ImportRouter.cpp for CXX dependencies
+[253/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Triangle.cppm for CXX dependencies
+[254/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Support.cppm for CXX dependencies
+[255/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Sparse.cppm for CXX dependencies
+[256/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.ModelTexturePayload.cpp for CXX dependencies
+[257/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.SurfaceReconstruction.cppm for CXX dependencies
+[258/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.UvAtlas.cppm for CXX dependencies
+[259/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/geometry/Geometry.Validation.cppm for CXX dependencies
+[260/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.LoadPipeline.cpp for CXX dependencies
+[261/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.Registry.cpp for CXX dependencies
+[262/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.OperationStatus.cppm for CXX dependencies
+[263/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.PayloadStore.cpp for CXX dependencies
+[264/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.PathIndex.cpp for CXX dependencies
+[265/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.ModelTexturePayload.cppm for CXX dependencies
+[266/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.EventBus.cppm for CXX dependencies
+[267/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.Registry.cppm for CXX dependencies
+[268/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.GeometryPayload.cppm for CXX dependencies
+[269/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.ImportRouter.cppm for CXX dependencies
+[270/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.TypePool.cppm for CXX dependencies
+[271/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.PathIndex.cppm for CXX dependencies
+[272/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.PayloadStore.cppm for CXX dependencies
+[273/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.StableId.cpp for CXX dependencies
+[274/1498] Generating CXX dyndep file src/geometry/CMakeFiles/IntrinsicGeometry.dir/CXX.dd
+[275/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.Service.cpp for CXX dependencies
+[276/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.LoadPipeline.cppm for CXX dependencies
+[277/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/assets/Asset.Service.cppm for CXX dependencies
+[278/1498] Generating CXX dyndep file src/assets/CMakeFiles/ExtrinsicAssets.dir/CXX.dd
+[279/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.RigidBody.cpp for CXX dependencies
+[280/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/ECS.Scene.Bootstrap.cpp for CXX dependencies
+[281/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.AssetInstance.cppm for CXX dependencies
+[282/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Hierarchy/ECS.Hierarchy.Structure.cpp for CXX dependencies
+[283/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/ECS.Scene.Registry.cpp for CXX dependencies
+[284/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.Collider.cpp for CXX dependencies
+[285/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.GeometrySources.cpp for CXX dependencies
+[286/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.Transform.Local.cpp for CXX dependencies
+[287/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/ECS.Scene.Bootstrap.cppm for CXX dependencies
+[288/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/ECS.Scene.Handle.cppm for CXX dependencies
+[289/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp for CXX dependencies
+[290/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Systems/ECS.System.RenderSync.cpp for CXX dependencies
+[291/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cpp for CXX dependencies
+[292/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.Hierarchy.cppm for CXX dependencies
+[293/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Hierarchy/ECS.Hierarchy.Structure.cppm for CXX dependencies
+[294/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.Collider.cppm for CXX dependencies
+[295/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Systems/ECS.System.BoundsPropagation.cpp for CXX dependencies
+[296/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.MetaData.cppm for CXX dependencies
+[297/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/ECS.Scene.Registry.cppm for CXX dependencies
+[298/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm for CXX dependencies
+[299/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.StableId.cppm for CXX dependencies
+[300/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.Selection.cppm for CXX dependencies
+[301/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cppm for CXX dependencies
+[302/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Systems/ECS.System.TransformHierarchy.cpp for CXX dependencies
+[303/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.DirtyTags.cppm for CXX dependencies
+[304/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.Light.cppm for CXX dependencies
+[305/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.RigidBody.cppm for CXX dependencies
+[306/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.CommandContext.cpp for CXX dependencies
+[307/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cppm for CXX dependencies
+[308/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.GeometrySources.cppm for CXX dependencies
+[309/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.BufferTransfer.cpp for CXX dependencies
+[310/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.BufferView.cppm for CXX dependencies
+[311/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/physics/Physics.World.cppm for CXX dependencies
+[312/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/physics/Physics.World.cpp for CXX dependencies
+[313/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.Profiler.cpp for CXX dependencies
+[314/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.TextureUpload.cpp for CXX dependencies
+[315/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Systems/ECS.System.RenderSync.cppm for CXX dependencies
+[316/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Systems/ECS.System.TransformHierarchy.cppm for CXX dependencies
+[317/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.TimelineSemaphore.cppm for CXX dependencies
+[318/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.QueueAffinity.cppm for CXX dependencies
+[319/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.Transform.World.cppm for CXX dependencies
+[320/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.BufferTransfer.cppm for CXX dependencies
+[321/1498] Generating CXX dyndep file src/physics/CMakeFiles/ExtrinsicPhysics.dir/CXX.dd
+[322/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Components/ECS.Component.Transform.Local.cppm for CXX dependencies
+[323/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.SamplerManager.cpp for CXX dependencies
+[324/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.PipelineRegistry.cpp for CXX dependencies
+[325/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/ecs/Systems/ECS.System.BoundsPropagation.cppm for CXX dependencies
+[326/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.PipelineManager.cpp for CXX dependencies
+[327/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.FrameHandle.cppm for CXX dependencies
+[328/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.Transfer.cppm for CXX dependencies
+[329/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.Descriptors.cppm for CXX dependencies
+[330/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.BufferManager.cpp for CXX dependencies
+[331/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.TextureManager.cpp for CXX dependencies
+[332/1498] Generating CXX dyndep file src/ecs/CMakeFiles/ExtrinsicECS.dir/CXX.dd
+[333/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.Bindless.cppm for CXX dependencies
+[334/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.TextureUpload.cppm for CXX dependencies
+[335/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.TransferQueue.cppm for CXX dependencies
+[336/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.Profiler.cppm for CXX dependencies
+[337/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.Types.cppm for CXX dependencies
+[338/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.CommandContext.cppm for CXX dependencies
+[339/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.TextureManager.cppm for CXX dependencies
+[340/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.PipelineManager.cppm for CXX dependencies
+[341/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.Device.cppm for CXX dependencies
+[342/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cpp for CXX dependencies
+[343/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp for CXX dependencies
+[344/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/assets/Graphics.GpuAssetCache.cppm for CXX dependencies
+[345/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.CameraSnapshots.cpp for CXX dependencies
+[346/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderingContract.cpp for CXX dependencies
+[347/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.PipelineRegistry.cppm for CXX dependencies
+[348/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/assets/Graphics.GpuAssetCache.cpp for CXX dependencies
+[349/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderCommandRouter.cpp for CXX dependencies
+[350/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp for CXX dependencies
+[351/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.BufferManager.cppm for CXX dependencies
+[352/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/rhi/RHI.SamplerManager.cppm for CXX dependencies
+[353/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cpp for CXX dependencies
+[354/1498] Generating CXX dyndep file src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/CXX.dd
+[355/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderPrepPipeline.cpp for CXX dependencies
+[356/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderRecipeConfig.cpp for CXX dependencies
+[357/1498] Generating CXX dyndep file src/graphics/assets/CMakeFiles/ExtrinsicGraphicsAssets.dir/CXX.dd
+[358/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.PropertyTextureBake.cpp for CXX dependencies
+[359/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp for CXX dependencies
+[360/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp for CXX dependencies
+[361/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.FrameRecipe.cpp for CXX dependencies
+[362/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cpp for CXX dependencies
+[363/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.GpuTransfer.cpp for CXX dependencies
+[364/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.VisualizationPackets.cpp for CXX dependencies
+[365/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.GpuWorld.cpp for CXX dependencies
+[366/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.GpuScene.cpp for CXX dependencies
+[367/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ColormapSystem.cpp for CXX dependencies
+[368/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.GeometryResidency.cpp for CXX dependencies
+[369/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp for CXX dependencies
+[370/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp for CXX dependencies
+[371/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.Renderer.cpp for CXX dependencies
+[372/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.MaterialSystem.cpp for CXX dependencies
+[373/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.CullingSystem.cpp for CXX dependencies
+[374/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ImGuiOverlaySystem.cpp for CXX dependencies
+[375/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.DeferredSystem.cpp for CXX dependencies
+[376/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.LightSystem.cpp for CXX dependencies
+[377/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.SelectionSystem.cpp for CXX dependencies
+[378/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.PostProcessSystem.cpp for CXX dependencies
+[379/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.DebugViewSystem.cpp for CXX dependencies
+[380/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.SpatialDebugVisualizers.cpp for CXX dependencies
+[381/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.LightClusters.cpp for CXX dependencies
+[382/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.Reconstruction.cpp for CXX dependencies
+[383/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ForwardSystem.cpp for CXX dependencies
+[384/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp for CXX dependencies
+[385/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Forward.Line.cpp for CXX dependencies
+[386/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Forward.Point.cpp for CXX dependencies
+[387/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Forward.Surface.cpp for CXX dependencies
+[388/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.UvView.cpp for CXX dependencies
+[389/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp for CXX dependencies
+[390/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.HZB.cpp for CXX dependencies
+[391/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ShadowSystem.cpp for CXX dependencies
+[392/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.TransformSyncSystem.cpp for CXX dependencies
+[393/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Deferred.Lighting.cpp for CXX dependencies
+[394/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cpp for CXX dependencies
+[395/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Backends/Null/Backends.Null.Bindless.cpp for CXX dependencies
+[396/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cpp for CXX dependencies
+[397/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.EdgeId.cpp for CXX dependencies
+[398/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp for CXX dependencies
+[399/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Backends/Null/Backends.Null.Profiler.cpp for CXX dependencies
+[400/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp for CXX dependencies
+[401/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.DepthPrepass.cpp for CXX dependencies
+[402/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.ImGui.cpp for CXX dependencies
+[403/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.PointId.cpp for CXX dependencies
+[404/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Shadows.cpp for CXX dependencies
+[405/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Backends/Null/Backends.Null.Transfer.cpp for CXX dependencies
+[406/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.Colormap.cppm for CXX dependencies
+[407/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.Outline.cpp for CXX dependencies
+[408/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Backends/Null/Backends.Null.cpp for CXX dependencies
+[409/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cpp for CXX dependencies
+[410/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.VisualizationOverlay.cpp for CXX dependencies
+[411/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm for CXX dependencies
+[412/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm for CXX dependencies
+[413/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderCommandRouter.cppm for CXX dependencies
+[414/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.CameraSnapshots.cppm for CXX dependencies
+[415/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderingContract.cppm for CXX dependencies
+[416/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm for CXX dependencies
+[417/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.PropertyTextureBake.cppm for CXX dependencies
+[418/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderWorld.cppm for CXX dependencies
+[419/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm for CXX dependencies
+[420/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.GpuTransfer.cppm for CXX dependencies
+[421/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderRecipeConfig.cppm for CXX dependencies
+[422/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.RenderPrepPipeline.cppm for CXX dependencies
+[423/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.GeometryResidency.cppm for CXX dependencies
+[424/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.FrameRecipe.cppm for CXX dependencies
+[425/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.Material.cppm for CXX dependencies
+[426/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.Renderer.cppm for CXX dependencies
+[427/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.GpuWorld.cppm for CXX dependencies
+[428/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.MaterialSystem.cppm for CXX dependencies
+[429/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.VisualizationPackets.cppm for CXX dependencies
+[430/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm for CXX dependencies
+[431/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm for CXX dependencies
+[432/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ColormapSystem.cppm for CXX dependencies
+[433/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.DebugViewSystem.cppm for CXX dependencies
+[434/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.CullingSystem.cppm for CXX dependencies
+[435/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm for CXX dependencies
+[436/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm for CXX dependencies
+[437/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ForwardSystem.cppm for CXX dependencies
+[438/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.SelectionSystem.cppm for CXX dependencies
+[439/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.LightClusters.cppm for CXX dependencies
+[440/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.PostProcessSystem.cppm for CXX dependencies
+[441/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.LightSystem.cppm for CXX dependencies
+[442/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm for CXX dependencies
+[443/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.GpuScene.cppm for CXX dependencies
+[444/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.DeferredSystem.cppm for CXX dependencies
+[445/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.HZB.cppm for CXX dependencies
+[446/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cppm for CXX dependencies
+[447/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Forward.Line.cppm for CXX dependencies
+[448/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.UvView.cppm for CXX dependencies
+[449/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.Reconstruction.cppm for CXX dependencies
+[450/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Forward.Point.cppm for CXX dependencies
+[451/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm for CXX dependencies
+[452/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Forward.Surface.cppm for CXX dependencies
+[453/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.DepthPrepass.cppm for CXX dependencies
+[454/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.TransformSyncSystem.cppm for CXX dependencies
+[455/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.ShadowSystem.cppm for CXX dependencies
+[456/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm for CXX dependencies
+[457/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cppm for CXX dependencies
+[458/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm for CXX dependencies
+[459/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Components/Graphics.Component.Material.cppm for CXX dependencies
+[460/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cppm for CXX dependencies
+[461/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cppm for CXX dependencies
+[462/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.EdgeId.cppm for CXX dependencies
+[463/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Components/Graphics.Component.RenderGeometry.cppm for CXX dependencies
+[464/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cppm for CXX dependencies
+[465/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cppm for CXX dependencies
+[466/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.EntityId.cppm for CXX dependencies
+[467/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.FaceId.cppm for CXX dependencies
+[468/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.Outline.cppm for CXX dependencies
+[469/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Selection.PointId.cppm for CXX dependencies
+[470/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm for CXX dependencies
+[471/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.Shadows.cppm for CXX dependencies
+[472/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.VisualizationOverlay.cppm for CXX dependencies
+[473/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Backends/Null/Backends.Null.cppm for CXX dependencies
+[474/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.DiagnosticsLogging.cpp for CXX dependencies
+[475/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.OperationalStatus.cpp for CXX dependencies
+[476/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cppm for CXX dependencies
+[477/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Mappings.cpp for CXX dependencies
+[478/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Staging.cpp for CXX dependencies
+[479/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.CommandPools.cppm for CXX dependencies
+[480/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Bindless.cpp for CXX dependencies
+[481/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Memory.cppm for CXX dependencies
+[482/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.OperationalStatus.cppm for CXX dependencies
+[483/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Vma.cpp for CXX dependencies
+[484/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.cppm for CXX dependencies
+[485/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Queues.cppm for CXX dependencies
+[486/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Surface.cppm for CXX dependencies
+[487/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.CommandContext.cpp for CXX dependencies
+[488/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Pipelines.cppm for CXX dependencies
+[489/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Transfer.cpp for CXX dependencies
+[490/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Descriptors.cppm for CXX dependencies
+[491/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Profiler.cpp for CXX dependencies
+[492/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Device.cpp for CXX dependencies
+[493/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Swapchain.cppm for CXX dependencies
+[494/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Sync.cppm for CXX dependencies
+[495/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cpp for CXX dependencies
+[496/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.Barriers.cpp for CXX dependencies
+[497/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cppm for CXX dependencies
+[498/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Device.cppm for CXX dependencies
+[499/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Diagnostics.cppm for CXX dependencies
+[500/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm for CXX dependencies
+[501/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.Resources.cppm for CXX dependencies
+[502/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm for CXX dependencies
+[503/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/platform/Platform.Input.cpp for CXX dependencies
+[504/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm for CXX dependencies
+[505/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/vulkan/Backends.Vulkan.Transfer.cppm for CXX dependencies
+[506/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp for CXX dependencies
+[507/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.Executor.cppm for CXX dependencies
+[508/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.cpp for CXX dependencies
+[509/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.Executor.cpp for CXX dependencies
+[510/1498] Generating CXX dyndep file src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/CXX.dd
+[511/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/platform/Platform.Input.cppm for CXX dependencies
+[512/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/graphics/framegraph/Graphics.RenderGraph.cppm for CXX dependencies
+[513/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AsyncWorkModule.cpp for CXX dependencies
+[514/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/platform/Platform.CreateWindow.cpp for CXX dependencies
+[515/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/platform/backends/null/Platform.Backend.Null.cpp for CXX dependencies
+[516/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/platform/backends/glfw/Platform.Backend.Glfw.cpp for CXX dependencies
+[517/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/platform/backends/null/Platform.Backend.Null.cppm for CXX dependencies
+[518/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/platform/Platform.IWindow.cppm for CXX dependencies
+[519/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/platform/backends/glfw/Platform.Backend.Glfw.cppm for CXX dependencies
+[520/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetIngestStateMachine.cpp for CXX dependencies
+[521/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowModule.cpp for CXX dependencies
+[522/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowImportExecutor.cpp for CXX dependencies
+[523/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cpp for CXX dependencies
+[524/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp for CXX dependencies
+[525/1498] Generating CXX dyndep file src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/CXX.dd
+[526/1498] Generating CXX dyndep file src/platform/CMakeFiles/ExtrinsicPlatform.dir/CXX.dd
+[527/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowTextureResidency.cpp for CXX dependencies
+[528/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp for CXX dependencies
+[529/1498] Generating CXX dyndep file src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/CXX.dd
+[530/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowModelTextureDecode.cpp for CXX dependencies
+[531/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.CommandBus.cpp for CXX dependencies
+[532/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.JobServiceGpuQueueBridge.cpp for CXX dependencies
+[533/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.JobService.cpp for CXX dependencies
+[534/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryPresentation.cpp for CXX dependencies
+[535/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp for CXX dependencies
+[536/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.DeviceBootstrap.cpp for CXX dependencies
+[537/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp for CXX dependencies
+[538/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp for CXX dependencies
+[539/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp for CXX dependencies
+[540/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ParameterizationConfig.cpp for CXX dependencies
+[541/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Queues.cppm.o
+[542/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Surface.cppm.o
+[543/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderArtifactPublication.cpp for CXX dependencies
+[544/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EcsSystemBundle.cpp for CXX dependencies
+[545/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp for CXX dependencies
+[546/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ProgressivePoissonConfig.cpp for CXX dependencies
+[547/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Memory.cppm.o
+[548/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorJobProjection.Public.cpp for CXX dependencies
+[549/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SceneEditingOperations.Debug.cpp for CXX dependencies
+[550/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp for CXX dependencies
+[551/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorWorkspaceAttachment.cpp for CXX dependencies
+[552/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorCommandHistory.cpp for CXX dependencies
+[553/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SceneEditingOperations.Public.cpp for CXX dependencies
+[554/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VisualizationEditingOperations.Debug.cpp for CXX dependencies
+[555/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SceneEditingOperations.Actions.cpp for CXX dependencies
+[556/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderRecipeEditingOperations.Public.cpp for CXX dependencies
+[557/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorWorkspaceSnapshots.Public.cpp for CXX dependencies
+[558/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp for CXX dependencies
+[559/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp for CXX dependencies
+[560/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VisualizationEditingOperations.Public.cpp for CXX dependencies
+[561/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryProcessingOperations.Public.cpp for CXX dependencies
+[562/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp for CXX dependencies
+[563/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderRecipeEditingOperations.Debug.cpp for CXX dependencies
+[564/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/internal/Runtime.EditorWorkspaceSession.cpp for CXX dependencies
+[565/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderRecipeEditingOperations.cpp for CXX dependencies
+[566/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Editor/Runtime.EditorPropertyWidgets.cpp for CXX dependencies
+[567/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Editor/Runtime.EditorUiModule.cpp for CXX dependencies
+[568/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Editor/Runtime.EditorUiHost.cpp for CXX dependencies
+[569/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryProcessingOperations.cpp for CXX dependencies
+[570/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EngineConfigControl.cpp for CXX dependencies
+[571/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp for CXX dependencies
+[572/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ParameterizationOperations.cpp for CXX dependencies
+[573/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.InputActions.cpp for CXX dependencies
+[574/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EngineConfigBoot.cpp for CXX dependencies
+[575/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Editor/Runtime.EditorWindowRegistry.cpp for CXX dependencies
+[576/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.WorldRegistry.cpp for CXX dependencies
+[577/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.Engine.cpp for CXX dependencies
+[578/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.OperationalStatus.cppm.o
+[579/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ServiceRegistry.cpp for CXX dependencies
+[580/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ModuleSchedule.cpp for CXX dependencies
+[581/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.KernelEvents.cpp for CXX dependencies
+[582/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Scene/Runtime.SceneDocumentModule.cpp for CXX dependencies
+[583/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.DiagnosticsLogging.cpp.o
+[584/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryAvailability.cpp for CXX dependencies
+[585/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.PhysicsBridge.cpp for CXX dependencies
+[586/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Scene/Runtime.SceneInteractionModule.cpp for CXX dependencies
+[587/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SceneSerialization.cpp for CXX dependencies
+[588/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Cameras/Runtime.CameraModule.cpp for CXX dependencies
+[589/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryPlanBuilders.Graph.cpp for CXX dependencies
+[590/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Cameras/Runtime.CameraControllers.cpp for CXX dependencies
+[591/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Gizmos/Runtime.GizmoFrameService.cpp for CXX dependencies
+[592/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Cameras/Runtime.CameraFocusCommand.cpp for CXX dependencies
+[593/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/ImGui/Runtime.ImGuiAdapter.cpp for CXX dependencies
+[594/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Sync.cppm.o
+[595/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Gizmos/Runtime.GizmoInteraction.cpp for CXX dependencies
+[596/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryPlanBuilders.Procedural.cpp for CXX dependencies
+[597/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Swapchain.cppm.o
+[598/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp for CXX dependencies
+[599/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryPlanBuilders.PointCloud.cpp for CXX dependencies
+[600/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryPlanBuilders.Mesh.cpp for CXX dependencies
+[601/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.MeshSurfaceTopology.cpp for CXX dependencies
+[602/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderRecipeActivation.cpp for CXX dependencies
+[603/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SelectionReadback.cpp for CXX dependencies
+[604/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderWorldPool.cpp for CXX dependencies
+[605/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderExtractionService.cpp for CXX dependencies
+[606/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderExtraction.Recipes.cpp for CXX dependencies
+[607/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderExtraction.Geometry.cpp for CXX dependencies
+[608/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderExtraction.cpp for CXX dependencies
+[609/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AsyncWorkModule.cppm for CXX dependencies
+[610/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VertexAttributeBinding.cpp for CXX dependencies
+[611/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VertexChannelStreams.cpp for CXX dependencies
+[612/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ReferenceScene.cpp for CXX dependencies
+[613/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.PrimitiveSelectionRefinement.cpp for CXX dependencies
+[614/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Pipelines.cppm.o
+[615/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Descriptors.cppm.o
+[616/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.StableEntityLookup.cpp for CXX dependencies
+[617/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SelectionController.cpp for CXX dependencies
+[618/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Visualization/Runtime.VisualizationRecipes.cpp for CXX dependencies
+[619/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.TextureBakeModule.cpp for CXX dependencies
+[620/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetIngestStateMachine.cppm for CXX dependencies
+[621/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.JobServiceGpuQueueBridge.cppm for CXX dependencies
+[622/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.DeviceBootstrap.cppm for CXX dependencies
+[623/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.CommandBus.cppm for CXX dependencies
+[624/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cppm for CXX dependencies
+[625/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm for CXX dependencies
+[626/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EcsSystemBundle.cppm for CXX dependencies
+[627/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryPresentation.cppm for CXX dependencies
+[628/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowModule.cppm for CXX dependencies
+[629/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderArtifactPublication.cppm for CXX dependencies
+[630/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ProgressivePoissonConfig.cppm for CXX dependencies
+[631/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.JobService.cppm for CXX dependencies
+[632/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm for CXX dependencies
+[633/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm for CXX dependencies
+[634/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ParameterizationConfig.cppm for CXX dependencies
+[635/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorCommon.cppm for CXX dependencies
+[636/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorJobProjection.cppm for CXX dependencies
+[637/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorCommandHistory.cppm for CXX dependencies
+[638/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Editor/Runtime.EditorPropertyWidgets.cppm for CXX dependencies
+[639/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorWorkspaceAttachment.cppm for CXX dependencies
+[640/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.FramePacingDiagnostics.cppm for CXX dependencies
+[641/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderRecipeEditingOperations.cppm for CXX dependencies
+[642/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryProcessingOperations.cppm for CXX dependencies
+[643/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SceneEditingOperations.cppm for CXX dependencies
+[644/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EditorWorkspaceSnapshots.cppm for CXX dependencies
+[645/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VisualizationEditingOperations.cppm for CXX dependencies
+[646/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Editor/Runtime.EditorUiModule.cppm for CXX dependencies
+[647/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EngineConfigBoot.cppm for CXX dependencies
+[648/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Editor/Runtime.EditorUiHost.cppm for CXX dependencies
+[649/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Editor/Runtime.EditorWindowRegistry.cppm for CXX dependencies
+[650/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.Engine.cppm for CXX dependencies
+[651/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.WorldHandle.cppm for CXX dependencies
+[652/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.InputActions.cppm for CXX dependencies
+[653/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ModuleSchedule.cppm for CXX dependencies
+[654/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.EngineConfigControl.cppm for CXX dependencies
+[655/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ServiceRegistry.cppm for CXX dependencies
+[656/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Cameras/Runtime.CameraModule.cppm for CXX dependencies
+[657/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.Module.cppm for CXX dependencies
+[658/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.KernelEvents.cppm for CXX dependencies
+[659/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SceneSerialization.cppm for CXX dependencies
+[660/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.WorldRegistry.cppm for CXX dependencies
+[661/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.MeshPrimitiveView.cppm for CXX dependencies
+[662/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Cameras/Runtime.CameraFocusCommand.cppm for CXX dependencies
+[663/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Scene/Runtime.SceneInteractionModule.cppm for CXX dependencies
+[664/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.PhysicsBridge.cppm for CXX dependencies
+[665/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryAvailability.cppm for CXX dependencies
+[666/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Gizmos/Runtime.GizmoInteraction.cppm for CXX dependencies
+[667/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/ImGui/Runtime.ImGuiAdapter.cppm for CXX dependencies
+[668/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Gizmos/Runtime.GizmoFrameService.cppm for CXX dependencies
+[669/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.ReferenceScene.cppm for CXX dependencies
+[670/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Scene/Runtime.SceneDocumentModule.cppm for CXX dependencies
+[671/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Cameras/Runtime.CameraControllers.cppm for CXX dependencies
+[672/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.MeshSurfaceTopology.cppm for CXX dependencies
+[673/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.PrimitiveSelectionRefinement.cppm for CXX dependencies
+[674/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SelectionReadback.cppm for CXX dependencies
+[675/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderWorldPool.cppm for CXX dependencies
+[676/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderRecipeActivation.cppm for CXX dependencies
+[677/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VertexChannelBindings.cppm for CXX dependencies
+[678/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.SelectionController.cppm for CXX dependencies
+[679/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderExtraction.cppm for CXX dependencies
+[680/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm for CXX dependencies
+[681/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VertexAttributeBinding.cppm for CXX dependencies
+[682/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Vma.cpp.o
+[683/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cppm for CXX dependencies
+[684/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowModelTextureDecode.cppm for CXX dependencies
+[685/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.TextureBakeModule.cppm for CXX dependencies
+[686/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.StableEntityLookup.cppm for CXX dependencies
+[687/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.VertexChannelStreams.cppm for CXX dependencies
+[688/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm for CXX dependencies
+[689/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Visualization/Runtime.VisualizationRecipes.cppm for CXX dependencies
+[690/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowRecipePolicies.cppm for CXX dependencies
+[691/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.GeometryPlanBuilders.cppm for CXX dependencies
+[692/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/internal/Runtime.EditorFeatures.Detail.cppm for CXX dependencies
+[693/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowModelMaterialization.cppm for CXX dependencies
+[694/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowImportExecutor.cppm for CXX dependencies
+[695/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Sandbox.ConfigSections.cpp for CXX dependencies
+[696/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.EditorController.cpp for CXX dependencies
+[697/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.AssetWorkflowTextureResidency.cppm for CXX dependencies
+[698/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.CommandPools.cppm.o
+[699/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Sandbox.ConfigSections.cppm for CXX dependencies
+[700/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp for CXX dependencies
+[701/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/runtime/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[702/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp for CXX dependencies
+[703/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.EditorController.cppm for CXX dependencies
+[704/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp for CXX dependencies
+[705/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.EditorShell.cpp for CXX dependencies
+[706/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm for CXX dependencies
+[707/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.EditorShell.cppm for CXX dependencies
+[708/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Sandbox.cpp for CXX dependencies
+[709/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm for CXX dependencies
+[710/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm for CXX dependencies
+[711/1498] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[712/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/src/app/Sandbox/Sandbox.cppm for CXX dependencies
+[713/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp for CXX dependencies
+[714/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/core/Bench_SchedulerHardeningSmoke.cpp for CXX dependencies
+[715/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/runners/BenchmarkSmokeRunner.cpp for CXX dependencies
+[716/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_ExampleSmoke.cpp for CXX dependencies
+[717/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp for CXX dependencies
+[718/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_QualityMetricsSmoke.cpp for CXX dependencies
+[719/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_PointCloudFilteringSmoke.cpp for CXX dependencies
+[720/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_SignedHeatReferenceSmoke.cpp for CXX dependencies
+[721/1498] Generating CXX dyndep file src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/CXX.dd
+[722/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_SurfaceSamplingSmoke.cpp for CXX dependencies
+[723/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_ProgressivePoissonReferenceSmoke.cpp for CXX dependencies
+[724/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_UvAtlasSmoke.cpp for CXX dependencies
+[725/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/physics/Bench_ParticleSpringReferenceSmoke.cpp for CXX dependencies
+[726/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_SimplificationQualitySmoke.cpp for CXX dependencies
+[727/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/physics/Bench_RigidBodyReferenceSmoke.cpp for CXX dependencies
+[728/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/rendering/Bench_FramegraphBarrierEmissionSmoke.cpp for CXX dependencies
+[729/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/rendering/Bench_FramegraphScratchReuseSmoke.cpp for CXX dependencies
+[730/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/rendering/Bench_FramegraphCompilerIndexingSmoke.cpp for CXX dependencies
+[731/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/physics/Bench_SphFluidReferenceSmoke.cpp for CXX dependencies
+[732/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/rendering/Bench_FrameRecipeCompileCacheSmoke.cpp for CXX dependencies
+[733/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp for CXX dependencies
+[734/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/rendering/Bench_VertexFetchLayoutSmoke.cpp for CXX dependencies
+[735/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/physics/Bench_XpbdClothReferenceSmoke.cpp for CXX dependencies
+[736/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/rendering/Bench_RenderGraphParallelRecordingSmoke.cpp for CXX dependencies
+[737/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp for CXX dependencies
+[738/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/physics/sph_fluid_reference/src/SphFluidReference.cpp for CXX dependencies
+[739/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp for CXX dependencies
+[740/1498] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/CXX.dd
+[741/1498] Compiling GLSL -> SPV: cluster_grid_build.comp
+[742/1498] Compiling GLSL -> SPV: debug_surface.frag
+[743/1498] Compiling GLSL -> SPV: debug_view.comp
+[744/1498] Compiling GLSL -> SPV: debug_view.frag
+[745/1498] Compiling GLSL -> SPV: debug_view.vert
+[746/1498] Compiling GLSL -> SPV: culling/instance_cull.comp
+[747/1498] Compiling GLSL -> SPV: deferred/default_debug_gbuffer.frag
+[748/1498] Compiling GLSL -> SPV: deferred/gbuffer.frag
+[749/1498] Compiling GLSL -> SPV: debug_surface.vert
+[750/1498] Compiling GLSL -> SPV: deferred/gbuffer.vert
+[751/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.ConfigSections.cppm.o
+[752/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.ConfigSections.cpp.o
+[753/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Diagnostics.cppm.o
+[754/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.cppm.o
+[755/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/core/Bench_TaskGraphPlanReuseSmoke.cpp.o
+[756/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/runners/BenchmarkSmokeRunner.cpp.o
+[757/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/core/Bench_SchedulerHardeningSmoke.cpp.o
+[758/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_PointCloudFilteringSmoke.cpp.o
+[759/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_SurfaceSamplingSmoke.cpp.o
+[760/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Mappings.cpp.o
+[761/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp.o
+[762/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_QualityMetricsSmoke.cpp.o
+[763/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.OperationalStatus.cpp.o
+[764/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_ProgressivePoissonReferenceSmoke.cpp.o
+[765/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_SimplificationQualitySmoke.cpp.o
+[766/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_ExampleSmoke.cpp.o
+[767/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/physics/Bench_RigidBodyReferenceSmoke.cpp.o
+[768/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Transfer.cppm.o
+[769/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Bindless.cpp.o
+[770/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_UvAtlasSmoke.cpp.o
+[771/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.CommandContext.cpp.o
+[772/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/physics/Bench_ParticleSpringReferenceSmoke.cpp.o
+[773/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/physics/Bench_XpbdClothReferenceSmoke.cpp.o
+[774/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/physics/Bench_SphFluidReferenceSmoke.cpp.o
+[775/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/rendering/Bench_FramegraphScratchReuseSmoke.cpp.o
+[776/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/rendering/Bench_FramegraphBarrierEmissionSmoke.cpp.o
+[777/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Profiler.cpp.o
+[778/1498] Compiling GLSL -> SPV: deferred/lighting.frag
+[779/1498] Compiling GLSL -> SPV: deferred_lighting.frag
+[780/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Staging.cpp.o
+[781/1498] Compiling GLSL -> SPV: forward/default_debug_surface.frag
+[782/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/rendering/Bench_RenderGraphParallelRecordingSmoke.cpp.o
+[783/1498] Compiling GLSL -> SPV: forward/line.frag
+[784/1498] Compiling GLSL -> SPV: depth_prepass.vert
+[785/1498] Compiling GLSL -> SPV: forward/default_debug_surface.vert
+[786/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/__/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp.o
+[787/1498] Compiling GLSL -> SPV: forward/line.vert
+[788/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/__/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp.o
+[789/1498] Compiling GLSL -> SPV: forward/point.frag
+[790/1498] Compiling GLSL -> SPV: forward/point.vert
+[791/1498] Compiling GLSL -> SPV: hzb_build.comp
+[792/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/rendering/Bench_FrameRecipeCompileCacheSmoke.cpp.o
+[793/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/rendering/Bench_FramegraphCompilerIndexingSmoke.cpp.o
+[794/1498] Compiling GLSL -> SPV: instance_cull.comp
+[795/1498] Compiling GLSL -> SPV: imgui.frag
+[796/1498] Compiling GLSL -> SPV: instance_cull_multigeo.comp
+[797/1498] Compiling GLSL -> SPV: imgui.vert
+[798/1498] Compiling GLSL -> SPV: kmeans_assign.comp
+[799/1498] Compiling GLSL -> SPV: kmeans_update.comp
+[800/1498] Compiling GLSL -> SPV: kmeans_reset.comp
+[801/1498] Compiling GLSL -> SPV: light_cluster_assign.comp
+[802/1498] Compiling GLSL -> SPV: line.frag
+[803/1498] Compiling GLSL -> SPV: parallel_compact_by_flags.comp
+[804/1498] Compiling GLSL -> SPV: line.vert
+[805/1498] Compiling GLSL -> SPV: pick_id.frag
+[806/1498] Compiling GLSL -> SPV: parallel_prefix_scan.comp
+[807/1498] Compiling GLSL -> SPV: parallel_count_to_dispatch_args.comp
+[808/1498] Compiling GLSL -> SPV: parallel_scan_add_offsets.comp
+[809/1498] Compiling GLSL -> SPV: parallel_segmented_float_reduce.comp
+[810/1498] Compiling GLSL -> SPV: pick_id.vert
+[811/1498] Compiling GLSL -> SPV: pick_mesh.frag
+[812/1498] Compiling GLSL -> SPV: pick_line.frag
+[813/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/__/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp.o
+[814/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/__/methods/physics/sph_fluid_reference/src/SphFluidReference.cpp.o
+[815/1498] Compiling GLSL -> SPV: pick_point.vert
+[816/1498] Compiling GLSL -> SPV: pick_point.frag
+[817/1498] Compiling GLSL -> SPV: pick_line.vert
+[818/1498] Compiling GLSL -> SPV: pick_mesh.vert
+[819/1498] Compiling GLSL -> SPV: point.frag
+[820/1498] Compiling GLSL -> SPV: point_flatdisc.frag
+[821/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorController.cppm.o
+[822/1498] Compiling GLSL -> SPV: point.vert
+[823/1498] Compiling GLSL -> SPV: point_sphere.frag
+[824/1498] Compiling GLSL -> SPV: point_retained.frag
+[825/1498] Compiling GLSL -> SPV: point_flatdisc.vert
+[826/1498] Compiling GLSL -> SPV: point_retained.vert
+[827/1498] Compiling GLSL -> SPV: point_sphere.vert
+[828/1498] Compiling GLSL -> SPV: point_surfel.vert
+[829/1498] Compiling GLSL -> SPV: post_bloom_downsample.frag
+[830/1498] Compiling GLSL -> SPV: point_surfel.frag
+[831/1498] Compiling GLSL -> SPV: post_fullscreen.vert
+[832/1498] Compiling GLSL -> SPV: post_bloom_upsample.frag
+[833/1498] Compiling GLSL -> SPV: post_fxaa.frag
+[834/1498] Compiling GLSL -> SPV: post_smaa_edge.frag
+[835/1498] Compiling GLSL -> SPV: post_smaa_blend.frag
+[836/1498] Compiling GLSL -> SPV: post_histogram.comp
+[837/1498] Compiling GLSL -> SPV: post_tonemap.frag
+[838/1498] Compiling GLSL -> SPV: post_smaa_resolve.frag
+[839/1498] Compiling GLSL -> SPV: progressive_poisson_build_cells.comp
+[840/1498] Compiling GLSL -> SPV: present.frag
+[841/1498] Compiling GLSL -> SPV: present.vert
+[842/1498] Compiling GLSL -> SPV: property_texture_bake.frag
+[843/1498] Compiling GLSL -> SPV: progressive_poisson_accept_phase.comp
+[844/1498] Compiling GLSL -> SPV: property_texture_bake_dilate.frag
+[845/1498] Compiling GLSL -> SPV: property_texture_bake.vert
+[846/1498] Compiling GLSL -> SPV: selection/edge_id.frag
+[847/1498] Compiling GLSL -> SPV: scene_update.comp
+[848/1498] Compiling GLSL -> SPV: selection/edge_id.vert
+[849/1498] Compiling GLSL -> SPV: selection/entity_id_outline.frag
+[850/1498] Compiling GLSL -> SPV: selection/entity_id.frag
+[851/1498] Compiling GLSL -> SPV: selection/face_id.vert
+[852/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/rendering/Bench_VertexFetchLayoutSmoke.cpp.o
+[853/1498] Compiling GLSL -> SPV: selection/entity_id.vert
+[854/1498] Compiling GLSL -> SPV: selection/face_id.frag
+[855/1498] Compiling GLSL -> SPV: selection/point_id.vert
+[856/1498] Compiling GLSL -> SPV: selection/point_id.frag
+[857/1498] Compiling GLSL -> SPV: shadow_depth.vert
+[858/1498] Compiling GLSL -> SPV: selection_outline.frag
+[859/1498] Compiling GLSL -> SPV: surface.vert
+[860/1498] Compiling GLSL -> SPV: surface.frag
+[861/1498] Compiling GLSL -> SPV: tests/hzb_conservatism_smoke.comp
+[862/1498] Compiling GLSL -> SPV: surface_gbuffer.frag
+[863/1498] Compiling GLSL -> SPV: transient_debug_line.vert
+[864/1498] Compiling GLSL -> SPV: transient_debug_line.frag
+[865/1498] Compiling GLSL -> SPV: transient_debug_triangle.frag
+[866/1498] Compiling GLSL -> SPV: transient_debug_point.frag
+[867/1498] Compiling GLSL -> SPV: transient_debug_point.vert
+[868/1498] Compiling GLSL -> SPV: transient_debug_triangle.vert
+[869/1498] Compiling GLSL -> SPV: triangle.vert
+[870/1498] Compiling GLSL -> SPV: triangle.frag
+[871/1498] Compiling GLSL -> SPV: uv_view/background.frag
+[872/1498] Compiling GLSL -> SPV: uv_view/fill.frag
+[873/1498] Compiling GLSL -> SPV: uv_view/mesh.vert
+[874/1498] Compiling GLSL -> SPV: visualization_isoline.frag
+[875/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test_IndexedHeap.cpp for CXX dependencies
+[876/1498] Compiling GLSL -> SPV: visualization_vector_field.frag
+[877/1498] Compiling GLSL -> SPV: uv_view/line.frag
+[878/1498] Compiling GLSL -> SPV: visualization_isoline.vert
+[879/1498] Compiling GLSL -> SPV: uv_view/background.vert
+[880/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.LogRingBuffer.cpp for CXX dependencies
+[881/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.CoreError.cpp for CXX dependencies
+[882/1498] Compiling GLSL -> SPV: visualization_vector_field.vert
+[883/1498] Generating CXX dyndep file tests/CMakeFiles/CoreTestObjs.dir/CXX.dd
+[884/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.Hierarchy.cpp for CXX dependencies
+[885/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.TransformHierarchy.cpp for CXX dependencies
+[886/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.BoundsPropagation.cpp for CXX dependencies
+[887/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.SceneRegistry.cpp for CXX dependencies
+[888/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.ColliderAuthoring.cpp for CXX dependencies
+[889/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.Events.cpp for CXX dependencies
+[890/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.SceneBootstrap.cpp for CXX dependencies
+[891/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.GeometryDirtyDomains.cpp for CXX dependencies
+[892/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.StableIdentity.cpp for CXX dependencies
+[893/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp for CXX dependencies
+[894/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/ecs/Test.ECS.RenderSync.cpp for CXX dependencies
+[895/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp for CXX dependencies
+[896/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp for CXX dependencies
+[897/1498] Generating CXX dyndep file tests/CMakeFiles/ECSTestObjs.dir/CXX.dd
+[898/1498] Generating CXX dyndep file tests/CMakeFiles/EcsContractTestObjs.dir/CXX.dd
+[899/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp for CXX dependencies
+[900/1498] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicKMeansGpuBenchmarkSmoke.dir/CXX.dd
+[901/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.CoreGraphInterfaces.cpp for CXX dependencies
+[902/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.GpuResultReadbackJob.cpp for CXX dependencies
+[903/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.AssetIngestStateMachine.cpp for CXX dependencies
+[904/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.AssetImportRecipe.cpp for CXX dependencies
+[905/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.AssetWorkflowModule.cpp for CXX dependencies
+[906/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp for CXX dependencies
+[907/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_SignedHeatReferenceSmoke.cpp.o
+[908/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.cppm.o
+[909/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Transfer.cpp.o
+[910/1498] Linking CXX executable bin/IntrinsicBenchmarkSmoke
+[911/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.cpp.o
+[912/1498] Building CXX object tests/CMakeFiles/CoreTestObjs.dir/unit/core/Test.LogRingBuffer.cpp.o
+[913/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.AsyncWorkModule.cpp for CXX dependencies
+[914/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.Events.cpp.o
+[915/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.EditorCommandHistory.cpp for CXX dependencies
+[916/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.EditorUiHost.cpp for CXX dependencies
+[917/1498] Building CXX object tests/CMakeFiles/CoreTestObjs.dir/unit/core/Test.CoreError.cpp.o
+[918/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.EditorPropertyWidgets.cpp for CXX dependencies
+[919/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.EditorWindowRegistry.cpp for CXX dependencies
+[920/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.ImGuiAdapter.cpp for CXX dependencies
+[921/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp for CXX dependencies
+[922/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.MeshGeometryExtraction.cpp for CXX dependencies
+[923/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp for CXX dependencies
+[924/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.GeometryDirtyDomains.cpp.o
+[925/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RenderArtifactPublication.cpp for CXX dependencies
+[926/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.ProgressivePoissonGpuBackend.cpp for CXX dependencies
+[927/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.ColliderAuthoring.cpp.o
+[928/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RenderExtractionContract.cpp for CXX dependencies
+[929/1498] Building CXX object tests/CMakeFiles/CoreTestObjs.dir/unit/core/Test_IndexedHeap.cpp.o
+[930/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.GizmoInteraction.cpp for CXX dependencies
+[931/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.GizmoInteractionEngineWiring.cpp for CXX dependencies
+[932/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.SceneRegistry.cpp.o
+[933/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.GeometryAvailability.cpp for CXX dependencies
+[934/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.GeometryPresentation.cpp for CXX dependencies
+[935/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.GraphGeometryExtraction.cpp for CXX dependencies
+[936/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp for CXX dependencies
+[937/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.PrimitiveSelectionRefinementWiring.cpp for CXX dependencies
+[938/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.PrimitiveSelectionRefinement.cpp for CXX dependencies
+[939/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.CameraModule.cpp for CXX dependencies
+[940/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp for CXX dependencies
+[941/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.ParameterizationOperations.cpp for CXX dependencies
+[942/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeConfigControl.cpp for CXX dependencies
+[943/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeEngineConfigBoot.cpp for CXX dependencies
+[944/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeEngineLayering.cpp for CXX dependencies
+[945/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeInputActions.cpp for CXX dependencies
+[946/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeCameraControllers.cpp for CXX dependencies
+[947/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp for CXX dependencies
+[948/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp for CXX dependencies
+[949/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeCameraFocusCommand.cpp for CXX dependencies
+[950/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeCommandBus.cpp for CXX dependencies
+[951/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.ClusteringModule.cpp for CXX dependencies
+[952/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeKernelEvents.cpp for CXX dependencies
+[953/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeJobService.cpp for CXX dependencies
+[954/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeModule.cpp for CXX dependencies
+[955/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeWorldRegistry.cpp for CXX dependencies
+[956/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeEcsSystemBundle.cpp for CXX dependencies
+[957/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SceneDocumentModule.cpp for CXX dependencies
+[958/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp for CXX dependencies
+[959/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SceneInteractionModule.cpp for CXX dependencies
+[960/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeReferenceScene.cpp for CXX dependencies
+[961/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeVulkanBreadcrumb.cpp for CXX dependencies
+[962/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SandboxEditorModels.cpp for CXX dependencies
+[963/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeSceneSerialization.cpp for CXX dependencies
+[964/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp for CXX dependencies
+[965/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.SceneBootstrap.cpp.o
+[966/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp for CXX dependencies
+[967/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SandboxEditorVisualization.cpp for CXX dependencies
+[968/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.TextureBakeModule.cpp for CXX dependencies
+[969/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp for CXX dependencies
+[970/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp for CXX dependencies
+[971/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SelectionReadbackCorrelation.cpp for CXX dependencies
+[972/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SelectionController.cpp for CXX dependencies
+[973/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.StableIdentity.cpp.o
+[974/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SelectionSnapshotExtraction.cpp for CXX dependencies
+[975/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.StableEntityLookup.cpp for CXX dependencies
+[976/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.SelectionStableLookupComposition.cpp for CXX dependencies
+[977/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.VertexAttributeBinding.cpp for CXX dependencies
+[978/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RenderWorldPool.cpp for CXX dependencies
+[979/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.VisualizationRecipes.cpp for CXX dependencies
+[980/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.VertexChannelStreams.cpp for CXX dependencies
+[981/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.SandboxConfigSections.cpp for CXX dependencies
+[982/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.SandboxDomainPanels.cpp for CXX dependencies
+[983/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp for CXX dependencies
+[984/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp for CXX dependencies
+[985/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.SandboxAppComposition.cpp for CXX dependencies
+[986/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/physics/Test.RigidBodyReference.cpp for CXX dependencies
+[987/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractSlowTestObjs.dir/CXX.dd
+[988/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/benchmark/slo/Test.ArchitectureSLO.cpp for CXX dependencies
+[989/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.SandboxEditorPresentation.cpp for CXX dependencies
+[990/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.SandboxParameterizationPanel.cpp for CXX dependencies
+[991/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/physics/Test.ParticleSpringReference.cpp for CXX dependencies
+[992/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/physics/Test.XpbdClothReference.cpp for CXX dependencies
+[993/1498] Generating CXX dyndep file tests/CMakeFiles/BenchmarkTestObjs.dir/CXX.dd
+[994/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractTestObjs.dir/CXX.dd
+[995/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/physics/Test.SphFluidReference.cpp for CXX dependencies
+[996/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp for CXX dependencies
+[997/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp for CXX dependencies
+[998/1498] Generating CXX dyndep file tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/CXX.dd
+[999/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp for CXX dependencies
+[1000/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/methods/physics/sph_fluid_reference/src/SphFluidReference.cpp for CXX dependencies
+[1001/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/physics/Test.PhysicsSolverParity.cpp for CXX dependencies
+[1002/1498] Generating CXX dyndep file tests/CMakeFiles/PhysicsMethodTestObjs.dir/CXX.dd
+[1003/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Statistics.cpp for CXX dependencies
+[1004/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/physics/Test.Physics.World.cpp for CXX dependencies
+[1005/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_RobustKernels.cpp for CXX dependencies
+[1006/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.RuntimePhysicsBridge.cpp for CXX dependencies
+[1007/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Device.cppm.o
+[1008/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.Hierarchy.cpp.o
+[1009/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/__/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp.o
+[1010/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.TransformHierarchy.cpp.o
+[1011/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.RenderSync.cpp.o
+[1012/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/__/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp.o
+[1013/1498] Generating CXX dyndep file tests/CMakeFiles/PhysicsWorldTestObjs.dir/CXX.dd
+[1014/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/__/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp.o
+[1015/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/__/methods/physics/sph_fluid_reference/src/SphFluidReference.cpp.o
+[1016/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimePhysicsBridgeTestObjs.dir/CXX.dd
+[1017/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_AABBCubify.cpp for CXX dependencies
+[1018/1498] Building CXX object tests/CMakeFiles/EcsContractTestObjs.dir/contract/ecs/Test.ECS.LayeringBoundaries.cpp.o
+[1019/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_BezierCurve.cpp for CXX dependencies
+[1020/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Curve.cpp for CXX dependencies
+[1021/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_RotationAveraging.cpp for CXX dependencies
+[1022/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Rotation.cpp for CXX dependencies
+[1023/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.BoundsPropagation.cpp.o
+[1024/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MeshClosestFace.cpp for CXX dependencies
+[1025/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MeshQuantities.cpp for CXX dependencies
+[1026/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_LinalgEigenMap.cpp for CXX dependencies
+[1027/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_RuntimeGraph.cpp for CXX dependencies
+[1028/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.GraphQueries.cpp for CXX dependencies
+[1029/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_RuntimeGraphKNN.cpp for CXX dependencies
+[1030/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_KDTree.cpp for CXX dependencies
+[1031/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.GeometryProperties.cpp for CXX dependencies
+[1032/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Octree.cpp for CXX dependencies
+[1033/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_DEC.cpp for CXX dependencies
+[1034/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_BVH.cpp for CXX dependencies
+[1035/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MeshOperations.cpp for CXX dependencies
+[1036/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.MeshConversion.cpp for CXX dependencies
+[1037/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.MeshSoup.cpp for CXX dependencies
+[1038/1498] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp.o
+[1039/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.PointCloudConversion.cpp for CXX dependencies
+[1040/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_GeometryProcessing.cpp for CXX dependencies
+[1041/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MeshBuilder.cpp for CXX dependencies
+[1042/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MeshQuality.cpp for CXX dependencies
+[1043/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_SurfaceReconstruction.cpp for CXX dependencies
+[1044/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MeshAnalysis.cpp for CXX dependencies
+[1045/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.ParameterizationDiagnostics.cpp for CXX dependencies
+[1046/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Parameterization.cpp for CXX dependencies
+[1047/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.ParameterizationDispatch.cpp for CXX dependencies
+[1048/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.HarmonicParameterization.cpp for CXX dependencies
+[1049/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.BoundaryFirstFlattening.cpp for CXX dependencies
+[1050/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.UvAtlas.cpp for CXX dependencies
+[1051/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_ConvexHull.cpp for CXX dependencies
+[1052/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_AdaptiveRemeshing.cpp for CXX dependencies
+[1053/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_PointCloud.cpp for CXX dependencies
+[1054/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_SphereFitting.cpp for CXX dependencies
+[1055/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_TriangleMetrics.cpp for CXX dependencies
+[1056/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Boolean.cpp for CXX dependencies
+[1057/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MeshBoundary.cpp for CXX dependencies
+[1058/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_GeometryAttributePropagation.cpp for CXX dependencies
+[1059/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.GraphVertexNormals.cpp for CXX dependencies
+[1060/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp for CXX dependencies
+[1061/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.HalfedgeMeshVertexNormals.cpp for CXX dependencies
+[1062/1498] Building CXX object tests/CMakeFiles/BenchmarkTestObjs.dir/benchmark/slo/Test.ArchitectureSLO.cpp.o
+[1063/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.MeshTopologyUtilities.cpp for CXX dependencies
+[1064/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Curvature.cpp for CXX dependencies
+[1065/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_HalfedgeMeshTopology.cpp for CXX dependencies
+[1066/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Validation.cpp for CXX dependencies
+[1067/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.CurvatureTensor.cpp for CXX dependencies
+[1068/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Raycast.cpp for CXX dependencies
+[1069/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_PcaPrimitives.cpp for CXX dependencies
+[1070/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/unit/physics/Test.ParticleSpringReference.cpp.o
+[1071/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Grid.cpp for CXX dependencies
+[1072/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/unit/physics/Test.SphFluidReference.cpp.o
+[1073/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Overlap.cpp for CXX dependencies
+[1074/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_GeometryQueries.cpp for CXX dependencies
+[1075/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MarchingCubes.cpp for CXX dependencies
+[1076/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/unit/physics/Test.XpbdClothReference.cpp.o
+[1077/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_ImplicitPlaneField.cpp for CXX dependencies
+[1078/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Containment.cpp for CXX dependencies
+[1079/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Geodesic.cpp for CXX dependencies
+[1080/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Support.cpp for CXX dependencies
+[1081/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_VectorHeatMethod.cpp for CXX dependencies
+[1082/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Subdivision.cpp for CXX dependencies
+[1083/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/unit/physics/Test.RigidBodyReference.cpp.o
+[1084/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Simplification.cpp for CXX dependencies
+[1085/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.QualityMetrics.cpp for CXX dependencies
+[1086/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_ShortestPath.cpp for CXX dependencies
+[1087/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Smoothing.cpp for CXX dependencies
+[1088/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.SurfaceSampling.cpp for CXX dependencies
+[1089/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.Sampling.cpp for CXX dependencies
+[1090/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.PointCloudFeatures.cpp for CXX dependencies
+[1091/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.PointCloudNormals.cpp for CXX dependencies
+[1092/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.IntersectionClassification.cpp for CXX dependencies
+[1093/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.PointCloudOutlierRemoval.cpp for CXX dependencies
+[1094/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_Registration.cpp for CXX dependencies
+[1095/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_PointCloudRobustness.cpp for CXX dependencies
+[1096/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.RobustPredicates.cpp for CXX dependencies
+[1097/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.LinearAlgebra.cpp for CXX dependencies
+[1098/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.RaycastClassify.cpp for CXX dependencies
+[1099/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.Sparse.cpp for CXX dependencies
+[1100/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.SparseFactorization.cpp for CXX dependencies
+[1101/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.SignedHeatMethod.cpp for CXX dependencies
+[1102/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.SparseNonsymmetric.cpp for CXX dependencies
+[1103/1498] Building CXX object tests/CMakeFiles/PhysicsMethodTestObjs.dir/unit/physics/Test.PhysicsSolverParity.cpp.o
+[1104/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp for CXX dependencies
+[1105/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_RuntimeGeometry.cpp for CXX dependencies
+[1106/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_SubmeshView.cpp for CXX dependencies
+[1107/1498] Generating CXX dyndep file tests/CMakeFiles/GeometryTestObjs.dir/CXX.dd
+[1108/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_HtexPatch.cpp for CXX dependencies
+[1109/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_SDF.cpp for CXX dependencies
+[1110/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_ContactManifold.cpp for CXX dependencies
+[1111/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_GJK.cpp for CXX dependencies
+[1112/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.ProgressivePoissonReference.cpp for CXX dependencies
+[1113/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.ProgressivePoissonReferenceSlow.cpp for CXX dependencies
+[1114/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.GeometryIO.cpp for CXX dependencies
+[1115/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test.MeshOperationsSlow.cpp for CXX dependencies
+[1116/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/assets/Test.Asset.EventBus.cpp for CXX dependencies
+[1117/1498] Building CXX object tests/CMakeFiles/PhysicsWorldTestObjs.dir/unit/physics/Test.Physics.World.cpp.o
+[1118/1498] Building CXX object tests/CMakeFiles/RuntimePhysicsBridgeTestObjs.dir/integration/runtime/Test.RuntimePhysicsBridge.cpp.o
+[1119/1498] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Device.cpp.o
+[1120/1498] Linking CXX static library lib/libExtrinsicBackendsVulkan.a
+[1121/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_RobustKernels.cpp.o
+[1122/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_AABBCubify.cpp.o
+[1123/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Statistics.cpp.o
+[1124/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_BezierCurve.cpp.o
+[1125/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Curve.cpp.o
+[1126/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Rotation.cpp.o
+[1127/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_RotationAveraging.cpp.o
+[1128/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_LinalgEigenMap.cpp.o
+[1129/1498] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxConfigSections.cpp.o
+[1130/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.MeshConversion.cpp.o
+[1131/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.MeshSoup.cpp.o
+[1132/1498] Building CXX object benchmarks/CMakeFiles/IntrinsicKMeansGpuBenchmarkSmoke.dir/geometry/Bench_KMeansGpuVulkanSmoke.cpp.o
+[1133/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.PointCloudConversion.cpp.o
+[1134/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_RuntimeGraphKNN.cpp.o
+[1135/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_BVH.cpp.o
+[1136/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshClosestFace.cpp.o
+[1137/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.GraphQueries.cpp.o
+[1138/1498] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxAppComposition.cpp.o
+[1139/1498] Linking CXX executable bin/IntrinsicKMeansGpuBenchmarkSmoke
+[1140/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_KDTree.cpp.o
+[1141/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshQuantities.cpp.o
+[1142/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_DEC.cpp.o
+[1143/1498] Building CXX object tests/CMakeFiles/RuntimeContractSlowTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp.o
+[1144/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.GeometryProperties.cpp.o
+[1145/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Octree.cpp.o
+[1146/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshOperations.cpp.o
+[1147/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshBuilder.cpp.o
+[1148/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_RuntimeGraph.cpp.o
+[1149/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshQuality.cpp.o
+[1150/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Parameterization.cpp.o
+[1151/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_TriangleMetrics.cpp.o
+[1152/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_GeometryProcessing.cpp.o
+[1153/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_SurfaceReconstruction.cpp.o
+/tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_SurfaceReconstruction.cpp:63:34: warning: unused function 'MakeSphereSDF' [-Wunused-function]
+   63 | static Geometry::Grid::DenseGrid MakeSphereSDF(
+      |                                  ^~~~~~~~~~~~~
+/tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_SurfaceReconstruction.cpp:96:34: warning: unused function 'MakePlaneSDF' [-Wunused-function]
+   96 | static Geometry::Grid::DenseGrid MakePlaneSDF(
+      |                                  ^~~~~~~~~~~~
+2 warnings generated.
+[1154/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.ParameterizationDispatch.cpp.o
+[1155/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.HarmonicParameterization.cpp.o
+[1156/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.ParameterizationDiagnostics.cpp.o
+[1157/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_AdaptiveRemeshing.cpp.o
+[1158/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.HalfedgeMeshVertexNormals.cpp.o
+[1159/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.BoundaryFirstFlattening.cpp.o
+[1160/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.GraphVertexNormals.cpp.o
+[1161/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Boolean.cpp.o
+[1162/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_SphereFitting.cpp.o
+[1163/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_ConvexHull.cpp.o
+[1164/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_HalfedgeMeshTopology.cpp.o
+[1165/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.MeshTopologyUtilities.cpp.o
+[1166/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Validation.cpp.o
+[1167/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshAnalysis.cpp.o
+[1168/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.UvAtlas.cpp.o
+[1169/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Raycast.cpp.o
+[1170/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_GeometryQueries.cpp.o
+[1171/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Curvature.cpp.o
+[1172/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.CurvatureTensor.cpp.o
+[1173/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MeshBoundary.cpp.o
+[1174/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Overlap.cpp.o
+[1175/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_PointCloud.cpp.o
+[1176/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_PcaPrimitives.cpp.o
+[1177/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp.o
+[1178/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_GeometryAttributePropagation.cpp.o
+[1179/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_ImplicitPlaneField.cpp.o
+[1180/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.QualityMetrics.cpp.o
+[1181/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.Sampling.cpp.o
+[1182/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Grid.cpp.o
+[1183/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_MarchingCubes.cpp.o
+/tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/geometry/Test_MarchingCubes.cpp:56:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+   56 |     grid.AddProperty<float>("scalar", 10.0f);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[1184/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SurfaceSampling.cpp.o
+[1185/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Geodesic.cpp.o
+[1186/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.PointCloudFeatures.cpp.o
+[1187/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Containment.cpp.o
+[1188/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Support.cpp.o
+[1189/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.PointCloudOutlierRemoval.cpp.o
+[1190/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.PointCloudNormals.cpp.o
+[1191/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_PointCloudRobustness.cpp.o
+[1192/1498] Generating CXX dyndep file tests/CMakeFiles/GeometryProcessStateTestObjs.dir/CXX.dd
+[1193/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.IntersectionClassification.cpp.o
+[1194/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Subdivision.cpp.o
+[1195/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_ShortestPath.cpp.o
+[1196/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.RobustPredicates.cpp.o
+[1197/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.RaycastClassify.cpp.o
+[1198/1498] Generating CXX dyndep file tests/CMakeFiles/GeometryIoTestObjs.dir/CXX.dd
+[1199/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.Sparse.cpp.o
+[1200/1498] Generating CXX dyndep file tests/CMakeFiles/GeometrySlowTestObjs.dir/CXX.dd
+[1201/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Simplification.cpp.o
+[1202/1498] Generating CXX dyndep file tests/CMakeFiles/GeometryMethodTestObjs.dir/CXX.dd
+[1203/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.LinearAlgebra.cpp.o
+[1204/1498] Generating CXX dyndep file tests/CMakeFiles/GeometryMethodSlowTestObjs.dir/CXX.dd
+[1205/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_VectorHeatMethod.cpp.o
+[1206/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/assets/Test.Asset.ImportRouter.cpp for CXX dependencies
+[1207/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/assets/Test.Asset.ModelTexturePayload.cpp for CXX dependencies
+[1208/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/assets/Test.Asset.OperationStatus.cpp for CXX dependencies
+[1209/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SparseFactorization.cpp.o
+[1210/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/assets/Test.Asset.PayloadStore.cpp for CXX dependencies
+[1211/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/assets/Test.Asset.PathIndex.cpp for CXX dependencies
+[1212/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.BoundedHeap.cpp for CXX dependencies
+[1213/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/assets/Test.Asset.Registry.cpp for CXX dependencies
+[1214/1498] Generating CXX dyndep file tests/CMakeFiles/AssetUnitTestObjs.dir/CXX.dd
+[1215/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.CallbackRegistry.cpp for CXX dependencies
+[1216/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Smoothing.cpp.o
+[1217/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SparseNonsymmetric.cpp.o
+[1218/1498] Building CXX object tests/CMakeFiles/GeometryMethodSlowTestObjs.dir/unit/geometry/Test.ProgressivePoissonReferenceSlow.cpp.o
+[1219/1498] Building CXX object tests/CMakeFiles/GeometryMethodTestObjs.dir/unit/geometry/Test.ProgressivePoissonReference.cpp.o
+[1220/1498] Building CXX object tests/CMakeFiles/AssetUnitTestObjs.dir/unit/assets/Test.Asset.ImportRouter.cpp.o
+[1221/1498] Building CXX object tests/CMakeFiles/AssetUnitTestObjs.dir/unit/assets/Test.Asset.OperationStatus.cpp.o
+[1222/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.Config.cpp for CXX dependencies
+[1223/1498] Building CXX object tests/CMakeFiles/AssetUnitTestObjs.dir/unit/assets/Test.Asset.EventBus.cpp.o
+[1224/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.EngineConfigLoad.cpp for CXX dependencies
+[1225/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_SubmeshView.cpp.o
+[1226/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.DagScheduler.cpp for CXX dependencies
+[1227/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.FrameClock.cpp for CXX dependencies
+[1228/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.ErrorLegacy.cpp for CXX dependencies
+[1229/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.CoreFrameGraphTypeTokenHelper.cpp for CXX dependencies
+[1230/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.Filesystem.cpp for CXX dependencies
+[1231/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.CoreFrameGraph.cpp for CXX dependencies
+[1232/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SignedHeatMethod.cpp.o
+[1233/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.CoreHash.cpp for CXX dependencies
+[1234/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.GraphCompiler.cpp for CXX dependencies
+[1235/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.LockFreeQueue.cpp for CXX dependencies
+[1236/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.HandleLease.cpp for CXX dependencies
+[1237/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.CoreProfiling.cpp for CXX dependencies
+[1238/1498] Building CXX object tests/CMakeFiles/AssetUnitTestObjs.dir/unit/assets/Test.Asset.ModelTexturePayload.cpp.o
+[1239/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.ResourcePool.cpp for CXX dependencies
+[1240/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.CoreMemory.cpp for CXX dependencies
+[1241/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.Logging.cpp for CXX dependencies
+[1242/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.TaskGraphLegacy.cpp for CXX dependencies
+[1243/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.TaskGraphCompletionLifetime.cpp for CXX dependencies
+[1244/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.CoreStrongHandle.cpp for CXX dependencies
+[1245/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/platform/Test.NullPlatform.cpp for CXX dependencies
+[1246/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.CoreTasks.cpp for CXX dependencies
+[1247/1498] Generating CXX dyndep file tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/CXX.dd
+[1248/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/platform/Test.GlfwPlatformSmoke.cpp for CXX dependencies
+[1249/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/platform/Test.PlatformLayering.cpp for CXX dependencies
+[1250/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.BufferReadbackGpuSmoke.cpp for CXX dependencies
+[1251/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.ComputeParallelPrimitivesGpuSmoke.cpp for CXX dependencies
+[1252/1498] Building CXX object tests/CMakeFiles/AssetUnitTestObjs.dir/unit/assets/Test.Asset.PathIndex.cpp.o
+[1253/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test_Registration.cpp.o
+[1254/1498] Building CXX object tests/CMakeFiles/AssetUnitTestObjs.dir/unit/assets/Test.Asset.PayloadStore.cpp.o
+[1255/1498] Building CXX object tests/CMakeFiles/AssetUnitTestObjs.dir/unit/assets/Test.Asset.Registry.cpp.o
+[1256/1498] Building CXX object tests/CMakeFiles/GeometryProcessStateTestObjs.dir/unit/geometry/Test_SDF.cpp.o
+[1257/1498] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.SubmeshViewDomainBorrows.cpp.o
+[1258/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.CoreFrameGraphTypeTokenHelper.cpp.o
+[1259/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.DagScheduler.cpp.o
+[1260/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.Config.cpp.o
+[1261/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.BoundedHeap.cpp.o
+[1262/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.ErrorLegacy.cpp.o
+[1263/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.CallbackRegistry.cpp.o
+[1264/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.EngineConfigLoad.cpp.o
+[1265/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.Filesystem.cpp.o
+[1266/1498] Building CXX object tests/CMakeFiles/GeometryProcessStateTestObjs.dir/unit/geometry/Test_RuntimeGeometry.cpp.o
+[1267/1498] Building CXX object tests/CMakeFiles/GeometryProcessStateTestObjs.dir/unit/geometry/Test_ContactManifold.cpp.o
+[1268/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.FrameClock.cpp.o
+[1269/1498] Building CXX object tests/CMakeFiles/GeometryProcessStateTestObjs.dir/unit/geometry/Test_HtexPatch.cpp.o
+[1270/1498] Generating CXX dyndep file tests/CMakeFiles/PlatformTestObjs.dir/CXX.dd
+[1271/1498] Building CXX object tests/CMakeFiles/GeometrySlowTestObjs.dir/unit/geometry/Test.MeshOperationsSlow.cpp.o
+[1272/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.HandleLease.cpp.o
+/tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/core/Test.Core.HandleLease.cpp:139:11: warning: explicitly moving variable of type 'Lease<Extrinsic::Core::StrongHandle<(anonymous namespace)::LeaseTag>, (anonymous namespace)::MockManager>' to itself [-Wself-move]
+  139 |     lease = std::move(lease);
+      |     ~~~~~ ^           ~~~~~
+1 warning generated.
+[1273/1498] Generating CXX dyndep file tests/CMakeFiles/PlatformGlfwSmokeTestObjs.dir/CXX.dd
+[1274/1498] Building CXX object tests/CMakeFiles/GeometryProcessStateTestObjs.dir/unit/geometry/Test_GJK.cpp.o
+[1275/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.GraphCompiler.cpp.o
+[1276/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp for CXX dependencies
+[1277/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.TextureReadbackGpuSmoke.cpp for CXX dependencies
+[1278/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.HzbOcclusionConservatismGpuSmoke.cpp for CXX dependencies
+[1279/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp for CXX dependencies
+[1280/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.ImGuiSurfaceGpuSmoke.cpp for CXX dependencies
+[1281/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.CoreHash.cpp.o
+[1282/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp for CXX dependencies
+[1283/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.Logging.cpp.o
+[1284/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.LockFreeQueue.cpp.o
+[1285/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/gpu/Test.VulkanBootstrapSmoke.cpp for CXX dependencies
+[1286/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.UvViewGpuSmoke.cpp for CXX dependencies
+[1287/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp for CXX dependencies
+[1288/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp for CXX dependencies
+[1289/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.CoreFrameGraph.cpp.o
+[1290/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp for CXX dependencies
+[1291/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.ProgressivePoissonGpuResultReadbackGpuSmoke.cpp for CXX dependencies
+[1292/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.RHI.BufferManager.cpp for CXX dependencies
+[1293/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimeProgressivePoissonResultGpuSmokeTestObjs.dir/CXX.dd
+[1294/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimeSandboxAcceptanceGpuSmokeTestObjs.dir/CXX.dd
+[1295/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimeClusteringServiceGpuSmokeTestObjs.dir/CXX.dd
+[1296/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/CXX.dd
+[1297/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.RHI.SamplerManager.cpp for CXX dependencies
+[1298/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.RHI.TextureManager.cpp for CXX dependencies
+[1299/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.CoreProfiling.cpp.o
+[1300/1498] Building CXX object tests/CMakeFiles/PlatformTestObjs.dir/unit/platform/Test.NullPlatform.cpp.o
+[1301/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.CoreMemory.cpp.o
+[1302/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.CoreStrongHandle.cpp.o
+[1303/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.ResourcePool.cpp.o
+[1304/1498] Building CXX object tests/CMakeFiles/PlatformGlfwSmokeTestObjs.dir/integration/platform/Test.GlfwPlatformSmoke.cpp.o
+[1305/1498] Building CXX object tests/CMakeFiles/PlatformTestObjs.dir/contract/platform/Test.PlatformLayering.cpp.o
+[1306/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.TaskGraphCompletionLifetime.cpp.o
+[1307/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.CoreTasks.cpp.o
+[1308/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsUnitTestObjs.dir/CXX.dd
+[1309/1498] Building CXX object tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/unit/core/Test.Core.TaskGraphLegacy.cpp.o
+[1310/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp.o
+[1311/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.BufferReadbackGpuSmoke.cpp.o
+[1312/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.RHI.PipelineManager.cpp for CXX dependencies
+[1313/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.TextureReadbackGpuSmoke.cpp.o
+[1314/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.RHI.PipelineRegistry.cpp for CXX dependencies
+[1315/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.RHI.Profiler.cpp for CXX dependencies
+[1316/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsRhiCpuUnitTestObjs.dir/CXX.dd
+[1317/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.BufferTransfer.cpp for CXX dependencies
+[1318/1498] Building CXX object tests/CMakeFiles/RuntimeProgressivePoissonResultGpuSmokeTestObjs.dir/integration/runtime/Test.ProgressivePoissonGpuResultReadbackGpuSmoke.cpp.o
+[1319/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/gpu/Test.VulkanBootstrapSmoke.cpp.o
+[1320/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsBufferTransferTestObjs.dir/CXX.dd
+[1321/1498] Building CXX object tests/CMakeFiles/GraphicsUnitTestObjs.dir/unit/graphics/Test.RHI.BufferManager.cpp.o
+[1322/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.Graphics.ColormapSystem.cpp for CXX dependencies
+[1323/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.Graphics.DebugViewSystem.cpp for CXX dependencies
+[1324/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.Graphics.GpuSceneSlot.cpp for CXX dependencies
+[1325/1498] Building CXX object tests/CMakeFiles/GraphicsUnitTestObjs.dir/unit/graphics/Test.RHI.SamplerManager.cpp.o
+[1326/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.Graphics.MaterialSystem.cpp for CXX dependencies
+[1327/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.Graphics.ImGuiOverlaySystem.cpp for CXX dependencies
+[1328/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.RenderGraphDebugDump.cpp for CXX dependencies
+[1329/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.Graphics.PostProcessSystem.cpp for CXX dependencies
+[1330/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.Graphics.VisualizationPackets.cpp for CXX dependencies
+[1331/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.Graphics.SpatialDebugVisualizers.cpp for CXX dependencies
+[1332/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/CXX.dd
+[1333/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/unit/graphics/Test.GpuAssetCache.cpp for CXX dependencies
+[1334/1498] Building CXX object tests/CMakeFiles/GraphicsUnitTestObjs.dir/unit/graphics/Test.RHI.TextureManager.cpp.o
+[1335/1498] Building CXX object tests/CMakeFiles/GraphicsRhiCpuUnitTestObjs.dir/unit/graphics/Test.RHI.Profiler.cpp.o
+[1336/1498] Building CXX object tests/CMakeFiles/GeometryIoTestObjs.dir/unit/geometry/Test.GeometryIO.cpp.o
+[1337/1498] Building CXX object tests/CMakeFiles/GraphicsRhiCpuUnitTestObjs.dir/unit/graphics/Test.RHI.PipelineManager.cpp.o
+[1338/1498] Building CXX object tests/CMakeFiles/GraphicsBufferTransferTestObjs.dir/contract/graphics/Test.BufferTransfer.cpp.o
+[1339/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.HzbOcclusionConservatismGpuSmoke.cpp.o
+[1340/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.ImGuiSurfaceGpuSmoke.cpp.o
+[1341/1498] Building CXX object tests/CMakeFiles/GraphicsRhiCpuUnitTestObjs.dir/unit/graphics/Test.RHI.PipelineRegistry.cpp.o
+[1342/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsAssetsUnitTestObjs.dir/CXX.dd
+[1343/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.ImGuiOverlaySystem.cpp.o
+[1344/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.GpuTransferFacade.cpp for CXX dependencies
+[1345/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.MinimalTriangleAcceptance.cpp for CXX dependencies
+[1346/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp.o
+[1347/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.DebugViewSystem.cpp.o
+[1348/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RHI.CommandContextBarriers.cpp for CXX dependencies
+[1349/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.PropertyTextureBake.cpp for CXX dependencies
+[1350/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.GpuSceneSlot.cpp.o
+[1351/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RendererRhiBoundary.cpp for CXX dependencies
+[1352/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.TextureReadback.cpp for CXX dependencies
+[1353/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.TextureUploadLayout.cpp for CXX dependencies
+[1354/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp.o
+[1355/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.TransferQueueReadback.cpp for CXX dependencies
+[1356/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.VulkanFailClosedContract.cpp for CXX dependencies
+[1357/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsContractTestObjs.dir/CXX.dd
+[1358/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.VulkanOperationalStatusEvaluator.cpp for CXX dependencies
+[1359/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.ComputeParallelPrimitivesGpuSmoke.cpp.o
+[1360/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.VulkanOperationalDiagnosticsSnapshot.cpp for CXX dependencies
+[1361/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsVulkanContractTestObjs.dir/CXX.dd
+[1362/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.CurrentRendererContractAdapter.cpp for CXX dependencies
+[1363/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.CullingPassContracts.cpp for CXX dependencies
+[1364/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.CrossQueueTimeline.cpp for CXX dependencies
+[1365/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.ComputeParallelPrimitives.cpp for CXX dependencies
+[1366/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.DefaultRecipeBackbufferReadback.cpp for CXX dependencies
+[1367/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.DebugViewContract.cpp for CXX dependencies
+[1368/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.DebugViewPass.cpp for CXX dependencies
+[1369/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.FrameRecipeContract.cpp for CXX dependencies
+[1370/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.ColormapSystem.cpp.o
+[1371/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.GeometryResidency.cpp for CXX dependencies
+[1372/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.GpuWorldCompactionContract.cpp for CXX dependencies
+[1373/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.GpuWorldUniformSoAContract.cpp for CXX dependencies
+[1374/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.PostProcessSystem.cpp.o
+[1375/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp for CXX dependencies
+[1376/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.HZBResourceLifetime.cpp for CXX dependencies
+[1377/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.ImGuiPass.cpp for CXX dependencies
+[1378/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.ImGuiPresentContract.cpp for CXX dependencies
+[1379/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.LightingShadowContracts.cpp for CXX dependencies
+[1380/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.LightClusterGrid.cpp for CXX dependencies
+[1381/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.LinePointPassContracts.cpp for CXX dependencies
+[1382/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.MaterialSubstitutionContract.cpp for CXX dependencies
+[1383/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.RenderGraphDebugDump.cpp.o
+[1384/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.MinimalTriangleReadbackHarness.cpp for CXX dependencies
+[1385/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.PostProcessChainContract.cpp for CXX dependencies
+[1386/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.PresentPass.cpp for CXX dependencies
+[1387/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.OwnershipTransferBarriers.cpp for CXX dependencies
+[1388/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.Profiler.cpp for CXX dependencies
+[1389/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.QueueAffinity.cpp for CXX dependencies
+[1390/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RHIResourceSlotRecycling.cpp for CXX dependencies
+[1391/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.ReconstructionContract.cpp for CXX dependencies
+[1392/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RenderCommandRouter.cpp for CXX dependencies
+[1393/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RenderPrepPipeline.cpp for CXX dependencies
+[1394/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RenderingContract.cpp for CXX dependencies
+[1395/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RenderRecipeConfig.cpp for CXX dependencies
+[1396/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RenderSubsystemRegistry.cpp for CXX dependencies
+[1397/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RenderWorldContract.cpp for CXX dependencies
+[1398/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RendererFrameLifecycle.cpp for CXX dependencies
+[1399/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RenderGraphParallelRecording.cpp for CXX dependencies
+[1400/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.SelectionPassContracts.cpp for CXX dependencies
+[1401/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.RenderGraphValidation.cpp for CXX dependencies
+[1402/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.SharedRenderRecipeExecution.cpp for CXX dependencies
+[1403/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.SelectionSystemContracts.cpp for CXX dependencies
+[1404/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.TransformSyncSystem.cpp for CXX dependencies
+[1405/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.SurfacePassContracts.cpp for CXX dependencies
+[1406/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.VisualizationOverlayPass.cpp for CXX dependencies
+[1407/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.VisualizationPropertyBufferResidency.cpp for CXX dependencies
+[1408/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.UvView.cpp for CXX dependencies
+[1409/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/graphics/Test.TransientDebugSurfacePass.cpp for CXX dependencies
+[1410/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/CXX.dd
+[1411/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.RuntimeRenderExtraction.cpp for CXX dependencies
+[1412/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeDeviceSelection.cpp for CXX dependencies
+[1413/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/contract/runtime/Test.RuntimeFrameLoopContract.cpp for CXX dependencies
+[1414/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.RenderWorldPoolPipelined.cpp for CXX dependencies
+[1415/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp for CXX dependencies
+[1416/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.AssetLoadPipeline.cpp for CXX dependencies
+[1417/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.AssetService.cpp for CXX dependencies
+[1418/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/CXX.dd
+[1419/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.UvViewGpuSmoke.cpp.o
+[1420/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.CoreFrameGraphParallel.cpp for CXX dependencies
+[1421/1498] Generating CXX dyndep file tests/CMakeFiles/TestSupportObjs.dir/CXX.dd
+[1422/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.CoreProcess.cpp for CXX dependencies
+[1423/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.CoreGraphStress.cpp for CXX dependencies
+[1424/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.SpatialDebugVisualizers.cpp.o
+[1425/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/CXX.dd
+[1426/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.RendererLegacy.cpp for CXX dependencies
+[1427/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp for CXX dependencies
+[1428/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.GpuWorldAndCulling.cpp for CXX dependencies
+[1429/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/integration/graphics/Test.RenderGraphLegacy.cpp for CXX dependencies
+[1430/1498] Linking CXX executable bin/IntrinsicCoreTests
+[1431/1498] Linking CXX executable bin/IntrinsicEcsContractTests
+[1432/1498] Generating CXX dyndep file tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/CXX.dd
+[1433/1498] Generating CXX dyndep file tests/CMakeFiles/RuntimeGpuResultReadbackSmokeTestObjs.dir/CXX.dd
+[1434/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.VisualizationPackets.cpp.o
+[1435/1498] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.MaterialSystem.cpp.o
+[1436/1498] Linking CXX executable bin/IntrinsicECSTests
+[1437/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanContractTestObjs.dir/contract/graphics/Test.VulkanOperationalDiagnosticsSnapshot.cpp.o
+[1438/1498] Building CXX object tests/CMakeFiles/GraphicsAssetsUnitTestObjs.dir/unit/graphics/Test.GpuAssetCache.cpp.o
+[1439/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanContractTestObjs.dir/contract/graphics/Test.VulkanOperationalStatusEvaluator.cpp.o
+[1440/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanContractTestObjs.dir/contract/graphics/Test.VulkanFailClosedContract.cpp.o
+[1441/1498] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp.o
+[1442/1498] Linking CXX executable bin/IntrinsicGeometryMethodTests
+[1443/1498] Linking CXX executable bin/IntrinsicGeometryMethodSlowTests
+[1444/1498] Linking CXX executable bin/IntrinsicBenchmarkTests
+[1445/1498] Linking CXX executable bin/IntrinsicPhysicsMethodTests
+[1446/1498] Linking CXX executable bin/IntrinsicPhysicsWorldTests
+[1447/1498] Linking CXX executable bin/IntrinsicRuntimePhysicsBridgeTests
+[1448/1498] Linking CXX executable bin/IntrinsicGeometryIoTests
+[1449/1498] Linking CXX executable bin/IntrinsicAssetUnitTests
+[1450/1498] Linking CXX executable bin/IntrinsicGeometrySlowTests
+[1451/1498] Linking CXX executable bin/IntrinsicGeometryProcessStateTests
+[1452/1498] Scanning /tmp/intrinsic-runtime-cleanup.ae4UkC/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp for CXX dependencies
+[1453/1498] Generating CXX dyndep file tests/CMakeFiles/IntrinsicGlfwLifecycleLsanProcess.dir/CXX.dd
+[1454/1498] Linking CXX executable bin/IntrinsicPlatformTests
+[1455/1498] Linking CXX executable bin/IntrinsicPlatformGlfwSmokeTests
+[1456/1498] Linking CXX executable bin/IntrinsicCoreWrapperUnitTests
+[1457/1498] Building CXX object tests/CMakeFiles/RuntimeClusteringServiceGpuSmokeTestObjs.dir/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp.o
+[1458/1498] Building CXX object tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/integration/runtime/Test.AssetLoadPipeline.cpp.o
+[1459/1498] Building CXX object tests/CMakeFiles/IntrinsicGlfwLifecycleLsanProcess.dir/regression/platform/Test.GlfwLifecycleLsanProcess.cpp.o
+/tmp/intrinsic-runtime-cleanup.ae4UkC/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:31:28: warning: unused function 'AllocateBug082SyntheticEngineLeak' [-Wunused-function]
+   31 |     [[gnu::noinline]] void AllocateBug082SyntheticEngineLeak()
+      |                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/intrinsic-runtime-cleanup.ae4UkC/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:37:10: warning: unused function 'VerifyEngineStaticTeardown' [-Wunused-function]
+   37 |     void VerifyEngineStaticTeardown()
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+2 warnings generated.
+[1460/1498] Linking CXX executable bin/IntrinsicGraphicsUnitTests
+[1461/1498] Linking CXX executable bin/IntrinsicGlfwLifecycleLsanProcess
+[1462/1498] Linking CXX executable bin/IntrinsicGraphicsAssetsUnitTests
+[1463/1498] Linking CXX executable bin/IntrinsicGraphicsBufferTransferTests
+[1464/1498] Linking CXX executable bin/IntrinsicRuntimeProgressivePoissonResultGpuSmokeTests
+[1465/1498] Building CXX object tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/integration/runtime/Test.CoreGraphStress.cpp.o
+[1466/1498] Linking CXX executable bin/IntrinsicGraphicsRhiCpuUnitTests
+[1467/1498] Building CXX object tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/integration/runtime/Test.CoreProcess.cpp.o
+[1468/1498] Linking CXX executable bin/IntrinsicGraphicsRendererCpuUnitTests
+[1469/1498] Linking CXX executable bin/IntrinsicGraphicsVulkanContractTests
+[1470/1498] Linking CXX executable bin/IntrinsicRuntimeContractSlowTests
+[1471/1498] Building CXX object tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/integration/runtime/Test.CoreFrameGraphParallel.cpp.o
+[1472/1498] Linking CXX executable bin/IntrinsicGeometryTests
+[1473/1498] Building CXX object tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/integration/runtime/Test.AssetService.cpp.o
+[1474/1498] Building CXX object tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/integration/graphics/Test.RenderGraphLegacy.cpp.o
+[1475/1498] Linking CXX executable bin/IntrinsicRuntimeIntegrationTests
+[1476/1498] Building CXX object tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/integration/graphics/Test.GpuWorldAndCulling.cpp.o
+[1477/1498] Linking CXX executable bin/IntrinsicGraphicsVulkanSmokeTests
+[1478/1498] Linking CXX executable bin/IntrinsicRuntimeClusteringServiceGpuSmokeTests
+[1479/1498] Building CXX object tests/CMakeFiles/RuntimeGpuResultReadbackSmokeTestObjs.dir/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp.o
+[1480/1498] Linking CXX executable bin/IntrinsicRuntimeGpuResultReadbackSmokeTests
+[1481/1498] Building CXX object tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/integration/graphics/Test.RendererLegacy.cpp.o
+[1482/1498] Linking CXX executable bin/IntrinsicGraphicsIntegrationCpuTests
+[1483/1498] Building CXX object tests/CMakeFiles/RuntimeSandboxAcceptanceGpuSmokeTestObjs.dir/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp.o
+[1484/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cppm.o
+[1485/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o
+[1486/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cppm.o
+[1487/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cppm.o
+[1488/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cppm.o
+[1489/1498] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxDomainPanels.cpp.o
+[1490/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o
+[1491/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorController.cpp.o
+[1492/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o
+[1493/1498] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cpp.o
+[1494/1498] Linking CXX static library lib/libExtrinsicSandboxEditor.a
+[1495/1498] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxParameterizationPanel.cpp.o
+[1496/1498] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+[1497/1498] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxEditorPresentation.cpp.o
+[1498/1498] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests

@@ -48,13 +48,12 @@ This is option (C) realized as uniform SoA + per-channel dirty: one vertex
 layout, one shader fetch path, per-attribute streaming available to every
 geometry kind.
 
-An AoS "fast lane" for proven-static, vertex-fetch-bound geometry (options A/B)
-is not part of the current design. `RUNTIME-125` retained a smoke probe with
-`adoption_claim=false`; no qualifying result justified allocation/shader
-variants. RUNTIME-139 therefore removes the dormant public hint/plan/promotion
-surface. A future alternate layout starts from a new task only after
-claim-eligible GPU profiling identifies vertex fetch/layout as a material
-bottleneck and a frozen matched-layout gate passes.
+RUNTIME-125 recorded a CPU smoke probe and a planning-only AoS proposal, but
+the probe remained explicit non-adoption evidence and no allocator, shader, or
+residency implementation followed. RUNTIME-139 therefore removed that dormant
+proposal from the public contract. A future alternate layout requires a new
+task backed by claim-eligible GPU profiling and a frozen matched-layout
+adoption threshold.
 
 ## Consequences
 
@@ -67,10 +66,10 @@ bottleneck and a frozen matched-layout gate passes.
   AoS. With BDA and sequential `gl_VertexIndex` the per-channel loads coalesce,
   and current evidence does not identify vertex fetch as this engine's
   bottleneck. If future profiling proves otherwise, a new evidence-backed task
-  may reconsider the layout without relying on dormant planning types.
+  may introduce an alternate lane without relying on dormant planning types.
 - Follow-up: RUNTIME-122 (SoA storage + shader fetch), RUNTIME-124 (per-channel
-  streaming), RUNTIME-125 (non-adoption layout probe), RUNTIME-139 (remove
-  speculative AoS planning state).
+  streaming), RUNTIME-125 (non-adoption vertex-fetch probe), RUNTIME-139
+  (retirement of speculative storage planning).
 
 ## Alternatives Considered
 
@@ -78,9 +77,9 @@ bottleneck and a frozen matched-layout gate passes.
   layouts force two shader fetch paths (pipeline variants across forward /
   deferred / depth / selection / line / point passes) and conversion lifetime
   logic, for a cache-locality benefit that is unmeasured in this engine and that
-  the upload mechanism (staged device-local copies) does not change. It may be
-  reconsidered only after the evidence trigger above; no public placeholder
-  seam is retained meanwhile.
+  the upload mechanism (staged device-local copies) does not change. Reconsider
+  only after claim-eligible GPU profiling demonstrates a material bottleneck;
+  no public placeholder seam is retained meanwhile.
 - **Keep AoS, scatter-write attributes:** rejected — `WriteBuffer` writes one
   contiguous range; strided per-attribute scatter is not supported and would be
   inefficient.
@@ -95,3 +94,5 @@ bottleneck and a frozen matched-layout gate passes.
   GpuScene shaders fetch those channels on a Vulkan-capable host.
 - RUNTIME-124: per-channel dirty tracking and partial uploads must add their own
   CPU/null contract coverage plus opt-in `gpu;vulkan` proof.
+- RUNTIME-139: source and behavior ratchets prove uniform SoA remains the sole
+  public/live contract and the non-adoption probe remains reproducible.

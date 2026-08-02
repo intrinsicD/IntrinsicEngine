@@ -7754,3 +7754,53 @@ tree:
       - "N325"
       - "Strict task, task-state, docs, ARA, layering, root-hygiene, and clean-workshop gates passed before staging."
     status: resolved
+  - id: N327
+    type: decision
+    title: "Resolve the runtime-cleanup merge to landed implementation state"
+    provenance: ai-executed
+    timestamp: "2026-08-02T11:16+02:00"
+    also_depends_on: [N317, N318, N326]
+    choice: >
+      Preserve the local rationale and explicit non-claim records while
+      accepting the incoming completed RUNTIME-139, RUNTIME-203, and
+      RUNTIME-205 implementations as current truth. Retire their open task
+      copies, rewrite planned-language conflicts to `Retired`, regenerate the
+      session brief and module inventory, and bind RUNTIME-138 evidence to its
+      clean pre-merge revision.
+    alternatives:
+      - "Choose either conflict side wholesale and discard valid rationale or landed implementation state."
+      - "Keep duplicate backlog and done task IDs after the independent task moves."
+      - "Abort the active merge or retain aspirational prose for code that is already retired."
+    evidence:
+      - "User direction: please resolve the merge conflicts."
+      - "local parent 31d9d30efdf05928225a4600e34ae6ec19a89695"
+      - "incoming parent fb494cfc7cdc319fcb050a73b2e291ff73cc6d1d"
+      - "tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md"
+      - "tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md"
+      - "tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/evidence/RUNTIME-138/report.yaml"
+    status: resolved
+  - id: N328
+    type: experiment
+    title: "Verify the reconciled runtime-cleanup merge"
+    provenance: ai-executed
+    timestamp: "2026-08-02T11:16+02:00"
+    also_depends_on: [N327]
+    evidence:
+      - "cmake --preset ci: Clang 23 configure passed"
+      - "cmake --build --preset ci --target IntrinsicTests: 1,360/1,360 steps passed"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60: 3,991/3,991 passed; expected GLFW/LSan control skipped"
+      - "tools/ci/run_clean_workshop_review.sh . --strict: 735 source files, 6,915 references, 85 CMake links, 0 layering violations"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict: 180 tasks, 0 findings"
+      - "python3 tools/agents/check_task_state_links.py --root . --strict: 816 IDs, 0 findings"
+      - "python3 tools/agents/workflow_evidence.py validate --root .: 0 errors, 7 declared skip warnings"
+      - "python3 tools/benchmark/validate_benchmark_manifests.py: 30 manifests passed"
+    result: >
+      The staged merge has zero unmerged paths or conflict markers. All removed
+      runtime BMIs and their downstream consumers compile through the aggregate
+      test target, every selected CPU test passes, generated records are fresh,
+      and strict layering, task, documentation, benchmark, ARA, and workflow-
+      evidence gates are clean. GPU/Vulkan execution was not rerun and no
+      performance, parity, or scientific claim is added.
+    status: resolved

@@ -36,6 +36,7 @@ import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Logging;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Platform.Window;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.Graphics.Renderer;
@@ -47,14 +48,11 @@ import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.ModuleSchedule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Core.FrameLoop;
-import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -62,6 +60,9 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.System.BoundsPropagation;
+import Extrinsic.ECS.System.RenderSync;
+import Extrinsic.ECS.System.TransformHierarchy;
 
 #include "Runtime.Engine.FrameLoop.Internal.hpp"
 #include "Runtime.RenderExtractionService.Internal.hpp"
@@ -75,6 +76,21 @@ namespace Extrinsic::Runtime
 
     struct Engine::Impl
     {
+        struct FrameHookRecord
+        {
+            std::string ModuleName{};
+            FramePhase Phase{FramePhase::UiBegin};
+            RuntimeFrameHook Hook{};
+            std::uint64_t Sequence{0u};
+        };
+
+        struct ViewportInputHookRecord
+        {
+            std::string ModuleName{};
+            RuntimeViewportInputHook Hook{};
+            std::uint64_t Sequence{0u};
+        };
+
         explicit Impl(Core::Config::EngineConfig config)
             : m_Config(std::move(config))
         {
@@ -94,7 +110,9 @@ namespace Extrinsic::Runtime
         ServiceRegistry m_ServiceRegistry{};
         WorldRegistry m_WorldRegistry{};
         ECS::Scene::Registry* m_Scene{};
-        RuntimeModuleSchedule m_RuntimeModuleSchedule{};
+        std::vector<FrameHookRecord> m_FrameHooks{};
+        std::vector<ViewportInputHookRecord> m_ViewportInputHooks{};
+        std::uint64_t m_NextHookRegistrationSequence{0u};
         Core::FrameClock m_FrameClock{};
         double m_Accumulator{0.0};
         double m_FixedDt{1.0 / 60.0};
@@ -106,7 +124,7 @@ namespace Extrinsic::Runtime
         bool m_RendererOperational{false};
         bool m_WindowCloseLogged{false};
         RuntimeFramePacingDiagnostics m_LastFramePacingDiagnostics{};
-        JobServiceGpuQueueBridge m_JobServiceGpuQueueBridge{};
+        Graphics::RuntimeFrameCommandHookHandle m_JobServiceGpuQueueHook{};
     };
 
     // ── Construction / destruction ────────────────────────────────────────
@@ -212,7 +230,9 @@ namespace Extrinsic::Runtime
                 return lhs->Name() < rhs->Name();
             });
 
-        m_Impl->m_RuntimeModuleSchedule.Clear();
+        m_Impl->m_FrameHooks.clear();
+        m_Impl->m_ViewportInputHooks.clear();
+        m_Impl->m_NextHookRegistrationSequence = 0u;
 
         m_Impl->m_ServiceRegistry.BeginRegistration();
         const auto requireProvide = [](Core::Result result,
@@ -254,14 +274,25 @@ namespace Extrinsic::Runtime
                 m_Impl->m_ServiceRegistry,
                 [this, moduleName](FramePhase phase, RuntimeFrameHook hook)
                 {
-                    m_Impl->m_RuntimeModuleSchedule.RegisterFrameHook(
-                        moduleName, phase, std::move(hook));
+                    m_Impl->m_FrameHooks.push_back(
+                        Impl::FrameHookRecord{
+                            .ModuleName = moduleName,
+                            .Phase = phase,
+                            .Hook = std::move(hook),
+                            .Sequence =
+                                m_Impl->m_NextHookRegistrationSequence++,
+                        });
                 },
                 recipeActivation,
                 [this, moduleName](RuntimeViewportInputHook hook)
                 {
-                    m_Impl->m_RuntimeModuleSchedule.RegisterViewportInputHook(
-                        moduleName, std::move(hook));
+                    m_Impl->m_ViewportInputHooks.push_back(
+                        Impl::ViewportInputHookRecord{
+                            .ModuleName = moduleName,
+                            .Hook = std::move(hook),
+                            .Sequence =
+                                m_Impl->m_NextHookRegistrationSequence++,
+                        });
                 },
                 &m_Impl->m_Initialized);
 
@@ -333,7 +364,28 @@ namespace Extrinsic::Runtime
         }
         m_Impl->m_ServiceRegistry.Lock();
 
-        m_Impl->m_RuntimeModuleSchedule.FinalizeForBoot();
+        std::sort(
+            m_Impl->m_FrameHooks.begin(),
+            m_Impl->m_FrameHooks.end(),
+            [](const Impl::FrameHookRecord& lhs,
+               const Impl::FrameHookRecord& rhs)
+            {
+                if (lhs.Phase != rhs.Phase)
+                    return lhs.Phase < rhs.Phase;
+                if (lhs.ModuleName != rhs.ModuleName)
+                    return lhs.ModuleName < rhs.ModuleName;
+                return lhs.Sequence < rhs.Sequence;
+            });
+        std::sort(
+            m_Impl->m_ViewportInputHooks.begin(),
+            m_Impl->m_ViewportInputHooks.end(),
+            [](const Impl::ViewportInputHookRecord& lhs,
+               const Impl::ViewportInputHookRecord& rhs)
+            {
+                if (lhs.ModuleName != rhs.ModuleName)
+                    return lhs.ModuleName < rhs.ModuleName;
+                return lhs.Sequence < rhs.Sequence;
+            });
     }
 
     void Engine::RunRuntimeModuleFrameHooks(
@@ -346,22 +398,26 @@ namespace Extrinsic::Runtime
         if (!m_Impl->m_Scene)
             return;
 
-        m_Impl->m_RuntimeModuleSchedule.RunFrameHooks(
-            RuntimeModuleFrameHookDispatchContext{
-                .Phase = phase,
-                .ActiveWorld = *m_Impl->m_Scene,
-                .ActiveWorldHandle = ActiveWorld(),
-                .Commands = m_Impl->m_CommandBus,
-                .Events = m_Impl->m_KernelEvents,
-                .Jobs = m_Impl->m_JobService,
-                .Worlds = m_Impl->m_WorldRegistry,
-                .Services = m_Impl->m_ServiceRegistry,
-                .EditorCapture = editorCapture,
-                .Pacing = pacing,
-                .FrameIndex = m_Impl->m_RenderExtractionService.CurrentFrameIndex(),
-                .FrameDeltaSeconds = frameDt,
-                .FixedStepAlpha = alpha,
-            });
+        RuntimeFrameHookContext context{
+            .ActiveWorld = *m_Impl->m_Scene,
+            .ActiveWorldHandle = ActiveWorld(),
+            .Commands = m_Impl->m_CommandBus,
+            .Events = m_Impl->m_KernelEvents,
+            .Jobs = m_Impl->m_JobService,
+            .Worlds = m_Impl->m_WorldRegistry,
+            .Services = m_Impl->m_ServiceRegistry,
+            .EditorCapture = editorCapture,
+            .Pacing = pacing,
+            .FrameIndex =
+                m_Impl->m_RenderExtractionService.CurrentFrameIndex(),
+            .FrameDeltaSeconds = frameDt,
+            .FixedStepAlpha = alpha,
+        };
+        for (const Impl::FrameHookRecord& record : m_Impl->m_FrameHooks)
+        {
+            if (record.Phase == phase && record.Hook)
+                record.Hook(context);
+        }
     }
 
     void Engine::AnnounceRuntimeShutdown()
@@ -496,7 +552,16 @@ namespace Extrinsic::Runtime
         const RuntimeRenderRecipeActivationKernel recipeActivation =
             MakeRenderRecipeActivationKernel(startupRecipeState);
         ResetRuntimeRenderRecipeActivation(recipeActivation);
-        m_Impl->m_JobServiceGpuQueueBridge.Install(*m_Impl->m_Renderer, m_Impl->m_JobService);
+        if (!m_Impl->m_JobServiceGpuQueueHook.IsValid())
+        {
+            m_Impl->m_JobServiceGpuQueueHook =
+                m_Impl->m_Renderer->RegisterRuntimeFrameCommandHook(
+                    [this](RHI::ICommandContext& commandContext)
+                    {
+                        m_Impl->m_JobService.RecordGpuQueueFrameCommands(
+                            commandContext);
+                    });
+        }
         if (!m_Impl->m_Config.Render.DefaultRecipeConfigPath.empty())
         {
             (void)LoadAndApplyRuntimeRenderRecipeConfigFile(
@@ -560,9 +625,14 @@ namespace Extrinsic::Runtime
         if (m_Impl->m_Window)
             m_Impl->m_Window->Listen({});
 
-        (void)m_Impl->m_JobServiceGpuQueueBridge.ShutdownParticipants(
-            m_Impl->m_Renderer.get(),
-            m_Impl->m_JobService,
+        if (m_Impl->m_Renderer != nullptr &&
+            m_Impl->m_JobServiceGpuQueueHook.IsValid())
+        {
+            m_Impl->m_Renderer->UnregisterRuntimeFrameCommandHook(
+                m_Impl->m_JobServiceGpuQueueHook);
+        }
+        m_Impl->m_JobServiceGpuQueueHook = {};
+        (void)m_Impl->m_JobService.ShutdownGpuQueueParticipants(
             [this]
             {
                 if (m_Impl->m_Device)
@@ -841,16 +911,21 @@ namespace Extrinsic::Runtime
         Graphics::RenderFrameInput& renderInput = frameContext.RenderInput;
 
         const Platform::IWindow& inputWindow = *m_Impl->m_Window;
-        m_Impl->m_RuntimeModuleSchedule.RunViewportInputHooks(
-            RuntimeViewportInputHookContext{
-                .Config = m_Impl->m_Config,
-                .ActiveWorldHandle = ActiveWorld(),
-                .Input = inputWindow.GetInput(),
-                .Viewport = viewport,
-                .EditorCapture = editorCapture,
-                .RenderInput = renderInput,
-                .FrameDeltaSeconds = frameDt,
-            });
+        RuntimeViewportInputHookContext viewportContext{
+            .Config = m_Impl->m_Config,
+            .ActiveWorldHandle = ActiveWorld(),
+            .Input = inputWindow.GetInput(),
+            .Viewport = viewport,
+            .EditorCapture = editorCapture,
+            .RenderInput = renderInput,
+            .FrameDeltaSeconds = frameDt,
+        };
+        for (const Impl::ViewportInputHookRecord& record :
+             m_Impl->m_ViewportInputHooks)
+        {
+            if (record.Hook)
+                record.Hook(viewportContext);
+        }
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
             HasPendingPreRenderTransformFlush(*m_Impl->m_Scene);
@@ -871,8 +946,13 @@ namespace Extrinsic::Runtime
         const auto preRenderFlushBegin = std::chrono::steady_clock::now();
         if (preRenderTransformFlushNeeded)
         {
-            const PreRenderTransformFlushStats preRenderFlush =
-                FlushPreRenderTransformState(*m_Impl->m_Scene);
+            ECS::Systems::TransformHierarchy::OnUpdate(
+                m_Impl->m_Scene->Raw());
+            ECS::Systems::BoundsPropagation::OnUpdate(
+                m_Impl->m_Scene->Raw());
+            ECS::Systems::RenderSync::Stats preRenderFlush{};
+            ECS::Systems::RenderSync::OnUpdate(
+                m_Impl->m_Scene->Raw(), preRenderFlush);
             pacing.PreRenderTransformFlushRan = true;
             pacing.PreRenderTransformWorldUpdatedObserved =
                 preRenderFlush.WorldUpdatedObserved;

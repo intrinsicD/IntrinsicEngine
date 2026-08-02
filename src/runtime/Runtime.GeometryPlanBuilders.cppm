@@ -31,8 +31,6 @@ export namespace Extrinsic::Runtime
         Graphics::GeometryUploadUpdateClass UpdateClass{
             Graphics::GeometryUploadUpdateClass::FullReplacement};
         Graphics::GpuWorld::GeometryChannelUpdateMask UpdateChannels{};
-        Graphics::GpuWorld::GeometryStorageHint StorageHint{
-            Graphics::GpuWorld::GeometryStorageHint::DynamicSoA};
     };
 
     [[nodiscard]] inline std::optional<AttributeSourceType>

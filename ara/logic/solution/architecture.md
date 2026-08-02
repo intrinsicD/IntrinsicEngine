@@ -309,9 +309,11 @@
   consumers; their public status changes only under a new concrete task.
 - **Provenance**: user-revised
 - **Crystallized via**: verbal-affirmation
-- **Evidence**: [N312, N313, N317, N318,
-  tasks/backlog/runtime/RUNTIME-203-internalize-engine-composition-helpers.md,
-  tasks/backlog/runtime/RUNTIME-205-internalize-scene-interaction-helpers.md,
+- **Evidence**: [N312, N313, N317, N318, N327, N328,
+  tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md,
+  tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md,
+  tasks/evidence/RUNTIME-203/report.yaml,
+  tasks/evidence/RUNTIME-205/report.yaml,
   tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
   src/runtime/Runtime.Engine.cpp,
   src/runtime/Scene/Runtime.SceneInteractionModule.cpp,

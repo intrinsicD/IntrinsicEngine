@@ -276,7 +276,6 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeKernelEvents.cpp
         Test.RuntimeModule.cpp
         Test.RuntimeWorldRegistry.cpp
-        Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
         Test.RuntimeSceneLifecycle.cpp
         Test.SceneDocumentModule.cpp
@@ -291,7 +290,6 @@ if(TARGET ExtrinsicRuntime)
         Test.SandboxEditorSessionLifecycle.cpp
         Test.TextureBakeModule.cpp
         Test.SelectionController.cpp
-        Test.SelectionReadbackCorrelation.cpp
         Test.SelectionSnapshotExtraction.cpp
         Test.SelectionStableLookupComposition.cpp
         Test.StableEntityLookup.cpp
@@ -888,7 +886,7 @@ set(_graphics_contract_cpu_test_files
     Test.GeometryResidency.cpp
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp
-    Test.GpuWorldStoragePlanContract.cpp
+    Test.GpuWorldUniformSoAContract.cpp
     Test.HZBResourceLifetime.cpp
     Test.ImGuiPass.cpp
     Test.ImGuiPresentContract.cpp

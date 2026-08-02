@@ -295,17 +295,21 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `CPUContracted`):
   retired legacy `tests/unit/ecs/Test_FrameGraphSystems.cpp` coverage because
   promoted ECS transform/bounds/render-sync and
-  `Test.RuntimeEcsSystemBundle.cpp` own the retained system-bundle contracts,
-  while legacy `AxisRotator` stays sample-only behavior; remaining Core
+  the then-current runtime bundle contract tests owned the retained activation
+  behavior; `RUNTIME-203` later moved that coverage to real Engine fixed-step
+  and pre-render contracts and deleted the helper-only test. Legacy
+  `AxisRotator` stays sample-only behavior; remaining Core
   deletion blockers are 25 tests and remaining ECS external blockers are 23
   tests.
 - [LEGACY-032 — Resolve legacy `Runtime.SystemBundles` test migration](../../archive/LEGACY-032-resolve-runtime-system-bundles-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy `tests/unit/runtime/Test_RuntimeSystemBundles.cpp` coverage
   after mapping retained fixed-step ECS activation to
-  `Test.RuntimeEcsSystemBundle.cpp`, graphics lifecycle names to existing
-  graphics/runtime contracts, and the old global feature-catalog ordering to an
-  explicit retirement decision; remaining Core deletion blockers are 24 tests,
+  the then-current bundle tests, graphics lifecycle names to existing
+  graphics/runtime contracts, and the old global feature-catalog ordering to
+  an explicit retirement decision. `RUNTIME-203` later moved fixed-step
+  activation coverage to Engine owner tests and deleted the helper-only test;
+  remaining Core deletion blockers are 24 tests,
   remaining ECS external blockers are 22 tests, and remaining Runtime external
   blockers are 18 tests.
 - [LEGACY-033 — Retire legacy RuntimeEngineConfig test](../../archive/LEGACY-033-retire-runtime-engine-config-test.md)

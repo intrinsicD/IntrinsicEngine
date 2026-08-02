@@ -288,10 +288,16 @@ namespace Extrinsic::Runtime
         int substeps = 0;
         while (accumulator >= fixedDt && substeps < maxSubSteps)
         {
-            // The promoted ECS bundle is the complete production fixed-step
-            // schedule. App-composed owners contribute frame/viewport hooks;
-            // no test-only module-system lane is retained in production.
-            (void)RegisterPromotedEcsSystemBundle(frameGraph, scene);
+            // The promoted ECS systems are the complete production fixed-step
+            // schedule. Their declared read/write and named-signal edges
+            // preserve TransformHierarchy -> BoundsPropagation -> RenderSync
+            // while Engine owns only composition and replay cadence.
+            ECS::Systems::TransformHierarchy::RegisterSystem(
+                frameGraph, scene.Raw());
+            ECS::Systems::BoundsPropagation::RegisterSystem(
+                frameGraph, scene.Raw());
+            ECS::Systems::RenderSync::RegisterSystem(
+                frameGraph, scene.Raw());
 
             if (frameGraph.PassCount() > 0)
             {

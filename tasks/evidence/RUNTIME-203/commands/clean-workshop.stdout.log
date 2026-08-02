@@ -1,0 +1,24 @@
+[clean-workshop-review] Running scorecard-relevant validators at root: /tmp/intrinsic-runtime-cleanup.ae4UkC
+[check_layering] Scan root: /tmp/intrinsic-runtime-cleanup.ae4UkC/src
+[check_layering] Files scanned: 739
+[check_layering] References scanned: 6943 import/include, 85 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+[check_layering_allowlist_quality] Allowlist: /tmp/intrinsic-runtime-cleanup.ae4UkC/tools/repo/layering_allowlist.yaml
+[check_layering_allowlist_quality] Entries: 0
+[check_layering_allowlist_quality] No findings.
+Validated 180 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /tmp/intrinsic-runtime-cleanup.ae4UkC
+[check_task_maturity_followups] Open task files scanned: 79
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_doc_links] Root: /tmp/intrinsic-runtime-cleanup.ae4UkC
+[check_doc_links] Checked relative links: 3007
+[check_doc_links] Mode: strict
+[check_doc_links] No broken relative links found.
+[clean-workshop-review] Automated rows complete.
+[clean-workshop-review] Score the manual rows (3-6) and record findings in:
+    docs/reviews/<YYYY-MM-DD>-clean-workshop-review.md
+[clean-workshop-review] Scorecard + 'when required' guidance:
+    docs/agent/clean-workshop-review.md

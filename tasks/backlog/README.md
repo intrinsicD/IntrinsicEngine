@@ -68,11 +68,11 @@ contract-first renderer/snapshot/recipe architecture sequence
 bake graphics dilation and shared-index follow-ups (`GRAPHICS-115` and
 `GRAPHICS-128`) and runtime scheduling/production closure (`RUNTIME-129`) are
 retired — see
-[`rendering/README.md`](rendering/README.md) and the retirement log. The former
-profile-gated AoS operational follow-up is now Theme F cleanup: `RUNTIME-139`
-removes its unimplemented planning surface because the retained probe has no
-adoption claim. Current Theme B leaves include the 2026-07-03 render-graph review leaves —
-pass contribution seam (`GRAPHICS-116`), compile caching
+[`rendering/README.md`](rendering/README.md) and the retirement log. Current
+state also retires the former profile-gated AoS planning surface through
+`RUNTIME-139`; the retained probe has no adoption claim. Open Theme B leaves
+include the 2026-07-03 render-graph review leaves — pass contribution seam
+(`GRAPHICS-116`), compile caching
 (`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), and parallel
 command recording (`GRAPHICS-119`); compiler/executor polish (`GRAPHICS-120`)
 is retired; see

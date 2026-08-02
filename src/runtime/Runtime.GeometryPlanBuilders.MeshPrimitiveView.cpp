@@ -446,8 +446,7 @@ namespace Extrinsic::Runtime
                 request.Generation,
                 desc,
                 request.UpdateClass,
-                request.UpdateChannels,
-                request.StorageHint),
+                request.UpdateChannels),
         };
     }
 
@@ -490,8 +489,7 @@ namespace Extrinsic::Runtime
                 request.Generation,
                 desc,
                 request.UpdateClass,
-                request.UpdateChannels,
-                request.StorageHint),
+                request.UpdateChannels),
         };
     }
 }

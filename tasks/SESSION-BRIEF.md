@@ -31,11 +31,8 @@ the authoritative open/unblocked view.
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- blocked by `RUNTIME-139`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+- blocked by `PHYSICS-004`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
-- unblocked: `RUNTIME-139` — Remove speculative AoS storage planning (tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md)
-- unblocked: `RUNTIME-203` — Internalize Engine composition helpers (tasks/backlog/runtime/RUNTIME-203-internalize-engine-composition-helpers.md)
-- unblocked: `RUNTIME-205` — Internalize SceneInteraction helpers (tasks/backlog/runtime/RUNTIME-205-internalize-scene-interaction-helpers.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 - unblocked: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 

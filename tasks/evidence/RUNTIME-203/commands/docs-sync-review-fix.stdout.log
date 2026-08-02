@@ -1,0 +1,6 @@
+[check_docs_sync] Root: /tmp/intrinsic-runtime-cleanup.ae4UkC
+[check_docs_sync] Rules: tools/docs/docs_sync_rules.yaml
+[check_docs_sync] Changed files source: git diff 8cb0985d...HEAD
+[check_docs_sync] Changed files count: 81
+[check_docs_sync] Triggered rules: 0
+[check_docs_sync] Docs sync rules satisfied.

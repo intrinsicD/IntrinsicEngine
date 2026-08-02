@@ -345,11 +345,12 @@
   lane, promotion, or shader-variant state.
 - **Provenance**: user-revised
 - **Crystallized via**: verbal-affirmation
-- **Evidence**: [N312, N313, N317, N318,
+- **Evidence**: [N312, N313, N317, N318, N327, N328,
   docs/adr/0022-vertex-storage-soa-per-channel-streaming.md,
   benchmarks/rendering/manifests/rendering_vertex_fetch_layout_smoke.yaml,
   benchmarks/rendering/README.md,
-  tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md]
+  tasks/done/RUNTIME-139-remove-speculative-aos-storage-planning.md,
+  tasks/evidence/RUNTIME-139/report.yaml]
 - **From staging**: O83
 
 ## K27: Method Presentation Follows Positive Evidence and a Frozen Payload

@@ -235,8 +235,7 @@ namespace Extrinsic::Runtime
                 request.Generation,
                 desc,
                 request.UpdateClass,
-                request.UpdateChannels,
-                request.StorageHint),
+                request.UpdateChannels),
         };
     }
 }

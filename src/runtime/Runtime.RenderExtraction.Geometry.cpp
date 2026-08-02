@@ -1067,8 +1067,6 @@ namespace Extrinsic::Runtime
                     .Generation = residencyIdentity,
                     .UpdateClass = Graphics::GeometryUploadUpdateClass::
                         FullReplacement,
-                    .StorageHint = Graphics::GpuWorld::GeometryStorageHint::
-                        StaticPreferInterleavedAoS,
                 },
                 m_ProceduralPack);
         if (!plan.has_value())

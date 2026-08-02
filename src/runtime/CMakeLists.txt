@@ -14,7 +14,6 @@ target_sources(${target_name}
         Runtime.CommandBus.cppm
         Runtime.DeviceBootstrap.cppm
         Runtime.JobService.cppm
-        Runtime.JobServiceGpuQueueBridge.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
         Modules/Clustering/Runtime.ClusteringGpuBackend.cppm
         Runtime.GeometryPresentation.cppm
@@ -23,7 +22,6 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringConfig.cppm
         Runtime.ProgressivePoissonConfig.cppm
         Runtime.ParameterizationConfig.cppm
-        Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.EditorCommon.cppm
         Runtime.EditorWorkspaceAttachment.cppm
@@ -44,7 +42,6 @@ target_sources(${target_name}
         Runtime.InputActions.cppm
         Runtime.KernelEvents.cppm
         Runtime.Module.cppm
-        Runtime.ModuleSchedule.cppm
         Runtime.ServiceRegistry.cppm
         Runtime.WorldHandle.cppm
         Runtime.WorldRegistry.cppm
@@ -56,7 +53,6 @@ target_sources(${target_name}
         Cameras/Runtime.CameraModule.cppm
         Cameras/Runtime.CameraControllers.cppm
         Cameras/Runtime.CameraFocusCommand.cppm
-        Gizmos/Runtime.GizmoFrameService.cppm
         Gizmos/Runtime.GizmoInteraction.cppm
         ImGui/Runtime.ImGuiAdapter.cppm
         Runtime.MeshPrimitiveView.cppm
@@ -66,7 +62,6 @@ target_sources(${target_name}
         Runtime.RenderRecipeActivation.cppm
         Runtime.RenderExtraction.cppm
         Runtime.RenderWorldPool.cppm
-        Runtime.SelectionReadback.cppm
         Runtime.SelectionController.cppm
         Runtime.StableEntityLookup.cppm
         Runtime.TextureBakeModule.cppm
@@ -106,7 +101,6 @@ target_sources(${target_name}
         Runtime.CommandBus.cpp
         Runtime.DeviceBootstrap.cpp
         Runtime.JobService.cpp
-        Runtime.JobServiceGpuQueueBridge.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
         Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
@@ -117,7 +111,6 @@ target_sources(${target_name}
         Runtime.ProgressivePoissonConfig.cpp
         Runtime.ParameterizationConfig.cpp
         internal/Runtime.FeatureConfigCodecs.Detail.cpp
-        Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.EditorCommon.Public.cpp
         Runtime.EditorWorkspaceAttachment.cpp
@@ -149,7 +142,6 @@ target_sources(${target_name}
         Runtime.FramePacingDiagnostics.cpp
         Runtime.InputActions.cpp
         Runtime.KernelEvents.cpp
-        Runtime.ModuleSchedule.cpp
         Runtime.ServiceRegistry.cpp
         Runtime.WorldRegistry.cpp
         Runtime.GeometryAvailability.cpp
@@ -160,7 +152,6 @@ target_sources(${target_name}
         Cameras/Runtime.CameraModule.cpp
         Cameras/Runtime.CameraControllers.cpp
         Cameras/Runtime.CameraFocusCommand.cpp
-        Gizmos/Runtime.GizmoFrameService.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp
         Runtime.GeometryPlanBuilders.Graph.cpp
@@ -177,7 +168,6 @@ target_sources(${target_name}
         Runtime.RenderExtraction.Geometry.cpp
         Runtime.RenderExtractionService.cpp
         Runtime.RenderWorldPool.cpp
-        Runtime.SelectionReadback.cpp
         Runtime.SelectionController.cpp
         Runtime.StableEntityLookup.cpp
         Runtime.TextureBakeModule.cpp
