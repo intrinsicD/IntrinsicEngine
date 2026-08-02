@@ -3,15 +3,15 @@ task_id: HARDEN-087
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-02T20:34:35Z'
+generated_at: '2026-08-02T20:37:11Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 1481c3b13d960d1b68cde5ef8b6fbb2a34741426
-  head_revision: 2ed66f6ceffb1f6c025d2c5d29787c84635da83f
+  head_revision: ed689adc0a92dde49cead904159924ae846b94d9
   branch: ecs/harden-087-unified-geometry-sources
   worktree: /tmp/intrinsic-harden087.0mo5us
-  dirty: true
+  dirty: false
   surface:
   - path: ara/logic/claims.md
     sha256: d641789ce364b8dc215c6d9f1f5fd412317de41f7769bd6df1bec20c31e44b66
