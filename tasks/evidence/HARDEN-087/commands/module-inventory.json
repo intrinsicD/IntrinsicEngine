@@ -1,0 +1,24 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/generate_module_inventory.py",
+    "--root",
+    "src",
+    "--out",
+    "docs/api/generated/module_inventory.md"
+  ],
+  "command_display": "python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md",
+  "cwd": ".",
+  "duration_ms": 35,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T19:03:44Z",
+  "label": "module-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T19:03:44Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/module-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/module-inventory.stdout.log",
+  "stdout_sha256": "8f34e425ce6bc13df20e9ff1c66a2492fb2c80bf95c52e4f60a683ca35c15f54",
+  "task_id": "HARDEN-087"
+}

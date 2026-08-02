@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 687,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T19:04:10Z",
+  "label": "doc-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T19:04:09Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/doc-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/doc-links.stdout.log",
+  "stdout_sha256": "d6e9fce865f939a154ed8116333e2eda25c804bcd1bbf2d33e3d1904463ba47c",
+  "task_id": "HARDEN-087"
+}

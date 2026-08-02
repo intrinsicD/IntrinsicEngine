@@ -1,0 +1,8 @@
+[check_task_state_links] Root: /tmp/intrinsic-harden087.0mo5us
+[check_task_state_links] Indexed task IDs: 827
+[check_task_state_links] Mode: strict
+[check_task_state_links] Findings:
+  - tasks/backlog/README.md:135: state-only index links retired task HARDEN-087-unified-geometry-element-source-components.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/README.md:360: state-only index links retired task HARDEN-087-unified-geometry-element-source-components.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/ecs/README.md:50: category index links retired task HARDEN-087-unified-geometry-element-source-components.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+[check_task_state_links] STRICT MODE: failing.

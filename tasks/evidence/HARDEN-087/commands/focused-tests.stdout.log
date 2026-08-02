@@ -1,0 +1,369 @@
+Internal ctest changing into directory: /tmp/intrinsic-harden087.0mo5us/build/ci
+Test project /tmp/intrinsic-harden087.0mo5us/build/ci
+        Start  279: ECSGeometrySourcesPopulate.PopulateFromMeshEmplacesAllFourDomains
+  1/177 Test  #279: ECSGeometrySourcesPopulate.PopulateFromMeshEmplacesAllFourDomains ..................................   Passed    0.00 sec
+        Start  280: ECSGeometrySourcesPopulate.PopulateFromMeshWritesCanonicalKeysAndPositions
+  2/177 Test  #280: ECSGeometrySourcesPopulate.PopulateFromMeshWritesCanonicalKeysAndPositions .........................   Passed    0.00 sec
+        Start  281: ECSGeometrySourcesPopulate.PopulateFromMeshAliveCountsMatchSourceMesh
+  3/177 Test  #281: ECSGeometrySourcesPopulate.PopulateFromMeshAliveCountsMatchSourceMesh ..............................   Passed    0.00 sec
+        Start  282: ECSGeometrySourcesPopulate.PopulateFromMeshCopiesUserDefinedVertexProperty
+  4/177 Test  #282: ECSGeometrySourcesPopulate.PopulateFromMeshCopiesUserDefinedVertexProperty .........................   Passed    0.00 sec
+        Start  283: ECSGeometrySourcesPopulate.PopulateFromMeshYieldsMeshDomain
+  5/177 Test  #283: ECSGeometrySourcesPopulate.PopulateFromMeshYieldsMeshDomain ........................................   Passed    0.00 sec
+        Start  284: ECSGeometrySourcesPopulate.MeshAvailabilitySeparatesProvenanceFromSourceCapabilities
+  6/177 Test  #284: ECSGeometrySourcesPopulate.MeshAvailabilitySeparatesProvenanceFromSourceCapabilities ...............   Passed    0.00 sec
+        Start  285: ECSGeometrySourcesPopulate.PopulateFromGraphEmplacesSharedElementSources
+  7/177 Test  #285: ECSGeometrySourcesPopulate.PopulateFromGraphEmplacesSharedElementSources ...........................   Passed    0.00 sec
+        Start  286: ECSGeometrySourcesPopulate.PopulateFromGraphWritesCanonicalKeysAndPositions
+  8/177 Test  #286: ECSGeometrySourcesPopulate.PopulateFromGraphWritesCanonicalKeysAndPositions ........................   Passed    0.00 sec
+        Start  287: ECSGeometrySourcesPopulate.PopulateFromGraphCompactsGarbageAndPreservesRealSources
+  9/177 Test  #287: ECSGeometrySourcesPopulate.PopulateFromGraphCompactsGarbageAndPreservesRealSources .................   Passed    0.00 sec
+        Start  288: ECSGeometrySourcesPopulate.PopulateFromGraphYieldsGraphDomain
+ 10/177 Test  #288: ECSGeometrySourcesPopulate.PopulateFromGraphYieldsGraphDomain ......................................   Passed    0.00 sec
+        Start  289: ECSGeometrySourcesPopulate.GraphAvailabilityReportsUnifiedElementSources
+ 11/177 Test  #289: ECSGeometrySourcesPopulate.GraphAvailabilityReportsUnifiedElementSources ...........................   Passed    0.00 sec
+        Start  290: ECSGeometrySourcesPopulate.GraphAndMeshSharePhysicalSourcesButKeepProvenance
+ 12/177 Test  #290: ECSGeometrySourcesPopulate.GraphAndMeshSharePhysicalSourcesButKeepProvenance .......................   Passed    0.00 sec
+        Start  291: ECSGeometrySourcesPopulate.PopulateFromCloudEmplacesOnlyVertices
+ 13/177 Test  #291: ECSGeometrySourcesPopulate.PopulateFromCloudEmplacesOnlyVertices ...................................   Passed    0.00 sec
+        Start  292: ECSGeometrySourcesPopulate.PopulateFromCloudWritesCanonicalPositionsAndNormals
+ 14/177 Test  #292: ECSGeometrySourcesPopulate.PopulateFromCloudWritesCanonicalPositionsAndNormals .....................   Passed    0.00 sec
+        Start  293: ECSGeometrySourcesPopulate.PopulateFromCloudSkipsNormalsWhenSourceLacksThem
+ 15/177 Test  #293: ECSGeometrySourcesPopulate.PopulateFromCloudSkipsNormalsWhenSourceLacksThem ........................   Passed    0.00 sec
+        Start  294: ECSGeometrySourcesPopulate.PopulateFromCloudYieldsPointCloudDomain
+ 16/177 Test  #294: ECSGeometrySourcesPopulate.PopulateFromCloudYieldsPointCloudDomain .................................   Passed    0.00 sec
+        Start  295: ECSGeometrySourcesPopulate.PointCloudAvailabilityReportsVertexSource
+ 17/177 Test  #295: ECSGeometrySourcesPopulate.PointCloudAvailabilityReportsVertexSource ...............................   Passed    0.00 sec
+        Start  296: ECSGeometrySourcesPopulate.PartialMeshMarkedEntityKeepsMeshProvenanceWithoutMissingSources
+ 18/177 Test  #296: ECSGeometrySourcesPopulate.PartialMeshMarkedEntityKeepsMeshProvenanceWithoutMissingSources .........   Passed    0.00 sec
+        Start  297: ECSGeometrySourcesPopulate.ECSComponentSurvivesSourceMeshDestruction
+ 19/177 Test  #297: ECSGeometrySourcesPopulate.ECSComponentSurvivesSourceMeshDestruction ...............................   Passed    0.00 sec
+        Start  298: ECSGeometrySourcesPopulate.MeshToCloudRePopulationDropsMeshTopology
+ 20/177 Test  #298: ECSGeometrySourcesPopulate.MeshToCloudRePopulationDropsMeshTopology ................................   Passed    0.00 sec
+        Start  299: ECSGeometrySourcesPopulate.GraphToCloudRePopulationDropsGraphState
+ 21/177 Test  #299: ECSGeometrySourcesPopulate.GraphToCloudRePopulationDropsGraphState .................................   Passed    0.00 sec
+        Start  300: ECSGeometrySourcesPopulate.MeshToGraphRePopulationReplacesSharedSources
+ 22/177 Test  #300: ECSGeometrySourcesPopulate.MeshToGraphRePopulationReplacesSharedSources ............................   Passed    0.00 sec
+        Start  301: ECSGeometrySourcesPopulate.CloudToMeshRePopulationProducesMeshDomain
+ 23/177 Test  #301: ECSGeometrySourcesPopulate.CloudToMeshRePopulationProducesMeshDomain ...............................   Passed    0.00 sec
+        Start  439: MeshGeometryExtraction.GeometryPresentationRecipeIsConsumedDuringExtraction
+ 24/177 Test  #439: MeshGeometryExtraction.GeometryPresentationRecipeIsConsumedDuringExtraction ........................   Passed    0.03 sec
+        Start  440: MeshGeometryExtraction.GeneratedGeometryPresentationTexturesBindUniqueMaterialSlots
+ 25/177 Test  #440: MeshGeometryExtraction.GeneratedGeometryPresentationTexturesBindUniqueMaterialSlots ................   Passed    0.03 sec
+        Start  510: GraphGeometryExtraction.LineGraphUploadsOnceAndBindsInstanceGeometry
+ 26/177 Test  #510: GraphGeometryExtraction.LineGraphUploadsOnceAndBindsInstanceGeometry ...............................   Passed    0.06 sec
+        Start  511: GraphGeometryExtraction.PointGraphUploadsOnceAndBindsInstanceGeometry
+ 27/177 Test  #511: GraphGeometryExtraction.PointGraphUploadsOnceAndBindsInstanceGeometry ..............................   Passed    0.06 sec
+        Start  512: GraphGeometryExtraction.LineAndPointGraphUploadsSingleHandleForBothLanes
+ 28/177 Test  #512: GraphGeometryExtraction.LineAndPointGraphUploadsSingleHandleForBothLanes ...........................   Passed    0.06 sec
+        Start  513: GraphGeometryExtraction.LaneOverridesColorLineAndPointLanesIndependently
+ 29/177 Test  #513: GraphGeometryExtraction.LaneOverridesColorLineAndPointLanesIndependently ...........................   Passed    0.05 sec
+        Start  514: GraphGeometryExtraction.RepeatedExtractionReusesGraphHandleWithoutReupload
+ 30/177 Test  #514: GraphGeometryExtraction.RepeatedExtractionReusesGraphHandleWithoutReupload .........................   Passed    0.05 sec
+        Start  515: GraphGeometryExtraction.TwoGraphEntitiesAllocateIndependentUploads
+ 31/177 Test  #515: GraphGeometryExtraction.TwoGraphEntitiesAllocateIndependentUploads .................................   Passed    0.06 sec
+        Start  516: GraphGeometryExtraction.EntityDestructionRetiresGraphGeometryAfterDeferredWindow
+ 32/177 Test  #516: GraphGeometryExtraction.EntityDestructionRetiresGraphGeometryAfterDeferredWindow ...................   Passed    0.05 sec
+        Start  517: GraphGeometryExtraction.ShutdownReleasesPendingGraphResidency
+ 33/177 Test  #517: GraphGeometryExtraction.ShutdownReleasesPendingGraphResidency ......................................   Passed    0.06 sec
+        Start  518: GraphGeometryExtraction.ProceduralRefPreemptsGraphPathOnSameEntity
+ 34/177 Test  #518: GraphGeometryExtraction.ProceduralRefPreemptsGraphPathOnSameEntity .................................   Passed    0.05 sec
+        Start  519: GraphGeometryExtraction.MissingNodePositionsIncrementsMissingNodesCounter
+ 35/177 Test  #519: GraphGeometryExtraction.MissingNodePositionsIncrementsMissingNodesCounter ..........................   Passed    0.06 sec
+        Start  520: GraphGeometryExtraction.OutOfRangeEdgeIncrementsInvalidEdgesCounter
+ 36/177 Test  #520: GraphGeometryExtraction.OutOfRangeEdgeIncrementsInvalidEdgesCounter ................................   Passed    0.06 sec
+        Start  521: GraphGeometryExtraction.SurfaceOnlyGraphEntityFailsClosedAsFailedPack
+ 37/177 Test  #521: GraphGeometryExtraction.SurfaceOnlyGraphEntityFailsClosedAsFailedPack ..............................   Passed    0.06 sec
+        Start  522: GraphGeometryExtraction.AddingProceduralRefAfterGraphUploadReleasesGraphResidency
+ 38/177 Test  #522: GraphGeometryExtraction.AddingProceduralRefAfterGraphUploadReleasesGraphResidency ..................   Passed    0.06 sec
+        Start  523: GraphGeometryExtraction.LosingGraphHintReleasesGraphResidency
+ 39/177 Test  #523: GraphGeometryExtraction.LosingGraphHintReleasesGraphResidency ......................................   Passed    0.06 sec
+        Start  524: GraphGeometryExtraction.GainingLineHintRepacksGraphWithoutDirtyTag
+ 40/177 Test  #524: GraphGeometryExtraction.GainingLineHintRepacksGraphWithoutDirtyTag .................................   Passed    0.06 sec
+        Start  525: GraphGeometryExtraction.LosingLineHintRepacksGraphWithoutDirtyTag
+ 41/177 Test  #525: GraphGeometryExtraction.LosingLineHintRepacksGraphWithoutDirtyTag ..................................   Passed    0.06 sec
+        Start  526: GraphGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag
+ 42/177 Test  #526: GraphGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag ..................   Passed    0.06 sec
+        Start  527: RuntimeGeometryAvailability.MeshResolvesIndependentSurfaceEdgeAndPointLanes
+ 43/177 Test  #527: RuntimeGeometryAvailability.MeshResolvesIndependentSurfaceEdgeAndPointLanes ........................   Passed    0.00 sec
+        Start  528: RuntimeGeometryAvailability.GraphSupportsUnifiedVertexHalfedgeAndEdgeSources
+ 44/177 Test  #528: RuntimeGeometryAvailability.GraphSupportsUnifiedVertexHalfedgeAndEdgeSources .......................   Passed    0.00 sec
+        Start  529: RuntimeGeometryAvailability.SharedSourceMatrixDoesNotReplaceGraphProvenance
+ 45/177 Test  #529: RuntimeGeometryAvailability.SharedSourceMatrixDoesNotReplaceGraphProvenance ........................   Passed    0.00 sec
+        Start  530: RuntimeGeometryAvailability.GraphMarkerKeepsProvenanceForMixedSourceMatrix
+ 46/177 Test  #530: RuntimeGeometryAvailability.GraphMarkerKeepsProvenanceForMixedSourceMatrix .........................   Passed    0.00 sec
+        Start  531: RuntimeGeometryAvailability.PointCloudSupportsPointsAndRejectsSurfaceAndEdges
+ 47/177 Test  #531: RuntimeGeometryAvailability.PointCloudSupportsPointsAndRejectsSurfaceAndEdges ......................   Passed    0.00 sec
+        Start  532: RuntimeGeometryAvailability.MeshEdgeLaneCanDeriveFromSurfaceTopologyWithoutEdges
+ 48/177 Test  #532: RuntimeGeometryAvailability.MeshEdgeLaneCanDeriveFromSurfaceTopologyWithoutEdges ...................   Passed    0.00 sec
+        Start  533: RuntimeGeometryAvailability.PartialMeshCanSupportPointsWhileSurfaceReportsMissingHalfedges
+ 49/177 Test  #533: RuntimeGeometryAvailability.PartialMeshCanSupportPointsWhileSurfaceReportsMissingHalfedges .........   Passed    0.00 sec
+        Start  540: GeometryPresentation.RecipeIntentAndRuntimeStatusProjectIntoGenerationQualifiedSnapshot
+ 50/177 Test  #540: GeometryPresentation.RecipeIntentAndRuntimeStatusProjectIntoGenerationQualifiedSnapshot ............   Passed    0.00 sec
+        Start  541: GeometryPresentation.GeneratedTextureAssetUsesRuntimeSidecarOutput
+ 51/177 Test  #541: GeometryPresentation.GeneratedTextureAssetUsesRuntimeSidecarOutput .................................   Passed    0.00 sec
+        Start  542: GeometryPresentation.GraphPointAndLineSlotsUseCanonicalPropertyReferences
+ 52/177 Test  #542: GeometryPresentation.GraphPointAndLineSlotsUseCanonicalPropertyReferences ..........................   Passed    0.00 sec
+        Start  543: GeometryPresentation.PropertyOptionsAreDeterministicCompatibleFirstCanonicalRefs
+ 53/177 Test  #543: GeometryPresentation.PropertyOptionsAreDeterministicCompatibleFirstCanonicalRefs ...................   Passed    0.00 sec
+        Start  544: GeometryPresentation.PointCloudAndProceduralShapesUseTheSameProjection
+ 54/177 Test  #544: GeometryPresentation.PointCloudAndProceduralShapesUseTheSameProjection .............................   Passed    0.00 sec
+        Start  545: GeometryPresentation.LegacyShapeSpellingsRemainReadCompatible
+ 55/177 Test  #545: GeometryPresentation.LegacyShapeSpellingsRemainReadCompatible ......................................   Passed    0.00 sec
+        Start  585: PrimitiveSelectionRefinement.MeshFaceHintAnchorsFaceWithNearestVertexAndEdge
+ 56/177 Test  #585: PrimitiveSelectionRefinement.MeshFaceHintAnchorsFaceWithNearestVertexAndEdge .......................   Passed    0.00 sec
+        Start  586: PrimitiveSelectionRefinement.MeshFaceHintWithoutAnchorReportsCentroidOnly
+ 57/177 Test  #586: PrimitiveSelectionRefinement.MeshFaceHintWithoutAnchorReportsCentroidOnly ..........................   Passed    0.00 sec
+        Start  587: PrimitiveSelectionRefinement.MeshEdgeHintReturnsEdgeAndNearestEndpoint
+ 58/177 Test  #587: PrimitiveSelectionRefinement.MeshEdgeHintReturnsEdgeAndNearestEndpoint .............................   Passed    0.00 sec
+        Start  588: PrimitiveSelectionRefinement.MeshPointHintResolvesVertex
+ 59/177 Test  #588: PrimitiveSelectionRefinement.MeshPointHintResolvesVertex ...........................................   Passed    0.00 sec
+        Start  589: PrimitiveSelectionRefinement.MeshEntityHintSelectsWholeEntity
+ 60/177 Test  #589: PrimitiveSelectionRefinement.MeshEntityHintSelectsWholeEntity ......................................   Passed    0.00 sec
+        Start  590: PrimitiveSelectionRefinement.TransformAppliesToWorldHit
+ 61/177 Test  #590: PrimitiveSelectionRefinement.TransformAppliesToWorldHit ............................................   Passed    0.00 sec
+        Start  591: PrimitiveSelectionRefinement.MeshFaceIndexOutOfRangeFailsClosed
+ 62/177 Test  #591: PrimitiveSelectionRefinement.MeshFaceIndexOutOfRangeFailsClosed ....................................   Passed    0.00 sec
+        Start  592: PrimitiveSelectionRefinement.MeshMissingPositionsFailsClosed
+ 63/177 Test  #592: PrimitiveSelectionRefinement.MeshMissingPositionsFailsClosed .......................................   Passed    0.00 sec
+        Start  593: PrimitiveSelectionRefinement.MeshFaceHintMapsTrianglePayloadToFaceRow
+ 64/177 Test  #593: PrimitiveSelectionRefinement.MeshFaceHintMapsTrianglePayloadToFaceRow ..............................   Passed    0.00 sec
+        Start  594: PrimitiveSelectionRefinement.SurfaceTriangleFaceMapMatchesCanonicalTopology
+ 65/177 Test  #594: PrimitiveSelectionRefinement.SurfaceTriangleFaceMapMatchesCanonicalTopology ........................   Passed    0.00 sec
+        Start  595: PrimitiveSelectionRefinement.GraphEdgeHintReturnsEdgeAndNearestEndpoint
+ 66/177 Test  #595: PrimitiveSelectionRefinement.GraphEdgeHintReturnsEdgeAndNearestEndpoint ............................   Passed    0.00 sec
+        Start  596: PrimitiveSelectionRefinement.GraphPointHintReturnsNode
+ 67/177 Test  #596: PrimitiveSelectionRefinement.GraphPointHintReturnsNode .............................................   Passed    0.00 sec
+        Start  597: PrimitiveSelectionRefinement.GraphFaceHintIsUnsupported
+ 68/177 Test  #597: PrimitiveSelectionRefinement.GraphFaceHintIsUnsupported ............................................   Passed    0.00 sec
+        Start  598: PrimitiveSelectionRefinement.PointCloudPointHintReturnsPoint
+ 69/177 Test  #598: PrimitiveSelectionRefinement.PointCloudPointHintReturnsPoint .......................................   Passed    0.00 sec
+        Start  599: PrimitiveSelectionRefinement.PointCloudPointIndexOutOfRangeFailsClosed
+ 70/177 Test  #599: PrimitiveSelectionRefinement.PointCloudPointIndexOutOfRangeFailsClosed .............................   Passed    0.00 sec
+        Start  600: PrimitiveSelectionRefinement.PointCloudEdgeHintIsUnsupported
+ 71/177 Test  #600: PrimitiveSelectionRefinement.PointCloudEdgeHintIsUnsupported .......................................   Passed    0.00 sec
+        Start  601: PrimitiveSelectionRefinement.PointCloudMissingHintRayFallbackResolvesNearestPoint
+ 72/177 Test  #601: PrimitiveSelectionRefinement.PointCloudMissingHintRayFallbackResolvesNearestPoint ..................   Passed    0.00 sec
+        Start  602: PrimitiveSelectionRefinement.RayFallbackOutsideRadiusMissesClosed
+ 73/177 Test  #602: PrimitiveSelectionRefinement.RayFallbackOutsideRadiusMissesClosed ..................................   Passed    0.00 sec
+        Start  603: PrimitiveSelectionRefinement.MissingHintWithoutRayIsUnsupported
+ 74/177 Test  #603: PrimitiveSelectionRefinement.MissingHintWithoutRayIsUnsupported ....................................   Passed    0.00 sec
+        Start  604: PrimitiveSelectionRefinement.DegenerateRayFallbackMissesClosed
+ 75/177 Test  #604: PrimitiveSelectionRefinement.DegenerateRayFallbackMissesClosed .....................................   Passed    0.00 sec
+        Start  605: PrimitiveSelectionRefinement.RayFallbackReportsTransformedWorldHit
+ 76/177 Test  #605: PrimitiveSelectionRefinement.RayFallbackReportsTransformedWorldHit .................................   Passed    0.00 sec
+        Start  606: PrimitiveSelectionRefinement.MeshMissingHintRayFallbackResolvesNearestVertex
+ 77/177 Test  #606: PrimitiveSelectionRefinement.MeshMissingHintRayFallbackResolvesNearestVertex .......................   Passed    0.00 sec
+        Start  607: PrimitiveSelectionRefinement.GraphMissingHintRayFallbackResolvesNearestNode
+ 78/177 Test  #607: PrimitiveSelectionRefinement.GraphMissingHintRayFallbackResolvesNearestNode ........................   Passed    0.00 sec
+        Start  608: PrimitiveSelectionRefinement.StaleEntityIsRejectedBeforeGeometry
+ 79/177 Test  #608: PrimitiveSelectionRefinement.StaleEntityIsRejectedBeforeGeometry ...................................   Passed    0.00 sec
+        Start  609: PrimitiveSelectionRefinement.NoneDomainIsUnsupported
+ 80/177 Test  #609: PrimitiveSelectionRefinement.NoneDomainIsUnsupported ...............................................   Passed    0.00 sec
+        Start  614: PrimitiveSelectionRefinementWiring.FaceHitResolvesToFaceRowAndWorldHit
+ 81/177 Test  #614: PrimitiveSelectionRefinementWiring.FaceHitResolvesToFaceRowAndWorldHit .............................   Passed    0.00 sec
+        Start  615: PrimitiveSelectionRefinementWiring.PointHitResolvesToMeshVertex
+ 82/177 Test  #615: PrimitiveSelectionRefinementWiring.PointHitResolvesToMeshVertex ....................................   Passed    0.00 sec
+        Start  616: PrimitiveSelectionRefinementWiring.PointHitResolvesToCloudPoint
+ 83/177 Test  #616: PrimitiveSelectionRefinementWiring.PointHitResolvesToCloudPoint ....................................   Passed    0.00 sec
+        Start  617: PrimitiveSelectionRefinementWiring.EntityHintResolvesToWholeEntity
+ 84/177 Test  #617: PrimitiveSelectionRefinementWiring.EntityHintResolvesToWholeEntity .................................   Passed    0.00 sec
+        Start  618: PrimitiveSelectionRefinementWiring.BackgroundReadbackResolvesToNoPrimitive
+ 85/177 Test  #618: PrimitiveSelectionRefinementWiring.BackgroundReadbackResolvesToNoPrimitive .........................   Passed    0.00 sec
+        Start  619: PrimitiveSelectionRefinementWiring.StaleRenderIdReportsStaleEntity
+ 86/177 Test  #619: PrimitiveSelectionRefinementWiring.StaleRenderIdReportsStaleEntity .................................   Passed    0.00 sec
+        Start  620: PrimitiveSelectionRefinementWiring.LiveEntityWithoutGeometryIsUnsupportedDomain
+ 87/177 Test  #620: PrimitiveSelectionRefinementWiring.LiveEntityWithoutGeometryIsUnsupportedDomain ....................   Passed    0.00 sec
+        Start  621: PrimitiveSelectionRefinementWiring.NewestReadbackWinsAndBackgroundClears
+ 88/177 Test  #621: PrimitiveSelectionRefinementWiring.NewestReadbackWinsAndBackgroundClears ...........................   Passed    0.00 sec
+        Start  622: PrimitiveSelectionRefinementWiring.EmptyDrainRetainsPriorCache
+ 89/177 Test  #622: PrimitiveSelectionRefinementWiring.EmptyDrainRetainsPriorCache .....................................   Passed    0.00 sec
+        Start  623: PrimitiveSelectionRefinementWiring.UnprojectPickDepthLandsOnCameraPickRay
+ 90/177 Test  #623: PrimitiveSelectionRefinementWiring.UnprojectPickDepthLandsOnCameraPickRay ..........................   Passed    0.00 sec
+        Start  624: PrimitiveSelectionRefinementWiring.FaceHitWithDepthContextAnchorsClosestVertexAndEdge
+ 91/177 Test  #624: PrimitiveSelectionRefinementWiring.FaceHitWithDepthContextAnchorsClosestVertexAndEdge ..............   Passed    0.00 sec
+        Start  625: PrimitiveSelectionRefinementWiring.DepthCursorIsTransformedIntoEntityLocalSpace
+ 92/177 Test  #625: PrimitiveSelectionRefinementWiring.DepthCursorIsTransformedIntoEntityLocalSpace ....................   Passed    0.00 sec
+        Start  626: PrimitiveSelectionRefinementWiring.DepthClearValueSkipsCursorAnchor
+ 93/177 Test  #626: PrimitiveSelectionRefinementWiring.DepthClearValueSkipsCursorAnchor ................................   Passed    0.00 sec
+        Start  627: PrimitiveSelectionRefinementWiring.MissingHintResolvesThroughContextRayFallback
+ 94/177 Test  #627: PrimitiveSelectionRefinementWiring.MissingHintResolvesThroughContextRayFallback ....................   Passed    0.00 sec
+        Start  628: PrimitiveSelectionRefinementWiring.IsOrthographicProjectionDistinguishesProjectionKinds
+ 95/177 Test  #628: PrimitiveSelectionRefinementWiring.IsOrthographicProjectionDistinguishesProjectionKinds ............   Passed    0.00 sec
+        Start  629: PrimitiveSelectionRefinementWiring.OrthographicFallbackRadiusDoesNotScaleWithHitDistance
+ 96/177 Test  #629: PrimitiveSelectionRefinementWiring.OrthographicFallbackRadiusDoesNotScaleWithHitDistance ...........   Passed    0.00 sec
+        Start  630: PrimitiveSelectionRefinementWiring.OrthographicFallbackStillResolvesWithinPixelFootprint
+ 97/177 Test  #630: PrimitiveSelectionRefinementWiring.OrthographicFallbackStillResolvesWithinPixelFootprint ...........   Passed    0.00 sec
+        Start  750: ClusteringModule.EngineRunCommitsLabelsAndPublishesChangeEvent
+ 98/177 Test  #750: ClusteringModule.EngineRunCommitsLabelsAndPublishesChangeEvent .....................................   Passed    0.04 sec
+        Start  751: ClusteringModule.DocumentHistoryOwnsQueuedOutputUndoRedo
+ 99/177 Test  #751: ClusteringModule.DocumentHistoryOwnsQueuedOutputUndoRedo ...........................................   Passed    0.04 sec
+        Start  752: ClusteringModule.NullDeviceVulkanRequestFallsBackHonestly
+100/177 Test  #752: ClusteringModule.NullDeviceVulkanRequestFallsBackHonestly ..........................................   Passed    0.04 sec
+        Start  753: ClusteringModule.WorldSwitchBeforeCompletionDropsCommit
+101/177 Test  #753: ClusteringModule.WorldSwitchBeforeCompletionDropsCommit ............................................   Passed    0.04 sec
+        Start  754: ClusteringModule.ValidationFailuresPublishCanonicalTypedCompletions
+102/177 Test  #754: ClusteringModule.ValidationFailuresPublishCanonicalTypedCompletions ................................   Passed    0.04 sec
+        Start  755: ClusteringModule.CpuResultsAreDeterministicAndHonorCustomPropertyRefs
+103/177 Test  #755: ClusteringModule.CpuResultsAreDeterministicAndHonorCustomPropertyRefs ..............................   Passed    0.04 sec
+        Start  756: ClusteringModule.SourceMutationBeforeCompletionDropsWriteback
+104/177 Test  #756: ClusteringModule.SourceMutationBeforeCompletionDropsWriteback ......................................   Passed    0.04 sec
+        Start  757: ClusteringModule.CancelledCpuWorkPublishesCanonicalCompletion
+105/177 Test  #757: ClusteringModule.CancelledCpuWorkPublishesCanonicalCompletion ......................................   Passed    0.04 sec
+        Start  758: ClusteringModule.RunKMeansWithoutModuleFailsClosedAtCommandDrain
+106/177 Test  #758: ClusteringModule.RunKMeansWithoutModuleFailsClosedAtCommandDrain ...................................   Passed    0.04 sec
+        Start  821: RuntimeRenderExtraction.VisualizationRecipeRevisionTracksMutations
+107/177 Test  #821: RuntimeRenderExtraction.VisualizationRecipeRevisionTracksMutations .................................   Passed    0.00 sec
+        Start  859: RuntimeSceneSerialization.SaveLoadRoundTripPreservesPromotedSandboxSceneData
+108/177 Test  #859: RuntimeSceneSerialization.SaveLoadRoundTripPreservesPromotedSandboxSceneData .......................   Passed    0.01 sec
+        Start  860: RuntimeSceneSerialization.UnsupportedPersistenceFamiliesReportDiagnosticsAndDropOnLoad
+109/177 Test  #860: RuntimeSceneSerialization.UnsupportedPersistenceFamiliesReportDiagnosticsAndDropOnLoad .............   Passed    0.00 sec
+        Start  861: RuntimeSceneSerialization.InvalidDocumentsFailClosed
+110/177 Test  #861: RuntimeSceneSerialization.InvalidDocumentsFailClosed ...............................................   Passed    0.00 sec
+        Start  862: RuntimeSceneSerialization.PropertyValueKindKeepsLegacyWireStrings
+111/177 Test  #862: RuntimeSceneSerialization.PropertyValueKindKeepsLegacyWireStrings ..................................   Passed    0.00 sec
+        Start  863: RuntimeSceneSerialization.PropertyValueKindRoundTripsThroughLegacyWire
+112/177 Test  #863: RuntimeSceneSerialization.PropertyValueKindRoundTripsThroughLegacyWire .............................   Passed    0.01 sec
+        Start  864: RuntimeSceneSerialization.GeometryPresentationRuntimeStateIsNotSerialized
+113/177 Test  #864: RuntimeSceneSerialization.GeometryPresentationRuntimeStateIsNotSerialized ..........................   Passed    0.00 sec
+        Start  865: RuntimeSceneSerialization.LegacyProgressiveRenderDataKeyLoadsAsGeometryPresentationRecipe
+114/177 Test  #865: RuntimeSceneSerialization.LegacyProgressiveRenderDataKeyLoadsAsGeometryPresentationRecipe ..........   Passed    0.01 sec
+        Start  866: RuntimeSceneSerialization.ReaderStaysPinnedToLegacyValueKindWireStrings
+115/177 Test  #866: RuntimeSceneSerialization.ReaderStaysPinnedToLegacyValueKindWireStrings ............................   Passed    0.01 sec
+        Start  867: RuntimeSceneSerialization.PropertyDomainKeepsLegacyWireStrings
+116/177 Test  #867: RuntimeSceneSerialization.PropertyDomainKeepsLegacyWireStrings .....................................   Passed    0.01 sec
+        Start  868: RuntimeSceneSerialization.LegacyMeshSurfaceDomainLoadsAsUnknown
+117/177 Test  #868: RuntimeSceneSerialization.LegacyMeshSurfaceDomainLoadsAsUnknown ....................................   Passed    0.00 sec
+        Start  888: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryPresentationRecipeGeneration
+118/177 Test  #888: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryPresentationRecipeGeneration ................   Passed    0.00 sec
+        Start  906: SandboxEditorUi.GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
+119/177 Test  #906: SandboxEditorUi.GeometryPresentationInspectorReportsSlotsPropertiesAndJobs .........................   Passed    0.00 sec
+        Start  907: SandboxEditorUi.GeometryPresentationInspectorInfersGraphPointCloudAndComposition
+120/177 Test  #907: SandboxEditorUi.GeometryPresentationInspectorInfersGraphPointCloudAndComposition ...................   Passed    0.00 sec
+        Start  908: SandboxEditorUi.GeometryPresentationCompositionReportsCorruptHierarchyWithoutPartialSummary
+121/177 Test  #908: SandboxEditorUi.GeometryPresentationCompositionReportsCorruptHierarchyWithoutPartialSummary ........   Passed    0.00 sec
+        Start 1025: SandboxEditorUi.GeometryPresentationSlotCommandsUseCommandHistory
+122/177 Test #1025: SandboxEditorUi.GeometryPresentationSlotCommandsUseCommandHistory ..................................   Passed    0.00 sec
+        Start 1026: SandboxEditorUi.GeometryPresentationHistoryRejectsInterveningGenerationWithoutMutation
+123/177 Test #1026: SandboxEditorUi.GeometryPresentationHistoryRejectsInterveningGenerationWithoutMutation .............   Passed    0.00 sec
+        Start 1142: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty"
+124/177 Test #1142: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty" ................   Passed    0.06 sec
+        Start 1143: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions"
+125/177 Test #1143: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions" ....   Passed    0.06 sec
+        Start 1144: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes"
+126/177 Test #1144: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes" ...   Passed    0.06 sec
+        Start 1145: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords"
+127/177 Test #1145: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords" ....   Passed    0.06 sec
+        Start 1146: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals"
+128/177 Test #1146: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals" ......   Passed    0.06 sec
+        Start 1147: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors"
+129/177 Test #1147: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors" .......   Passed    0.06 sec
+        Start 1148: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyEdgeTopology"
+130/177 Test #1148: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyEdgeTopology" .......   Passed    0.06 sec
+        Start 1360: RuntimeGraph.GarbageCollectionRemapsSurvivingConnectivity
+131/177 Test #1360: RuntimeGraph.GarbageCollectionRemapsSurvivingConnectivity ..........................................   Passed    0.00 sec
+        Start 1885: GraphVertexNormals.DebugNamesAreStable
+132/177 Test #1885: GraphVertexNormals.DebugNamesAreStable .............................................................   Passed    0.00 sec
+        Start 1886: GraphVertexNormals.PlanarCycleWritesCanonicalNormals
+133/177 Test #1886: GraphVertexNormals.PlanarCycleWritesCanonicalNormals ...............................................   Passed    0.00 sec
+        Start 1887: GraphVertexNormals.LineGraphReportsDegreeOneAndCollinearFallbacks
+134/177 Test #1887: GraphVertexNormals.LineGraphReportsDegreeOneAndCollinearFallbacks ..................................   Passed    0.00 sec
+        Start 1888: GraphVertexNormals.IsolatedDuplicateAndNonFiniteInputsStayFinite
+135/177 Test #1888: GraphVertexNormals.IsolatedDuplicateAndNonFiniteInputsStayFinite ...................................   Passed    0.00 sec
+        Start 1889: GraphVertexNormals.RawPropertySetOverloadReportsInvalidEdges
+136/177 Test #1889: GraphVertexNormals.RawPropertySetOverloadReportsInvalidEdges .......................................   Passed    0.00 sec
+        Start 1890: GraphVertexNormals.OutputPropertyTypeConflictFailsClosed
+137/177 Test #1890: GraphVertexNormals.OutputPropertyTypeConflictFailsClosed ...........................................   Passed    0.00 sec
+        Start 4002: RuntimeRenderExtraction.CreatesUpdatesAndClearsDirtyTransformSidecar
+138/177 Test #4002: RuntimeRenderExtraction.CreatesUpdatesAndClearsDirtyTransformSidecar ...............................   Passed    0.03 sec
+        Start 4003: RuntimeRenderExtraction.ClearSceneStateDropsSidecarsAndPerEntityRecipes
+139/177 Test #4003: RuntimeRenderExtraction.ClearSceneStateDropsSidecarsAndPerEntityRecipes ............................   Passed    0.03 sec
+        Start 4004: RuntimeRenderExtraction.RetiresDestroyedRenderableSidecar
+140/177 Test #4004: RuntimeRenderExtraction.RetiresDestroyedRenderableSidecar ..........................................   Passed    0.03 sec
+        Start 4005: RuntimeRenderExtraction.ReusesLiveRenderableKeyScratchAcrossExtractions
+141/177 Test #4005: RuntimeRenderExtraction.ReusesLiveRenderableKeyScratchAcrossExtractions ............................   Passed    0.03 sec
+        Start 4006: RuntimeRenderExtraction.ExtractsVisualizationAndLightsWithoutRenderableOwnership
+142/177 Test #4006: RuntimeRenderExtraction.ExtractsVisualizationAndLightsWithoutRenderableOwnership ...................   Passed    0.03 sec
+        Start 4007: RuntimeRenderExtraction.VisualizationScalarRecipeReachesRenderWorld
+143/177 Test #4007: RuntimeRenderExtraction.VisualizationScalarRecipeReachesRenderWorld ................................   Passed    0.03 sec
+        Start 4008: RuntimeRenderExtraction.VisualizationScalarConfigMissingSourceFailsClosed
+144/177 Test #4008: RuntimeRenderExtraction.VisualizationScalarConfigMissingSourceFailsClosed ..........................   Passed    0.03 sec
+        Start 4009: RuntimeRenderExtraction.VisualizationScalarRecipeMissingBdaUploadsPropertyBuffer
+145/177 Test #4009: RuntimeRenderExtraction.VisualizationScalarRecipeMissingBdaUploadsPropertyBuffer ...................   Passed    0.03 sec
+        Start 4010: RuntimeRenderExtraction.VisualizationPropertyBufferKeysAreStableIdScoped
+146/177 Test #4010: RuntimeRenderExtraction.VisualizationPropertyBufferKeysAreStableIdScoped ...........................   Passed    0.03 sec
+        Start 4011: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferUploadsFromGeometrySources
+147/177 Test #4011: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferUploadsFromGeometrySources .............   Passed    0.03 sec
+        Start 4012: RuntimeRenderExtraction.PointCloudVisualizationPropertyBuffersUploadFromGeometrySources
+148/177 Test #4012: RuntimeRenderExtraction.PointCloudVisualizationPropertyBuffersUploadFromGeometrySources ............   Passed    0.03 sec
+        Start 4013: RuntimeRenderExtraction.MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange
+149/177 Test #4013: RuntimeRenderExtraction.MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange ...........   Passed    0.07 sec
+        Start 4014: RuntimeRenderExtraction.MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig
+150/177 Test #4014: RuntimeRenderExtraction.MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig ..........   Passed    0.07 sec
+        Start 4015: RuntimeRenderExtraction.MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig
+151/177 Test #4015: RuntimeRenderExtraction.MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig ............   Passed    0.07 sec
+        Start 4016: RuntimeRenderExtraction.MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames
+152/177 Test #4016: RuntimeRenderExtraction.MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames ............   Passed    0.10 sec
+        Start 4017: RuntimeRenderExtraction.MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig
+153/177 Test #4017: RuntimeRenderExtraction.MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig .................   Passed    0.07 sec
+        Start 4018: RuntimeRenderExtraction.GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains
+154/177 Test #4018: RuntimeRenderExtraction.GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains ..............   Passed    0.03 sec
+        Start 4019: RuntimeRenderExtraction.GeometryPresentationPropertyBuffersProjectToVisualizationRecipes
+155/177 Test #4019: RuntimeRenderExtraction.GeometryPresentationPropertyBuffersProjectToVisualizationRecipes ...........   Passed    0.03 sec
+        Start 4020: RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream
+156/177 Test #4020: RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream ...........   Passed    0.08 sec
+        Start 4021: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferFailsClosed
+157/177 Test #4021: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferFailsClosed ............................   Passed    0.03 sec
+        Start 4022: RuntimeRenderExtraction.VisualizationNonScalarRecipesReachRenderWorld
+158/177 Test #4022: RuntimeRenderExtraction.VisualizationNonScalarRecipesReachRenderWorld ..............................   Passed    0.04 sec
+        Start 4023: RuntimeRenderExtraction.VisualizationNonScalarRecipeFailuresAreCounted
+159/177 Test #4023: RuntimeRenderExtraction.VisualizationNonScalarRecipeFailuresAreCounted .............................   Passed    0.03 sec
+        Start 4024: RuntimeRenderExtraction.ObservesAssetSourceAsUnavailableWithoutGpuAssetCache
+160/177 Test #4024: RuntimeRenderExtraction.ObservesAssetSourceAsUnavailableWithoutGpuAssetCache .......................   Passed    0.03 sec
+        Start 4025: RuntimeRenderExtraction.ObservesReadyAssetGenerationAsRebindRequired
+161/177 Test #4025: RuntimeRenderExtraction.ObservesReadyAssetGenerationAsRebindRequired ...............................   Passed    0.03 sec
+        Start 4026: RuntimeRenderExtraction.HelperDoesNotMarkRebindGenerationAsSeen
+162/177 Test #4026: RuntimeRenderExtraction.HelperDoesNotMarkRebindGenerationAsSeen ....................................   Passed    0.03 sec
+        Start 4027: RuntimeRenderExtraction.AcknowledgeRebindAdvancesLastSeenGeneration
+163/177 Test #4027: RuntimeRenderExtraction.AcknowledgeRebindAdvancesLastSeenGeneration ................................   Passed    0.03 sec
+        Start 4028: RuntimeRenderExtraction.AcknowledgeRebindRejectsObservationsWithoutGeneration
+164/177 Test #4028: RuntimeRenderExtraction.AcknowledgeRebindRejectsObservationsWithoutGeneration ......................   Passed    0.00 sec
+        Start 4029: RuntimeRenderExtraction.AcknowledgeRebindRejectsAssetMismatch
+165/177 Test #4029: RuntimeRenderExtraction.AcknowledgeRebindRejectsAssetMismatch ......................................   Passed    0.00 sec
+        Start 4030: RuntimeRenderExtraction.AcknowledgeRebindRejectsSlotWithoutSourceAsset
+166/177 Test #4030: RuntimeRenderExtraction.AcknowledgeRebindRejectsSlotWithoutSourceAsset .............................   Passed    0.00 sec
+        Start 4031: RuntimeRenderExtraction.ExtractAndSubmitDoesNotAutoAcknowledgeRebinds
+167/177 Test #4031: RuntimeRenderExtraction.ExtractAndSubmitDoesNotAutoAcknowledgeRebinds ..............................   Passed    0.03 sec
+        Start 4045: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction
+168/177 Test #4045: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction ..........................   Passed    0.04 sec
+        Start 4046: RuntimeSandboxAcceptance.CameraControllerProducesFiniteInvertibleFrameCamera
+169/177 Test #4046: RuntimeSandboxAcceptance.CameraControllerProducesFiniteInvertibleFrameCamera .......................   Passed    0.00 sec
+        Start 4047: RuntimeSandboxAcceptance.ComposedCameraModuleDrivesFiniteFirstFrame
+170/177 Test #4047: RuntimeSandboxAcceptance.ComposedCameraModuleDrivesFiniteFirstFrame ................................   Passed    0.04 sec
+        Start 4048: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily
+171/177 Test #4048: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily ..............................   Passed    0.04 sec
+        Start 4049: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene
+172/177 Test #4049: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene ..........................   Passed    0.04 sec
+        Start 4050: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily
+173/177 Test #4050: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily .............................   Passed    0.04 sec
+        Start 4051: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity
+174/177 Test #4051: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity ........................   Passed    0.04 sec
+        Start 4052: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+175/177 Test #4052: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick .....................................   Passed    0.04 sec
+        Start 4053: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+176/177 Test #4053: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush .....................................   Passed    0.04 sec
+        Start 4054: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+177/177 Test #4054: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame .......................   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 177
+
+Label Time Summary:
+contract       =   2.53 sec*proc (107 tests)
+ecs            =   0.04 sec*proc (23 tests)
+geometry       =   0.03 sec*proc (7 tests)
+graphics       =   1.45 sec*proc (40 tests)
+integration    =   1.45 sec*proc (40 tests)
+runtime        =   3.98 sec*proc (147 tests)
+unit           =   0.07 sec*proc (30 tests)
+
+Total Test time (real) =   4.35 sec

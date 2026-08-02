@@ -1,0 +1,22 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check",
+    "origin/main...HEAD"
+  ],
+  "command_display": "git diff --check origin/main...HEAD",
+  "cwd": ".",
+  "duration_ms": 27,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T19:11:47Z",
+  "label": "diff-check-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T19:11:47Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/diff-check-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/diff-check-final.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "HARDEN-087"
+}

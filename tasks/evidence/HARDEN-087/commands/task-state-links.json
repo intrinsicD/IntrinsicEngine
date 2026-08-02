@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_state_links.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_state_links.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 437,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T19:05:20Z",
+  "label": "task-state-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T19:05:20Z",
+  "stderr_path": "tasks/evidence/HARDEN-087/commands/task-state-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-087/commands/task-state-links.stdout.log",
+  "stdout_sha256": "ec8a707e8855c4c2cf09b8b725c683203b0a3902172e9a48c372deccf71f90ff",
+  "task_id": "HARDEN-087"
+}
