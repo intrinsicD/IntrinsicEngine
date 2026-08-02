@@ -5,15 +5,23 @@ depends_on: [HARDEN-087]
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-RUNTIME208"
+branch: "runtime/runtime-208-element-domain-publication"
+worktree: "/tmp/intrinsic-runtime208.qxtdIf"
+claimed_at: "2026-08-02T22:05:49Z"
 contract_schema: 1
 contracts: [geometry.element-domain-sources, method.engine-integration]
 maturity_target: Operational
 ---
 # RUNTIME-208 — Progressive Poisson element-domain publication
+
+## Status
+
+- State: `in-progress`.
+- Owner: `Codex-RUNTIME208`.
+- Branch: `runtime/runtime-208-element-domain-publication`.
+- Next verification: build the focused runtime/Sandbox targets and run the
+  `ProgressivePoisson` CPU contract selection after the implementation slice.
 
 ## Goal
 

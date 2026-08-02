@@ -21,7 +21,7 @@ materialization with the element-domain contract:
 - [RUNTIME-207 — ICP element-domain source integration](RUNTIME-207-icp-element-domain-source-integration.md)
   accepts all mixed vertex-source pairs and adds the shared config lane after
   `BUG-096` makes point-to-plane readiness truthful.
-- [RUNTIME-208 — Progressive Poisson element-domain publication](RUNTIME-208-progressive-poisson-element-domain-publication.md)
+- [RUNTIME-208 — Progressive Poisson element-domain publication](../../active/RUNTIME-208-progressive-poisson-element-domain-publication.md)
   removes implicit mesh surface sampling/domain replacement and publishes
   source-cardinality hierarchy properties on all vertex domains.
 - [RUNTIME-209 — Point-set outlier analysis and publication split](RUNTIME-209-point-set-outlier-analysis-publication.md)
