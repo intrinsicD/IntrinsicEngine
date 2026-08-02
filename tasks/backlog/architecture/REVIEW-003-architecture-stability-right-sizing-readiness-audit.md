@@ -10,6 +10,7 @@ depends_on:
   - CORE-009
   - GRAPHICS-127
   - HARDEN-086
+  - RUNTIME-139
   - RUNTIME-166
   - RUNTIME-167
   - RUNTIME-168
@@ -35,6 +36,7 @@ depends_on:
   - RUNTIME-202
   - RUNTIME-203
   - RUNTIME-204
+  - RUNTIME-205
   - PHYSICS-004
   - PROC-027
 workflow_schema: 1
@@ -49,6 +51,13 @@ claimed_at:
 
 ## Status
 
+- Runtime backlog coherence re-gate on 2026-08-01: completed RUNTIME-202 makes
+  the remaining helper cleanup owner boundaries concrete. RUNTIME-203 now owns
+  only Engine composition helpers; new RUNTIME-205 owns SceneInteraction
+  helpers. RUNTIME-139 now removes the public planning surface for an
+  unimplemented/non-adopted AoS lane. All three are static readiness blockers.
+  The unsupported broad RUNTIME-138 async umbrella and premature RUNTIME-189
+  method view were withdrawn and do not block this audit.
 - Dependency re-gate on 2026-07-30: `RUNTIME-138` is no longer a static
   prerequisite. Its remaining broad selected-analysis scope is not required
   to retire the Sandbox facade or to execute this audit. If the audit finds a
@@ -109,6 +118,11 @@ claimed_at:
   contract/test → production workflow migration → parity → old-path deletion.
   A task cannot satisfy this gate by adding a general abstraction while
   retaining the specialized path as a permanent compatibility route.
+- The 2026-08-01 coherence review split the final helper deletion by concrete
+  owner and removed multi-consumer `RenderRecipeActivation` and
+  `DeviceBootstrap` from that premise. It also classified the dormant AoS
+  hint/plan/promotion API as a readiness-blocking speculative public seam;
+  RUNTIME-139 removes that surface without implementing another storage lane.
 - `RUNTIME-172` and `RUNTIME-188` are separate gates because the audited scene
   ownership split assigns document/history replacement authority and
   frame-driven interaction/readback state to different concrete modules. The

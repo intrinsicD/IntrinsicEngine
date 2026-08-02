@@ -2,6 +2,13 @@
 id: METHOD-032
 theme: I
 depends_on: []
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 maturity_target: CPUContracted
 ---
 # METHOD-032 — Octree parity normal orientation reference backend
@@ -35,7 +42,7 @@ maturity_target: CPUContracted
 - Reuse: `Geometry.KDTree` + `Geometry.PointCloud.QualityMetrics` nearest-neighbor statistics for the spacing estimate; patch planes derive exclusively from the supplied precomputed normals (signs aligned within each cluster, plane through the cluster centroid along the mean direction) — the method never computes or refits normals itself; `Geometry.PointCloud.SurfaceSampling` for ground-truth-normal fixtures; `Geometry.MarchingCubes` on a `Grid::DenseGrid` sampling of the corner sign field for the benchmark-level reconstruction check; existing `Geometry.PointCloud.Normals` MST mode as baseline.
 - Method-local structure: hashed integer-lattice octree (Morton keys per level), strict center splits, 2:1 balanced so hanging nodes reduce to sub-edge constraints on the finer side; corner identity via integer lattice coordinates, never floating-point comparison.
 - Baseline: `Geometry.PointCloud.Normals` `OrientationMode::MinimumSpanningTree` on identical fixtures; the known MST failure cases (thin plates, nearby opposing sheets, around-hole propagation) are exactly where this method must show its value.
-- Publication track: modern competitor baselines and evidence are seeded as `METHOD-033` (screened Poisson reconstruction reference — the inner solver iPSR needs), `METHOD-034` (iPSR baseline, blocked by `METHOD-033`), `METHOD-035` (PGR winding-number baseline), and `METHOD-036` (shared-protocol comparison evidence report, blocked by this task and the baselines); the sandbox parity-diagnostics debug-draw view is `RUNTIME-189` (blocked by retired `RUNTIME-177` and this task).
+- Publication track: modern competitor baselines and evidence are seeded as `METHOD-033` (screened Poisson reconstruction reference — the inner solver iPSR needs), `METHOD-034` (iPSR baseline, blocked by `METHOD-033`), `METHOD-035` (PGR winding-number baseline), and `METHOD-036` (shared-protocol comparison evidence report, blocked by this task and the baselines). The premature RUNTIME-189 Sandbox view is retired: a new runtime/UI task may be considered only after a positive killing verdict, a frozen public diagnostics payload, and concrete debugging demand.
 
 ## Slice plan
 

@@ -335,3 +335,34 @@
   tests/regression/tooling/Test.ExperimentCustody.py,
   docs/agent/workflow-evidence.md, N290, N292]
 - **From staging**: O72
+
+## K26: Alternate Geometry Layouts Require Adoption Evidence Before Public Planning
+- **Constraint**: Uniform SoA is the sole implemented geometry-storage
+  contract. A second storage/shader lane, or public hints/plans that reserve
+  one, may be introduced only after claim-eligible GPU profiling identifies
+  vertex layout as a material bottleneck and a frozen matched-layout adoption
+  gate passes. A CPU smoke with `adoption_claim=false` cannot justify dormant
+  lane, promotion, or shader-variant state.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N312, N313, N317, N318,
+  docs/adr/0022-vertex-storage-soa-per-channel-streaming.md,
+  benchmarks/rendering/manifests/rendering_vertex_fetch_layout_smoke.yaml,
+  benchmarks/rendering/README.md,
+  tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md]
+- **From staging**: O83
+
+## K27: Method Presentation Follows Positive Evidence and a Frozen Payload
+- **Constraint**: A runtime/UI diagnostic view for an evidence-gated method
+  opens only after the method produces a positive killing verdict, freezes the
+  public result/lifetime contract needed by the view, and demonstrates a
+  concrete debugging consumer. A method task that may retire negatively with
+  no public surface cannot have a pre-committed production view or speculative
+  payload fields.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N312, N313, N317, N318,
+  tasks/backlog/methods/METHOD-032-octree-parity-normal-orientation.md,
+  tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md,
+  docs/adr/0008-spatial-debug-visualizer-adapters.md]
+- **From staging**: O85

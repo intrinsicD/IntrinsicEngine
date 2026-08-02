@@ -24,9 +24,10 @@ map.
   readiness work when required).
 - [UI-035 — Sandbox point-cloud consolidation editor panel](UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
   (LOP/WLOP/CLOP/EAR CPU-reference strategy and parameter controls driving the
-  post-facade `RUNTIME-175` typed operation/config path; METHOD-019/020 may add only backends
-  that pass their evidence gates; gated on `runtime/RUNTIME-175`; uses the
-  app-owned editor structure retired by `ARCH-006`).
+  post-facade `RUNTIME-175` runtime-owned config and explicit typed operation;
+  this task owns visible UI parity after that dependency retires. METHOD-019/020
+  may add only backends that pass their evidence gates; uses the app-owned
+  editor structure retired by `ARCH-006`).
 
 Further UI children open from the deferred triggers recorded by the retired
 RORG-031F seed and from reproducible workflow audits.
@@ -62,15 +63,16 @@ retired under the runtime backlog as `RUNTIME-135`.
   bounded `ExtrinsicSandbox --frame-pacing-report` capture loop ranks the
   default run as present/fallback-frame-lifecycle dominated, rules out editor
   callback work and ImGui draw-data copying as dominant causes, and splits the
-  default sandbox Vulkan validation-gate fallback to `BUG-056`. Source-level
-  selected-entity findings remain tracked by `RUNTIME-138`, retired
-  `GRAPHICS-113`, and retired `GRAPHICS-114`.
+  default sandbox Vulkan validation-gate fallback to `BUG-056`. The broad
+  RUNTIME-138 selected-analysis umbrella is now retired; a measured concrete
+  feature cost gets its own scoped follow-up. Renderer findings remain covered
+  by retired `GRAPHICS-113` and `GRAPHICS-114`.
 - UI-031 is retired as the information-architecture follow-up from the
   2026-07-01 domain-UI review: `Properties` is now a pure data explorer,
   `Appearance` owns render hints, visualization, binding, and texture-bake
-  controls, and domain processing leaves open focused method windows. The
-  broader generation-keyed async selected-analysis cache/job pipeline remains
-  owned by open `RUNTIME-138`.
+  controls, and domain processing leaves open focused method windows. Its
+  delivered visibility-gated/cached model behavior remains, but no broad async
+  selected-analysis pipeline is planned after RUNTIME-138 retirement.
 - UI-001 is retired as part of **Theme A — Working sandbox app path** and depends on
   `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
   runtime selection/geometry-residency tasks for live content. RUNTIME-095 closes

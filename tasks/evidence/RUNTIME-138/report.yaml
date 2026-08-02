@@ -1,0 +1,188 @@
+schema_version: 1
+task_id: RUNTIME-138
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-02T08:50:10Z'
+claim_eligible: false
+source:
+  base_ref: 85449896b74e8d43a50ee848e04faff0972c1baa
+  base_revision: 85449896b74e8d43a50ee848e04faff0972c1baa
+  head_revision: 85449896b74e8d43a50ee848e04faff0972c1baa
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/logic/solution/architecture.md
+    sha256: f19ad2592156ad2863ce540d4518c756eee560312e611e1208eb04680fe91ee8
+  - path: ara/logic/solution/constraints.md
+    sha256: 2413a17a8539f566b6c25063fbe906f16bfee6b6e28d100c4c84daf344f2cbfd
+  - path: ara/staging/observations.yaml
+    sha256: 5d8b89419d9f54b4332a639f5adf71c4b7201a671e513550e83864c5536e89ed
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 6234f089a97697021146de6b7b14978f3eba703b9da410029ca31717ef1c6b08
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: e92d28c857662aba83e775b0d3544c7faf0d8b5c4a456ae015b94252bc7c305f
+  - path: ara/trace/sessions/2026-08-01_001.yaml
+    sha256: 488496270ba3faf907361ad85fe0f30d33382bdd76b02241b4aa62ea1a909506
+  - path: ara/trace/sessions/2026-08-02_001.yaml
+    sha256: 4524b8023ad2e59e3d7000223674971e475b2be4a3f561b3691ae891edb7a5ce
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: 974cd900d0583e240e70e6d3f2530ef7151e6bed24210f8dfbd3b7ae1c92801b
+  - path: benchmarks/rendering/README.md
+    sha256: 4fe31a74a93ff2456ef89830315d241c221fbdc0962b86b7498d824c7d208821
+  - path: docs/adr/0008-spatial-debug-visualizer-adapters.md
+    sha256: 6d9b78cbc4371295ba277c51829b5a24ab07e600723842e71440df882da59006
+  - path: docs/adr/0022-vertex-storage-soa-per-channel-streaming.md
+    sha256: 3365f1873e5b07b58b92ec001696000df8d42a1d046087174d3da9cf6d3018e8
+  - path: docs/reports/2026-07-05-ui-030-frame-pacing-diagnostics.md
+    sha256: 6bfced97f6b933e5af46eaf634c1b63162c93703c4a464cdcffd05038dc22bf4
+  - path: docs/reviews/2026-07-02-clean-workshop-review.md
+    sha256: e9907cf9164d5974f69fbc486e2e477b9a39f47df338770cfc1cc21bf075a556
+  - path: src/graphics/renderer/README.md
+    sha256: 155748e35c0e7f7aee45257ba7d10353dac042b46c22b5bace012e036be3c39f
+  - path: src/runtime/README.md
+    sha256: 5357537950839f64fb4b855c795dc6387f41040277f33f50c657222e48f2f91d
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 5134bc3654b6106fadb2061dccb9c0b147aecf58627e667dbac8e96d8809074a
+  - path: tasks/archive/UI-030-editor-frame-pacing-diagnostics.md
+    sha256: 7c266c3ca10756eab570da1b0e21cf396351d40cd00e1f0a6a99a8128d60728e
+  - path: tasks/backlog/README.md
+    sha256: a68c4f9176dba5c14263c250317cbc1650e258fca20ecf01f8e5be64e9b3a271
+  - path: tasks/backlog/architecture/README.md
+    sha256: 3da486092d209f519e06d708d984a8dbe87177e14f79135563aa0b47fca3e450
+  - path: tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+    sha256: 621777a9662872931260c2920eec9132b6fabdcb33e0e6bf466499ef7660c797
+  - path: tasks/backlog/methods/METHOD-032-octree-parity-normal-orientation.md
+    sha256: 663061555af140efbfbe5a65cb1fe3a4fe07225f6f0a1cce6381a602cfa2ccb4
+  - path: tasks/backlog/methods/README.md
+    sha256: 802be61e93a9763de91c18b77f2953fcc058a794eb4f10c9d431fa2785ac10a9
+  - path: tasks/backlog/runtime/README.md
+    sha256: 00b1e281d94674dfc6181804e4c65eb7a2c8698c013a42eb93cdac6b4a062dcb
+  - path: tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md
+    sha256: null
+  - path: tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md
+    sha256: 1546a0089874ad0c9d46f140b8cc1f1bef0b6f6a8875cb79857aa462851fc483
+  - path: tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md
+    sha256: null
+  - path: tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md
+    sha256: 59f3922e957e63fad70626410fadb830ba2395dc9079485a61d0f63d8a045d9e
+  - path: tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md
+    sha256: null
+  - path: tasks/backlog/runtime/RUNTIME-203-internalize-engine-composition-helpers.md
+    sha256: d2d365c8733e0b2f734f66006f8108476d8137eaf0f277ca97f78ea609768570
+  - path: tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md
+    sha256: null
+  - path: tasks/backlog/runtime/RUNTIME-205-internalize-scene-interaction-helpers.md
+    sha256: 2a380a5f6d4d40b0c3f716fc9ef25816243f196422ecb74eed148ebd38ecef22
+  - path: tasks/backlog/ui/README.md
+    sha256: a8e4ef3e236a8e51d6e386e9e5137629d0519dac7031a539413d88435afeb7ce
+  - path: tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md
+    sha256: e4301a1fcf62ee0a95c0365be429a989e4f38372810eca9197c3c787a0422c1e
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 1a4406510677b1f1f6c140687b2042c8053d3eab66eaea556b3db1d1ff224f27
+  - path: tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md
+    sha256: 7fc9751162c5003c99729b26ed4c8c8982eb9338ac5c04e1d01aa4dea098e160
+  - path: tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md
+    sha256: 4e8f4934c72b663f37f983cca1607095f5225fc07eed57dde3bd82109b5258d8
+  content_digest: 6b4800d05bd18c88ac95a20be998afcea0c37b52621f9066cad724883cfc5548
+touched:
+  paths:
+  - ara/logic/solution/architecture.md
+  - ara/logic/solution/constraints.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-01_001.yaml
+  - ara/trace/sessions/2026-08-02_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - benchmarks/rendering/README.md
+  - docs/adr/0008-spatial-debug-visualizer-adapters.md
+  - docs/adr/0022-vertex-storage-soa-per-channel-streaming.md
+  - docs/reports/2026-07-05-ui-030-frame-pacing-diagnostics.md
+  - docs/reviews/2026-07-02-clean-workshop-review.md
+  - src/graphics/renderer/README.md
+  - src/runtime/README.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/archive/UI-030-editor-frame-pacing-diagnostics.md
+  - tasks/backlog/README.md
+  - tasks/backlog/architecture/README.md
+  - tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+  - tasks/backlog/methods/METHOD-032-octree-parity-normal-orientation.md
+  - tasks/backlog/methods/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md
+  - tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md
+  - tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md
+  - tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md
+  - tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md
+  - tasks/backlog/runtime/RUNTIME-203-internalize-engine-composition-helpers.md
+  - tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md
+  - tasks/backlog/runtime/RUNTIME-205-internalize-scene-interaction-helpers.md
+  - tasks/backlog/ui/README.md
+  - tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md
+  - tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md
+  layers:
+  - runtime
+  modules:
+  - runtime task graph
+extension_seam: New feature-local tasks open only after measured concrete demand
+future_change_plan: Promote RUNTIME-139, RUNTIME-203, or RUNTIME-205 independently; open selected-analysis
+  or orientation-view work only when their recorded evidence triggers fire
+acceptance:
+- criterion: RUNTIME-138 is absent from the open task queue and no dependency waits
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Existing cache, visibility, diagnostics, and bounded work-execution
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Any future async selected derivation requires a named consumer and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No responsiveness, Vulkan, or performance improvement is claimed by this
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-138/commands/final-ara.json
+- receipt: tasks/evidence/RUNTIME-138/commands/final-clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-138/commands/final-diff-check.json
+- receipt: tasks/evidence/RUNTIME-138/commands/final-doc-links.json
+- receipt: tasks/evidence/RUNTIME-138/commands/final-docs-sync.json
+- receipt: tasks/evidence/RUNTIME-138/commands/final-session-brief.json
+- receipt: tasks/evidence/RUNTIME-138/commands/final-task-policy.json
+- receipt: tasks/evidence/RUNTIME-138/commands/final-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-138/commands/final-validate-tasks.json
+changed_public_contracts:
+- Task and architecture contracts only; no production C++ API changed
+diagnostics_and_previews:
+- Clean-workshop rows 1-2, 7, and 8 passed; rows 3-6 are not applicable because no code, API, pass, recipe,
+  or ordering edge changed
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Open implementation tasks still require their own high-risk evidence and independent review
+skipped_checks:
+- check: build_and_ctest
+  reason: No production, test, build, or shader source changed; structural and documentation gates are
+    the strongest relevant checks
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

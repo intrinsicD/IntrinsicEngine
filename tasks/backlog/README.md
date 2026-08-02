@@ -68,9 +68,10 @@ contract-first renderer/snapshot/recipe architecture sequence
 bake graphics dilation and shared-index follow-ups (`GRAPHICS-115` and
 `GRAPHICS-128`) and runtime scheduling/production closure (`RUNTIME-129`) are
 retired — see
-[`rendering/README.md`](rendering/README.md) and the retirement log. Current
-open Theme B leaves include the profile-gated vertex attribute operational
-follow-up (`RUNTIME-139`) and the 2026-07-03 render-graph review leaves —
+[`rendering/README.md`](rendering/README.md) and the retirement log. The former
+profile-gated AoS operational follow-up is now Theme F cleanup: `RUNTIME-139`
+removes its unimplemented planning surface because the retained probe has no
+adoption claim. Current Theme B leaves include the 2026-07-03 render-graph review leaves —
 pass contribution seam (`GRAPHICS-116`), compile caching
 (`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), and parallel
 command recording (`GRAPHICS-119`); compiler/executor polish (`GRAPHICS-120`)
@@ -159,27 +160,22 @@ extraction, progressive helpers, GPU availability inspection, and the sandbox
 editor now share the promoted source/provenance and render-lane availability
 contracts.
 
-`RUNTIME-138` is the next runtime/editor responsiveness leaf: the Sandbox
-selected-entity path should read cached state and submit commands/jobs, while
-heavy selected-entity derivations run asynchronously and apply through bounded
-main-thread results. Its first visibility-gated model-build slice is landed,
-but the generation-keyed async analysis cache and bounded main-thread apply are
-still open. `UI-031` is retired and consumes the visibility-gated model-build
-slice for the domain-window information-architecture cleanup; the broader async
-cache/job pipeline remains owned by `RUNTIME-138`.
-
-Right-sizing re-gate (2026-07-30): `RUNTIME-138` remains a standalone open
-investigation but no longer blocks `RUNTIME-202`, `REVIEW-003`, or `UI-037`.
-Those tasks consume the cache, metadata, diagnostics, and shared `JobService`
-contracts already present; a downstream feature owns a narrow generation-
-keyed derivation only if one of its concrete workflows still requires it.
+`RUNTIME-138` retired on 2026-08-01 after the coherence review found no
+evidence for a broad selected-analysis program. Its delivered visibility
+gating, immutable model caches, metadata, diagnostics, and bounded shared
+`JobService` completion path remain factual behavior. Any future async
+derivation belongs to the named feature whose measurement proves a material
+full-buffer cost; no global selected-analysis service is planned.
 
 The 2026-07-24 source-complete runtime surface audit opened the dependency-
-ordered `RUNTIME-192..204` remediation set and `PHYSICS-004`, re-gating
+ordered `RUNTIME-192..205` remediation set and `PHYSICS-004`, re-gating
 `REVIEW-003`. It consolidates canonical property/presentation/work/readback/
 clustering/residency/visualization/spatial-debug/import/history concepts,
 migrates production workflows, retires the monolithic Sandbox facade,
-internalizes one-consumer helpers, and withdraws dormant public modules. Every
+internalizes one-consumer helpers, and withdraws dormant public modules. The
+2026-08-01 coherence pass split final helper deletion into Engine-owned
+RUNTIME-203 and SceneInteraction-owned RUNTIME-205, and added RUNTIME-139's
+removal of speculative AoS planning. Every
 member requires tests and production adoption before its old specialized path
 is deleted; none may retire by leaving a permanent compatibility facade.
 
@@ -360,13 +356,10 @@ Open members (kernel-seam priority set first):
   (one-shot post-convergence admission gate; re-gated by the 2026-07-24 runtime
   surface remediation set).
 - The dependency-ordered
-  [`RUNTIME-192..204` runtime consolidation set](runtime/README.md).
+  [`RUNTIME-192..205` runtime consolidation set](runtime/README.md), whose
+  remaining leaves are RUNTIME-139, RUNTIME-203, and RUNTIME-205.
 - [`physics/PHYSICS-004-operational-runtime-physics-module.md`](physics/PHYSICS-004-operational-runtime-physics-module.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
-- [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-  (remaining slices use `RUNTIME-192` property snapshots and the
-  post-`RUNTIME-194` `JobService`; no longer a static dependency of
-  `RUNTIME-202`, `REVIEW-003`, or `UI-037`).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).
 - [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md)
@@ -481,7 +474,7 @@ CLOP (blocked by `METHOD-016`/`GEOM-058`/`GEOM-062`), `METHOD-018`
 EAR/anisotropic (blocked by `METHOD-016`/`GEOM-062`), `METHOD-019` optimized CPU
 (blocked by `METHOD-016`/`017`/`018`), `METHOD-020` GPU (blocked by
 `METHOD-019`), and its engine-integration leaves `RUNTIME-175` (blocked by
-`METHOD-016`) and `UI-035` (blocked by `RUNTIME-175`); the parameterization
+`METHOD-016`/`017`/`018`) and `UI-035` (blocked by `RUNTIME-175`); the parameterization
 family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
 `GEOM-064`), `METHOD-022` SLIM (blocked by `GEOM-064`/`METHOD-021`),
 `METHOD-023` BFF (retired),
@@ -504,10 +497,10 @@ two-consumer evidence before opening broader engine integration. The
 formulation, no upstream paper) opens unblocked as `METHOD-032`; its
 publication track seeds screened-Poisson reconstruction `METHOD-033`, the
 iPSR baseline `METHOD-034` (blocked by `METHOD-033`), the PGR
-winding-number baseline `METHOD-035`, the shared-protocol comparison
-evidence `METHOD-036` (blocked by `METHOD-032`/`034`/`035`), and the
-sandbox parity-diagnostics debug-draw view `RUNTIME-189` (blocked by
-`METHOD-032`; its `RUNTIME-177` prerequisite is retired).
+winding-number baseline `METHOD-035`, and the shared-protocol comparison
+evidence `METHOD-036` (blocked by `METHOD-032`/`034`/`035`). The premature
+RUNTIME-189 Sandbox view is retired; a new presentation task requires a
+positive method verdict, frozen public diagnostics, and concrete demand.
 
 ## Cross-domain dependency anchors
 

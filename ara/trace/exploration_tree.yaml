@@ -5523,7 +5523,7 @@ tree:
       - "tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md"
       - "tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md"
       - "tasks/backlog/architecture/CORE-009-app-owned-config-sections.md"
-      - "tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md"
+      - "tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md"
     result: >
       The tracked and staged diffs were empty; only M16.xyz and child.obj
       remained untracked. Local main, origin/main, and the requested audit
@@ -7455,7 +7455,7 @@ tree:
       Determine whether active and backlog runtime tasks still form one
       coherent architecture sequence, contradict current evidence or ownership,
       or should be narrowed, replaced, or retired as obsolete work.
-    status: open
+    status: resolved
   - id: N313
     type: experiment
     title: "Audit remaining runtime tasks against current source and evidence"
@@ -7463,12 +7463,12 @@ tree:
     timestamp: "2026-08-01T01:15+02:00"
     also_depends_on: [N312]
     evidence:
-      - "tasks/active/RUNTIME-202-retire-sandbox-runtime-facade.md"
-      - "tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md"
-      - "tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md"
+      - "tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md"
+      - "tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md"
+      - "tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md"
       - "tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md"
-      - "tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md"
-      - "tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md"
+      - "tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md"
+      - "tasks/backlog/runtime/RUNTIME-203-internalize-engine-composition-helpers.md"
       - "docs/reports/2026-07-05-ui-030-frame-pacing-diagnostics.md"
       - "docs/adr/0022-vertex-storage-soa-per-channel-streaming.md"
       - "python3 tools/agents/validate_tasks.py --root tasks --strict: 178 tasks, 0 findings"
@@ -7554,4 +7554,203 @@ tree:
       tests passed with the expected GLFW/LSan control skip; prior exact ASan
       and UBSan selectors passed 2,664/2,664 each. No GPU/Vulkan or performance
       claim is made.
+    status: resolved
+  - id: N317
+    type: decision
+    title: "Adopt the runtime backlog coherence surgery"
+    provenance: user
+    timestamp: "2026-08-01T09:07+02:00"
+    also_depends_on: [N312, N313, N316]
+    choice: >
+      Apply the audited dispositions: retire the broad selected-analysis and
+      premature orientation-view plans, replace AoS implementation scope with
+      deletion of dormant planning state, correct consolidation config /
+      operation / UI ownership, split helper cleanup by Engine versus
+      SceneInteraction owner, and preserve the already-retired feature-local
+      RUNTIME-202 result.
+    alternatives:
+      - "Leave the semantically contradictory backlog tasks selectable."
+      - "Implement the speculative AoS, selected-analysis, and method-view scopes without their required evidence."
+      - "Reopen completed RUNTIME-202 despite its accepted locality correction."
+    evidence:
+      - "User direction: please do that."
+      - "N313"
+      - "O82"
+      - "O83"
+      - "O84"
+      - "O85"
+      - "O86"
+      - "tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md"
+    status: resolved
+  - id: N318
+    type: experiment
+    title: "Rewrite and validate the coherent runtime task graph"
+    provenance: ai-executed
+    timestamp: "2026-08-01T09:07+02:00"
+    also_depends_on: [N313, N317]
+    evidence:
+      - "tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md"
+      - "tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md"
+      - "tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md"
+      - "tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md"
+      - "tasks/backlog/runtime/RUNTIME-203-internalize-engine-composition-helpers.md"
+      - "tasks/backlog/runtime/RUNTIME-205-internalize-scene-interaction-helpers.md"
+      - "tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md"
+      - "tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md"
+      - "docs/adr/0022-vertex-storage-soa-per-channel-streaming.md"
+      - "tools/ci/run_clean_workshop_review.sh . --strict: 745 source files, 6,975 references, 85 CMake links, 0 layering violations"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict: 180 tasks, 0 findings"
+      - "python3 tools/agents/check_task_state_links.py --root . --strict: 0 findings"
+      - "python3 tools/docs/check_doc_links.py --root .: 3,007 links, 0 broken"
+    result: >
+      RUNTIME-138 and RUNTIME-189 now preserve explicit no-capability
+      retirement records; RUNTIME-139 removes an unimplemented lane instead of
+      promising it; RUNTIME-175 owns config semantics and separates
+      non-destructive config commit from explicit undoable execution; UI-035
+      owns the later visible proof; and RUNTIME-203/RUNTIME-205 partition
+      helper privatization by concrete owner while retaining multi-consumer
+      recipe/device modules. REVIEW-003 now gates on the three remaining
+      right-sizing leaves. No production, shader, build, or test source changed,
+      and every structural/clean-workshop check run before evidence binding is
+      clean.
+    status: resolved
+  - id: N319
+    type: question
+    title: "Clarify the geometry-method-runtime implementation pipeline"
+    provenance: user
+    timestamp: "2026-08-01T09:38+02:00"
+    description: >
+      Determine whether IRuntimeModule is the universal UI/ECS-to-method
+      composition seam and whether every pending GEOM, METHOD, and RUNTIME
+      task is intended to follow one GEOM-to-METHOD-to-RUNTIME sequence.
+    status: resolved
+  - id: N320
+    type: question
+    title: "Make every agent's current work plan visible and revisable"
+    provenance: user
+    timestamp: "2026-08-01T15:21+02:00"
+    description: >
+      Define a Codex CLI and Claude Code CLI workflow in which each
+      task-bearing agent first creates and continuously manages an observable
+      ordered plan, then records later conversational ideas or constraints at
+      the correct execution point while supporting one or more concurrent
+      agents alongside the generated repository session brief.
+    status: open
+  - id: N321
+    type: experiment
+    title: "Audit current cross-worktree agent observability"
+    provenance: ai-executed
+    timestamp: "2026-08-01T15:21+02:00"
+    also_depends_on: [N320]
+    evidence:
+      - "tasks/SESSION-BRIEF.md reports no active tasks in the current main worktree"
+      - "python3 tools/agents/task_claim.py status reports live METHOD-016 ownership in /tmp/intrinsic-geometry-e2e.GJlhXS"
+      - "git worktree list --porcelain reports multiple repository worktrees"
+      - "tools/agents/generate_session_brief.py reads only task files in its current worktree"
+      - "tools/agents/task_claim.py stores live claims in the Git common directory"
+      - "tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md"
+    result: >
+      The committed session brief truthfully describes the task tree visible
+      in one worktree but cannot expose unmerged live state from sibling
+      worktrees. The Git-common-dir claim ledger does expose cross-worktree
+      ownership immediately, but it records no current step, next step,
+      blocker, or conversational intake. Existing task checklists provide the
+      durable contract but no uniform live-current marker. No workflow or task
+      policy was changed in this audit.
+    status: resolved
+  - id: N322
+    type: question
+    title: "Gate published-method work on literature intake and modular variants"
+    provenance: user
+    timestamp: "2026-08-02T00:53+02:00"
+    also_depends_on: [N319]
+    description: >
+      Determine how IntrinsicEngine can require literature research before
+      implementing published methods or extensions, preserve selectable whole-
+      method and submethod variants, keep METHOD and RuntimeModule work aligned
+      with repository patterns, and give METHOD/GEOM tasks correct durable
+      scientific references, including HARDEN-084.
+    status: resolved
+  - id: N323
+    type: experiment
+    title: "Audit scientific-provenance and modular-dispatch enforcement"
+    provenance: ai-executed
+    timestamp: "2026-08-02T00:53+02:00"
+    also_depends_on: [N322]
+    evidence:
+      - "python3 tools/agents/validate_method_manifests.py --root methods --strict: passed 9 manifests"
+      - "7 concrete methods/**/method.yaml packages and 7 matching paper.md files"
+      - "All 7 concrete paper.md files lack a Literature Search, Search Record, Prior Art, Related Work, or Sources section"
+      - "2 concrete manifests carry an empty DOI; the schema accepts key presence without validating a non-empty stable identifier"
+      - "Manual classification found 11 published METHOD backlog tasks with title/year prose but no DOI, arXiv identifier, or source URL in the task"
+      - "docs/architecture/algorithm-variant-dispatch.md"
+      - "docs/adr/0026-runtime-module-scope-by-consumer-contract.md"
+      - "10 production IRuntimeModule implementors across src/runtime and src/app/Sandbox/main.cpp"
+      - "tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md"
+    result: >
+      The repository has a strong CPU-reference-first workflow, a canonical
+      closed Strategy x optional Backend dispatch pattern, and a four-axis
+      RuntimeModule cohesion rule, but the strict method-manifest gate does not
+      prove literature search, bibliographic identity, variant provenance, or
+      code-to-method mapping. HARDEN-084 already follows the desired local-
+      prototype/two-consumer promotion discipline; it lacks explicit canonical
+      scientific-provenance links. No engine, task, policy, or method file was
+      changed by the audit.
+    status: resolved
+  - id: N324
+    type: decision
+    title: "Affirm literature-gated modular method architecture"
+    provenance: user
+    timestamp: "2026-08-02T01:17+02:00"
+    also_depends_on: [N319, N322, N323]
+    choice: >
+      Adopt the proposed pre-implementation literature-intake gate, canonical
+      reference-to-variant-to-implementation graph, closed strategy plus
+      optional backend axes, and evidence-based RuntimeModule scope; explicitly
+      reject interpreting that direction as one RuntimeModule per method.
+    alternatives:
+      - "Rely on an unverifiable skill-invocation assertion rather than a validated literature artifact."
+      - "Duplicate citation prose and variant mappings across tasks instead of one canonical method package."
+      - "Preallocate one RuntimeModule wrapper for every method."
+    evidence:
+      - "User statement: yes you are exactly right."
+      - "O88"
+      - "O91"
+      - "O92"
+      - "N323"
+    status: resolved
+  - id: N325
+    type: question
+    title: "Confirm the common selected-entity method-operation lifecycle"
+    provenance: user
+    timestamp: "2026-08-02T01:17+02:00"
+    also_depends_on: [N319, N324]
+    description: >
+      Determine whether METHOD integrations should generally share a UI-to-
+      runtime flow in which parameters and selected ECS entities are resolved
+      into the required mesh, graph, or point-cloud domains and PropertySets
+      before method execution, without requiring one RuntimeModule per method.
+    status: resolved
+  - id: N326
+    type: decision
+    title: "Commit the complete runtime-backlog and research-trail surface"
+    provenance: user
+    timestamp: "2026-08-02T10:48+02:00"
+    also_depends_on: [N317, N318, N324, N325]
+    choice: >
+      Commit every current worktree change as one coherent local revision:
+      the runtime backlog/task-graph surgery, synchronized architecture and
+      task documentation, RUNTIME-138 completion evidence, and the subsequent
+      scientific-workflow research trail.
+    alternatives:
+      - "Commit only the latest ARA updates and leave the coherent task surgery dirty."
+      - "Split or postpone the already synchronized documentation/task graph."
+      - "Pull or push as part of the commit-only request."
+    evidence:
+      - "User direction: commit all changes."
+      - "N317"
+      - "N318"
+      - "N324"
+      - "N325"
+      - "Strict task, task-state, docs, ARA, layering, root-hygiene, and clean-workshop gates passed before staging."
     status: resolved

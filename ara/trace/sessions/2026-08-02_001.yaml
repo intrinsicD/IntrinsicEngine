@@ -1,0 +1,129 @@
+session:
+  id: "2026-08-02_001"
+  date: "2026-08-02"
+  started: "2026-08-02T00:53+02:00"
+  last_turn: "2026-08-02T10:48+02:00"
+  turn_count: 3
+  summary: "Affirmed the literature/provenance/variant architecture, clarified typed method operations, and prepared the complete synchronized runtime-backlog and research-trail surface for commit."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: "N322"
+    routing: direct
+    provenance: user
+    summary: "Asked how to require literature intake, preserve selectable variants, align METHOD/RuntimeModule implementations, and carry correct references into METHOD/GEOM tasks."
+  - turn: 1
+    type: experiment
+    id: "N323"
+    routing: direct
+    provenance: ai-executed
+    summary: "Audited method manifests, paper notes, task references, modular-dispatch policy, RuntimeModule cohesion, and HARDEN-084."
+  - turn: 1
+    type: observation
+    id: "O91"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Gate published work on a validated literature artifact and predecessor phase, not an unverifiable skill-invocation assertion."
+  - turn: 1
+    type: observation
+    id: "O92"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Map canonical references through variant axes to real implementations and keep RuntimeModule optional under demonstrated cohesion."
+  - turn: 2
+    type: decision
+    id: "N324"
+    routing: direct
+    provenance: user
+    summary: "Affirmed the proposed literature gate, canonical method graph, modular variant axes, and evidence-based RuntimeModule scope."
+  - turn: 2
+    type: question
+    id: "N325"
+    routing: direct
+    provenance: user
+    summary: "Asked whether method integrations should share a UI-selected-entity to resolved-domain operation lifecycle."
+  - turn: 2
+    type: architecture
+    id: "A23"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized optional RuntimeModule scope and typed runtime operations via verbal affirmation of O88."
+  - turn: 2
+    type: architecture
+    id: "A24"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the validated pre-implementation literature-intake predecessor via verbal affirmation of O91."
+  - turn: 2
+    type: architecture
+    id: "A25"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized one canonical reference-to-variant-to-implementation method graph via verbal affirmation of O92."
+  - turn: 2
+    type: observation
+    id: "O93"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Proposed a common typed runtime operation envelope with method-specific input, result, diagnostics, and commit semantics."
+  - turn: 3
+    type: decision
+    id: "N326"
+    routing: direct
+    provenance: user
+    summary: "Directed one local commit containing the complete synchronized runtime-backlog surgery and research trail."
+
+ai_actions:
+  - turn: 1
+    action: "Read the core, method, task, review, right-sizing, docs-sync, research-ideation, runtime-composition, and evidence contracts; audited the seven concrete method packages, open Theme-I tasks, ten production RuntimeModules, variant-dispatch exemplars, and the strict manifest validator."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 2
+    action: "Traced Sandbox K-Means submission, GeometryAvailability property identity/resolution, ClusteringModule snapshot/job/revalidation/commit, the right-sized RUNTIME-175 plan, ADR-0026, and HARDEN-084; updated only the required ARA research trail."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/staging/observations.yaml"
+      - "ara/logic/solution/architecture.md"
+      - "ara/trace/sessions/2026-08-02_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 3
+    action: "Reviewed every tracked and untracked worktree path, applied the core/review/task-workflow contracts, confirmed no task-claim overlap, ran strict task/task-state/docs/ARA/layering/test-layout/root-hygiene/clean-workshop checks, and detected the RUNTIME-138 report hashes made stale by later ARA edits before staging."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-08-02_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "tasks/evidence/RUNTIME-138/report.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The current strict validator passes all nine manifests while checking paper keys only for presence and allowing explicit test/benchmark placeholders."
+  - turn: 1
+    excerpt: "Use a repository-owned literature-intake artifact plus dependency gate; skill routing alone cannot prove the research occurred before implementation."
+  - turn: 1
+    excerpt: "HARDEN-084 already has the correct modularity shape: local prototypes first, shared non-polymorphic code only after two positive consumers, and no new RuntimeModule."
+  - turn: 2
+    excerpt: "The user explicitly affirmed the prior literature/provenance/modularity recommendation and clarified that no one-RuntimeModule-per-method requirement was intended."
+  - turn: 2
+    excerpt: "The repeatable seam is a typed operation: stable entity/property identities in, runtime-resolved immutable method input, execution, stale-safe commit, and pointer-free completion out."
+  - turn: 3
+    excerpt: "The user explicitly requested that the complete dirty worktree be committed; the branch remains local and 18 commits behind origin/main, with no pull or push included."
+
+open_threads:
+  - "Choose whether temporal enforcement uses a separate intake child task or a sealed phase transition inside one METHOD/GEOM task."
+  - "If adopted, backfill the seven concrete method packages and ratchet new/changed METHOD/GEOM tasks prospectively."
+  - "HARDEN-084 still needs canonical method-package links and an explicit in-house/direct-literature provenance decision before promotion."
+  - "Specify the typed prepare/execute/commit checklist and decide which existing property-resolution, JobService, and mutation helpers are reused without creating a universal MethodRuntime framework."
+  - "Decide whether and when to implement the affirmed literature skill, schema, validator, and task-policy changes."
+
+ai_suggestions_pending:
+  - "Implement intrinsicengine-literature-intake and route published/mixed METHOD/GEOM work through it before the implementation skill."
+  - "Version method.yaml with canonical references, variant axes, supported combinations, and implementation module/path mappings."
+  - "Require scientific-provenance metadata on every new or changed METHOD/GEOM task, including explicit in-house or not-applicable reasons."
+  - "Document a common typed runtime operation envelope while keeping method records and RuntimeModule grouping consumer-specific."

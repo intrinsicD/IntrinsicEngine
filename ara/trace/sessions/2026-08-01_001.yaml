@@ -2,9 +2,9 @@ session:
   id: "2026-08-01_001"
   date: "2026-08-01"
   started: "2026-08-01T01:15+02:00"
-  last_turn: "2026-08-01T08:10+02:00"
-  turn_count: 2
-  summary: "Audited the remaining runtime tasks, then retired and merged RUNTIME-202 after physically localizing editor features and passing independent review plus the 4,010-case CPU gate."
+  last_turn: "2026-08-01T15:21+02:00"
+  turn_count: 5
+  summary: "Audited and reconciled the runtime task graph, clarified conditional GEOM/METHOD/RUNTIME ownership, and designed a separate cross-worktree live-plan layer for observable Codex and Claude agent execution."
 
 events_logged:
   - turn: 1
@@ -79,6 +79,84 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized the single published asset-workflow service and copied seven-stage import recipe as A19 through mainline artifact commitment."
+  - turn: 3
+    type: decision
+    id: "N317"
+    routing: direct
+    provenance: user
+    summary: "Directed the audited runtime backlog dispositions to be applied."
+  - turn: 3
+    type: experiment
+    id: "N318"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rewrote the runtime task graph and passed strict task, link, layering, and clean-workshop checks."
+  - turn: 3
+    type: architecture
+    id: "O82"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized feature-local, evidence-triggered selected-editor async work as A20."
+  - turn: 3
+    type: constraint
+    id: "O83"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the evidence gate for alternate geometry layouts as K26."
+  - turn: 3
+    type: architecture
+    id: "O84"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized runtime-owned consolidation config and explicit operation semantics as A21."
+  - turn: 3
+    type: constraint
+    id: "O85"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the positive-evidence and frozen-payload gate for method presentation as K27."
+  - turn: 3
+    type: architecture
+    id: "O86"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized owner-local runtime helper privatization as A22."
+  - turn: 4
+    type: question
+    id: "N319"
+    routing: direct
+    provenance: user
+    summary: "Asked whether IRuntimeModule and a GEOM-to-METHOD-to-RUNTIME sequence govern every pending geometry/method/runtime task."
+  - turn: 4
+    type: observation
+    id: "O88"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Task prefixes are conditional ownership/evidence scopes; focused runtime operations, not universal IRuntimeModule wrappers, own selection/ECS integration."
+  - turn: 5
+    type: question
+    id: "N320"
+    routing: direct
+    provenance: user
+    summary: "Asked for per-agent persistent plans that expose current work and place later conversational additions in execution order."
+  - turn: 5
+    type: experiment
+    id: "N321"
+    routing: direct
+    provenance: ai-executed
+    summary: "Compared the committed session brief, task checklists, common claim ledger, and sibling worktrees to locate the live-observability gap."
+  - turn: 5
+    type: observation
+    id: "O89"
+    routing: staged
+    provenance: user
+    summary: "Task-bearing agents should persist an ordered live plan and explicitly place later user input into it."
+  - turn: 5
+    type: observation
+    id: "O90"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Separate deterministic merged task state from Git-common-dir live run state and crystallize durable decisions into task files."
 
 ai_actions:
   - turn: 1
@@ -100,6 +178,30 @@ ai_actions:
     action: "Merged the accepted cleanup branch into main, rebuilt IntrinsicTests with Clang 23, ran the complete CPU-supported selector, and pushed main to origin."
     provenance: ai-executed
     files_changed: []
+  - turn: 3
+    action: "Retired RUNTIME-138 and RUNTIME-189 without capability claims, replaced RUNTIME-139 with dormant-plan removal, corrected RUNTIME-175/UI-035 ownership, split RUNTIME-203 into Engine and SceneInteraction leaves, synchronized dependent task/docs records, and crystallized the accepted architecture rules."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md"
+      - "tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md"
+      - "tasks/backlog/runtime/RUNTIME-139-remove-speculative-aos-storage-planning.md"
+      - "tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md"
+      - "tasks/backlog/runtime/RUNTIME-203-internalize-engine-composition-helpers.md"
+      - "tasks/backlog/runtime/RUNTIME-205-internalize-scene-interaction-helpers.md"
+      - "tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md"
+      - "tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md"
+      - "docs/adr/0008-spatial-debug-visualizer-adapters.md"
+      - "docs/adr/0022-vertex-storage-soa-per-channel-streaming.md"
+      - "ara/logic/solution/architecture.md"
+      - "ara/logic/solution/constraints.md"
+  - turn: 4
+    action: "Traced the current app/runtime/ECS/geometry method path and classified all 16 pending GEOM, 27 METHOD, and 4 RUNTIME tasks by declared owner, dependency, backend, and integration role."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 5
+    action: "Read the repository task, claim, workflow-evidence, session-brief, CLI-hook, worktree, and RUNTIME-139 surfaces; diagnosed the live-status gap and produced a bounded cross-CLI design without changing workflow policy or implementation."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched:
   - id: C11
@@ -118,19 +220,27 @@ key_context:
     excerpt: "continue with the cleanup tasks in backlog/runtime. when youre done then commit, merge and push to remote"
   - turn: 2
     excerpt: "Independent round-four review accepted 176/176 source hashes and all 54 required receipts after a repository-wide attachment/snapshot ownership audit."
+  - turn: 3
+    excerpt: "please do that"
+  - turn: 3
+    excerpt: "The reconciled graph passes strict task policy/state-link/doc-link checks and a clean-workshop audit with zero layering violations."
+  - turn: 4
+    excerpt: "IRuntimeModule is the optional app-to-runtime lifecycle seam; selected-entity resolution and method invocation live in focused typed runtime operations."
+  - turn: 4
+    excerpt: "Only the LOP-family backlog declares the pending METHOD-016..018 to RUNTIME-175 to UI-035 integration chain."
+  - turn: 5
+    excerpt: "The current main brief reports no active tasks while the Git-common-dir ledger reports a live METHOD-016 owner in a sibling worktree."
+  - turn: 5
+    excerpt: "Keep SESSION-BRIEF deterministic; expose current, next, blocker, and conversational intake through one live plan record per claimed agent task."
 
 open_threads:
-  - "RUNTIME-138 and RUNTIME-189 are proposed withdrawals, not yet retired task artifacts."
-  - "RUNTIME-139 is proposed for replacement by dormant planning-surface deletion or a future measured gate."
-  - "RUNTIME-175 requires config ownership and non-destructive apply corrections before promotion."
-  - "RUNTIME-203 requires an owner/consumer re-census and split before implementation."
-  - "The user has not yet accepted or rejected the proposed RUNTIME-138, RUNTIME-139, RUNTIME-175, RUNTIME-189, and RUNTIME-203 dispositions."
+  - "RUNTIME-139, RUNTIME-203, and RUNTIME-205 are independent unblocked implementation leaves; RUNTIME-175 and UI-035 remain method-gated."
   - "O87's stronger non-public selected-model-cache suggestion remains staged: RUNTIME-202 retired the universal operation owner, but explicit runtime test seams still construct the exported cache record."
+  - "O88's generalized task-prefix and runtime-operation model awaits user affirmation or a downstream task/docs commitment."
+  - "O89/O90's live-plan architecture awaits user adoption; no workflow task, validator, or CLI implementation has been opened."
+  - "If adopted, the live-plan policy needs a grilled high-risk PROC task covering the common-dir schema, status command, task crystallization, tests, docs, and Codex/Claude onboarding."
 
 ai_suggestions_pending:
-  - "Retire RUNTIME-138 at the delivered cache/visibility baseline; any future expensive derivation should be feature-local."
-  - "Rewrite RUNTIME-139 as removal of unproven AoS planning state; re-open optimization only after GPU profiling."
-  - "Correct RUNTIME-175 and split UI-035's presentation proof from runtime integration."
-  - "Withdraw RUNTIME-189 until METHOD-032 has positive evidence and a production consumer."
-  - "Split RUNTIME-203 and retain RenderRecipeActivation plus DeviceBootstrap."
   - "Revisit O87's selected-model-cache API only as a scoped follow-up that preserves explicit test coverage without recreating an editor facade."
+  - "Use GEOM, METHOD, RUNTIME, and UI as conditional ownership/evidence scopes; introduce IRuntimeModule only for a demonstrated lifecycle/service owner."
+  - "Use one claimed task and worktree per writing agent, one common-dir live plan per claim, stable step/intake IDs, and an on-demand aggregate status view; keep durable scope and follow-ups in canonical task files."

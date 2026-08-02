@@ -9,16 +9,20 @@ another backlog directory.
 
 ### Runtime abstraction consolidation (seeded 2026-07-24)
 
-The source-complete runtime surface audit re-gated `REVIEW-003`. Each task
-lands and tests the general path, migrates real production workflows, proves
-parity, and only then deletes the specialized/forwarding path in a separate
-cleanup slice:
+The source-complete runtime surface audit re-gated `REVIEW-003`. Each remaining
+task is now scoped to one concrete production owner: it preserves public
+behavior first and deletes only the shallow exported helper surface.
 
 #### Open tasks
 
-- [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
-  removes public BMIs for Engine/SceneInteraction/config/device helpers after
-  their owner-level behavior tests are in place.
+- [`RUNTIME-203` — Internalize Engine composition helpers](RUNTIME-203-internalize-engine-composition-helpers.md)
+  removes the one-consumer ModuleSchedule, EcsSystemBundle, and
+  JobServiceGpuQueueBridge BMIs after Engine-level behavior coverage exists.
+- [`RUNTIME-205` — Internalize SceneInteraction helpers](RUNTIME-205-internalize-scene-interaction-helpers.md)
+  separately removes GizmoFrameService and SelectionReadback after interaction-
+  owner behavior/lifetime coverage exists. RenderRecipeActivation and
+  DeviceBootstrap remain outside both tasks because their current production
+  census has multiple load-bearing consumers.
 
 #### Retired prerequisites and completed paths
 
@@ -494,28 +498,26 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
 - [`RUNTIME-175 — Point-cloud consolidation runtime operation and config lane`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
   is the engine-integration leaf for the LOP consolidation method family
-  (`methods/METHOD-016..018`): an app-owned
-  `sandbox.point_cloud_consolidation` section on the generic CORE-009 config
-  lane, an `EngineConfigControl` hot-apply path, a post-`RUNTIME-202` typed
-  operation using canonical `JobService` plus the common mutation transaction,
-  `GeometrySources` writeback, and CPU-reference result diagnostics. It is
+  (`methods/METHOD-016..018`): a runtime-owned config value/schema/codec and
+  typed operation, with app-owned section registration/default aggregation on
+  the generic CORE-009 lane. Config preview/apply is non-destructive; a
+  separate explicit operation uses canonical `JobService`, current-generation
+  revalidation, the common mutation transaction, `GeometrySources` writeback,
+  and CPU-reference diagnostics. It is
   gated on `CORE-009` for the section substrate and on
   `methods/METHOD-016..018` for the four reference strategies. No placeholder
   backend selector or RHI adapter lands here; METHOD-019/020 extend the
   delivered surface only for backends that pass their evidence gates. Mirrors
-  retired `RUNTIME-134` progressive-Poisson playground; the Sandbox panel is
-  `ui/UI-035`; coordinate with the app-owned editor structure retired by
-  `ARCH-006`.
+  retired `RUNTIME-134` progressive-Poisson playground. The dependent
+  `ui/UI-035` task owns the Sandbox panel and visible UI parity; RUNTIME-175
+  does not make that downstream task part of its own acceptance criteria.
 
-### Normal-orientation diagnostics (Theme I, seeded 2026-07-20)
+### Retired normal-orientation presentation plan
 
-- [`RUNTIME-189 — Sandbox debug-draw view for orientation parity diagnostics`](RUNTIME-189-orientation-parity-debug-draw-view.md)
-  consumes the method-owned `METHOD-032` result/diagnostics through retired
-  `RUNTIME-199`'s direct-producer rule and owns its orientation-specific copied
-  snapshot/encoder. It owns
-  deterministic primitive budgeting, config/UI parity, and the opt-in
-  `gpu;vulkan` operational smoke; it does not create a generic debug registry,
-  alter orientation results, or gate the method reference.
+- [`RUNTIME-189` — Withdraw the premature orientation debug view](../../done/RUNTIME-189-withdraw-premature-orientation-debug-view.md)
+  retired before implementation. METHOD-032 first owes a positive private
+  killing verdict and a frozen public diagnostics payload; even then, a new
+  runtime/UI task opens only for concrete debugging demand.
 
 ### Parameterization family integration (Theme I, seeded 2026-07-13)
 
@@ -552,9 +554,12 @@ as normals/colors. This series fixes that incrementally.
 
 `RUNTIME-125` is retired at `CPUContracted`: it added the PR-fast
 SoA-vs-interleaved probe benchmark and planning-only storage/promotion
-contracts without adopting an AoS lane. `RUNTIME-139` owns the optional
-operational AoS storage path, shader variants, promote-on-edit behavior, and
-`gpu;vulkan` parity evidence.
+contracts without adopting an AoS lane. The probe still records
+`adoption_claim=false`; no qualifying result exists.
+[`RUNTIME-139`](RUNTIME-139-remove-speculative-aos-storage-planning.md)
+therefore removes the dormant AoS hint/plan/promotion API and preserves the
+implemented uniform SoA path. A future alternate layout requires a new task
+after claim-eligible GPU profiling proves a material vertex-fetch bottleneck.
 
 Storage model is fixed by
 [`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
@@ -623,17 +628,14 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
 `RUNTIME-134` is retired at `CPUContracted`; the Sandbox now exposes the
 progressive-Poisson playground for selected point-cloud and mesh inputs.
 
-`RUNTIME-138` is the runtime-owned selected-entity responsiveness task. It
-makes the Sandbox editor path read cached selected-entity state, submit
-commands/jobs, and move heavy property/channel/UV/scalar derivations out of the
-ImGui callback into generation-keyed canonical `JobService` work over
-`RUNTIME-192` property snapshots. The first landed slice is visibility-gated
-model construction plus per-frame domain-window model reuse; canonical
-property adoption, async analysis, and bounded-apply slices remain open.
-The task is now standalone: it no longer gates `RUNTIME-202`, `REVIEW-003`, or
-`UI-037`. A downstream task uses existing metadata/cache results first and
-owns a narrow feature-local derivation only when a concrete workflow requires
-one.
+`RUNTIME-138`
+retired the broad selected-analysis umbrella without deleting its delivered
+baseline: visibility-gated model construction, immutable selected-model cache
+entries, scan/allocation/timing diagnostics, canonical property snapshots, and
+bounded JobService completion draining remain. The bounded UI-030 capture did
+not establish editor callbacks as a dominant bottleneck. A future feature owns
+the smallest generation-keyed derivation only after its own measurement proves
+a concrete full-buffer cost.
 
 
 ## Cross-linked rendering tasks (runtime-owned)
@@ -807,9 +809,9 @@ split; narratives live in the retirement log.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../archive/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an
-  AoS GPU lane or selecting shader variants. Operational AoS storage/shaders,
-  promote-on-edit behavior, and Vulkan parity remain owned by open follow-up
-  `RUNTIME-139`.
+  AoS GPU lane or selecting shader variants. Its adoption condition was never
+  met; open `RUNTIME-139` now removes the speculative public planning surface
+  while retaining the benchmark as non-adoption evidence.
 - [RUNTIME-136 — Sandbox method backend selectors](../../archive/RUNTIME-136-sandbox-method-backend-selectors.md)
   (done, 2026-07-02, `CPUContracted`): the Sandbox exposes CPU/GPU backend
   selectors for K-Means and Progressive Poisson, with requested-vs-actual

@@ -94,10 +94,11 @@ Sandbox EditorUI CPU work.
 
 ## Follow-Ups
 
-- Open
-  [`RUNTIME-138`](../../tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-  owns the nonblocking selected-entity editor/cache/job pipeline, so UI-030
-  does not expand into model-construction rewrites.
+- Retired
+  [`RUNTIME-138`](../../tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md)
+  preserves the delivered cache/visibility/diagnostic baseline but withdraws
+  the broad async umbrella: this capture did not identify the editor callback
+  as a dominant cost. A future feature-local job requires its own measurement.
 - Retired
   [`GRAPHICS-110`](../../tasks/archive/GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
   owns ImGui upload buffer in-flight safety.

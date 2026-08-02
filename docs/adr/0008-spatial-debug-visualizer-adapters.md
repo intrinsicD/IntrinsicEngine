@@ -140,8 +140,11 @@ What this ADR still governs, unchanged:
 What is superseded: §2's assumption that a *general, registry-based* adapter
 umbrella is the right shape. The evidence says the generic indirection was
 speculative. A future feature that needs spatial-debug rendering (for example
-`RUNTIME-189`) owns a concrete copied record and converts it directly to the
-existing packets — no interface, no opaque key, no registry.
+a post-evidence method diagnostic with a real consumer) owns a concrete copied
+record and converts it directly to the existing packets — no interface, no
+opaque key, no registry. The premature RUNTIME-189 example retired before
+implementation because METHOD-032 had not passed its killing gate or frozen a
+public payload.
 
 ## Alternatives Considered
 

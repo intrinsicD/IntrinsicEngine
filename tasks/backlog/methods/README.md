@@ -159,8 +159,9 @@ map.
   `METHOD-019`; the GPU adapter follows in `METHOD-020`. The shared weight
   math is factored into the `geometry/GEOM-062` `Geometry.PointCloud.Kernels`
   seam; optimized CPU/GPU work follows reference parity; and the engine
-  integration — config lane, runtime facade,
-  and Sandbox editor panel — is owned by `runtime/RUNTIME-175` and `ui/UI-035`,
+  integration — runtime-owned config/typed operation plus app registration,
+  and the dependent Sandbox editor panel — is owned by `runtime/RUNTIME-175`
+  and `ui/UI-035`,
   mirroring the retired `RUNTIME-134` progressive-Poisson playground. Promote
   CPU-reference-first in the dependency order encoded in each task's
   `depends_on`; do not open optimized/GPU/engine slices before the reference
@@ -196,8 +197,9 @@ map.
   `METHOD-033` supplies screened-Poisson reconstruction for the `METHOD-034`
   iPSR baseline; `METHOD-035` supplies the PGR winding-number baseline; and
   `METHOD-036` owns only the shared-input comparison evidence and publication
-  report. The optional Sandbox diagnostic view is `runtime/RUNTIME-189` and
-  cannot change method outputs or confer method maturity.
+  report. The premature `runtime/RUNTIME-189` diagnostic-view plan is retired;
+  any future presentation task follows only a positive method verdict, a
+  frozen public payload, and concrete debugging demand.
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
   into a method package; claiming performance wins without a baseline.
 

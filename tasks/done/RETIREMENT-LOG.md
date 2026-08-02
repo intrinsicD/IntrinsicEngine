@@ -8,6 +8,34 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-138`](RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md) — the
+broad selected-analysis umbrella was withdrawn on 2026-08-01 at `Retired`
+without deleting delivered cache/visibility/diagnostic behavior. The bounded
+UI-030 capture attributed 0.21% of measured time to the editor callback and
+identified present/fallback-frame lifecycle as dominant, so no evidence
+justified an all-feature async pipeline or a responsiveness claim. Existing
+immutable model caches, canonical property snapshots, scan/allocation/timing
+counters, and bounded JobService publication remain. A future expensive
+derivation belongs to a named feature only after its own measurement proves a
+material full-buffer cost. Because the task now records an administrative
+non-claim rather than the originally contemplated performance result, its
+workflow profile closes at `standard`, with the rationale and exact tracker/docs
+surface bound in its report. The same coherence pass converted RUNTIME-139 to
+removal of speculative AoS planning, corrected RUNTIME-175's config/operation /
+UI sequencing, and split final helper cleanup into Engine-owned RUNTIME-203 and
+SceneInteraction-owned RUNTIME-205.
+
+[`RUNTIME-189`](RUNTIME-189-withdraw-premature-orientation-debug-view.md) — the
+orientation-parity Sandbox view plan was withdrawn on 2026-08-01 before any
+implementation or capability claim. METHOD-032 first runs a private killing
+gate and may retire negatively with no public method surface; even a positive
+result does not yet freeze the proposed corner-sign-field lifetime or establish
+a concrete view consumer. This pre-enrollment planning record is preserved as
+history under the RUNTIME-138 coherence review. A future view requires a new
+task based on a positive method verdict, the actual public diagnostics payload,
+and measured debugging demand; no config, runtime, graphics, UI, or Vulkan
+surface landed here.
+
 [`RUNTIME-202`](RUNTIME-202-retire-sandbox-runtime-facade.md) — Sandbox editor
 facade retirement completed on 2026-08-01 at `Retired`. The public all-feature
 facade, shared Sandbox config/default-policy modules, thin method wrappers,

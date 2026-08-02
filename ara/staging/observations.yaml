@@ -1237,7 +1237,7 @@ observations:
     stale: false
   - id: O82
     timestamp: "2026-08-01T01:15+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       RUNTIME-138 should retire at its delivered cache/visibility baseline
       instead of implementing the remaining broad selected-analysis job
@@ -1250,13 +1250,13 @@ observations:
       unchecked slices still require a universal async selected-analysis path.
     potential_type: architecture
     bound_to: [N312, N313]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A20"
+    crystallized_via: verbal-affirmation
     stale: false
   - id: O83
     timestamp: "2026-08-01T01:15+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       RUNTIME-139 should be rewritten as deletion of the dormant static-AoS
       planning surface, or withdrawn until a GPU/profile baseline proves vertex
@@ -1269,13 +1269,13 @@ observations:
       allocation.
     potential_type: constraint
     bound_to: [N312, N313]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K26"
+    crystallized_via: verbal-affirmation
     stale: false
   - id: O84
     timestamp: "2026-08-01T01:15+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       RUNTIME-175 remains a valid post-method integration leaf only if its
       feature config value/schema/codec are runtime-owned, Sandbox owns
@@ -1288,13 +1288,13 @@ observations:
       surface whose task depends on RUNTIME-175.
     potential_type: architecture
     bound_to: [N312, N313]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A21"
+    crystallized_via: verbal-affirmation
     stale: false
   - id: O85
     timestamp: "2026-08-01T01:15+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       RUNTIME-189 should be withdrawn until METHOD-032 produces positive killing
       evidence and a concrete production result/lifetime contract; a debug view
@@ -1307,13 +1307,13 @@ observations:
       positive CPUContracted evidence.
     potential_type: constraint
     bound_to: [N312, N313]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K27"
+    crystallized_via: verbal-affirmation
     stale: false
   - id: O86
     timestamp: "2026-08-01T01:15+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       RUNTIME-203 should be split into owner-local privatization leaves for
       Engine composition and SceneInteraction internals, while
@@ -1327,9 +1327,9 @@ observations:
       repository's one-finding-per-slice right-sizing rule.
     potential_type: architecture
     bound_to: [N312, N313]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A22"
+    crystallized_via: verbal-affirmation
     stale: false
   - id: O87
     timestamp: "2026-08-01T01:15+02:00"
@@ -1347,6 +1347,145 @@ observations:
       essentially the same size as the former facade implementation.
     potential_type: architecture
     bound_to: [N312, N313, N315, N316]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O88
+    timestamp: "2026-08-01T09:38+02:00"
+    provenance: user-revised
+    content: >
+      GEOM, METHOD, and RUNTIME task prefixes describe owning capability or
+      evidence scope rather than mandatory consecutive stages: reusable
+      geometry kernels split out only when independently justified, a METHOD
+      task may itself land executable geometry or private runtime backend code,
+      and runtime/UI integration is owed only by a named consumer. Selection
+      and ECS materialization belong to focused typed runtime operations;
+      IRuntimeModule remains an optional lifecycle/service composition seam,
+      not one wrapper per algorithm.
+    context: >
+      Read-only audit traced IRuntimeModule, Sandbox method panels, geometry
+      operation contexts, ADR-0026/0027, and all 47 pending GEOM/METHOD/RUNTIME
+      task files in the current worktree. Only the LOP-family chain declares a
+      pending reference-method to runtime-operation to UI sequence, and
+      RUNTIME-175 explicitly rejects a new feature service or backend seam.
+    potential_type: architecture
+    bound_to: [N319, N322, N323]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A23"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O89
+    timestamp: "2026-08-01T15:21+02:00"
+    provenance: user
+    content: >
+      Every task-bearing agent should begin by persisting and managing its own
+      ordered work plan so the operator can see its current position; later
+      conversational ideas, constraints, or work items should be explicitly
+      inserted or appended at the execution point the agent intends to honor.
+    context: >
+      The user requested one workflow shared by Codex CLI and Claude Code CLI
+      that remains understandable with one or multiple concurrently running
+      agents and coexists with tasks/SESSION-BRIEF.md.
+    potential_type: architecture
+    bound_to: [N320]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O90
+    timestamp: "2026-08-01T15:21+02:00"
+    provenance: ai-suggested
+    content: >
+      Preserve tasks/SESSION-BRIEF.md as the deterministic committed view of
+      the merged task DAG; represent live execution in one per-owner plan
+      record under the Git common directory, aggregate those records on demand
+      across worktrees, and crystallize scope, acceptance, decisions, and
+      follow-up dependencies into the owning tracked task file. A committed
+      multi-writer live-status file should not become a second task backlog.
+    context: >
+      The observability audit found a live METHOD-016 claim in a sibling
+      worktree while the current main brief correctly reported no local active
+      tasks. The existing common claim ledger already supplies the atomic
+      cross-worktree coordination primitive needed for a small extension.
+    potential_type: architecture
+    bound_to: [N320, N321]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O91
+    timestamp: "2026-08-02T00:53+02:00"
+    provenance: user-revised
+    content: >
+      Published or mixed-basis method work should be unblocked by a versioned,
+      machine-validated literature-intake artifact rather than by an
+      unverifiable assertion that an agent invoked a skill. A repository-owned
+      literature-intake skill should produce stable primary/related reference
+      identities, search sources/queries/cutoff, claim and equation locators,
+      selection/exclusion rationale, and implementation deltas. A separate
+      intake child task or equivalent sealed predecessor should complete before
+      production implementation begins; in-house and not-applicable work must
+      declare that basis explicitly.
+    context: >
+      The read-only audit found that the current method workflow requires paper
+      intake but strict validation accepts empty citation values and records no
+      literature-search evidence. The existing research-ideation skill
+      explicitly excludes direct implementation of an already selected method,
+      so it is not the missing intake gate.
+    potential_type: architecture
+    bound_to: [N322, N323]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A24"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O92
+    timestamp: "2026-08-02T00:53+02:00"
+    provenance: user-revised
+    content: >
+      Scientific traceability and selectable extensions should be represented
+      as one canonical method-package graph: stable reference IDs feed named
+      variant axes and supported combinations, which map to real module/source
+      paths, entry points, backend tokens, and owning tasks. METHOD/GEOM tasks
+      should reference those canonical IDs rather than duplicate drifting
+      citation prose. Known variants use small enums or std::variant payloads;
+      backend remains an orthogonal optional axis; IRuntimeModule is introduced
+      only for demonstrated lifecycle, durable-state, commit, or consumer-
+      reaction ownership under ADR-0026.
+    context: >
+      The repository already documents Strategy x Backend dispatch and
+      right-sized RuntimeModule composition, while the current method graph
+      infers code only from methods/**/src|include and therefore cannot bind the
+      seven packages whose implementations live in promoted src/ modules.
+      HARDEN-084 demonstrates the desired rule that shared helpers appear only
+      after two positive concrete consumers.
+    potential_type: architecture
+    bound_to: [N319, N322, N323]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A25"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O93
+    timestamp: "2026-08-02T01:17+02:00"
+    provenance: ai-suggested
+    content: >
+      Runtime-backed method integrations should share a typed operation
+      lifecycle: app UI submits validated parameters plus stable, role-specific
+      entity IDs and typed property references; runtime resolves live ECS
+      sources to precise mesh, graph, or point-cloud domains, snapshots only
+      required PropertySet data, executes the pure method/geometry contract,
+      revalidates before one canonical commit, and publishes pointer-free
+      completion diagnostics. The operation envelope is common while method
+      inputs, outputs, diagnostics, and writeback semantics remain specific.
+    context: >
+      The user clarified that the desired similarity is the UI-selection-to-
+      domain-resolution pipeline rather than one RuntimeModule per method. A
+      source audit found the complete lifecycle in the K-Means integration,
+      canonical typed property identity/resolution in GeometryAvailability,
+      and the same planned shape without a service/module wrapper in
+      RUNTIME-175.
+    potential_type: architecture
+    bound_to: [N324, N325]
     promoted: false
     promoted_to: null
     crystallized_via: null

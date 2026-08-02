@@ -1830,14 +1830,16 @@ Concretely:
   preserve content identity. Free or stale handles fail and clear the output.
 - `GpuWorld::PlanGeometryStorage(...)` and
   `GpuWorld::PlanGeometryStoragePromotion(...)` are RUNTIME-125's planning-only
-  contract for the optional static AoS fast lane. `GeometryUploadPlan` carries
+  contract for a proposed static AoS fast lane. `GeometryUploadPlan` carries
   the hint and `GeometryResidencyCoordinator` reports/stores the proposed plan,
   but the coordinator delegates execution to the existing
   `GpuWorld::UploadGeometry(...)` path. The current live allocation and
   `TryGetGeometryResidencyView(...)` therefore remain `UniformSoA`: complete
   static surface data can be classified as `StaticInterleavedAoS`, but no AoS
-  buffer is allocated and no shader variant is selected. Changing that
-  operational policy requires a separate storage-lane task and proof.
+  buffer is allocated and no shader variant is selected. The retained probe
+  records `adoption_claim=false`; RUNTIME-139 therefore plans to delete these
+  dormant hints/plans rather than implement the lane. A future alternate layout
+  requires a new task after qualifying GPU/profile evidence.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes
   `Cull.LineQuads.NonIndexedArgs` / `Cull.LineQuads.Count`; the indexed
@@ -2482,10 +2484,10 @@ Concretely:
   `GpuGeometryHandle`. The runtime object-space normal-bake provider accepts
   only a view whose retained bytes exactly match its canonical identity and
   whose current lane advertises tightly packed bake-readable channels. The
-  planned optional static-AoS lane in `RUNTIME-139` must either preserve and
-  truthfully advertise equivalent separate bake-readable channels or produce
-  the deterministic unsupported-lane result; it must not expose interleaved
-  addresses as tightly packed SoA.
+  dormant `StaticInterleavedAoS` planning value is never allocated, so the
+  unsupported-lane result is currently unreachable from a live residency.
+  RUNTIME-139 plans to remove that speculative lane/planning surface while
+  preserving the exact channel-identity contract.
 - `Extrinsic.Graphics.GeometryResidency` is the one runtime-authored geometry
   lifecycle above `GpuWorld`. Its owning `GeometryUploadPlan` contains a
   graphics-only stable key, generation, copied vertex/index/channel bytes,

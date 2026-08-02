@@ -246,8 +246,8 @@ diagnostics immediately, so the viewport does not inherit stale capture from
 the prior frame. Direct ImGui capture reads remain confined to
 `Runtime.ImGuiAdapter.cpp`.
 
-`RUNTIME-138` makes the first selected-entity responsiveness slice
-visibility-gated: the attached `EditorShell` derives a
+The delivered RUNTIME-138 selected-entity baseline is visibility-gated: the
+attached `EditorShell` derives an
 `EditorWorkspaceSnapshotRequest` from currently open panel windows, so closed
 Scene Hierarchy, Inspector, Selection Details, and Geometry Visualization panels
 skip their selected-entity model sections. Cheap document/import/menu/status
@@ -283,8 +283,11 @@ The app-composed `AsyncWorkModule` publishes the kernel-owned `JobService` for
 module/editor discovery and owns survivor cancellation at shutdown. Engine
 always performs the count-limited completion drain, so a completed-work burst
 cannot consume the whole frame by default even when the module is omitted.
-The broader async selected-analysis job pipeline and fuller generation stamps
-remain owned by the open `RUNTIME-138` slices.
+RUNTIME-138 retired the broader async selected-analysis umbrella after the
+bounded UI-030 capture did not establish editor callbacks as a dominant cost.
+If a named feature later measures a material full-buffer derivation, that
+feature owns the smallest generation-keyed JobService operation and its exact
+staleness/diagnostic tests; no global selected-analysis service is planned.
 
 `GRAPHICS-114` updates the runtime ImGui producer side so `ImGuiAdapter` keeps a
 font-atlas cache and revision. `EndFrame()` copies atlas bytes into
@@ -675,9 +678,9 @@ visualization, binding, or texture-bake controls. Processing menu leaves open
 focused method windows such as `Mesh / Processing / Denoise`,
 `Mesh / Processing / Simplify`, `PointCloud / Processing / Remove Outliers`,
 and `Graph / Processing / Vertices / Normals`; the old omnibus per-domain
-`Processing` window is no longer the primary execution surface. The broader
-generation-keyed async selected-analysis cache/job pipeline remains owned by
-open `RUNTIME-138`.
+`Processing` window is no longer the primary execution surface. Delivered
+selected-model caching remains, while any future async derivation requires a
+measured feature-local need rather than the retired RUNTIME-138 umbrella.
 
 `UI-033` makes the `Appearance` windows compositional over render lanes rather
 than exact provenance-domain gates. `PointCloud / Appearance` is the point/vertex
@@ -1620,7 +1623,9 @@ switch. The coordinator records the proposed `PlanGeometryStorage(...)` result,
 but its upload executor remains `GpuWorld::UploadGeometry`, whose live
 `GpuGeometryResidencyView` is currently `UniformSoA`. Static procedural plans
 may therefore report a `StaticInterleavedAoS` preference while the actual
-allocation remains SoA; RUNTIME-197 intentionally does not change that policy.
+allocation remains SoA. The retained benchmark has no adoption claim, so
+RUNTIME-139 plans to remove this dormant hint/plan propagation and keep the
+implemented uniform SoA contract direct.
 
 `FindRenderableSidecarForTest(stableId)` exposes handles and boolean residency
 facts for procedural, mesh, graph, point-cloud, mesh-edge, and mesh-vertex lanes

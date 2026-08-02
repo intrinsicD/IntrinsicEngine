@@ -49,9 +49,12 @@ layout, one shader fetch path, per-attribute streaming available to every
 geometry kind.
 
 An AoS "fast lane" for proven-static, vertex-fetch-bound geometry (options A/B)
-is **deferred** to profile-gated optimization tasks: `RUNTIME-125` recorded the
-benchmark/planning contract, and `RUNTIME-139` owns the optional operational
-storage/shader path. It is not on the critical path.
+is not part of the current design. `RUNTIME-125` retained a smoke probe with
+`adoption_claim=false`; no qualifying result justified allocation/shader
+variants. RUNTIME-139 therefore removes the dormant public hint/plan/promotion
+surface. A future alternate layout starts from a new task only after
+claim-eligible GPU profiling identifies vertex fetch/layout as a material
+bottleneck and a frozen matched-layout gate passes.
 
 ## Consequences
 
@@ -62,11 +65,12 @@ storage/shader path. It is not on the critical path.
   free + compaction model.
 - Trade-off: static geometry loses some vertex-cache locality versus interleaved
   AoS. With BDA and sequential `gl_VertexIndex` the per-channel loads coalesce,
-  and vertex fetch is rarely this engine's bottleneck; if profiling proves
-  otherwise, `RUNTIME-139` adds the opt-in AoS fast lane.
+  and current evidence does not identify vertex fetch as this engine's
+  bottleneck. If future profiling proves otherwise, a new evidence-backed task
+  may reconsider the layout without relying on dormant planning types.
 - Follow-up: RUNTIME-122 (SoA storage + shader fetch), RUNTIME-124 (per-channel
-  streaming), RUNTIME-125 (deferred AoS benchmark/planning gate), RUNTIME-139
-  (optional AoS storage/shader operational path).
+  streaming), RUNTIME-125 (non-adoption layout probe), RUNTIME-139 (remove
+  speculative AoS planning state).
 
 ## Alternatives Considered
 
@@ -74,9 +78,9 @@ storage/shader path. It is not on the critical path.
   layouts force two shader fetch paths (pipeline variants across forward /
   deferred / depth / selection / line / point passes) and conversion lifetime
   logic, for a cache-locality benefit that is unmeasured in this engine and that
-  the upload mechanism (staged device-local copies) does not change. Retained as
-  a deferred, profile-gated optimization (RUNTIME-125 planning, RUNTIME-139
-  operational follow-up).
+  the upload mechanism (staged device-local copies) does not change. It may be
+  reconsidered only after the evidence trigger above; no public placeholder
+  seam is retained meanwhile.
 - **Keep AoS, scatter-write attributes:** rejected — `WriteBuffer` writes one
   contiguous range; strided per-attribute scatter is not supported and would be
   inefficient.

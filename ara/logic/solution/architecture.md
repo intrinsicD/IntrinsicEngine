@@ -266,3 +266,104 @@
   tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md,
   tasks/evidence/RUNTIME-200/report.yaml, N268, N269, N288]
 - **From staging**: O81
+
+## A20: Selected-Editor Async Work Is Feature-Local and Evidence-Triggered
+- **Decision**: Keep the delivered visibility-gated immutable selected-model
+  caches, property snapshots, diagnostics, and bounded shared JobService
+  publication, but retire the all-feature selected-analysis umbrella. A new
+  async derivation belongs to the concrete feature whose measurement proves a
+  material full-buffer cost and carries only that feature's generation and
+  staleness contract.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N312, N313, N317, N318,
+  tasks/done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md,
+  docs/reports/2026-07-05-ui-030-frame-pacing-diagnostics.md,
+  src/runtime/README.md,
+  tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md]
+- **From staging**: O82
+
+## A21: Consolidation Config Semantics Belong to Runtime
+- **Decision**: Point-cloud consolidation uses a runtime-owned config value,
+  schema, codec, validator, and explicit typed operation. Sandbox owns only
+  section registration/default aggregation and later UI presentation. Config
+  preview/apply commits validated parameters without mutating geometry; a
+  separate JobService-backed, current-generation, undoable request executes
+  consolidation. UI-035 owns the dependent visible proof rather than forming a
+  circular RUNTIME-175 acceptance gate.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N312, N313, N317, N318,
+  tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md,
+  tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md,
+  src/runtime/Runtime.ParameterizationConfig.cppm,
+  src/app/Sandbox/Sandbox.ConfigSections.cpp]
+- **From staging**: O84
+
+## A22: Runtime Helper Privatization Is Split by Concrete Owner
+- **Decision**: Engine composition privately owns ModuleSchedule,
+  EcsSystemBundle, and JobServiceGpuQueueBridge behavior; SceneInteraction
+  privately owns GizmoFrameService and SelectionReadback behavior. The two
+  deletion slices remain separate. RenderRecipeActivation and DeviceBootstrap
+  stay outside the premise because each has multiple load-bearing production
+  consumers; their public status changes only under a new concrete task.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N312, N313, N317, N318,
+  tasks/backlog/runtime/RUNTIME-203-internalize-engine-composition-helpers.md,
+  tasks/backlog/runtime/RUNTIME-205-internalize-scene-interaction-helpers.md,
+  tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
+  src/runtime/Runtime.Engine.cpp,
+  src/runtime/Scene/Runtime.SceneInteractionModule.cpp,
+  src/runtime/Runtime.EngineConfigControl.cpp,
+  src/runtime/Runtime.AssetWorkflowModule.cpp]
+- **From staging**: O86
+
+## A23: Method Integrations Share Typed Operations, Not Mandatory Modules
+- **Decision**: GEOM, METHOD, and RUNTIME task prefixes identify owning
+  capability or evidence scope rather than mandatory consecutive stages.
+  Selection and ECS materialization belong to focused typed runtime operations;
+  reusable geometry kernels split out only when independently justified, and a
+  METHOD task may land executable lower-layer code or a private backend adapter.
+  IRuntimeModule remains optional and is introduced only for demonstrated
+  lifecycle, durable-state, dependency/commit, or consumer-reaction ownership,
+  never as one wrapper per algorithm.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N319, N322, N323, N324, N325,
+  docs/adr/0026-runtime-module-scope-by-consumer-contract.md,
+  docs/architecture/feature-module-playbook.md,
+  tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md]
+- **From staging**: O88
+
+## A24: Published Methods Require a Validated Literature-Intake Predecessor
+- **Decision**: Published and mixed-basis method implementation is gated by a
+  versioned, machine-validated literature-intake artifact rather than an
+  unverifiable skill-invocation assertion. The artifact records stable primary
+  and related reference identities, search sources/queries/cutoff, claim and
+  equation locators, selection/exclusion rationale, and implementation deltas.
+  A sealed intake phase or separate predecessor completes before production
+  implementation; in-house and not-applicable work declares that basis.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N322, N323, N324,
+  docs/agent/method-workflow.md,
+  tools/agents/validate_method_manifests.py,
+  methods]
+- **From staging**: O91
+
+## A25: One Method-Package Graph Owns References, Variants, and Implementations
+- **Decision**: Stable scientific reference IDs feed named variant axes and
+  supported combinations, which map to real module/source paths, entry points,
+  backend tokens, and owning tasks. METHOD and GEOM tasks reference those
+  canonical IDs rather than duplicating citation prose. Known variants use
+  value-based enums or std::variant payloads; backend is an orthogonal optional
+  axis, and shared parity helpers appear only after two positive concrete
+  consumers justify them.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N322, N323, N324,
+  docs/architecture/algorithm-variant-dispatch.md,
+  docs/adr/0026-runtime-module-scope-by-consumer-contract.md,
+  tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md]
+- **From staging**: O92

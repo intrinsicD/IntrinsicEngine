@@ -47,7 +47,7 @@ completed: 2026-07-05
 - Follow-up filed: [`GRAPHICS-110`](GRAPHICS-110-imgui-upload-buffer-in-flight-safety.md)
   — per-frame/ring ImGui upload buffers for in-flight safety.
 - Follow-ups filed from the selected-entity source diagnosis:
-  [`RUNTIME-138`](../backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
+  [`RUNTIME-138`](../done/RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md)
   owns the nonblocking selected-entity editor/cache/job pipeline,
   [`GRAPHICS-113`](GRAPHICS-113-selection-outline-id-work-pruning.md) retired
   selected-outline ID work pruning, and

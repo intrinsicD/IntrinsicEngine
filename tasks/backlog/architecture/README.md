@@ -23,9 +23,11 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
   abstraction/adoption/legacy-deletion dependencies. It remains the
   machine-visible admission gate for deferred post-stability research and
   rendering ideas; audit findings become separate dependencies rather than
-  fixes inside the review task. The 2026-07-30 right-sizing re-gate removed
-  `RUNTIME-138` as a static prerequisite; a concrete selected-editor finding
-  would return as its own scoped remediation task.
+  fixes inside the review task. The 2026-08-01 coherence re-gate retired the
+  unsupported RUNTIME-138 umbrella, split helper cleanup into Engine-owned
+  RUNTIME-203 and SceneInteraction-owned RUNTIME-205, and added RUNTIME-139's
+  speculative-AoS-surface removal as a static prerequisite. A concrete future
+  selected-editor finding would return as its own scoped remediation task.
 
 ### Retired seam tasks
 

@@ -2,6 +2,13 @@
 id: UI-035
 theme: I
 depends_on: [RUNTIME-175]
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 maturity_target: Operational
 ---
 # UI-035 — Sandbox point-cloud consolidation editor panel
@@ -9,22 +16,26 @@ maturity_target: Operational
 ## Goal
 - Add the Sandbox editor window that lets a user pick a CPU-reference
   LOP-family strategy (LOP/WLOP/CLOP/EAR), tune its parameters, apply the
-  consolidation to the selected point-cloud entity through the validated
-  config path, and see the cleaned cloud update in the viewport with
+  validated runtime-owned config, explicitly run consolidation on the selected
+  point-cloud entity, and see the cleaned cloud update in the viewport with
   convergence feedback.
 
 ## Non-goals
 - No algorithm, runtime, or config code — the panel is presentation only and
   calls the post-`RUNTIME-202` `RUNTIME-175` typed operation/config surface; it
   never receives `Engine&` or owns geometry/runtime/asset state.
-- No new control path that bypasses the config lane — the panel drives the same validated apply path an agent/config file uses.
+- No app-owned config vocabulary or validator. The panel edits the
+  runtime-owned config through the same preview/validate/commit path as an
+  agent/config file.
+- No geometry mutation merely because config is committed; the Run action is
+  a separate explicit RUNTIME-175 operation.
 - No visualization/colormap changes beyond selecting the consolidated point cloud for display.
 
 ## Context
 - Owner/layer: `src/app/Sandbox/Editor/` (ImGui panels). `app -> runtime` only; panels import runtime seams, not lower layers.
 - Panel structure to mirror: `Sandbox.MethodPanels.cpp`. The
-  **config-lane** exemplar is the progressive-Poisson panel: editor mirror
-  config type with `Make*` converters and an apply routed through
+  **config-lane** exemplar is the delivered parameterization panel: a draft of
+  the runtime-owned config and an apply routed through
   `EngineConfigControl::PreviewEngineConfigControlDocument` /
   `ApplyEngineConfigHotSubset`. Mirror that path so the panel is the config
   lane's UI surface, not a private path.
@@ -39,19 +50,21 @@ maturity_target: Operational
 
 ## Control surfaces
 - UI: `PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` window.
-- Config/Agent: unchanged from `RUNTIME-175` — the panel edits registered app
-  section `sandbox.point_cloud_consolidation` and applies through the tagged
-  `Editor` source, so config files and agents remain co-equal drivers.
+- Config/Agent: unchanged from `RUNTIME-175` — the panel edits the registered
+  `sandbox.point_cloud_consolidation` section and commits through tagged
+  `Editor` source; config files and agents use the same validator. None of
+  those config commits implicitly executes consolidation.
 
 ## Required changes
 - [ ] Add a registered consolidation window in `src/app/Sandbox/Editor/` (mirroring `Sandbox.MethodPanels.cpp`), receiving `SandboxEditorContext`, not `Engine&`.
 - [ ] Strategy selector (LOP/WLOP/CLOP/EAR) reflecting the strategies the `Geometry.PointCloud.Consolidation` module implements; disable/annotate strategies not yet available so the UI never offers an unimplemented variant.
 - [ ] Parameter widgets for the shared and per-strategy knobs (`h`, `mu`,
       iterations, CLOP component count, EAR edge sensitivity and normal-source
-      policy, seed), edited into the editor mirror of
-      `PointCloudConsolidationConfig` and applied through the `RUNTIME-175`
-      config-routed typed operation (preview → submit → apply), not a private
-      call.
+      policy, seed), edited as a draft `PointCloudConsolidationConfig` and
+      committed through the RUNTIME-175 preview/validate/apply config lane.
+- [ ] Add a separate Run affordance that submits the explicit RUNTIME-175
+      operation with the current validated config snapshot; config commit
+      alone must not enqueue work or mutate geometry.
 - [ ] Render the actual `cpu_reference` implementation identity, selected
       strategy, and convergence diagnostics (iterations, converged flag, moved
       distance) from `PointCloudConsolidationResult`.
@@ -60,6 +73,9 @@ maturity_target: Operational
 
 ## Tests
 - [ ] Extend the app/editor panel registration coverage (or a headless panel-model test where one exists) to assert the consolidation window registers through the `UI-034` registry and produces a valid apply request from a param set without ImGui frame state.
+- [ ] Prove config commit and Run are distinct panel actions: commit updates
+      the draft/active config without a geometry request, while Run emits one
+      typed operation request.
 - [ ] Strategy gating: the panel does not emit a request for an unimplemented
       strategy; it annotates the unavailable choice instead.
 - [ ] Result rendering: a model-level assertion covers strategy identity and
@@ -73,7 +89,8 @@ maturity_target: Operational
 - [ ] Selecting a point cloud, choosing a strategy, and applying consolidates
       the cloud and updates the viewport, undoably.
 - [ ] The panel drives the `RUNTIME-175` validated typed operation (no private
-      subsystem poke); config-file and agent drivers stay co-equal.
+      subsystem poke) and separately drives its validated config lane;
+      config-file and agent tuning stays co-equal.
 - [ ] Strategy/implementation identity and convergence feedback are shown;
       unavailable strategies are annotated, not offered.
 - [ ] `app -> runtime` only; the panel owns no engine state.
