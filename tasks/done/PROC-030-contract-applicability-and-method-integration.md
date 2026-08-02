@@ -86,8 +86,9 @@ maturity_target: Operational
 
 - Target: `Operational` as a strict prospective task-authoring and completion
   gate with synchronized templates, skills, review policy, and tooling tests.
-- Existing open tasks remain hash-grandfathered until materially changed;
-  claimed/new tasks enroll. No historical backfill is owed.
+- Byte-identical pre-policy tasks remain baseline-grandfathered across every
+  lifecycle until changed, moved, or consumed; all new/changed tasks enroll.
+  No historical content backfill is owed.
 
 ## Required changes
 
@@ -102,8 +103,9 @@ maturity_target: Operational
   and end-to-end tests or named follow-ups.
 - [x] Extend the method and task authoring/review skills through their canonical
   docs and synchronized mirrors.
-- [x] Extend strict task validation to resolve contract IDs and grandfather
-  byte-identical pre-policy open tasks without backfilling history.
+- [x] Extend strict task validation to resolve contract IDs, grandfather
+  byte-identical pre-policy tasks without backfilling history, and reject
+  direct done/archive insertion or consumed-snapshot replay.
 - [x] Inventory every existing engine-integrated method against the catalog and
   create one bounded backlog refactor task per confirmed violation.
 - [x] Keep method refactor tasks dependency-correct, contract-enrolled, and
@@ -113,7 +115,8 @@ maturity_target: Operational
 
 - [x] Add tooling regressions for valid contract declarations, unknown IDs,
   missing prospective enrollment, empty declarations without justification,
-  and byte-identical legacy grandfathering.
+  byte-identical legacy grandfathering, changed/moved legacy tasks, direct
+  done/archive insertion, and consumed-snapshot replay.
 - [x] Validate all task IDs, dependencies, contract references, task policy,
   workflow evidence, skill mirrors, documentation links, and ARA structure.
 - [x] Confirm the method integration inventory against source, runtime/config
@@ -134,8 +137,9 @@ maturity_target: Operational
 
 - [x] A task author can find applicable contracts from stable catalog IDs
   without searching retired tasks or copying policy text.
-- [x] Every new or materially changed claimed task declares known contracts or
-  a non-empty justified-empty review; strict validation rejects omissions.
+- [x] Every new or materially changed task in any lifecycle declares known
+  contracts or a non-empty justified-empty review; strict validation rejects
+  omissions.
 - [x] A consuming task cannot treat narrower task wording as an override of a
   canonical contract without updating that contract through review.
 - [x] Method work records one end-to-end integration matrix and names owners for

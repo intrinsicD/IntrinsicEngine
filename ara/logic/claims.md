@@ -451,9 +451,10 @@
   statistical/radius outlier processing, and Signed Heat. `HARDEN-087`,
   `RUNTIME-206` through `RUNTIME-210`, and `UI-038` through `UI-042` assign a
   bounded dependency-correct owner to every finding.
-- **Status**: supported — source and literature audit plus strict task-contract
-  validation; no method-correctness, CPU/GPU parity, performance, sanitizer, or
-  Vulkan claim
+- **Status**: supported — source audit, stable-reference bibliographic
+  cross-check, and strict task-contract validation; this is not sealed A24
+  literature intake and makes no method-correctness, CPU/GPU parity,
+  performance, sanitizer, or Vulkan claim
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: A production geometry package or callable

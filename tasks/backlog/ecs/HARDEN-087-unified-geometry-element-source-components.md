@@ -10,7 +10,7 @@ branch:
 worktree:
 claimed_at:
 contract_schema: 1
-contracts: [geometry.element-domain-sources]
+contracts: [repo.task-contract-discovery, geometry.element-domain-sources]
 maturity_target: Operational
 ---
 # HARDEN-087 — Unified geometry element-source components

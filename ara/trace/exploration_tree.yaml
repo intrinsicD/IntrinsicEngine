@@ -7840,8 +7840,8 @@ tree:
       - "src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp"
       - "src/ecs/Components/ECS.Component.GeometrySources.cppm"
       - "feature/lop-consolidation-e2e revision 33930efab13764cbbd0887bfc8c726948a480479"
-      - "LOP, CLOP, EAR, Generalized ICP, Robust ICP, Progressive Poisson, outlier-filter, and Signed Heat primary/extension literature"
-      - "python3 tests/regression/tooling/Test.ValidateTasks.py: 16/16 passed"
+      - "Stable primary/related references recorded for LOP/WLOP/CLOP/EAR, ICP/point-to-plane/GICP/Trimmed/Robust ICP, Progressive Poisson comparisons, SOR/ROR, and Signed Heat"
+      - "python3 tests/regression/tooling/Test.ValidateTasks.py: 21/21 passed"
       - "python3 tools/agents/validate_tasks.py --root tasks --strict: 191 task files, 0 findings"
     result: >
       The intended physical element matrix is not implemented for graphs:
@@ -7851,6 +7851,8 @@ tree:
       statistical/radius outlier processing, and Signed Heat. One foundational
       ECS task and five bounded runtime/UI task pairs now own those gaps. The
       prospective catalog/task validator rejects unknown, omitted, duplicate,
-      unjustified-empty, and incomplete method-integration declarations. No
-      engine behavior changed in this process slice.
+      unjustified-empty, incomplete method-integration declarations, and
+      grandfather-snapshot replay across task lifecycles. The literature work
+      here is a stable-reference cross-check, not sealed A24 intake. No engine
+      behavior changed in this process slice.
     status: resolved

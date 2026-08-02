@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 675,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T14:01:24Z",
+  "label": "revision2-doc-link-check",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T14:01:24Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/revision2-doc-link-check.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/revision2-doc-link-check.stdout.log",
+  "stdout_sha256": "96cb5b8f4f14187e19edebc6d120326982e68ea8a18a7a25c9df8624c304a15f",
+  "task_id": "PROC-030"
+}

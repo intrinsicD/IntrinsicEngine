@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_root_hygiene.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/repo/check_root_hygiene.py --root .",
+  "cwd": ".",
+  "duration_ms": 32,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T14:01:24Z",
+  "label": "revision2-root-hygiene",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T14:01:24Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/revision2-root-hygiene.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/revision2-root-hygiene.stdout.log",
+  "stdout_sha256": "fb85dd921647fb5bdb8f7a0d9a74fcbe83585d17ba42d0464da462b3e84e2702",
+  "task_id": "PROC-030"
+}

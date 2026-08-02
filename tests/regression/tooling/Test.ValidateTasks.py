@@ -10,6 +10,7 @@ from shutil import copyfile
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPO_ROOT / "tools" / "agents" / "validate_tasks.py"
+CONTRACT_BASE_REVISION = "577b45837d47e731f4495c8ab4ea1570bdc63911"
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -93,6 +94,74 @@ true
 """
     target.write_text(f"---\n{front_matter}---\n{body}", encoding="utf-8")
     return target
+
+
+def write_retired_task(
+    root: Path, *, lifecycle: str, task_id: str = "TEST-001"
+) -> Path:
+    target = root / lifecycle / f"{task_id}-fixture.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        f"""---
+id: {task_id}
+theme: none
+depends_on: []
+---
+# {task_id} — Retired fixture
+
+## Status
+- Completed on 2026-08-02.
+- Commit reference: fixture.
+
+## Goal
+- Exercise prospective retired-task validation.
+
+## Non-goals
+- No product behavior.
+
+## Context
+- Tooling fixture.
+
+## Required changes
+- [x] Add the fixture.
+
+## Tests
+- [x] Run the validator.
+
+## Docs
+- [x] Keep the fixture self-describing.
+
+## Acceptance criteria
+- [x] The fixture is valid.
+
+## Verification
+```bash
+true
+```
+
+## Forbidden changes
+- No unrelated work.
+""",
+        encoding="utf-8",
+    )
+    return target
+
+
+def task_bytes_at_contract_baseline(relative_path: str) -> bytes:
+    result = subprocess.run(
+        [
+            "git",
+            "show",
+            f"{CONTRACT_BASE_REVISION}:tasks/{relative_path}",
+        ],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stderr.decode("utf-8", errors="replace"))
+    return result.stdout
 
 
 class ValidateTasksTests(unittest.TestCase):
@@ -445,6 +514,98 @@ contracts: [method.engine-integration]
             result = run_validator(root)
 
         self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_changed_legacy_task_must_enroll(self) -> None:
+        source = (
+            REPO_ROOT
+            / "tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            target = root / "backlog/bugs" / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(source, target)
+            target.write_text(
+                target.read_text(encoding="utf-8")
+                + "\n<!-- prospective semantic edit -->\n",
+                encoding="utf-8",
+            )
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("must declare `contract_schema: 1`", result.stdout)
+
+    def test_promoted_legacy_task_must_enroll(self) -> None:
+        source = (
+            REPO_ROOT
+            / "tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            target = root / "active" / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(source, target)
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("must declare `contract_schema: 1`", result.stdout)
+
+    def test_new_done_task_cannot_bypass_contract_enrollment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            write_retired_task(root, lifecycle="done")
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("outside the prospective contract baseline", result.stdout)
+        self.assertIn("`contract_schema: 1`", result.stdout)
+
+    def test_new_archive_task_cannot_bypass_contract_enrollment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            write_task(
+                root,
+                front_matter="""id: TEST-001
+theme: none
+depends_on: []
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner: fixture
+branch: test/contracts
+worktree: /tmp/contracts
+claimed_at: "2026-08-02T12:00:00Z"
+contract_schema: 1
+contracts: []
+contract_review: fixture has no subsystem contract
+""",
+            )
+            write_retired_task(root, lifecycle="archive", task_id="TEST-002")
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("outside the prospective contract baseline", result.stdout)
+        self.assertIn("`contract_schema: 1`", result.stdout)
+
+    def test_consumed_legacy_snapshot_cannot_be_replayed(self) -> None:
+        relative = (
+            "backlog/ui/"
+            "UI-038-progressive-poisson-destructive-conversion-safety.md"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(task_bytes_at_contract_baseline(relative))
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("consumed legacy task snapshots cannot be replayed", result.stdout)
 
 
 if __name__ == "__main__":

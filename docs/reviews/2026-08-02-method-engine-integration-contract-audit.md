@@ -77,24 +77,37 @@ review before source changes. The intake used for this audit confirms only the
 input/publication distinctions needed to slice the work:
 
 - LOP originates in Lipman et al., “Parameterization-free Projection for
-  Geometry Reconstruction” (DOI `10.1145/1275808.1276405`); WLOP, CLOP
-  (DOI `10.1145/2601097.2601172`), and EAR
+  Geometry Reconstruction” (DOI `10.1145/1275808.1276405`); WLOP (DOI
+  `10.1145/1618452.1618522`), CLOP (DOI `10.1145/2601097.2601172`), and EAR
   (DOI `10.1145/2421636.2421645`) extend point-set consolidation without adding
   an ECS provenance requirement.
-- ICP and its point-to-plane, Generalized ICP, trimmed, and robust extensions
-  formulate registration over point/normal sets; ECS mesh/graph provenance is
-  not an algorithmic precondition.
+- ICP (DOI `10.1109/34.121791`) and its point-to-plane (DOI
+  `10.1016/0262-8856(92)90066-C`), Generalized ICP (DOI
+  `10.15607/RSS.2009.V.021`), trimmed (DOI
+  `10.1109/ICPR.2002.1047997`), and robust (DOI
+  `10.1109/TPAMI.2021.3054619`) extensions formulate registration over
+  point/normal sets; ECS mesh/graph provenance is not an algorithmic
+  precondition.
 - The repository Progressive Poisson contract explicitly accepts a contiguous
-  point buffer. Progressive surface generation is distinct literature and must
-  not be smuggled into that method's mesh binding.
+  point buffer and identifies an unpublished working draft at
+  `https://github.com/intrinsicD/GPU-Accelerated-Progressive-Poisson-Disk-Sampling-via-Phase-Parallel-Spatial-Hashing`.
+  Brandt et al.'s visibility-aware progressive farthest-point sampler (DOI
+  `10.1111/cgf.13848`) and Yuksel's weighted sample elimination (DOI
+  `10.1111/cgf.12538`) are comparative adjacent methods; progressive surface
+  generation must not be smuggled into this method's mesh binding.
 - Statistical/radius filters classify input points before optional removal;
-  exposing classification separately is consistent with the PCL/Rusu family
-  and enables topology-safe analysis.
-- Feng and Crane's Signed Heat method (DOI `10.1145/3658220`) includes surface,
-  point-cloud, and volumetric formulations. The repository package explicitly
-  implements only surface Variant A, so this audit preserves a mesh-only UI and
-  does not advertise unimplemented variants.
+  exposing classification separately is consistent with Rusu et al.'s
+  statistical formulation (DOI `10.1016/j.robot.2008.08.005`) and the official
+  PCL StatisticalOutlierRemoval/RadiusOutlierRemoval behavior, and enables
+  topology-safe analysis.
+- Feng and Crane's Signed Heat method (DOI `10.1145/3658220`) extends the
+  scalar Heat Method lineage (DOI `10.1145/2516971.2516977`) and includes
+  surface, point-cloud, and volumetric formulations. The repository package
+  explicitly implements only surface Variant A, so this audit preserves a
+  mesh-only UI and does not advertise unimplemented variants.
 
-This is an integration audit, not a new numerical or performance claim. Each
-follow-up must record the exact formulation and later improvements it relies on
-in its method/package documentation before implementation changes.
+This is a bounded bibliographic cross-check for integration slicing, not the
+sealed literature-intake artifact required by A24 and not a new numerical or
+performance claim. Each follow-up must perform and record its fresh search,
+exact formulation, later improvements, and selection/exclusion rationale in
+its method/package documentation before implementation changes.

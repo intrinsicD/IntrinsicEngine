@@ -1523,9 +1523,10 @@ observations:
       bounded owning task chain for every finding.
     context: >
       Source tracing, runtime/UI registration inspection, method manifests,
-      existing contracts, and original-plus-extension literature were audited
-      while implementing PROC-030. The resulting audit and backlog now depend
-      on this bounded inventory.
+      existing contracts, and stable original-plus-extension references were
+      cross-checked while implementing PROC-030. This bounded bibliographic
+      check is not the sealed literature-intake artifact required by A24. The
+      resulting audit and backlog now depend on this bounded inventory.
     potential_type: claim
     bound_to: [N330]
     promoted: true

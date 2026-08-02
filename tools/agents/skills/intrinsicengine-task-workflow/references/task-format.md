@@ -106,13 +106,22 @@ enroll. Historical done/archive tasks are not backfilled. See
 evidence custody. After opening, retiring, or re-gating a task, regenerate the session brief with
 `python3 tools/agents/generate_session_brief.py`.
 
-Contract enrollment is independently prospective. Exact hashes in
-`tools/agents/contract_legacy_tasks.json` grandfather only byte-identical open
-tasks that predate `PROC-030`; editing, renaming, or promoting one enrolls it.
-`tools/agents/validate_tasks.py --strict` resolves declared IDs against the
-catalog and validates each catalog source/proof path. Add a catalog entry only
-for a reusable rule with canonical prose and an executable validator or test;
-do not make a task, skill, generated file, or code comment its sole authority.
+Contract enrollment is independently prospective across
+`tasks/active|backlog|done|archive`; creating a task directly in a retired
+lifecycle is not an escape hatch. `tools/agents/contract_legacy_tasks.json`
+pins the exact pre-policy Git revision. Its `tasks` mapping grandfathers the
+remaining byte-identical open snapshots, while unchanged done/archive history
+is checked directly against that revision. Editing, renaming, promoting, or
+moving one enrolls it. When a mapped open snapshot is enrolled or removed,
+move its original path/hash to `consumed`; the validator rejects both stale
+live entries and replay of consumed bytes. Historical task contents are not
+backfilled.
+
+`tools/agents/validate_tasks.py --strict` applies this gate before the ordinary
+done/archive format exemptions, resolves declared IDs against the catalog, and
+validates each catalog source/proof path. Add a catalog entry only for a
+reusable rule with canonical prose and an executable validator or test; do not
+make a task, skill, generated file, or code comment its sole authority.
 
 For method-backed work, declaring `method.engine-integration` also requires an
 `## Engine integration` matrix. Record the least-structured input, every

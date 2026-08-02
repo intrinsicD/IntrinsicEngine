@@ -1,7 +1,11 @@
 {
+  "consumed": {
+    "backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md": "ae1644b7ad871f02a1831f7dff154af631ff8fc16036fe8dfeb92d3fa0695fd6"
+  },
   "effective_date": "2026-08-02",
   "policy_task": "PROC-030",
   "schema_version": 1,
+  "source_revision": "577b45837d47e731f4495c8ab4ea1570bdc63911",
   "tasks": {
     "backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md": "621777a9662872931260c2920eec9132b6fabdcb33e0e6bf466499ef7660c797",
     "backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md": "6d07ff34135a77297323bd3ce7f098c568c02dd41da4d6e8b2047b9a8f9f198e",
@@ -75,7 +79,6 @@
     "backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md": "f1d3dd8b13137da01dbe9a011da090b9f4c93a105f07e34de4d5ee2ee3eba33e",
     "backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md": "59f3922e957e63fad70626410fadb830ba2395dc9079485a61d0f63d8a045d9e",
     "backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md": "e4301a1fcf62ee0a95c0365be429a989e4f38372810eca9197c3c787a0422c1e",
-    "backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md": "900b23e61ead50e8ce418aab90f3d09af5e5b69bffc22621d20e1287897a2318",
-    "backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md": "ae1644b7ad871f02a1831f7dff154af631ff8fc16036fe8dfeb92d3fa0695fd6"
+    "backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md": "900b23e61ead50e8ce418aab90f3d09af5e5b69bffc22621d20e1287897a2318"
   }
 }

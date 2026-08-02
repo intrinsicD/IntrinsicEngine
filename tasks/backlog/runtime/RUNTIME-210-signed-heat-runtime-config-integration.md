@@ -34,9 +34,14 @@ maturity_target: Operational
   CPU-reference assets but have no runtime/config/Sandbox binding. Unlike the
   point-span violations, this method legitimately requires mesh faces and an
   oriented halfedge curve.
-- Re-read Feng and Crane, “A Heat Method for Generalized Signed Distance”
-  (DOI `10.1145/3658220`) and subsequent heat-distance extensions before
-  integration; keep the repository's documented surface Variant A limitations.
+- Re-read Crane, Weischedel, and Wardetzky's scalar Heat Method predecessor
+  (DOI `10.1145/2516971.2516977`), Feng and Crane, “A Heat Method for
+  Generalized Signed Distance” (DOI `10.1145/3658220`), and the official
+  geometry-central Signed Heat reference implementation
+  (`https://geometry-central.net/surface/algorithms/signed_heat_method/`)
+  before integration. Keep the repository's documented surface Variant A
+  limitations; do not infer that the package implements the paper's other
+  discretizations merely because the paper and reference suite describe them.
 
 ## Engine integration
 

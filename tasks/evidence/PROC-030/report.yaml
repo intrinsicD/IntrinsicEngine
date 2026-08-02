@@ -1,0 +1,318 @@
+schema_version: 1
+task_id: PROC-030
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-02T13:24:23Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 577b45837d47e731f4495c8ab4ea1570bdc63911
+  head_revision: 06680c57fa910977f0217e58f096909543742dd2
+  branch: process/contract-applicability
+  worktree: /tmp/intrinsic-proc030.lxl95I
+  dirty: false
+  surface:
+  - path: AGENTS.md
+    sha256: ec68491c54abbaa041d285541b5412ec603af0971fbee2fc3ae29f8b8984a275
+  - path: ara/logic/claims.md
+    sha256: a800a59e32704cb147422e65eda899050506377d2054eb5b3bf97fea1c96d896
+  - path: ara/logic/solution/architecture.md
+    sha256: da623009617a2c3565e14605e43e1d9ad1a40cd5c00b554b1be766706d62a026
+  - path: ara/staging/observations.yaml
+    sha256: 6ca563ba78ac8286d1fa14f8b568ce0570d7b1a9624a61de8c89fbd7786de3ca
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 1d0f99492e68bdd8583a8dde918c01f47d33f4c29d0717d31c0f24e7f793f610
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: c0a6ccbc227a87667e619c99697cb72e982914b3901aa1c4020dbc90b9e7e31e
+  - path: ara/trace/sessions/2026-08-02_001.yaml
+    sha256: 322f212d037315f9f2d880780169c06148df055661d5c824b8e16cb01688807e
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: 3ed98430c99347da5ded88a4731d80c5ecb207837364f7a0ffd4d67e132e609a
+  - path: docs/agent/method-review-checklist.md
+    sha256: 2021bb1dab43e9931609c3cab80198853255639a15ba16927c91644cbc92f657
+  - path: docs/agent/method-workflow.md
+    sha256: 5ef4b8ea7bd14e17a659e46561c79d8decdef7635edb2797ee7bc93782a7faa9
+  - path: docs/agent/prompt/prompt.md
+    sha256: a95430294f019e1bc5b1ecb988ba54f39f4bd0e5b03a6a636a49f23e44ba9fc3
+  - path: docs/agent/review-checklist.md
+    sha256: e5838a9d9d58c26660539bcbdfa7cdba4cc7f9b8d72bdd417e0a54e0175edfab
+  - path: docs/agent/task-format.md
+    sha256: e7ff5ebeab1656420f455103d34f5df3d4a20d060709f5b185263629f5487dfb
+  - path: docs/architecture/contract-catalog.yaml
+    sha256: 8b61113d6efaea8ab31a97fe7f8e1ba6e306b6fad55a2b1eeb89aca7e7ef0da2
+  - path: docs/architecture/geometry-api-style.md
+    sha256: cc7f2fefd935bc41a39e48035817af71806d9ec7d3beea6401014b7cf371d035
+  - path: docs/architecture/index.md
+    sha256: 31e91702c93aa4257a002e76eb5f18a37b0de58bb0a7d94acee24efad3c605f3
+  - path: docs/architecture/method-api-contract.md
+    sha256: 695665a3e5cc0990047b14ed40c09a4c5dfd6e51a13e2c6ae3130b173fba7ef5
+  - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+    sha256: ee348923a046fe5b3e1e535d1436822f05a8002dcea4bc133461a509b5054501
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 475a4002f42fc4a3f00a388a0f1a70ede0c0abd41f6b42f7cc43ae619220c2e0
+  - path: tasks/active/README.md
+    sha256: 2bf8cc3ee5d96a6ea5e54d247ee7eb949c28ab45e2ddb4ee47b7a2a0a82aed72
+  - path: tasks/backlog/README.md
+    sha256: 31a22d150a1bcfcfa81c5b32d36d73a7267048bb87d0fa502fb76c8a91ec95dd
+  - path: tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md
+    sha256: 79a3d19ed649a70babb3eee3364f7d3f80dd9971e4c2472357dca7193df0b0fc
+  - path: tasks/backlog/ecs/README.md
+    sha256: fd5ba69a22ecef47229934a82d3351faad863d118bebd9dc3477035c309c5619
+  - path: tasks/backlog/methods/README.md
+    sha256: 55d21724531cfa5b58a8e2c0b8b1434edd99f4352a65bbf22375e96a9d17431e
+  - path: tasks/backlog/process/README.md
+    sha256: 80c20ded58a3109f11a5bbd7122e79c70783a793bd04ded56a7d0f5c92a537e5
+  - path: tasks/backlog/runtime/README.md
+    sha256: 0fdb7f1e735d32d9ccdd04ee5e7eed1c1b275d939b53f7f5fb78f36282f77092
+  - path: tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md
+    sha256: 84416162e11eb21bd0d0ade545b8f72a7709ba91bc05189e18e5d26ff55723a5
+  - path: tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md
+    sha256: 16a85d77b505d034ab6a2a21550d9a69f5f94a5411c3226d9fcfa392fd207981
+  - path: tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md
+    sha256: 736ac6d271b6d6be59210d37353fd009da56fec341e5b91193b31127d3f39533
+  - path: tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md
+    sha256: 81bedcec02cbf7a1e9936d6648a5e932529551ab3922b2defd199856371d0263
+  - path: tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md
+    sha256: 55f7742ab0dc51532b79ec08e43e644fd17fc0735f7ed7e2e4d32cd11f02741d
+  - path: tasks/backlog/ui/README.md
+    sha256: 2d108ca3afff1ee03becc2d41c845ea46849e7529a5f104e704cf152cc333031
+  - path: tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md
+    sha256: null
+  - path: tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md
+    sha256: 7aaf42ab79f96518742387727c3d1b8a98c21e505bfb7f9a4b111aa4a6433cf7
+  - path: tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md
+    sha256: 0d7e120bee13ce70e0a5a1a882630c9d9c6e8a7c49fbbad907293a03e236496e
+  - path: tasks/backlog/ui/UI-040-icp-compatible-source-selection.md
+    sha256: bf7ca4fa9cc2bb7f2c00d72e5f86c9916b1aeddbcdb1d0a142b8678b0704737c
+  - path: tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md
+    sha256: 62d4b9e6584ab4a12cc508de6939b071e7cd7eca00f365996b4db85ec13a9686
+  - path: tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md
+    sha256: b386804006a82872164002b74a246b6f147395f5170b2283dee9e722246c4dde
+  - path: tasks/done/PROC-030-contract-applicability-and-method-integration.md
+    sha256: c3eabcf2c63fedb20f00486d42868c7d0f5f0df46e580f8b08ecb18c93ca552d
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: d6996c33a4067251ef14476a6e9d72da85e9a4b3058314cbe2c82401ebc2e7b0
+  - path: tasks/templates/bug-task.md
+    sha256: a980be7fa1e956767c1e37d34eb69b0797cc58ff95351d5194b568188ff60459
+  - path: tasks/templates/method-task.md
+    sha256: e5702058622c444d9f176766c0baef1c1c8a3dbc4a230336653312ede928f9ab
+  - path: tasks/templates/review-task.md
+    sha256: 934ae5025711dec193f7723a15cd1a0cf2ce774eb4c9475a45ebbbe75a106cc5
+  - path: tasks/templates/task-micro.md
+    sha256: 33808df94214bd5310c384826a56b8cb0f7cf9a31bc9cda19255953d2b313e33
+  - path: tasks/templates/task.md
+    sha256: 19f1b06127234b51e1362d4a87d6ce8ed8771b7cf015a5039c68ae7c7012cc61
+  - path: tests/regression/tooling/Test.ValidateTasks.py
+    sha256: 790ac602922cd18b8f86156e5bcfca30331aceae399954f632f2094ed871873a
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 68a7a9a7d067e4f957a01ec7c3a3b97c10503b4708c9b44047651c9fdde89026
+  - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+    sha256: a95430294f019e1bc5b1ecb988ba54f39f4bd0e5b03a6a636a49f23e44ba9fc3
+  - path: tools/agents/skills/intrinsicengine-method/SKILL.md
+    sha256: f11b4e1b2534d8d9514484a3e07bf3a00159cdf9065a2a853d494ca7745fadfc
+  - path: tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
+    sha256: 2021bb1dab43e9931609c3cab80198853255639a15ba16927c91644cbc92f657
+  - path: tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+    sha256: 4c1d54c4ba8dab5b1042d96824f5294c9d96991bc1804aafa5f1b9a4b538a0e7
+  - path: tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+    sha256: 83b4e2b784701dde7361726ef01052bd2aebbb41f99fffd6ce7e3ff39bb1f71a
+  - path: tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
+    sha256: 8521f39e02d911b377a8a85a1f6d468377c5718b365b1db8432cdae242d8c98b
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+    sha256: 3e995dd4caad40801690169c60b4c08386d5dd020b76fbd4943abffd65c3b5e6
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
+    sha256: 19f1b06127234b51e1362d4a87d6ce8ed8771b7cf015a5039c68ae7c7012cc61
+  - path: tools/agents/validate_tasks.py
+    sha256: bb02b54c6cecc8465246a661a33480f7f835004a11cb4eb3214fd318d1c8be3a
+  content_digest: a60a1836c41b7adef3a972ee7d1bff40418fbcb0b7d221eafc80502bf6eb4bca
+touched:
+  paths:
+  - AGENTS.md
+  - ara/logic/claims.md
+  - ara/logic/solution/architecture.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-02_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/agent/method-review-checklist.md
+  - docs/agent/method-workflow.md
+  - docs/agent/prompt/prompt.md
+  - docs/agent/review-checklist.md
+  - docs/agent/task-format.md
+  - docs/architecture/contract-catalog.yaml
+  - docs/architecture/geometry-api-style.md
+  - docs/architecture/index.md
+  - docs/architecture/method-api-contract.md
+  - docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md
+  - tasks/backlog/ecs/README.md
+  - tasks/backlog/methods/README.md
+  - tasks/backlog/process/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md
+  - tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md
+  - tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md
+  - tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md
+  - tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md
+  - tasks/backlog/ui/README.md
+  - tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md
+  - tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md
+  - tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md
+  - tasks/backlog/ui/UI-040-icp-compatible-source-selection.md
+  - tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md
+  - tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md
+  - tasks/done/PROC-030-contract-applicability-and-method-integration.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/templates/bug-task.md
+  - tasks/templates/method-task.md
+  - tasks/templates/review-task.md
+  - tasks/templates/task-micro.md
+  - tasks/templates/task.md
+  - tests/regression/tooling/Test.ValidateTasks.py
+  - tools/agents/contract_legacy_tasks.json
+  - tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+  - tools/agents/skills/intrinsicengine-method/SKILL.md
+  - tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
+  - tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+  - tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+  - tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
+  - tools/agents/validate_tasks.py
+  layers:
+  - agent-workflow
+  - architecture
+  - tasks
+  modules:
+  - method-workflow
+  - task-contract-validation
+extension_seam: Stable contract IDs in one plain YAML catalog, referenced prospectively from task front-matter
+  and resolved by the existing task validator
+future_change_plan: Add or change a reusable contract only with one canonical source, an applicability
+  entry, executable proof, focused validator coverage where mechanically enforceable, and an enrolled
+  owning task
+acceptance:
+- criterion: A task author can find applicable contracts from stable catalog IDs
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every new or materially changed claimed task declares known contracts or
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A consuming task cannot treat narrower task wording as an override of a
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Method work records one end-to-end integration matrix and names owners for
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every confirmed existing method-integration violation has a unique,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No method or engine behavior changes are mixed into this process slice.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The final high-risk evidence report is current and an independent review
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/PROC-030/commands/ara-claims-check.json
+- receipt: tasks/evidence/PROC-030/commands/build-intrinsic-tests.json
+- receipt: tasks/evidence/PROC-030/commands/cmake-configure.json
+- receipt: tasks/evidence/PROC-030/commands/ctest-cpu.json
+- receipt: tasks/evidence/PROC-030/commands/diff-check.json
+- receipt: tasks/evidence/PROC-030/commands/doc-link-check.json
+- receipt: tasks/evidence/PROC-030/commands/final-ara-claims-check.json
+- receipt: tasks/evidence/PROC-030/commands/final-diff-check.json
+- receipt: tasks/evidence/PROC-030/commands/final-doc-link-check.json
+- receipt: tasks/evidence/PROC-030/commands/final-session-brief-check.json
+- receipt: tasks/evidence/PROC-030/commands/final-skill-mirror-check.json
+- receipt: tasks/evidence/PROC-030/commands/final-strict-task-policy.json
+- receipt: tasks/evidence/PROC-030/commands/final-strict-task-validation.json
+- receipt: tasks/evidence/PROC-030/commands/final-task-state-links.json
+- receipt: tasks/evidence/PROC-030/commands/final-task-validator-regressions.json
+- receipt: tasks/evidence/PROC-030/commands/python-compile.json
+- receipt: tasks/evidence/PROC-030/commands/root-hygiene.json
+- receipt: tasks/evidence/PROC-030/commands/session-brief-check.json
+- receipt: tasks/evidence/PROC-030/commands/skill-mirror-check.json
+- receipt: tasks/evidence/PROC-030/commands/strict-task-policy.json
+- receipt: tasks/evidence/PROC-030/commands/strict-task-validation.json
+- receipt: tasks/evidence/PROC-030/commands/task-claim-status.json
+- receipt: tasks/evidence/PROC-030/commands/task-state-links.json
+- receipt: tasks/evidence/PROC-030/commands/task-validator-regressions.json
+changed_public_contracts:
+- AGENTS.md now requires task authors and implementers to discover, declare, preserve, and dispose every
+  applicable catalog contract; task wording cannot silently narrow canonical semantics
+- New or materially changed open tasks use contract_schema 1 with unique known contract IDs or a justified
+  empty review; byte-identical historical open tasks alone are grandfathered
+- Method-backed tasks dispose the least-structured input, compatible ECS sources, RuntimeModule, config/agent,
+  UI, publication, and end-to-end-test matrix and review original papers plus relevant extensions and
+  improvements
+- The target ECS element-domain matrix is Vertices for point cloud/graph/mesh, Halfedges and Edges for
+  graph/mesh, and Faces for mesh; HARDEN-087 owns the documented current graph storage mismatch
+diagnostics_and_previews:
+- Focused task-validator regressions pass 16/16; strict validation accepts 191 task files with zero findings
+- Clang aggregate IntrinsicTests build passed and the default CPU selector passed 3,991/3,991 selected
+  tests
+- Strict task policy/state, skill mirror, documentation-link, ARA, root-hygiene, Python compile, and post-commit
+  docs-sync gates pass
+- The scoped source/literature audit found one physical ECS source drift and five method-integration gaps,
+  each assigned to a bounded dependency-linked ECS/runtime/UI task chain
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/PROC-030-contract-applicability-and-method-integration.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Catalog applicability remains a semantic author/reviewer decision; validation proves declaration shape
+  and known IDs but does not pretend to infer every applicable contract from source text
+- Graph entities remain physically represented by Nodes plus Edges without Halfedges until HARDEN-087
+  retires; graph-capable method runtime tasks are dependency-gated on that correction
+- The policy requires original-plus-extension literature review but does not yet claim the sealed machine-validated
+  literature-intake artifact described by A24
+skipped_checks:
+- check: gpu-vulkan
+  reason: No engine source, backend, shader, RHI, runtime behavior, or byte layout changed; the full CPU
+    gate and strict workflow/tooling checks are the relevant evidence
+artifacts:
+- path: docs/architecture/contract-catalog.yaml
+  sha256: 8b61113d6efaea8ab31a97fe7f8e1ba6e306b6fad55a2b1eeb89aca7e7ef0da2
+  kind: file
+- path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  sha256: ee348923a046fe5b3e1e535d1436822f05a8002dcea4bc133461a509b5054501
+  kind: file
+- path: tools/agents/contract_legacy_tasks.json
+  sha256: 68a7a9a7d067e4f957a01ec7c3a3b97c10503b4708c9b44047651c9fdde89026
+  kind: file
+- path: tests/regression/tooling/Test.ValidateTasks.py
+  sha256: 790ac602922cd18b8f86156e5bcfca30331aceae399954f632f2094ed871873a
+  kind: file
+- path: tasks/done/PROC-030-contract-applicability-and-method-integration.md
+  sha256: c3eabcf2c63fedb20f00486d42868c7d0f5f0df46e580f8b08ecb18c93ca552d
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/PROC-030/handoff.jsonl
+review: tasks/evidence/PROC-030/reviews.jsonl

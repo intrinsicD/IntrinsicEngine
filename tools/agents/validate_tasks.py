@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import re
+import subprocess
 import sys
+import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -62,7 +65,9 @@ CONTRACT_CATALOG = (
 CONTRACT_LEGACY_INVENTORY = (
     Path(__file__).resolve().with_name("contract_legacy_tasks.json")
 )
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$")
+GIT_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 METHOD_INTEGRATION_CONTRACT = "method.engine-integration"
 METHOD_INTEGRATION_FIELDS = (
     "Least-structured input",
@@ -259,6 +264,52 @@ def find_archive_files(root: Path) -> list[Path]:
     return files
 
 
+def task_snapshot_hashes_at_revision(revision: str) -> dict[str, str]:
+    """Return SHA-256 task-file hashes from one immutable Git revision."""
+    if not GIT_REVISION_RE.fullmatch(revision):
+        raise ValueError("source_revision must be an exact 40-hex Git revision")
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(REPOSITORY_ROOT),
+            "archive",
+            "--format=tar",
+            revision,
+            "tasks",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(
+            f"cannot read contract source_revision `{revision}`: {detail}"
+        )
+
+    hashes: dict[str, str] = {}
+    with tarfile.open(fileobj=io.BytesIO(result.stdout), mode="r:") as archive:
+        for member in archive.getmembers():
+            if not member.isfile() or not member.name.endswith(".md"):
+                continue
+            lifecycle = member.name.split("/", 2)
+            if len(lifecycle) < 3 or lifecycle[1] not in {
+                "active",
+                "backlog",
+                "done",
+                "archive",
+            }:
+                continue
+            stream = archive.extractfile(member)
+            if stream is None:
+                raise ValueError(
+                    f"cannot read `{member.name}` from contract source revision"
+                )
+            hashes[member.name] = hashlib.sha256(stream.read()).hexdigest()
+    return hashes
+
+
 def is_micro_task(parsed: ParsedTask) -> bool:
     return bool(parsed.front_matter and MICRO_TEMPLATE_RE.search(parsed.front_matter))
 
@@ -434,6 +485,8 @@ def validate_front_matter(
             )
 
     contract_legacy_hashes: dict[str, str] = {}
+    contract_consumed_hashes: dict[str, str] = {}
+    contract_source_hashes: dict[str, str] = {}
     if CONTRACT_LEGACY_INVENTORY.is_file():
         try:
             inventory = json.loads(
@@ -443,11 +496,47 @@ def validate_front_matter(
                 isinstance(inventory, dict)
                 and inventory.get("schema_version") == CONTRACT_SCHEMA_VERSION
                 and isinstance(inventory.get("tasks"), dict)
+                and isinstance(inventory.get("consumed"), dict)
+                and isinstance(inventory.get("source_revision"), str)
             ):
                 contract_legacy_hashes = inventory["tasks"]
+                contract_consumed_hashes = inventory["consumed"]
+                contract_source_hashes = task_snapshot_hashes_at_revision(
+                    inventory["source_revision"]
+                )
+                overlap = set(contract_legacy_hashes) & set(
+                    contract_consumed_hashes
+                )
+                if overlap:
+                    raise ValueError(
+                        "tasks and consumed mappings overlap: "
+                        + ", ".join(sorted(overlap))
+                    )
+                for mapping_name, mapping in (
+                    ("tasks", contract_legacy_hashes),
+                    ("consumed", contract_consumed_hashes),
+                ):
+                    for rel, expected_hash in mapping.items():
+                        if (
+                            not isinstance(rel, str)
+                            or not rel
+                            or not isinstance(expected_hash, str)
+                            or not re.fullmatch(r"[0-9a-f]{64}", expected_hash)
+                        ):
+                            raise ValueError(
+                                f"{mapping_name} entries must map relative paths "
+                                "to 64-hex SHA-256 values"
+                            )
+                        source_hash = contract_source_hashes.get(f"tasks/{rel}")
+                        if source_hash != expected_hash:
+                            raise ValueError(
+                                f"{mapping_name} entry `{rel}` does not match "
+                                "source_revision"
+                            )
             else:
                 raise ValueError(
-                    f"expected schema_version {CONTRACT_SCHEMA_VERSION} and a tasks mapping"
+                    f"expected schema_version {CONTRACT_SCHEMA_VERSION}, "
+                    "source_revision, tasks mapping, and consumed mapping"
                 )
         except (json.JSONDecodeError, OSError, ValueError) as exc:
             findings.append(
@@ -513,6 +602,200 @@ def validate_front_matter(
         )
 
     tasks_root = _tasks_root(parsed_tasks)
+
+    all_contract_tasks = [*parsed_tasks, *(parsed_archive or [])]
+    parsed_by_inventory_path = {
+        _task_inventory_path(parsed.path, tasks_root): parsed
+        for parsed in all_contract_tasks
+    }
+
+    # The open-task inventory is a live subset of the immutable pre-policy
+    # snapshot. Removing, renaming, promoting, or enrolling an entry consumes
+    # it; leaving a stale entry would make deleted legacy bytes replayable.
+    if tasks_root.resolve() == (REPOSITORY_ROOT / "tasks").resolve():
+        for rel, expected_hash in sorted(contract_legacy_hashes.items()):
+            parsed = parsed_by_inventory_path.get(rel)
+            if parsed is None:
+                findings.append(
+                    Finding(
+                        "error",
+                        CONTRACT_LEGACY_INVENTORY,
+                        f"stale contract legacy entry `{rel}` must move to "
+                        "`consumed` when its task is removed, renamed, promoted, "
+                        "or enrolled.",
+                    )
+                )
+                continue
+            actual_hash = hashlib.sha256(parsed.path.read_bytes()).hexdigest()
+            if actual_hash != expected_hash:
+                findings.append(
+                    Finding(
+                        "error",
+                        CONTRACT_LEGACY_INVENTORY,
+                        f"stale contract legacy entry `{rel}` no longer matches "
+                        "the current task; move its baseline hash to `consumed`.",
+                    )
+                )
+
+    for parsed in all_contract_tasks:
+        rel = _task_inventory_path(parsed.path, tasks_root)
+        lifecycle = rel.split("/", 1)[0]
+        actual_hash = hashlib.sha256(parsed.path.read_bytes()).hexdigest()
+        consumed_hash = contract_consumed_hashes.get(rel)
+        if lifecycle in {"active", "backlog"}:
+            expected_legacy_hash = contract_legacy_hashes.get(rel)
+        elif lifecycle in {"done", "archive"}:
+            expected_legacy_hash = contract_source_hashes.get(f"tasks/{rel}")
+        else:
+            expected_legacy_hash = None
+
+        if consumed_hash == actual_hash:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "consumed legacy task snapshots cannot be replayed; "
+                    "create or retain the enrolled successor instead.",
+                )
+            )
+            continue
+
+        if expected_legacy_hash == actual_hash:
+            continue
+
+        if parsed.front_matter is None:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "the task is new, changed, renamed, promoted, or outside "
+                    "the baseline; every prospective task under "
+                    "tasks/active|backlog|done|archive must declare "
+                    "`contract_schema: 1`.",
+                )
+            )
+            continue
+
+        try:
+            contract_data = yaml.load(
+                parsed.front_matter, Loader=UniqueKeyLoader
+            )
+        except yaml.YAMLError as exc:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "new or changed task has invalid front-matter and cannot "
+                    f"declare its contracts: {exc}",
+                )
+            )
+            continue
+        if not isinstance(contract_data, dict):
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "new or changed task front-matter must be a YAML mapping "
+                    "with `contract_schema: 1`.",
+                )
+            )
+            continue
+
+        contract_schema = contract_data.get("contract_schema")
+        if contract_schema is None:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "new or changed tasks are outside the prospective contract "
+                    "baseline and must declare `contract_schema: 1`; only "
+                    "byte-identical, unconsumed pre-policy tasks are grandfathered.",
+                )
+            )
+            continue
+        if contract_schema != CONTRACT_SCHEMA_VERSION:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    f"front-matter `contract_schema` must equal "
+                    f"{CONTRACT_SCHEMA_VERSION}.",
+                )
+            )
+            continue
+
+        declared_contracts = contract_data.get("contracts")
+        if not isinstance(declared_contracts, list):
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "front-matter `contracts` must be a list (may be empty).",
+                )
+            )
+            continue
+
+        seen_contracts: set[str] = set()
+        for contract_id in declared_contracts:
+            if not isinstance(contract_id, str) or contract_id not in contract_ids:
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        f"front-matter contract `{contract_id}` is not a known ID "
+                        "in docs/architecture/contract-catalog.yaml.",
+                    )
+                )
+            elif contract_id in seen_contracts:
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        f"front-matter contract `{contract_id}` is duplicated.",
+                    )
+                )
+            seen_contracts.add(contract_id)
+
+        contract_review = contract_data.get("contract_review")
+        if not declared_contracts and (
+            not isinstance(contract_review, str) or not contract_review.strip()
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "empty `contracts` requires a non-empty `contract_review` "
+                    "explaining why no catalog contract applies.",
+                )
+            )
+
+        if METHOD_INTEGRATION_CONTRACT in seen_contracts:
+            integration = parsed.section_bodies.get("Engine integration")
+            if integration is None:
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        "`method.engine-integration` requires an "
+                        "`## Engine integration` section.",
+                    )
+                )
+            else:
+                missing_fields = [
+                    field
+                    for field in METHOD_INTEGRATION_FIELDS
+                    if field not in integration
+                ]
+                if missing_fields:
+                    findings.append(
+                        Finding(
+                            "error",
+                            parsed.path,
+                            "`## Engine integration` is missing field(s): "
+                            + ", ".join(missing_fields)
+                            + ".",
+                        )
+                    )
 
     for parsed in parsed_tasks:
         path_parts = {p.lower() for p in parsed.path.parts}
@@ -588,104 +871,6 @@ def validate_front_matter(
                             "under tasks/active|backlog|done|archive.",
                         )
                     )
-
-        contract_schema = data.get("contract_schema")
-        if contract_schema is None:
-            if "done" not in path_parts:
-                rel = _task_inventory_path(parsed.path, tasks_root)
-                expected_hash = contract_legacy_hashes.get(rel)
-                actual_hash = hashlib.sha256(parsed.path.read_bytes()).hexdigest()
-                if expected_hash != actual_hash:
-                    findings.append(
-                        Finding(
-                            "error",
-                            parsed.path,
-                            "new or changed open task is outside the prospective "
-                            "contract inventory and must declare `contract_schema: 1`; "
-                            "untouched historical tasks alone are grandfathered.",
-                        )
-                    )
-        elif contract_schema != CONTRACT_SCHEMA_VERSION:
-            findings.append(
-                Finding(
-                    "error",
-                    parsed.path,
-                    f"front-matter `contract_schema` must equal "
-                    f"{CONTRACT_SCHEMA_VERSION}.",
-                )
-            )
-        else:
-            declared_contracts = data.get("contracts")
-            if not isinstance(declared_contracts, list):
-                findings.append(
-                    Finding(
-                        "error",
-                        parsed.path,
-                        "front-matter `contracts` must be a list (may be empty).",
-                    )
-                )
-            else:
-                seen_contracts: set[str] = set()
-                for contract_id in declared_contracts:
-                    if not isinstance(contract_id, str) or contract_id not in contract_ids:
-                        findings.append(
-                            Finding(
-                                "error",
-                                parsed.path,
-                                f"front-matter contract `{contract_id}` is not a known ID "
-                                "in docs/architecture/contract-catalog.yaml.",
-                            )
-                        )
-                    elif contract_id in seen_contracts:
-                        findings.append(
-                            Finding(
-                                "error",
-                                parsed.path,
-                                f"front-matter contract `{contract_id}` is duplicated.",
-                            )
-                        )
-                    seen_contracts.add(contract_id)
-
-                contract_review = data.get("contract_review")
-                if not declared_contracts and (
-                    not isinstance(contract_review, str) or not contract_review.strip()
-                ):
-                    findings.append(
-                        Finding(
-                            "error",
-                            parsed.path,
-                            "empty `contracts` requires a non-empty `contract_review` "
-                            "explaining why no catalog contract applies.",
-                        )
-                    )
-
-                if METHOD_INTEGRATION_CONTRACT in seen_contracts:
-                    integration = parsed.section_bodies.get("Engine integration")
-                    if integration is None:
-                        findings.append(
-                            Finding(
-                                "error",
-                                parsed.path,
-                                "`method.engine-integration` requires an "
-                                "`## Engine integration` section.",
-                            )
-                        )
-                    else:
-                        missing_fields = [
-                            field
-                            for field in METHOD_INTEGRATION_FIELDS
-                            if field not in integration
-                        ]
-                        if missing_fields:
-                            findings.append(
-                                Finding(
-                                    "error",
-                                    parsed.path,
-                                    "`## Engine integration` is missing field(s): "
-                                    + ", ".join(missing_fields)
-                                    + ".",
-                                )
-                            )
 
         workflow_schema = data.get("workflow_schema")
         if workflow_schema is None:

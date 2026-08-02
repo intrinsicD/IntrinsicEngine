@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py",
+    "--root",
+    "tasks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py --root tasks --strict",
+  "cwd": ".",
+  "duration_ms": 452,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T14:01:24Z",
+  "label": "revision2-strict-task-validation",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T14:01:24Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/revision2-strict-task-validation.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/revision2-strict-task-validation.stdout.log",
+  "stdout_sha256": "e9dc42dfff49d9c9aaa02a5e4bb55ce78b2fcd4c5570e175724fcf2556a463e4",
+  "task_id": "PROC-030"
+}

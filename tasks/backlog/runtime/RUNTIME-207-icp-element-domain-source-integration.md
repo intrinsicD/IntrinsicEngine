@@ -35,9 +35,12 @@ maturity_target: Operational
   consumes point sets. Both source and target may independently be mesh,
   graph, or point cloud.
 - Re-check Besl–McKay ICP (DOI `10.1109/34.121791`), Chen–Medioni
-  point-to-plane ICP, Segal et al. Generalized ICP, and robust/trimmed ICP
-  extensions before changing the binding. These formulations constrain point
-  and normal inputs, not ECS provenance.
+  point-to-plane registration (DOI `10.1016/0262-8856(92)90066-C`), Segal et
+  al. Generalized ICP (DOI `10.15607/RSS.2009.V.021`), Chetverikov et al.
+  Trimmed ICP (DOI `10.1109/ICPR.2002.1047997`), and Zhang et al. Fast and
+  Robust ICP (DOI `10.1109/TPAMI.2021.3054619`) before changing the binding.
+  These formulations constrain point, normal, correspondence, and robustness
+  inputs, not ECS provenance; do not expose a variant unless its kernel exists.
 
 ## Engine integration
 

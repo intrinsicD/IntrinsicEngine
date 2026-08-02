@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.ValidateTasks.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.ValidateTasks.py",
+  "cwd": ".",
+  "duration_ms": 4203,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T13:58:47Z",
+  "label": "review-fix-task-validator-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T13:58:43Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/review-fix-task-validator-regressions.stderr.log",
+  "stderr_sha256": "270166caaf527c6f4b2ea2aae8be2865a06ef01a42dbf61fc7dee5566066dc02",
+  "stdout_path": "tasks/evidence/PROC-030/commands/review-fix-task-validator-regressions.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-030"
+}

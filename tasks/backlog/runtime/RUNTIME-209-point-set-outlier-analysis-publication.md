@@ -33,9 +33,16 @@ maturity_target: Operational
 - The current command rejects mesh/graph provenance and immediately compacts a
   point cloud. Its statistical and radius kernels first compute rejected input
   indices, which are valid analysis results for any vertex-position source.
-- Review Rusu's statistical neighborhood formulation, the PCL SOR/ROR behavior,
-  and relevant density-aware improvements before editing. Preserve the current
-  methods while making detection vs deletion explicit.
+- Review Rusu et al.'s statistical neighborhood formulation (DOI
+  `10.1016/j.robot.2008.08.005`) and the official PCL behavior references for
+  StatisticalOutlierRemoval
+  (`https://pointclouds.org/documentation/classpcl_1_1_statistical_outlier_removal.html`)
+  and RadiusOutlierRemoval
+  (`https://pointclouds.org/documentation/classpcl_1_1_radius_outlier_removal.html`)
+  before editing. Search density-aware successors during the task's literature
+  intake and record stable identities plus selection/exclusion rationale, but
+  do not silently change the two existing estimators. Preserve detection vs
+  deletion as an explicit engine distinction.
 
 ## Engine integration
 

@@ -34,9 +34,15 @@ maturity_target: Operational
 - `methods/geometry/progressive_poisson/method.yaml` declares any contiguous
   `vec3` property buffer. The current mesh path instead surface-samples faces
   and replaces the mesh with a point cloud, while graph sources are omitted.
-- Review the repository working draft plus relevant progressive/farthest-point
-  and GPU Poisson sampling extensions before editing. Preserve the distinction
-  between ordering an input set and generating samples on a continuous surface.
+- Review the repository's unpublished working draft and canonical package URL
+  (`https://github.com/intrinsicD/GPU-Accelerated-Progressive-Poisson-Disk-Sampling-via-Phase-Parallel-Spatial-Hashing`)
+  together with Brandt et al.'s visibility-aware progressive farthest-point
+  sampler (DOI `10.1111/cgf.13848`) and Yuksel's progressive-capable weighted
+  sample elimination (DOI `10.1111/cgf.12538`) before editing. The published
+  works are comparative adjacent methods, not provenance for the repository's
+  exact in-house formulation. Preserve the distinction between reordering or
+  selecting an existing input set and generating samples on a continuous
+  surface.
 
 ## Engine integration
 

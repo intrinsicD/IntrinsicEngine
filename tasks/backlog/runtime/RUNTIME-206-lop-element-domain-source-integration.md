@@ -36,8 +36,9 @@ maturity_target: Operational
   positions; mesh vertices and graph nodes therefore satisfy the same input
   contract.
 - Re-read Lipman et al. (LOP, DOI `10.1145/1275808.1276405`), Huang et al.
-  (WLOP), Preiner et al. (CLOP, DOI `10.1145/2601097.2601172`), and Huang et
-  al. (EAR, DOI `10.1145/2421636.2421645`) before editing. Record which
+  (WLOP, DOI `10.1145/1618452.1618522`), Preiner et al. (CLOP, DOI
+  `10.1145/2601097.2601172`), and Huang et al. (EAR, DOI
+  `10.1145/2421636.2421645`) before editing. Record which
   variants permit changed output cardinality; do not infer an ECS conversion
   requirement from their point-set terminology.
 
