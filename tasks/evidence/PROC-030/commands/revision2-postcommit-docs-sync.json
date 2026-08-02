@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--diff-mode",
+    "--base-ref",
+    "origin/main",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict",
+  "cwd": ".",
+  "duration_ms": 35,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T14:02:11Z",
+  "label": "revision2-postcommit-docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T14:02:11Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/revision2-postcommit-docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/revision2-postcommit-docs-sync.stdout.log",
+  "stdout_sha256": "427648a293cdd2e8bfa256b6f873abfc4f54361b179638f805da88fb1b6e1168",
+  "task_id": "PROC-030"
+}
