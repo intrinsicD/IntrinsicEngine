@@ -19,6 +19,10 @@ No process tasks are currently open.
 
 ## Retired
 
+- [PROC-030 — Contract applicability and method-integration workflow](../../done/PROC-030-contract-applicability-and-method-integration.md):
+  added prospective reusable-contract discovery/declarations, complete method
+  integration matrices, strict validation, and bounded ECS/runtime/UI refactor
+  tasks for every confirmed violation in the scoped method audit.
 - [PROC-028 — Enforce agent evidence, review, and experiment custody](../../done/PROC-028-enforced-agent-evidence-review-experiment-workflow.md):
   one explicitly batched, risk-tiered workflow task covering generated
   completion evidence, strict benchmark results, independent high-risk review,

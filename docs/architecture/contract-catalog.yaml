@@ -1,0 +1,36 @@
+schema_version: 1
+contracts:
+  repo.task-contract-discovery:
+    owner: agent-workflow
+    source: docs/agent/task-format.md
+    applies_when:
+      - The task schema, a task template, or the task-authoring/review workflow is materially changed.
+      - A reusable subsystem or cross-layer contract is introduced or changed.
+    proofs:
+      - tools/agents/validate_tasks.py
+      - tests/regression/tooling/Test.ValidateTasks.py
+  geometry.element-domain-sources:
+    owner: ecs-geometry-runtime
+    source: docs/architecture/geometry-api-style.md
+    applies_when:
+      - A method or operation consumes vertices, halfedges, edges, or faces from an ECS geometry entity.
+      - Runtime or UI eligibility is selected from geometry provenance or element-domain availability.
+      - Results are published back to an ECS geometry source or change its topology or cardinality.
+    proofs:
+      - tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp
+      - tests/contract/runtime/Test.GeometryAvailability.cpp
+      - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
+      - tests/contract/runtime/Test.GraphGeometryExtraction.cpp
+      - tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
+  method.engine-integration:
+    owner: methods-runtime-app
+    source: docs/architecture/method-api-contract.md
+    applies_when:
+      - A method package is created or materially changed.
+      - A method is bound into RuntimeModule, config/agent controls, ECS publication, or Sandbox UI.
+      - Method work defers an engine integration surface to a follow-up task.
+    proofs:
+      - tools/agents/validate_tasks.py
+      - tests/regression/tooling/Test.ValidateTasks.py
+      - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+      - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp

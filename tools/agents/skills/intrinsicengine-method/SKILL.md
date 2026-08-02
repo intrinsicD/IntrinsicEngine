@@ -27,9 +27,12 @@ never against each other.
 
 Implement method work in this order. Earlier steps gate later ones; do not skip.
 
-1. **Paper intake.** Capture claims, assumptions, and required inputs/outputs.
-   Define the method contract and failure modes. The contract names objective,
-   constraints, diagnostics, and the input/output shape with units.
+1. **Paper intake.** Query and review the original paper plus relevant
+   extensions and subsequent improvements. Capture stable citations, claims,
+   assumptions, and required inputs/outputs, and identify the formulation being
+   implemented. Define the method contract and failure modes. The contract
+   names objective, constraints, diagnostics, and the input/output shape with
+   units.
 
 2. **CPU reference backend first.** Implement a deterministic, correctness-first
    baseline. No SIMD, no parallelism, no GPU — clarity over speed. This becomes
@@ -56,6 +59,19 @@ Implement method work in this order. Earlier steps gate later ones; do not skip.
    behavior, not aspirational behavior.
 
 For the full source procedure, read `references/method-workflow.md`.
+
+## Required engine-integration matrix
+
+Every new or materially changed method task declares
+`method.engine-integration` and includes `## Engine integration`, disposing:
+least-structured input, compatible entity sources, `RuntimeModule`,
+config/agent, UI, publication/cardinality, and end-to-end tests. A deferred row
+must name its owning follow-up; method-only scope is not an `N/A` reason.
+
+For geometry methods, also apply `geometry.element-domain-sources`. A kernel
+that only consumes point/vertex positions accepts mesh vertices, graph nodes,
+and point-cloud points without conversion. Runtime availability, config, UI
+discovery, and publication tests must preserve that substitutability.
 
 ## Backend policy
 
@@ -85,6 +101,8 @@ Apply this checklist when reviewing any method/paper-implementation task. Read
 - Paper claim is captured correctly: objective, assumptions, expected output.
 - Mathematical formulation is explicit (objective / constraints / diagnostics).
 - Input/output contract and units are explicit.
+- Original paper and relevant extensions/improvements are reviewed, with the
+  implemented formulation identified.
 - **Use the `knowledge-graph` MCP aid to trace claim → code.** When the server is
   available (see `intrinsicengine-core`), query the paper→method→code chain to
   confirm which paper claim each method implements and which engine modules
@@ -120,6 +138,8 @@ Apply this checklist when reviewing any method/paper-implementation task. Read
 - Task file includes acceptance criteria and verification commands (see
   `intrinsicengine-task-workflow`).
 - PR includes links to benchmarks/tests used for validation.
+- Engine-integration matrix covers every compatible source and control surface,
+  or names the task owning each deferred row.
 
 ## How method work maps to the maturity taxonomy
 

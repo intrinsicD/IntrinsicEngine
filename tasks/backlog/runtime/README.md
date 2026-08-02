@@ -7,6 +7,30 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
+### Method element-domain integration (audited 2026-08-02)
+
+The contract audit in
+[`docs/reviews/2026-08-02-method-engine-integration-contract-audit.md`](../../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md)
+found five bounded integration gaps. Runtime fixes precede their paired UI
+tasks; graph-capable fixes also wait for `HARDEN-087` to align physical ECS
+materialization with the element-domain contract:
+
+- [RUNTIME-206 — LOP family element-domain source integration](RUNTIME-206-lop-element-domain-source-integration.md)
+  accepts Mesh/Graph/PointCloud `Vertices`, preserves richer topology, and
+  gates count-changing publication by source capability after `RUNTIME-175`.
+- [RUNTIME-207 — ICP element-domain source integration](RUNTIME-207-icp-element-domain-source-integration.md)
+  accepts all mixed vertex-source pairs and adds the shared config lane after
+  `BUG-096` makes point-to-plane readiness truthful.
+- [RUNTIME-208 — Progressive Poisson element-domain publication](RUNTIME-208-progressive-poisson-element-domain-publication.md)
+  removes implicit mesh surface sampling/domain replacement and publishes
+  source-cardinality hierarchy properties on all vertex domains.
+- [RUNTIME-209 — Point-set outlier analysis and publication split](RUNTIME-209-point-set-outlier-analysis-publication.md)
+  exposes topology-safe detection on all vertex sources and retains explicit
+  destructive removal only for point clouds.
+- [RUNTIME-210 — Signed Heat runtime and config integration](RUNTIME-210-signed-heat-runtime-config-integration.md)
+  adds the missing mesh-only RuntimeModule/config/publication path for the
+  existing CPU reference.
+
 ### Runtime abstraction consolidation (seeded 2026-07-24)
 
 The source-complete runtime surface audit re-gated `REVIEW-003`. `RUNTIME-203`

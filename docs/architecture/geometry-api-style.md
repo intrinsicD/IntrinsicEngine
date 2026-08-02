@@ -53,6 +53,46 @@ record should name the deviation and include a removal or normalization follow-u
   necessary. Those conversions should return diagnostics rather than silently
   dropping data.
 
+## ECS element-domain source contract
+
+The canonical physical materialization contract is organized by element domain,
+not only by import provenance:
+
+| Element domain | Compatible entity provenance |
+| --- | --- |
+| `Vertices` | point cloud, graph, mesh |
+| `Halfedges` | graph, mesh |
+| `Edges` | graph, mesh |
+| `Faces` | mesh |
+
+Current implementation caveat (tracked by `HARDEN-087`): graph population still
+materializes `Nodes + Edges + HasGraphTopology` and intentionally omits a graph
+`Halfedges` component, as recorded by retired `HARDEN-065`. Until
+`HARDEN-087` retires, canonical source resolution treats `NodePoints` and
+`VertexPoints` as the same logical vertex-role capability; operations that
+genuinely require graph halfedges remain unavailable rather than fabricating
+them. `HARDEN-087` owns converging the physical storage on the table above and
+retiring the graph-only `Nodes` split. This caveat is not permission for method
+bindings to use exact point-cloud provenance.
+
+The rows are a substitutability contract. If an algorithm's public input is
+only a point/vertex span, runtime eligibility, config commands, and UI discovery
+must accept every entity satisfying the logical `Vertices` role. If it needs
+adjacency it may require `Halfedges`/`Edges`; if it needs surface topology it
+may require `Faces`. Exact provenance checks are valid only when provenance
+itself changes the algorithm's semantics, never as a shortcut for asking
+whether an element source exists. Reusing a mesh's vertex source as points is a
+view of existing data, not a mesh-to-point-cloud conversion.
+
+Runtime owns the ECS-to-method binding and must use the canonical geometry
+source extraction/availability seam rather than rebuilding provenance switches
+in each method. UI actions derive readiness and domain placement from the same
+runtime capability. A method result publishes to the originating element
+domain when its cardinality is preserved. Topology or cardinality changes are
+separate, explicit owning operations with diagnostics and history semantics;
+they must not silently replace a topology-rich entity merely because the
+kernel consumed point positions.
+
 ## Property API contract
 
 Geometry properties expose names as `std::string_view` borrowed from the owning

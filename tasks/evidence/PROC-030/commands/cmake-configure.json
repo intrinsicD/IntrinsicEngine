@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci",
+    "-DCMAKE_TOOLCHAIN_FILE=/home/alex/Documents/IntrinsicEngine/external/vcpkg/scripts/buildsystems/vcpkg.cmake",
+    "-DVCPKG_INSTALLED_DIR=/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci"
+  ],
+  "command_display": "cmake --preset ci -DCMAKE_TOOLCHAIN_FILE=/home/alex/Documents/IntrinsicEngine/external/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_INSTALLED_DIR=/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci",
+  "cwd": ".",
+  "duration_ms": 8368,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T12:53:47Z",
+  "label": "cmake-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T12:53:38Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/cmake-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/cmake-configure.stdout.log",
+  "stdout_sha256": "bee5b8bdb629e3f9165f2c21574588b0636913dc7e36ad079e4a2e6ad8f326f3",
+  "task_id": "PROC-030"
+}

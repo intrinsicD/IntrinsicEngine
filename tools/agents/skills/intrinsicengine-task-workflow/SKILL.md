@@ -58,6 +58,22 @@ Plain bullets for `Non-goals`, `Context`, and `Forbidden changes`. **Checkboxes
 glance. Completed task files under `tasks/done/` must not contain unchecked
 actionable todos — unresolved work goes into a follow-up task.
 
+## Contract discovery and declaration
+
+Before creating, promoting, or materially changing a task, inspect
+`docs/architecture/contract-catalog.yaml`. Determine applicability from both
+owning and consuming layers, the least-structured data domain,
+publication/cardinality behavior, and config, agent, runtime, and UI control
+surfaces. Add `contract_schema: 1` and the unique stable IDs under `contracts`;
+when none apply, use `contracts: []` plus a non-empty `contract_review` reason.
+
+Task wording cannot narrow a canonical contract. Read the `source` for every
+declared ID and use its `proofs` as the starting verification surface. A new
+reusable contract needs canonical prose, a catalog entry, and executable proof
+in the same reviewed change. For `method.engine-integration`, the task also
+needs the complete `## Engine integration` matrix defined by the method
+workflow.
+
 ## Optional `## Maturity` section
 
 For tasks where the stop-state is ambiguous — typically rendering, Vulkan, asset
@@ -224,7 +240,8 @@ python3 tools/agents/workflow_evidence.py validate --root .
 The validator enforces the nine required sections; the optional `## Maturity`
 section is not validator-enforced. New or materially changed open tasks use the
 prospective workflow profile and evidence fields described in
-`references/workflow-evidence.md`.
+`references/workflow-evidence.md` and the prospective contract declaration
+fields described in `references/task-format.md`.
 
 ## References
 

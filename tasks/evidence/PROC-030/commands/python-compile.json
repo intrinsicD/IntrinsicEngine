@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "-m",
+    "py_compile",
+    "tools/agents/validate_tasks.py",
+    "tests/regression/tooling/Test.ValidateTasks.py"
+  ],
+  "command_display": "python3 -m py_compile tools/agents/validate_tasks.py tests/regression/tooling/Test.ValidateTasks.py",
+  "cwd": ".",
+  "duration_ms": 28,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T13:20:48Z",
+  "label": "python-compile",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T13:20:48Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/python-compile.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/python-compile.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-030"
+}

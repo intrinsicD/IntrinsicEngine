@@ -369,3 +369,21 @@
   docs/adr/0026-runtime-module-scope-by-consumer-contract.md,
   tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md]
 - **From staging**: O92
+
+## A26: Reusable Contracts Have Canonical Sources and Explicit Task Enrollment
+- **Decision**: Each reusable engine contract has one canonical architecture
+  source and one stable entry in the contract catalog. `AGENTS.md` owns the
+  global obligation to discover, preserve, and dispose applicable contracts;
+  task front-matter records the applicable IDs or a justified empty review.
+  Templates and authoring/review skills route agents to that authority, while
+  strict validation and executable proof paths enforce it prospectively
+  without copying subsystem semantics into every workflow surface.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N329, N330, AGENTS.md,
+  docs/architecture/contract-catalog.yaml,
+  docs/agent/task-format.md,
+  tools/agents/validate_tasks.py,
+  tests/regression/tooling/Test.ValidateTasks.py,
+  tasks/done/PROC-030-contract-applicability-and-method-integration.md]
+- **From staging**: O94

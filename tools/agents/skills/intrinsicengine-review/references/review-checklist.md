@@ -11,6 +11,13 @@ Use this checklist before commit and PR creation.
       metadata mirrors a live Git-common-dir claim.
 - [ ] Parallel writers used separate worktrees; explicit path claims do not
       overlap.
+- [ ] The task declares every applicable ID from
+      `docs/architecture/contract-catalog.yaml`, considering owning and
+      consuming layers, data/publication domains, and config/agent/runtime/UI
+      surfaces; a justified-empty review is credible.
+- [ ] Task wording did not narrow a canonical contract. Any intentional
+      contract change updates its canonical source, catalog routing metadata,
+      and executable proof in this change.
 
 ## Evidence and review custody
 
@@ -118,6 +125,8 @@ Use this checklist before commit and PR creation.
 - [ ] Docs updated for structural/policy/behavior changes.
 - [ ] Links are updated and valid.
 - [ ] Task records synchronized (`active`, `backlog`, `done` as appropriate).
+- [ ] Every declared contract is disposed by executable evidence or a named
+      follow-up; method work includes the complete engine-integration matrix.
 
 ## CI and temporary shims
 

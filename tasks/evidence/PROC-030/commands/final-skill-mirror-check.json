@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/sync_skills.py",
+    "--check"
+  ],
+  "command_display": "python3 tools/agents/sync_skills.py --check",
+  "cwd": ".",
+  "duration_ms": 24,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T13:22:58Z",
+  "label": "final-skill-mirror-check",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T13:22:58Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/final-skill-mirror-check.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/final-skill-mirror-check.stdout.log",
+  "stdout_sha256": "c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58",
+  "task_id": "PROC-030"
+}

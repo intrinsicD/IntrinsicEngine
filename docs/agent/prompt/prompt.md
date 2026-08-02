@@ -10,7 +10,11 @@ Read in this order, only as deep as the touched scope requires:
 
 1. `/AGENTS.md` — authoritative contract. Mission, layering invariants, source-tree map, coding rules, method/test/benchmark/docs/CI protocols, task workflow. Re-read at the start of every session. Skills do not supersede this file.
 2. `tasks/SESSION-BRIEF.md` — generated current state: active tasks plus per-theme unblocked/blocked backlog with first unmet dependencies. This is the authoritative open/unblocked view; regenerate it (`python3 tools/agents/generate_session_brief.py`) whenever you open, retire, or re-gate a task.
-3. The chosen task file — read it completely before touching code.
+3. The chosen task file — read it completely before touching code. Resolve its
+   declared contract IDs through `docs/architecture/contract-catalog.yaml` and
+   read each canonical source; when creating or materially editing a task,
+   inspect the catalog first and record all applicable IDs or a justified-empty
+   review.
 4. `tasks/active/README.md` and `tasks/backlog/README.md` — on demand only, for theme priorities, rationale, and the promotion checklist; they are no longer mandatory session reading. Do not duplicate their priorities into this prompt.
 5. `docs/agent/*` (or the equivalent `intrinsicengine-*` skill) — read only the routing-table entry that applies. The skill bodies and their `references/` mirror the docs; pick whichever path is available, do not load both:
    - `task-format.md` / `intrinsicengine-task-workflow` before creating, promoting, retiring, or materially editing a task file;
@@ -43,6 +47,13 @@ Apply this priority strictly:
 4. **Reproducible regressions trump feature work.** If `tasks/backlog/README.md` records a bugs theme (or equivalent), a reproducible regression there outranks new feature work in any other theme unless the task or backlog README explicitly says otherwise.
 
 Read the chosen task file completely before touching code. Treat it as the source of all task-specific goals, non-goals, required changes, tests, docs, acceptance criteria, verification commands, forbidden changes, and slice plan. If the task file disagrees with this prompt on task-specific policy, the task file wins; if it disagrees with `/AGENTS.md` on repository contract, `/AGENTS.md` wins.
+
+Task scope is not permission to narrow a canonical contract. Before claiming,
+cross-check the task's owning and consuming layers, least-structured data
+domain, publication/cardinality behavior, and config/agent/runtime/UI surfaces
+against the catalog. If a reusable rule is missing, add its canonical prose,
+catalog routing entry, and executable proof through a reviewed process task;
+do not bury it only in the current task.
 
 If you intend to land more than one slice, promote the task into `tasks/active/` with status, owner, branch, and next verification step (see `docs/agent/task-format.md` or `intrinsicengine-task-workflow`). Single-slice patches may stay in `tasks/backlog/` while you work them.
 

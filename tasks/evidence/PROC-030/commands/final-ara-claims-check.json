@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_ara_claims.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_ara_claims.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 26,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T13:22:58Z",
+  "label": "final-ara-claims-check",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T13:22:58Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/final-ara-claims-check.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/final-ara-claims-check.stdout.log",
+  "stdout_sha256": "25a6752da3d6334d790f976785b1a9432aad7c1e02651ecccb677b6fc3fcb0f8",
+  "task_id": "PROC-030"
+}

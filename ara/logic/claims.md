@@ -442,3 +442,41 @@
 - **Dependencies**: [C06, C11, C12, C14]
 - **Tags**: runtime, editor, mutation, history, undo, redo, CPU, retirement
 - **From staging**: O76
+
+## C17: Audited geometry method-integration gaps have bounded owners
+- **Statement**: At `main` revision `577b4583` plus the LOP integration at
+  revision `33930efab13764cbbd0887bfc8c726948a480479`, the declared audit scope
+  contains one foundational ECS element-source drift and five method
+  engine-integration gaps: Progressive Poisson, LOP/WLOP/CLOP/EAR, ICP,
+  statistical/radius outlier processing, and Signed Heat. `HARDEN-087`,
+  `RUNTIME-206` through `RUNTIME-210`, and `UI-038` through `UI-042` assign a
+  bounded dependency-correct owner to every finding.
+- **Status**: supported — source and literature audit plus strict task-contract
+  validation; no method-correctness, CPU/GPU parity, performance, sanitizer, or
+  Vulkan claim
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A production geometry package or callable
+  Sandbox geometry method inside the audit's stated revisions and inclusion
+  rules violates either catalog contract without appearing in the inventory;
+  any listed integration is source-conforming; or any finding lacks a unique
+  actionable task chain.
+- **Proof**: [docs/reviews/2026-08-02-method-engine-integration-contract-audit.md,
+  docs/architecture/contract-catalog.yaml,
+  tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md,
+  tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md,
+  tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md,
+  tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md,
+  tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md,
+  tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md,
+  tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md,
+  tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md,
+  tasks/backlog/ui/UI-040-icp-compatible-source-selection.md,
+  tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md,
+  tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md,
+  tools/agents/validate_tasks.py,
+  tests/regression/tooling/Test.ValidateTasks.py,
+  N330]
+- **Dependencies**: []
+- **Tags**: geometry, methods, runtime, UI, contracts, source audit, backlog
+- **From staging**: O95

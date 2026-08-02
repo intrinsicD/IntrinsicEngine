@@ -11,7 +11,11 @@ map.
 
 ## Tasks
 
-No open ECS tasks.
+- [HARDEN-087 — Unified geometry element-source components](HARDEN-087-unified-geometry-element-source-components.md)
+  supersedes `HARDEN-065`'s graph `Nodes + Edges`/no-halfedges exception and
+  converges point cloud, graph, and mesh materialization on the canonical
+  `Vertices`/`Halfedges`/`Edges`/`Faces` matrix before graph-capable method
+  integration refactors.
 
 ## Convergence
 
@@ -47,6 +51,10 @@ No open ECS tasks.
   contract: it separates underlying provenance from available vertex/node,
   edge, halfedge, and face source data so runtime/UI consumers do not treat
   exact `ActiveDomain` as the only capability query.
+- HARDEN-087 is the explicit follow-up to the physical-layout contradiction
+  found by `PROC-030`: it retains `HARDEN-083`'s provenance-vs-capability split
+  while removing the graph-only `Nodes` component and promoting existing graph
+  halfedge data into the shared ECS source component.
 - Retired HARDEN-086 is a **Theme F** architecture/runtime foundation leaf
   rather than a reopening of completed Theme D. It removes two runtime-local
   hierarchy walks while keeping query mechanics in ECS and editor/composition

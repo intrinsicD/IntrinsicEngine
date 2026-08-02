@@ -2,9 +2,9 @@ session:
   id: "2026-08-02_001"
   date: "2026-08-02"
   started: "2026-08-02T00:53+02:00"
-  last_turn: "2026-08-02T11:16+02:00"
-  turn_count: 4
-  summary: "Affirmed the literature/provenance/variant architecture, clarified typed method operations, and reconciled the runtime-cleanup merge with full CPU verification."
+  last_turn: "2026-08-02T15:12+02:00"
+  turn_count: 5
+  summary: "Affirmed literature and method architecture, reconciled runtime cleanup, and operationalized reusable-contract enrollment with a source-audited geometry-method remediation backlog."
 
 events_logged:
   - turn: 1
@@ -85,6 +85,30 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Verified the reconciled merge with the Clang 23 aggregate build, 3,991 selected CPU tests, and strict structural/evidence gates."
+  - turn: 5
+    type: decision
+    id: "N329"
+    routing: direct
+    provenance: user
+    summary: "Adopted canonical catalog IDs, global lookup/preservation policy, explicit task enrollment, and bounded remediation tasks for every audited method violation."
+  - turn: 5
+    type: experiment
+    id: "N330"
+    routing: direct
+    provenance: ai-executed
+    summary: "Audited ECS materialization and production/callable method integrations against source plus original/extension literature, finding one physical source drift and five method gaps."
+  - turn: 5
+    type: architecture
+    id: "A26"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized canonical contract ownership plus explicit prospective task enrollment via verbal affirmation of O94."
+  - turn: 5
+    type: claim
+    id: "C17"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Bound the scoped five-gap geometry method inventory and its foundational ECS drift to one dependency-correct remediation task chain."
 
 ai_actions:
   - turn: 1
@@ -129,8 +153,42 @@ ai_actions:
       - "ara/trace/sessions/2026-08-02_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 5
+    action: "Implemented PROC-030's stable contract catalog, prospective task metadata and validator regressions, synchronized templates/skills/docs, audited current geometry method integrations against source and literature, and created one foundational ECS task plus five runtime/UI remediation pairs."
+    provenance: ai-executed
+    files_changed:
+      - "AGENTS.md"
+      - "docs/architecture/contract-catalog.yaml"
+      - "docs/architecture/geometry-api-style.md"
+      - "docs/architecture/method-api-contract.md"
+      - "docs/reviews/2026-08-02-method-engine-integration-contract-audit.md"
+      - "docs/agent/task-format.md"
+      - "docs/agent/method-workflow.md"
+      - "tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md"
+      - "tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md"
+      - "tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md"
+      - "tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md"
+      - "tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md"
+      - "tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md"
+      - "tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md"
+      - "tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md"
+      - "tasks/backlog/ui/UI-040-icp-compatible-source-selection.md"
+      - "tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md"
+      - "tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md"
+      - "tools/agents/validate_tasks.py"
+      - "tests/regression/tooling/Test.ValidateTasks.py"
+      - "ara/logic/claims.md"
+      - "ara/logic/solution/architecture.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-08-02_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
-claims_touched: []
+claims_touched:
+  - id: C17
+    action: crystallized
+    turn: 5
 
 key_context:
   - turn: 1
@@ -149,13 +207,20 @@ key_context:
     excerpt: "Conflict resolution follows the implemented runtime surface: RUNTIME-139, RUNTIME-203, and RUNTIME-205 are retired, their former backlog copies do not survive, and local no-claim rationale remains where it is still factual."
   - turn: 4
     excerpt: "The reconciled tree built all 1,360 aggregate steps and passed 3,991/3,991 selected CPU tests; only the policy-expected GLFW/LSan control was skipped."
+  - turn: 5
+    excerpt: "The user explicitly approved a global obligation plus canonical catalog/task enrollment and requested refactor tasks for every currently violating method."
+  - turn: 5
+    excerpt: "Source inspection found graph ECS materialization still uses Nodes plus Edges without Halfedges; this contradicts the target physical element matrix and is now the dependency of graph-capable method refactors."
+  - turn: 5
+    excerpt: "The scoped audit found five method-integration gaps and created RUNTIME-206 through RUNTIME-210 plus UI-038 through UI-042, with original-paper and extension/improvement intake required in every implementation task."
 
 open_threads:
   - "Choose whether temporal enforcement uses a separate intake child task or a sealed phase transition inside one METHOD/GEOM task."
   - "If adopted, backfill the seven concrete method packages and ratchet new/changed METHOD/GEOM tasks prospectively."
   - "HARDEN-084 still needs canonical method-package links and an explicit in-house/direct-literature provenance decision before promotion."
   - "Specify the typed prepare/execute/commit checklist and decide which existing property-resolution, JobService, and mutation helpers are reused without creating a universal MethodRuntime framework."
-  - "Decide whether and when to implement the affirmed literature skill, schema, validator, and task-policy changes."
+  - "Implement the machine-validated literature-intake artifact/schema gate affirmed by A24; PROC-030 requires original-plus-extension review in task policy but does not claim that sealed artifact yet."
+  - "Execute HARDEN-087 before graph-capable RUNTIME-206 through RUNTIME-209, then close each paired UI task with per-domain end-to-end proof."
 
 ai_suggestions_pending:
   - "Implement intrinsicengine-literature-intake and route published/mixed METHOD/GEOM work through it before the implementation skill."

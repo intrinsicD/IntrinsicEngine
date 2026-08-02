@@ -1490,3 +1490,45 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O94
+    timestamp: "2026-08-02T15:12+02:00"
+    provenance: user-revised
+    content: >
+      Reusable engine contracts should have one canonical architecture source
+      and stable catalog ID, while AGENTS.md owns the global lookup and
+      preservation obligation. New or materially changed tasks explicitly
+      declare every applicable ID or a justified empty review; templates,
+      authoring/review skills, strict validation, and executable proofs enforce
+      the declaration without duplicating subsystem semantics.
+    context: >
+      The user affirmed this division of authority after asking how future
+      geometry and other reusable contracts can remain visible across agent
+      sessions, task creation, implementation, and review.
+    potential_type: architecture
+    bound_to: [N329, N330]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A26"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O95
+    timestamp: "2026-08-02T15:12+02:00"
+    provenance: ai-suggested
+    content: >
+      At main revision 577b4583 plus the LOP integration at revision 33930efa,
+      the stated production/callable geometry-method audit scope contains one
+      foundational physical source-contract drift and exactly five method
+      engine-integration gaps: Progressive Poisson, LOP/WLOP/CLOP/EAR, ICP,
+      statistical/radius outlier processing, and Signed Heat. HARDEN-087 and
+      RUNTIME-206 through RUNTIME-210 plus UI-038 through UI-042 provide one
+      bounded owning task chain for every finding.
+    context: >
+      Source tracing, runtime/UI registration inspection, method manifests,
+      existing contracts, and original-plus-extension literature were audited
+      while implementing PROC-030. The resulting audit and backlog now depend
+      on this bounded inventory.
+    potential_type: claim
+    bound_to: [N330]
+    promoted: true
+    promoted_to: "logic/claims.md:C17"
+    crystallized_via: artifact-commitment
+    stale: false

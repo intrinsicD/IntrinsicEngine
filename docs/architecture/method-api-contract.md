@@ -76,6 +76,36 @@ Method tests must support deterministic validation:
 - Method correctness tests and benchmark manifests: `methods/**` and `benchmarks/**`.
 - Engine-layer adapters (if needed): owning subsystem (`src/geometry`, `src/graphics`, `src/runtime`) while preserving architecture invariants.
 
+## Engine integration contract
+
+A production method is integrated only when its task records and proves the
+whole consumer path. The required `## Engine integration` matrix contains:
+
+| Field | Required decision |
+| --- | --- |
+| Least-structured input | The weakest data/topology contract the public method actually needs. |
+| Compatible entity sources | Every ECS entity/source satisfying that input contract, not merely the provenance used during development. |
+| `RuntimeModule` | Public runtime binding and availability/readiness path. |
+| Config/agent | Serializable or command control using the same validated apply path as UI. |
+| UI | Discoverability under every appropriate geometric domain, with readiness diagnostics. |
+| Publication | Destination entity/domain/property plus explicit topology/cardinality and undo/history behavior. |
+| End-to-end tests | Tests that start from each compatible source and exercise runtime binding, publication, and UI discovery. |
+
+The element-domain rows in
+[`geometry-api-style.md`](geometry-api-style.md#ecs-element-domain-source-contract)
+govern geometry methods. In particular, a point-span method accepts the logical
+`Vertices` role of point-cloud, graph, and mesh entities without conversion
+(`HARDEN-087` owns the remaining physical graph `Nodes` migration). Requiring
+stronger topology is correct only when the public method contract requires it.
+Input eligibility and result publication are separate decisions:
+a same-cardinality property may publish in place, while a topology/cardinality
+change requires an explicit owning operation and must not silently discard
+richer source domains.
+
+Method-only scientific slices may defer runtime/config/UI/publication work, but
+each deferred matrix row names the task that owns it. A package is not described
+as end-to-end or editor-integrated until those rows and their tests close.
+
 ## Complexity and diagnostics expectations
 
 Each method package should document:

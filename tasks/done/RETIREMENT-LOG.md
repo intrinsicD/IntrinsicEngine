@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-030`](PROC-030-contract-applicability-and-method-integration.md) —
+reusable-contract applicability enforcement completed on 2026-08-02 at
+`Operational`. One canonical stable-ID catalog now routes agents from the
+repository-wide discovery/preservation obligation to owning architecture prose
+and executable proofs. New or materially changed tasks prospectively declare
+applicable contracts or a justified empty review; method-backed tasks also
+dispose the full input/source/runtime/config/UI/publication/test matrix. The
+strict validator and 16 focused regression cases cover catalog integrity,
+unknown/duplicate/omitted declarations, justified-empty enrollment,
+byte-identical legacy grandfathering, and incomplete method matrices. The
+source and original-plus-extension literature audit found that current graph
+ECS materialization still uses `Nodes + Edges` without graph `Halfedges`, plus
+five bounded method-integration gaps. `HARDEN-087`, `RUNTIME-206..210`, and
+`UI-038..042` own those corrections in dependency order. This process slice
+changes no engine or method behavior; its full CPU gate and strict structural
+checks are recorded under `tasks/evidence/PROC-030/`, with independent
+fixed-surface acceptance.
+
 [`RUNTIME-138`](RUNTIME-138-withdraw-broad-selected-analysis-umbrella.md) — the
 broad selected-analysis umbrella was withdrawn on 2026-08-01 at `Retired`
 without deleting delivered cache/visibility/diagnostic behavior. The bounded

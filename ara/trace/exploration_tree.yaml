@@ -7804,3 +7804,53 @@ tree:
       evidence gates are clean. GPU/Vulkan execution was not rerun and no
       performance, parity, or scientific claim is added.
     status: resolved
+  - id: N329
+    type: decision
+    title: "Adopt cataloged reusable contracts and explicit method remediation"
+    provenance: user
+    timestamp: "2026-08-02T15:12+02:00"
+    also_depends_on: [N324, N325]
+    choice: >
+      Put the repository-wide obligation to discover and preserve reusable
+      contracts in AGENTS.md, keep each contract's semantics in a canonical
+      architecture source routed by stable catalog ID, require applicable IDs
+      in task creation and review, and create bounded follow-up tasks for every
+      currently audited method integration that violates the geometry source
+      or end-to-end integration contract.
+    alternatives:
+      - "Copy every subsystem contract into AGENTS.md and accept inevitable prose drift."
+      - "Rely only on task-authoring skills or task prose without a repository-wide obligation and strict validator."
+      - "Fix only the observed LOP panel while leaving equivalent existing method integrations unaudited."
+    evidence:
+      - "User direction: yes. this looks good. please do that."
+      - "User direction: add tasks for all existing methods currently violating this."
+      - "docs/architecture/contract-catalog.yaml"
+      - "docs/agent/task-format.md"
+    status: resolved
+  - id: N330
+    type: experiment
+    title: "Audit and encode geometry method-integration contract gaps"
+    provenance: ai-executed
+    timestamp: "2026-08-02T15:12+02:00"
+    also_depends_on: [N323, N329]
+    evidence:
+      - "docs/reviews/2026-08-02-method-engine-integration-contract-audit.md"
+      - "docs/architecture/geometry-api-style.md"
+      - "docs/architecture/method-api-contract.md"
+      - "src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp"
+      - "src/ecs/Components/ECS.Component.GeometrySources.cppm"
+      - "feature/lop-consolidation-e2e revision 33930efab13764cbbd0887bfc8c726948a480479"
+      - "LOP, CLOP, EAR, Generalized ICP, Robust ICP, Progressive Poisson, outlier-filter, and Signed Heat primary/extension literature"
+      - "python3 tests/regression/tooling/Test.ValidateTasks.py: 16/16 passed"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict: 191 task files, 0 findings"
+    result: >
+      The intended physical element matrix is not implemented for graphs:
+      current ECS materialization uses Nodes plus Edges and omits graph
+      Halfedges. Within the stated production/callable integration scope, five
+      method gaps remain: Progressive Poisson, LOP-family consolidation, ICP,
+      statistical/radius outlier processing, and Signed Heat. One foundational
+      ECS task and five bounded runtime/UI task pairs now own those gaps. The
+      prospective catalog/task validator rejects unknown, omitted, duplicate,
+      unjustified-empty, and incomplete method-integration declarations. No
+      engine behavior changed in this process slice.
+    status: resolved

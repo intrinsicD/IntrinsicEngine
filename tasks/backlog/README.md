@@ -185,8 +185,10 @@ route-level prerequisite contract delivered by `BUG-093`; `ASSETIO-011` owns
 the app-linked semantic File / Import matrix after its preview/timing/PLY/
 queued-geometry dependencies retire; `UI-037` owns runtime-authoritative
 linear action readiness and disabled-reason tooltips after `BUG-093`,
-`BUG-096`, and `RUNTIME-202`; and `UI-038` owns explicit, undoable safety for
-destructive Progressive Poisson mesh conversion. The four reproducible Theme G defects
+`BUG-096`, and `RUNTIME-202`; the 2026-08-02 method integration audit re-scoped
+`UI-038` from securing a destructive Progressive Poisson conversion to removing
+that invalid conversion and exposing the method across compatible element
+sources. The four reproducible Theme G defects
 (`BUG-098..101`) are retired: completed-frame timing, binary PLY non-vertex
 list consumption, queued manual geometry import, and near-linear UV edge
 grouping now satisfy their recorded maturity targets.
@@ -351,6 +353,14 @@ AssetWorkflow owner.
 The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 (`CORE-007`) are retired, as is compiled-plan efficiency (`CORE-008`).
 
+The 2026-08-02 element-domain/method-integration audit opened foundational
+`HARDEN-087` plus the bounded `RUNTIME-206..210` and `UI-038..042` runtime/UI
+pairs under Themes D/I; see the
+[runtime](runtime/README.md) and [UI](ui/README.md) indexes for the dependency
+split and the
+[audit](../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md)
+for the exhaustive scoped inventory.
+
 Open members (kernel-seam priority set first):
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
   (one-shot post-convergence admission gate; re-gated by the 2026-07-24 runtime
@@ -365,8 +375,9 @@ Open members (kernel-seam priority set first):
 - [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md)
   (blocked by `BUG-096` and facade retirement; expensive readiness derivations
   are feature-owned only when concretely required).
-- [`ui/UI-038-progressive-poisson-destructive-conversion-safety.md`](ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
-  (blocked by the common mutation transaction and facade retirement).
+- [`ui/UI-038-progressive-poisson-multi-domain-panel.md`](ui/UI-038-progressive-poisson-multi-domain-panel.md)
+  (blocked by the non-destructive multi-domain runtime correction in
+  `RUNTIME-208`).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
 ### Theme G — Active bugs

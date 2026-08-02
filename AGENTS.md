@@ -197,7 +197,9 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 
 Method/paper work must follow this order:
 
-1. Intake paper + define method contract.
+1. Query and review the original paper plus relevant extensions and subsequent
+   improvements; record stable citations, select the exact formulation, and
+   define the method contract.
 2. Implement CPU reference backend first.
 3. Add correctness tests.
 4. Add benchmark harness/manifests.
@@ -351,6 +353,16 @@ When code, structure, or policy changes:
   in `.github/pull_request_template.md` and `docs/agent/review-checklist.md`.
 
 ## 11. Task execution workflow
+
+Before claiming or materially changing a task, consult
+`docs/architecture/contract-catalog.yaml` and declare every applicable stable
+contract ID in task front-matter. Determine applicability from the owning and
+consuming layers, data domains, publication/cardinality behavior, and config,
+agent, runtime, and UI control surfaces — task wording may not silently narrow
+a canonical contract. A new reusable contract or an intentional contract
+change must update its canonical source, catalog entry, and executable proof in
+the same reviewed change; retirement must dispose every declared contract with
+tests or a named follow-up.
 
 Every task execution should follow this sequence:
 

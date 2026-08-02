@@ -55,6 +55,24 @@ WORKFLOW_EVIDENCE_VALUES = {"required", "not_applicable"}
 WORKFLOW_LEGACY_INVENTORY = (
     Path(__file__).resolve().with_name("workflow_legacy_tasks.json")
 )
+CONTRACT_SCHEMA_VERSION = 1
+CONTRACT_CATALOG = (
+    Path(__file__).resolve().parents[2] / "docs" / "architecture" / "contract-catalog.yaml"
+)
+CONTRACT_LEGACY_INVENTORY = (
+    Path(__file__).resolve().with_name("contract_legacy_tasks.json")
+)
+CONTRACT_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$")
+METHOD_INTEGRATION_CONTRACT = "method.engine-integration"
+METHOD_INTEGRATION_FIELDS = (
+    "Least-structured input",
+    "Compatible entity sources",
+    "RuntimeModule",
+    "Config/agent",
+    "UI",
+    "Publication",
+    "End-to-end tests",
+)
 
 REQUIRED_SECTIONS_MICRO = [
     "Goal",
@@ -415,6 +433,85 @@ def validate_front_matter(
                 )
             )
 
+    contract_legacy_hashes: dict[str, str] = {}
+    if CONTRACT_LEGACY_INVENTORY.is_file():
+        try:
+            inventory = json.loads(
+                CONTRACT_LEGACY_INVENTORY.read_text(encoding="utf-8")
+            )
+            if (
+                isinstance(inventory, dict)
+                and inventory.get("schema_version") == CONTRACT_SCHEMA_VERSION
+                and isinstance(inventory.get("tasks"), dict)
+            ):
+                contract_legacy_hashes = inventory["tasks"]
+            else:
+                raise ValueError(
+                    f"expected schema_version {CONTRACT_SCHEMA_VERSION} and a tasks mapping"
+                )
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            findings.append(
+                Finding(
+                    "error",
+                    CONTRACT_LEGACY_INVENTORY,
+                    f"contract legacy inventory is invalid: {exc}",
+                )
+            )
+
+    contract_ids: set[str] = set()
+    try:
+        catalog = yaml.load(
+            CONTRACT_CATALOG.read_text(encoding="utf-8"), Loader=UniqueKeyLoader
+        )
+        if not isinstance(catalog, dict):
+            raise ValueError("catalog root must be a YAML mapping")
+        if catalog.get("schema_version") != CONTRACT_SCHEMA_VERSION:
+            raise ValueError(
+                f"schema_version must equal {CONTRACT_SCHEMA_VERSION}"
+            )
+        contracts = catalog.get("contracts")
+        if not isinstance(contracts, dict) or not contracts:
+            raise ValueError("contracts must be a non-empty mapping")
+        for contract_id, contract in contracts.items():
+            if not isinstance(contract_id, str) or not CONTRACT_ID_RE.fullmatch(
+                contract_id
+            ):
+                raise ValueError(f"invalid stable contract ID `{contract_id}`")
+            if not isinstance(contract, dict):
+                raise ValueError(f"contract `{contract_id}` must be a mapping")
+            owner = contract.get("owner")
+            if not isinstance(owner, str) or not owner.strip():
+                raise ValueError(f"contract `{contract_id}` needs a non-empty owner")
+            source = contract.get("source")
+            if not isinstance(source, str) or not source.strip():
+                raise ValueError(f"contract `{contract_id}` needs a source path")
+            source_path = CONTRACT_CATALOG.parents[2] / source
+            if not source_path.is_file():
+                raise ValueError(
+                    f"contract `{contract_id}` source does not exist: {source}"
+                )
+            for field in ("applies_when", "proofs"):
+                values = contract.get(field)
+                if (
+                    not isinstance(values, list)
+                    or not values
+                    or any(not isinstance(value, str) or not value.strip() for value in values)
+                ):
+                    raise ValueError(
+                        f"contract `{contract_id}` needs a non-empty string list `{field}`"
+                    )
+            for proof in contract["proofs"]:
+                proof_path = CONTRACT_CATALOG.parents[2] / proof
+                if not proof_path.is_file():
+                    raise ValueError(
+                        f"contract `{contract_id}` proof does not exist: {proof}"
+                    )
+            contract_ids.add(contract_id)
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        findings.append(
+            Finding("error", CONTRACT_CATALOG, f"contract catalog is invalid: {exc}")
+        )
+
     tasks_root = _tasks_root(parsed_tasks)
 
     for parsed in parsed_tasks:
@@ -458,7 +555,8 @@ def validate_front_matter(
             )
 
         if "done" in path_parts and "workflow_schema" not in data:
-            continue
+            if "contract_schema" not in data:
+                continue
 
         theme = data.get("theme")
         if not isinstance(theme, str) or not theme.strip():
@@ -490,6 +588,104 @@ def validate_front_matter(
                             "under tasks/active|backlog|done|archive.",
                         )
                     )
+
+        contract_schema = data.get("contract_schema")
+        if contract_schema is None:
+            if "done" not in path_parts:
+                rel = _task_inventory_path(parsed.path, tasks_root)
+                expected_hash = contract_legacy_hashes.get(rel)
+                actual_hash = hashlib.sha256(parsed.path.read_bytes()).hexdigest()
+                if expected_hash != actual_hash:
+                    findings.append(
+                        Finding(
+                            "error",
+                            parsed.path,
+                            "new or changed open task is outside the prospective "
+                            "contract inventory and must declare `contract_schema: 1`; "
+                            "untouched historical tasks alone are grandfathered.",
+                        )
+                    )
+        elif contract_schema != CONTRACT_SCHEMA_VERSION:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    f"front-matter `contract_schema` must equal "
+                    f"{CONTRACT_SCHEMA_VERSION}.",
+                )
+            )
+        else:
+            declared_contracts = data.get("contracts")
+            if not isinstance(declared_contracts, list):
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        "front-matter `contracts` must be a list (may be empty).",
+                    )
+                )
+            else:
+                seen_contracts: set[str] = set()
+                for contract_id in declared_contracts:
+                    if not isinstance(contract_id, str) or contract_id not in contract_ids:
+                        findings.append(
+                            Finding(
+                                "error",
+                                parsed.path,
+                                f"front-matter contract `{contract_id}` is not a known ID "
+                                "in docs/architecture/contract-catalog.yaml.",
+                            )
+                        )
+                    elif contract_id in seen_contracts:
+                        findings.append(
+                            Finding(
+                                "error",
+                                parsed.path,
+                                f"front-matter contract `{contract_id}` is duplicated.",
+                            )
+                        )
+                    seen_contracts.add(contract_id)
+
+                contract_review = data.get("contract_review")
+                if not declared_contracts and (
+                    not isinstance(contract_review, str) or not contract_review.strip()
+                ):
+                    findings.append(
+                        Finding(
+                            "error",
+                            parsed.path,
+                            "empty `contracts` requires a non-empty `contract_review` "
+                            "explaining why no catalog contract applies.",
+                        )
+                    )
+
+                if METHOD_INTEGRATION_CONTRACT in seen_contracts:
+                    integration = parsed.section_bodies.get("Engine integration")
+                    if integration is None:
+                        findings.append(
+                            Finding(
+                                "error",
+                                parsed.path,
+                                "`method.engine-integration` requires an "
+                                "`## Engine integration` section.",
+                            )
+                        )
+                    else:
+                        missing_fields = [
+                            field
+                            for field in METHOD_INTEGRATION_FIELDS
+                            if field not in integration
+                        ]
+                        if missing_fields:
+                            findings.append(
+                                Finding(
+                                    "error",
+                                    parsed.path,
+                                    "`## Engine integration` is missing field(s): "
+                                    + ", ".join(missing_fields)
+                                    + ".",
+                                )
+                            )
 
         workflow_schema = data.get("workflow_schema")
         if workflow_schema is None:

@@ -25,6 +25,10 @@ the authoritative open/unblocked view.
 
 - unblocked: `PHYSICS-004` — Operational runtime physics module and bridge privatization (tasks/backlog/physics/PHYSICS-004-operational-runtime-physics-module.md)
 
+## Theme D — ECS hardening parity
+
+- unblocked: `HARDEN-087` — Unified geometry element-source components (tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md)
+
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
@@ -34,7 +38,6 @@ the authoritative open/unblocked view.
 - blocked by `PHYSICS-004`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
-- unblocked: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 
 ## Theme G — Active bugs
 
@@ -93,7 +96,17 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+- blocked by `RUNTIME-175`: `RUNTIME-206` — LOP family element-domain source integration (tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md)
+- blocked by `BUG-096`: `RUNTIME-207` — ICP element-domain source integration (tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md)
+- blocked by `HARDEN-087`: `RUNTIME-208` — Progressive Poisson element-domain publication (tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md)
+- blocked by `HARDEN-087`: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
+- unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
+- blocked by `RUNTIME-208`: `UI-038` — Progressive Poisson multi-domain panel (tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md)
+- blocked by `RUNTIME-206`: `UI-039` — LOP family multi-domain discovery (tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md)
+- blocked by `RUNTIME-207`: `UI-040` — ICP compatible-source selection and discovery (tasks/backlog/ui/UI-040-icp-compatible-source-selection.md)
+- blocked by `RUNTIME-209`: `UI-041` — Point-set outlier multi-domain panel (tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md)
+- blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)
 
 ## Unthemed
 

@@ -11,6 +11,9 @@ owner:
 branch:
 worktree:
 claimed_at:
+contract_schema: 1
+contracts: []
+contract_review: <why no catalog contract applies>
 ---
 # <TASK-ID> — <Task title>
 

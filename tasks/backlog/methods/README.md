@@ -8,6 +8,29 @@ optimized CPU → GPU only after reference parity.
 See [`tasks/backlog/README.md`](../README.md) for the cross-domain convergence
 map.
 
+## Engine-integration remediation
+
+The 2026-08-02
+[`method engine-integration contract audit`](../../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md)
+applies the new element-source and end-to-end matrix to every production
+geometry method package and callable Sandbox method. Five gaps are owned by
+bounded runtime/UI pairs rather than duplicate METHOD implementations:
+
+- Physical ECS prerequisite: `HARDEN-087` converges graph `Nodes`/omitted
+  halfedges onto the canonical element-component matrix.
+
+- LOP family: `RUNTIME-206` → `UI-039` after the initial
+  `RUNTIME-175`/`UI-035` integration.
+- Progressive Poisson: `RUNTIME-208` → re-scoped `UI-038`.
+- ICP: `RUNTIME-207` → `UI-040`, gated on `BUG-096`.
+- Statistical/radius outliers: `RUNTIME-209` → `UI-041`.
+- Signed Heat: `RUNTIME-210` → `UI-042`.
+
+Each pair preserves the existing numerical implementation, requires a fresh
+original-paper plus extensions/improvements review, and owns RuntimeModule,
+config/agent, ECS publication, UI discovery, and source-domain tests end to
+end.
+
 ## Program tasks
 
 - No open program tasks. Retired `METHODS-001` pins METHOD-002 as the

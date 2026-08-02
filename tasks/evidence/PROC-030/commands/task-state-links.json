@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_state_links.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_state_links.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 467,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T13:20:48Z",
+  "label": "task-state-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T13:20:48Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/task-state-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/task-state-links.stdout.log",
+  "stdout_sha256": "89fdb70edfd4f5193411ad18d073e205959f981080b4c6221900c11c6b17c759",
+  "task_id": "PROC-030"
+}

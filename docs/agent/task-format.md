@@ -20,6 +20,9 @@ owner:
 branch:
 worktree:
 claimed_at:
+contract_schema: 1
+contracts: []
+contract_review: <required explanation when contracts is empty>
 ---
 # <TASK-ID> <Title>
 
@@ -83,6 +86,16 @@ feeds the generated `tasks/SESSION-BRIEF.md`:
 - `evidence_skip_reason` — required for the micro exemption.
 - `owner`, `branch`, `worktree`, `claimed_at` — null while a backlog task is
   unclaimed and non-empty ISO-8601 ownership metadata in `tasks/active/`.
+- `contract_schema` (required for new/changed tasks) — currently `1`.
+- `contracts` (required, may be `[]`) — unique stable IDs from
+  [`contract-catalog.yaml`](../architecture/contract-catalog.yaml). Determine
+  applicability from both owning and consuming layers, the least-structured
+  data domain, result publication/cardinality, and every config, agent,
+  runtime, and UI control surface. Task wording cannot narrow a listed
+  contract.
+- `contract_review` — required and non-empty when `contracts: []`; records why
+  the catalog was reviewed and no contract applies. It is optional when IDs are
+  declared.
 
 `tools/agents/validate_tasks.py --strict` enforces the schema for open tasks;
 enrolled retired tasks retain the workflow fields. Exact hashes in
@@ -92,6 +105,22 @@ enroll. Historical done/archive tasks are not backfilled. See
 [`workflow-evidence.md`](workflow-evidence.md) for profile triggers and
 evidence custody. After opening, retiring, or re-gating a task, regenerate the session brief with
 `python3 tools/agents/generate_session_brief.py`.
+
+Contract enrollment is independently prospective. Exact hashes in
+`tools/agents/contract_legacy_tasks.json` grandfather only byte-identical open
+tasks that predate `PROC-030`; editing, renaming, or promoting one enrolls it.
+`tools/agents/validate_tasks.py --strict` resolves declared IDs against the
+catalog and validates each catalog source/proof path. Add a catalog entry only
+for a reusable rule with canonical prose and an executable validator or test;
+do not make a task, skill, generated file, or code comment its sole authority.
+
+For method-backed work, declaring `method.engine-integration` also requires an
+`## Engine integration` matrix. Record the least-structured input, every
+compatible entity source, `RuntimeModule` binding, config/agent path, UI
+domains, publication/cardinality policy, and end-to-end tests. A method-only
+slice may defer a surface, but the matrix must name the owning follow-up task;
+`N/A` is valid only when the canonical method contract makes engine integration
+inapplicable.
 
 The general, bug, and review templates default to `standard`; authors promote
 the profile when a trigger applies. The method template defaults to

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/task_claim.py",
+    "status"
+  ],
+  "command_display": "python3 tools/agents/task_claim.py status",
+  "cwd": ".",
+  "duration_ms": 43,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T13:21:02Z",
+  "label": "task-claim-status",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T13:21:02Z",
+  "stderr_path": "tasks/evidence/PROC-030/commands/task-claim-status.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-030/commands/task-claim-status.stdout.log",
+  "stdout_sha256": "14e76399cbbeb71834b7e501390038e6eb1098c7b98f0560fd41429ee4bca542",
+  "task_id": "PROC-030"
+}

@@ -211,8 +211,8 @@ sessions:
     open_threads: 5
   - id: "2026-08-02_001"
     date: "2026-08-02"
-    summary: "Affirmed the literature/provenance/variant architecture, clarified typed method operations, and reconciled the runtime-cleanup merge with full CPU verification."
-    turn_count: 4
-    events_count: 13
-    claims_touched: []
-    open_threads: 5
+    summary: "Affirmed literature and method architecture, reconciled runtime cleanup, and operationalized reusable-contract enrollment with a source-audited geometry-method remediation backlog."
+    turn_count: 5
+    events_count: 17
+    claims_touched: [C17]
+    open_threads: 6

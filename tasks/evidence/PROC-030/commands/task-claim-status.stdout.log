@@ -1,0 +1,2 @@
+LIVE GEOM-064 owner=Codex-GeometryE2E branch=feature/lop-consolidation-e2e worktree=/tmp/intrinsic-geometry-e2e.GJlhXS paths=['task-only']
+LIVE PROC-030 owner=Codex branch=process/contract-applicability worktree=/tmp/intrinsic-proc030.lxl95I paths=['task-only']
