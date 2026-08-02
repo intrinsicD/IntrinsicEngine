@@ -91,6 +91,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph.Vertex.Normals;
+import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.Vertices.Normals;
@@ -155,16 +156,6 @@ void AddPointCloudSource(ECS::Scene::Registry& registry,
         auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
         vertices.Properties.Resize(pointCount);
         registry.Raw().emplace<G::RenderPoints>(entity);
-    }
-
-void SetNodePositions(GS::Nodes& nodes,
-                          const std::vector<glm::vec3>& positions)
-    {
-        nodes.Properties.Resize(positions.size());
-        auto pos = nodes.Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f});
-        pos.Vector() = positions;
     }
 
 void SetPositions(GS::Vertices& vertices,
@@ -363,16 +354,13 @@ void AddGraphSource(ECS::Scene::Registry& registry,
                         const ECS::EntityHandle entity)
     {
         auto& raw = registry.Raw();
-        auto& nodes = raw.emplace<GS::Nodes>(entity);
-        SetNodePositions(nodes,
-                         {
-                             {0.0f, 0.0f, 0.0f},
-                             {1.0f, 0.0f, 0.0f},
-                             {2.0f, 0.0f, 0.0f},
-                         });
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        SetEdges(edges, {0u, 1u}, {1u, 2u});
-        raw.emplace<GS::HasGraphTopology>(entity);
+        Geometry::Graph::Graph graph{};
+        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+        const auto v2 = graph.AddVertex({2.0f, 0.0f, 0.0f});
+        (void)graph.AddEdge(v0, v1);
+        (void)graph.AddEdge(v1, v2);
+        GS::PopulateFromGraph(raw, entity, graph);
         raw.emplace<G::RenderEdges>(entity);
         raw.emplace<G::RenderPoints>(entity);
     }
@@ -515,7 +503,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
              Runtime::EditorDomainWindowKind::Graph,
              Runtime::EditorPropertyCatalogDomain::GraphVertices,
              Runtime::GeometryElementDomain::GraphNode,
-             registry.Raw().get<GS::Nodes>(graph).Properties,
+             registry.Raw().get<GS::Vertices>(graph).Properties,
              3u);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");

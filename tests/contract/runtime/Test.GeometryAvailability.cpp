@@ -74,7 +74,7 @@ TEST(RuntimeGeometryAvailability, MeshResolvesIndependentSurfaceEdgeAndPointLane
         availability, Runtime::GeometryElementDomain::PointCloudPoint));
 }
 
-TEST(RuntimeGeometryAvailability, GraphSupportsEdgeAndPointLanesWithoutHalfedgeSource)
+TEST(RuntimeGeometryAvailability, GraphSupportsUnifiedVertexHalfedgeAndEdgeSources)
 {
     entt::registry registry;
     const entt::entity entity = registry.create();
@@ -86,6 +86,9 @@ TEST(RuntimeGeometryAvailability, GraphSupportsEdgeAndPointLanesWithoutHalfedgeS
     const auto availability = Runtime::BuildGeometryAvailability(registry, entity);
 
     EXPECT_EQ(availability.Sources.ProvenanceDomain, GS::Domain::Graph);
+    EXPECT_TRUE(availability.Sources.Has(GS::SourceCapability::Vertices));
+    EXPECT_TRUE(availability.Sources.Has(GS::SourceCapability::Halfedges));
+    EXPECT_TRUE(availability.Sources.Has(GS::SourceCapability::Edges));
     EXPECT_TRUE(Runtime::ResolveRenderLaneAvailability(
         availability, Runtime::GeometryRenderLane::Edges).Ready());
     EXPECT_TRUE(Runtime::ResolveRenderLaneAvailability(
@@ -96,6 +99,50 @@ TEST(RuntimeGeometryAvailability, GraphSupportsEdgeAndPointLanesWithoutHalfedgeS
         availability, Runtime::GeometryElementDomain::GraphNode));
     EXPECT_TRUE(Runtime::SupportsGeometryElementDomain(
         availability, Runtime::GeometryElementDomain::GraphEdge));
+    EXPECT_EQ(Runtime::ResolveGeometryPropertySet(
+                  availability,
+                  Runtime::GeometryElementDomain::GraphNode),
+              &availability.SourceView.VertexSource->Properties);
+}
+
+TEST(RuntimeGeometryAvailability, SharedSourceMatrixDoesNotReplaceGraphProvenance)
+{
+    entt::registry registry;
+    const entt::entity entity = registry.create();
+    auto graph = MakeGraph();
+    GS::PopulateFromGraph(registry, entity, graph);
+
+    registry.remove<GS::HasGraphTopology>(entity);
+    const auto availability = Runtime::BuildGeometryAvailability(registry, entity);
+
+    EXPECT_EQ(availability.Sources.ExactDomain, GS::Domain::Unknown);
+    EXPECT_EQ(availability.Sources.ProvenanceDomain, GS::Domain::Unknown);
+    EXPECT_TRUE(availability.Sources.Has(GS::SourceCapability::Vertices));
+    EXPECT_TRUE(availability.Sources.Has(GS::SourceCapability::Halfedges));
+    EXPECT_TRUE(availability.Sources.Has(GS::SourceCapability::Edges));
+    EXPECT_FALSE(Runtime::SupportsGeometryElementDomain(
+        availability, Runtime::GeometryElementDomain::GraphNode));
+    EXPECT_FALSE(Runtime::SupportsGeometryElementDomain(
+        availability, Runtime::GeometryElementDomain::MeshVertex));
+}
+
+TEST(RuntimeGeometryAvailability, GraphMarkerKeepsProvenanceForMixedSourceMatrix)
+{
+    entt::registry registry;
+    const entt::entity entity = registry.create();
+    auto graph = MakeGraph();
+    GS::PopulateFromGraph(registry, entity, graph);
+
+    registry.emplace<GS::Faces>(entity);
+    const auto availability = Runtime::BuildGeometryAvailability(registry, entity);
+
+    EXPECT_EQ(availability.Sources.ExactDomain, GS::Domain::Unknown);
+    EXPECT_EQ(availability.Sources.ProvenanceDomain, GS::Domain::Graph);
+    EXPECT_TRUE(availability.Sources.Has(GS::SourceCapability::Faces));
+    EXPECT_TRUE(Runtime::SupportsGeometryElementDomain(
+        availability, Runtime::GeometryElementDomain::GraphNode));
+    EXPECT_FALSE(Runtime::SupportsGeometryElementDomain(
+        availability, Runtime::GeometryElementDomain::MeshFace));
 }
 
 TEST(RuntimeGeometryAvailability, PointCloudSupportsPointsAndRejectsSurfaceAndEdges)

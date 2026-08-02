@@ -39,7 +39,6 @@ using Extrinsic::ECS::Components::GeometrySources::Edges;
 using Extrinsic::ECS::Components::GeometrySources::Faces;
 using Extrinsic::ECS::Components::GeometrySources::Halfedges;
 using Extrinsic::ECS::Components::GeometrySources::HasMeshTopology;
-using Extrinsic::ECS::Components::GeometrySources::Nodes;
 using Extrinsic::ECS::Components::GeometrySources::Vertices;
 using Extrinsic::ECS::Components::GeometrySources::Domain;
 using Extrinsic::ECS::Components::Transform::WorldMatrix;

@@ -4,6 +4,7 @@
 #include <limits>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -62,7 +63,6 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromMeshEmplacesAllFourDomains)
     EXPECT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
     EXPECT_TRUE(raw.all_of<GeometrySources::Halfedges>(entity));
     EXPECT_TRUE(raw.all_of<GeometrySources::Faces>(entity));
-    EXPECT_FALSE(raw.all_of<GeometrySources::Nodes>(entity));
 }
 
 TEST(ECSGeometrySourcesPopulate, PopulateFromMeshWritesCanonicalKeysAndPositions)
@@ -184,20 +184,19 @@ TEST(ECSGeometrySourcesPopulate, MeshAvailabilitySeparatesProvenanceFromSourceCa
     EXPECT_EQ(availability.ExactDomain, GeometrySources::Domain::Mesh);
     EXPECT_EQ(availability.ProvenanceDomain, GeometrySources::Domain::Mesh);
     EXPECT_TRUE(availability.HasMeshProvenance());
-    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::VertexPoints));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Vertices));
     EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Edges));
     EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Halfedges));
     EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Faces));
-    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::NodePoints));
     EXPECT_TRUE(availability.HasPointSource());
-    EXPECT_EQ(availability.VertexPointCount, static_cast<std::size_t>(4));
+    EXPECT_EQ(availability.VertexCount, static_cast<std::size_t>(4));
     EXPECT_EQ(availability.FaceCount, static_cast<std::size_t>(2));
 }
 
 // =============================================================================
 // PopulateFromGraph
 // =============================================================================
-TEST(ECSGeometrySourcesPopulate, PopulateFromGraphEmplacesNodesAndEdges)
+TEST(ECSGeometrySourcesPopulate, PopulateFromGraphEmplacesSharedElementSources)
 {
     Registry scene;
     auto& raw = scene.Raw();
@@ -212,10 +211,10 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromGraphEmplacesNodesAndEdges)
 
     GeometrySources::PopulateFromGraph(raw, entity, graph);
 
-    EXPECT_TRUE(raw.all_of<GeometrySources::Nodes>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Halfedges>(entity));
     EXPECT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
     EXPECT_TRUE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
-    EXPECT_FALSE(raw.all_of<GeometrySources::Vertices>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::Faces>(entity));
 }
 
@@ -229,15 +228,34 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromGraphWritesCanonicalKeysAndPosition
     const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
     const auto v1 = graph.AddVertex({1.0f, 2.0f, 3.0f});
     (void)graph.AddEdge(v0, v1);
+    auto vertexWeight =
+        graph.VertexProperties().GetOrAdd<float>("v:user_weight", 0.0f);
+    vertexWeight.Vector() = {1.0f, 2.0f};
+    auto halfedgeWeight =
+        graph.HalfedgeProperties().GetOrAdd<float>("h:user_weight", 0.0f);
+    halfedgeWeight.Vector() = {3.0f, 4.0f};
+    auto edgeWeight =
+        graph.EdgeProperties().GetOrAdd<float>("e:user_weight", 0.0f);
+    edgeWeight.Vector() = {5.0f};
 
     GeometrySources::PopulateFromGraph(raw, entity, graph);
 
-    auto& nComp = raw.get<GeometrySources::Nodes>(entity);
-    ASSERT_TRUE(nComp.Properties.Exists(PropertyNames::kPosition));
-    auto posProp = nComp.Properties.Get<glm::vec3>(PropertyNames::kPosition);
+    auto& vComp = raw.get<GeometrySources::Vertices>(entity);
+    ASSERT_TRUE(vComp.Properties.Exists(PropertyNames::kPosition));
+    auto posProp = vComp.Properties.Get<glm::vec3>(PropertyNames::kPosition);
     ASSERT_EQ(posProp.Vector().size(), static_cast<std::size_t>(2));
     EXPECT_EQ(posProp.Vector()[0], glm::vec3(0.0f, 0.0f, 0.0f));
     EXPECT_EQ(posProp.Vector()[1], glm::vec3(1.0f, 2.0f, 3.0f));
+    ASSERT_TRUE(vComp.Properties.Exists("v:user_weight"));
+    EXPECT_EQ(vComp.Properties.Get<float>("v:user_weight").Vector(),
+              (std::vector<float>{1.0f, 2.0f}));
+
+    auto& hComp = raw.get<GeometrySources::Halfedges>(entity);
+    ASSERT_TRUE(hComp.Properties.Exists(PropertyNames::kHalfedgeConnectivity));
+    ASSERT_TRUE(hComp.Properties.Exists("h:user_weight"));
+    EXPECT_EQ(hComp.Properties.Size(), static_cast<std::size_t>(2));
+    EXPECT_EQ(hComp.Properties.Get<float>("h:user_weight").Vector(),
+              (std::vector<float>{3.0f, 4.0f}));
 
     auto& eComp = raw.get<GeometrySources::Edges>(entity);
     ASSERT_TRUE(eComp.Properties.Exists(PropertyNames::kEdgeV0));
@@ -248,6 +266,71 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromGraphWritesCanonicalKeysAndPosition
     ASSERT_EQ(v1Prop.Vector().size(), static_cast<std::size_t>(1));
     EXPECT_EQ(v0Prop.Vector()[0], static_cast<std::uint32_t>(0));
     EXPECT_EQ(v1Prop.Vector()[0], static_cast<std::uint32_t>(1));
+    ASSERT_TRUE(eComp.Properties.Exists("e:user_weight"));
+    EXPECT_EQ(eComp.Properties.Get<float>("e:user_weight").Vector(),
+              (std::vector<float>{5.0f}));
+}
+
+TEST(ECSGeometrySourcesPopulate, PopulateFromGraphCompactsGarbageAndPreservesRealSources)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    Geometry::Graph::Graph graph;
+    const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = graph.AddVertex({2.0f, 0.0f, 0.0f});
+    const auto v3 = graph.AddVertex({3.0f, 0.0f, 0.0f});
+    ASSERT_TRUE(graph.AddEdge(v0, v1).has_value());
+    ASSERT_TRUE(graph.AddEdge(v2, v3).has_value());
+
+    graph.VertexProperties()
+        .GetOrAdd<float>("v:user_weight", 0.0f)
+        .Vector() = {10.0f, 20.0f, 30.0f, 40.0f};
+    graph.HalfedgeProperties()
+        .GetOrAdd<float>("h:user_weight", 0.0f)
+        .Vector() = {1.0f, 2.0f, 3.0f, 4.0f};
+    graph.EdgeProperties()
+        .GetOrAdd<float>("e:user_weight", 0.0f)
+        .Vector() = {5.0f, 6.0f};
+
+    graph.DeleteVertex(v1);
+    ASSERT_TRUE(graph.HasGarbage());
+
+    GeometrySources::PopulateFromGraph(raw, entity, graph);
+
+    EXPECT_FALSE(graph.HasGarbage());
+    const auto& vertices = raw.get<GeometrySources::Vertices>(entity);
+    const auto& halfedges = raw.get<GeometrySources::Halfedges>(entity);
+    const auto& edges = raw.get<GeometrySources::Edges>(entity);
+    EXPECT_EQ(vertices.Properties.Size(), 3u);
+    EXPECT_EQ(halfedges.Properties.Size(), 2u);
+    EXPECT_EQ(edges.Properties.Size(), 1u);
+    EXPECT_EQ(vertices.Properties.Get<float>("v:user_weight").Vector(),
+              (std::vector<float>{10.0f, 40.0f, 30.0f}));
+    EXPECT_EQ(halfedges.Properties.Get<float>("h:user_weight").Vector(),
+              (std::vector<float>{3.0f, 4.0f}));
+    EXPECT_EQ(edges.Properties.Get<float>("e:user_weight").Vector(),
+              (std::vector<float>{6.0f}));
+
+    const auto connectivity =
+        halfedges.Properties.Get<Geometry::Graph::HalfedgeConnectivity>(
+            PropertyNames::kHalfedgeConnectivity);
+    ASSERT_TRUE(connectivity);
+    ASSERT_EQ(connectivity.Vector().size(), 2u);
+    for (const auto& item : connectivity.Vector())
+    {
+        EXPECT_LT(item.Vertex.Index, 3u);
+        EXPECT_LT(item.Next.Index, 2u);
+        EXPECT_LT(item.Prev.Index, 2u);
+    }
+    EXPECT_EQ(edges.Properties.Get<std::uint32_t>(PropertyNames::kEdgeV0)
+                  .Vector(),
+              (std::vector<std::uint32_t>{2u}));
+    EXPECT_EQ(edges.Properties.Get<std::uint32_t>(PropertyNames::kEdgeV1)
+                  .Vector(),
+              (std::vector<std::uint32_t>{1u}));
 }
 
 TEST(ECSGeometrySourcesPopulate, PopulateFromGraphYieldsGraphDomain)
@@ -266,11 +349,12 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromGraphYieldsGraphDomain)
     const auto view = GeometrySources::BuildConstView(raw, entity);
     EXPECT_TRUE(view.Valid());
     EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::Graph);
-    EXPECT_EQ(view.NodesAlive(), static_cast<std::size_t>(2));
+    EXPECT_EQ(view.VerticesAlive(), static_cast<std::size_t>(2));
+    EXPECT_EQ(view.HalfedgesTotal(), static_cast<std::size_t>(2));
     EXPECT_EQ(view.EdgesAlive(), static_cast<std::size_t>(1));
 }
 
-TEST(ECSGeometrySourcesPopulate, GraphAvailabilityReportsNodesAndEdgesWithoutHalfedgeSource)
+TEST(ECSGeometrySourcesPopulate, GraphAvailabilityReportsUnifiedElementSources)
 {
     Registry scene;
     auto& raw = scene.Raw();
@@ -289,14 +373,47 @@ TEST(ECSGeometrySourcesPopulate, GraphAvailabilityReportsNodesAndEdgesWithoutHal
     EXPECT_EQ(availability.ExactDomain, GeometrySources::Domain::Graph);
     EXPECT_EQ(availability.ProvenanceDomain, GeometrySources::Domain::Graph);
     EXPECT_TRUE(availability.HasGraphProvenance());
-    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::NodePoints));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Vertices));
     EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Edges));
-    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::VertexPoints));
-    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Halfedges));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Halfedges));
     EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Faces));
     EXPECT_TRUE(availability.HasPointSource());
-    EXPECT_EQ(availability.NodePointCount, static_cast<std::size_t>(2));
+    EXPECT_EQ(availability.VertexCount, static_cast<std::size_t>(2));
     EXPECT_EQ(availability.EdgeCount, static_cast<std::size_t>(1));
+    EXPECT_EQ(availability.HalfedgeCount, static_cast<std::size_t>(2));
+}
+
+TEST(ECSGeometrySourcesPopulate, GraphAndMeshSharePhysicalSourcesButKeepProvenance)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle meshEntity = scene.Create();
+    const EntityHandle graphEntity = scene.Create();
+
+    auto mesh = MakeQuadMesh();
+    GeometrySources::PopulateFromMesh(raw, meshEntity, mesh);
+
+    Geometry::Graph::Graph graph;
+    const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+    (void)graph.AddEdge(v0, v1);
+    GeometrySources::PopulateFromGraph(raw, graphEntity, graph);
+
+    EXPECT_TRUE((raw.all_of<GeometrySources::Vertices,
+                            GeometrySources::Halfedges,
+                            GeometrySources::Edges>(meshEntity)));
+    EXPECT_TRUE((raw.all_of<GeometrySources::Vertices,
+                            GeometrySources::Halfedges,
+                            GeometrySources::Edges>(graphEntity)));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Faces>(meshEntity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Faces>(graphEntity));
+
+    const auto meshView = GeometrySources::BuildConstView(raw, meshEntity);
+    const auto graphView = GeometrySources::BuildConstView(raw, graphEntity);
+    EXPECT_EQ(meshView.ActiveDomain, GeometrySources::Domain::Mesh);
+    EXPECT_EQ(graphView.ActiveDomain, GeometrySources::Domain::Graph);
+    EXPECT_FALSE(meshView.HasGraphTopologyMarker);
+    EXPECT_TRUE(graphView.HasGraphTopologyMarker);
 }
 
 // =============================================================================
@@ -319,7 +436,6 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromCloudEmplacesOnlyVertices)
     EXPECT_FALSE(raw.all_of<GeometrySources::Edges>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::Halfedges>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::Faces>(entity));
-    EXPECT_FALSE(raw.all_of<GeometrySources::Nodes>(entity));
 }
 
 TEST(ECSGeometrySourcesPopulate, PopulateFromCloudWritesCanonicalPositionsAndNormals)
@@ -388,7 +504,7 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromCloudYieldsPointCloudDomain)
     EXPECT_EQ(view.VerticesAlive(), static_cast<std::size_t>(2));
 }
 
-TEST(ECSGeometrySourcesPopulate, PointCloudAvailabilityReportsVertexPointSource)
+TEST(ECSGeometrySourcesPopulate, PointCloudAvailabilityReportsVertexSource)
 {
     Registry scene;
     auto& raw = scene.Raw();
@@ -406,11 +522,10 @@ TEST(ECSGeometrySourcesPopulate, PointCloudAvailabilityReportsVertexPointSource)
     EXPECT_EQ(availability.ExactDomain, GeometrySources::Domain::PointCloud);
     EXPECT_EQ(availability.ProvenanceDomain, GeometrySources::Domain::PointCloud);
     EXPECT_TRUE(availability.HasPointCloudProvenance());
-    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::VertexPoints));
-    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::NodePoints));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Vertices));
     EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Edges));
     EXPECT_TRUE(availability.HasPointSource());
-    EXPECT_EQ(availability.VertexPointCount, static_cast<std::size_t>(2));
+    EXPECT_EQ(availability.VertexCount, static_cast<std::size_t>(2));
     EXPECT_EQ(availability.PointCount(), static_cast<std::size_t>(2));
 }
 
@@ -444,7 +559,7 @@ TEST(ECSGeometrySourcesPopulate, PartialMeshMarkedEntityKeepsMeshProvenanceWitho
     EXPECT_EQ(availability.ExactDomain, GeometrySources::Domain::Unknown);
     EXPECT_EQ(availability.ProvenanceDomain, GeometrySources::Domain::Mesh);
     EXPECT_TRUE(availability.HasMeshProvenance());
-    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::VertexPoints));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Vertices));
     EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Faces));
     EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Edges));
     EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Halfedges));
@@ -499,7 +614,6 @@ TEST(ECSGeometrySourcesPopulate, MeshToCloudRePopulationDropsMeshTopology)
     EXPECT_FALSE(raw.all_of<GeometrySources::Edges>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::Halfedges>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::Faces>(entity));
-    EXPECT_FALSE(raw.all_of<GeometrySources::Nodes>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::HasMeshTopology>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
 
@@ -521,7 +635,8 @@ TEST(ECSGeometrySourcesPopulate, GraphToCloudRePopulationDropsGraphState)
         (void)graph.AddEdge(v0, v1);
         GeometrySources::PopulateFromGraph(raw, entity, graph);
     }
-    ASSERT_TRUE(raw.all_of<GeometrySources::Nodes>(entity));
+    ASSERT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
+    ASSERT_TRUE(raw.all_of<GeometrySources::Halfedges>(entity));
     ASSERT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
     ASSERT_TRUE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
 
@@ -530,8 +645,8 @@ TEST(ECSGeometrySourcesPopulate, GraphToCloudRePopulationDropsGraphState)
     GeometrySources::PopulateFromCloud(raw, entity, cloud);
 
     EXPECT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
-    EXPECT_FALSE(raw.all_of<GeometrySources::Nodes>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::Edges>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Halfedges>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
 
     const auto view = GeometrySources::BuildConstView(raw, entity);
@@ -539,7 +654,7 @@ TEST(ECSGeometrySourcesPopulate, GraphToCloudRePopulationDropsGraphState)
     EXPECT_EQ(view.VerticesAlive(), static_cast<std::size_t>(1));
 }
 
-TEST(ECSGeometrySourcesPopulate, MeshToGraphRePopulationDropsMeshFacesAndHalfedges)
+TEST(ECSGeometrySourcesPopulate, MeshToGraphRePopulationReplacesSharedSources)
 {
     Registry scene;
     auto& raw = scene.Raw();
@@ -561,17 +676,17 @@ TEST(ECSGeometrySourcesPopulate, MeshToGraphRePopulationDropsMeshFacesAndHalfedg
     (void)graph.AddEdge(v1, v2);
     GeometrySources::PopulateFromGraph(raw, entity, graph);
 
-    EXPECT_TRUE(raw.all_of<GeometrySources::Nodes>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Halfedges>(entity));
     EXPECT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
     EXPECT_TRUE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
-    EXPECT_FALSE(raw.all_of<GeometrySources::Vertices>(entity));
-    EXPECT_FALSE(raw.all_of<GeometrySources::Halfedges>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::Faces>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::HasMeshTopology>(entity));
 
     const auto view = GeometrySources::BuildConstView(raw, entity);
     EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::Graph);
-    EXPECT_EQ(view.NodesAlive(), static_cast<std::size_t>(3));
+    EXPECT_EQ(view.VerticesAlive(), static_cast<std::size_t>(3));
+    EXPECT_EQ(view.HalfedgesTotal(), static_cast<std::size_t>(4));
     EXPECT_EQ(view.EdgesAlive(), static_cast<std::size_t>(2));
 }
 
@@ -595,7 +710,6 @@ TEST(ECSGeometrySourcesPopulate, CloudToMeshRePopulationProducesMeshDomain)
     EXPECT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
     EXPECT_TRUE(raw.all_of<GeometrySources::Halfedges>(entity));
     EXPECT_TRUE(raw.all_of<GeometrySources::Faces>(entity));
-    EXPECT_FALSE(raw.all_of<GeometrySources::Nodes>(entity));
     EXPECT_FALSE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
 
     // Vertex data must be the mesh's, not the prior point cloud's.

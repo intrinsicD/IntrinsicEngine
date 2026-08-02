@@ -13,6 +13,32 @@
 - Allowed: `core` and geometry handles/types only when explicitly justified.
 - Disallowed: direct dependency on graphics/runtime/app internals.
 
+## Geometry element-source components
+
+ECS geometry is materialized by physical element domain, independently of the
+entity's authored provenance:
+
+| Entity provenance | Required source components | Provenance signal |
+| --- | --- | --- |
+| Point cloud | `Vertices` | Exact vertex-only layout |
+| Graph | `Vertices`, `Halfedges`, `Edges` | `HasGraphTopology` |
+| Mesh | `Vertices`, `Halfedges`, `Edges`, `Faces` | Face-bearing layout; `HasMeshTopology` may retain provenance for an incomplete authored source |
+
+Each source owns its `Geometry::PropertySet`. `PopulateFromGraph` copies the
+graph's real vertex, halfedge, and edge property sets; its `Halfedges` source
+retains the count-matched `h:connectivity` records (target vertex, next, and
+previous halfedge) and never invents mesh faces. Provenance signals do not
+stand in for missing source components.
+
+`BuildConstView` and `BuildMutableView` classify an exact complete layout.
+`BuildSourceAvailability` separately reports marker-derived provenance and the
+actually present `Vertices`, `Halfedges`, `Edges`, and `Faces` capabilities.
+Consumers ask for the least structured capability they need, so a point-span
+operation can use graph or mesh vertices without converting the entity or
+discarding topology. The canonical substitutability rules and their reduced-
+halfedge literature basis live in
+[Geometry API Style](geometry-api-style.md#ecs-element-domain-source-contract).
+
 ## Physics authoring boundary
 
 Physics layer ownership is accepted in

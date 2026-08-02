@@ -629,7 +629,7 @@ TEST(SceneDocumentModule,
 {
     TempSceneFile valid(
         "runtime172-lifetime.scene.json",
-        R"({"version":1,"entities":[{"id":0,"name":"Late"}]})");
+        R"({"version":2,"entities":[{"id":0,"name":"Late"}]})");
     const bool schedulerWasInitialized =
         Core::Tasks::Scheduler::IsInitialized();
     if (!schedulerWasInitialized)

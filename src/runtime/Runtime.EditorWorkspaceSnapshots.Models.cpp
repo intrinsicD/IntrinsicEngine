@@ -1958,11 +1958,15 @@ namespace {
             return EditorGeometryDomainModel{
                 .Domain = view.ActiveDomain,
                 .Valid = view.Valid(),
-                .VertexCount = view.VerticesAlive(),
+                .VertexCount = view.HasGraphTopologyMarker
+                    ? 0u
+                    : view.VerticesAlive(),
                 .EdgeCount = view.EdgesAlive(),
                 .HalfedgeCount = view.HalfedgesTotal(),
                 .FaceCount = view.FacesAlive(),
-                .NodeCount = view.NodesAlive(),
+                .NodeCount = view.HasGraphTopologyMarker
+                    ? view.VerticesAlive()
+                    : 0u,
             };
         }
 
@@ -2829,13 +2833,6 @@ namespace {
                 view.FaceSource != nullptr ? &view.FaceSource->Properties
                                            : nullptr,
                 view.FaceSource != nullptr ? view.FaceSource->NumDeleted
-                                           : 0u);
-            AppendPropertySetMetadataSignature(
-                signature,
-                5u,
-                view.NodeSource != nullptr ? &view.NodeSource->Properties
-                                           : nullptr,
-                view.NodeSource != nullptr ? view.NodeSource->NumDeleted
                                            : 0u);
             return signature;
         }

@@ -767,7 +767,20 @@ performs the same reset/rebind before delayed events arrive and never
 resurrects state from the former world. Document operations retain their
 separate validated binding.
 
-Scene JSON remains backend-neutral. Supported persistence is limited to current
+Runtime geometry extraction, method readiness, property resolution, history,
+and editor snapshots consume the shared ECS element sources through
+`BuildSourceAvailability`. Physical capability and semantic provenance remain
+separate: mesh vertices, graph nodes, and point-cloud points all resolve through
+`VertexSource`, while logical `GraphNode` publication additionally requires
+graph provenance. Graph algorithms that need adjacency read the real
+`HalfedgeSource` `h:connectivity` property; runtime does not reconstruct it from
+edge endpoints or convert the entity into another geometry kind.
+
+Scene JSON version 2 remains backend-neutral. Version 2 makes graph halfedge
+connectivity mandatory so a loaded graph satisfies the same
+`Vertices + Halfedges + Edges` source contract as a freshly materialized one.
+Version 1 is rejected rather than upgraded by synthesizing topology. Supported
+persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
 selection eligibility, render hints, visualization configs, authored
 `GeometryPresentationRecipe` values, and mesh/graph/point-cloud

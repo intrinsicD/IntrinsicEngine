@@ -1533,3 +1533,23 @@ observations:
     promoted_to: "logic/claims.md:C17"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O96
+    timestamp: "2026-08-02T20:34+02:00"
+    provenance: ai-executed
+    content: >
+      ECS geometry materialization now uses one physical element-source
+      matrix: point clouds expose Vertices; graphs expose Vertices, Halfedges,
+      and Edges; meshes additionally expose Faces. Graph provenance remains a
+      separate marker, and graph halfedges preserve real connectivity without
+      duplicate Nodes storage, fabricated faces, or a domain converter.
+    context: >
+      HARDEN-087 replaced the contradictory graph-only Nodes layout and
+      migrated runtime availability, method bindings, extraction, editing,
+      scene serialization, and Sandbox models. Focused, complete CPU, ASan,
+      and UBSan contracts passed; no GPU/Vulkan or performance claim is made.
+    potential_type: claim
+    bound_to: [N330]
+    promoted: true
+    promoted_to: "logic/claims.md:C18"
+    crystallized_via: artifact-commitment
+    stale: false

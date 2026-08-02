@@ -95,8 +95,8 @@ The element-domain rows in
 [`geometry-api-style.md`](geometry-api-style.md#ecs-element-domain-source-contract)
 govern geometry methods. In particular, a point-span method accepts the logical
 `Vertices` role of point-cloud, graph, and mesh entities without conversion
-(`HARDEN-087` owns the remaining physical graph `Nodes` migration). Requiring
-stronger topology is correct only when the public method contract requires it.
+through their shared ECS `Vertices` source. Requiring stronger topology is
+correct only when the public method contract requires it.
 Input eligibility and result publication are separate decisions:
 a same-cardinality property may publish in place, while a topology/cardinality
 change requires an explicit owning operation and must not silently discard

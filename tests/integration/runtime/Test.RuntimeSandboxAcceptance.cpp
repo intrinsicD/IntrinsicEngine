@@ -35,6 +35,7 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Bootstrap;
@@ -67,6 +68,7 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
+import Geometry.Graph;
 import Geometry.Properties;
 
 namespace ECS = Extrinsic::ECS;
@@ -191,13 +193,13 @@ namespace
         auto& raw = scene.Raw();
         raw.emplace<G::RenderEdges>(entity);
 
-        auto& nodes = raw.emplace<gs::Nodes>(entity);
-        SetPositions(nodes.Properties, {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}});
-        auto& edges = raw.emplace<gs::Edges>(entity);
-        edges.Properties.Resize(2);
-        edges.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kEdgeV0}, kInvalidIndex).Vector() = {0u, 1u};
-        edges.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kEdgeV1}, kInvalidIndex).Vector() = {1u, 2u};
-        raw.emplace<gs::HasGraphTopology>(entity);
+        Geometry::Graph::Graph graph{};
+        const auto v0 = graph.AddVertex({0.f, 0.f, 0.f});
+        const auto v1 = graph.AddVertex({1.f, 0.f, 0.f});
+        const auto v2 = graph.AddVertex({0.f, 1.f, 0.f});
+        (void)graph.AddEdge(v0, v1);
+        (void)graph.AddEdge(v1, v2);
+        gs::PopulateFromGraph(raw, entity, graph);
         return entity;
     }
 

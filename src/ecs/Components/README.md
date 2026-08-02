@@ -134,7 +134,7 @@ drain that `RenderSync::OnUpdate` produces and `RenderExtraction` consumes
 
 `HARDEN-065` slice 2 closed the borrowed-vs-owned decision for promoted
 `GeometrySources`: the per-domain components (`Vertices`, `Edges`,
-`Halfedges`, `Faces`, `Nodes`) now own a `Geometry::PropertySet` directly,
+`Halfedges`, `Faces`) now own a `Geometry::PropertySet` directly,
 matching the legacy `ECS::Components::GeometrySources` shape. The entity is
 the authoritative CPU geometry source after a `PopulateFrom*` call, so the
 originating mesh/graph/cloud object can be discarded without invalidating
@@ -150,13 +150,12 @@ implemented in the matching `.cpp`):
   properties (colors, labels, vector fields, …) survive the promotion.
   Canonical keys: `v:position`, `e:v0`/`e:v1`, `h:to_vertex`/`h:next`/
   `h:face`, `f:halfedge`.
-- `PopulateFromGraph(registry, entity, graph)` — emplaces `Nodes` and
-  `Edges` plus the `HasGraphTopology` marker (graph halfedges remain
-  internal to `Geometry::Graph` and are not promoted to GeometrySources;
-  the marker lets `BuildConstView`/`BuildMutableView` resolve
-  `Domain::Graph` without a `Halfedges` PropertySet). Calls
-  `graph.GarbageCollection()` if `HasGarbage()` so the resulting
-  PropertySets are contiguous.
+- `PopulateFromGraph(registry, entity, graph)` — emplaces `Vertices`,
+  `Halfedges`, and `Edges` plus the `HasGraphTopology` provenance marker.
+  The graph's real count-matched `h:connectivity` halfedge property is copied
+  with all custom properties; no face adjacency or `Faces` component is
+  invented. Calls `graph.GarbageCollection()` if `HasGarbage()` so the
+  resulting PropertySets are contiguous.
 - `PopulateFromCloud(registry, entity, cloud)` — emplaces `Vertices` with
   canonical `v:position` (and `v:normal` when `HasNormals()`), preserving
   the full `PointProperties()` PropertySet.
@@ -165,7 +164,8 @@ Canonical key constants live in
 `Extrinsic.ECS.Components.GeometrySources::PropertyNames`
 (`kPosition`, `kNormal`, `kMeanCurvature`, `kGaussianCurvature`,
 `kPrincipalDir1`, `kPrincipalDir2`, `kEdgeV0`, `kEdgeV1`,
-`kHalfedgeToVertex`, `kHalfedgeNext`, `kHalfedgeFace`, `kFaceHalfedge`);
+`kHalfedgeToVertex`, `kHalfedgeNext`, `kHalfedgeFace`,
+`kHalfedgeConnectivity`, `kFaceHalfedge`);
 read sites must prefer these constants over inline string literals.
 The curvature keys are mesh-vertex properties published by the runtime/editor
 curvature command: `v:mean_curvature` and `v:gaussian_curvature` store
@@ -179,13 +179,13 @@ exclusive domain, while partial or mixed source sets resolve to `Unknown`.
 Use `BuildSourceAvailability` when a consumer needs to know which CPU sources
 are actually present. The availability contract reports provenance (`Mesh`,
 `Graph`, `PointCloud`, `Unknown`) separately from capabilities
-(`VertexPoints`, `NodePoints`, `Edges`, `Halfedges`, `Faces`), so a mesh can
+(`Vertices`, `Edges`, `Halfedges`, `Faces`), so a mesh can
 satisfy point/edge consumers without pretending to be a point cloud or graph,
-and graph entities populated without a `Halfedges` property set do not
-advertise halfedge-source availability.
+while graph and mesh entities expose the same physical vertex/halfedge/edge
+source types without losing their separate provenance.
 
 Each populate helper drops the entity's prior `GeometrySources`
-components (`Vertices`/`Edges`/`Halfedges`/`Faces`/`Nodes`) and
+components (`Vertices`/`Edges`/`Halfedges`/`Faces`) and
 topology markers (`HasMeshTopology`/`HasGraphTopology`) before
 emplacing the new domain, so a re-population from a different
 domain (mesh→cloud, graph→cloud, mesh→graph, etc.) cannot leak stale

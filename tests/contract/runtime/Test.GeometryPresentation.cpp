@@ -7,10 +7,12 @@
 #include <glm/glm.hpp>
 
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.GeometryPresentation;
+import Geometry.Graph;
 
 namespace ECS = Extrinsic::ECS;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
@@ -85,29 +87,22 @@ namespace
         const ECS::EntityHandle entity =
             ECS::Scene::CreateDefault(scene, "presentation graph");
         auto& raw = scene.Raw();
-        auto& nodes = raw.emplace<GS::Nodes>(entity);
-        nodes.Properties.Resize(2u);
-        nodes.Properties
-            .GetOrAdd<glm::vec3>("v:position", glm::vec3{0.0f})
-            .Vector() = {{0.0f, 0.0f, 0.0f},
-                         {1.0f, 0.0f, 0.0f}};
+        Geometry::Graph::Graph graph{};
+        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+        (void)graph.AddEdge(v0, v1);
+        GS::PopulateFromGraph(raw, entity, graph);
+
+        auto& nodes = raw.get<GS::Vertices>(entity);
         nodes.Properties
             .GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f})
             .Vector() = {{1.0f, 0.0f, 0.0f, 1.0f},
                          {0.0f, 1.0f, 0.0f, 1.0f}};
 
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        edges.Properties.Resize(1u);
-        edges.Properties
-            .GetOrAdd<std::uint32_t>("e:v0", 0u)
-            .Vector() = {0u};
-        edges.Properties
-            .GetOrAdd<std::uint32_t>("e:v1", 0u)
-            .Vector() = {1u};
+        auto& edges = raw.get<GS::Edges>(entity);
         edges.Properties
             .GetOrAdd<glm::vec4>("e:color", glm::vec4{1.0f})
             .Vector() = {{0.0f, 0.0f, 1.0f, 1.0f}};
-        raw.emplace<GS::HasGraphTopology>(entity);
         return entity;
     }
 

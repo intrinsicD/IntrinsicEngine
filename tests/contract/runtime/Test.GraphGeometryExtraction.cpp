@@ -2,7 +2,6 @@
 #include <limits>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
@@ -12,6 +11,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -28,6 +28,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
+import Geometry.Graph;
 import Geometry.Properties;
 
 namespace gs = Extrinsic::ECS::Components::GeometrySources;
@@ -57,8 +58,6 @@ namespace
         engine.Initialize();
     }
 
-    constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
-
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -67,52 +66,27 @@ namespace
         return config;
     }
 
-    void SetNodePositions(gs::Nodes& n, const std::vector<glm::vec3>& positions)
-    {
-        n.Properties.Resize(positions.size());
-        auto pos = n.Properties.GetOrAdd<glm::vec3>(std::string{pn::kPosition}, glm::vec3(0.0f));
-        pos.Vector() = positions;
-    }
-
-    void SetEdges(gs::Edges& e,
-                  const std::vector<std::uint32_t>& v0,
-                  const std::vector<std::uint32_t>& v1)
-    {
-        e.Properties.Resize(v0.size());
-        auto p0 = e.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kEdgeV0}, kInvalidIndex);
-        auto p1 = e.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kEdgeV1}, kInvalidIndex);
-        p0.Vector() = v0;
-        p1.Vector() = v1;
-    }
-
-    // Attach a graph `GeometrySources` (Nodes [+ Edges] + HasGraphTopology) to
-    // `entity` so `BuildConstView` resolves `Domain::Graph`. The
-    // `HasGraphTopology` marker stands in for the (graph-irrelevant) halfedge
-    // domain so `DetectDomain` resolves a graph without a `Halfedges`
-    // PropertySet, matching `PopulateFromGraph`.
+    // Attach the canonical graph source matrix (Vertices + Halfedges + Edges)
+    // and separate provenance marker so `BuildConstView` resolves Graph.
     void AttachLineGraphSources(Registry& scene, EntityHandle entity)
     {
         auto& raw = scene.Raw();
-        auto& nodes = raw.emplace<gs::Nodes>(entity);
-        SetNodePositions(nodes, {
-            {0.0f, 0.0f, 0.0f},
-            {1.0f, 0.0f, 0.0f},
-            {0.0f, 1.0f, 0.0f},
-        });
-        auto& edges = raw.emplace<gs::Edges>(entity);
-        SetEdges(edges, /*v0*/ {0u, 1u}, /*v1*/ {1u, 2u});
-        raw.emplace<gs::HasGraphTopology>(entity);
+        Geometry::Graph::Graph graph{};
+        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+        const auto v2 = graph.AddVertex({0.0f, 1.0f, 0.0f});
+        (void)graph.AddEdge(v0, v1);
+        (void)graph.AddEdge(v1, v2);
+        gs::PopulateFromGraph(raw, entity, graph);
     }
 
     void AttachPointGraphSources(Registry& scene, EntityHandle entity)
     {
         auto& raw = scene.Raw();
-        auto& nodes = raw.emplace<gs::Nodes>(entity);
-        SetNodePositions(nodes, {
-            {0.0f, 0.0f, 0.0f},
-            {1.0f, 0.0f, 0.0f},
-        });
-        raw.emplace<gs::HasGraphTopology>(entity);
+        Geometry::Graph::Graph graph{};
+        (void)graph.AddVertex({0.0f, 0.0f, 0.0f});
+        (void)graph.AddVertex({1.0f, 0.0f, 0.0f});
+        gs::PopulateFromGraph(raw, entity, graph);
     }
 
     EntityHandle MakeLineGraphRenderable(Registry& scene)
@@ -548,8 +522,10 @@ TEST(GraphGeometryExtraction, MissingNodePositionsIncrementsMissingNodesCounter)
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
     raw.emplace<G::RenderPoints>(entity);
-    // Graph-domain sources but the Nodes PropertySet carries no `v:position`.
-    (void)raw.emplace<gs::Nodes>(entity);
+    // Graph-domain sources but the Vertices PropertySet carries no `v:position`.
+    (void)raw.emplace<gs::Vertices>(entity);
+    (void)raw.emplace<gs::Halfedges>(entity);
+    (void)raw.emplace<gs::Edges>(entity);
     raw.emplace<gs::HasGraphTopology>(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -582,12 +558,14 @@ TEST(GraphGeometryExtraction, OutOfRangeEdgeIncrementsInvalidEdgesCounter)
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
     raw.emplace<G::RenderEdges>(entity);
-    auto& nodes = raw.emplace<gs::Nodes>(entity);
-    SetNodePositions(nodes, {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}});
-    auto& edges = raw.emplace<gs::Edges>(entity);
+    Geometry::Graph::Graph graph{};
+    const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+    (void)graph.AddEdge(v0, v1);
+    gs::PopulateFromGraph(raw, entity, graph);
+    auto& edges = raw.get<gs::Edges>(entity);
     // Endpoint 7 indexes past the two-node range.
-    SetEdges(edges, /*v0*/ {0u}, /*v1*/ {7u});
-    raw.emplace<gs::HasGraphTopology>(entity);
+    edges.Properties.Get<std::uint32_t>(pn::kEdgeV1).Vector()[0] = 7u;
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
@@ -723,8 +701,9 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
     // must release even though no procedural / asset path took over. A
     // `RenderSurface` hint keeps the entity a renderable candidate.
     auto& raw = scene.Raw();
-    raw.remove<gs::Nodes>(entity);
+    raw.remove<gs::Vertices>(entity);
     raw.remove<gs::Edges>(entity);
+    raw.remove<gs::Halfedges>(entity);
     raw.remove<gs::HasGraphTopology>(entity);
     raw.remove<G::RenderEdges>(entity);
     raw.emplace<G::RenderSurface>(entity);
@@ -1042,7 +1021,7 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
 
     // Corrupt a node position to non-finite, then mark vertex positions dirty so
     // the next graph plan build returns NonFinitePosition (folded into FailedPack).
-    auto& nodes = raw.get<gs::Nodes>(entity);
+    auto& nodes = raw.get<gs::Vertices>(entity);
     auto pos = nodes.Properties.GetOrAdd<glm::vec3>(std::string{pn::kPosition}, glm::vec3(0.0f));
     pos.Vector() = {
         {0.0f, 0.0f, 0.0f},

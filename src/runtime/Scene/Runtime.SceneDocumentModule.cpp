@@ -206,9 +206,6 @@ namespace Extrinsic::Runtime
                 CopySerializableComponent<GS::Faces>(
                     sourceRaw, destinationRaw,
                     sourceEntity, destinationEntity);
-                CopySerializableComponent<GS::Nodes>(
-                    sourceRaw, destinationRaw,
-                    sourceEntity, destinationEntity);
                 CopySerializableTag<GS::HasMeshTopology>(
                     sourceRaw, destinationRaw,
                     sourceEntity, destinationEntity);

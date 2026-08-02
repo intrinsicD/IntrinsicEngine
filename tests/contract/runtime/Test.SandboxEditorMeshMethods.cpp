@@ -102,6 +102,7 @@ import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph.Vertex.Normals;
+import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.Vertices.Normals;
@@ -186,16 +187,6 @@ void AddPointCloudSource(ECS::Scene::Registry& registry,
         auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
         vertices.Properties.Resize(pointCount);
         registry.Raw().emplace<G::RenderPoints>(entity);
-    }
-
-void SetNodePositions(GS::Nodes& nodes,
-                          const std::vector<glm::vec3>& positions)
-    {
-        nodes.Properties.Resize(positions.size());
-        auto pos = nodes.Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f});
-        pos.Vector() = positions;
     }
 
 void SetPositions(GS::Vertices& vertices,
@@ -552,17 +543,16 @@ void AddPlanarCycleGraphSource(ECS::Scene::Registry& registry,
                                    const ECS::EntityHandle entity)
     {
         auto& raw = registry.Raw();
-        auto& nodes = raw.emplace<GS::Nodes>(entity);
-        SetNodePositions(nodes,
-                         {
-                             {0.0f, 0.0f, 0.0f},
-                             {1.0f, 0.0f, 0.0f},
-                             {1.0f, 1.0f, 0.0f},
-                             {0.0f, 1.0f, 0.0f},
-                         });
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        SetEdges(edges, {0u, 1u, 2u, 3u}, {1u, 2u, 3u, 0u});
-        raw.emplace<GS::HasGraphTopology>(entity);
+        Geometry::Graph::Graph graph{};
+        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+        const auto v2 = graph.AddVertex({1.0f, 1.0f, 0.0f});
+        const auto v3 = graph.AddVertex({0.0f, 1.0f, 0.0f});
+        (void)graph.AddEdge(v0, v1);
+        (void)graph.AddEdge(v1, v2);
+        (void)graph.AddEdge(v2, v3);
+        (void)graph.AddEdge(v3, v0);
+        GS::PopulateFromGraph(raw, entity, graph);
         raw.emplace<G::RenderEdges>(entity);
         raw.emplace<G::RenderPoints>(entity);
     }
@@ -3032,7 +3022,7 @@ TEST(SandboxEditorUi,
 
     const ECS::EntityHandle graph = MakeSelectable(registry, "QueuedGraphNormals");
     AddPlanarCycleGraphSource(registry, graph);
-    auto& graphProperties = registry.Raw().get<GS::Nodes>(graph).Properties;
+    auto& graphProperties = registry.Raw().get<GS::Vertices>(graph).Properties;
     ASSERT_FALSE(graphProperties.Exists(PN::kNormal));
 
     const Runtime::EditorGraphVertexNormalsResult graphResult =
@@ -3240,7 +3230,7 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
         EXPECT_EQ(done.Entries[0].State,
                   Runtime::JobState::StaleDiscarded);
         EXPECT_FALSE(completedSinkCalled);
-        EXPECT_FALSE(registry.Raw().get<GS::Nodes>(graph)
+        EXPECT_FALSE(registry.Raw().get<GS::Vertices>(graph)
                          .Properties.Exists(PN::kNormal));
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
     }
@@ -4086,7 +4076,7 @@ TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNor
     EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(graph));
 
     auto graphNormals = registry.Raw()
-                            .get<GS::Nodes>(graph)
+                            .get<GS::Vertices>(graph)
                             .Properties.Get<glm::vec3>(PN::kNormal);
     ASSERT_TRUE(graphNormals);
     ASSERT_EQ(graphNormals.Vector().size(), 4u);
@@ -4243,7 +4233,7 @@ TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsFailClosedForInvali
         MakeSelectable(registry, "GraphConflict");
     AddPlanarCycleGraphSource(registry, graphConflict);
     auto graphConflictNormals = registry.Raw()
-                                    .get<GS::Nodes>(graphConflict)
+                                    .get<GS::Vertices>(graphConflict)
                                     .Properties.GetOrAdd<float>(
                                         std::string{PN::kNormal},
                                         0.0f);
@@ -4264,7 +4254,7 @@ TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsFailClosedForInvali
     EXPECT_FALSE(
         registry.Raw().all_of<Dirty::DirtyVertexNormals>(graphConflict));
     EXPECT_TRUE(registry.Raw()
-                    .get<GS::Nodes>(graphConflict)
+                    .get<GS::Vertices>(graphConflict)
                     .Properties.Get<float>(PN::kNormal));
 
     const ECS::EntityHandle meshWrongDomain =

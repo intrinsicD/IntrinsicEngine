@@ -125,7 +125,7 @@ namespace Extrinsic::Runtime
                 result.Status = GeometryAvailabilityStatus::UnsupportedProvenance;
                 return result;
             }
-            if (!has(GS::SourceCapability::VertexPoints))
+            if (!has(GS::SourceCapability::Vertices))
             {
                 result.Status = GeometryAvailabilityStatus::MissingPointSource;
                 return result;
@@ -243,8 +243,8 @@ namespace Extrinsic::Runtime
                 ? &view.FaceSource->Properties
                 : nullptr;
         case GeometryElementDomain::GraphNode:
-            return sources.ProvenanceDomain == GS::Domain::Graph && view.NodeSource
-                ? &view.NodeSource->Properties
+            return sources.ProvenanceDomain == GS::Domain::Graph && view.VertexSource
+                ? &view.VertexSource->Properties
                 : nullptr;
         case GeometryElementDomain::GraphEdge:
             return sources.ProvenanceDomain == GS::Domain::Graph && view.EdgeSource

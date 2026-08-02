@@ -189,13 +189,13 @@ namespace Extrinsic::Runtime
             {
             case GeometryElementDomain::MeshVertex:
                 return sources.ProvenanceDomain == GS::Domain::Mesh &&
-                       sources.Has(GS::SourceCapability::VertexPoints);
+                       sources.Has(GS::SourceCapability::Vertices);
             case GeometryElementDomain::GraphNode:
                 return sources.ProvenanceDomain == GS::Domain::Graph &&
-                       sources.Has(GS::SourceCapability::NodePoints);
+                       sources.Has(GS::SourceCapability::Vertices);
             case GeometryElementDomain::PointCloudPoint:
                 return sources.ProvenanceDomain == GS::Domain::PointCloud &&
-                       sources.Has(GS::SourceCapability::VertexPoints);
+                       sources.Has(GS::SourceCapability::Vertices);
             default: break;
             }
             return false;
@@ -213,7 +213,7 @@ namespace Extrinsic::Runtime
                     ? &view.VertexSource->Properties
                     : nullptr;
             case GeometryElementDomain::GraphNode:
-                return view.NodeSource != nullptr ? &view.NodeSource->Properties
+                return view.VertexSource != nullptr ? &view.VertexSource->Properties
                                                   : nullptr;
             default: break;
             }

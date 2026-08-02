@@ -65,15 +65,23 @@ not only by import provenance:
 | `Edges` | graph, mesh |
 | `Faces` | mesh |
 
-Current implementation caveat (tracked by `HARDEN-087`): graph population still
-materializes `Nodes + Edges + HasGraphTopology` and intentionally omits a graph
-`Halfedges` component, as recorded by retired `HARDEN-065`. Until
-`HARDEN-087` retires, canonical source resolution treats `NodePoints` and
-`VertexPoints` as the same logical vertex-role capability; operations that
-genuinely require graph halfedges remain unavailable rather than fabricating
-them. `HARDEN-087` owns converging the physical storage on the table above and
-retiring the graph-only `Nodes` split. This caveat is not permission for method
-bindings to use exact point-cloud provenance.
+The implementation matches this matrix. `PopulateFromGraph` materializes the
+graph's existing vertex, halfedge, and edge property sets as `Vertices`,
+`Halfedges`, and `Edges`, then stamps `HasGraphTopology` as provenance. Graph
+halfedges preserve the count-matched `h:connectivity` property
+(`Geometry::Graph::HalfedgeConnectivity`, containing target vertex plus
+next/previous halfedge handles); they do not fabricate mesh face adjacency or a
+`Faces` component. `HARDEN-087` explicitly supersedes the bounded graph-only
+`Nodes` layout recorded by `HARDEN-065` and retains the provenance-versus-
+capability separation introduced by `HARDEN-083` with one physical `Vertices`
+capability.
+
+This representation follows the reduced halfedge model described by Kettner,
+where undirected graphs need not carry face records, and the independent
+per-element property model used by OpenMesh. See Kettner's
+[generic halfedge design](https://doi.org/10.1016/S0925-7721(99)00007-3), the
+[CGAL `HalfedgeDS` description](https://doc.cgal.org/Manual/3.3/doc_html/cgal_manual/HalfedgeDS/Chapter_main.html),
+and the [OpenMesh paper](https://www.graphics.rwth-aachen.de/publication/03130/).
 
 The rows are a substitutability contract. If an algorithm's public input is
 only a point/vertex span, runtime eligibility, config commands, and UI discovery

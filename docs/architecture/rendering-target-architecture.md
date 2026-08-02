@@ -986,7 +986,7 @@ Each ECS system has exactly **one responsibility**. Systems are registered in `R
 |--------|-------|--------|-------------|
 | `PropertySetDirtySyncSystem` | `DirtyTag::*` components | `GpuDirty` flag, escalated dirty tags | Translates domain dirty tags (vertex/edge/face) into `GpuDirty`. Attribute-only changes extract cached color/radius vectors without full re-upload. |
 | `MeshRendererLifecycleSystem` | `DataAuthority::MeshTag`, `GeometrySources::*`, `GpuDirty` | `GpuWorld::GeoStore` (managed buffer region), `BufferView`, `Surface::Component`, instance slot | Phase 1: upload geometry to managed buffers. Phase 2: allocate/update instance slot + AABB. Phase 3: populate `Surface::Component`. No `Mesh::Data` — reads directly from GeometrySources. |
-| `GraphLifecycleSystem` | `DataAuthority::GraphTag`, `GeometrySources::Nodes/Edges`, `GpuDirty` | `GpuWorld::GeoStore`, `BufferView`, `Line::Component`, `Point::Component`, instance slot | Same three phases as mesh lifecycle, for graph edge pairs and node positions. Upload mode selected per-entity by `ECS::StaticTag` presence. No `Graph::Data` — reads directly from GeometrySources. |
+| `GraphLifecycleSystem` | `DataAuthority::GraphTag`, `GeometrySources::Vertices/Halfedges/Edges`, `GpuDirty` | `GpuWorld::GeoStore`, `BufferView`, `Line::Component`, `Point::Component`, instance slot | Same three phases as mesh lifecycle, for graph edge pairs and node positions. Upload mode selected per-entity by `ECS::StaticTag` presence. No `Graph::Data` — reads directly from GeometrySources. |
 | `PointCloudLifecycleSystem` | `DataAuthority::PointCloudTag`, `GeometrySources::Vertices`, `GpuDirty` | `GpuWorld::GeoStore`, `BufferView`, `Point::Component`, instance slot | Reads positions/normals spans from GeometrySources zero-copy, uploads via Staged mode. No `PointCloud::Data`. |
 | `GPUSceneSyncSystem` | `Transform::Component` changes | `GpuWorld::InstanceBuffer` (model matrix) | Transform-only updates: writes model matrix to instance slot without re-uploading geometry. |
 | `EntityConfigSyncSystem` | `Visualization::Config`, `GeometrySources`, `BufferView`, render components | `GpuWorld::EntityConfigBuffer` (BDA ptrs, vis config) | Syncs the `GpuEntityConfig` record when any per-entity visualization or attribute config changes. Uploads attribute SSBOs (normals, scalar props, color props) and writes BDA pointers. Does NOT touch `GpuInstanceData` (transforms are handled by `GPUSceneSyncSystem`). |
@@ -1248,7 +1248,7 @@ The UI discovers what an entity can display by inspecting which `GeometrySources
 Entity has GeometrySources::Vertices → show vertex domain UI
 Entity has GeometrySources::Edges    → show edge domain UI
 Entity has GeometrySources::Faces    → show face domain UI
-Entity has GeometrySources::Nodes    → show graph node domain UI
+Entity has HasGraphTopology + Vertices → show graph node domain UI
 ```
 
 For each domain, the Inspector enumerates all properties in that domain's `PropertySet` and groups them by value type:

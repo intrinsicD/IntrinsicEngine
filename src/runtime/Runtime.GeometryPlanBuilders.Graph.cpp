@@ -99,11 +99,11 @@ namespace Extrinsic::Runtime
             return Failure(GraphPackStatus::NoRenderLane, outBuffer);
         }
 
-        if (view.NodeSource == nullptr)
+        if (view.VertexSource == nullptr)
         {
             return Failure(GraphPackStatus::MissingNodes, outBuffer);
         }
-        const auto posProp = view.NodeSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
+        const auto posProp = view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
         if (!posProp)
         {
             return Failure(GraphPackStatus::MissingNodes, outBuffer);
@@ -202,7 +202,7 @@ namespace Extrinsic::Runtime
             };
             const AttributeBindResult normalResult =
                 ResolveVec3Channel(
-                    view.NodeSource->Properties,
+                    view.VertexSource->Properties,
                     normalBinding,
                     nodeCountU32,
                     normals);
@@ -237,7 +237,7 @@ namespace Extrinsic::Runtime
                 };
                 const AttributeBindResult colorResult =
                     ResolveColorChannelPackedUnorm8(
-                        view.NodeSource->Properties,
+                        view.VertexSource->Properties,
                         colorBinding,
                         nodeCountU32,
                         outBuffer.PackedColors);

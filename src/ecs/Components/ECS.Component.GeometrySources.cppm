@@ -17,7 +17,7 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     // All lifecycle systems and attribute-sync systems must read from these
     // well-known keys, regardless of the originating geometry type.
     //
-    // Domain: Vertices (mesh vertex OR point-cloud point)
+    // Domain: Vertices (mesh vertex, graph node, OR point-cloud point)
     //   "v:position"           – glm::vec3  mandatory canonical position
     //   "v:normal"             – glm::vec3  optional surface / point-cloud normal
     //   "v:mean_curvature"     – double     optional mean curvature scalar
@@ -25,15 +25,14 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     //   "v:principal_dir1"     – glm::vec3  optional max-principal tangent direction
     //   "v:principal_dir2"     – glm::vec3  optional min-principal tangent direction
     //
-    // Domain: Nodes (graph node)
-    //   "v:position"  – glm::vec3  same canonical key as above (node pos)
-    //   "v:normal"    – glm::vec3  optional, defaults to world-up on graphs
-    //
     // Domain: Edges (mesh or graph)
     //   "e:v0"        – uint32_t   index of first  endpoint vertex / node
     //   "e:v1"        – uint32_t   index of second endpoint vertex / node
     //
-    // Domain: Halfedges (mesh only)
+    // Domain: Halfedges (mesh or graph)
+    //   Graph sources preserve the graph's real `h:connectivity`
+    //   (`Geometry::Graph::HalfedgeConnectivity`) property and never invent a
+    //   face channel. Mesh sources additionally expose the canonical keys:
     //   "h:to_vertex" – uint32_t   index of the halfedge's target vertex
     //   "h:next"      – uint32_t   index of the next halfedge around its face
     //   "h:face"      – uint32_t   index of the adjacent face (UINT32_MAX = boundary)
@@ -56,6 +55,7 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         constexpr std::string_view kHalfedgeToVertex  = "h:to_vertex";
         constexpr std::string_view kHalfedgeNext      = "h:next";
         constexpr std::string_view kHalfedgeFace      = "h:face";
+        constexpr std::string_view kHalfedgeConnectivity = "h:connectivity";
 
         constexpr std::string_view kFaceHalfedge      = "f:halfedge";
     }
@@ -87,15 +87,9 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         std::size_t NumDeleted{0};
     };
 
-    struct Nodes
-    {
-        Geometry::PropertySet Properties{};
-        std::size_t NumDeleted{0};
-    };
-
-    // Topology markers — let callers declare "this entity is a mesh / graph"
-    // even when not every per-domain `PropertySet` has been emplaced (e.g.,
-    // `PopulateFromGraph` populates `Nodes`+`Edges` without halfedges).
+    // Topology markers carry provenance independently of the element-source
+    // component matrix. They allow partial sources to retain their authored
+    // identity without pretending that a missing component is present.
     struct HasMeshTopology
     {
     };
@@ -116,11 +110,10 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     enum class SourceCapability : std::uint32_t
     {
         None = 0u,
-        VertexPoints = 1u << 0u,
-        NodePoints = 1u << 1u,
-        Edges = 1u << 2u,
-        Halfedges = 1u << 3u,
-        Faces = 1u << 4u,
+        Vertices = 1u << 0u,
+        Edges = 1u << 1u,
+        Halfedges = 1u << 2u,
+        Faces = 1u << 3u,
     };
 
     [[nodiscard]] constexpr SourceCapability operator|(
@@ -180,11 +173,6 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         return AliveCount(source.Properties.Size(), source.NumDeleted);
     }
 
-    [[nodiscard]] inline std::size_t NodeCount(const Nodes& source) noexcept
-    {
-        return AliveCount(source.Properties.Size(), source.NumDeleted);
-    }
-
     struct ConstSourceView
     {
         Domain ActiveDomain{Domain::None};
@@ -195,7 +183,6 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         const Edges* EdgeSource{nullptr};
         const Halfedges* HalfedgeSource{nullptr};
         const Faces* FaceSource{nullptr};
-        const Nodes* NodeSource{nullptr};
 
         [[nodiscard]] bool Valid() const noexcept
         {
@@ -221,11 +208,6 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         {
             return FaceSource ? FaceCount(*FaceSource) : 0;
         }
-
-        [[nodiscard]] std::size_t NodesAlive() const noexcept
-        {
-            return NodeSource ? NodeCount(*NodeSource) : 0;
-        }
     };
 
     struct MutableSourceView
@@ -238,7 +220,6 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         Edges* EdgeSource{nullptr};
         Halfedges* HalfedgeSource{nullptr};
         Faces* FaceSource{nullptr};
-        Nodes* NodeSource{nullptr};
 
         [[nodiscard]] bool Valid() const noexcept
         {
@@ -252,8 +233,7 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         Domain ProvenanceDomain{Domain::None};
         SourceCapability Capabilities{SourceCapability::None};
 
-        std::size_t VertexPointCount{0};
-        std::size_t NodePointCount{0};
+        std::size_t VertexCount{0};
         std::size_t EdgeCount{0};
         std::size_t HalfedgeCount{0};
         std::size_t FaceCount{0};
@@ -265,13 +245,12 @@ export namespace Extrinsic::ECS::Components::GeometrySources
 
         [[nodiscard]] bool HasPointSource() const noexcept
         {
-            return Has(SourceCapability::VertexPoints) ||
-                   Has(SourceCapability::NodePoints);
+            return Has(SourceCapability::Vertices);
         }
 
         [[nodiscard]] std::size_t PointCount() const noexcept
         {
-            return VertexPointCount + NodePointCount;
+            return VertexCount;
         }
 
         [[nodiscard]] bool HasMeshProvenance() const noexcept
@@ -294,7 +273,8 @@ export namespace Extrinsic::ECS::Components::GeometrySources
                                       bool hasEdges,
                                       bool hasHalfedges,
                                       bool hasFaces,
-                                      bool hasNodes) noexcept;
+                                      bool hasMeshTopologyMarker,
+                                      bool hasGraphTopologyMarker) noexcept;
 
     [[nodiscard]] SourceAvailability BuildSourceAvailability(
         const ConstSourceView& view) noexcept;

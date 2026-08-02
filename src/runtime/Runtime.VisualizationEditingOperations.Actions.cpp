@@ -1221,7 +1221,7 @@ namespace {
                 return false;
 
             if (editsSurface &&
-                (!availability.Sources.Has(GS::SourceCapability::VertexPoints) ||
+                (!availability.Sources.Has(GS::SourceCapability::Vertices) ||
                  !availability.Sources.Has(GS::SourceCapability::Halfedges) ||
                  !availability.Sources.Has(GS::SourceCapability::Faces)))
                 return false;
@@ -1888,7 +1888,7 @@ namespace {
                 GS::BuildSourceAvailability(view);
             model.IsMesh =
                 availability.ProvenanceDomain == GS::Domain::Mesh &&
-                availability.Has(GS::SourceCapability::VertexPoints) &&
+                availability.Has(GS::SourceCapability::Vertices) &&
                 availability.Has(GS::SourceCapability::Halfedges) &&
                 availability.Has(GS::SourceCapability::Faces);
             if (!model.IsMesh)
@@ -1972,7 +1972,7 @@ namespace {
                 GS::BuildSourceAvailability(view);
             model.IsMesh =
                 availability.ProvenanceDomain == GS::Domain::Mesh &&
-                availability.Has(GS::SourceCapability::VertexPoints) &&
+                availability.Has(GS::SourceCapability::Vertices) &&
                 availability.Has(GS::SourceCapability::Halfedges) &&
                 availability.Has(GS::SourceCapability::Faces);
             model.HasRuntimeBakeCommand =

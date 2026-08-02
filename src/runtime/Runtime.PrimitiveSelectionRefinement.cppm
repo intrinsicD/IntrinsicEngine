@@ -18,7 +18,7 @@ export namespace Extrinsic::Runtime
 
     // Which authoritative CPU primitive the runtime resolved a GPU hint to.
     // A graph node is reported through the `Vertex` kind (nodes are stored in
-    // the `Nodes` PropertySet but indexed like vertices); a point-cloud point is
+    // the shared `Vertices` PropertySet with graph provenance); a point-cloud point is
     // reported through `Point`.
     enum class RefinedPrimitiveKind : std::uint8_t
     {

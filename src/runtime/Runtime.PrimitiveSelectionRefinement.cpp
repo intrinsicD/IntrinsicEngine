@@ -481,11 +481,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] PrimitiveSelectionResult RefineGraph(const ConstSourceView& view,
                                                            const PrimitiveRefineRequest& request)
         {
-            if (view.NodeSource == nullptr)
+            if (view.VertexSource == nullptr)
             {
                 return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
             }
-            const auto* positions = TryVector<glm::vec3>(view.NodeSource->Properties, pn::kPosition);
+            const auto* positions = TryVector<glm::vec3>(view.VertexSource->Properties, pn::kPosition);
             if (positions == nullptr)
             {
                 return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
@@ -660,7 +660,7 @@ namespace Extrinsic::Runtime
         switch (availability.ProvenanceDomain)
         {
             case Domain::Mesh:
-                if (availability.Has(SourceCapability::VertexPoints) &&
+                if (availability.Has(SourceCapability::Vertices) &&
                     availability.Has(SourceCapability::Halfedges) &&
                     availability.Has(SourceCapability::Faces))
                 {
@@ -668,14 +668,14 @@ namespace Extrinsic::Runtime
                 }
                 return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
             case Domain::Graph:
-                if (availability.Has(SourceCapability::NodePoints) &&
+                if (availability.Has(SourceCapability::Vertices) &&
                     availability.Has(SourceCapability::Edges))
                 {
                     return RefineGraph(view, request);
                 }
                 return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
             case Domain::PointCloud:
-                if (availability.Has(SourceCapability::VertexPoints))
+                if (availability.Has(SourceCapability::Vertices))
                     return RefinePointCloud(view, request);
                 return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
             case Domain::None:

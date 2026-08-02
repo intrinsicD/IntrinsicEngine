@@ -41,6 +41,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Geometry.Graph.Fwd;
 import Geometry.Properties;
 import Extrinsic.Runtime.GeometryPresentation;
 
@@ -178,7 +179,10 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        constexpr std::uint32_t kSceneDocumentVersion = 1u;
+        // Version 2 makes graph halfedge connectivity mandatory. Version 1
+        // graph documents contained only nodes and edges and cannot satisfy
+        // the unified source contract without synthesizing topology.
+        constexpr std::uint32_t kSceneDocumentVersion = 2u;
         constexpr std::uint32_t kInvalidSerializedId = 0xFFFFFFFFu;
 
         [[nodiscard]] std::uint32_t EntitySortKey(const ECS::EntityHandle entity) noexcept
@@ -1497,7 +1501,7 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] bool AddNodes(json& geometry, const GS::Nodes& nodes)
+        [[nodiscard]] bool AddNodes(json& geometry, const GS::Vertices& nodes)
         {
             json out = json::object();
             out["deleted"] = nodes.NumDeleted;
@@ -1541,6 +1545,43 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            geometry["halfedges"] = std::move(out);
+            return true;
+        }
+
+        [[nodiscard]] bool AddGraphHalfedges(
+            json& geometry,
+            const GS::Halfedges& halfedges)
+        {
+            const auto connectivity =
+                halfedges.Properties.Get<
+                    Geometry::Graph::HalfedgeConnectivity>(
+                    PN::kHalfedgeConnectivity);
+            if (!connectivity ||
+                connectivity.Vector().size() != halfedges.Properties.Size())
+            {
+                return false;
+            }
+
+            std::vector<std::uint32_t> toVertex{};
+            std::vector<std::uint32_t> next{};
+            std::vector<std::uint32_t> prev{};
+            toVertex.reserve(connectivity.Vector().size());
+            next.reserve(connectivity.Vector().size());
+            prev.reserve(connectivity.Vector().size());
+            for (const Geometry::Graph::HalfedgeConnectivity& item :
+                 connectivity.Vector())
+            {
+                toVertex.push_back(
+                    static_cast<std::uint32_t>(item.Vertex.Index));
+                next.push_back(static_cast<std::uint32_t>(item.Next.Index));
+                prev.push_back(static_cast<std::uint32_t>(item.Prev.Index));
+            }
+
+            json out = json::object();
+            out["toVertex"] = UIntArrayToJson(toVertex);
+            out["next"] = UIntArrayToJson(next);
+            out["prev"] = UIntArrayToJson(prev);
             geometry["halfedges"] = std::move(out);
             return true;
         }
@@ -1590,9 +1631,12 @@ namespace Extrinsic::Runtime
                 ++stats.MeshEntities;
                 break;
             case GS::Domain::Graph:
-                if (view.NodeSource == nullptr || view.EdgeSource == nullptr)
+                if (view.VertexSource == nullptr ||
+                    view.HalfedgeSource == nullptr ||
+                    view.EdgeSource == nullptr)
                     return false;
-                if (!AddNodes(geometry, *view.NodeSource) ||
+                if (!AddNodes(geometry, *view.VertexSource) ||
+                    !AddGraphHalfedges(geometry, *view.HalfedgeSource) ||
                     !AddEdges(geometry, *view.EdgeSource))
                 {
                     return false;
@@ -1668,9 +1712,9 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] bool ApplyNodes(entt::registry& raw,
-                                      const ECS::EntityHandle entity,
-                                      const json& value)
+        [[nodiscard]] bool ApplyGraphVertices(entt::registry& raw,
+                                              const ECS::EntityHandle entity,
+                                              const json& value)
         {
             if (!value.is_object() || !value.contains("positions"))
                 return false;
@@ -1683,7 +1727,7 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            GS::Nodes nodes{};
+            GS::Vertices nodes{};
             WriteVec3Property(nodes.Properties, PN::kPosition, std::move(positions));
             if (value.contains("normals"))
             {
@@ -1696,7 +1740,7 @@ namespace Extrinsic::Runtime
                 WriteVec3Property(nodes.Properties, PN::kNormal, std::move(normals));
             }
             nodes.NumDeleted = deleted;
-            raw.emplace_or_replace<GS::Nodes>(entity, std::move(nodes));
+            raw.emplace_or_replace<GS::Vertices>(entity, std::move(nodes));
             return true;
         }
 
@@ -1758,6 +1802,55 @@ namespace Extrinsic::Runtime
             WriteUIntProperty(halfedges.Properties, PN::kHalfedgeToVertex, std::move(toVertex));
             WriteUIntProperty(halfedges.Properties, PN::kHalfedgeNext, std::move(next));
             WriteUIntProperty(halfedges.Properties, PN::kHalfedgeFace, std::move(face));
+            raw.emplace_or_replace<GS::Halfedges>(entity, std::move(halfedges));
+            return true;
+        }
+
+        [[nodiscard]] bool ApplyGraphHalfedges(
+            entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const json& value)
+        {
+            if (!value.is_object() ||
+                !value.contains("toVertex") ||
+                !value.contains("next") ||
+                !value.contains("prev"))
+            {
+                return false;
+            }
+
+            std::vector<std::uint32_t> toVertex{};
+            std::vector<std::uint32_t> next{};
+            std::vector<std::uint32_t> prev{};
+            if (!TryReadUIntArray(value["toVertex"], toVertex) ||
+                !TryReadUIntArray(value["next"], next) ||
+                !TryReadUIntArray(value["prev"], prev) ||
+                toVertex.size() != next.size() ||
+                toVertex.size() != prev.size() ||
+                (toVertex.size() % 2u) != 0u)
+            {
+                return false;
+            }
+
+            GS::Halfedges halfedges{};
+            halfedges.Properties.Resize(toVertex.size());
+            auto connectivity =
+                halfedges.Properties.GetOrAdd<
+                    Geometry::Graph::HalfedgeConnectivity>(
+                    std::string{PN::kHalfedgeConnectivity},
+                    {});
+            for (std::size_t i = 0u; i < toVertex.size(); ++i)
+            {
+                connectivity.Vector()[i] =
+                    Geometry::Graph::HalfedgeConnectivity{
+                        .Vertex = Geometry::VertexHandle{
+                            static_cast<Geometry::PropertyIndex>(toVertex[i])},
+                        .Next = Geometry::HalfedgeHandle{
+                            static_cast<Geometry::PropertyIndex>(next[i])},
+                        .Prev = Geometry::HalfedgeHandle{
+                            static_cast<Geometry::PropertyIndex>(prev[i])},
+                    };
+            }
             raw.emplace_or_replace<GS::Halfedges>(entity, std::move(halfedges));
             return true;
         }
@@ -1824,9 +1917,12 @@ namespace Extrinsic::Runtime
                 break;
             }
             case GS::Domain::Graph:
-                if (!geometry.contains("nodes") || !geometry.contains("edges"))
+                if (!geometry.contains("nodes") ||
+                    !geometry.contains("halfedges") ||
+                    !geometry.contains("edges"))
                     return false;
-                if (!ApplyNodes(raw, entity, geometry["nodes"]) ||
+                if (!ApplyGraphVertices(raw, entity, geometry["nodes"]) ||
+                    !ApplyGraphHalfedges(raw, entity, geometry["halfedges"]) ||
                     !ApplyEdges(raw, entity, geometry["edges"]))
                 {
                     return false;

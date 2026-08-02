@@ -18,6 +18,7 @@ import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform;
@@ -48,6 +49,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.AABB;
+import Geometry.Graph;
 import Geometry.Plane;
 import Geometry.Properties;
 
@@ -204,29 +206,15 @@ namespace
                                 entt::entity entity)
     {
         namespace GS = ECS::Components::GeometrySources;
-        namespace PN = ECS::Components::GeometrySources::PropertyNames;
 
         auto& raw = scene.Raw();
-        auto& nodes = raw.emplace_or_replace<GS::Nodes>(entity);
-        nodes.Properties.Resize(3u);
-        nodes.Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f}).Vector() = {
-            {0.0f, 0.0f, 0.0f},
-            {1.0f, 0.0f, 0.0f},
-            {0.0f, 1.0f, 0.0f},
-        };
-
-        auto& edges = raw.emplace_or_replace<GS::Edges>(entity);
-        edges.Properties.Resize(2u);
-        edges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kEdgeV0},
-            0u).Vector() = {0u, 1u};
-        edges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kEdgeV1},
-            0u).Vector() = {1u, 2u};
-
-        raw.emplace_or_replace<GS::HasGraphTopology>(entity);
+        Geometry::Graph::Graph graph{};
+        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+        const auto v2 = graph.AddVertex({0.0f, 1.0f, 0.0f});
+        (void)graph.AddEdge(v0, v1);
+        (void)graph.AddEdge(v1, v2);
+        GS::PopulateFromGraph(raw, entity, graph);
     }
 
     void AttachTriangleMeshSources(ECS::Scene::Registry& scene,
@@ -1142,7 +1130,7 @@ TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAnd
     ConfigureGraphScalarVisualization(
         scene, nodeScalarEntity, "node_score", Domain::Vertex);
     auto& nodeScalarProperties =
-        scene.Raw().get<GS::Nodes>(nodeScalarEntity).Properties;
+        scene.Raw().get<GS::Vertices>(nodeScalarEntity).Properties;
     nodeScalarProperties.GetOrAdd<float>("node_score", 0.0f).Vector() =
         {0.1f, 0.5f, 0.9f};
 
@@ -1158,7 +1146,7 @@ TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAnd
     ConfigureGraphColorVisualization(
         scene, nodeColorEntity, "node_color", ColorSource::PerVertexBuffer);
     auto& nodeColorProperties =
-        scene.Raw().get<GS::Nodes>(nodeColorEntity).Properties;
+        scene.Raw().get<GS::Vertices>(nodeColorEntity).Properties;
     nodeColorProperties.GetOrAdd<glm::vec4>(
         "node_color",
         glm::vec4{1.0f}).Vector() = {
@@ -1279,7 +1267,7 @@ TEST(RuntimeRenderExtraction, GeometryPresentationPropertyBuffersProjectToVisual
     registry.emplace<Graphics::Components::RenderPoints>(entity);
     AttachLineGraphSources(scene, entity);
 
-    registry.get<GS::Nodes>(entity)
+    registry.get<GS::Vertices>(entity)
         .Properties.GetOrAdd<float>("node_heat", 0.0f).Vector() =
         {0.1f, 0.5f, 0.9f};
     registry.get<GS::Edges>(entity)

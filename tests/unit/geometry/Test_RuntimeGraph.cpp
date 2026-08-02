@@ -65,6 +65,33 @@ TEST(RuntimeGraph, DeleteVertex_ThenGarbageCollect)
     EXPECT_EQ(g.EdgeCount(), 0u);
 }
 
+TEST(RuntimeGraph, GarbageCollectionRemapsSurvivingConnectivity)
+{
+    Geometry::Graph::Graph g;
+
+    const auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = g.AddVertex({2.0f, 0.0f, 0.0f});
+    const auto v3 = g.AddVertex({3.0f, 0.0f, 0.0f});
+    ASSERT_TRUE(g.AddEdge(v0, v1).has_value());
+    ASSERT_TRUE(g.AddEdge(v2, v3).has_value());
+
+    g.DeleteVertex(v1);
+    g.GarbageCollection();
+
+    ASSERT_EQ(g.VertexCount(), 3u);
+    ASSERT_EQ(g.EdgeCount(), 1u);
+    ASSERT_EQ(g.HalfedgesSize(), 2u);
+    for (std::size_t i = 0u; i < g.HalfedgesSize(); ++i)
+    {
+        const Geometry::HalfedgeHandle halfedge{
+            static_cast<Geometry::PropertyIndex>(i)};
+        EXPECT_LT(g.ToVertex(halfedge).Index, g.VertexCount());
+        EXPECT_LT(g.NextHalfedge(halfedge).Index, g.HalfedgesSize());
+        EXPECT_LT(g.PrevHalfedge(halfedge).Index, g.HalfedgesSize());
+    }
+}
+
 
 TEST(RuntimeGraph, ForceDirectedLayoutRejectsDegenerateInputs)
 {

@@ -8,6 +8,29 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`HARDEN-087`](HARDEN-087-unified-geometry-element-source-components.md) —
+unified geometry element-source components completed on 2026-08-02 at
+`Operational`. Point clouds, graphs, and meshes now share the physical
+`Vertices` source; graphs and meshes expose `Halfedges` and `Edges`, while only
+meshes expose `Faces`. Graph provenance remains an independent marker, and
+graph materialization copies its real halfedge connectivity and all custom
+element properties without a converter, fabricated faces, or duplicate
+`Nodes` storage. A new deletion/compaction regression also corrected the
+graph garbage collector's transient-map double-swap so surviving connectivity
+is remapped into compact ranges before publication. Runtime availability,
+method bindings, graph normals, extraction, selection, editing/history, scene
+JSON v2, and Sandbox domain
+models consume the unified source matrix. Focused contracts passed 177/177,
+the default CPU selector passed 3,996/3,996, and the grouped ASan and UBSan
+selectors each passed 2,649/2,649. The first unchanged final UBSan attempt
+reproduced the already-open `BUG-123` retired-scene-save terminal-event race;
+its failed receipt is preserved and the unchanged retry passed without a gate
+exclusion. Strict repository checks and independent fixed-surface review close
+the high-risk evidence; C18 records the CPU and
+sanitizer-backed capability without a GPU/Vulkan or performance claim.
+Review:
+[`2026-08-02-harden-087-clean-workshop-review.md`](../../docs/reviews/2026-08-02-harden-087-clean-workshop-review.md).
+
 [`PROC-030`](PROC-030-contract-applicability-and-method-integration.md) —
 reusable-contract applicability enforcement completed on 2026-08-02 at
 `Operational`. One canonical stable-ID catalog now routes agents from the

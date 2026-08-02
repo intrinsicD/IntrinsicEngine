@@ -9,15 +9,13 @@
 //
 // Population contract:
 //   PopulateFromMesh   → emplaces Vertices, Edges, Halfedges, Faces
-//   PopulateFromGraph  → emplaces Nodes, Edges, plus the HasGraphTopology
-//                        marker (graph entities don't carry a Halfedges
-//                        PropertySet, so DetectDomain falls back to the
-//                        marker to resolve `Domain::Graph`).
+//   PopulateFromGraph  → emplaces Vertices, Halfedges, Edges, plus the
+//                        HasGraphTopology provenance marker.
 //                        Calls graph.GarbageCollection() if HasGarbage().
 //   PopulateFromCloud  → emplaces Vertices
 //
 // Every populate call first drops the entity's existing GeometrySources
-// components (Vertices/Edges/Halfedges/Faces/Nodes) and topology markers
+// components (Vertices/Edges/Halfedges/Faces) and topology markers
 // (HasMeshTopology/HasGraphTopology) so a re-population from a different
 // domain (e.g. mesh→cloud, graph→cloud, mesh→graph) does not leak stale
 // topology into BuildConstView/BuildMutableView. The reset is silent on
@@ -25,7 +23,7 @@
 //
 // Canonical properties written by every populate call (see
 // `Extrinsic.ECS.Components.GeometrySources::PropertyNames`):
-//   Vertices / Nodes : "v:position"  (glm::vec3)
+//   Vertices         : "v:position"  (glm::vec3)
 //                      "v:normal"    (glm::vec3, when available)
 //   Edges            : "e:v0", "e:v1" (uint32_t endpoint indices)
 //   Halfedges        : "h:to_vertex", "h:next", "h:face" (uint32_t)
@@ -58,10 +56,10 @@ export namespace Extrinsic::ECS::Components::GeometrySources
                           entt::entity entity,
                           Geometry::HalfedgeMesh::Mesh& mesh);
 
-    // Populate Nodes and Edges from a graph; also stamps `HasGraphTopology`
-    // so `BuildConstView`/`BuildMutableView` resolve `Domain::Graph` without
-    // requiring a Halfedges PropertySet. Calls graph.GarbageCollection() if
-    // HasGarbage() so the resulting PropertySets are contiguous.
+    // Populate Vertices, Halfedges, and Edges from a graph; also stamp
+    // `HasGraphTopology` so provenance remains independent of the shared
+    // physical component types. Calls graph.GarbageCollection() if HasGarbage()
+    // so the resulting PropertySets are contiguous.
     void PopulateFromGraph(entt::registry& registry,
                            entt::entity entity,
                            Geometry::Graph::Graph& graph);

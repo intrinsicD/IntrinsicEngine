@@ -38,21 +38,18 @@ Publication is a separate decision: same-cardinality results return to the
 originating element source, while topology/cardinality changes require an
 explicit owning operation and must not silently discard richer data.
 
-The physical ECS implementation does not yet match that target. Retired
-`HARDEN-065` deliberately made graph population produce `Nodes + Edges` and no
-`Halfedges`; `Geometry::Graph` itself does own vertex/halfedge/edge property
-sets. This is foundational violation **V0**, now owned by `HARDEN-087`. Until
-it retires, the runtime's `VertexPoints | NodePoints` capability union is the
-logical `Vertices` role for point-span consumers; graph-halfedge methods cannot
-claim availability. The method findings below remain valid independently of
-the physical cleanup because exact point-cloud provenance is narrower than
-either representation.
+`HARDEN-087` closed foundational violation **V0** after this audit identified
+it. Graph population now exposes the existing graph vertex/halfedge/edge
+property sets as shared `Vertices + Halfedges + Edges` sources, with
+`HasGraphTopology` retained as separate provenance and no fabricated faces.
+The method findings below remain valid because exact point-cloud provenance is
+still narrower than the shared `Vertices` capability.
 
 ## Inventory and disposition
 
 | Method/integration | Evidence inspected | Disposition | Follow-up |
 | --- | --- | --- | --- |
-| ECS geometry materialization | `ECS.Component.GeometrySourcesPopulate.cpp`; `ECS.Component.GeometrySources.cppm`; retired `HARDEN-065`; `Geometry.Graph` | **Foundational violation V0.** Graph uses the separate `Nodes` component and omits its existing halfedge property set, contrary to the canonical physical matrix. | `HARDEN-087`; graph-capable V1–V4 runtime tasks depend on it. |
+| ECS geometry materialization | `ECS.Component.GeometrySourcesPopulate.cpp`; `ECS.Component.GeometrySources.cppm`; retired `HARDEN-065`; `Geometry.Graph` | **V0 resolved by `HARDEN-087`.** Graph and mesh share the physical vertex/halfedge/edge source types; graph provenance remains explicit and graph halfedges preserve real `h:connectivity` without faces. | None; V1–V4 runtime tasks may proceed against the unified source contract. |
 | Boundary First Flattening / parameterization | `methods/geometry/boundary_first_flattening/method.yaml`; `src/runtime/Runtime.ParameterizationOperations.cpp`; `src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp` | Conforming. The public input genuinely requires connected triangle-mesh/disk topology; runtime and UI use the Mesh domain and publish same-count UVs. | None. |
 | K-Means | `GetEditorSupportedGeometryProcessingDomains`; three registrations in `Sandbox.MethodPanels.cpp`; runtime clustering contracts | Conforming. Mesh vertices, graph nodes, and point-cloud points are all advertised and registered. | None. |
 | Vertex normal estimation family | `GetEditorSupportedGeometryProcessingDomains`; Mesh/Graph/PointCloud normal registrations in `Sandbox.MeshProcessingPanels.cpp` | Conforming at the engine-integration level. Domain-specific kernels intentionally differ, but all compatible entity sources have a method path. | None. |
@@ -63,8 +60,9 @@ either representation.
 | Statistical/radius outlier processing | `ApplyEditorPointCloudOutlierRemovalCommand`; PointCloud-only “Remove Outliers” controls in `Sandbox.DomainPanels.cpp` | **Violation V4.** Detection indices are meaningful for every vertex source, but eligibility is point-cloud-only and detection is inseparable from destructive compaction. | `RUNTIME-209` + `UI-041`. |
 | Signed Heat | `methods/geometry/signed_heat/method.yaml`; `Geometry.SignedHeatMethod`; no runtime/Sandbox binding | **Violation V5.** The mesh-only input restriction is legitimate, but the existing production method package has no RuntimeModule, config/agent, ECS publication/history, visualization, UI, or end-to-end integration owner. | `RUNTIME-210` + `UI-042`. |
 
-The five method-integration violation rows are exhaustive for the stated scope;
-V0 is their shared physical-source prerequisite, not a sixth method.
+The five open method-integration violation rows are exhaustive for the stated
+scope; resolved V0 was their shared physical-source prerequisite, not a sixth
+method.
 Progressive Poisson and LOP need capability/publication correction; ICP and
 outlier processing need capability plus control-surface correction; Signed
 Heat needs the missing end-to-end integration while retaining its real

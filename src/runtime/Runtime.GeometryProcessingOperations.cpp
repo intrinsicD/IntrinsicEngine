@@ -659,7 +659,6 @@ namespace Extrinsic::Runtime
             std::optional<GS::Edges> Edges{};
             std::optional<GS::Halfedges> Halfedges{};
             std::optional<GS::Faces> Faces{};
-            std::optional<GS::Nodes> Nodes{};
             bool HasMeshTopology{false};
             bool HasGraphTopology{false};
             std::optional<G::RenderSurface> RenderSurface{};
@@ -694,7 +693,6 @@ namespace Extrinsic::Runtime
                     raw,
                     entity),
                 .Faces = CaptureOptionalComponent<GS::Faces>(raw, entity),
-                .Nodes = CaptureOptionalComponent<GS::Nodes>(raw, entity),
                 .HasMeshTopology =
                     raw.all_of<GS::HasMeshTopology>(entity),
                 .HasGraphTopology =
@@ -1035,9 +1033,6 @@ namespace Extrinsic::Runtime
                    SameOptionalGeometrySource(
                        current.Faces,
                        expected.Faces) &&
-                   SameOptionalGeometrySource(
-                       current.Nodes,
-                       expected.Nodes) &&
                    current.HasMeshTopology ==
                        expected.HasMeshTopology &&
                    current.HasGraphTopology ==
@@ -1084,7 +1079,6 @@ namespace Extrinsic::Runtime
             ApplyOptionalComponent(raw, *entity, state.Edges);
             ApplyOptionalComponent(raw, *entity, state.Halfedges);
             ApplyOptionalComponent(raw, *entity, state.Faces);
-            ApplyOptionalComponent(raw, *entity, state.Nodes);
             if (state.HasMeshTopology)
                 raw.emplace_or_replace<GS::HasMeshTopology>(*entity);
             else
@@ -1139,7 +1133,6 @@ namespace Extrinsic::Runtime
             after.Edges.reset();
             after.Halfedges.reset();
             after.Faces.reset();
-            after.Nodes.reset();
             after.HasMeshTopology = false;
             after.HasGraphTopology = false;
             after.RenderSurface.reset();

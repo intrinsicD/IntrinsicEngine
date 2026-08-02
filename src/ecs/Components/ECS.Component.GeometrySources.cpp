@@ -11,18 +11,26 @@ namespace Extrinsic::ECS::Components::GeometrySources
                         bool hasEdges,
                         bool hasHalfedges,
                         bool hasFaces,
-                        bool hasNodes) noexcept
+                        bool hasMeshTopologyMarker,
+                        bool hasGraphTopologyMarker) noexcept
     {
-        if (hasVertices && hasEdges && hasHalfedges && hasFaces && !hasNodes)
+        if (hasMeshTopologyMarker && hasGraphTopologyMarker)
+            return Domain::Unknown;
+
+        if (hasVertices && hasEdges && hasHalfedges && hasFaces &&
+            !hasGraphTopologyMarker)
             return Domain::Mesh;
 
-        if (!hasVertices && hasEdges && hasHalfedges && !hasFaces && hasNodes)
+        if (hasVertices && hasEdges && hasHalfedges && !hasFaces &&
+            hasGraphTopologyMarker && !hasMeshTopologyMarker)
             return Domain::Graph;
 
-        if (hasVertices && !hasEdges && !hasHalfedges && !hasFaces && !hasNodes)
+        if (hasVertices && !hasEdges && !hasHalfedges && !hasFaces &&
+            !hasMeshTopologyMarker && !hasGraphTopologyMarker)
             return Domain::PointCloud;
 
-        if (!hasVertices && !hasEdges && !hasHalfedges && !hasFaces && !hasNodes)
+        if (!hasVertices && !hasEdges && !hasHalfedges && !hasFaces &&
+            !hasMeshTopologyMarker && !hasGraphTopologyMarker)
             return Domain::None;
 
         return Domain::Unknown;
@@ -35,20 +43,25 @@ namespace Extrinsic::ECS::Components::GeometrySources
         view.EdgeSource = registry.try_get<Edges>(entity);
         view.HalfedgeSource = registry.try_get<Halfedges>(entity);
         view.FaceSource = registry.try_get<Faces>(entity);
-        view.NodeSource = registry.try_get<Nodes>(entity);
 
         view.HasMeshTopologyMarker = registry.all_of<HasMeshTopology>(entity);
         view.HasGraphTopologyMarker = registry.all_of<HasGraphTopology>(entity);
 
         view.ActiveDomain = DetectDomain(
             view.VertexSource != nullptr,
-            view.EdgeSource != nullptr || view.HasGraphTopologyMarker,
-            view.HalfedgeSource != nullptr || view.HasGraphTopologyMarker,
-            view.FaceSource != nullptr || view.HasMeshTopologyMarker,
-            view.NodeSource != nullptr);
+            view.EdgeSource != nullptr,
+            view.HalfedgeSource != nullptr,
+            view.FaceSource != nullptr,
+            view.HasMeshTopologyMarker,
+            view.HasGraphTopologyMarker);
 
-        assert(view.ActiveDomain != Domain::Mesh || view.FaceSource != nullptr || view.HasMeshTopologyMarker);
-        assert(view.ActiveDomain != Domain::Graph || view.NodeSource != nullptr || view.HasGraphTopologyMarker);
+        assert(view.ActiveDomain != Domain::Mesh ||
+               (view.VertexSource != nullptr && view.EdgeSource != nullptr &&
+                view.HalfedgeSource != nullptr && view.FaceSource != nullptr &&
+                !view.HasGraphTopologyMarker));
+        assert(view.ActiveDomain != Domain::Graph ||
+               (view.VertexSource != nullptr && view.HalfedgeSource != nullptr &&
+                view.EdgeSource != nullptr && view.HasGraphTopologyMarker));
 
         return view;
     }
@@ -60,20 +73,25 @@ namespace Extrinsic::ECS::Components::GeometrySources
         view.EdgeSource = registry.try_get<Edges>(entity);
         view.HalfedgeSource = registry.try_get<Halfedges>(entity);
         view.FaceSource = registry.try_get<Faces>(entity);
-        view.NodeSource = registry.try_get<Nodes>(entity);
 
         view.HasMeshTopologyMarker = registry.all_of<HasMeshTopology>(entity);
         view.HasGraphTopologyMarker = registry.all_of<HasGraphTopology>(entity);
 
         view.ActiveDomain = DetectDomain(
             view.VertexSource != nullptr,
-            view.EdgeSource != nullptr || view.HasGraphTopologyMarker,
-            view.HalfedgeSource != nullptr || view.HasGraphTopologyMarker,
-            view.FaceSource != nullptr || view.HasMeshTopologyMarker,
-            view.NodeSource != nullptr);
+            view.EdgeSource != nullptr,
+            view.HalfedgeSource != nullptr,
+            view.FaceSource != nullptr,
+            view.HasMeshTopologyMarker,
+            view.HasGraphTopologyMarker);
 
-        assert(view.ActiveDomain != Domain::Mesh || view.FaceSource != nullptr || view.HasMeshTopologyMarker);
-        assert(view.ActiveDomain != Domain::Graph || view.NodeSource != nullptr || view.HasGraphTopologyMarker);
+        assert(view.ActiveDomain != Domain::Mesh ||
+               (view.VertexSource != nullptr && view.EdgeSource != nullptr &&
+                view.HalfedgeSource != nullptr && view.FaceSource != nullptr &&
+                !view.HasGraphTopologyMarker));
+        assert(view.ActiveDomain != Domain::Graph ||
+               (view.VertexSource != nullptr && view.HalfedgeSource != nullptr &&
+                view.EdgeSource != nullptr && view.HasGraphTopologyMarker));
 
         return view;
     }
@@ -83,10 +101,14 @@ namespace Extrinsic::ECS::Components::GeometrySources
         SourceAvailability availability{};
         availability.ExactDomain = view.ActiveDomain;
 
-        if (view.FaceSource != nullptr || view.HasMeshTopologyMarker)
+        if (view.HasMeshTopologyMarker && view.HasGraphTopologyMarker)
+            availability.ProvenanceDomain = Domain::Unknown;
+        else if (view.HasMeshTopologyMarker)
             availability.ProvenanceDomain = Domain::Mesh;
-        else if (view.NodeSource != nullptr || view.HasGraphTopologyMarker)
+        else if (view.HasGraphTopologyMarker)
             availability.ProvenanceDomain = Domain::Graph;
+        else if (view.FaceSource != nullptr)
+            availability.ProvenanceDomain = Domain::Mesh;
         else if (view.VertexSource != nullptr &&
                  view.EdgeSource == nullptr &&
                  view.HalfedgeSource == nullptr)
@@ -94,21 +116,15 @@ namespace Extrinsic::ECS::Components::GeometrySources
         else if (view.VertexSource == nullptr &&
                  view.EdgeSource == nullptr &&
                  view.HalfedgeSource == nullptr &&
-                 view.FaceSource == nullptr &&
-                 view.NodeSource == nullptr)
+                 view.FaceSource == nullptr)
             availability.ProvenanceDomain = Domain::None;
         else
             availability.ProvenanceDomain = Domain::Unknown;
 
         if (view.VertexSource != nullptr)
         {
-            availability.Capabilities |= SourceCapability::VertexPoints;
-            availability.VertexPointCount = view.VerticesAlive();
-        }
-        if (view.NodeSource != nullptr)
-        {
-            availability.Capabilities |= SourceCapability::NodePoints;
-            availability.NodePointCount = view.NodesAlive();
+            availability.Capabilities |= SourceCapability::Vertices;
+            availability.VertexCount = view.VerticesAlive();
         }
         if (view.EdgeSource != nullptr)
         {
@@ -139,7 +155,6 @@ namespace Extrinsic::ECS::Components::GeometrySources
         constView.EdgeSource = view.EdgeSource;
         constView.HalfedgeSource = view.HalfedgeSource;
         constView.FaceSource = view.FaceSource;
-        constView.NodeSource = view.NodeSource;
         return BuildSourceAvailability(constView);
     }
 }

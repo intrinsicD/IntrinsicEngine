@@ -127,11 +127,13 @@ runtime physics module and retirement of the otherwise test-only public
 `PhysicsBridge`; optimized/GPU backends still open separately only through the
 roadmap's evidence gates.
 
-### Theme D — ECS hardening parity (P0, complete)
+### Theme D — ECS hardening parity (P0, bounded contract convergence)
 
 Promote ECS scene/hierarchy/component contracts out of `src/legacy` while
-keeping `ecs -> core` and explicit geometry handles only. All members
-(`HARDEN-060..068`, `HARDEN-081`) are retired — see
+keeping `ecs -> core` and explicit geometry handles only. Historical members
+(`HARDEN-060..068`, `HARDEN-081`, `HARDEN-083`, and `HARDEN-087`)
+are retired. `HARDEN-087` closed the bounded correction that unifies graph
+element-source components; see
 [`ecs/README.md`](ecs/README.md) and the retirement log.
 
 ### Theme E — Geometry IO completion (P0, complete)
@@ -354,8 +356,9 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 (`CORE-007`) are retired, as is compiled-plan efficiency (`CORE-008`).
 
 The 2026-08-02 element-domain/method-integration audit opened foundational
-`HARDEN-087` plus the bounded `RUNTIME-206..210` and `UI-038..042` runtime/UI
-pairs under Themes D/I; see the
+`HARDEN-087`, now retired, plus the bounded `RUNTIME-206..210` and
+`UI-038..042` runtime/UI pairs under
+Themes D/I; see the
 [runtime](runtime/README.md) and [UI](ui/README.md) indexes for the dependency
 split and the
 [audit](../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md)

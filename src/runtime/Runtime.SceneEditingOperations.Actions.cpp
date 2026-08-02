@@ -1279,7 +1279,7 @@ ApplyEditorPrimitiveViewCommand(
             command.SetVertexRenderMode ||
             command.SetVertexPointRadius)
         {
-            if (!availability.Sources.Has(GS::SourceCapability::VertexPoints))
+            if (!availability.Sources.Has(GS::SourceCapability::Vertices))
                 return EditorCommandStatus::UnsupportedGeometryDomain;
         }
         if (command.SetEdgeView && command.EnableEdgeView)
@@ -1289,7 +1289,7 @@ ApplyEditorPrimitiveViewCommand(
             const bool hasMeshWireTopology =
                 availability.Sources.Has(GS::SourceCapability::Halfedges) &&
                 availability.Sources.Has(GS::SourceCapability::Faces);
-            if (!availability.Sources.Has(GS::SourceCapability::VertexPoints) ||
+            if (!availability.Sources.Has(GS::SourceCapability::Vertices) ||
                 (!hasExplicitEdges && !hasMeshWireTopology))
             {
                 return EditorCommandStatus::UnsupportedGeometryDomain;

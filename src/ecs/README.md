@@ -26,12 +26,13 @@ plain data; systems are stateless functions that operate on components.
 - `Extrinsic.ECS.Component.Hierarchy`
 - `Extrinsic.ECS.Component.MetaData`
 - `Extrinsic.ECS.Components.GeometrySources` — per-domain owned
-  `PropertySet` components (`Vertices`, `Edges`, `Halfedges`, `Faces`,
-  `Nodes`) plus canonical `PropertyNames` keys, domain markers
+  `PropertySet` components (`Vertices`, `Edges`, `Halfedges`, `Faces`) plus
+  canonical `PropertyNames` keys, domain markers
   (`HasMeshTopology`, `HasGraphTopology`), and `BuildConstView`/
   `BuildMutableView` exact-domain detection. Use `BuildSourceAvailability`
   for CPU source capability queries that keep provenance separate from source
-  presence.
+  presence. Point clouds, graphs, and meshes share `Vertices`; graphs and
+  meshes share `Halfedges` and `Edges`; only meshes carry `Faces`.
 - `Extrinsic.ECS.Components.GeometrySourcesPopulate` — promoted
   `PopulateFromMesh` / `PopulateFromGraph` / `PopulateFromCloud` helpers
   that copy a `Geometry::HalfedgeMesh::Mesh`, `Geometry::Graph::Graph`,

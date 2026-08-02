@@ -17,7 +17,6 @@ using Extrinsic::ECS::Components::GeometrySources::Domain;
 using Extrinsic::ECS::Components::GeometrySources::Edges;
 using Extrinsic::ECS::Components::GeometrySources::Faces;
 using Extrinsic::ECS::Components::GeometrySources::Halfedges;
-using Extrinsic::ECS::Components::GeometrySources::Nodes;
 using Extrinsic::ECS::Components::GeometrySources::Vertices;
 using Extrinsic::Graphics::EncodeSelectionId;
 using Extrinsic::Graphics::SelectionPrimitiveDomain;
@@ -145,15 +144,17 @@ namespace
     // Two nodes joined by one edge.
     struct GraphScratch
     {
-        Nodes NodeSource{};
+        Vertices VertexSource{};
+        Halfedges HalfedgeSource{};
         Edges EdgeSource{};
 
         GraphScratch()
         {
-            SetPositions(NodeSource.Properties, {
+            SetPositions(VertexSource.Properties, {
                 {0.0f, 0.0f, 0.0f},
                 {2.0f, 0.0f, 0.0f},
             });
+            HalfedgeSource.Properties.Resize(2u);
             SetU32(EdgeSource.Properties, pn::kEdgeV0, {0u}, 1);
             SetU32(EdgeSource.Properties, pn::kEdgeV1, {1u}, 1);
         }
@@ -162,7 +163,9 @@ namespace
         {
             ConstSourceView view{};
             view.ActiveDomain = Domain::Graph;
-            view.NodeSource = &NodeSource;
+            view.HasGraphTopologyMarker = true;
+            view.VertexSource = &VertexSource;
+            view.HalfedgeSource = &HalfedgeSource;
             view.EdgeSource = &EdgeSource;
             return view;
         }

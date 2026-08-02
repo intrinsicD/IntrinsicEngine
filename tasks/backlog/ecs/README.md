@@ -11,11 +11,7 @@ map.
 
 ## Tasks
 
-- [HARDEN-087 — Unified geometry element-source components](HARDEN-087-unified-geometry-element-source-components.md)
-  supersedes `HARDEN-065`'s graph `Nodes + Edges`/no-halfedges exception and
-  converges point cloud, graph, and mesh materialization on the canonical
-  `Vertices`/`Halfedges`/`Edges`/`Faces` matrix before graph-capable method
-  integration refactors.
+No ECS tasks are currently in backlog.
 
 ## Convergence
 
@@ -51,9 +47,10 @@ map.
   contract: it separates underlying provenance from available vertex/node,
   edge, halfedge, and face source data so runtime/UI consumers do not treat
   exact `ActiveDomain` as the only capability query.
-- HARDEN-087 is the explicit follow-up to the physical-layout contradiction
-  found by `PROC-030`: it retains `HARDEN-083`'s provenance-vs-capability split
-  while removing the graph-only `Nodes` component and promoting existing graph
+- Retired `HARDEN-087` is the explicit follow-up to the physical-layout
+  contradiction found by
+  `PROC-030`: it retains `HARDEN-083`'s provenance-vs-capability split while
+  removing the graph-only `Nodes` component and promoting existing graph
   halfedge data into the shared ECS source component.
 - Retired HARDEN-086 is a **Theme F** architecture/runtime foundation leaf
   rather than a reopening of completed Theme D. It removes two runtime-local
@@ -68,6 +65,9 @@ map.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [HARDEN-087 — Unified geometry element-source components](../../done/HARDEN-087-unified-geometry-element-source-components.md)
+  (done, 2026-08-02, `Operational`): point clouds, graphs, and meshes share
+  canonical element-source components while provenance remains independent.
 - [HARDEN-086 — Guarded hierarchy query helpers](../../done/HARDEN-086-guarded-hierarchy-query-helpers.md)
   (done, 2026-07-18, `CPUContracted`): deterministic, all-or-nothing
   child/preorder queries in the existing hierarchy-structure module, adopted

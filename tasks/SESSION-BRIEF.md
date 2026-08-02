@@ -25,10 +25,6 @@ the authoritative open/unblocked view.
 
 - unblocked: `PHYSICS-004` — Operational runtime physics module and bridge privatization (tasks/backlog/physics/PHYSICS-004-operational-runtime-physics-module.md)
 
-## Theme D — ECS hardening parity
-
-- unblocked: `HARDEN-087` — Unified geometry element-source components (tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md)
-
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
@@ -98,8 +94,8 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `RUNTIME-206` — LOP family element-domain source integration (tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md)
 - blocked by `BUG-096`: `RUNTIME-207` — ICP element-domain source integration (tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md)
-- blocked by `HARDEN-087`: `RUNTIME-208` — Progressive Poisson element-domain publication (tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md)
-- blocked by `HARDEN-087`: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
+- unblocked: `RUNTIME-208` — Progressive Poisson element-domain publication (tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md)
+- unblocked: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 - blocked by `RUNTIME-208`: `UI-038` — Progressive Poisson multi-domain panel (tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md)

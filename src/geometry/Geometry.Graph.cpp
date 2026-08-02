@@ -382,9 +382,11 @@ namespace Geometry::Graph
 
         auto swap_vertex_slots = [&](std::size_t a, std::size_t b)
         {
+            // `vmap` belongs to `m_Vertices`, so PropertySet::Swap moves the
+            // original-index record with every other vertex property. Swapping
+            // `vmap` a second time would restore identity entries and leave
+            // compacted connectivity pointing at the old slots.
             m_Vertices.Swap(a, b);
-            using std::swap;
-            swap(vmap[VertexHandle{static_cast<PropertyIndex>(a)}], vmap[VertexHandle{static_cast<PropertyIndex>(b)}]);
         };
         auto swap_edge_slots = [&](std::size_t a, std::size_t b)
         {
@@ -397,10 +399,6 @@ namespace Geometry::Graph
 
             m_Halfedges.Swap(ha0, hb0);
             m_Halfedges.Swap(ha1, hb1);
-
-            using std::swap;
-            swap(hmap[HalfedgeHandle{static_cast<PropertyIndex>(ha0)}], hmap[HalfedgeHandle{static_cast<PropertyIndex>(hb0)}]);
-            swap(hmap[HalfedgeHandle{static_cast<PropertyIndex>(ha1)}], hmap[HalfedgeHandle{static_cast<PropertyIndex>(hb1)}]);
         };
 
         if (nv > 0)

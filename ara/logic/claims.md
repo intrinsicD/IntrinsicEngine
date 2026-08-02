@@ -464,7 +464,7 @@
   actionable task chain.
 - **Proof**: [docs/reviews/2026-08-02-method-engine-integration-contract-audit.md,
   docs/architecture/contract-catalog.yaml,
-  tasks/backlog/ecs/HARDEN-087-unified-geometry-element-source-components.md,
+  tasks/done/HARDEN-087-unified-geometry-element-source-components.md,
   tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md,
   tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md,
   tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md,
@@ -481,3 +481,45 @@
 - **Dependencies**: []
 - **Tags**: geometry, methods, runtime, UI, contracts, source audit, backlog
 - **From staging**: O95
+
+## C18: Geometry entities expose one canonical element-source matrix
+- **Statement**: ECS materialization publishes point clouds as `Vertices`,
+  graphs as `Vertices + Halfedges + Edges`, and meshes as
+  `Vertices + Halfedges + Edges + Faces`. Graph and mesh use the same physical
+  component types while `HasGraphTopology` and the provenance query distinguish
+  graph semantics from mesh semantics. Graph
+  halfedges carry the graph's real connectivity and custom element properties;
+  runtime method bindings, property lookup, extraction, scene serialization,
+  and Sandbox domain models consume those sources without a converter,
+  fabricated faces, or duplicate graph-node storage.
+- **Status**: supported — focused and complete CPU plus ASan and UBSan
+  contracts; no GPU/Vulkan or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A materialized point cloud, graph, or mesh has a
+  different physical element-source matrix; graph and mesh vertices or
+  halfedges use different component types; graph connectivity is reconstructed
+  from edge endpoints or graph faces are fabricated; graph provenance is
+  inferred only from source presence; or a production runtime/UI consumer
+  requires duplicate `Nodes` storage or a domain converter.
+- **Proof**: [tasks/done/HARDEN-087-unified-geometry-element-source-components.md,
+  src/ecs/Components/ECS.Component.GeometrySources.cppm,
+  src/ecs/Components/ECS.Component.GeometrySources.cpp,
+  src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp,
+  src/geometry/Geometry.Graph.cpp,
+  src/runtime/Runtime.GeometryAvailability.cpp,
+  src/runtime/Runtime.GeometryPlanBuilders.Graph.cpp,
+  src/runtime/Runtime.SceneSerialization.cpp,
+  tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp,
+  tests/unit/geometry/Test_RuntimeGraph.cpp,
+  tests/contract/runtime/Test.GeometryAvailability.cpp,
+  tests/contract/runtime/Test.GraphGeometryExtraction.cpp,
+  tests/contract/runtime/Test.RuntimeSceneSerialization.cpp,
+  tests/contract/runtime/Test.SandboxEditorModels.cpp,
+  tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp,
+  docs/architecture/ecs.md,
+  docs/architecture/runtime.md]
+- **Dependencies**: [C12, C17]
+- **Tags**: ecs, geometry, runtime, UI, element sources, graph halfedges,
+  CPU, ASan, UBSan, retirement
+- **From staging**: O96

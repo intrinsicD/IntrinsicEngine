@@ -872,13 +872,6 @@ struct EditorJobResult { std::string Diagnostic{}; };
                                            : nullptr,
                 view.FaceSource != nullptr ? view.FaceSource->NumDeleted
                                            : 0u);
-            AppendPropertySetMetadataSignature(
-                signature,
-                5u,
-                view.NodeSource != nullptr ? &view.NodeSource->Properties
-                                           : nullptr,
-                view.NodeSource != nullptr ? view.NodeSource->NumDeleted
-                                           : 0u);
             return signature;
         }
         [[nodiscard]] bool IsFiniteGeometryPosition(
@@ -1269,7 +1262,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
             if (availability.ProvenanceDomain != GS::Domain::Graph ||
-                view.NodeSource == nullptr ||
+                view.VertexSource == nullptr ||
+                view.HalfedgeSource == nullptr ||
                 view.EdgeSource == nullptr)
             {
                 result.Status =
@@ -1280,58 +1274,25 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return result;
             }
 
-            const auto edgeV0 =
-                view.EdgeSource->Properties.Get<std::uint32_t>(
-                    GS::PropertyNames::kEdgeV0);
-            const auto edgeV1 =
-                view.EdgeSource->Properties.Get<std::uint32_t>(
-                    GS::PropertyNames::kEdgeV1);
             const std::size_t edgeSlotCount =
                 view.EdgeSource->Properties.Size();
-            if (!edgeV0 || !edgeV1 ||
-                edgeV0.Vector().size() != edgeSlotCount ||
-                edgeV1.Vector().size() != edgeSlotCount)
+            const auto connectivity =
+                view.HalfedgeSource->Properties.Get<
+                    Geometry::Graph::HalfedgeConnectivity>(
+                    GS::PropertyNames::kHalfedgeConnectivity);
+            if (!connectivity ||
+                view.HalfedgeSource->Properties.Size() != edgeSlotCount * 2u ||
+                connectivity.Vector().size() != edgeSlotCount * 2u)
             {
                 result.Status =
                     EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic = "selected graph requires count-matched edge endpoint "
-                                    "properties for normal recompute";
+                result.Diagnostic = "selected graph requires count-matched real halfedge "
+                                    "connectivity for normal recompute";
                 return result;
             }
 
-            result.Halfedges.Resize(edgeSlotCount * 2u);
-            auto connectivity =
-                result.Halfedges.GetOrAdd<Geometry::Graph::HalfedgeConnectivity>(
-                    "h:connectivity",
-                    {});
-            if (!connectivity ||
-                connectivity.Vector().size() != edgeSlotCount * 2u)
-            {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::Unknown;
-                result.Diagnostic = "graph normal recompute could not build halfedge "
-                                    "connectivity scratch storage";
-                return result;
-            }
-
-            for (std::size_t edgeIndex = 0u;
-                 edgeIndex < edgeSlotCount;
-                 ++edgeIndex)
-            {
-                const std::size_t h0 = edgeIndex * 2u;
-                const std::size_t h1 = h0 + 1u;
-                connectivity.Vector()[h0].Vertex =
-                    Geometry::VertexHandle{
-                        static_cast<Geometry::PropertyIndex>(
-                            edgeV1.Vector()[edgeIndex])};
-                connectivity.Vector()[h1].Vertex =
-                    Geometry::VertexHandle{
-                        static_cast<Geometry::PropertyIndex>(
-                            edgeV0.Vector()[edgeIndex])};
-            }
-
+            result.Halfedges = view.HalfedgeSource->Properties;
             result.EdgeSlotCount = edgeSlotCount;
             result.Status = EditorCommandStatus::Applied;
             return result;
@@ -3779,12 +3740,9 @@ struct EditorJobResult { std::string Diagnostic{}; };
             {
             case EditorVertexNormalsCpuJobKind::Mesh:
             case EditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return view.VertexSource != nullptr
                     ? &view.VertexSource->Properties
-                    : nullptr;
-            case EditorVertexNormalsCpuJobKind::Graph:
-                return view.NodeSource != nullptr
-                    ? &view.NodeSource->Properties
                     : nullptr;
             }
             return nullptr;
@@ -3798,12 +3756,9 @@ struct EditorJobResult { std::string Diagnostic{}; };
             {
             case EditorVertexNormalsCpuJobKind::Mesh:
             case EditorVertexNormalsCpuJobKind::PointCloud:
+            case EditorVertexNormalsCpuJobKind::Graph:
                 return view.VertexSource != nullptr
                     ? &view.VertexSource->Properties
-                    : nullptr;
-            case EditorVertexNormalsCpuJobKind::Graph:
-                return view.NodeSource != nullptr
-                    ? &view.NodeSource->Properties
                     : nullptr;
             }
             return nullptr;
@@ -3922,14 +3877,16 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 out.Faces = view.FaceSource->Properties;
                 return true;
             case EditorVertexNormalsCpuJobKind::Graph:
-                if (view.NodeSource == nullptr ||
+                if (view.VertexSource == nullptr ||
+                    view.HalfedgeSource == nullptr ||
                     view.EdgeSource == nullptr)
                 {
                     return false;
                 }
                 out.Primary = CopyVertexNormalSourceProperties(
-                    view.NodeSource->Properties);
+                    view.VertexSource->Properties);
                 out.Edges = view.EdgeSource->Properties;
+                out.Halfedges = view.HalfedgeSource->Properties;
                 return true;
             case EditorVertexNormalsCpuJobKind::PointCloud:
                 if (view.VertexSource == nullptr)
@@ -4379,7 +4336,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                         .Get<glm::vec3>(GS::PropertyNames::kPosition),
                     Geometry::ConstPropertySet(state->GraphHalfedges)
                         .Get<Geometry::Graph::HalfedgeConnectivity>(
-                            "h:connectivity"),
+                            GS::PropertyNames::kHalfedgeConnectivity),
                     state->GraphEdgeSlotCount,
                     params,
                     Geometry::ConstPropertySet(state->GraphNodes)
@@ -9165,7 +9122,7 @@ ApplyEditorMeshSimplifyCommand(
             return SubmitGraphVertexNormalsCpuJob(
                 context,
                 command,
-                view.NodeSource->Properties,
+                view.VertexSource->Properties,
                 view.EdgeSource->Properties,
                 source.Halfedges,
                 source.EdgeSlotCount,
@@ -9174,7 +9131,7 @@ ApplyEditorMeshSimplifyCommand(
                 geometryMetadataSignature);
         }
 
-        Geometry::Vertices scratchNodes = view.NodeSource->Properties;
+        Geometry::Vertices scratchNodes = view.VertexSource->Properties;
         GraphNormals::Params params{};
         params.PositionProperty = GS::PropertyNames::kPosition;
         params.OutputProperty = GraphNormals::kDefaultOutputProperty;
@@ -9193,7 +9150,7 @@ ApplyEditorMeshSimplifyCommand(
                     .Get<glm::vec3>(GS::PropertyNames::kPosition),
                 Geometry::ConstPropertySet(source.Halfedges)
                     .Get<Geometry::Graph::HalfedgeConnectivity>(
-                        "h:connectivity"),
+                        GS::PropertyNames::kHalfedgeConnectivity),
                 source.EdgeSlotCount,
                 params,
                 Geometry::ConstPropertySet(scratchNodes).Get<bool>(

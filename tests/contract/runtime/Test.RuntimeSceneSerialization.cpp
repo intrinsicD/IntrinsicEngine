@@ -25,6 +25,7 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Bootstrap;
@@ -36,6 +37,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SceneSerialization;
 import Geometry.Properties;
+import Geometry.Graph;
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Core = Extrinsic::Core;
@@ -95,16 +97,6 @@ namespace
     {
         vertices.Properties.Resize(positions.size());
         auto property = vertices.Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f});
-        property.Vector() = std::move(positions);
-    }
-
-    void SetNodePositions(GS::Nodes& nodes,
-                          std::vector<glm::vec3> positions)
-    {
-        nodes.Properties.Resize(positions.size());
-        auto property = nodes.Properties.GetOrAdd<glm::vec3>(
             std::string{PN::kPosition},
             glm::vec3{0.0f});
         property.Vector() = std::move(positions);
@@ -237,16 +229,13 @@ namespace
         ECS::EntityHandle entity = ECS::Scene::CreateDefault(scene, "Graph Entity");
         auto& raw = scene.Raw();
         raw.emplace<Sel::SelectableTag>(entity);
-        auto& nodes = raw.emplace<GS::Nodes>(entity);
-        SetNodePositions(nodes,
-                         {
-                             {0.0f, 0.0f, 0.0f},
-                             {1.0f, 0.0f, 0.0f},
-                             {2.0f, 0.0f, 0.0f},
-                         });
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        SetEdges(edges, {0u, 1u}, {1u, 2u});
-        raw.emplace<GS::HasGraphTopology>(entity);
+        Geometry::Graph::Graph graph{};
+        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+        const auto v2 = graph.AddVertex({2.0f, 0.0f, 0.0f});
+        (void)graph.AddEdge(v0, v1);
+        (void)graph.AddEdge(v1, v2);
+        GS::PopulateFromGraph(raw, entity, graph);
         raw.emplace<G::RenderEdges>(entity);
         G::RenderPoints points{};
         points.Type = G::RenderPoints::RenderType::Flat;
@@ -307,7 +296,7 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     const std::string document = backend.Text("scene.json");
     ASSERT_FALSE(document.empty());
     const nlohmann::json parsed = nlohmann::json::parse(document);
-    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 1u);
+    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 2u);
     ASSERT_EQ(parsed["entities"].size(), 3u);
     EXPECT_EQ(parsed["stats"]["renderHintEntities"].get<std::uint32_t>(), 3u);
     ASSERT_TRUE(parsed["entities"][0]["render"]["visualization"].is_object());
@@ -315,6 +304,9 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
               "ScalarField");
     ASSERT_TRUE(parsed["entities"][0]["geometrySources"]["vertices"]["texcoords"].is_array());
     EXPECT_EQ(parsed["entities"][0]["geometrySources"]["vertices"]["texcoords"].size(), 3u);
+    ASSERT_TRUE(parsed["entities"][1]["geometrySources"]["halfedges"]["toVertex"].is_array());
+    EXPECT_EQ(parsed["entities"][1]["geometrySources"]["halfedges"]["toVertex"].size(), 4u);
+    EXPECT_FALSE(parsed["entities"][1]["geometrySources"]["halfedges"].contains("face"));
 
     ECS::Scene::Registry loaded;
     auto loadedResult = Runtime::LoadSceneDocument(loaded, "scene.json", backend);
@@ -402,8 +394,14 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
 
     const GS::ConstSourceView graphView = GS::BuildConstView(raw, loadedGraph);
     ASSERT_EQ(graphView.ActiveDomain, GS::Domain::Graph);
-    ASSERT_NE(graphView.NodeSource, nullptr);
-    EXPECT_EQ(graphView.NodeSource->Properties.Get<glm::vec3>(PN::kPosition).Vector().size(), 3u);
+    ASSERT_NE(graphView.VertexSource, nullptr);
+    ASSERT_NE(graphView.HalfedgeSource, nullptr);
+    EXPECT_EQ(graphView.VertexSource->Properties.Get<glm::vec3>(PN::kPosition).Vector().size(), 3u);
+    EXPECT_EQ(graphView.HalfedgeSource->Properties
+                  .Get<Geometry::Graph::HalfedgeConnectivity>(PN::kHalfedgeConnectivity)
+                  .Vector()
+                  .size(),
+              4u);
     const auto& graphPoints = raw.get<G::RenderPoints>(loadedGraph);
     ASSERT_NE(std::get_if<std::string>(&graphPoints.SizeSource), nullptr);
     EXPECT_EQ(*std::get_if<std::string>(&graphPoints.SizeSource), "node:radius");
@@ -466,13 +464,13 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
 
     auto unsupportedVersion = Runtime::DeserializeSceneDocument(
         scene,
-        R"({"version":2,"entities":[]})");
+        R"({"version":1,"entities":[]})");
     EXPECT_FALSE(unsupportedVersion.has_value());
     EXPECT_EQ(unsupportedVersion.error(), Core::ErrorCode::InvalidFormat);
 
     auto badGeometry = Runtime::DeserializeSceneDocument(
         scene,
-        R"({"version":1,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
+        R"({"version":2,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
     EXPECT_FALSE(badGeometry.has_value());
     EXPECT_EQ(badGeometry.error(), Core::ErrorCode::InvalidFormat);
 }

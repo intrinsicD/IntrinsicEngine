@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -28,7 +29,7 @@ namespace Extrinsic::ECS::Components::GeometrySources
         // before a populate call writes the new domain. Without this reset,
         // emplace_or_replace would only overwrite the components shared
         // between the old and new domains, leaving stale Edges/Halfedges/
-        // Faces/Nodes/marker entries behind — and `BuildConstView` /
+        // Faces/marker entries behind — and `BuildConstView` /
         // `BuildMutableView` would then resolve `Domain::Unknown` (or expose
         // stale topology) on a domain switch such as mesh→cloud, graph→cloud,
         // or mesh→graph. `entt::registry::remove<T>` is a silent no-op when
@@ -40,7 +41,6 @@ namespace Extrinsic::ECS::Components::GeometrySources
             registry.remove<Edges>(entity);
             registry.remove<Halfedges>(entity);
             registry.remove<Faces>(entity);
-            registry.remove<Nodes>(entity);
             registry.remove<HasMeshTopology>(entity);
             registry.remove<HasGraphTopology>(entity);
         }
@@ -170,15 +170,17 @@ namespace Extrinsic::ECS::Components::GeometrySources
             graph.GarbageCollection();
 
         const std::size_t vSize = graph.VerticesSize();
+        const std::size_t hSize = graph.HalfedgesSize();
         const std::size_t eSize = graph.EdgesSize();
 
-        // ---- Nodes ----------------------------------------------------------
-        auto& nComp = registry.emplace_or_replace<Nodes>(entity);
-        nComp.Properties = graph.VertexProperties();
-        nComp.NumDeleted = 0;
+        // ---- Vertices -------------------------------------------------------
+        auto& vComp = registry.emplace_or_replace<Vertices>(entity);
+        vComp.Properties = graph.VertexProperties();
+        vComp.NumDeleted = 0;
 
         {
-            auto posProp = nComp.Properties.GetOrAdd<glm::vec3>(
+            RemovePropertyIfPresent(vComp.Properties, PropertyNames::kPosition);
+            auto posProp = vComp.Properties.GetOrAdd<glm::vec3>(
                 std::string{PropertyNames::kPosition}, glm::vec3(0.0f));
             posProp.Vector().resize(vSize);
             for (std::size_t i = 0; i < vSize; ++i)
@@ -188,12 +190,21 @@ namespace Extrinsic::ECS::Components::GeometrySources
             }
         }
 
+        // ---- Halfedges ------------------------------------------------------
+        // Preserve the graph's real `h:connectivity` rows. Unlike a mesh,
+        // graph halfedges intentionally have no face-adjacency property.
+        auto& hComp = registry.emplace_or_replace<Halfedges>(entity);
+        hComp.Properties = graph.HalfedgeProperties();
+        assert(hComp.Properties.Size() == hSize);
+
         // ---- Edges ----------------------------------------------------------
         auto& eComp = registry.emplace_or_replace<Edges>(entity);
         eComp.Properties = graph.EdgeProperties();
         eComp.NumDeleted = 0;
 
         {
+            RemovePropertyIfPresent(eComp.Properties, PropertyNames::kEdgeV0);
+            RemovePropertyIfPresent(eComp.Properties, PropertyNames::kEdgeV1);
             auto v0Prop = eComp.Properties.GetOrAdd<std::uint32_t>(
                 std::string{PropertyNames::kEdgeV0}, 0u);
             auto v1Prop = eComp.Properties.GetOrAdd<std::uint32_t>(
@@ -210,9 +221,8 @@ namespace Extrinsic::ECS::Components::GeometrySources
             }
         }
 
-        // Mark the entity as a graph so DetectDomain returns `Graph` without
-        // requiring a Halfedges PropertySet (graph halfedges remain internal
-        // to `Geometry::Graph` and are not promoted to GeometrySources).
+        // Provenance is explicit even though the physical source components
+        // are shared with meshes.
         registry.emplace_or_replace<HasGraphTopology>(entity);
     }
 
