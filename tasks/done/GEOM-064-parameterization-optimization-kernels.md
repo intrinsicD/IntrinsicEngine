@@ -150,7 +150,9 @@ completed_on: 2026-08-03
 - [x] Determinism: identical `(reference, uvs, direction)` inputs produce
       bitwise-identical outputs across repeated calls; the reference kernels
       are serial and own no scheduler/thread-count axis.
-- [x] Fail-closed: non-triangle faces, non-finite input, and empty meshes return explicit failure states with no NaN/Inf.
+- [x] Fail-closed: non-triangle faces, non-finite input, empty meshes, and
+      caller-forged public reference/local-fit records return explicit failure
+      states before allocation or indexing, with no NaN/Inf payload escape.
 
 ## Docs
 - [x] Interface documentation per `docs/architecture/geometry-api-style.md`:
@@ -170,11 +172,13 @@ completed_on: 2026-08-03
 
 ## Verification
 
-The Clang-23 `ci` preset built all 1,287 `IntrinsicTests` actions. The focused
-parameterization selector selected 68 registered cases, passed 67, and skipped
-one opt-in Vulkan case; all nine new CPU cases passed. The default CPU-supported
-selector selected 4,073 cases, passed 4,072, and made one expected GLFW/LSan
-self-skip. The nine new cases also pass under isolated ASan and UBSan binaries.
+The Clang-23 `ci` preset built `IntrinsicTests`. After the independent review
+revision, the focused parameterization selector selected 69 registered cases,
+passed 68, and skipped one opt-in Vulkan case; all ten new CPU cases passed. The
+default CPU-supported selector selected 4,074 cases, passed 4,073, and made one
+expected GLFW/LSan self-skip. The ten new cases also pass under isolated ASan
+and UBSan binaries, including forged-record indexing and the ratio-extreme
+`1e-200` flip-root regressions.
 Strict layering, test-layout, module-inventory,
 task-policy, task-schema/state, and docs-link gates close the structural
 evidence; GPU/Vulkan execution is not applicable to this pure CPU seam.

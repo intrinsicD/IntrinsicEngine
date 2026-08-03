@@ -441,6 +441,32 @@ TEST(ParameterizationOptimize, InjectiveSearchStopsInsideFirstFlipRoot)
         1.0,
         1.0e-12);
 
+    const std::vector<glm::dvec2> tinyUvs{
+        glm::dvec2{0.0, 0.0},
+        glm::dvec2{1.0e-100, 0.0},
+        glm::dvec2{0.0, 1.0e-100},
+    };
+    const std::vector<glm::dvec2> opposingExtremeDirection{
+        glm::dvec2{0.0, 0.0},
+        glm::dvec2{1.0e100, 0.0},
+        glm::dvec2{0.0, -1.0e100},
+    };
+    const Param::InjectiveStepResult ratioExtremeBoundary =
+        Param::MaxInjectiveStep(
+            reference,
+            tinyUvs,
+            opposingExtremeDirection,
+            1.0,
+            1.0e-250);
+    ASSERT_TRUE(ratioExtremeBoundary.Succeeded());
+    EXPECT_TRUE(ratioExtremeBoundary.LimitedByTriangle);
+    EXPECT_EQ(ratioExtremeBoundary.LimitingFace, 0u);
+    EXPECT_GT(ratioExtremeBoundary.MaximumStep, 0.0);
+    EXPECT_NEAR(
+        ratioExtremeBoundary.MaximumStep / 1.0e-200,
+        1.0,
+        1.0e-12);
+
     const Param::InjectiveLineSearchResult search =
         Param::FindInjectiveDirichletStep(reference, uvs, direction);
     ASSERT_TRUE(search.Succeeded());
@@ -585,4 +611,97 @@ TEST(ParameterizationOptimize, InvalidDynamicInputsReturnExplicitStatuses)
             uvs,
             std::span<const glm::dvec2>{direction.data(), 2u}).Status,
         Param::OptimizationStatus::SizeMismatch);
+}
+
+TEST(ParameterizationOptimize, PublicRecordsAreRevalidatedBeforeIndexing)
+{
+    const auto mesh = MakeRightTriangle();
+    const Param::OptimizationReference reference =
+        Param::PrepareOptimizationReference(mesh);
+    const std::vector<glm::dvec2> uvs = IdentityTriangleUvs();
+    const Param::LocalFitResult fits =
+        Param::FitLocalModels(reference, uvs);
+    ASSERT_TRUE(reference.Succeeded());
+    ASSERT_TRUE(fits.Succeeded());
+
+    Param::OptimizationReference wrongFaceStorage = reference;
+    wrongFaceStorage.FaceStorageCount = 0u;
+    EXPECT_EQ(
+        Param::FitLocalModels(wrongFaceStorage, uvs).Status,
+        Param::OptimizationStatus::SizeMismatch);
+
+    Param::OptimizationReference extraFace = reference;
+    extraFace.Faces.push_back(extraFace.Faces.front());
+    EXPECT_EQ(
+        Param::EvaluateArapEnergy(extraFace, uvs).Status,
+        Param::OptimizationStatus::SizeMismatch);
+
+    Param::OptimizationReference shortActiveVertices = reference;
+    shortActiveVertices.ActiveVertices.clear();
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            shortActiveVertices,
+            uvs,
+            fits,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::SizeMismatch);
+
+    Param::OptimizationReference wrongActiveCount = reference;
+    ++wrongActiveCount.ActiveFaceCount;
+    EXPECT_EQ(
+        Param::FitLocalModels(wrongActiveCount, uvs).Status,
+        Param::OptimizationStatus::SizeMismatch);
+
+    Param::OptimizationReference wrongVertex = reference;
+    wrongVertex.Faces[0u].Vertices[2u] = reference.VertexStorageCount;
+    EXPECT_EQ(
+        Param::MaxInjectiveStep(
+            wrongVertex,
+            uvs,
+            std::vector<glm::dvec2>(3u, glm::dvec2{0.0})).Status,
+        Param::OptimizationStatus::SizeMismatch);
+
+    Param::OptimizationReference duplicateVertex = reference;
+    duplicateVertex.Faces[0u].Vertices[2u] =
+        duplicateVertex.Faces[0u].Vertices[1u];
+    EXPECT_EQ(
+        Param::FitLocalModels(duplicateVertex, uvs).Status,
+        Param::OptimizationStatus::DegenerateReference);
+
+    Param::OptimizationReference nonFiniteArea = reference;
+    nonFiniteArea.Faces[0u].Area =
+        std::numeric_limits<double>::infinity();
+    EXPECT_EQ(
+        Param::EvaluateSymmetricDirichlet(nonFiniteArea, uvs).Status,
+        Param::OptimizationStatus::NonFiniteInput);
+
+    Param::OptimizationReference nonPositiveArea = reference;
+    nonPositiveArea.Faces[0u].Area = 0.0;
+    EXPECT_EQ(
+        Param::FitLocalModels(nonPositiveArea, uvs).Status,
+        Param::OptimizationStatus::DegenerateReference);
+
+    Param::OptimizationReference nonFiniteGradient = reference;
+    nonFiniteGradient.Faces[0u].Gradients[0u].x =
+        std::numeric_limits<double>::quiet_NaN();
+    EXPECT_EQ(
+        Param::EvaluateArapEnergy(nonFiniteGradient, uvs).Status,
+        Param::OptimizationStatus::NonFiniteInput);
+
+    Param::OptimizationReference wrongActiveDomain = reference;
+    wrongActiveDomain.ActiveVertices[0u] = 0u;
+    EXPECT_EQ(
+        Param::FitLocalModels(wrongActiveDomain, uvs).Status,
+        Param::OptimizationStatus::SizeMismatch);
+
+    Param::LocalFitResult nonFiniteFit = fits;
+    nonFiniteFit.Faces[0u].Rotation[0u][0u] =
+        std::numeric_limits<double>::infinity();
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            uvs,
+            nonFiniteFit,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
 }

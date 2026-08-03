@@ -122,9 +122,8 @@ namespace Geometry::Parameterization
             return 0.5 * (e1.x * e2.y - e1.y * e2.x);
         }
 
-        [[nodiscard]] bool ValidateReferenceAndUvs(
+        [[nodiscard]] bool ValidateReference(
             const OptimizationReference& reference,
-            const std::span<const glm::dvec2> uvs,
             OptimizationStatus& status)
         {
             if (!reference.Succeeded())
@@ -132,25 +131,140 @@ namespace Geometry::Parameterization
                 status = reference.Status;
                 return false;
             }
+            if (reference.Faces.size() != reference.FaceStorageCount
+                || reference.ActiveVertices.size()
+                    != reference.VertexStorageCount)
+            {
+                status = OptimizationStatus::SizeMismatch;
+                return false;
+            }
+            if (reference.VertexStorageCount == 0u
+                || reference.FaceStorageCount == 0u
+                || reference.ActiveFaceCount == 0u)
+            {
+                status = OptimizationStatus::EmptyInput;
+                return false;
+            }
+
+            std::vector<std::uint8_t> activeVertices(
+                reference.VertexStorageCount, 0u);
+            std::size_t activeFaceCount = 0u;
+            for (const OptimizationTriangleReference& face : reference.Faces)
+            {
+                if (!face.Active)
+                    continue;
+                ++activeFaceCount;
+                if (!IsFinite(face.Area)
+                    || !std::ranges::all_of(
+                        face.Gradients,
+                        [](const glm::dvec2 gradient)
+                        {
+                            return IsFinite(gradient);
+                        }))
+                {
+                    status = OptimizationStatus::NonFiniteInput;
+                    return false;
+                }
+                if (face.Area <= 0.0
+                    || face.Vertices[0u] == face.Vertices[1u]
+                    || face.Vertices[0u] == face.Vertices[2u]
+                    || face.Vertices[1u] == face.Vertices[2u])
+                {
+                    status = OptimizationStatus::DegenerateReference;
+                    return false;
+                }
+                for (const std::size_t vertex : face.Vertices)
+                {
+                    if (vertex >= reference.VertexStorageCount)
+                    {
+                        status = OptimizationStatus::SizeMismatch;
+                        return false;
+                    }
+                    activeVertices[vertex] = 1u;
+                }
+            }
+            if (activeFaceCount != reference.ActiveFaceCount
+                || activeVertices != reference.ActiveVertices)
+            {
+                status = OptimizationStatus::SizeMismatch;
+                return false;
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool ValidateUvs(
+            const OptimizationReference& reference,
+            const std::span<const glm::dvec2> uvs,
+            OptimizationStatus& status)
+        {
             if (uvs.size() != reference.VertexStorageCount)
             {
                 status = OptimizationStatus::SizeMismatch;
                 return false;
             }
-            for (const OptimizationTriangleReference& face : reference.Faces)
+            for (std::size_t vertex = 0u;
+                 vertex < reference.VertexStorageCount;
+                 ++vertex)
             {
-                if (!face.Active)
-                    continue;
-                for (const std::size_t vertex : face.Vertices)
+                if (reference.ActiveVertices[vertex] != 0u
+                    && !IsFinite(uvs[vertex]))
                 {
-                    if (vertex >= uvs.size() || !IsFinite(uvs[vertex]))
-                    {
-                        status = OptimizationStatus::NonFiniteInput;
-                        return false;
-                    }
+                    status = OptimizationStatus::NonFiniteInput;
+                    return false;
                 }
             }
             return true;
+        }
+
+        [[nodiscard]] bool ValidateReferenceAndUvs(
+            const OptimizationReference& reference,
+            const std::span<const glm::dvec2> uvs,
+            OptimizationStatus& status)
+        {
+            return ValidateReference(reference, status)
+                && ValidateUvs(reference, uvs, status);
+        }
+
+        [[nodiscard]] bool ValidateLocalFits(
+            const OptimizationReference& reference,
+            const LocalFitResult& localFits) noexcept
+        {
+            if (!localFits.Succeeded()
+                || localFits.Faces.size() != reference.FaceStorageCount
+                || localFits.ActiveFaceCount != reference.ActiveFaceCount
+                || localFits.ReflectedFaceCount > localFits.ActiveFaceCount)
+            {
+                return false;
+            }
+
+            std::size_t activeFaceCount = 0u;
+            std::size_t reflectedFaceCount = 0u;
+            for (std::size_t faceIndex = 0u;
+                 faceIndex < reference.Faces.size();
+                 ++faceIndex)
+            {
+                const FaceLocalFit& fit = localFits.Faces[faceIndex];
+                if (fit.Active != reference.Faces[faceIndex].Active)
+                    return false;
+                if (!fit.Active)
+                    continue;
+                if (!IsFinite(fit.Jacobian)
+                    || !IsFinite(fit.Rotation)
+                    || !IsFinite(fit.LeftSingularVectors)
+                    || !IsFinite(fit.SignedSingularValues)
+                    || !IsFinite(fit.Determinant)
+                    || fit.SignedSingularValues.x <= 0.0
+                    || fit.SignedSingularValues.y == 0.0
+                    || std::abs(Determinant(fit.Rotation) - 1.0) > 1.0e-8)
+                {
+                    return false;
+                }
+                ++activeFaceCount;
+                if (fit.Determinant < 0.0)
+                    ++reflectedFaceCount;
+            }
+            return activeFaceCount == localFits.ActiveFaceCount
+                && reflectedFaceCount == localFits.ReflectedFaceCount;
         }
 
         [[nodiscard]] glm::dmat2 ComputeJacobian(
@@ -329,62 +443,145 @@ namespace Geometry::Parameterization
             return weight;
         }
 
-        [[nodiscard]] double SmallestPositiveRoot(
+        struct PositiveRoot
+        {
+            bool Exists{false};
+            bool BelowRepresentableRange{false};
+            double Value{0.0};
+        };
+
+        [[nodiscard]] double ScaleSafeGeometricMean(
+            const double left,
+            const double right) noexcept
+        {
+            int leftExponent = 0;
+            int rightExponent = 0;
+            const double leftMantissa = std::frexp(left, &leftExponent);
+            const double rightMantissa = std::frexp(right, &rightExponent);
+            const int exponent = leftExponent + rightExponent;
+            const int halfExponent = exponent / 2;
+            const int remainder = exponent - 2 * halfExponent;
+            const double mantissa = std::scalbn(
+                leftMantissa * rightMantissa, remainder);
+            return std::scalbn(std::sqrt(mantissa), halfExponent);
+        }
+
+        [[nodiscard]] double ScaleSafeSqrtRatio(
+            const double numerator,
+            const double denominator) noexcept
+        {
+            int numeratorExponent = 0;
+            int denominatorExponent = 0;
+            const double numeratorMantissa =
+                std::frexp(numerator, &numeratorExponent);
+            const double denominatorMantissa =
+                std::frexp(denominator, &denominatorExponent);
+            const int exponent = numeratorExponent - denominatorExponent;
+            const int halfExponent = exponent / 2;
+            const int remainder = exponent - 2 * halfExponent;
+            const double mantissa = std::scalbn(
+                numeratorMantissa / denominatorMantissa, remainder);
+            return std::scalbn(std::sqrt(mantissa), halfExponent);
+        }
+
+        [[nodiscard]] double ScaleSafeProductQuotient(
+            const double left,
+            const double right,
+            const double denominator) noexcept
+        {
+            int leftExponent = 0;
+            int rightExponent = 0;
+            int denominatorExponent = 0;
+            const double leftMantissa = std::frexp(left, &leftExponent);
+            const double rightMantissa = std::frexp(right, &rightExponent);
+            const double denominatorMantissa =
+                std::frexp(denominator, &denominatorExponent);
+            const double mantissa =
+                leftMantissa * rightMantissa / denominatorMantissa;
+            return std::scalbn(
+                mantissa,
+                leftExponent + rightExponent - denominatorExponent);
+        }
+
+        [[nodiscard]] PositiveRoot MakePositiveRoot(
+            const double value) noexcept
+        {
+            if (std::isnan(value) || value <= 0.0)
+                return PositiveRoot{true, true, 0.0};
+            return PositiveRoot{true, false, value};
+        }
+
+        [[nodiscard]] PositiveRoot SmallestPositiveRoot(
             const double a,
             const double b,
             const double c) noexcept
         {
-            const double coefficientScale = std::max({
-                std::abs(a), std::abs(b), std::abs(c)});
-            if (coefficientScale == 0.0 || !IsFinite(coefficientScale))
-                return 0.0;
-
-            // Normalize before forming the discriminant. This prevents
-            // overflow for large finite directions without comparing a root
-            // (a time) to a coefficient-scaled tolerance (an area).
-            const double normalizedA = a / coefficientScale;
-            const double normalizedB = b / coefficientScale;
-            const double normalizedC = c / coefficientScale;
-            if (normalizedA == 0.0)
+            if (a == 0.0)
             {
-                if (normalizedB == 0.0)
-                    return 0.0;
-                const double root = -normalizedC / normalizedB;
-                return root > 0.0 && IsFinite(root) ? root : 0.0;
+                if (b >= 0.0)
+                    return {};
+                return MakePositiveRoot(c / -b);
             }
 
-            const double squaredB = normalizedB * normalizedB;
-            const double fourAC = 4.0 * normalizedA * normalizedC;
-            double discriminant = squaredB - fourAC;
-            const double discriminantScale = std::max({
-                squaredB,
-                std::abs(fourAC),
-                std::numeric_limits<double>::min()});
-            const double discriminantTolerance =
-                64.0 * std::numeric_limits<double>::epsilon()
-                * discriminantScale;
-            if (discriminant < -discriminantTolerance)
-                return 0.0;
-            discriminant = std::max(0.0, discriminant);
-            const double squareRoot = std::sqrt(discriminant);
-            const double q = -0.5 * (
-                normalizedB + std::copysign(squareRoot, normalizedB));
-
-            std::array<double, 2u> roots{0.0, 0.0};
-            roots[0u] = q / normalizedA;
-            roots[1u] = q != 0.0
-                ? normalizedC / q
-                : -normalizedB / (2.0 * normalizedA);
-
-            double smallest = 0.0;
-            for (const double root : roots)
+            const double absoluteA = std::abs(a);
+            const double geometricMean =
+                ScaleSafeGeometricMean(absoluteA, c);
+            const double rootScale = ScaleSafeSqrtRatio(c, absoluteA);
+            if (a < 0.0)
             {
-                if (!IsFinite(root) || root <= 0.0)
-                    continue;
-                if (smallest == 0.0 || root < smallest)
-                    smallest = root;
+                // With t=sqrt(c/|a|)*x, solve -x^2+beta*x+1=0.
+                // Select the equivalent form whose ratios are <= 1 so no
+                // finite coefficient is erased by one global normalization.
+                if (b == 0.0)
+                    return MakePositiveRoot(rootScale);
+                if (b > 0.0)
+                {
+                    if (b <= geometricMean)
+                    {
+                        const double beta = b / geometricMean;
+                        const double x = 0.5 * (
+                            beta + std::hypot(beta, 2.0));
+                        return MakePositiveRoot(rootScale * x);
+                    }
+                    const double ratio = geometricMean / b;
+                    const double factor = 0.5 * (
+                        1.0 + std::hypot(1.0, 2.0 * ratio));
+                    return MakePositiveRoot(ScaleSafeProductQuotient(
+                        b, factor, absoluteA));
+                }
+
+                const double absoluteB = -b;
+                if (absoluteB <= geometricMean)
+                {
+                    const double beta = absoluteB / geometricMean;
+                    const double x = 2.0
+                        / (std::hypot(beta, 2.0) + beta);
+                    return MakePositiveRoot(rootScale * x);
+                }
+                const double ratio = geometricMean / absoluteB;
+                const double factor = 2.0
+                    / (1.0 + std::hypot(1.0, 2.0 * ratio));
+                return MakePositiveRoot(ScaleSafeProductQuotient(
+                    c, factor, absoluteB));
             }
-            return smallest;
+
+            if (b >= 0.0)
+                return {};
+            const double absoluteB = -b;
+            double ratio = geometricMean / absoluteB;
+            constexpr double discriminantTolerance =
+                64.0 * std::numeric_limits<double>::epsilon();
+            if (!IsFinite(ratio)
+                || ratio > 0.5 * (1.0 + discriminantTolerance))
+            {
+                return {};
+            }
+            ratio = std::min(ratio, 0.5);
+            const double discriminant = std::sqrt(std::max(
+                0.0, 1.0 - 4.0 * ratio * ratio));
+            const double factor = 2.0 / (1.0 + discriminant);
+            return MakePositiveRoot(ScaleSafeProductQuotient(
+                c, factor, absoluteB));
         }
     } // namespace
 
@@ -481,6 +678,17 @@ namespace Geometry::Parameterization
             prepared.Gradients[0u] =
                 -prepared.Gradients[1u] - prepared.Gradients[2u];
             prepared.Area = 0.5 * doubleArea;
+            if (!IsFinite(prepared.Area)
+                || !std::ranges::all_of(
+                    prepared.Gradients,
+                    [](const glm::dvec2 gradient)
+                    {
+                        return IsFinite(gradient);
+                    }))
+            {
+                result.Status = OptimizationStatus::NonFiniteInput;
+                return result;
+            }
 
             for (const std::size_t vertex : prepared.Vertices)
             {
@@ -509,13 +717,15 @@ namespace Geometry::Parameterization
         const double singularEpsilon)
     {
         LocalFitResult result{};
-        result.Faces.resize(reference.FaceStorageCount);
         if (!IsFinite(singularEpsilon) || singularEpsilon <= 0.0)
         {
             result.Status = OptimizationStatus::DegenerateUv;
             return result;
         }
-        if (!ValidateReferenceAndUvs(reference, uvs, result.Status))
+        if (!ValidateReference(reference, result.Status))
+            return result;
+        result.Faces.resize(reference.FaceStorageCount);
+        if (!ValidateUvs(reference, uvs, result.Status))
             return result;
 
         for (std::size_t faceIndex = 0u;
@@ -550,7 +760,6 @@ namespace Geometry::Parameterization
         const double singularEpsilon)
     {
         ArapEnergyResult result{};
-        result.FaceEnergy.assign(reference.FaceStorageCount, 0.0);
         const LocalFitResult fits =
             FitLocalModels(reference, uvs, singularEpsilon);
         if (!fits.Succeeded())
@@ -558,6 +767,7 @@ namespace Geometry::Parameterization
             result.Status = fits.Status;
             return result;
         }
+        result.FaceEnergy.assign(reference.FaceStorageCount, 0.0);
 
         double faceEnergySum = 0.0;
         for (std::size_t faceIndex = 0u;
@@ -599,14 +809,16 @@ namespace Geometry::Parameterization
         const double determinantEpsilon)
     {
         SymmetricDirichletResult result{};
-        result.FaceEnergy.assign(reference.FaceStorageCount, 0.0);
-        result.Gradient.assign(reference.VertexStorageCount, glm::dvec2{0.0});
         if (!IsFinite(determinantEpsilon) || determinantEpsilon <= 0.0)
         {
             result.Status = OptimizationStatus::NonInjectiveInput;
             return result;
         }
-        if (!ValidateReferenceAndUvs(reference, uvs, result.Status))
+        if (!ValidateReference(reference, result.Status))
+            return result;
+        result.FaceEnergy.assign(reference.FaceStorageCount, 0.0);
+        result.Gradient.assign(reference.VertexStorageCount, glm::dvec2{0.0});
+        if (!ValidateUvs(reference, uvs, result.Status))
             return result;
 
         result.MinimumDeterminant = std::numeric_limits<double>::max();
@@ -706,8 +918,7 @@ namespace Geometry::Parameterization
         }
         if (!ValidateReferenceAndUvs(reference, currentUvs, result.Status))
             return result;
-        if (!localFits.Succeeded()
-            || localFits.Faces.size() != reference.FaceStorageCount)
+        if (!ValidateLocalFits(reference, localFits))
         {
             result.Status = OptimizationStatus::InvalidProxyInput;
             return result;
@@ -906,10 +1117,17 @@ namespace Geometry::Parameterization
                 return result;
             }
 
-            const double root = SmallestPositiveRoot(a, b, c);
-            if (root > 0.0 && root <= result.MaximumStep)
+            const PositiveRoot root = SmallestPositiveRoot(a, b, c);
+            if (root.BelowRepresentableRange)
             {
-                result.MaximumStep = root;
+                result.Status = OptimizationStatus::NumericalFailure;
+                result.LimitingFace = faceIndex;
+                result.MaximumStep = 0.0;
+                return result;
+            }
+            if (root.Exists && root.Value <= result.MaximumStep)
+            {
+                result.MaximumStep = root.Value;
                 result.LimitingFace = faceIndex;
                 result.LimitedByTriangle = true;
             }

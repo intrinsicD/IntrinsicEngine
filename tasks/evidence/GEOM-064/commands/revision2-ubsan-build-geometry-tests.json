@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-ubsan",
+    "--target",
+    "IntrinsicGeometryTests"
+  ],
+  "command_display": "cmake --build --preset ci-ubsan --target IntrinsicGeometryTests",
+  "cwd": ".",
+  "duration_ms": 15906,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T16:48:30Z",
+  "label": "revision2-ubsan-build-geometry-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T16:48:14Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/revision2-ubsan-build-geometry-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/revision2-ubsan-build-geometry-tests.stdout.log",
+  "stdout_sha256": "1c233d0418d5069e04ef7c223ff2c23b4a8e36309ba850b226bf286d5e45e64b",
+  "task_id": "GEOM-064"
+}

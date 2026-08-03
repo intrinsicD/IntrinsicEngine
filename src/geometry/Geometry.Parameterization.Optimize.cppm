@@ -65,6 +65,8 @@ export namespace Geometry::Parameterization
     /// Precompute deterministic local source frames and barycentric gradients.
     /// Live non-triangles, non-finite positions, and source triangles whose
     /// area is <= areaEpsilon fail closed. Deleted storage slots are retained.
+    /// Every consuming kernel revalidates this public record's cardinalities,
+    /// active-domain markers, indices, areas, and gradients before indexing it.
     [[nodiscard]] OptimizationReference PrepareOptimizationReference(
         const HalfedgeMesh::Mesh& mesh,
         double areaEpsilon = 1.0e-12);
@@ -202,8 +204,9 @@ export namespace Geometry::Parameterization
     };
 
     /// Return the first positive root of every triangle's signed-area
-    /// quadratic, minimized and capped by finite positive tMax. The returned
-    /// root is the degeneracy boundary; callers must step strictly inside it.
+    /// quadratic with ratio-preserving scale-safe arithmetic, minimized and
+    /// capped by finite positive tMax. The returned root is the degeneracy
+    /// boundary; callers must step strictly inside it.
     [[nodiscard]] InjectiveStepResult MaxInjectiveStep(
         const OptimizationReference& reference,
         std::span<const glm::dvec2> uvs,

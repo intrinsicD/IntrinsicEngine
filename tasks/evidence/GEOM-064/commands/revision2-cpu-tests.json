@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 61742,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T16:47:25Z",
+  "label": "revision2-cpu-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T16:46:23Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/revision2-cpu-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/revision2-cpu-tests.stdout.log",
+  "stdout_sha256": "c68d27b53e4af495a427552173f1d83b125dfa07e9ce89d054cc1caefac937da",
+  "task_id": "GEOM-064"
+}

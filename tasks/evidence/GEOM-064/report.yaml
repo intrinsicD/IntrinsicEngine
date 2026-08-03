@@ -1,0 +1,174 @@
+schema_version: 1
+task_id: GEOM-064
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-03T16:24:50Z'
+claim_eligible: false
+source:
+  base_ref: 3d0098e16830ad26a5b11932725f2ec3857272b0
+  base_revision: 3d0098e16830ad26a5b11932725f2ec3857272b0
+  head_revision: cc548bf15f91688625bf3bd11fc2369ee3a911c4
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: e2deab549e69248e40cd8d9c4abe3c2a3d0b2bb66dd74fc1ecd51e6b0bfcec45
+  - path: ara/staging/observations.yaml
+    sha256: da9ed80f1d7d77af28afcf59f6d346a51467d60b44c8b0099b62845dff89c39e
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 5e520c75ebd039a62a27a209b44b9cfe974b4c8250d1b6abb6f8720ecb7b13a9
+  - path: docs/architecture/contract-catalog.yaml
+    sha256: ade8d2517dce01564ba5395386dd25b531d5ca0cf5442e8bff514607a39aa9d9
+  - path: docs/architecture/parameterization-mapping-roadmap.md
+    sha256: a0819c32595bca6aabb3c060de1a51ad1df8dddc1383ef311c5e24ecc8ae88cf
+  - path: src/geometry/CMakeLists.txt
+    sha256: 6cec653d7828a468a5dccec8133c70da31518aefac058ab9c6719d7df1c01694
+  - path: src/geometry/Geometry.Parameterization.Optimize.cpp
+    sha256: 566e228ab325535a106120c0fc7277709bad5d693e9b6bd69aa89fd58cc4cf70
+  - path: src/geometry/Geometry.Parameterization.Optimize.cppm
+    sha256: 57edab7b80df70422c6a1be3ba2baa6677c917a2a9b8fee8788e698d11566024
+  - path: tasks/SESSION-BRIEF.md
+    sha256: e929c07f45f3a4158cffcab2c0c73a81a7818b1074946fb77c9f8b66d5b34afa
+  - path: tasks/active/README.md
+    sha256: 21086954992e59188d218ea0846e82b5f40f61219e116e842695ba98b0b82a5b
+  - path: tasks/backlog/geometry/README.md
+    sha256: 9a97fd1117ce6bdf363b8761371400449e8a2b006e5a935469d1caad7b1cbf35
+  - path: tasks/done/GEOM-064-parameterization-optimization-kernels.md
+    sha256: 1aabbf8a0efbce05915a19bb16376e30ecbab48b65e63aac748aa312e1791ae6
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 6c098931bdc6ae5e1d2a362e213b09a7458d233450074230df581374ca075c65
+  - path: tests/CMakeLists.txt
+    sha256: 02e507795147aa3cb9ddc91be734c8bad6800eadd1a3f5a4afff6c9d8f491e1f
+  - path: tests/unit/geometry/Test.ParameterizationOptimize.cpp
+    sha256: ce9d693845c83e93807ee27c638f1c94902cfeebf46c8d591cb911a79792d456
+  content_digest: 6ed9f8c1b8656e24b19442179e3ddde0b3bdd58a74c97f4b1cc18702829d0c24
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - docs/architecture/contract-catalog.yaml
+  - docs/architecture/parameterization-mapping-roadmap.md
+  - src/geometry/CMakeLists.txt
+  - src/geometry/Geometry.Parameterization.Optimize.cpp
+  - src/geometry/Geometry.Parameterization.Optimize.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/geometry/README.md
+  - tasks/done/GEOM-064-parameterization-optimization-kernels.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/CMakeLists.txt
+  - tests/unit/geometry/Test.ParameterizationOptimize.cpp
+  layers:
+  - geometry
+  modules:
+  - Geometry.Parameterization.Optimize
+extension_seam: 'Shared stateless CPU parameterization optimization kernels: reference frames, local fits,
+  energy and gradient evaluation, gradient-matching proxies, and locally injective bounded line search.'
+future_change_plan: METHOD-021 and METHOD-022 consume this CPU seam; METHOD-025 must preserve its contract
+  when adding optimized CPU execution; METHOD-026 owns any future GPU backend.
+acceptance:
+- criterion: Public surface exposes only `std`/`glm`/scalar/geometry-owned types (no Eigen, no RHI).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: All listed tests pass in the default CPU gate.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: '`METHOD-021` (ARAP) and `METHOD-022` (SLIM) can express their local step,'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Layering check passes (`geometry -> core` only).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GEOM-064/commands/ara-claims.json
+- receipt: tasks/evidence/GEOM-064/commands/asan-build-geometry-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/asan-configure.json
+- receipt: tasks/evidence/GEOM-064/commands/asan-parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/catalog-doc-links.json
+- receipt: tasks/evidence/GEOM-064/commands/catalog-session-brief.json
+- receipt: tasks/evidence/GEOM-064/commands/catalog-task-policy.json
+- receipt: tasks/evidence/GEOM-064/commands/catalog-task-state-links.json
+- receipt: tasks/evidence/GEOM-064/commands/catalog-validate-tasks.json
+- receipt: tasks/evidence/GEOM-064/commands/ci-build-intrinsic-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/ci-configure.json
+- receipt: tasks/evidence/GEOM-064/commands/cpu-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/doc-links.json
+- receipt: tasks/evidence/GEOM-064/commands/final-ara-claims.json
+- receipt: tasks/evidence/GEOM-064/commands/final-asan-build-geometry-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/final-asan-parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/final-ci-build-intrinsic-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/final-cpu-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/final-doc-links.json
+- receipt: tasks/evidence/GEOM-064/commands/final-parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/final-task-policy.json
+- receipt: tasks/evidence/GEOM-064/commands/final-ubsan-build-geometry-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/final-ubsan-parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/final-validate-tasks.json
+- receipt: tasks/evidence/GEOM-064/commands/layering.json
+- receipt: tasks/evidence/GEOM-064/commands/module-inventory.json
+- receipt: tasks/evidence/GEOM-064/commands/parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/root-hygiene.json
+- receipt: tasks/evidence/GEOM-064/commands/session-brief.json
+- receipt: tasks/evidence/GEOM-064/commands/task-policy.json
+- receipt: tasks/evidence/GEOM-064/commands/task-state-links-fixed.json
+- receipt: tasks/evidence/GEOM-064/commands/test-layout.json
+- receipt: tasks/evidence/GEOM-064/commands/ubsan-build-geometry-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/ubsan-configure.json
+- receipt: tasks/evidence/GEOM-064/commands/ubsan-parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/validate-tasks.json
+- receipt: tasks/evidence/GEOM-064/commands/whitespace.json
+changed_public_contracts:
+- geometry.parameterization-optimization stable contract catalog entry
+- Geometry.Parameterization.Optimize public C++23 module API
+diagnostics_and_previews:
+- Explicit preparation, energy, proxy, step-bound, and line-search statuses fail closed.
+- Barrier diagnostics identify the limiting face and report minimum determinant and signed area.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GEOM-064-parameterization-optimization-kernels.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Near-singular behavior depends on caller-selected tolerances and Geometry.Linalg numerical behavior.
+- Positive per-triangle orientation is a local injectivity condition, not a proof of global boundary bijectivity
+  or non-overlap.
+skipped_checks:
+- check: gpu-vulkan
+  reason: Pure CPU geometry numerics change with no RHI, shader, device, runtime, or Vulkan behavior;
+    METHOD-026 owns any future GPU backend.
+artifacts:
+- path: src/geometry/Geometry.Parameterization.Optimize.cppm
+  sha256: 57edab7b80df70422c6a1be3ba2baa6677c917a2a9b8fee8788e698d11566024
+  kind: file
+- path: src/geometry/Geometry.Parameterization.Optimize.cpp
+  sha256: 566e228ab325535a106120c0fc7277709bad5d693e9b6bd69aa89fd58cc4cf70
+  kind: file
+- path: tests/unit/geometry/Test.ParameterizationOptimize.cpp
+  sha256: ce9d693845c83e93807ee27c638f1c94902cfeebf46c8d591cb911a79792d456
+  kind: file
+- path: docs/architecture/contract-catalog.yaml
+  sha256: ade8d2517dce01564ba5395386dd25b531d5ca0cf5442e8bff514607a39aa9d9
+  kind: file
+- path: docs/architecture/parameterization-mapping-roadmap.md
+  sha256: a0819c32595bca6aabb3c060de1a51ad1df8dddc1383ef311c5e24ecc8ae88cf
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GEOM-064/handoff.jsonl
+review: tasks/evidence/GEOM-064/reviews.jsonl
