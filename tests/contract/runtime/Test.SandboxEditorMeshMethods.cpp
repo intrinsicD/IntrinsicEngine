@@ -3680,7 +3680,7 @@ TEST(SandboxEditorUi, DirectMeshPostProcessPendingStateGatesMutatingActions)
     EXPECT_FALSE(pendingModel.Processing.MeshSubdivideAvailable);
     EXPECT_FALSE(pendingModel.Processing.MeshSimplifyAvailable);
     EXPECT_FALSE(pendingModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_FALSE(pendingModel.Processing.MeshProgressivePoissonAvailable);
+    EXPECT_FALSE(pendingModel.Processing.ProgressivePoissonAvailable);
 
     Runtime::JobToken enrichmentJob{};
     for (const Runtime::JobSnapshot& job : jobs.SnapshotAll())
@@ -3731,7 +3731,7 @@ TEST(SandboxEditorUi, DirectMeshPostProcessPendingStateGatesMutatingActions)
     EXPECT_TRUE(readyModel.Processing.MeshSubdivideAvailable);
     EXPECT_TRUE(readyModel.Processing.MeshSimplifyAvailable);
     EXPECT_TRUE(readyModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_TRUE(readyModel.Processing.MeshProgressivePoissonAvailable);
+    EXPECT_TRUE(readyModel.Processing.ProgressivePoissonAvailable);
 
     engine.Shutdown();
 }

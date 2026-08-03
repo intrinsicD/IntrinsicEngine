@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "--parallel",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests --parallel 4",
+  "cwd": ".",
+  "duration_ms": 272007,
+  "exit_code": 0,
+  "finished_at": "2026-08-02T23:14:25Z",
+  "label": "ci-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-02T23:09:53Z",
+  "stderr_path": "tasks/evidence/RUNTIME-208/commands/ci-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-208/commands/ci-build.stdout.log",
+  "stdout_sha256": "b2c5a941f0fabacf38c35530b605e549924dacb6e0a0e337f9fe3414bb5b2448",
+  "task_id": "RUNTIME-208"
+}

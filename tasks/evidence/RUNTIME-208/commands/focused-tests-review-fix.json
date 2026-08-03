@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "ProgressivePoisson|DomainMenusUseAppearanceAndFocusedProcessingWindows",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'ProgressivePoisson|DomainMenusUseAppearanceAndFocusedProcessingWindows' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 1468,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T00:43:14Z",
+  "label": "focused-tests-review-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T00:43:12Z",
+  "stderr_path": "tasks/evidence/RUNTIME-208/commands/focused-tests-review-fix.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-208/commands/focused-tests-review-fix.stdout.log",
+  "stdout_sha256": "862285728ef45e8012df760cba61f12def1fdd0e3adf2b5e49755ebd4d372b20",
+  "task_id": "RUNTIME-208"
+}

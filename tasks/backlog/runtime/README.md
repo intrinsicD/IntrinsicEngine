@@ -21,9 +21,6 @@ materialization with the element-domain contract:
 - [RUNTIME-207 — ICP element-domain source integration](RUNTIME-207-icp-element-domain-source-integration.md)
   accepts all mixed vertex-source pairs and adds the shared config lane after
   `BUG-096` makes point-to-plane readiness truthful.
-- [RUNTIME-208 — Progressive Poisson element-domain publication](RUNTIME-208-progressive-poisson-element-domain-publication.md)
-  removes implicit mesh surface sampling/domain replacement and publishes
-  source-cardinality hierarchy properties on all vertex domains.
 - [RUNTIME-209 — Point-set outlier analysis and publication split](RUNTIME-209-point-set-outlier-analysis-publication.md)
   exposes topology-safe detection on all vertex sources and retains explicit
   destructive removal only for point clouds.
@@ -39,6 +36,11 @@ production owners while preserving public behavior first.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-208` — Progressive Poisson element-domain publication](../../done/RUNTIME-208-progressive-poisson-element-domain-publication.md)
+  removed implicit mesh surface sampling/domain replacement. Mesh, graph, and
+  point-cloud `Vertices` now share one runtime/config/publication path with
+  source-cardinality hierarchy attributes and preserved topology; `UI-038`
+  owns the final Graph panel registration.
 - [`RUNTIME-205` — Internalize SceneInteraction helpers](../../done/RUNTIME-205-internalize-scene-interaction-helpers.md)
   moved gizmo frame orchestration/scratch and pick correlation/refinement state
   directly into the sole production owner, `SceneInteractionModule`, then

@@ -7907,3 +7907,75 @@ tree:
       promoted Vulkan was not run because no graphics/RHI/backend surface
       changed, and no GPU/Vulkan or performance claim is made.
     status: resolved
+  - id: N336
+    type: decision
+    title: "Execute RUNTIME-208 as the next dependency-ready geometry task"
+    provenance: ai-executed
+    timestamp: "2026-08-03T02:59+02:00"
+    also_depends_on: [N329, N330, N332]
+    choice: >
+      Select RUNTIME-208 from the generated task DAG after HARDEN-087 published
+      the canonical element-source matrix, and repair Progressive Poisson as
+      one vertex-domain runtime/config/existing-UI slice without a converter or
+      a mesh-surface replacement path.
+    alternatives:
+      - "Start a downstream geometry method whose runtime predecessor remains open."
+      - "Restore a mesh-to-point-cloud converter or duplicate geometry store."
+      - "Expand RUNTIME-208 into METHOD-014 Vulkan compute parity or UI-038 Graph-panel ownership."
+    evidence:
+      - "User direction: implement the next task from the task DAG."
+      - "tasks/SESSION-BRIEF.md at selection time"
+      - "tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md"
+      - "N329"
+      - "N330"
+      - "N332"
+    status: resolved
+  - id: N337
+    type: dead_end
+    title: "Reject descriptor-only comparison of erased connectivity"
+    provenance: ai-executed
+    timestamp: "2026-08-03T02:59+02:00"
+    also_depends_on: [N336]
+    hypothesis: >
+      Matching descriptors are sufficient for Unknown-kind geometry properties
+      because promoted scalar topology fields cover stale-state validation.
+    failure_mode: >
+      Independent fixed-surface review showed that production graph and mesh
+      connectivity is stored in erased typed records. A same-cardinality edit
+      could therefore retain descriptor equality, evade queued/history stale
+      validation, and be overwritten by publication or undo/redo.
+    lesson: >
+      Compare every production typed connectivity value and reject an
+      unrecognized erased property type; retrying a stale operation is safer
+      than overwriting an unverified geometry snapshot.
+    evidence:
+      - "tasks/evidence/RUNTIME-208/reviews.jsonl sequence 1"
+      - "src/runtime/Runtime.GeometryProcessingOperations.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp"
+    status: resolved
+  - id: N338
+    type: experiment
+    title: "Implement and verify Progressive Poisson vertex publication"
+    provenance: ai-executed
+    timestamp: "2026-08-03T02:59+02:00"
+    also_depends_on: [N332, N336, N337]
+    evidence:
+      - "tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md"
+      - "methods/geometry/progressive_poisson/paper.md"
+      - "src/runtime/Runtime.GeometryProcessingOperations.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp"
+      - "tasks/evidence/RUNTIME-208/commands/focused-tests-review-fix.json: 46/46 passed"
+      - "tasks/evidence/RUNTIME-208/commands/cpu-tests-review-fix.json: 4,003 passed and one policy skip from 4,004 selected"
+      - "tasks/evidence/RUNTIME-208/commands/asan-tests-review-fix.json: 2,656/2,656 passed"
+      - "tasks/evidence/RUNTIME-208/commands/ubsan-tests-review-fix.json: 2,655 passed and one LSan-only skip from 2,656 selected"
+    result: >
+      One validated Progressive Poisson operation now consumes canonical
+      Vertices for point-cloud, graph, and mesh entities and publishes
+      deterministic source-cardinality level, rank, splat-radius, and prefix
+      visibility channels. Direct, queued, config/agent, existing Mesh and
+      PointCloud UI, and requested-GPU CPU-fallback lanes share publication and
+      history semantics. Real production connectivity regressions fail closed
+      after the first independent review exposed and rejected descriptor-only
+      comparison. No operational Vulkan, performance, or Graph-panel claim is
+      made.
+    status: resolved

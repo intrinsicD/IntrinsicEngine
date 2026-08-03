@@ -487,7 +487,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         ParseProgressivePoissonChannel(const std::string_view value) noexcept
         {
             if (value == "Level") return ProgressivePoissonPlaygroundChannel::Level;
-            if (value == "Phase") return ProgressivePoissonPlaygroundChannel::Phase;
+            if (value == "Rank") return ProgressivePoissonPlaygroundChannel::Rank;
             if (value == "SplatRadius")
                 return ProgressivePoissonPlaygroundChannel::SplatRadius;
             if (value == "PrefixVisible")
@@ -587,7 +587,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             switch (value)
             {
             case ProgressivePoissonPlaygroundChannel::Level: return "Level";
-            case ProgressivePoissonPlaygroundChannel::Phase: return "Phase";
+            case ProgressivePoissonPlaygroundChannel::Rank: return "Rank";
             case ProgressivePoissonPlaygroundChannel::SplatRadius:
                 return "SplatRadius";
             case ProgressivePoissonPlaygroundChannel::PrefixVisible:
@@ -816,10 +816,6 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                  "prefix_count",
                  "channel",
                  "backend",
-                 "mesh_surface_sample_count",
-                 "mesh_surface_seed",
-                 "mesh_surface_min_triangle_area",
-                 "mesh_surface_interpolate_normals",
                  "auto_run_on_edit",
                  "debounce_seconds"});
 
@@ -906,44 +902,6 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     ParseProgressivePoissonBackend,
                     config.Backend))
             {
-                CountParsed(context);
-            }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "mesh_surface_sample_count",
-                    1,
-                    10'000'000))
-            {
-                config.MeshSurfaceSampleCount =
-                    static_cast<std::uint32_t>(*value);
-                CountParsed(context);
-            }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "mesh_surface_seed",
-                    0,
-                    std::numeric_limits<std::int32_t>::max()))
-            {
-                config.MeshSurfaceSampleSeed =
-                    static_cast<std::uint32_t>(*value);
-                CountParsed(context);
-            }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "mesh_surface_min_triangle_area",
-                    1.0e-30,
-                    1.0e30))
-            {
-                config.MeshSurfaceMinTriangleArea = *value;
-                CountParsed(context);
-            }
-            if (const auto value =
-                    ReadBool(context, *object, "mesh_surface_interpolate_normals"))
-            {
-                config.MeshSurfaceInterpolateNormals = *value;
                 CountParsed(context);
             }
             if (const auto value =
@@ -1430,12 +1388,6 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             {"prefix_count", config.PrefixCount},
             {"channel", std::string{ToConfigString(config.Channel)}},
             {"backend", std::string{ToConfigString(config.Backend)}},
-            {"mesh_surface_sample_count", config.MeshSurfaceSampleCount},
-            {"mesh_surface_seed", config.MeshSurfaceSampleSeed},
-            {"mesh_surface_min_triangle_area",
-             config.MeshSurfaceMinTriangleArea},
-            {"mesh_surface_interpolate_normals",
-             config.MeshSurfaceInterpolateNormals},
             {"auto_run_on_edit", config.AutoRunOnEdit},
             {"debounce_seconds", config.DebounceSeconds},
         }).dump();

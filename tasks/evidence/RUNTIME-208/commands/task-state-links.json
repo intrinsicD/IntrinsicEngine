@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_state_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/check_task_state_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 462,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T00:04:39Z",
+  "label": "task-state-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T00:04:39Z",
+  "stderr_path": "tasks/evidence/RUNTIME-208/commands/task-state-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-208/commands/task-state-links.stdout.log",
+  "stdout_sha256": "ffec3beea4255d6dc5787696629cc0b33a6fa4d55fe509a2f3d4e4f7c9f0967b",
+  "task_id": "RUNTIME-208"
+}

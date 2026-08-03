@@ -68,10 +68,6 @@ imports the application DTO or field vocabulary.
           "prefix_count": 0,
           "channel": "Level",
           "backend": "CpuReference",
-          "mesh_surface_sample_count": 4096,
-          "mesh_surface_seed": 1337,
-          "mesh_surface_min_triangle_area": 1e-14,
-          "mesh_surface_interpolate_normals": true,
           "auto_run_on_edit": true,
           "debounce_seconds": 0.25
         }
@@ -153,13 +149,11 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `poisson` | `max_levels` | Integer in `[1, 32]` |
 | `poisson` | `hash_load_factor` | Number in `[0.01, 16.0]` |
 | `poisson` | `radius_alpha` | Number in `[-1.0, 0.999]`; negative keeps method defaulting semantics |
-| `poisson` | `randomize_grid_origin`, `shuffle_within_levels`, `mesh_surface_interpolate_normals`, `auto_run_on_edit` | Boolean |
-| `poisson` | `grid_origin_seed`, `shuffle_seed`, `mesh_surface_seed` | Integer in `[0, 2147483647]` |
+| `poisson` | `randomize_grid_origin`, `shuffle_within_levels`, `auto_run_on_edit` | Boolean |
+| `poisson` | `grid_origin_seed`, `shuffle_seed` | Integer in `[0, 2147483647]` |
 | `poisson` | `prefix_count` | Integer in `[0, 10000000]`; `0` means all accepted points |
-| `poisson` | `channel` | `Level`, `Phase`, `SplatRadius`, `PrefixVisible` |
+| `poisson` | `channel` | `Level`, `Rank`, `SplatRadius`, `PrefixVisible` |
 | `poisson` | `backend` | `CpuReference`, `VulkanCompute`; unavailable Vulkan execution reports explicit CPU fallback, while METHOD-014 owns Operational dispatch/parity closure |
-| `poisson` | `mesh_surface_sample_count` | Integer in `[1, 10000000]` |
-| `poisson` | `mesh_surface_min_triangle_area` | Positive finite number in `[1e-30, 1e30]` |
 | `poisson` | `debounce_seconds` | Number in `[0.0, 10.0]` |
 | `parameterization` | `strategy` | `lscm`, `harmonic_cotangent`, `tutte_uniform`, `bff` |
 | `parameterization.view` | `render_mode` | `cpu_layout`, `gpu_shaded`; the GPU request falls back to the CPU layout until a matching completed target is ready |

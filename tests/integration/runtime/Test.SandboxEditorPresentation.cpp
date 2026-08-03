@@ -470,6 +470,41 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
     EXPECT_NE(source.find("Shell = nullptr"), std::string::npos);
 }
 
+TEST(SandboxEditorPresentation,
+     ProgressivePoissonPanelUsesOneNonDestructiveConfigAndRunPath)
+{
+    const std::string source = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
+    ASSERT_FALSE(source.empty());
+
+    for (const std::string_view required :
+         {"processing.ProgressivePoissonAvailable",
+          "EditorProgressivePoissonChannel::Rank",
+          "const auto runSampler = [&]()",
+          "ApplyEditorProgressivePoissonConfigCommand",
+          "ApplyEditorProgressivePoissonCommand"})
+    {
+        EXPECT_NE(source.find(required), std::string::npos) << required;
+    }
+
+    const std::size_t manualRun = source.find("runSampler();");
+    ASSERT_NE(manualRun, std::string::npos);
+    EXPECT_NE(source.find("runSampler();", manualRun + 1u),
+              std::string::npos)
+        << "manual Run and debounced auto-run must share one command path";
+
+    for (const std::string_view forbidden :
+         {"MeshSurfaceSampleCount",
+          "MeshSurfaceSampleSeed",
+          "MeshSurfaceMinTriangleArea",
+          "MeshSurfaceInterpolateNormals",
+          "Surface input",
+          "p:poisson_phase"})
+    {
+        EXPECT_EQ(source.find(forbidden), std::string::npos) << forbidden;
+    }
+}
+
 TEST(SandboxEditorPresentation, ExtrinsicSandboxAppStaysRuntimeOnly)
 {
     constexpr std::array<std::string_view, 13> paths{{

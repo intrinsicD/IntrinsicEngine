@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/generate_session_brief.py"
+  ],
+  "command_display": "python3 tools/agents/generate_session_brief.py",
+  "cwd": ".",
+  "duration_ms": 111,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T01:02:58Z",
+  "label": "session-brief-review-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T01:02:58Z",
+  "stderr_path": "tasks/evidence/RUNTIME-208/commands/session-brief-review-fix.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-208/commands/session-brief-review-fix.stdout.log",
+  "stdout_sha256": "a97fcd4c53c43e2a20780db5c24d2baa09d7aa9474eb8af8c205900b45a2b574",
+  "task_id": "RUNTIME-208"
+}

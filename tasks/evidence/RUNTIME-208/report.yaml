@@ -1,0 +1,261 @@
+schema_version: 1
+task_id: RUNTIME-208
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-03T01:06:07Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 614a59bf25cefd97bee9659f4a1b6782358e47b6
+  head_revision: 3f4d2dba73e2b5bf381db76ccf55586778771eb9
+  branch: runtime/runtime-208-element-domain-publication
+  worktree: /tmp/intrinsic-runtime208.qxtdIf
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: 92b71310e6898efdd88851d2b908f38ebe6444428c03d77c3c4ad8b3b5fd94aa
+  - path: ara/staging/observations.yaml
+    sha256: 8dd58c4fc1b11d9347c55f1f6b6819b90bb7bc49957ebec15bd23272e57a1800
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 86fdb936a8e3cfa05fa59a2e6b8d97007c6e4f2e45af370dd0e619990875be24
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: 82382ee34fa3fc18a1e80494707832b9b0dc9bc74855b374febb042bce12ada8
+  - path: ara/trace/sessions/2026-08-03_002.yaml
+    sha256: c4930760117c749f73f9b55d74a8c582599d36b0f66a59b67f147cb3b292d50e
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: 2986c5152f67aecf377707b45f964f72e0bba3d23947d1f37f2de1ae26ec24dc
+  - path: docs/architecture/engine-config.md
+    sha256: 283a6267cfcb2543ede8de03d3e86beefd640a9dcd290ca2d4f7d40be28ee1b3
+  - path: docs/architecture/runtime-config-control.md
+    sha256: c17c85c91d2a38579201be6b0b075f341b8cffb88603493395c00edf910e646b
+  - path: docs/architecture/runtime.md
+    sha256: a7310d12a92b9c1964c2c1ea0d6025dc634d1b157cb87e5b1da2ab5c822373ea
+  - path: docs/methods/index.md
+    sha256: 7904e507cc4d2b15faf7352430d8050f3ad5187037bc11cabaea96279db8ff48
+  - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+    sha256: e3f51352a6549dbc9fa1fdfa135287f0fc98ef35fcddc296a2c43bc740b3d6c3
+  - path: docs/reviews/2026-08-03-runtime-208-clean-workshop-review.md
+    sha256: 6903cf5a389c77d6cc3f3b5fcc47ababd9f01ace065aba0e96e6d686521f27c1
+  - path: methods/geometry/progressive_poisson/README.md
+    sha256: 2d748e5f5ae3c192cc7e8c950787c028b9d26b6191159bed68bf43a9d2698bdf
+  - path: methods/geometry/progressive_poisson/method.yaml
+    sha256: 287eace13c2af9f5fc9af76c061a3d724b3b8a6773bae067816cbeea1788cfb4
+  - path: methods/geometry/progressive_poisson/paper.md
+    sha256: 4b673f41b2f94c6b69229839d1852bce620f5aba55269d368b7313ac7ab95b71
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: a049ee3da707e69d92e466f15574cd37779e037840d956147ff693e183f89aed
+  - path: src/app/Sandbox/README.md
+    sha256: 1d9cddaaf823b2a78d138480960e963952fe36fdd955bb022810b90fce086dc6
+  - path: src/runtime/README.md
+    sha256: 08cd67bfa2e68d934c1b001ae6b30d165e1284e8fc76a416e5c7d50644764d1b
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 8439869eae7cf7398eab0b5dcd8fcb43e9b2f3a0e52c918436d59f8f4096fd49
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: d9fab40697cf4bb416c877e655eac57e465337173041bfee52c20163800bf302
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cpp
+    sha256: a8f5dfa23c39981d4a472efcac225565a686cc968520bf70ea1c686407e01ac2
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cppm
+    sha256: 01cc94f4ba6147ea07a0904d3d061859908e262153dbfaf4a60d5d27d5575982
+  - path: src/runtime/Runtime.ProgressivePoissonConfig.cppm
+    sha256: c7457ce1e9d11816a8f7fa0e25b977eb3242785e097a1e20051909a9643f8a72
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: f607ac3a41a948d7954c6ee0b2298118307bf9b38b62acc069a5623c4ff6074c
+  - path: tasks/SESSION-BRIEF.md
+    sha256: a5e99fcac808ef52d0c60e337f46df9d684d83aaf17bbefb6b2e4cce19c26433
+  - path: tasks/backlog/runtime/README.md
+    sha256: e9b922cc5cfedaffd4a4d2061d3ea3b69715e9fa32e838504fb315121cf79aae
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: eb6a7cdf48274602bfb9ac24e37e15f54f56ed178437bd2e7c08265cb1061583
+  - path: tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md
+    sha256: 7af2d52091e298e2a2bc9d33b8319d50b52a3d11d03edb3c5b5ab477a0f557c5
+  - path: tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    sha256: 9eb7c467160161f96575f5b4b7c785991543035a0bee3451374f55bf7ca69c66
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: ec63e5e9ee5e441c2967a066ccbc1ee54e018c7c8390ef88ea0b13fd2128b5a1
+  - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    sha256: 7318753147976e426c695d3ce28ab6218980b1ad8becaa2c203b8ed38aea0b52
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 55867670f5793723f6e77f951645de4bb2d02011e3ceace399fb8db42d10ed94
+  content_digest: b60c68ffb0e3064d978cca780e58a966a473e648b2ffd232f8ae128ac0061e61
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-03_002.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/architecture/engine-config.md
+  - docs/architecture/runtime-config-control.md
+  - docs/architecture/runtime.md
+  - docs/methods/index.md
+  - docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  - docs/reviews/2026-08-03-runtime-208-clean-workshop-review.md
+  - methods/geometry/progressive_poisson/README.md
+  - methods/geometry/progressive_poisson/method.yaml
+  - methods/geometry/progressive_poisson/paper.md
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/README.md
+  - src/runtime/README.md
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Runtime.ProgressivePoissonConfig.cppm
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md
+  - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  layers:
+  - app
+  - methods
+  - runtime
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots.Models
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Runtime.ProgressivePoissonConfig
+extension_seam: The existing typed EditorProgressivePoisson operation/config and GeometryElementDomain
+  resolver now provide one shared Vertices-source worker, publisher, and history mutation for mesh, graph,
+  and point-cloud provenance.
+future_change_plan: UI-038 registers the existing generic readiness and operation under the Graph panel;
+  METHOD-014 may replace the declared requested-GPU CPU fallback only after operational Vulkan compute-result
+  parity plugs into this same publisher.
+acceptance:
+- criterion: Progressive Poisson is runnable from every `Vertices` source with no converter and with source-cardinality
+    publication.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Mesh and graph topology/cardinality are unchanged on every backend path.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Obsolete surface-generation controls cannot trigger hidden conversion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-claims-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-claims-research-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-claims-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-claims-seal.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-claims.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-id-collision-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-build-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-build.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-configure-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-configure.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-tests-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-tests.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ci-build-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ci-build.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ci-configure.json
+- receipt: tasks/evidence/RUNTIME-208/commands/clean-workshop-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-208/commands/cpu-tests-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-id-collision-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-report-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-research-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-seal.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-208/commands/doc-links-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-208/commands/docs-sync-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/docs-sync.json
+- receipt: tasks/evidence/RUNTIME-208/commands/focused-tests-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/focused-tests.json
+- receipt: tasks/evidence/RUNTIME-208/commands/layering-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-208/commands/method-manifests-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/method-manifests.json
+- receipt: tasks/evidence/RUNTIME-208/commands/module-inventory-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/module-inventory.json
+- receipt: tasks/evidence/RUNTIME-208/commands/root-hygiene-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-208/commands/session-brief-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy-id-collision-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy-report-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy-research-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy-seal.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-state-links-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-state-links.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-validation-report-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-validation-research-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-validation-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-validation-seal.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-validation.json
+- receipt: tasks/evidence/RUNTIME-208/commands/test-layout-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/test-layout.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-build-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-configure-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-configure.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-tests-review-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-tests.json
+changed_public_contracts:
+- Progressive Poisson consumes canonical mesh, graph, or point-cloud Vertices directly and publishes source-cardinality
+  v:poisson_level, v:poisson_rank, v:poisson_splat_radius, and v:poisson_prefix_visible without domain
+  replacement or topology mutation.
+- The playground channel token is Rank; the obsolete Phase token and mesh-surface-generation fields are
+  rejected/diagnosed and omitted from canonical serialization.
+- Queued publication and history value-compare production typed mesh/graph connectivity and reject unrecognized
+  erased properties rather than overwriting an unverified snapshot.
+diagnostics_and_previews:
+- Unknown removed mesh-surface fields produce UnknownField diagnostics; obsolete Phase produces InvalidValue
+  and falls back to the supplied per-field reference value before canonical serialization (Rank in the
+  migration regression).
+- Requested gpu_vulkan_compute remains an explicit reported CPU-reference fallback until METHOD-014 closes
+  operational compute parity.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- METHOD-014 still owns operational Vulkan compute-result parity, and UI-038 still owns Graph-panel registration;
+  neither surface is claimed by RUNTIME-208.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No shader, RHI, Vulkan backend, byte-layout, or compute-execution behavior changed; requested
+    GPU execution deliberately follows the tested CPU-reference fallback path and METHOD-014 retains parity
+    ownership.
+artifacts:
+- path: tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md
+  sha256: 7af2d52091e298e2a2bc9d33b8319d50b52a3d11d03edb3c5b5ab477a0f557c5
+  kind: file
+- path: methods/geometry/progressive_poisson/method.yaml
+  sha256: 287eace13c2af9f5fc9af76c061a3d724b3b8a6773bae067816cbeea1788cfb4
+  kind: file
+- path: tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  sha256: 9eb7c467160161f96575f5b4b7c785991543035a0bee3451374f55bf7ca69c66
+  kind: file
+- path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  sha256: 55867670f5793723f6e77f951645de4bb2d02011e3ceace399fb8db42d10ed94
+  kind: file
+- path: docs/reviews/2026-08-03-runtime-208-clean-workshop-review.md
+  sha256: 6903cf5a389c77d6cc3f3b5fcc47ababd9f01ace065aba0e96e6d686521f27c1
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-208/handoff.jsonl
+review: tasks/evidence/RUNTIME-208/reviews.jsonl

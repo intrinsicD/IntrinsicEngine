@@ -99,9 +99,12 @@ presentation while the module owns adapter/overlay/action/hook lifecycle.
 Runtime exposes presentation-free workspace snapshots, job projections, and
 focused scene, geometry, visualization, and render-recipe operations. The shell
 copies prepared bindings/snapshots into app-owned `SandboxEditorContext` and
-`SandboxEditorFrame` records. `Sandbox.Editor.MethodPanels` owns the K-Means, Progressive Poisson,
-and parameterization ImGui controls and registers six domain windows through
-the shell's context-aware contribution seam. The app
+`SandboxEditorFrame` records. `Sandbox.Editor.MethodPanels` owns the K-Means,
+Progressive Poisson, and parameterization ImGui controls and registers six
+domain windows through the shell's context-aware contribution seam. Progressive
+Poisson currently has Mesh and PointCloud panels; the runtime model already
+discovers the same typed operation for graph vertices, and `UI-038` owns the
+matching Graph panel. The app
 continues to import the same runtime module surface. `Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It

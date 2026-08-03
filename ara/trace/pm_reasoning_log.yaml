@@ -1267,3 +1267,10 @@ entries:
       - "Recorded the initial UBSan BUG-123 reproduction and unchanged successful retry without misclassifying the known unrelated lifecycle defect as HARDEN-087 evidence."
       - "Kept O93 staged: this implementation reuses typed domain resolution but does not commit the repository to one universal prepare/execute/revalidate/commit framework."
       - "Did not stale current observations or add GPU/Vulkan/performance claims; promoted Vulkan was proportionately skipped because the slice changes no graphics/RHI/backend surface."
+  - turn: "2026-08-03_002#1"
+    notes:
+      - "Routed RUNTIME-208 task selection as decision N336, the rejected descriptor-only connectivity assumption as dead end N337, and the corrected implementation/verification as experiment N338."
+      - "Renumbered the RUNTIME-208 artifact-committed observation and claim to O102/C20 after concurrent dirty-main research state reserved O101/C19 and N333-N335; no user-owned record was modified."
+      - "Kept C20 bounded to CPU reference publication: METHOD-014 retains operational Vulkan parity and UI-038 retains Graph-panel registration."
+      - "Recorded selected, passed, and skipped counts separately after independent review rejected the earlier conflation."
+      - "Did not crystallize O93 or stale current observations; RUNTIME-208 follows existing operation patterns but does not adopt a repository-wide universal operation envelope."

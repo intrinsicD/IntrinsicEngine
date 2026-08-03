@@ -216,3 +216,10 @@ sessions:
     events_count: 20
     claims_touched: [C17, C18]
     open_threads: 6
+  - id: "2026-08-03_002"
+    date: "2026-08-03"
+    summary: "Implemented and verified RUNTIME-208 canonical-vertex Progressive Poisson publication, then closed the independent review's production-connectivity stale-state finding."
+    turn_count: 1
+    events_count: 4
+    claims_touched: [C20]
+    open_threads: 3
