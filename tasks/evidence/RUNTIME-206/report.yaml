@@ -3,15 +3,15 @@ task_id: RUNTIME-206
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-03T21:53:00Z'
+generated_at: '2026-08-03T21:53:28Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 19554530c62fe4033be381a068442689104a56d7
-  head_revision: 5600fef10d1208316dc7810d05431002c718712a
+  head_revision: add2522413378ae6be1fec6aa58181e654be7bd3
   branch: runtime/runtime-206-lop-domain-sources
   worktree: /tmp/intrinsic-runtime206.ZvbjE9
-  dirty: true
+  dirty: false
   surface:
   - path: AGENTS.md
     sha256: 6e4ddc7e426989a7aaceb160ffe1d90cd37e10c6314f477bdb6ff46f318d1305
