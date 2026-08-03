@@ -1817,9 +1817,9 @@ observations:
       correctness without requiring ECS/runtime/UI domain coverage.
     potential_type: architecture
     bound_to: [N344]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A26"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O110
     timestamp: "2026-08-02T13:49+02:00"
@@ -1837,7 +1837,27 @@ observations:
       their acceptance criteria and had no LOP mesh/graph integration proof.
     potential_type: constraint
     bound_to: [N343, N344]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K29"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O111
+    timestamp: "2026-08-03T14:32+02:00"
+    provenance: ai-executed
+    content: >
+      A supplemental task-contract baseline for parallel pre-policy history
+      must be restricted to byte-identical retired paths bound to an exact Git
+      revision and SHA-256 digest, must name a high-risk policy owner, and must
+      leave active, backlog, moved, or later-edited work prospective. Sealed
+      experiment task hashes are never rewritten to accommodate the merge.
+    context: >
+      Merging the pre-PROC-030 LOP branch into current main made prospective
+      enrollment edits invalidate four already audited claim-grade runs. The
+      path-scoped BUG-128 mechanism preserved the original task bytes while
+      strict task and workflow-evidence validation passed.
+    potential_type: constraint
+    bound_to: [N346, N347, N348]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K30"
+    crystallized_via: artifact-commitment
     stale: false

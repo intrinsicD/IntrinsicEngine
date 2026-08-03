@@ -1327,3 +1327,12 @@ entries:
       - "Recorded the literature review as terminology and scope guidance, not as evidence of a new sampling algorithm or performance result."
       - "Did not promote O93 or stale other recent observations; this slice reuses the existing typed operation but does not adopt a universal operation framework."
       - "No contradiction was found, and no GPU/Vulkan compute, parity, performance, or sanitizer claim was added."
+  - turn: "2026-08-03_001#4"
+    notes:
+      - "Routed the user's all-changes/all-branches instruction as decision N345, the rejected post-seal task-edit path as dead end N346, the bounded historical-baseline choice as decision N347, and the merged verification result as experiment N348."
+      - "Coalesced parallel observation O109 into existing A26 rather than duplicating the already implemented contract-discovery architecture; the merged PROC-030 artifacts supply artifact commitment."
+      - "Crystallized O110 to K29 because AGENTS.md, the catalog, strict validator, and PROC-030 now commit to canonical contract disposition before task retirement."
+      - "Staged O111 and crystallized it to K30 through artifact commitment because BUG-128 now enforces exact retired path/revision/digest baselines without rewriting sealed custody."
+      - "Kept O87, O89, O90, and O93 staged and non-stale; this merge does not adopt the universal operation envelope or the separate live-agent-plan architecture."
+      - "Added no capability or performance claim: the 102/102 focused and 4,064/4,064 CPU results are bounded merge verification; sanitizer and GPU/Vulkan gates were not rerun."
+      - "BUG-128 remains active despite complete implementation because high-risk retirement still requires a durable handoff and independent fixed-surface accepted review; GEOM-064 remains an unregistered draft."

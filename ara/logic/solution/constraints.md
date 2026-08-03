@@ -386,3 +386,38 @@
   tasks/backlog/process/CI-018-hybrid-impact-selection-admission.md,
   tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md]
 - **From staging**: O98
+
+## K29: Reusable Contracts Require Canonical Disposition Before Retirement
+- **Constraint**: A task that establishes or changes a reusable contract may
+  retire only with the canonical contract entry, owning documentation, and an
+  executable proof. A consuming task preserves every declared contract or
+  changes the canonical contract through reviewed evidence; narrower task
+  wording cannot silently override it.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N343, N344, N347,
+  AGENTS.md,
+  docs/architecture/contract-catalog.yaml,
+  docs/agent/task-format.md,
+  tools/agents/validate_tasks.py,
+  tests/regression/tooling/Test.ValidateTasks.py,
+  tasks/done/PROC-030-contract-applicability-and-method-integration.md]
+- **From staging**: O110
+
+## K30: Parallel Historical Baselines Preserve Exact Retired Bytes
+- **Constraint**: A supplemental task-contract baseline for work retired on a
+  parallel pre-policy branch is restricted to explicitly listed `done/` or
+  `archive/` paths whose bytes match an exact Git revision and SHA-256 digest,
+  and it names a high-risk policy owner. Active, backlog, moved, or later-edited
+  work remains prospective; sealed experiment task hashes are never rewritten
+  to accommodate a merge.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N346, N347, N348,
+  docs/agent/task-format.md,
+  tools/agents/contract_legacy_tasks.json,
+  tools/agents/validate_tasks.py,
+  tests/regression/tooling/Test.ValidateTasks.py,
+  tasks/backlog/bugs/BUG-128-parallel-prepolicy-retired-task-baselines.md,
+  872059d5]
+- **From staging**: O111

@@ -387,6 +387,8 @@
   tests/regression/tooling/Test.ValidateTasks.py,
   tasks/done/PROC-030-contract-applicability-and-method-integration.md]
 - **From staging**: O94
+- **Parallel staging convergence**: O109 (artifact-commitment after the
+  pre-policy feature history merged with the implemented PROC-030 policy).
 
 ## A27: Verification Plans Derive from One Evidence Graph
 - **Decision**: Local edit, pull-request, merge-group, scheduled-deep, and

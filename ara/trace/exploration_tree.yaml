@@ -8163,4 +8163,97 @@ tree:
       contract references belong in task creation, and how additional
       contracts remain discoverable without duplicating their content across
       prompts, skills, and task files.
-    status: open
+    resolution: >
+      Resolved by N329 and A26, now present in the merged main history through
+      PROC-030: AGENTS.md owns applicability, the contract catalog owns stable
+      identifiers and proof links, and prospectively enrolled tasks declare
+      their applicable contracts.
+    status: resolved
+  - id: N345
+    type: decision
+    title: "Commit every local worktree and converge all branches on main"
+    provenance: user
+    timestamp: "2026-08-03T14:32+02:00"
+    choice: >
+      Preserve and commit every dirty local change, integrate origin/main, and
+      merge every local branch into main rather than selecting only the
+      attached RUNTIME-208 task branch.
+    alternatives:
+      - "Commit only the attached task or current main worktree."
+      - "Leave already-contained or divergent local branches outside main."
+      - "Discard dirty worktree state before integration."
+    evidence:
+      - "User direction: commit all changes and merge all local branches into main."
+      - "backup/pre-merge-all-main-20260803T1230"
+      - "backup/pre-merge-all-geometry-20260803T1230"
+    status: resolved
+  - id: N346
+    type: dead_end
+    title: "Reject post-seal enrollment edits to parallel retired tasks"
+    provenance: ai-executed
+    timestamp: "2026-08-03T14:32+02:00"
+    also_depends_on: [N345]
+    hypothesis: >
+      Retired tasks from a pre-policy parallel branch can be reconciled with
+      the newer contract catalog by adding prospective front-matter and method
+      integration matrices after merging them.
+    failure_mode: >
+      Strict task validation accepted the additions, but claim-grade custody
+      rejected METHOD-016 through METHOD-019 because their task SHA-256 values
+      changed after official run initialization. Rebinding those hashes would
+      rewrite sealed scientific provenance.
+    lesson: >
+      A parallel-history compatibility mechanism must preserve the exact
+      retired task bytes and verify their historical revision; it must not
+      mutate or rehash completed experiment custody.
+    evidence:
+      - "python3 tools/agents/workflow_evidence.py validate --root .: four task-changed errors before the approach was reverted"
+      - "tasks/evidence/METHOD-016/experiment/runs/run-001/run.yaml"
+      - "tools/agents/experiment_custody.py"
+    status: resolved
+  - id: N347
+    type: decision
+    title: "Use a path-scoped immutable baseline for parallel retired history"
+    provenance: ai-executed
+    timestamp: "2026-08-03T14:32+02:00"
+    also_depends_on: [N345, N346, N344]
+    choice: >
+      Keep the primary prospective baseline unchanged and admit only listed
+      done/archive task paths whose bytes match both an exact parallel Git
+      revision and declared SHA-256 digest, with BUG-128 retaining high-risk
+      review ownership.
+    alternatives:
+      - "Rewrite official run and bundle task hashes to the merged files."
+      - "Grandfather the complete parallel branch, including open tasks."
+      - "Drop or weaken prospective contract validation for the merge."
+    evidence:
+      - "tasks/backlog/bugs/BUG-128-parallel-prepolicy-retired-task-baselines.md"
+      - "tools/agents/contract_legacy_tasks.json"
+      - "tools/agents/validate_tasks.py"
+      - "tests/regression/tooling/Test.ValidateTasks.py"
+      - "docs/agent/task-format.md"
+    status: resolved
+  - id: N348
+    type: experiment
+    title: "Integrate and verify every local branch on main"
+    provenance: ai-executed
+    timestamp: "2026-08-03T14:32+02:00"
+    also_depends_on: [N345, N346, N347]
+    evidence:
+      - "8ec23c1d: verification architecture and task graph checkpoint"
+      - "f8a722c8: GEOM-064 draft checkpoint"
+      - "f37f8ff9: origin/main integration"
+      - "872059d5: feature/lop-consolidation-e2e merge into main"
+      - "cmake --preset ci --fresh: Clang 23 configure passed"
+      - "cmake --build --preset ci --target IntrinsicTests: passed"
+      - "focused consolidation/Progressive Poisson/editor selector: 102/102 passed"
+      - "default CPU-supported selector: 4,064/4,064 passed with one policy-defined GLFW/LSan skip"
+      - "strict task, ARA, docs, layering, test-layout, root-hygiene, method, benchmark, skill-mirror, and workflow-evidence validation passed"
+    result: >
+      All dirty worktrees were checkpointed, origin/main and the only
+      uncontained feature branch were merged, all fifteen local branches are
+      ancestors of main, and the merged C++/test surface is CPU-regression
+      clean. One merge-specific editor menu-count mismatch was found by the
+      focused gate, corrected from 36 to 37, and reconfirmed. No push,
+      sanitizer rerun, or GPU/Vulkan capability claim is part of this result.
+    status: resolved
