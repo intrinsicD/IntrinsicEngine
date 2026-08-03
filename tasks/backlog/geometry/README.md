@@ -21,10 +21,6 @@ map.
 - [GEOM-061 — Point-cloud grid-downsampling reduction strategies](GEOM-061-grid-downsampling-reduction-strategies.md)
   (index-returning per-cell reduction extending retired GEOM-016's voxel
   downsampling; framework24 port-gap follow-up).
-- [GEOM-064 — Parameterization optimization kernels seam](../../active/GEOM-064-parameterization-optimization-kernels.md)
-  (reusable `Geometry.Parameterization.Optimize`: local rotation fit,
-  symmetric-Dirichlet energy/proxy, injective line search; gates ARAP
-  `methods/METHOD-021` and SLIM `methods/METHOD-022`).
 - [GEOM-065 — Invariant-aware scientific-field mip pyramids](GEOM-065-invariant-aware-scientific-field-mip-pyramids.md)
   (post-stability method/evidence-local CPU study for unit normals, discrete
   labels, and signed scalar fields; blocked by `REVIEW-003`, with no
@@ -135,7 +131,7 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 - GEOM-071 extracts plain, lossless sharp-feature facts into Simplification;
   GEOM-072 is its named second adopter and owns Catmull-Clark crease stencils
   and tag propagation.
-- Retired GEOM-063 and open GEOM-064 are the parameterization-family seams that realize
+- Retired GEOM-063 and GEOM-064 are the parameterization-family seams that realize
   Packs 3–4 of the
   [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).
   Retired GEOM-063 makes `Geometry.Parameterization` a typed CPU strategy dispatch

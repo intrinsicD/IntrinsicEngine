@@ -1,0 +1,22 @@
+{
+  "command": [
+    "env",
+    "ASAN_OPTIONS=detect_leaks=1:halt_on_error=1",
+    "build/ci-asan/bin/IntrinsicGeometryTests",
+    "--gtest_filter=ParameterizationOptimize.*"
+  ],
+  "command_display": "env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 build/ci-asan/bin/IntrinsicGeometryTests '--gtest_filter=ParameterizationOptimize.*'",
+  "cwd": ".",
+  "duration_ms": 75,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T16:07:34Z",
+  "label": "asan-parameterization-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T16:07:34Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/asan-parameterization-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/asan-parameterization-tests.stdout.log",
+  "stdout_sha256": "4f126f41c0547654bbf39eb4c3e37bc9a73f633c2413545e8ed5c8e0b0bde1a0",
+  "task_id": "GEOM-064"
+}

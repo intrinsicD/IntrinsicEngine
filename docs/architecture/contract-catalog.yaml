@@ -22,6 +22,14 @@ contracts:
       - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
       - tests/contract/runtime/Test.GraphGeometryExtraction.cpp
       - tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
+  geometry.parameterization-optimization:
+    owner: geometry
+    source: docs/architecture/parameterization-mapping-roadmap.md
+    applies_when:
+      - A parameterization method consumes or changes shared triangle reference frames, signed-SVD proper rotations, ARAP/SLIM proxies, symmetric-Dirichlet energy or gradients, or locally-injective step selection.
+      - A new parameterization backend would otherwise reimplement the shared optimization numerics.
+    proofs:
+      - tests/unit/geometry/Test.ParameterizationOptimize.cpp
   method.engine-integration:
     owner: methods-runtime-app
     source: docs/architecture/method-api-contract.md

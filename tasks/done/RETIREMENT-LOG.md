@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GEOM-064`](GEOM-064-parameterization-optimization-kernels.md) — the shared
+parameterization optimization-kernel seam completed on 2026-08-03 at
+`CPUContracted`. `Geometry.Parameterization.Optimize` now owns deterministic
+triangle reference preparation, signed-SVD proper-rotation fits, the full
+orientation-aware symmetric-Dirichlet objective and analytic gradient,
+gradient-matching ARAP/SLIM proxy assembly, and an injectivity-preserving
+quadratic-root/Armijo line search. It remains a stateless geometry CPU seam:
+method-owned outer loops, factorization policy, runtime/config/UI wiring,
+global-boundary bijectivity, and GPU backends stay with their named consumers.
+The parameterization family selected 68 registered cases, passed 67, and
+skipped one opt-in Vulkan case; all nine new CPU cases passed. The full CPU
+selector selected 4,073, passed 4,072, and made one expected environment skip;
+all nine new cases also passed focused ASan and UBSan execution. Strict
+layering, test layout, task policy/state, documentation links, and generated
+inventory gates close the task without a performance or global-bijectivity
+claim.
+
 [`BUG-128`](BUG-128-parallel-prepolicy-retired-task-baselines.md) — parallel
 pre-policy retired-task baselines completed on 2026-08-03 at `Operational`.
 The prospective contract validator now accepts only explicitly listed

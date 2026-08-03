@@ -451,6 +451,7 @@ set(_geometry_test_files
     Test_Parameterization.cpp
     Test.ParameterizationDiagnostics.cpp
     Test.HarmonicParameterization.cpp
+    Test.ParameterizationOptimize.cpp
     Test.ParameterizationDispatch.cpp
     Test.BoundaryFirstFlattening.cpp
     Test.UvAtlas.cpp

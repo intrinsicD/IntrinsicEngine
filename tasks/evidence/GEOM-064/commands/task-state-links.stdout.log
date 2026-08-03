@@ -1,0 +1,7 @@
+[check_task_state_links] Root: /tmp/intrinsic-geometry-e2e.GJlhXS
+[check_task_state_links] Indexed task IDs: 842
+[check_task_state_links] Mode: strict
+[check_task_state_links] Findings:
+  - tasks/active/README.md:14: GEOM-064: link targets tasks/active, but actual location is done:tasks/done/GEOM-064-parameterization-optimization-kernels.md
+  - tasks/backlog/geometry/README.md:24: category index links retired task GEOM-064-parameterization-optimization-kernels.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+[check_task_state_links] STRICT MODE: failing.

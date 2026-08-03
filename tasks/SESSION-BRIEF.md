@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GEOM-064` — Parameterization optimization kernels seam (tasks/active/GEOM-064-parameterization-optimization-kernels.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -83,8 +83,8 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - unblocked: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
 - unblocked: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
-- blocked by `GEOM-064`: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
-- blocked by `GEOM-064`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)
+- unblocked: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
+- blocked by `METHOD-021`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
 - blocked by `METHOD-022`: `METHOD-025` — Progressive SLIM optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-025-parameterization-family-optimized-cpu-backend.md)
 - blocked by `METHOD-025`: `METHOD-026` — Parameterization family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)

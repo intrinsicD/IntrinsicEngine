@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py",
+    "--root",
+    "tasks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py --root tasks --strict",
+  "cwd": ".",
+  "duration_ms": 602,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T16:16:01Z",
+  "label": "validate-tasks",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T16:16:01Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/validate-tasks.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/validate-tasks.stdout.log",
+  "stdout_sha256": "1c1be7af1502c81fe009d19ec55935b4d77272e6e7320b0a2e98e48de76c6272",
+  "task_id": "GEOM-064"
+}

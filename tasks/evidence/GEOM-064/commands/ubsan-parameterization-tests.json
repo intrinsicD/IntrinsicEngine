@@ -1,0 +1,22 @@
+{
+  "command": [
+    "env",
+    "UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1",
+    "build/ci-ubsan/bin/IntrinsicGeometryTests",
+    "--gtest_filter=ParameterizationOptimize.*"
+  ],
+  "command_display": "env UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 build/ci-ubsan/bin/IntrinsicGeometryTests '--gtest_filter=ParameterizationOptimize.*'",
+  "cwd": ".",
+  "duration_ms": 15,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T16:08:13Z",
+  "label": "ubsan-parameterization-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T16:08:13Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/ubsan-parameterization-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/ubsan-parameterization-tests.stdout.log",
+  "stdout_sha256": "7f89014f34e00d84bd7207e62bd125a92fb9f5e22bca344e4499ceda2f0dd830",
+  "task_id": "GEOM-064"
+}

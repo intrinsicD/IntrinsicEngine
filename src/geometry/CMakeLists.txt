@@ -71,6 +71,7 @@ target_sources(${target_name}
         Geometry.Parameterization.Diagnostics.cppm
         Geometry.Parameterization.Bff.cppm
         Geometry.Parameterization.Harmonic.cppm
+        Geometry.Parameterization.Optimize.cppm
         Geometry.Plane.cppm
         Geometry.PointCloud.Consolidation.cppm
         Geometry.PointCloud.Conversion.cppm
@@ -170,6 +171,7 @@ target_sources(${target_name}
         Geometry.Parameterization.Diagnostics.cpp
         Geometry.Parameterization.Bff.cpp
         Geometry.Parameterization.Harmonic.cpp
+        Geometry.Parameterization.Optimize.cpp
         Geometry.Plane.cpp
         Geometry.PointCloud.Consolidation.cpp
         Geometry.PointCloud.Conversion.cpp

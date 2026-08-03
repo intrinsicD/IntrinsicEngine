@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`GEOM-064 — Parameterization optimization kernels seam`](GEOM-064-parameterization-optimization-kernels.md)
-  is active on `feature/lop-consolidation-e2e` under `Codex-LocalMerge`. Its
-  draft module remains unregistered and untested; the next gate is CMake
-  registration plus the focused `ParameterizationOptimize` unit contract.
+No tasks are currently active.
 
 ## History
 

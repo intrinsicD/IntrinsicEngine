@@ -1861,3 +1861,22 @@ observations:
     promoted_to: "logic/solution/constraints.md:K30"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O112
+    timestamp: "2026-08-03T18:14+02:00"
+    provenance: ai-executed
+    content: >
+      The shared parameterization optimization module has a deterministic
+      geometry-owned CPU contract for reference frames, signed-SVD proper
+      rotations, symmetric-Dirichlet energy/gradients, ARAP/SLIM proxies, and
+      locally-injective step selection, with explicit finite failure states.
+    context: >
+      GEOM-064 completed the reusable numerical seam required by the planned
+      ARAP, SLIM, and optimized CPU method owners. Focused, full CPU, ASan, and
+      UBSan evidence passed; solver convergence, global boundary bijectivity,
+      runtime/UI integration, GPU execution, and performance are not claimed.
+    potential_type: claim
+    bound_to: [N349]
+    promoted: true
+    promoted_to: "logic/claims.md:C26"
+    crystallized_via: artifact-commitment
+    stale: false

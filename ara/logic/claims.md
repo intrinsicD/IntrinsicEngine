@@ -749,3 +749,38 @@
 - **Tags**: geometry, point cloud, LOP, WLOP, CLOP, EAR, optimized CPU,
   negative result
 - **From staging**: O107
+
+## C26: Parameterization optimization kernels have a deterministic CPU contract
+- **Statement**: For supported triangle meshes and positive-orientation UV
+  maps, `Geometry.Parameterization.Optimize` deterministically prepares
+  face-storage-aligned reference data, fits signed-SVD proper rotations,
+  evaluates the full area-weighted symmetric-Dirichlet objective and analytic
+  gradient, assembles gradient-matching ARAP/SLIM proxy systems, and selects a
+  finite energy-decreasing step strictly inside the first local flip root.
+  Invalid, degenerate, and non-finite inputs fail through explicit statuses;
+  reflected maps retain a proper ARAP rotation but are rejected by the
+  orientation-aware objective/proxy barrier, and no successful record contains
+  a non-finite payload.
+- **Status**: supported — Clang 23 focused and complete CPU contracts plus
+  focused ASan and UBSan; no method-level convergence, global-boundary
+  bijectivity, runtime/UI, GPU/Vulkan, or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A supported fixture produces an improper local
+  rotation, an analytic gradient or proxy direction disagrees with finite
+  differences, a proxy normal matrix is asymmetric or indefinite, a returned
+  injective step reaches/crosses the first flip root or increases energy,
+  identical inputs differ bitwise on one host, or malformed/non-finite input
+  returns success or a successful non-finite payload.
+- **Proof**: [tasks/done/GEOM-064-parameterization-optimization-kernels.md,
+  src/geometry/Geometry.Parameterization.Optimize.cppm,
+  src/geometry/Geometry.Parameterization.Optimize.cpp,
+  tests/unit/geometry/Test.ParameterizationOptimize.cpp,
+  tasks/evidence/GEOM-064/commands/final-parameterization-tests.json,
+  tasks/evidence/GEOM-064/commands/final-cpu-tests.json,
+  tasks/evidence/GEOM-064/commands/final-asan-parameterization-tests.json,
+  tasks/evidence/GEOM-064/commands/final-ubsan-parameterization-tests.json]
+- **Dependencies**: []
+- **Tags**: geometry, parameterization, ARAP, SLIM, CPU, deterministic,
+  local injectivity
+- **From staging**: O112

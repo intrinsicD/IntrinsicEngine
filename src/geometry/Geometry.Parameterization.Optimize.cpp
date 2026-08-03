@@ -19,15 +19,13 @@ module Geometry.Parameterization.Optimize;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Linalg;
+import Geometry.Properties;
 import Geometry.Sparse;
 
 namespace Geometry::Parameterization
 {
     namespace
     {
-        constexpr std::size_t kInvalidIndex =
-            std::numeric_limits<std::size_t>::max();
-
         [[nodiscard]] bool IsFinite(const double value) noexcept
         {
             return std::isfinite(value);
@@ -336,38 +334,52 @@ namespace Geometry::Parameterization
             const double b,
             const double c) noexcept
         {
-            const double scale = std::max({
-                std::abs(a), std::abs(b), std::abs(c), 1.0});
-            const double epsilon =
-                64.0 * std::numeric_limits<double>::epsilon() * scale;
-            if (std::abs(a) <= epsilon)
+            const double coefficientScale = std::max({
+                std::abs(a), std::abs(b), std::abs(c)});
+            if (coefficientScale == 0.0 || !IsFinite(coefficientScale))
+                return 0.0;
+
+            // Normalize before forming the discriminant. This prevents
+            // overflow for large finite directions without comparing a root
+            // (a time) to a coefficient-scaled tolerance (an area).
+            const double normalizedA = a / coefficientScale;
+            const double normalizedB = b / coefficientScale;
+            const double normalizedC = c / coefficientScale;
+            if (normalizedA == 0.0)
             {
-                if (std::abs(b) <= epsilon)
+                if (normalizedB == 0.0)
                     return 0.0;
-                const double root = -c / b;
-                return root > epsilon && IsFinite(root) ? root : 0.0;
+                const double root = -normalizedC / normalizedB;
+                return root > 0.0 && IsFinite(root) ? root : 0.0;
             }
 
-            double discriminant = b * b - 4.0 * a * c;
+            const double squaredB = normalizedB * normalizedB;
+            const double fourAC = 4.0 * normalizedA * normalizedC;
+            double discriminant = squaredB - fourAC;
+            const double discriminantScale = std::max({
+                squaredB,
+                std::abs(fourAC),
+                std::numeric_limits<double>::min()});
             const double discriminantTolerance =
                 64.0 * std::numeric_limits<double>::epsilon()
-                * std::max({b * b, std::abs(4.0 * a * c), 1.0});
+                * discriminantScale;
             if (discriminant < -discriminantTolerance)
                 return 0.0;
             discriminant = std::max(0.0, discriminant);
             const double squareRoot = std::sqrt(discriminant);
-            const double q = -0.5 * (b + std::copysign(squareRoot, b));
+            const double q = -0.5 * (
+                normalizedB + std::copysign(squareRoot, normalizedB));
 
             std::array<double, 2u> roots{0.0, 0.0};
-            roots[0u] = q / a;
-            roots[1u] = std::abs(q) > epsilon
-                ? c / q
-                : -b / (2.0 * a);
+            roots[0u] = q / normalizedA;
+            roots[1u] = q != 0.0
+                ? normalizedC / q
+                : -normalizedB / (2.0 * normalizedA);
 
             double smallest = 0.0;
             for (const double root : roots)
             {
-                if (!IsFinite(root) || root <= epsilon)
+                if (!IsFinite(root) || root <= 0.0)
                     continue;
                 if (smallest == 0.0 || root < smallest)
                     smallest = root;
@@ -431,7 +443,7 @@ namespace Geometry::Parameterization
             const glm::dvec3 normal = glm::cross(edge1, edge2);
             const double doubleArea = glm::length(normal);
             if (!IsFinite(edge1Length) || !IsFinite(doubleArea)
-                || edge1Length <= 2.0 * areaEpsilon
+                || edge1Length <= 0.0
                 || doubleArea <= 2.0 * areaEpsilon)
             {
                 result.Status = OptimizationStatus::DegenerateReference;
@@ -520,6 +532,7 @@ namespace Geometry::Parameterization
                 fit);
             if (faceStatus != OptimizationStatus::Success)
             {
+                fit = FaceLocalFit{};
                 result.Status = faceStatus;
                 return result;
             }
@@ -625,8 +638,7 @@ namespace Geometry::Parameterization
                 std::min(result.MinimumDeterminant, determinant);
             result.MinimumSignedUvArea =
                 std::min(result.MinimumSignedUvArea, signedArea);
-            if (determinant <= determinantEpsilon
-                || signedArea <= determinantEpsilon)
+            if (determinant <= determinantEpsilon || signedArea <= 0.0)
             {
                 result.Status = OptimizationStatus::NonInjectiveInput;
                 result.BarrierFace = faceIndex;
@@ -686,7 +698,9 @@ namespace Geometry::Parameterization
         ProxySystem result{};
         result.Energy = energy;
         if (!IsFinite(proximalWeight) || proximalWeight < 0.0
-            || !IsFinite(determinantEpsilon) || determinantEpsilon <= 0.0)
+            || !IsFinite(determinantEpsilon) || determinantEpsilon <= 0.0
+            || (energy != ProxyEnergy::Arap
+                && energy != ProxyEnergy::SymmetricDirichlet))
         {
             return result;
         }
@@ -967,7 +981,7 @@ namespace Geometry::Parameterization
             uvs,
             direction,
             params.MaximumStep,
-            0.5 * params.DeterminantEpsilon);
+            std::numeric_limits<double>::min());
         if (!boundary.Succeeded())
         {
             result.Status = boundary.Status;
