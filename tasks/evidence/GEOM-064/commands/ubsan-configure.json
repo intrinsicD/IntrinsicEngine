@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-ubsan",
+    "--fresh",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+  ],
+  "command_display": "cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+  "cwd": ".",
+  "duration_ms": 8252,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T16:07:48Z",
+  "label": "ubsan-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T16:07:40Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/ubsan-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/ubsan-configure.stdout.log",
+  "stdout_sha256": "7ec6e6f370cc1ae43f303f32557c6a24f9ce57fd011d6e71548f31d3f6dfb938",
+  "task_id": "GEOM-064"
+}

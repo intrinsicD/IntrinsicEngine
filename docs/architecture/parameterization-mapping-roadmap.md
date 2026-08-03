@@ -39,7 +39,7 @@ typed payloads. Backend selection stays at the runtime/method boundary until a
 second implementation exists.
 
 - Family surface: retired [`GEOM-063`](../../tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — `Geometry.Parameterization::ParameterizeMesh(mesh, strategy)` with `ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams, BffParams>`, normalized status, and the GEOM-018 diagnostics in every successful result. Tutte is selected through `HarmonicParams::Weights = Uniform`. No unimplemented strategy or backend token is reserved; each method/backend owner extends the surface when its implementation lands.
-- Shared optimization seam: [`GEOM-064`](../../tasks/active/GEOM-064-parameterization-optimization-kernels.md) — `Geometry.Parameterization.Optimize` with precomputed reference frames, signed-SVD/proper-rotation fits, orientation-aware symmetric-Dirichlet energy/gradient, ARAP/SLIM least-squares proxy assembly, and the locally-injective line search that ARAP (Pack 3), SLIM (Pack 4), and the optimized backend (Pack 7) share, so no variant re-derives the nonlinear-solve core privately.
+- Shared optimization seam: retired [`GEOM-064`](../../tasks/done/GEOM-064-parameterization-optimization-kernels.md) — `Geometry.Parameterization.Optimize` provides precomputed reference frames, signed-SVD/proper-rotation fits, orientation-aware symmetric-Dirichlet energy/gradient, ARAP/SLIM least-squares proxy assembly, and the locally-injective line search that ARAP (Pack 3), SLIM (Pack 4), and the optimized backend (Pack 7) share, so no variant re-derives the nonlinear-solve core privately. Its CPU-contract tests cover analytic-gradient agreement, proxy gradient matching and PSD structure, ratio-preserving exact flip roots across extreme coefficient scales, deterministic repetition, and fail-closed invalid inputs. Because the reference and fit records are intentionally plain public data, every consumer revalidates their storage cardinalities, active domains, indices, and finite numerical invariants before allocation or indexing; proxy assembly additionally binds each fit back to the current-UV Jacobian, determinant, SO(2) rotation, orthogonal left frame, and signed-SVD reconstruction with quantity-relative comparisons that preserve sign near the supported singular threshold. Method-owned outer loops and global-boundary barriers remain outside the seam.
 
 The rendering/interaction decision for the interactive UV view is recorded in [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md): the UV layout is a derived second view of the mesh entity (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity.
 
@@ -144,7 +144,7 @@ Primary home: `src/geometry` — the `Arap` strategy on the `Geometry.Parameteri
 Dependencies:
 
 - Pack 1 distortion diagnostics; Pack 2 boundary constraints and initial (Tutte) embedding via the surface.
-- The `GEOM-063` dispatch surface and the `GEOM-064` optimization kernels seam — the "future generic optimization framework" this pack originally contemplated, now factored out because ARAP, SLIM, and the optimized backend share it.
+- The retired `GEOM-063` dispatch surface and retired `GEOM-064` optimization kernels seam — the "future generic optimization framework" this pack originally contemplated, now delivered as stateless reference-frame, rotation-fit, proxy-assembly, and locally-injective line-search kernels because ARAP, SLIM, and the optimized backend share them.
 - `Geometry.Linalg` for per-triangle local rotations/polar decomposition (behind `GEOM-064`).
 
 Correctness and benchmarks:
@@ -344,7 +344,7 @@ Parameterization and mapping tasks must make topology, boundary, and degeneracy 
 The diagnostics ([`GEOM-018`](../../tasks/archive/GEOM-018-parameterization-distortion-map-quality-diagnostics.md), retired) and harmonic/Tutte ([`GEOM-019`](../../tasks/done/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md), retired) foundations exist, so the SOTA-variant program orders as:
 
 1. Retired [`GEOM-063`](../../tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — the typed CPU family dispatch surface, consolidating existing Harmonic/Tutte and LSCM so later implemented variants can extend one API. Behavior-preserving; no new algorithm or speculative backend token.
-2. [`GEOM-064`](../../tasks/active/GEOM-064-parameterization-optimization-kernels.md) — the shared optimization-kernel seam ARAP and SLIM consume.
+2. Retired [`GEOM-064`](../../tasks/done/GEOM-064-parameterization-optimization-kernels.md) — the shared optimization-kernel seam ARAP, SLIM, and their optimized CPU backend consume.
 3. The SOTA reference variants on the surface: ARAP (`METHOD-021`, Pack 3), SLIM (`METHOD-022`, Pack 4), SCP (`METHOD-024`, Pack 4b), BFF (`METHOD-023`, Pack 4c) — CPU-reference-first, in each task's `depends_on` order.
 4. The optimized CPU (`METHOD-025`) and GPU (`METHOD-026`) backends for the iterative strategies after reference parity; the linear one-shot strategies (LSCM/SCP/BFF) record no optimized/GPU follow-up in their tasks. `METHOD-026` also wires the runtime GPU job-queue leg, so it is additionally gated on `RUNTIME-176`.
 5. The entire engine-integration and interactive-UV Pack 7 is retired,

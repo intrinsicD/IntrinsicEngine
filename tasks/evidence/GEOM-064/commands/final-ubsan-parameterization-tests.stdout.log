@@ -1,0 +1,28 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = ParameterizationOptimize.*
+[==========] Running 9 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 9 tests from ParameterizationOptimize
+[ RUN      ] ParameterizationOptimize.ReferencePreparationIsStorageAlignedAndFailClosed
+[       OK ] ParameterizationOptimize.ReferencePreparationIsStorageAlignedAndFailClosed (0 ms)
+[ RUN      ] ParameterizationOptimize.ProperRotationFitRecoversRotationAndScale
+[       OK ] ParameterizationOptimize.ProperRotationFitRecoversRotationAndScale (0 ms)
+[ RUN      ] ParameterizationOptimize.SymmetricDirichletMatchesReportingDiagnostics
+[       OK ] ParameterizationOptimize.SymmetricDirichletMatchesReportingDiagnostics (0 ms)
+[ RUN      ] ParameterizationOptimize.ReflectionUsesProperRotationButTripsBarrier
+[       OK ] ParameterizationOptimize.ReflectionUsesProperRotationButTripsBarrier (0 ms)
+[ RUN      ] ParameterizationOptimize.AnalyticDirichletGradientMatchesFiniteDifference
+[       OK ] ParameterizationOptimize.AnalyticDirichletGradientMatchesFiniteDifference (0 ms)
+[ RUN      ] ParameterizationOptimize.ProxySystemsArePsdAndMatchCurrentGradients
+[       OK ] ParameterizationOptimize.ProxySystemsArePsdAndMatchCurrentGradients (0 ms)
+[ RUN      ] ParameterizationOptimize.InjectiveSearchStopsInsideFirstFlipRoot
+[       OK ] ParameterizationOptimize.InjectiveSearchStopsInsideFirstFlipRoot (0 ms)
+[ RUN      ] ParameterizationOptimize.IdenticalInputsProduceBitwiseIdenticalOutputs
+[       OK ] ParameterizationOptimize.IdenticalInputsProduceBitwiseIdenticalOutputs (0 ms)
+[ RUN      ] ParameterizationOptimize.InvalidDynamicInputsReturnExplicitStatuses
+[       OK ] ParameterizationOptimize.InvalidDynamicInputsReturnExplicitStatuses (0 ms)
+[----------] 9 tests from ParameterizationOptimize (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 9 tests from 1 test suite ran. (1 ms total)
+[  PASSED  ] 9 tests.

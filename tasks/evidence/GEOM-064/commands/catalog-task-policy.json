@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 657,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T16:19:50Z",
+  "label": "catalog-task-policy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T16:19:50Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/catalog-task-policy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/catalog-task-policy.stdout.log",
+  "stdout_sha256": "19761e8244aec3c185b4f8ac4565a981f110015fb8437e43a26a570d8f888c52",
+  "task_id": "GEOM-064"
+}

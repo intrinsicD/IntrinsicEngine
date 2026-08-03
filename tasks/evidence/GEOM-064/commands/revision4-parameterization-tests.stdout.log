@@ -1,0 +1,157 @@
+Internal ctest changing into directory: /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+Test project /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+      Start  565: ParameterizationOperations.StableTokensAndAllImplementedStrategiesWriteFiniteUvs
+ 1/69 Test  #565: ParameterizationOperations.StableTokensAndAllImplementedStrategiesWriteFiniteUvs ..........................   Passed    0.01 sec
+      Start  566: ParameterizationOperations.UndoRedoRestoresAbsentUvProperty
+ 2/69 Test  #566: ParameterizationOperations.UndoRedoRestoresAbsentUvProperty ...............................................   Passed    0.00 sec
+      Start  567: ParameterizationOperations.UndoRedoRestoresPresentUvValues
+ 3/69 Test  #567: ParameterizationOperations.UndoRedoRestoresPresentUvValues ................................................   Passed    0.00 sec
+      Start  568: ParameterizationOperations.HistoryRejectsInterveningGeometryState
+ 4/69 Test  #568: ParameterizationOperations.HistoryRejectsInterveningGeometryState .........................................   Passed    0.00 sec
+      Start  569: ParameterizationOperations.HistoryDoesNotRetainSessionOwnedModelCache
+ 5/69 Test  #569: ParameterizationOperations.HistoryDoesNotRetainSessionOwnedModelCache .....................................   Passed    0.00 sec
+      Start  570: ParameterizationOperations.DeletedVertexTombstonePreservesStorageUvs
+ 6/69 Test  #570: ParameterizationOperations.DeletedVertexTombstonePreservesStorageUvs ......................................   Passed    0.00 sec
+      Start  571: ParameterizationOperations.ConfiguredPathReadsActiveEngineConfig
+ 7/69 Test  #571: ParameterizationOperations.ConfiguredPathReadsActiveEngineConfig ..........................................   Passed    0.00 sec
+      Start  572: ParameterizationOperations.EditorConfigHelperUsesValidatedHotApplyLane
+ 8/69 Test  #572: ParameterizationOperations.EditorConfigHelperUsesValidatedHotApplyLane ....................................   Passed    0.04 sec
+      Start  573: ParameterizationOperations.ConfigSourcesProduceIdenticalStateAndUvs
+ 9/69 Test  #573: ParameterizationOperations.ConfigSourcesProduceIdenticalStateAndUvs .......................................   Passed    0.10 sec
+      Start  574: ParameterizationOperations.IdenticalInputAndConfigAreDeterministic
+10/69 Test  #574: ParameterizationOperations.IdenticalInputAndConfigAreDeterministic ........................................   Passed    0.01 sec
+      Start  575: ParameterizationOperations.SectionValidationKeepsNestedReferenceFallbackAtomic
+11/69 Test  #575: ParameterizationOperations.SectionValidationKeepsNestedReferenceFallbackAtomic ............................   Passed    0.00 sec
+      Start  576: ParameterizationOperations.InvalidEnumsAndNarrowingFailClosed
+12/69 Test  #576: ParameterizationOperations.InvalidEnumsAndNarrowingFailClosed .............................................   Passed    0.00 sec
+      Start  577: ParameterizationOperations.InvalidConfigEditDoesNotSerializeFallbackToken
+13/69 Test  #577: ParameterizationOperations.InvalidConfigEditDoesNotSerializeFallbackToken .................................   Passed    0.00 sec
+      Start  578: ParameterizationOperations.WrongTypedUvAndNonTriangleFacesFailClosed
+14/69 Test  #578: ParameterizationOperations.WrongTypedUvAndNonTriangleFacesFailClosed ......................................   Passed    0.00 sec
+      Start  579: ParameterizationOperations.ViewModelIsPointerFreeAndCarriesAggregateDiagnostics
+15/69 Test  #579: ParameterizationOperations.ViewModelIsPointerFreeAndCarriesAggregateDiagnostics ...........................   Passed    0.00 sec
+      Start  580: ParameterizationOperations.ViewModelFansFaceDiagnosticsIntoRenderedTriangles
+16/69 Test  #580: ParameterizationOperations.ViewModelFansFaceDiagnosticsIntoRenderedTriangles ..............................   Passed    0.01 sec
+      Start  581: ParameterizationOperations.FaceDiagnosticsRequireTheExactGeometryAndUvFingerprint
+17/69 Test  #581: ParameterizationOperations.FaceDiagnosticsRequireTheExactGeometryAndUvFingerprint .........................   Passed    0.01 sec
+      Start  582: ParameterizationOperations.DeletedFaceTombstoneKeepsDiagnosticsAlignedWithSourceFaceStorage
+18/69 Test  #582: ParameterizationOperations.DeletedFaceTombstoneKeepsDiagnosticsAlignedWithSourceFaceStorage ...............   Passed    0.00 sec
+      Start  583: ParameterizationOperations.CpuViewDisablesGpuWorkAndReportsBackgroundFallback
+19/69 Test  #583: ParameterizationOperations.CpuViewDisablesGpuWorkAndReportsBackgroundFallback .............................   Passed    0.00 sec
+      Start  584: ParameterizationOperations.GpuViewWithoutCommandSurfaceReportsCpuFallback
+20/69 Test  #584: ParameterizationOperations.GpuViewWithoutCommandSurfaceReportsCpuFallback .................................   Passed    0.00 sec
+      Start  585: ParameterizationOperations.GpuViewRequestTokenIsStableAndSemantic
+21/69 Test  #585: ParameterizationOperations.GpuViewRequestTokenIsStableAndSemantic .........................................   Passed    0.00 sec
+      Start 1201: SandboxParameterizationPanel.RegistrationIsStableAndIdempotent
+22/69 Test #1201: SandboxParameterizationPanel.RegistrationIsStableAndIdempotent ............................................   Passed    0.04 sec
+      Start 1202: SandboxParameterizationPanel.StrategiesAndTypedRequestAreExact
+23/69 Test #1202: SandboxParameterizationPanel.StrategiesAndTypedRequestAreExact ............................................   Passed    0.00 sec
+      Start 1203: SandboxParameterizationPanel.ProjectionFitsAndFailsClosed
+24/69 Test #1203: SandboxParameterizationPanel.ProjectionFitsAndFailsClosed .................................................   Passed    0.00 sec
+      Start 1204: SandboxParameterizationPanel.ResultSummaryCarriesAggregateDiagnostics
+25/69 Test #1204: SandboxParameterizationPanel.ResultSummaryCarriesAggregateDiagnostics .....................................   Passed    0.00 sec
+      Start 1205: SandboxParameterizationPanel.RealWindowAndTypedActionAreOperational
+26/69 Test #1205: SandboxParameterizationPanel.RealWindowAndTypedActionAreOperational .......................................   Passed    0.07 sec
+      Start 1714: ParameterizationDiagnostics.IdentityTriangleHasZeroNormalizedError
+27/69 Test #1714: ParameterizationDiagnostics.IdentityTriangleHasZeroNormalizedError ........................................   Passed    0.00 sec
+      Start 1715: ParameterizationDiagnostics.IdentitySquareReportsBoundaryMetrics
+28/69 Test #1715: ParameterizationDiagnostics.IdentitySquareReportsBoundaryMetrics ..........................................   Passed    0.00 sec
+      Start 1716: ParameterizationDiagnostics.StretchedRectangleHasPredictableDistortion
+29/69 Test #1716: ParameterizationDiagnostics.StretchedRectangleHasPredictableDistortion ....................................   Passed    0.00 sec
+      Start 1717: ParameterizationDiagnostics.FlippedUvReportsElementWithoutFailing
+30/69 Test #1717: ParameterizationDiagnostics.FlippedUvReportsElementWithoutFailing .........................................   Passed    0.00 sec
+      Start 1718: ParameterizationDiagnostics.DegeneratePositionTriangleIsSkipped
+31/69 Test #1718: ParameterizationDiagnostics.DegeneratePositionTriangleIsSkipped ...........................................   Passed    0.00 sec
+      Start 1719: ParameterizationDiagnostics.DegenerateUvTriangleIsSkipped
+32/69 Test #1719: ParameterizationDiagnostics.DegenerateUvTriangleIsSkipped .................................................   Passed    0.00 sec
+      Start 1720: ParameterizationDiagnostics.DeletedFaceKeepsStorageAlignedNanSentinel
+33/69 Test #1720: ParameterizationDiagnostics.DeletedFaceKeepsStorageAlignedNanSentinel .....................................   Passed    0.00 sec
+      Start 1721: ParameterizationDiagnostics.NonTriangleFaceIsReported
+34/69 Test #1721: ParameterizationDiagnostics.NonTriangleFaceIsReported .....................................................   Passed    0.00 sec
+      Start 1722: ParameterizationDiagnostics.MissingUvsFailBeforeEvaluation
+35/69 Test #1722: ParameterizationDiagnostics.MissingUvsFailBeforeEvaluation ................................................   Passed    0.00 sec
+      Start 1723: ParameterizationDiagnostics.NonFiniteUvsAreReported
+36/69 Test #1723: ParameterizationDiagnostics.NonFiniteUvsAreReported .......................................................   Passed    0.00 sec
+      Start 1724: HarmonicParameterization.SquareFanCenterAtHarmonicAverage
+37/69 Test #1724: HarmonicParameterization.SquareFanCenterAtHarmonicAverage .................................................   Passed    0.00 sec
+      Start 1725: HarmonicParameterization.CircleBoundaryIsOnCircleAndDeterministic
+38/69 Test #1725: HarmonicParameterization.CircleBoundaryIsOnCircleAndDeterministic .........................................   Passed    0.00 sec
+      Start 1726: HarmonicParameterization.SquareArcLengthBoundaryProducesValidEmbedding
+39/69 Test #1726: HarmonicParameterization.SquareArcLengthBoundaryProducesValidEmbedding ....................................   Passed    0.00 sec
+      Start 1727: HarmonicParameterization.TutteEmbeddingHasNoFlippedTriangles
+40/69 Test #1727: HarmonicParameterization.TutteEmbeddingHasNoFlippedTriangles ..............................................   Passed    0.00 sec
+      Start 1728: HarmonicParameterization.ClosedMeshIsNotDiskTopology
+41/69 Test #1728: HarmonicParameterization.ClosedMeshIsNotDiskTopology ......................................................   Passed    0.00 sec
+      Start 1729: HarmonicParameterization.MultipleBoundaryLoopsAreNotDiskTopology
+42/69 Test #1729: HarmonicParameterization.MultipleBoundaryLoopsAreNotDiskTopology ..........................................   Passed    0.00 sec
+      Start 1730: HarmonicParameterization.PuncturedGenusOneMeshIsNotDiskTopology
+43/69 Test #1730: HarmonicParameterization.PuncturedGenusOneMeshIsNotDiskTopology ...........................................   Passed    0.00 sec
+      Start 1731: HarmonicParameterization.FewerThanThreeVerticesAreReported
+44/69 Test #1731: HarmonicParameterization.FewerThanThreeVerticesAreReported ................................................   Passed    0.00 sec
+      Start 1732: HarmonicParameterization.NonTriangleMeshIsRejected
+45/69 Test #1732: HarmonicParameterization.NonTriangleMeshIsRejected ........................................................   Passed    0.01 sec
+      Start 1733: HarmonicParameterization.MismatchedBoundaryArrayIsRejected
+46/69 Test #1733: HarmonicParameterization.MismatchedBoundaryArrayIsRejected ................................................   Passed    0.00 sec
+      Start 1734: HarmonicParameterization.DuplicatePinIsRejected
+47/69 Test #1734: HarmonicParameterization.DuplicatePinIsRejected ...........................................................   Passed    0.00 sec
+      Start 1735: HarmonicParameterization.DeletedPinIsRejected
+48/69 Test #1735: HarmonicParameterization.DeletedPinIsRejected .............................................................   Passed    0.00 sec
+      Start 1736: HarmonicParameterization.NonFinitePinUvIsRejected
+49/69 Test #1736: HarmonicParameterization.NonFinitePinUvIsRejected .........................................................   Passed    0.00 sec
+      Start 1737: HarmonicParameterization.CustomBoundaryNotFullyPinnedIsRejected
+50/69 Test #1737: HarmonicParameterization.CustomBoundaryNotFullyPinnedIsRejected ...........................................   Passed    0.00 sec
+      Start 1738: HarmonicParameterization.LscmApiRemainsReachable
+51/69 Test #1738: HarmonicParameterization.LscmApiRemainsReachable ..........................................................   Passed    0.01 sec
+      Start 1739: ParameterizationOptimize.ReferencePreparationIsStorageAlignedAndFailClosed
+52/69 Test #1739: ParameterizationOptimize.ReferencePreparationIsStorageAlignedAndFailClosed ................................   Passed    0.00 sec
+      Start 1740: ParameterizationOptimize.ProperRotationFitRecoversRotationAndScale
+53/69 Test #1740: ParameterizationOptimize.ProperRotationFitRecoversRotationAndScale ........................................   Passed    0.00 sec
+      Start 1741: ParameterizationOptimize.SymmetricDirichletMatchesReportingDiagnostics
+54/69 Test #1741: ParameterizationOptimize.SymmetricDirichletMatchesReportingDiagnostics ....................................   Passed    0.00 sec
+      Start 1742: ParameterizationOptimize.ReflectionUsesProperRotationButTripsBarrier
+55/69 Test #1742: ParameterizationOptimize.ReflectionUsesProperRotationButTripsBarrier ......................................   Passed    0.00 sec
+      Start 1743: ParameterizationOptimize.AnalyticDirichletGradientMatchesFiniteDifference
+56/69 Test #1743: ParameterizationOptimize.AnalyticDirichletGradientMatchesFiniteDifference .................................   Passed    0.00 sec
+      Start 1744: ParameterizationOptimize.ProxySystemsArePsdAndMatchCurrentGradients
+57/69 Test #1744: ParameterizationOptimize.ProxySystemsArePsdAndMatchCurrentGradients .......................................   Passed    0.00 sec
+      Start 1745: ParameterizationOptimize.InjectiveSearchStopsInsideFirstFlipRoot
+58/69 Test #1745: ParameterizationOptimize.InjectiveSearchStopsInsideFirstFlipRoot ..........................................   Passed    0.00 sec
+      Start 1746: ParameterizationOptimize.IdenticalInputsProduceBitwiseIdenticalOutputs
+59/69 Test #1746: ParameterizationOptimize.IdenticalInputsProduceBitwiseIdenticalOutputs ....................................   Passed    0.00 sec
+      Start 1747: ParameterizationOptimize.InvalidDynamicInputsReturnExplicitStatuses
+60/69 Test #1747: ParameterizationOptimize.InvalidDynamicInputsReturnExplicitStatuses .......................................   Passed    0.00 sec
+      Start 1748: ParameterizationOptimize.PublicRecordsAreRevalidatedBeforeIndexing
+61/69 Test #1748: ParameterizationOptimize.PublicRecordsAreRevalidatedBeforeIndexing ........................................   Passed    0.00 sec
+      Start 1749: ParameterizationDispatch.LscmMatchesDirectSolverAndCarriesDiagnostics
+62/69 Test #1749: ParameterizationDispatch.LscmMatchesDirectSolverAndCarriesDiagnostics .....................................   Passed    0.00 sec
+      Start 1750: ParameterizationDispatch.HarmonicAndTutteMatchDirectSolver
+63/69 Test #1750: ParameterizationDispatch.HarmonicAndTutteMatchDirectSolver ................................................   Passed    0.00 sec
+      Start 1751: ParameterizationDispatch.InvalidInputsFailClosedThroughStatus
+64/69 Test #1751: ParameterizationDispatch.InvalidInputsFailClosedThroughStatus .............................................   Passed    0.00 sec
+      Start 1752: ParameterizationDispatch.UnusableDiagnosticsFailClosedWithoutUvs
+65/69 Test #1752: ParameterizationDispatch.UnusableDiagnosticsFailClosedWithoutUvs ..........................................   Passed    0.00 sec
+      Start 1753: ParameterizationDispatch.LscmNonConvergenceIsSolverFailureWithoutUvs
+66/69 Test #1753: ParameterizationDispatch.LscmNonConvergenceIsSolverFailureWithoutUvs ......................................   Passed    0.00 sec
+      Start 1754: ParameterizationDispatch.RepeatedCallsAreDeterministic
+67/69 Test #1754: ParameterizationDispatch.RepeatedCallsAreDeterministic ....................................................   Passed    0.00 sec
+      Start 1959: HalfedgeMesh_PropertyAccess.ParameterizationMutableOverloadPublishesUvAndPinProperties
+68/69 Test #1959: HalfedgeMesh_PropertyAccess.ParameterizationMutableOverloadPublishesUvAndPinProperties ....................   Passed    0.00 sec
+      Start 3341: RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath
+69/69 Test #3341: RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath ...***Skipped   0.12 sec
+
+100% tests passed, 0 tests failed out of 69
+
+Label Time Summary:
+contract       =   0.23 sec*proc (21 tests)
+geometry       =   0.19 sec*proc (42 tests)
+gpu            =   0.12 sec*proc (1 test)
+graphics       =   0.12 sec*proc (1 test)
+integration    =   0.23 sec*proc (6 tests)
+runtime        =   0.46 sec*proc (27 tests)
+unit           =   0.19 sec*proc (42 tests)
+vulkan         =   0.12 sec*proc (1 test)
+
+Total Test time (real) =   1.44 sec
+
+The following tests did not run:
+	3341 - RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath (Skipped)

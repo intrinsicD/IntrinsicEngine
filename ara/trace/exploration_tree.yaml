@@ -8257,3 +8257,32 @@ tree:
       focused gate, corrected from 36 to 37, and reconfirmed. No push,
       sanitizer rerun, or GPU/Vulkan capability claim is part of this result.
     status: resolved
+  - id: N349
+    type: experiment
+    title: "Complete and verify shared parameterization optimization kernels"
+    provenance: ai-executed
+    timestamp: "2026-08-03T18:14+02:00"
+    also_depends_on: [N348]
+    evidence:
+      - "tasks/done/GEOM-064-parameterization-optimization-kernels.md"
+      - "src/geometry/Geometry.Parameterization.Optimize.cppm"
+      - "src/geometry/Geometry.Parameterization.Optimize.cpp"
+      - "tests/unit/geometry/Test.ParameterizationOptimize.cpp"
+      - "tasks/evidence/GEOM-064/commands/revision4-parameterization-tests.json: 69 selected, 68 passed, and one opt-in Vulkan skip"
+      - "tasks/evidence/GEOM-064/commands/revision4-cpu-tests.json: 4,074 selected, 4,073 passed, and one expected GLFW/LSan skip"
+      - "tasks/evidence/GEOM-064/commands/revision4-asan-parameterization-tests.json: 10/10 passed"
+      - "tasks/evidence/GEOM-064/commands/revision4-ubsan-parameterization-tests.json: 10/10 passed"
+    result: >
+      Geometry.Parameterization.Optimize now provides deterministic
+      face-storage-aligned reference preparation, signed-SVD proper rotations,
+      full area-weighted symmetric-Dirichlet energy and analytic gradients,
+      gradient-matching ARAP/SLIM proxy systems, and a stable locally-injective
+      flip-root/Armijo search. Independent review forced ratio-preserving
+      extreme-scale root arithmetic and complete revalidation of caller-mutable
+      reference/local-fit records before allocation or indexing, including
+      binding supplied fits back to the current-UV Jacobian and SO(2)/signed-SVD
+      identities with scale-relative checks that preserve determinant and
+      singular-value signs near the supported threshold. Method outer loops,
+      global boundary bijectivity, runtime/UI integration, GPU execution, and
+      performance remain explicitly outside this CPU-contract result.
+    status: resolved

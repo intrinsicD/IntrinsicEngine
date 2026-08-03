@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_root_hygiene.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/repo/check_root_hygiene.py --root .",
+  "cwd": ".",
+  "duration_ms": 50,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T17:08:15Z",
+  "label": "revision3-root-hygiene",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T17:08:15Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/revision3-root-hygiene.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/revision3-root-hygiene.stdout.log",
+  "stdout_sha256": "34e20571bacf6bd67681f88a86ca27bbf91a60d10be37a5ecda78fcccd628129",
+  "task_id": "GEOM-064"
+}

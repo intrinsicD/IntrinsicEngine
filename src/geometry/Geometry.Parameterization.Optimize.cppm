@@ -7,7 +7,7 @@ module;
 #include <span>
 #include <vector>
 
-#include <glm/fwd.hpp>
+#include <glm/glm.hpp>
 
 export module Geometry.Parameterization.Optimize;
 
@@ -16,6 +16,10 @@ export import Geometry.Sparse;
 
 export namespace Geometry::Parameterization
 {
+    /// Stable fail-closed outcomes for the stateless optimization kernels.
+    /// Callers may consume numerical payloads only when Succeeded() is true;
+    /// malformed, singular, reflected, or non-finite inputs never yield a
+    /// successful record containing NaN or infinity.
     enum class OptimizationStatus : std::uint8_t
     {
         Success = 0,
@@ -61,6 +65,8 @@ export namespace Geometry::Parameterization
     /// Precompute deterministic local source frames and barycentric gradients.
     /// Live non-triangles, non-finite positions, and source triangles whose
     /// area is <= areaEpsilon fail closed. Deleted storage slots are retained.
+    /// Every consuming kernel revalidates this public record's cardinalities,
+    /// active-domain markers, indices, areas, and gradients before indexing it.
     [[nodiscard]] OptimizationReference PrepareOptimizationReference(
         const HalfedgeMesh::Mesh& mesh,
         double areaEpsilon = 1.0e-12);
@@ -92,6 +98,8 @@ export namespace Geometry::Parameterization
         }
     };
 
+    /// Fit the face-storage-aligned signed SVD and closest proper rotation.
+    /// Singular/non-finite UV maps return an explicit failure status.
     [[nodiscard]] LocalFitResult FitLocalModels(
         const OptimizationReference& reference,
         std::span<const glm::dvec2> uvs,
@@ -174,6 +182,10 @@ export namespace Geometry::Parameterization
     /// Assemble the area-weighted ARAP (W=I) or SLIM gradient-matching proxy.
     /// A finite non-negative proximalWeight adds lambda*I and
     /// lambda*currentUvs to the normal equations; the method owner chooses it.
+    /// The public local-fit record is revalidated against currentUvs, including
+    /// its Jacobian, determinant, orthogonal factors, and signed SVD identity.
+    /// Quantity-relative checks preserve sign distinctions down to the
+    /// supported determinant threshold instead of imposing a unit-scale floor.
     [[nodiscard]] ProxySystem AssembleProxySystem(
         const OptimizationReference& reference,
         std::span<const glm::dvec2> currentUvs,
@@ -196,8 +208,9 @@ export namespace Geometry::Parameterization
     };
 
     /// Return the first positive root of every triangle's signed-area
-    /// quadratic, minimized and capped by finite positive tMax. The returned
-    /// root is the degeneracy boundary; callers must step strictly inside it.
+    /// quadratic with ratio-preserving scale-safe arithmetic, minimized and
+    /// capped by finite positive tMax. The returned root is the degeneracy
+    /// boundary; callers must step strictly inside it.
     [[nodiscard]] InjectiveStepResult MaxInjectiveStep(
         const OptimizationReference& reference,
         std::span<const glm::dvec2> uvs,
@@ -236,6 +249,8 @@ export namespace Geometry::Parameterization
     /// Orientation-aware bounded Armijo search. It starts at
     /// min(1,0.8*alpha_max) when a triangle limits the step, never evaluates
     /// at the degeneracy root, and accepts only a finite energy decrease.
+    /// Positive element orientation establishes local injectivity only; this
+    /// helper does not detect boundary overlap or claim global bijectivity.
     [[nodiscard]] InjectiveLineSearchResult FindInjectiveDirichletStep(
         const OptimizationReference& reference,
         std::span<const glm::dvec2> uvs,

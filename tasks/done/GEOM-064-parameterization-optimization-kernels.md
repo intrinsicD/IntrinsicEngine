@@ -8,20 +8,22 @@ evidence: required
 owner: "Codex-LocalMerge"
 branch: "feature/lop-consolidation-e2e"
 worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
-claimed_at: "2026-08-03T11:45:54Z"
+claimed_at: "2026-08-03T16:19:28Z"
 contract_schema: 1
-contracts: []
-contract_review: "Pure geometry-owned numerical kernels do not consume or publish ECS element domains and do not bind a method into runtime, config, or UI."
+contracts: [repo.task-contract-discovery, geometry.parameterization-optimization]
+contract_review: "GEOM-064 establishes the reusable geometry.parameterization-optimization seam and records its canonical roadmap source plus executable proof. The pure geometry-owned kernels do not consume or publish ECS element domains and do not bind a method into runtime, config, or UI."
 maturity_target: CPUContracted
+completed_on: 2026-08-03
 ---
 # GEOM-064 — Parameterization optimization kernels seam
 
 ## Status
-- Active. The literature/reference contract below was frozen before source
-  implementation on 2026-08-02.
-- A draft module interface and implementation are checkpointed, but they are
-  not registered in CMake, covered by the required tests, or evidence-eligible.
-  Every actionable checkbox remains open and no `CPUContracted` claim is made.
+- Completed on 2026-08-03 at `CPUContracted`. The literature/reference
+  contract was frozen before source implementation on 2026-08-02; the final
+  module is registered, documented, and covered by focused, full-CPU, ASan,
+  and UBSan evidence. Independent fixed-surface acceptance is required before
+  the high-risk evidence bundle is complete.
+- Commit: pending final evidence binding.
 
 ## Goal
 - Add a reusable geometry-owned kernel seam for iterative distortion-minimizing
@@ -108,65 +110,83 @@ maturity_target: CPUContracted
   iteration counts.
 
 ## Required changes
-- [ ] Add module `Geometry.Parameterization.Optimize` (`.cppm` interface + `.cpp` implementation unit) in namespace `Geometry::Parameterization`, exposing only `std`/`glm`/scalar and geometry-owned types.
-- [ ] Add one plain precomputed reference record for face-storage-aligned vertex
+- [x] Add module `Geometry.Parameterization.Optimize` (`.cppm` interface + `.cpp` implementation unit) in namespace `Geometry::Parameterization`, exposing only `std`/`glm`/scalar and geometry-owned types.
+- [x] Add one plain precomputed reference record for face-storage-aligned vertex
       indices, local gradients, and positive 3D area. Every later kernel
       consumes it; deleted/non-triangle/degenerate/non-finite inputs fail
       closed during preparation.
-- [ ] Local step: fit face-storage-aligned proper rotations, Jacobians, left
+- [x] Local step: fit face-storage-aligned proper rotations, Jacobians, left
       singular frames, signed singular values, determinant, and validity from
       the frozen signed-SVD convention.
-- [ ] Energy/gradient: evaluate the orientation-aware full symmetric-Dirichlet
+- [x] Energy/gradient: evaluate the orientation-aware full symmetric-Dirichlet
       objective and analytic per-vertex gradient in `double`; expose the
       normalized per-face values needed to prove agreement with diagnostics.
-- [ ] Global proxy: assemble ARAP and SLIM weighted least-squares normal
+- [x] Global proxy: assemble ARAP and SLIM weighted least-squares normal
       matrices/RHS through `Geometry.Sparse::SparseBuilder`. A plain proxy
       record is the boundary; solving/factorization and outer-loop state remain
       in `METHOD-021`/`022`.
-- [ ] Injective line search: compute the stable smallest positive quadratic
+- [x] Injective line search: compute the stable smallest positive quadratic
       root for every triangle, return the limiting face/step, and provide a
       bounded orientation-aware energy-decrease search with explicit
       no-descent/no-acceptable-step diagnostics.
-- [ ] Compute in `double` internally; expose `float`/scalar results. Fail-closed on non-triangle faces, non-finite inputs, and empty meshes (explicit status/`std::optional`, never NaN/Inf escape).
-- [ ] Register `Geometry.Parameterization.Optimize.cppm` / `.cpp` in the existing `IntrinsicGeometry` module-library target lists in `src/geometry/CMakeLists.txt` (alphabetical placement; no new target — `glm`/`Eigen3` are already linked).
+- [x] Compute in `double` internally; expose `float`/scalar results. Fail-closed on non-triangle faces, non-finite inputs, and empty meshes (explicit status/`std::optional`, never NaN/Inf escape).
+- [x] Register `Geometry.Parameterization.Optimize.cppm` / `.cpp` in the existing `IntrinsicGeometry` module-library target lists in `src/geometry/CMakeLists.txt` (alphabetical placement; no new target — `glm`/`Eigen3` are already linked).
 
 ## Tests
-- [ ] `tests/unit/geometry/Test.ParameterizationOptimize.cpp` with `unit;geometry` labels.
-- [ ] Local rotation fit: on a rigidly rotated planar patch the fitted per-face rotation recovers the applied rotation; a pure scale returns identity rotation with the expected singular values.
-- [ ] Energy agreement: normalized per-face values match diagnostics on
+- [x] `tests/unit/geometry/Test.ParameterizationOptimize.cpp` with `unit;geometry` labels.
+- [x] Local rotation fit: on a rigidly rotated planar patch the fitted per-face rotation recovers the applied rotation; a pure scale returns identity rotation with the expected singular values.
+- [x] Energy agreement: normalized per-face values match diagnostics on
       identity and stretched-rectangle fixtures; the full isometric objective
       attains `4` per face. A reflected face remains finite/countable in
       diagnostics but is rejected by the optimizer barrier.
-- [ ] Gradient check: finite-difference of the energy matches the analytic gradient on a small fixture within tolerance.
-- [ ] Proxy agreement: ARAP identity weights and SLIM analytic weights produce
+- [x] Gradient check: finite-difference of the energy matches the analytic gradient on a small fixture within tolerance.
+- [x] Proxy agreement: ARAP identity weights and SLIM analytic weights produce
       symmetric PSD normal matrices and gradient-matching directions on small
       fixtures; the proxy builder itself does not solve.
-- [ ] Injective line search: on a step that would flip a triangle,
+- [x] Injective line search: on a step that would flip a triangle,
       `MaxInjectiveStep` returns the exact first root and the accepted safety-
       scaled step is strictly smaller, preserves positive orientation, and
       never increases energy.
-- [ ] Determinism: identical `(reference, uvs, direction)` inputs produce
+- [x] Determinism: identical `(reference, uvs, direction)` inputs produce
       bitwise-identical outputs across repeated calls; the reference kernels
       are serial and own no scheduler/thread-count axis.
-- [ ] Fail-closed: non-triangle faces, non-finite input, and empty meshes return explicit failure states with no NaN/Inf.
+- [x] Fail-closed: non-triangle faces, non-finite input, empty meshes, and
+      caller-forged public reference/local-fit records return explicit failure
+      states before allocation or indexing, with no NaN/Inf payload escape;
+      scale-relative validation rejects sign-changing field corruption even
+      near the supported singular threshold.
 
 ## Docs
-- [ ] Interface documentation per `docs/architecture/geometry-api-style.md`:
+- [x] Interface documentation per `docs/architecture/geometry-api-style.md`:
       each closed form, signed-SVD/orientation convention, proxy definition,
       line-search boundary, local-versus-global injectivity distinction, and
       failure-state contract.
-- [ ] Regenerate `docs/api/generated/module_inventory.md`.
-- [ ] Record `METHOD-021`/`022`/`025` as the consumers in `tasks/backlog/geometry/README.md`, and note the seam under Pack 3 of `docs/architecture/parameterization-mapping-roadmap.md`.
+- [x] Regenerate `docs/api/generated/module_inventory.md`.
+- [x] Record `METHOD-021`/`022`/`025` as the consumers in `tasks/backlog/geometry/README.md`, and note the seam under Pack 3 of `docs/architecture/parameterization-mapping-roadmap.md`.
 
 ## Acceptance criteria
-- [ ] Public surface exposes only `std`/`glm`/scalar/geometry-owned types (no Eigen, no RHI).
-- [ ] All listed tests pass in the default CPU gate.
-- [ ] `METHOD-021` (ARAP) and `METHOD-022` (SLIM) can express their local step,
+- [x] Public surface exposes only `std`/`glm`/scalar/geometry-owned types (no Eigen, no RHI).
+- [x] All listed tests pass in the default CPU gate.
+- [x] `METHOD-021` (ARAP) and `METHOD-022` (SLIM) can express their local step,
       proxy assembly, and (SLIM) locally-injective line search against this
       surface without private per-triangle/proxy/barrier math.
-- [ ] Layering check passes (`geometry -> core` only).
+- [x] Layering check passes (`geometry -> core` only).
 
 ## Verification
+
+The Clang-23 `ci` preset built `IntrinsicTests`. After the independent review
+revisions, the focused parameterization selector selected 69 registered cases,
+passed 68, and skipped one opt-in Vulkan case; all ten new CPU cases passed. The
+default CPU-supported selector selected 4,074 cases, passed 4,073, and made one
+expected GLFW/LSan self-skip. The ten new cases also pass under isolated ASan
+and UBSan binaries, including forged-record indexing and the ratio-extreme
+`1e-200` flip-root regressions. The forged-fit coverage includes sign-changing
+determinant, signed-singular-value, and Jacobian corruption at a supported
+`2e-12` singular value.
+Strict layering, test-layout, module-inventory,
+task-policy, task-schema/state, and docs-link gates close the structural
+evidence; GPU/Vulkan execution is not applicable to this pure CPU seam.
+
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
@@ -185,4 +205,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No `std::rand` or global RNG state; no public Eigen types on the module interface.
 
 ## Maturity
-- Target: `CPUContracted`; no `Operational` follow-up is owed — this is a pure CPU numerics seam. GPU evaluation of the local step / proxy solve, if ever needed, opens with the family GPU backend (`METHOD-026`).
+- Reached: `CPUContracted`; no `Operational` follow-up is owed — this is a pure CPU numerics seam. GPU evaluation of the local step / proxy solve, if ever needed, opens with the family GPU backend (`METHOD-026`).
+
+Completed: 2026-08-03. Final source revision, artifact digest, durable handoff,
+and independent acceptance are recorded under `tasks/evidence/GEOM-064/`.

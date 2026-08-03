@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicGeometryTests"
+  ],
+  "command_display": "cmake --build --preset ci-asan --target IntrinsicGeometryTests",
+  "cwd": ".",
+  "duration_ms": 17739,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T17:21:40Z",
+  "label": "revision4-asan-build-geometry-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T17:21:22Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/revision4-asan-build-geometry-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/revision4-asan-build-geometry-tests.stdout.log",
+  "stdout_sha256": "2bfc6b37f9863015376785246c1fe218ad92b9f0961ab4a0dc50e4bce218298d",
+  "task_id": "GEOM-064"
+}
