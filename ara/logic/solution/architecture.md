@@ -427,3 +427,23 @@
   tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md,
   tasks/backlog/process/CI-016-content-addressed-build-test-result-cache.md]
 - **From staging**: O100
+
+## A29: Geometry Methods Bind to Their Least Structured Data Domain
+- **Decision**: Method eligibility is expressed by the least structured
+  element domains and typed values the algorithm consumes, not by an entity
+  container, provenance label, or handle-indexed property wrapper. Meshes may
+  satisfy mesh, graph, and point-set contracts; graphs may satisfy graph and
+  point-set contracts. A point-set method accepts compatible `Property<T>`,
+  `ConstProperty<T>`, or spans from any originating vertex, edge, halfedge, or
+  face domain, while a graph method adds only its named adjacency/property
+  requirements. Same-cardinality output returns to the originating domain;
+  topology/cardinality changes require an explicitly owned operation and never
+  an implicit converter.
+- **Provenance**: user
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N355,
+  AGENTS.md,
+  docs/architecture/geometry-api-style.md,
+  docs/architecture/method-api-contract.md,
+  docs/architecture/contract-catalog.yaml]
+- **From staging**: O114

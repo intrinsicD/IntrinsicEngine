@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci",
+    "--fresh",
+    "-DCMAKE_TOOLCHAIN_FILE=/home/alex/Documents/IntrinsicEngine/external/vcpkg/scripts/buildsystems/vcpkg.cmake",
+    "-DVCPKG_INSTALLED_DIR=/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci"
+  ],
+  "command_display": "cmake --preset ci --fresh -DCMAKE_TOOLCHAIN_FILE=/home/alex/Documents/IntrinsicEngine/external/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_INSTALLED_DIR=/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci",
+  "cwd": ".",
+  "duration_ms": 9127,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:02:49Z",
+  "label": "ci-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:02:40Z",
+  "stderr_path": "tasks/evidence/RUNTIME-206/commands/ci-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-206/commands/ci-configure.stdout.log",
+  "stdout_sha256": "aff1acf2476e1a7ae77d78290e18e38044292a64871464930ba2ba7e67ff2e59",
+  "task_id": "RUNTIME-206"
+}

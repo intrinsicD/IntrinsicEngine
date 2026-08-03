@@ -47,8 +47,10 @@ work; lowering it can blur thin sheets.
 Select `clop` in the registered `sandbox.point_cloud_consolidation` section and
 submit through `Extrinsic.Runtime.PointCloudConsolidationService`. Runtime uses
 the same CPU-reference strategy, async snapshot/stale-result contract, and
-undoable `GeometrySources` publication as the LOP-family paths.
-The Sandbox exposes the identical path at
-`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)`, including the
-mixture component, iteration, tolerance, and covariance-floor controls plus
-the returned implementation and convergence diagnostics.
+undoable named-property publication as the LOP-family paths. Any finite `vec3`
+property on a resolved mesh, graph, or point-cloud element domain can be the
+sample set; handle-specific property wrappers and conversions are not required.
+Topology-bearing domains use same-cardinality output only. `UI-039` owns the
+matching property-aware Sandbox discovery; the current PointCloud panel still
+exposes the mixture component, iteration, tolerance, covariance-floor, and
+returned implementation/convergence diagnostics in the meantime.

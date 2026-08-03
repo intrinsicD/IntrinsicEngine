@@ -18,8 +18,9 @@ maturity_target: Operational
 ## Goal
 
 - Replace the PointCloud-only “Remove Outliers” control with a shared
-  mesh/graph/point-cloud analysis panel: Detect publishes an outlier mask on
-  every vertex source, while explicit Remove is offered only for point clouds.
+  mesh/graph/point-cloud analysis panel: Detect publishes an outlier mask for
+  any selected typed element-domain property, while explicit Remove is offered
+  only for point clouds.
 
 ## Non-goals
 
@@ -37,18 +38,18 @@ maturity_target: Operational
 
 | Field | Disposition |
 | --- | --- |
-| Least-structured input | Vertex positions. |
-| Compatible entity sources | Mesh, graph, and point cloud for Detect; point cloud only for Remove. |
+| Least-structured input | A selected finite `vec3` property. |
+| Compatible entity sources | Every mesh/graph/point-cloud element domain for Detect; point-cloud points only for Remove. |
 | RuntimeModule | Consume `RUNTIME-209` config/readiness/analyze/remove/result paths. |
 | Config/agent | Edit and apply the shared validated outlier config. |
-| UI | Register the analysis panel under all three Processing domains with capability-specific actions. |
-| Publication | Visualize same-count mask/score; label point-cloud compaction as a separate destructive history command. |
+| UI | Register the analysis panel under all three Processing domains with canonical property selectors and capability-specific actions. |
+| Publication | Visualize same-domain, same-count mask/score; label point-cloud compaction as a separate destructive history command. |
 | End-to-end tests | Three-domain discovery/detection, visualization, point-cloud removal, disabled reasons, and undo/redo. |
 
 ## Required changes
 
 - [ ] Register one feature panel under Mesh, Graph, and PointCloud Processing
-      with shared method/parameter state.
+      with shared method/parameter state and input/output property selectors.
 - [ ] Rename the primary action to Detect Outliers and display mask/score and
       diagnostics through existing property visualization controls.
 - [ ] Show Remove Marked Points only when runtime readiness allows
@@ -58,7 +59,8 @@ maturity_target: Operational
 
 ## Tests
 
-- [ ] Assert all three menu registrations and Detect routing with shared config.
+- [ ] Assert all three menu registrations and Detect routing over each physical
+      property-domain family, including mesh face centers, with shared config.
 - [ ] Cover mask visualization, missing/invalid source diagnostics, explicit
       point-cloud Remove, and absence/disabled state for mesh/graph Remove.
 - [ ] Verify no detection action mutates cardinality and undo/redo remains
@@ -70,7 +72,8 @@ maturity_target: Operational
 
 ## Acceptance criteria
 
-- [ ] Every compatible vertex source can discover and run outlier detection.
+- [ ] Every compatible typed sample property can discover and run outlier
+      detection.
 - [ ] Only point clouds expose explicit removal; mesh/graph topology is safe.
 - [ ] UI and agent callers share config, readiness, and operations.
 

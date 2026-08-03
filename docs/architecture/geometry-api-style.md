@@ -45,9 +45,11 @@ record should name the deviation and include a removal or normalization follow-u
   through spans or noun accessors and reserve mutation for explicit operations.
 - Mutable borrowed views must document the source storage they mutate and the
   lifetime requirements of that borrow.
-- Algorithms should request the least structured domain they need. Use point-cloud
-  views for point samples, graph views for traversal, and mesh views for face or
-  topological editing.
+- Algorithms should request the least structured data they need. A point-set
+  kernel accepts a typed property/span of samples on any element domain; it
+  does not require a point-cloud container or vertex handles. Traversal kernels
+  additionally request graph adjacency, and face/topology editors request the
+  corresponding mesh topology.
 - Use explicit hard-copy conversions when topology/cardinality changes, when
   independent lifetime is required, or when attribute layout conversion is
   necessary. Those conversions should return diagnostics rather than silently
@@ -89,23 +91,33 @@ per-element property model used by OpenMesh. See Kettner's
 [CGAL `HalfedgeDS` description](https://doc.cgal.org/Manual/3.3/doc_html/cgal_manual/HalfedgeDS/Chapter_main.html),
 and the [OpenMesh paper](https://www.graphics.rwth-aachen.de/publication/03130/).
 
-The rows are a substitutability contract. If an algorithm's public input is
-only a point/vertex span, runtime eligibility, config commands, and UI discovery
-must accept every entity satisfying the logical `Vertices` role. If it needs
-adjacency it may require `Halfedges`/`Edges`; if it needs surface topology it
-may require `Faces`. Exact provenance checks are valid only when provenance
-itself changes the algorithm's semantics, never as a shortcut for asking
-whether an element source exists. Reusing a mesh's vertex source as points is a
-view of existing data, not a mesh-to-point-cloud conversion.
+The rows are a physical availability matrix, while method substitutability is
+defined by typed properties plus the least required topology. A point-set
+kernel consumes a compatible `Property<T>`/`ConstProperty<T>` (or its span) on
+*any* resolved element-domain `PropertySet`: mesh face centers in the Faces
+property set are as valid as positions in the Vertices property set. The
+handle-indexed `VertexProperty`, `FaceProperty`, and related wrappers are
+container conveniences, never eligibility requirements. A graph kernel adds
+the exact `Halfedges`/`Edges` adjacency and connectivity properties its
+contract names; a mesh satisfies that graph contract through its existing
+vertex/halfedge/edge sources. A mesh-only requirement is valid only when faces
+or surface topology are actually semantic inputs.
 
-Runtime owns the ECS-to-method binding and must use the canonical geometry
-source extraction/availability seam rather than rebuilding provenance switches
-in each method. UI actions derive readiness and domain placement from the same
-runtime capability. A method result publishes to the originating element
-domain when its cardinality is preserved. Topology or cardinality changes are
-separate, explicit owning operations with diagnostics and history semantics;
-they must not silently replace a topology-rich entity merely because the
-kernel consumed point positions.
+Consequently, point-set methods are available on graphs and meshes, and graph
+methods are available on meshes, whenever the requested property and topology
+contract resolves. Exact provenance checks are valid only when provenance
+itself changes algorithm semantics, never as a shortcut for asking whether a
+property or adjacency source exists. Borrowing any mesh/graph property as a
+sample span is a view of existing data, not a conversion.
+
+Runtime owns the ECS-to-method binding and must use canonical property
+references, catalogs, and geometry-source availability rather than rebuilding
+provenance switches in each method. UI actions derive readiness and domain
+placement from that same property/topology preflight. A method result publishes
+named output properties to the originating element domain when cardinality is
+preserved. Topology or cardinality changes are separate, explicit owning
+operations with diagnostics and history semantics; they must not silently
+replace a topology-rich entity merely because a kernel consumed point samples.
 
 ## Property API contract
 
@@ -124,6 +136,12 @@ Mutable property lookup returns `Property<T>`; const lookup returns
 Default-constructed and failed lookups are invalid handles that report empty
 storage and no typed span. Public algorithms should test property validity
 before reading or writing optional channels.
+
+Public kernels that only need values should prefer generic
+`Property<T>`/`ConstProperty<T>` or spans. `VertexProperty<T>`,
+`FaceProperty<T>`, and other handle-indexed aliases are appropriate only when
+the algorithm genuinely indexes with those handle types; runtime adapters must
+not use the wrapper type to exclude an otherwise compatible property domain.
 
 Typed scalar and vector properties expose contiguous `Data()`/`Span()` access
 when their storage is valid. `bool` properties intentionally do not expose a

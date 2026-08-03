@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-ubsan",
+    "--fresh",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON",
+    "-DCMAKE_TOOLCHAIN_FILE=/home/alex/Documents/IntrinsicEngine/external/vcpkg/scripts/buildsystems/vcpkg.cmake",
+    "-DVCPKG_INSTALLED_DIR=/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci-ubsan"
+  ],
+  "command_display": "cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON -DCMAKE_TOOLCHAIN_FILE=/home/alex/Documents/IntrinsicEngine/external/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_INSTALLED_DIR=/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci-ubsan",
+  "cwd": ".",
+  "duration_ms": 8073,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:45:36Z",
+  "label": "ubsan-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:45:28Z",
+  "stderr_path": "tasks/evidence/RUNTIME-206/commands/ubsan-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-206/commands/ubsan-configure.stdout.log",
+  "stdout_sha256": "a8943ec223b8364387e33f9f955c0480ce17ce7ea42ed4dd2749a3577852b5cf",
+  "task_id": "RUNTIME-206"
+}

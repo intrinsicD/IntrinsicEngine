@@ -91,16 +91,21 @@ whole consumer path. The required `## Engine integration` matrix contains:
 | Publication | Destination entity/domain/property plus explicit topology/cardinality and undo/history behavior. |
 | End-to-end tests | Tests that start from each compatible source and exercise runtime binding, publication, and UI discovery. |
 
-The element-domain rows in
+The property-domain contract in
 [`geometry-api-style.md`](geometry-api-style.md#ecs-element-domain-source-contract)
-govern geometry methods. In particular, a point-span method accepts the logical
-`Vertices` role of point-cloud, graph, and mesh entities without conversion
-through their shared ECS `Vertices` source. Requiring stronger topology is
-correct only when the public method contract requires it.
-Input eligibility and result publication are separate decisions:
-a same-cardinality property may publish in place, while a topology/cardinality
-change requires an explicit owning operation and must not silently discard
-richer source domains.
+governs geometry methods. A point-set method accepts any compatible typed
+property/span on any resolved element domain: mesh face centers, mesh/graph
+edge samples, mesh/graph halfedge samples, mesh vertices, graph nodes, and
+point-cloud points do not require conversion or a `VertexProperty` wrapper. A
+graph method additionally names the adjacency/connectivity sources it needs and
+therefore also accepts a mesh satisfying those sources. Requiring mesh
+provenance is correct only when faces or surface topology are semantic inputs.
+
+Input eligibility and result publication are separate decisions. A
+same-cardinality result publishes only named output properties on the
+originating element domain and preserves all unrelated properties/topology. A
+topology or cardinality change requires an explicit owning operation and must
+not silently discard richer source domains.
 
 Method-only scientific slices may defer runtime/config/UI/publication work, but
 each deferred matrix row names the task that owns it. A package is not described

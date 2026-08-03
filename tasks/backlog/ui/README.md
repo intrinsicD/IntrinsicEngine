@@ -10,18 +10,27 @@ map.
 
 ## Tasks
 
+- [UI-045 — Point-set normal property-domain panel](UI-045-point-normal-property-domain-panel.md)
+  (generic estimator on every compatible property; topology-aware variants
+  only where their real adjacency resolves after `RUNTIME-213`).
+- [UI-044 — Progressive Poisson property-domain panel](UI-044-progressive-poisson-property-domain-panel.md)
+  (extends the retired shared provenance panel with catalog-backed
+  vertex/edge/halfedge/face property selection after `RUNTIME-212`).
+- [UI-043 — K-Means property-domain panel](UI-043-kmeans-property-domain-panel.md)
+  (one CPU/Vulkan clustering panel with canonical input/output property
+  selectors after `RUNTIME-211`).
 - [UI-042 — Signed Heat mesh method panel](UI-042-signed-heat-mesh-panel.md)
   (mesh-only source-curve selection, shared config, runtime execution,
   diagnostics, publication, and scalar visualization after `RUNTIME-210`).
 - [UI-041 — Point-set outlier multi-domain panel](UI-041-point-set-outlier-multi-domain-panel.md)
-  (Detect on Mesh/Graph/PointCloud; explicit Remove only on point clouds after
-  `RUNTIME-209`).
+  (Detect on any typed Mesh/Graph/PointCloud element property; explicit Remove
+  only on point clouds after `RUNTIME-209`).
 - [UI-040 — ICP compatible-source selection and discovery](UI-040-icp-compatible-source-selection.md)
-  (all mixed Mesh/Graph/PointCloud vertex-source pairs through one shared
+  (all mixed Mesh/Graph/PointCloud property-source pairs through one shared
   runtime config/readiness window after `RUNTIME-207`).
 - [UI-039 — LOP family multi-domain discovery](UI-039-lop-multi-domain-discovery.md)
-  (extends the `UI-035` panel across Mesh/Graph/PointCloud through
-  topology-safe `RUNTIME-206` publication).
+  (extends the `UI-035` panel across every compatible element-domain property
+  through topology-safe `RUNTIME-206` publication).
 - [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)
   (one shared readiness value reused by each feature-owned typed operation for
   mesh, UV, bake, point-cloud, registration, and parameterization actions;
@@ -34,8 +43,8 @@ map.
 Further UI children open from the deferred triggers recorded by the retired
 RORG-031F seed and from reproducible workflow audits.
 
-The five current method-integration findings and their runtime/UI split are
-recorded in
+The current method-integration findings and their runtime/UI split are recorded
+in
 [`docs/reviews/2026-08-02-method-engine-integration-contract-audit.md`](../../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md).
 
 The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is

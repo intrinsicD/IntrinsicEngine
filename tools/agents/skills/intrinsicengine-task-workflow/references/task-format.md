@@ -141,6 +141,16 @@ slice may defer a surface, but the matrix must name the owning follow-up task;
 `N/A` is valid only when the canonical method contract makes engine integration
 inapplicable.
 
+For geometry methods, “least structured” is property/topology based, not
+container based. A point-set input names a compatible typed property/span on
+any element domain (including face, edge, or halfedge properties); it must not
+be narrowed to `Vertices`, point-cloud provenance, or `VertexProperty`. A graph
+input names the adjacency/property sources it needs and includes meshes that
+satisfy them. The matrix must separately state same-domain output publication
+and any explicit topology/cardinality-changing owner. Paired UI work must use
+the same runtime preflight and expose compatible properties under every
+appropriate provenance menu.
+
 The general, bug, and review templates default to `standard`; authors promote
 the profile when a trigger applies. The method template defaults to
 `claim-grade` because its lifecycle is designed to support scientific

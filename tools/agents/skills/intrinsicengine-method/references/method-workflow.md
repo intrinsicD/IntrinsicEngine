@@ -39,8 +39,13 @@ must dispose these fields even when the current slice is method-only:
 
 A deferred field names its follow-up task. `N/A` requires a method-contract
 reason; method-only scope is not by itself a reason. Geometry methods also
-apply `geometry.element-domain-sources`: a point/vertex-span kernel consumes
-mesh vertices, graph nodes, and point-cloud points without a converter.
+apply `geometry.element-domain-sources`: a point-set kernel consumes any
+compatible typed property/span on any resolved mesh, graph, or point-cloud
+element domain without a converter or handle-specific property requirement. A
+graph kernel adds only its named adjacency/connectivity sources and therefore
+also accepts meshes satisfying them. Same-cardinality results publish named
+properties back to the originating domain; topology/cardinality edits remain
+explicit owning operations.
 
 ## Backend policy summary
 

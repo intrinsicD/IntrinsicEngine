@@ -1,0 +1,20 @@
+Internal ctest changing into directory: /tmp/intrinsic-runtime206.ZvbjE9/build/ci
+Test project /tmp/intrinsic-runtime206.ZvbjE9/build/ci
+    Start 761: PointCloudConsolidationModule.AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain
+1/5 Test #761: PointCloudConsolidationModule.AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain ......   Passed    0.00 sec
+    Start 762: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo
+2/5 Test #762: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo ..................   Passed    0.04 sec
+    Start 763: PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion
+3/5 Test #763: PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion ...   Passed    0.04 sec
+    Start 764: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+4/5 Test #764: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ............................   Passed    0.26 sec
+    Start 765: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput
+5/5 Test #765: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput ..........   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 5
+
+Label Time Summary:
+contract    =   0.39 sec*proc (5 tests)
+runtime     =   0.39 sec*proc (5 tests)
+
+Total Test time (real) =   0.52 sec

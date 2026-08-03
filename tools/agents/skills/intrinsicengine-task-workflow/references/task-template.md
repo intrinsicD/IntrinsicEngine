@@ -37,6 +37,27 @@ selection policy.
 - Backend axis: present, not applicable, or deferred to <TASK-ID>.
 -->
 
+<!--
+Required when `method.engine-integration` is declared. For geometry methods,
+describe typed property domains rather than container/provenance shorthand:
+point-set methods accept compatible properties on any element domain; graph
+methods add only named adjacency/property requirements and therefore include
+meshes satisfying them. State same-domain publication separately from explicit
+topology/cardinality edits. Do not use `Vertices` or `VertexProperty` as an
+eligibility boundary.
+
+## Engine integration
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | |
+| Compatible entity sources | |
+| RuntimeModule | |
+| Config/agent | |
+| UI | |
+| Publication | |
+| End-to-end tests | |
+-->
+
 ## Required changes
 - [ ] <required change>
 
