@@ -3,32 +3,32 @@ task_id: GEOM-064
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-03T17:10:20Z'
+generated_at: '2026-08-03T17:24:37Z'
 claim_eligible: false
 source:
   base_ref: 3d0098e16830ad26a5b11932725f2ec3857272b0
   base_revision: 3d0098e16830ad26a5b11932725f2ec3857272b0
-  head_revision: f614698f4342353fd11f4db58bcb6dba916e3cdc
+  head_revision: 6a976f8a3e549d5c5d85d5661a9319a218ec7a2d
   branch: feature/lop-consolidation-e2e
   worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
   dirty: false
   surface:
   - path: ara/logic/claims.md
-    sha256: 33a947215d96eba675d45e8c4899b10ecd7944ffce4af6790fd71dce3ebc81fb
+    sha256: 575b9c6ae745e4f10e1434e4d1da969a0d4c2cd6d16233bd526876a70b6e1f55
   - path: ara/staging/observations.yaml
     sha256: da9ed80f1d7d77af28afcf59f6d346a51467d60b44c8b0099b62845dff89c39e
   - path: ara/trace/exploration_tree.yaml
-    sha256: 136a33b40913fe7c68651d097f4b49645cb2e65526357dfae74ace98d4b0b408
+    sha256: fbebb9e77e8da25e794678c906fd111d6582ba9997577abf1ab7cf37f83b1572
   - path: docs/architecture/contract-catalog.yaml
     sha256: ade8d2517dce01564ba5395386dd25b531d5ca0cf5442e8bff514607a39aa9d9
   - path: docs/architecture/parameterization-mapping-roadmap.md
-    sha256: bc27d6e8646da86ef78f5ae1b4a59df2f25254b9ef1f9d2034a6b79e576ea28d
+    sha256: 0b50298afe91c0e4541e0b2d2f7d1af872aa6542914675a69453ed5aae6d748b
   - path: src/geometry/CMakeLists.txt
     sha256: 6cec653d7828a468a5dccec8133c70da31518aefac058ab9c6719d7df1c01694
   - path: src/geometry/Geometry.Parameterization.Optimize.cpp
-    sha256: 17b7ae9716c8f065b3d257a3c7ed492fbf6aedafa14b4805481eca8bf5a63184
+    sha256: 4a0d16feac207c86fed277f2fc0e73a0c8f50df5fd8e978d818cc1c54b6b0112
   - path: src/geometry/Geometry.Parameterization.Optimize.cppm
-    sha256: ddd0ccb71f3c62bfc27198f9ffd7e3bd382d5816935ccbd496dd238e36c6708f
+    sha256: 4438e30195e55279007b977e56041dbac54aa2d4d569d6349e4f9db4bc4886ed
   - path: tasks/SESSION-BRIEF.md
     sha256: e929c07f45f3a4158cffcab2c0c73a81a7818b1074946fb77c9f8b66d5b34afa
   - path: tasks/active/README.md
@@ -36,14 +36,14 @@ source:
   - path: tasks/backlog/geometry/README.md
     sha256: 9a97fd1117ce6bdf363b8761371400449e8a2b006e5a935469d1caad7b1cbf35
   - path: tasks/done/GEOM-064-parameterization-optimization-kernels.md
-    sha256: eecaad57c40caa92228dc8a407fa17976c73403ff018fe8d2747fc12c400c83f
+    sha256: 2fe60f43d990409547c1452ad23f9a685cf09728ba3f678c5bcaaaf33463183b
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: 6c098931bdc6ae5e1d2a362e213b09a7458d233450074230df581374ca075c65
   - path: tests/CMakeLists.txt
     sha256: 02e507795147aa3cb9ddc91be734c8bad6800eadd1a3f5a4afff6c9d8f491e1f
   - path: tests/unit/geometry/Test.ParameterizationOptimize.cpp
-    sha256: 874d356d07a7a846eff86624653d82d3c216608f922daddb4b3c779f54763b30
-  content_digest: 649cfc247dfb2e95acf6d8e3de9458870d3fceb62fae3a9fc39d0f4f5828cc58
+    sha256: e1e3a6fd5e9f80a1996e40c1420a14225910e3d93d7af35af302d8f373f1f658
+  content_digest: 419a0c76014cfdb25e757bf34e9b40fd83cb1c788a6960c40637d0131eb8b0dd
 touched:
   paths:
   - ara/logic/claims.md
@@ -66,8 +66,8 @@ touched:
   modules:
   - Geometry.Parameterization.Optimize
 extension_seam: 'Shared stateless CPU parameterization optimization kernels: validated reference frames,
-  current-UV-bound local fits, energy and gradient evaluation, gradient-matching proxies, and ratio-safe
-  locally injective bounded line search.'
+  scale-relative current-UV-bound local fits, energy and gradient evaluation, gradient-matching proxies,
+  and ratio-safe locally injective bounded line search.'
 future_change_plan: METHOD-021 and METHOD-022 consume this CPU seam; METHOD-025 must preserve its contract
   when adding optimized CPU execution; METHOD-026 owns any future GPU backend.
 acceptance:
@@ -153,6 +153,24 @@ commands:
 - receipt: tasks/evidence/GEOM-064/commands/revision3-ubsan-parameterization-tests.json
 - receipt: tasks/evidence/GEOM-064/commands/revision3-validate-tasks.json
 - receipt: tasks/evidence/GEOM-064/commands/revision3-whitespace.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-ara-claims.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-asan-build-geometry-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-asan-parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-ci-build-intrinsic-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-cpu-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-doc-links.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-layering.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-module-inventory.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-root-hygiene.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-session-brief.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-task-policy.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-task-state-links.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-test-layout.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-ubsan-build-geometry-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-ubsan-parameterization-tests.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-validate-tasks.json
+- receipt: tasks/evidence/GEOM-064/commands/revision4-whitespace.json
 - receipt: tasks/evidence/GEOM-064/commands/root-hygiene.json
 - receipt: tasks/evidence/GEOM-064/commands/session-brief.json
 - receipt: tasks/evidence/GEOM-064/commands/task-policy.json
@@ -186,19 +204,19 @@ skipped_checks:
     METHOD-026 owns any future GPU backend.
 artifacts:
 - path: src/geometry/Geometry.Parameterization.Optimize.cppm
-  sha256: ddd0ccb71f3c62bfc27198f9ffd7e3bd382d5816935ccbd496dd238e36c6708f
+  sha256: 4438e30195e55279007b977e56041dbac54aa2d4d569d6349e4f9db4bc4886ed
   kind: file
 - path: src/geometry/Geometry.Parameterization.Optimize.cpp
-  sha256: 17b7ae9716c8f065b3d257a3c7ed492fbf6aedafa14b4805481eca8bf5a63184
+  sha256: 4a0d16feac207c86fed277f2fc0e73a0c8f50df5fd8e978d818cc1c54b6b0112
   kind: file
 - path: tests/unit/geometry/Test.ParameterizationOptimize.cpp
-  sha256: 874d356d07a7a846eff86624653d82d3c216608f922daddb4b3c779f54763b30
+  sha256: e1e3a6fd5e9f80a1996e40c1420a14225910e3d93d7af35af302d8f373f1f658
   kind: file
 - path: docs/architecture/contract-catalog.yaml
   sha256: ade8d2517dce01564ba5395386dd25b531d5ca0cf5442e8bff514607a39aa9d9
   kind: file
 - path: docs/architecture/parameterization-mapping-roadmap.md
-  sha256: bc27d6e8646da86ef78f5ae1b4a59df2f25254b9ef1f9d2034a6b79e576ea28d
+  sha256: 0b50298afe91c0e4541e0b2d2f7d1af872aa6542914675a69453ed5aae6d748b
   kind: file
 self_review:
   completed: true
