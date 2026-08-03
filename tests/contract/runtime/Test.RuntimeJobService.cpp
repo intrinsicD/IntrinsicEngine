@@ -1058,6 +1058,66 @@ namespace
     };
 }
 
+TEST(RuntimeJobService,
+     WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion)
+{
+    SchedulerScope scheduler{1};
+    CompletionQueueInterlock workInterlock;
+    CompletionQueueInterlock finalizerInterlock;
+    Runtime::JobService jobs(Runtime::JobServiceTestHooks{
+        .BeforeWorkerUnpublishedQueued =
+            [&](const Runtime::JobToken token)
+            {
+                finalizerInterlock.PauseWorker(token);
+            },
+    });
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    FinalizerProbe probe;
+    Runtime::JobDesc desc =
+        MakeCountingJob("finalize.forced-worker-order", 1, publishOrder);
+    desc.Work =
+        [&](const Runtime::JobCancellation&)
+        {
+            workInterlock.PauseWorker({});
+            return Runtime::JobResultEnvelope::Make<CountedResult>(
+                CountedResult{.Value = 1});
+        };
+    desc.FinalizeUnpublishedOnMainThread = probe.Hook();
+    const Runtime::JobToken token = jobs.Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+
+    ASSERT_TRUE(workInterlock.WaitForWorkerPause());
+    EXPECT_TRUE(jobs.Cancel(token));
+    workInterlock.ReleaseWorker();
+
+    // Force the historical race exactly: the worker has published Cancelled,
+    // but has not yet queued the consumer's main-thread finalizer. An empty
+    // drain must not make the job complete or reapable in this window.
+    ASSERT_TRUE(finalizerInterlock.WaitForWorkerPause());
+    EXPECT_EQ(finalizerInterlock.QueuedToken(), token);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Cancelled);
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_FALSE(jobs.IsComplete(token));
+    EXPECT_EQ(jobs.ReapCompleted(), 0u);
+    EXPECT_EQ(probe.Calls, 0);
+
+    finalizerInterlock.ReleaseWorker();
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        return jobs.Stats().PendingUnpublishedFinalizers == 1u;
+    }));
+
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(probe.Calls, 1);
+    EXPECT_EQ(probe.Thread, std::this_thread::get_id());
+    EXPECT_TRUE(publishOrder.empty());
+    EXPECT_TRUE(jobs.IsComplete(token));
+    EXPECT_EQ(jobs.ReapCompleted(), 1u);
+}
+
 TEST(RuntimeJobService, CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing)
 {
     SchedulerScope scheduler{2};

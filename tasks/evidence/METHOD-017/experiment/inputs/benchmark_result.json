@@ -1,0 +1,88 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.continuous_lop.reference.smoke",
+  "claim_eligible": true,
+  "commit": "26c6133f78071a7a029995a4941ba5099fd360f2",
+  "config_digest": "2e469c4a262be495d4cc3edac71c6de70ea09536ef801ae36db50b5daf38c919",
+  "dataset": "builtin.noisy_plane_sphere.clop.confirmation.v1",
+  "diagnostics": {
+    "clop_plane_error": 0.015985392,
+    "clop_sphere_error": 0.015674817,
+    "compact_attraction_contributions": 1233,
+    "compact_mixture_component_count": 8,
+    "compact_plane_error": 0.011521442,
+    "failure_status": "invalid_mixture_component_count",
+    "measured_iterations": 4,
+    "mixtures_converged": true,
+    "mode": "correctness_smoke",
+    "outlier_patch_max_displacement": 0.079638384,
+    "plane_projection_iterations": 1,
+    "raw_plane_error": 0.031111112,
+    "raw_sphere_error": 0.016285727,
+    "rich_attraction_contributions": 4278,
+    "rich_mixture_component_count": 28,
+    "rich_mixture_iterations": 30,
+    "runner": "IntrinsicBenchmarkSmoke",
+    "sphere_mixture_iterations": 1,
+    "sphere_projection_iterations": 1,
+    "strategy": "clop",
+    "uniformity_with_repulsion": 0.125917777,
+    "uniformity_without_repulsion": 2.6675e-05,
+    "warmup_iterations": 1,
+    "wlop_parity_mean_distance": 0.034874247
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml",
+    "sha256": "9e0c41a9efb44df2a07869610a2a8ea468308d3c7d92ea7c32231fa3f10047d4"
+  },
+  "method": "geometry.continuous_lop",
+  "metrics": {
+    "quality_error_l2": 0.015830867,
+    "runtime_ms": 225.31517975
+  },
+  "resolved_params": {
+    "compact_mixture_component_count": 8,
+    "intent": "correctness",
+    "measured_iterations": 4,
+    "rich_mixture_component_count": 28,
+    "seed": 41,
+    "sphere_mixture_component_count": 72,
+    "strategy": "clop",
+    "warmup_iterations": 1
+  },
+  "run_id": "run-001",
+  "schema_version": 2,
+  "source": {
+    "revision": "26c6133f78071a7a029995a4941ba5099fd360f2",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 1000,
+      "metric": "runtime_ms",
+      "observed": 225.31517975,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 0.03,
+      "metric": "quality_error_l2",
+      "observed": 0.015830867,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 0.03,
+    "smoke_runtime_ms_max": 1000
+  },
+  "warmup_policy": {
+    "measured_iterations": 4,
+    "warmup_iterations": 1
+  }
+}

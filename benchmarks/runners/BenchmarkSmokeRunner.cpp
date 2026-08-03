@@ -17,6 +17,10 @@
 #include "../core/Bench.TaskGraphPlanReuseSmoke.hpp"
 #include "../geometry/Bench.GeometrySmoke.hpp"
 #include "../geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
+#include "../geometry/Bench.ContinuousLopReferenceSmoke.hpp"
+#include "../geometry/Bench.EdgeAwareResamplingReferenceSmoke.hpp"
+#include "../geometry/Bench.LopFamilyComparisonSmoke.hpp"
+#include "../geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp"
 #include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
@@ -591,6 +595,328 @@ auto EmitSignedHeatReferenceSmoke(const std::string &commit)
 
   return EmittedBenchmark{kSignedHeatReferenceSmokeBenchmarkId, out.str(),
                           metrics.Succeeded};
+}
+
+auto EmitPointCloudConsolidationReferenceSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunPointCloudConsolidationReferenceSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kPointCloudConsolidationReferenceSmokeBenchmarkId)
+      << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kPointCloudConsolidationReferenceSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kPointCloudConsolidationReferenceSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"correctness_smoke\",\n"
+      << "    \"warmup_iterations\": 1,\n"
+      << "    \"measured_iterations\": 8,\n"
+      << "    \"strategies\": [\"lop\", \"wlop\"],\n"
+      << "    \"raw_plane_error\": " << metrics.RawPlaneError << ",\n"
+      << "    \"wlop_plane_error\": " << metrics.WlopPlaneError << ",\n"
+      << "    \"raw_sphere_error\": " << metrics.RawSphereError << ",\n"
+      << "    \"wlop_sphere_error\": " << metrics.WlopSphereError << ",\n"
+      << "    \"uniformity_without_repulsion\": "
+      << metrics.UniformityWithoutRepulsion << ",\n"
+      << "    \"uniformity_with_repulsion\": "
+      << metrics.UniformityWithRepulsion << ",\n"
+      << "    \"outlier_patch_max_displacement\": "
+      << metrics.OutlierPatchMaxDisplacement << ",\n"
+      << "    \"lop_iterations\": " << metrics.LopIterations << ",\n"
+      << "    \"wlop_plane_iterations\": "
+      << metrics.WlopPlaneIterations << ",\n"
+      << "    \"wlop_sphere_iterations\": "
+      << metrics.WlopSphereIterations << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{
+      kPointCloudConsolidationReferenceSmokeBenchmarkId,
+      out.str(), metrics.Succeeded};
+}
+
+auto EmitLopFamilyComparisonSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunLopFamilyComparisonSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kLopFamilyComparisonBenchmarkId) << "\",\n"
+      << "  \"method\": \"" << EscapeJson(kLopFamilyComparisonMethod)
+      << "\",\n"
+      << "  \"backend\": \"cpu_optimized\",\n"
+      << "  \"dataset\": \"" << EscapeJson(kLopFamilyComparisonDataset)
+      << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"paired_backend_comparison\",\n"
+      << "    \"baseline_backend\": \"cpu_reference\",\n"
+      << "    \"probe_backend\": \"cpu_optimized\",\n"
+      << "    \"warmup_pairs\": " << kLopFamilyComparisonWarmupPairs
+      << ",\n"
+      << "    \"measured_pairs\": " << kLopFamilyComparisonMeasuredPairs
+      << ",\n"
+      << "    \"timing_statistic\": \"median_paired_runtime_ratio\",\n"
+      << "    \"backend_runtime_statistic\": "
+         "\"median_individual_runtime_ms\",\n"
+      << "    \"measurement_order\": "
+         "\"alternating_reference_optimized_optimized_reference\",\n"
+      << "    \"useful_runtime_ratio_max\": "
+      << kLopFamilyUsefulRuntimeRatioMax << ",\n"
+      << "    \"position_rms_delta_max\": " << kLopFamilyRmsDeltaMax
+      << ",\n"
+      << "    \"position_linf_delta_max\": " << kLopFamilyLinfDeltaMax
+      << ",\n"
+      << "    \"normal_rms_delta_max\": " << kLopFamilyRmsDeltaMax
+      << ",\n"
+      << "    \"normal_linf_delta_max\": " << kLopFamilyLinfDeltaMax
+      << ",\n"
+      << "    \"supported_cpu_threads\": [1],\n"
+      << "    \"evaluated_strategy_count\": "
+      << metrics.EvaluatedStrategyCount << ",\n"
+      << "    \"adopted_strategy_count\": "
+      << metrics.AdoptedStrategyCount << ",\n"
+      << "    \"strategies\": [\n";
+
+  for (std::size_t i = 0u; i < metrics.Strategies.size(); ++i) {
+    const auto &strategy = metrics.Strategies[i];
+    out << "      {\n"
+        << "        \"strategy\": \"" << EscapeJson(strategy.Strategy)
+        << "\",\n"
+        << "        \"reference_backend\": \"cpu_reference\",\n"
+        << "        \"optimized_backend\": \"cpu_optimized\",\n"
+        << "        \"reference_status\": \""
+        << EscapeJson(strategy.ReferenceStatus) << "\",\n"
+        << "        \"optimized_status\": \""
+        << EscapeJson(strategy.OptimizedStatus) << "\",\n"
+        << "        \"input_point_count\": " << strategy.InputPointCount
+        << ",\n"
+        << "        \"output_point_count\": " << strategy.OutputPointCount
+        << ",\n"
+        << "        \"reference_median_runtime_ms\": "
+        << strategy.ReferenceMedianRuntimeMilliseconds << ",\n"
+        << "        \"optimized_median_runtime_ms\": "
+        << strategy.OptimizedMedianRuntimeMilliseconds << ",\n"
+        << "        \"median_runtime_ratio\": "
+        << strategy.MedianRuntimeRatio << ",\n"
+        << "        \"reference_runtime_samples_ms\": ";
+    EmitDoubleSamples(out, strategy.ReferenceRuntimeSamplesMilliseconds);
+    out << ",\n        \"optimized_runtime_samples_ms\": ";
+    EmitDoubleSamples(out, strategy.OptimizedRuntimeSamplesMilliseconds);
+    out << ",\n        \"paired_runtime_ratio_samples\": ";
+    EmitDoubleSamples(out, strategy.PairedRuntimeRatios);
+    out << ",\n"
+        << "        \"position_rms_delta\": " << strategy.PositionRmsDelta
+        << ",\n"
+        << "        \"position_linf_delta\": " << strategy.PositionLinfDelta
+        << ",\n"
+        << "        \"normal_rms_delta\": " << strategy.NormalRmsDelta
+        << ",\n"
+        << "        \"normal_linf_delta\": " << strategy.NormalLinfDelta
+        << ",\n"
+        << "        \"state_matched\": "
+        << (strategy.StateMatched ? "true" : "false") << ",\n"
+        << "        \"output_shape_matched\": "
+        << (strategy.OutputShapeMatched ? "true" : "false") << ",\n"
+        << "        \"reference_identity_matched\": "
+        << (strategy.ReferenceIdentityMatched ? "true" : "false") << ",\n"
+        << "        \"optimized_identity_matched\": "
+        << (strategy.OptimizedIdentityMatched ? "true" : "false") << ",\n"
+        << "        \"optimized_used_fallback\": "
+        << (strategy.OptimizedUsedFallback ? "true" : "false") << ",\n"
+        << "        \"reference_deterministic\": "
+        << (strategy.ReferenceDeterministic ? "true" : "false") << ",\n"
+        << "        \"optimized_deterministic\": "
+        << (strategy.OptimizedDeterministic ? "true" : "false") << ",\n"
+        << "        \"parity_passed\": "
+        << (strategy.ParityPassed ? "true" : "false") << ",\n"
+        << "        \"acceleration_passed\": "
+        << (strategy.AccelerationPassed ? "true" : "false") << ",\n"
+        << "        \"adopted\": "
+        << (strategy.Adopted ? "true" : "false") << "\n"
+        << "      }"
+        << (i + 1u == metrics.Strategies.size() ? "\n" : ",\n");
+  }
+
+  out << "    ]\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kLopFamilyComparisonBenchmarkId, out.str(),
+                          metrics.Succeeded};
+}
+
+auto EmitContinuousLopReferenceSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunContinuousLopReferenceSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kContinuousLopReferenceSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kContinuousLopReferenceSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kContinuousLopReferenceSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"correctness_smoke\",\n"
+      << "    \"warmup_iterations\": 1,\n"
+      << "    \"measured_iterations\": 4,\n"
+      << "    \"strategy\": \"clop\",\n"
+      << "    \"raw_plane_error\": " << metrics.RawPlaneError << ",\n"
+      << "    \"clop_plane_error\": " << metrics.ClopPlaneError << ",\n"
+      << "    \"raw_sphere_error\": " << metrics.RawSphereError << ",\n"
+      << "    \"clop_sphere_error\": " << metrics.ClopSphereError << ",\n"
+      << "    \"wlop_parity_mean_distance\": "
+      << metrics.WlopParityMeanDistance << ",\n"
+      << "    \"compact_plane_error\": " << metrics.CompactPlaneError
+      << ",\n"
+      << "    \"uniformity_without_repulsion\": "
+      << metrics.UniformityWithoutRepulsion << ",\n"
+      << "    \"uniformity_with_repulsion\": "
+      << metrics.UniformityWithRepulsion << ",\n"
+      << "    \"outlier_patch_max_displacement\": "
+      << metrics.OutlierPatchMaxDisplacement << ",\n"
+      << "    \"rich_mixture_component_count\": "
+      << metrics.RichMixtureComponentCount << ",\n"
+      << "    \"compact_mixture_component_count\": "
+      << metrics.CompactMixtureComponentCount << ",\n"
+      << "    \"rich_attraction_contributions\": "
+      << metrics.RichAttractionContributions << ",\n"
+      << "    \"compact_attraction_contributions\": "
+      << metrics.CompactAttractionContributions << ",\n"
+      << "    \"rich_mixture_iterations\": "
+      << metrics.RichMixtureIterations << ",\n"
+      << "    \"sphere_mixture_iterations\": "
+      << metrics.SphereMixtureIterations << ",\n"
+      << "    \"plane_projection_iterations\": "
+      << metrics.PlaneProjectionIterations << ",\n"
+      << "    \"sphere_projection_iterations\": "
+      << metrics.SphereProjectionIterations << ",\n"
+      << "    \"mixtures_converged\": "
+      << (metrics.MixturesConverged ? "true" : "false") << ",\n"
+      << "    \"failure_status\": \""
+      << (metrics.InvalidRequestFailedClosed
+              ? "invalid_mixture_component_count"
+              : "unexpected")
+      << "\"\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kContinuousLopReferenceSmokeBenchmarkId, out.str(),
+                          metrics.Succeeded};
+}
+
+auto EmitEdgeAwareResamplingReferenceSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunEdgeAwareResamplingReferenceSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kEdgeAwareResamplingReferenceSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kEdgeAwareResamplingReferenceSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kEdgeAwareResamplingReferenceSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"correctness_smoke\",\n"
+      << "    \"warmup_iterations\": 1,\n"
+      << "    \"measured_iterations\": 4,\n"
+      << "    \"strategies\": [\"wlop_isotropic\", "
+         "\"wlop_anisotropic\", \"ear\"],\n"
+      << "    \"normal_source\": \"authored\",\n"
+      << "    \"raw_expected_plane_error\": "
+      << metrics.RawExpectedPlaneError << ",\n"
+      << "    \"isotropic_expected_plane_error\": "
+      << metrics.IsotropicExpectedPlaneError << ",\n"
+      << "    \"anisotropic_expected_plane_error\": "
+      << metrics.AnisotropicExpectedPlaneError << ",\n"
+      << "    \"edge_sharpness_preservation\": "
+      << metrics.EdgeSharpnessPreservation << ",\n"
+      << "    \"normal_angular_error_radians\": "
+      << metrics.NormalAngularErrorRadians << ",\n"
+      << "    \"uniformity_min_pairwise_distance\": "
+      << metrics.UniformityMinimumPairwiseDistance << ",\n"
+      << "    \"input_point_count\": " << metrics.InputPointCount << ",\n"
+      << "    \"output_point_count\": " << metrics.OutputPointCount << ",\n"
+      << "    \"inserted_point_count\": " << metrics.InsertedPointCount
+      << ",\n"
+      << "    \"inserted_near_feature_count\": "
+      << metrics.InsertedNearFeatureCount << ",\n"
+      << "    \"edge_priority_evaluations\": "
+      << metrics.EdgePriorityEvaluations << ",\n"
+      << "    \"anisotropic_iterations\": "
+      << metrics.AnisotropicIterations << ",\n"
+      << "    \"normal_refinement_iterations\": "
+      << metrics.NormalRefinementIterations << ",\n"
+      << "    \"used_authored_normals\": "
+      << (metrics.UsedAuthoredNormals ? "true" : "false") << ",\n"
+      << "    \"deterministic\": "
+      << (metrics.Deterministic ? "true" : "false") << ",\n"
+      << "    \"failure_status\": \""
+      << (metrics.NormalsRequiredFailedClosed ? "normals_required"
+                                              : "unexpected")
+      << "\"\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kEdgeAwareResamplingReferenceSmokeBenchmarkId,
+                          out.str(), metrics.Succeeded};
 }
 
 auto EmitSurfaceSamplingSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -1511,6 +1837,10 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitUvAtlasEdgeGroupingScaling(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
+  emitted.push_back(EmitPointCloudConsolidationReferenceSmoke(commit));
+  emitted.push_back(EmitLopFamilyComparisonSmoke(commit));
+  emitted.push_back(EmitContinuousLopReferenceSmoke(commit));
+  emitted.push_back(EmitEdgeAwareResamplingReferenceSmoke(commit));
   emitted.push_back(EmitBoundaryFirstFlatteningReferenceSmoke(commit));
   emitted.push_back(EmitSimplificationQualitySmoke(commit));
   emitted.push_back(EmitSurfaceSamplingSmoke(commit));

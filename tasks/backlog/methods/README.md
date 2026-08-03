@@ -65,21 +65,6 @@ end.
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
   (rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
-- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](METHOD-016-locally-optimal-projection-reference-backend.md)
-  (WLOP default; establishes the shared typed
-  `Geometry.PointCloud.Consolidation` strategy surface; the first backend
-  selector belongs to `METHOD-019`; gated on `geometry/GEOM-062` kernels).
-- [METHOD-017 — Continuous LOP (CLOP) reference backend](METHOD-017-continuous-lop-clop-reference-backend.md)
-  (adds the `Clop` strategy; gated on `METHOD-016`, `geometry/GEOM-058`
-  Gaussian-mixture seam, and `geometry/GEOM-062` kernels).
-- [METHOD-018 — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend](METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
-  (adds the `Ear`/anisotropic strategies; gated on `METHOD-016` and
-  `geometry/GEOM-062`; consumes `Geometry.PointCloud.Normals`).
-- [METHOD-019 — LOP-family optimized CPU backend and comparison benchmark](METHOD-019-lop-family-optimized-cpu-backend.md)
-  (adds the first concrete backend selector plus `cpu_optimized` with paired
-  parity/baseline evidence; gated on `METHOD-016`/`017`/`018` and the delivered
-  `RUNTIME-175`/`UI-035` CPU control surfaces; deliberately excludes
-  opportunistic `GEOM-060`/`061` adoption).
 - [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
   (adds a private `gpu_vulkan_compute` implementation to the `RUNTIME-175`
   typed operation with `gpu;vulkan` parity; uses `RUNTIME-194`/`195` and adds
@@ -179,9 +164,11 @@ end.
 - **LOP consolidation family (METHOD-016..020).** WLOP/LOP (`METHOD-016`),
   CLOP (`METHOD-017`), and EAR/anisotropic (`METHOD-018`) share one
   `Geometry.PointCloud.Consolidation` module and typed `Strategy` surface, so
-  every implemented variant is choosable through one surface. The first
-  backend selector lands only with the real `cpu_optimized` implementation in
-  `METHOD-019`; the GPU adapter follows in `METHOD-020`. The shared weight
+  every implemented variant is choosable through one surface. `METHOD-019`
+  evaluated four exact-parity optimized CPU candidates, but none met its
+  frozen useful-acceleration gate, so it retired without adding a selector;
+  the first backend selector remains owned by the real GPU implementation in
+  `METHOD-020`. The shared weight
   math is factored into the `geometry/GEOM-062` `Geometry.PointCloud.Kernels`
   seam; optimized CPU/GPU work follows reference parity; and the engine
   integration — runtime-owned config/typed operation plus app registration,
@@ -233,6 +220,26 @@ end.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [METHOD-019 — LOP-family optimized CPU backend and comparison benchmark](../../done/METHOD-019-lop-family-optimized-cpu-backend.md)
+  (done, 2026-08-02, negative confirmation): exact reference parity,
+  deterministic identity, and zero fallback held for all four validation-only
+  candidates, but none met the frozen `<= 0.80` paired-median runtime-ratio
+  gate. No public `cpu_optimized` backend, runtime token, or UI choice was
+  adopted.
+- [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](../../done/METHOD-016-locally-optimal-projection-reference-backend.md)
+  (done, 2026-08-01, `CPUContracted`): WLOP is the default on the shared typed
+  `Geometry.PointCloud.Consolidation` strategy surface. The first backend
+  selector remains owned by `METHOD-019`.
+- [METHOD-017 — Continuous LOP (CLOP) reference backend](../../done/METHOD-017-continuous-lop-clop-reference-backend.md)
+  (done, 2026-08-01, `CPUContracted`): the shared strategy evaluates the
+  original CLOP Gaussian-product attraction through
+  `Geometry.GaussianMixture::FitEM` and reuses `geometry/GEOM-062` repulsion
+  kernels.
+- [METHOD-018 — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend](../../done/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
+  (done, 2026-08-01, `CPUContracted`): the shared strategy exposes anisotropic
+  WLOP and the original two-stage EAR reference with authored-or-estimated
+  oriented normals, deterministic progressive insertion, and explicit
+  fail-closed diagnostics.
 - [METHOD-002 — Signed Heat Method reference backend](../../archive/METHOD-002-signed-heat-method-reference-backend.md)
   (done, 2026-06-28, `CPUContracted`): pathfinder method package for
   `geometry.signed_heat`, with surface Variant A CPU reference, correctness

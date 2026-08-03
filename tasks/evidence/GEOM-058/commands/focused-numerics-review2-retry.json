@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "ctest --test-dir build/ci --output-on-failure -R '^(AndersonAcceleration|GaussianMixture)\\.' --no-tests=error --timeout 60"
+  ],
+  "command_display": "bash -lc 'ctest --test-dir build/ci --output-on-failure -R '\"'\"'^(AndersonAcceleration|GaussianMixture)\\.'\"'\"' --no-tests=error --timeout 60'",
+  "cwd": ".",
+  "duration_ms": 257,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T11:57:04Z",
+  "label": "focused-numerics-review2-retry",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T11:57:04Z",
+  "stderr_path": "tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.stdout.log",
+  "stdout_sha256": "63b530a3fa9f22a5043c2fe3ae8de3b9f288094cac9a3c59894ed2b302b58cae",
+  "task_id": "GEOM-058"
+}

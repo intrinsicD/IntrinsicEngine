@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=OFF && cmake --build --preset ci-asan --target IntrinsicGeometryTests && ctest --test-dir build/ci-asan --output-on-failure -R '^(AndersonAcceleration|GaussianMixture)\\.' --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "bash -lc 'cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=OFF && cmake --build --preset ci-asan --target IntrinsicGeometryTests && ctest --test-dir build/ci-asan --output-on-failure -R '\"'\"'^(AndersonAcceleration|GaussianMixture)\\.'\"'\"' --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 88991,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T11:53:58Z",
+  "label": "asan-focused-review2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T11:52:29Z",
+  "stderr_path": "tasks/evidence/GEOM-058/commands/asan-focused-review2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-058/commands/asan-focused-review2.stdout.log",
+  "stdout_sha256": "072486ccd1dd5df277c3f1b41392e646853fddb8a0fc472c838c61fbec633c65",
+  "task_id": "GEOM-058"
+}

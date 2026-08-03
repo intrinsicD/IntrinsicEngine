@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_layering.py",
+    "--root",
+    "src",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_layering.py --root src --strict",
+  "cwd": ".",
+  "duration_ms": 179,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:06:26Z",
+  "label": "strict-layering",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:06:26Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/strict-layering.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/strict-layering.stdout.log",
+  "stdout_sha256": "7aa895ba9ce2969a7a497dd56e55011571fd04d09d313d35f136ae20736f94e0",
+  "task_id": "UI-035"
+}

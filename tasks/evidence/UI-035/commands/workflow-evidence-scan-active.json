@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/workflow_evidence.py",
+    "validate",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/workflow_evidence.py validate --root .",
+  "cwd": ".",
+  "duration_ms": 2249,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:36:25Z",
+  "label": "workflow-evidence-scan-active",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:36:22Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/workflow-evidence-scan-active.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/workflow-evidence-scan-active.stdout.log",
+  "stdout_sha256": "a65eff7ace6ee3a5eb9ffc2d0245c3bce1e22bcf2bb0ec9f12f80d3bb427df3f",
+  "task_id": "UI-035"
+}

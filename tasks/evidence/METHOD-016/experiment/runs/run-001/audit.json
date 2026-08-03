@@ -1,0 +1,33 @@
+{
+  "attempt_id": "attempt-001",
+  "audited_at": "2026-08-01T14:20:54Z",
+  "audited_revision": "89193bef887bac1d3876b9e8cb29cc43bd9ca9bf",
+  "auditor_label": "Noether-METHOD016-Auditor",
+  "bundle_path": "tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml",
+  "bundle_sha256": "eb11a7b912fd5a22cb1b79d99a631f301da284bac304937f6ea614a5315266f7",
+  "claim_authorized": false,
+  "disposition": "accepted",
+  "driver_label": "Codex-GeometryE2E",
+  "errors": [],
+  "identity_assurance": "cooperative-label-only",
+  "recomputed_gates": [
+    {
+      "metric": "quality_error_l2",
+      "observed": 0.020443686,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.03
+    }
+  ],
+  "recomputed_summaries": [
+    {
+      "column": "quality_error_l2",
+      "name": "quality_error_l2",
+      "statistic": "mean",
+      "value": 0.020443686
+    }
+  ],
+  "run_id": "run-001",
+  "schema_version": 1,
+  "task_id": "METHOD-016"
+}

@@ -49,6 +49,11 @@ export namespace Geometry
             bool IsLeaf{true};
         };
 
+        struct RadiusQueryScratch
+        {
+            std::vector<NodeIndex> NodeStack{};
+        };
+
         [[nodiscard]] std::optional<KDTreeBuildResult> Build(std::span<const AABB> elementAabbs,
             const KDTreeBuildParams& params = {});
         [[nodiscard]] std::optional<KDTreeBuildResult> Build(std::vector<AABB>&& elementAabbs,
@@ -116,6 +121,8 @@ export namespace Geometry
 
         [[nodiscard]] std::optional<KDTreeRadiusResult> QueryRadius(const glm::vec3& query, float radius,
             std::vector<ElementIndex>& outElementIndices) const;
+        [[nodiscard]] std::optional<KDTreeRadiusResult> QueryRadius(const glm::vec3& query, float radius,
+            std::vector<ElementIndex>& outElementIndices, RadiusQueryScratch& scratch) const;
 
         [[nodiscard]] const std::vector<AABB>& ElementAabbs() const noexcept { return m_ElementAabbs; }
         [[nodiscard]] const std::vector<ElementIndex>& ElementIndices() const noexcept { return m_ElementIndices; }

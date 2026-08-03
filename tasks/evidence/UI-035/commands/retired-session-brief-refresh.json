@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/generate_session_brief.py"
+  ],
+  "command_display": "python3 tools/agents/generate_session_brief.py",
+  "cwd": ".",
+  "duration_ms": 98,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:41:21Z",
+  "label": "retired-session-brief-refresh",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:41:21Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/retired-session-brief-refresh.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/retired-session-brief-refresh.stdout.log",
+  "stdout_sha256": "db96aae8dca2bca571766fb132a70850b9a0f27dfadf46c0890f828f8a51b4c3",
+  "task_id": "UI-035"
+}

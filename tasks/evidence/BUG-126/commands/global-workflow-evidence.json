@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/workflow_evidence.py",
+    "validate",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/workflow_evidence.py validate --root .",
+  "cwd": ".",
+  "duration_ms": 1932,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T15:48:04Z",
+  "label": "global-workflow-evidence",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T15:48:03Z",
+  "stderr_path": "tasks/evidence/BUG-126/commands/global-workflow-evidence.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-126/commands/global-workflow-evidence.stdout.log",
+  "stdout_sha256": "18f5e4ab455a16531790dc4e8c53fe410d2fb27343b1b5e84590ed7ac799bb2a",
+  "task_id": "BUG-126"
+}

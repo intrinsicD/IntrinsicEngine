@@ -1,0 +1,30 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-R",
+    "PointCloudKernels",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -R PointCloudKernels -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 132,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:39:31Z",
+  "label": "review2-ubsan-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:39:31Z",
+  "stderr_path": "tasks/evidence/GEOM-062/commands/review2-ubsan-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-062/commands/review2-ubsan-focused.stdout.log",
+  "stdout_sha256": "7fc5105844233add3bb4577083af3bdad2cf5d16d4a85387d7fe40f71f3b0359",
+  "task_id": "GEOM-062"
+}

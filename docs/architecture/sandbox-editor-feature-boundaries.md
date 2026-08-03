@@ -44,12 +44,13 @@ facade.
 | Copied workspace snapshots and queries | `Extrinsic.Runtime.EditorWorkspaceSnapshots` |
 | Job identity/progress projection | `Extrinsic.Runtime.EditorJobProjection` |
 | Selection, import, scene-file, transform, camera, primitive-view operations | `Extrinsic.Runtime.SceneEditingOperations` |
-| Geometry methods, texture/UV, clustering, registration, parameterization | `Extrinsic.Runtime.GeometryProcessingOperations` |
+| Geometry methods, texture/UV, clustering, registration, parameterization, point-cloud consolidation | `Extrinsic.Runtime.GeometryProcessingOperations` |
 | Property, presentation, binding, spatial-debug, visualization operations | `Extrinsic.Runtime.VisualizationEditingOperations` |
 | Frame-graph, recipe, profiling, artifact operations | `Extrinsic.Runtime.RenderRecipeEditingOperations` |
 | Clustering config schema/codec | `Extrinsic.Runtime.ClusteringConfig` |
 | Progressive-Poisson config schema/codec | `Extrinsic.Runtime.ProgressivePoissonConfig` |
 | Parameterization config schema/codec | `Extrinsic.Runtime.ParameterizationConfig` |
+| Point-cloud consolidation config schema/codec | `Extrinsic.Runtime.PointCloudConsolidationConfig` |
 | Sandbox context/frame, windows, defaults, registration aggregation | `Extrinsic.Sandbox.Editor.Shell`, `Extrinsic.Sandbox.ConfigSections`, and `Extrinsic.Sandbox` |
 
 ## Workflow verification matrix
@@ -61,10 +62,11 @@ facade.
 | Clustering submit, pending/ready/failure, stale completion | `ClusteringService` + geometry operations + job projection | `Test.SandboxEditorClusteringMethods.cpp`, `Test.SandboxEditorSessionLifecycle.cpp` |
 | Denoise, curvature, remesh, subdivide, simplify, normals, outliers, registration | geometry operations | `Test.SandboxEditorMeshMethods.cpp`, `Test.SandboxEditorClusteringMethods.cpp` |
 | Parameterization config, execution, undo, diagnostics, CPU/GPU view fallback | geometry operations + parameterization config | `Test.ParameterizationOperations.cpp`, `Test.SandboxParameterizationPanel.cpp` |
+| Point-cloud consolidation config, async execution, stale gate, result projection, and undo | geometry operations + consolidation service/config | `Test.PointCloudConsolidationModule.cpp`, `Test.SandboxPointCloudConsolidationPanel.cpp` |
 | Property catalog, bindings, texture bake, presentation, visualization recipes | visualization operations | `Test.SandboxEditorVisualization.cpp`, `Test.TextureBakeModule.cpp` |
 | Frame graph, profiling, render-recipe preview/apply, artifact state | render-recipe operations + config control | `Test.RuntimeRenderRecipeActivation.cpp`, `Test.RuntimeConfigControl.cpp` |
 | App-owned context/frame, window lifecycle, runtime-only imports | Sandbox shell | `Test.SandboxEditorPresentation.cpp`, `Test.SandboxDomainPanels.cpp` |
-| Config file, UI, and agent/CLI parity | feature config modules + app registration + config control | `Test.SandboxConfigSections.cpp`, `Test.RuntimeConfigControl.cpp`, `Test.ParameterizationOperations.cpp` |
+| Config file, UI, and agent/CLI parity | feature config modules + app registration + config control | `Test.SandboxConfigSections.cpp`, `Test.RuntimeConfigControl.cpp`, `Test.ParameterizationOperations.cpp`, `Test.SandboxPointCloudConsolidationPanel.cpp` |
 
 ## Exhaustive removed-type ledger
 

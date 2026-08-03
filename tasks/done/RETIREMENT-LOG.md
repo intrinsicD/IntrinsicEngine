@@ -124,6 +124,161 @@ history under the RUNTIME-138 coherence review. A future view requires a new
 task based on a positive method verdict, the actual public diagnostics payload,
 and measured debugging demand; no config, runtime, graphics, UI, or Vulkan
 surface landed here.
+[`METHOD-019`](METHOD-019-lop-family-optimized-cpu-backend.md) — LOP-family
+optimized-CPU evaluation retired on 2026-08-02 as a claim-grade negative
+confirmation. Validation-only candidates for LOP, WLOP, CLOP, and EAR retained
+exact reference parity, deterministic identity, and zero fallback, but their
+paired-median candidate/reference runtime ratios were respectively
+`0.961823997`, `0.966844794`, `0.998817796`, and `1.037145476`; none met the
+preregistered `<= 0.80` useful-acceleration gate. Consequently no public
+`cpu_optimized` backend, runtime config token, or UI choice was adopted. The
+post-repair focused selector passed 54/54, the supported CPU gate passed
+4,812/4,812, and isolated ASan and UBSan gates each passed 2,655/2,655. The
+schema-v2 benchmark result, frozen protocol, source/data/config seals, raw
+strategy rows, negative decision, and independent audit are retained under
+claim-grade experiment custody; strict method, benchmark, layering, task,
+documentation, inventory, ARA, and diff-hygiene checks close the evidence.
+
+[`BUG-123`](BUG-123-retired-scene-save-terminal-event-race.md) — retired
+queued-scene-save terminal publication repaired on 2026-08-01. A worker could
+publish `Cancelled`, race immediately behind an empty main-thread completion
+drain, and only then queue the scene operation's unpublished finalizer; a
+drain-until-terminal caller consequently returned before the required event.
+Finalizer-owning jobs now remain incomplete and unreapable until normal
+publication wins or the exactly-once main-thread finalizer actually runs. A
+test-only two-gate interlock forces that ordering without sleeps. Both the
+interlock and original scene-save selectors passed 200 registered executions,
+the focused JobService/scene cohort passed 92/92, the canonical CPU gate passed
+4,812/4,812, and isolated ASan and UBSan gates each passed 2,655/2,655. Strict
+layering, test-layout, task/docs, inventory, and diff-hygiene checks pass; no
+timeout, assertion, label, or quarantine was weakened.
+
+[`BUG-127`](BUG-127-task-claim-multiline-dependency-front-matter.md) — task
+claim multiline-dependency preservation retired on 2026-08-01. The textual
+front-matter updater now advances past the complete indented `depends_on`
+sequence before inserting workflow and claim custody keys, while leaving the
+compact inline-list path and unrelated metadata unchanged. The dedicated
+regression parses and checks a two-entry dependency sequence after acquisition;
+all eight atomic claim, one-writer, overlap, release, and stale-recovery cases
+pass, together with strict task schema and policy validation.
+
+[`RUNTIME-175`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md) —
+point-cloud consolidation runtime/config integration completed on 2026-08-01
+at `Operational`. The runtime-owned registered config, module, service, and
+editor-operation path captures immutable selected-point-cloud snapshots, runs
+LOP/WLOP/CLOP/EAR through canonical `JobService`, rejects stale
+world/entity/source completion, and commits a current result through one
+undoable `GeometrySources` mutation with exact dirty tags. Config files plus
+`Editor`, `AgentCli`, and `Programmatic` hot apply share one validator and
+source-tagged control path; retired `UI-035` consumes that exact surface. The
+pointer-free result reports actual `cpu_reference` identity and strategy,
+convergence/displacement, normal, and insertion diagnostics without reserving
+a backend selector. Ten focused runtime/config/UI cases, all 4,044 selected
+default CPU tests, and the four focused contracts under combined ASan/UBSan
+instrumentation pass. Optimized CPU and Vulkan backends remain evidence-gated
+by `METHOD-019`/`METHOD-020`; no performance claim is made.
+
+[`UI-035`](UI-035-sandbox-pointcloud-consolidation-editor-panel.md) — the
+Sandbox point-cloud consolidation panel completed on 2026-08-01 at
+`Operational`. The decentralized editor registry now exposes
+`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` with shared and
+strategy-specific typed controls, canonical config preview/hot apply, async
+service submission, exact `cpu_reference` identity and convergence/normal/
+insertion diagnostics, and document-history undo/redo. The app remains a
+runtime-only consumer; a narrow runtime validator owns the Core config result
+types. The canonical editor target passes all 40 integration cases, including
+the prepared-workspace config-to-service-to-ECS-to-undo proof and the source
+boundary ratchets. The combined-sanitizer promoted-Vulkan Sandbox built and
+launched on an NVIDIA GeForce RTX 3050; its GLFW/ImGui window rendered while
+the locked desktop correctly prevented synthetic interactive input. No GPU
+method backend or performance claim is made.
+
+[`METHOD-018`](METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md) —
+Edge-Aware Resampling completed on 2026-08-01 at `CPUContracted`.
+`Geometry.PointCloud.Consolidation` now exposes anisotropic WLOP and the
+original EAR two-stage reference on the shared typed strategy surface. It
+consumes immutable authored `p:normal` values or uses the deterministic shared
+normal estimator, alternates bilateral normal refinement with anisotropic
+projection for the paper's fixed rounds, and progressively inserts oriented
+samples using deterministic midpoint clearance and edge-priority ordering.
+Focused equation, edge-preservation, flat-region denoising, exact-count,
+normal-policy, resource, failure, serial-repeat, and concurrent-call cases
+pass; the complete 4,035-test CPU selector and serial grouped ASan/UBSan
+geometry cohorts pass. The confirmation smoke reports quality-error L2
+`0.007731229`, retains all eight inserted samples near the feature, and binds
+the authored-normal and `normals_required` paths. The literature record covers
+the original EAR oracle and later L0, graph-uniformity, intrinsic/isotropic,
+EC-Net, and cross-field improvements without substituting them into the
+reference. Runtime/config and editor integration remain owned by
+`RUNTIME-175`/`UI-035`; no performance or scanner-data generalization claim is
+made.
+
+[`METHOD-017`](METHOD-017-continuous-lop-clop-reference-backend.md) —
+Continuous LOP completed on 2026-08-01 at `CPUContracted`.
+`Geometry.PointCloud.Consolidation` now exposes a typed `ClopStrategy` beside
+LOP/WLOP, fits the input density through deterministic seeded
+`Geometry.GaussianMixture::FitEM`, evaluates the original paper's closed-form
+three-Gaussian attraction in fixed order, and reuses the shared repulsion
+kernel. Six CLOP-specific cases cover the independent equation oracle,
+plane/sphere denoising, WLOP parity, mixture-resolution work, sparse outliers,
+fail-closed controls, serial repetition, and concurrent callers. The disjoint
+schema-v2 confirmation smoke reports denoising, WLOP parity, uniformity,
+outlier displacement, mixture resolution/convergence, projection iterations,
+and explicit failure status; its quality-error L2 is `0.015830867` against the
+frozen `0.03` gate. The default 4,029-test CPU gate and grouped ASan/UBSan
+geometry cohorts pass. The literature record covers LOP, WLOP, bilateral FLOP,
+original CLOP, and the later incomplete-gamma improvement while retaining the
+original CLOP equations as this reference. Runtime/config and editor
+integration remain owned by `RUNTIME-175`/`UI-035`; no speed claim is made.
+
+[`METHOD-016`](METHOD-016-locally-optimal-projection-reference-backend.md) —
+LOP/WLOP point-cloud consolidation completed on 2026-08-01 at
+`CPUContracted`. `Geometry.PointCloud.Consolidation` now owns one deterministic
+serial reference loop with typed plain-LOP and density-corrected WLOP
+strategies, shared `Geometry.PointCloud.Kernels` weights, seeded initialization,
+explicit convergence/work diagnostics, and fail-closed input, neighborhood,
+index, and numeric states. Eight focused cases cover analytic plane/sphere
+denoising, repulsion spacing, density contrast, outlier isolation, a frozen
+plain-LOP result, determinism, coincident samples, non-convergence, invalid
+requests, and cloud garbage. The focused default selector, full grouped ASan
+and UBSan geometry cohorts, and the manifest-bound schema-v2 benchmark smoke
+pass; strict method/benchmark manifests, layering, test layout, task policy,
+documentation links, and module-inventory freshness close the structural
+surface. Runtime/config integration and the editor remain owned by
+`RUNTIME-175`/`UI-035`; no performance claim is made.
+
+[`GEOM-062`](GEOM-062-point-set-projection-weighting-kernels.md) — point-cloud
+projection kernels completed on 2026-08-01 at `CPUContracted`.
+`Geometry.PointCloud.Kernels` now owns compactly supported Gaussian,
+LOP/WLOP theta, and Wendland C2 radial weights; the finite normalized linear
+repulsion potential and derivative; and deterministic KD-tree density weights
+in direct and reciprocal forms. Public inputs and diagnostics use only engine,
+`std`, `glm`, and scalar types, accumulation is double precision, and invalid
+support, non-finite points, mismatched spatial indices, query failures, and
+empty positive-weight neighborhoods fail closed without publishing partial
+weights. Focused normal, ASan, and UBSan selectors passed 7/7, and the full
+CPU-only geometry selector passed 1,616/1,616. The aggregate `IntrinsicTests`,
+strict layering, test-layout, task-policy, module-inventory, and documentation
+checks pass. Projection control flow remains with `METHOD-016`; CLOP and EAR
+reuse this seam through `METHOD-017`/`018`. No performance claim is made.
+
+[`GEOM-058`](GEOM-058-gaussian-mixture-em-anderson-acceleration.md) — Gaussian-
+mixture numerics completed on 2026-08-01 at `CPUContracted`.
+`Geometry.GaussianMixture` now owns deterministic 3D Gaussian evaluation,
+seeded sampling, responsibilities, likelihood, and regularized EM fitting;
+`Geometry.FixedPoint.Anderson` supplies a narrow windowed, damped, residual-
+safeguarded fixed-point mixer. EM reuses the new seeded D²
+`Geometry.KMeans::KMeansPlusPlus` initializer, reports explicit convergence,
+likelihood, regularization, and acceleration diagnostics, and accepts an
+accelerated proposal only after model and monotonic-likelihood validation.
+Focused two-/three-component recovery, monotonicity, acceleration,
+determinism, adversarial-state, extreme-value, covariance, and degenerate-input
+coverage passed 13/13 under the normal, ASan, and UBSan builds, and the full
+CPU-only geometry label gate passed 1,609/1,609. The aggregate `IntrinsicTests`
+target and strict layering check pass. Both modules stay narrow imports with
+no public Eigen types or umbrella re-export. Optimized/GPU variants remain
+future method-workflow work only when a concrete consumer justifies them; no
+performance claim is made.
 
 [`RUNTIME-205`](RUNTIME-205-internalize-scene-interaction-helpers.md) — scene-
 interaction helper internalization completed on 2026-08-01 at `Retired`.
@@ -6306,3 +6461,15 @@ unrelated complete-ASan runtime-asset test-lifetime defects already present on
 quarantined. Strict retired-symbol, layering, test-layout, task-policy,
 docs-link, root-hygiene, ARA, generated-inventory, and whitespace checks close
 the evidence; C14 records the capability scope without a performance claim.
+
+[`BUG-126`](BUG-126-claim-custody-historical-source-seals.md) — historical
+claim-custody source-seal validation retired on 2026-08-01. Clean
+claim-eligible datasets, config, environment, and implementation inputs now
+validate lexically at their exact 40-hex source revision, so later method
+extensions do not invalidate older evidence. Bundle fallback is restricted to
+links that name those declared source inputs; raw rows, results, receipts,
+previews, audits, and other post-run evidence remain current-only. A regression
+commits all sealed inputs forward and proves the historical run still passes,
+then tampers a current evidence link and proves the gate still rejects it. Both
+28-case tooling suites, global METHOD-016/METHOD-017 custody/workflow
+validation, skill-mirror sync, task policy, task schema, and docs links pass.

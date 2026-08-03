@@ -1,0 +1,168 @@
+schema_version: 1
+task_id: METHOD-016
+workflow_profile: claim-grade
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T14:21:59Z'
+claim_eligible: true
+source:
+  base_ref: 1d9fbb1e
+  base_revision: 1d9fbb1ee06a9d671a56c2f32a7f8541a1b60ce9
+  head_revision: 1c0531290b498ff8964d64e3f5c82e40a992c1f4
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: a77378a7f3556fcb8f8924876acfc290ed7865b0ce827d650ea35adecf4481b0
+  - path: ara/staging/observations.yaml
+    sha256: b65f4eb2ac7e7a3990a31b4beca4d3383850858f549d509c2092f5ebe5e926b5
+  - path: benchmarks/CMakeLists.txt
+    sha256: af3b45873bbec7f824c364dde0bfc2a7db49be3cb6d3798cdbac3b681fdcc323
+  - path: benchmarks/geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp
+    sha256: 22f1fcb081510769813d478b17fe39e6cf0bc2443f60fd1dc1f2104504a74cef
+  - path: benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
+    sha256: 78df47006a902e92e0efe4e9f6e68a796d7a8185a90a8e2c7173cb620c9a5263
+  - path: benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml
+    sha256: 2ff28bf453268a783f7795dc6190219c6243c26f50dda99a460d40f405725159
+  - path: benchmarks/runners/BenchmarkSmokeRunner.cpp
+    sha256: eec1aae09774feff8fec9498021fd7af6a2411209c9e247dcc0d0097e30e393f
+  - path: docs/api/generated/module_inventory.md
+    sha256: 1df9c6272d72d63c47295bbc319ce3932a4999550808d4003267ae944ed4f3a2
+  - path: docs/architecture/geometry.md
+    sha256: 53d6167a3383008b0ea3e198470f74581a43d12bcfe2e01263325c5505428f59
+  - path: methods/geometry/locally_optimal_projection/README.md
+    sha256: 06b3078d87ad561d351a3438bcf8b9454e5ac32623365bedc62dbc2e4410ff92
+  - path: methods/geometry/locally_optimal_projection/benchmarks/README.md
+    sha256: ecf71b29c3493f98d1abec570e9d9f25f6cc707f21f803667d2f1b70dd37e2a2
+  - path: methods/geometry/locally_optimal_projection/include/README.md
+    sha256: 91f2189c02f1552b443d291ed53fb65fc5bf626ed20a91827436a75ccfb4999e
+  - path: methods/geometry/locally_optimal_projection/method.yaml
+    sha256: 29a2ef1bf87d48991211e950b9ade5fbb952382e0bc7102ae80cfc2b4c3b1892
+  - path: methods/geometry/locally_optimal_projection/paper.md
+    sha256: 50336246a9e1fdb4ca49247b5677d4a26577b3ec7bfb60931ebd7b17c5d1e722
+  - path: methods/geometry/locally_optimal_projection/reports/README.md
+    sha256: ceb6add084e7a5a776f07d83c46aa8ae3e01bd3a8d583ebf46c7369d581b9168
+  - path: methods/geometry/locally_optimal_projection/src/README.md
+    sha256: 340471f3c6543d9ebff80c9572bdb151517b92b7ca94abb234ca7c114a4c956b
+  - path: methods/geometry/locally_optimal_projection/tests/README.md
+    sha256: 553d09d5e7d8b4dc67e326a7aa60658e169abba4f165022e427c28609b0c5551
+  - path: src/geometry/CMakeLists.txt
+    sha256: 61da0388f13972f34fb4a5d126f5609c803134844870b785d1be781a7993fd78
+  - path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+    sha256: 9d30680cd6040e0a976c3d53ff506ded8586b9dafc009c8dd903f9b777d6d5fd
+  - path: src/geometry/Geometry.PointCloud.Consolidation.cppm
+    sha256: 6ae148fba96baff4edf082fd81d7baa79d00aa4757324a67fe8696c20d7181a6
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 49469ccf7766cfcf8ed79a2c33e8d045d7009ca346df97b67575a65493c85818
+  - path: tasks/backlog/methods/README.md
+    sha256: c5f1f35321226762986f4abcb84f48e8d2dfb83171a8c3b57c3d8406cdc93321
+  - path: tasks/done/METHOD-016-locally-optimal-projection-reference-backend.md
+    sha256: 92e040436ecba2f4ddf86f53b9c8f9743b341add18af20e06d10171ee9c27543
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 6bbafb522b38ee126a9fc043550fdfcfce8cec5bba1751afe6e8c5f7f67b1aaf
+  - path: tests/CMakeLists.txt
+    sha256: f8bc07435a41c989fa526284a8fa59f69eb44f0645bc78282cbcb79c80f367c8
+  - path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: b4051e975686affc19b38062853eded5fbddc7dd4634e1a48ec86041cb7841f8
+  content_digest: 189df8257a21cae741f956dabd71ae029f1f9facb7f89761e9553a3d019339b0
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - benchmarks/CMakeLists.txt
+  - benchmarks/geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp
+  - benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
+  - benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml
+  - benchmarks/runners/BenchmarkSmokeRunner.cpp
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/geometry.md
+  - methods/geometry/locally_optimal_projection/README.md
+  - methods/geometry/locally_optimal_projection/benchmarks/README.md
+  - methods/geometry/locally_optimal_projection/include/README.md
+  - methods/geometry/locally_optimal_projection/method.yaml
+  - methods/geometry/locally_optimal_projection/paper.md
+  - methods/geometry/locally_optimal_projection/reports/README.md
+  - methods/geometry/locally_optimal_projection/src/README.md
+  - methods/geometry/locally_optimal_projection/tests/README.md
+  - src/geometry/CMakeLists.txt
+  - src/geometry/Geometry.PointCloud.Consolidation.cpp
+  - src/geometry/Geometry.PointCloud.Consolidation.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/methods/README.md
+  - tasks/done/METHOD-016-locally-optimal-projection-reference-backend.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/CMakeLists.txt
+  - tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  layers:
+  - geometry
+  modules:
+  - Geometry.PointCloud.Consolidation
+extension_seam: Typed Strategy variant; METHOD-017/018 extend the same payload without a backend registry.
+future_change_plan: METHOD-017 adds Clop, METHOD-018 adds Ear/anisotropic weighting, RUNTIME-175 composes
+  the runtime/config lane.
+acceptance:
+- criterion: WLOP is the default and plain LOP is available from the same
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: All correctness tests pass in the default CPU gate.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Benchmark smoke manifest validates and runs.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Smoke result validates and reports quality/error plus convergence
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: 'Public API type discipline: the exported surface uses only'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/METHOD-016/commands/custody-replay.json
+changed_public_contracts:
+- Deterministic fail-closed cpu_reference Consolidate(span|Cloud, Params) with Lop/Wlop Strategy and pointer-free
+  diagnostics.
+diagnostics_and_previews:
+- Explicit status, strategy, contribution counts, convergence, displacement, resource-limit, and implementation
+  identity.
+benchmark_or_parity_evidence:
+- 'tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml: independently accepted quality_error_l2
+  0.020443686 <= 0.03'
+docs_sync:
+  task_file: tasks/done/METHOD-016-locally-optimal-projection-reference-backend.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Analytic fixtures bound the CPU reference only; no scanner-data, performance, runtime/UI, optimized,
+  or GPU generalization.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json
+  sha256: e10594506d031b5be393e0a25e4f23de7e8c4db89ba5cebc6be32a5f88bfeb10
+  kind: file
+- path: tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml
+  sha256: eb11a7b912fd5a22cb1b79d99a631f301da284bac304937f6ea614a5315266f7
+  kind: file
+- path: tasks/evidence/METHOD-016/experiment/runs/run-001/audit.json
+  sha256: b3eb6fe964e44c7fdcf946e1909d7290341c026c29907c81cfcbb497c0105dd4
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/METHOD-016/handoff.jsonl
+review: tasks/evidence/METHOD-016/reviews.jsonl
+experiment_root: tasks/evidence/METHOD-016/experiment

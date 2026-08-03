@@ -97,8 +97,12 @@ EditorGeometryProcessingPreparedFrame PrepareEditorGeometryProcessingFrame(
         prepared.ConfigCommandsAvailable =
             AreEditorGeometryConfigCommandsAvailable(context);
         prepared.ClusteringAvailable = IsEditorClusteringAvailable(context);
+        prepared.PointCloudConsolidationAvailable =
+            IsEditorPointCloudConsolidationAvailable(context);
         prepared.Results = EditorGeometryProcessingResultsSnapshot{
             .LastKMeansResult = CopyOptional(bindings.LastKMeansResult),
+            .LastPointCloudConsolidationResult =
+                CopyOptional(bindings.LastPointCloudConsolidationResult),
             .LastMeshDenoiseResult =
                 CopyOptional(bindings.LastMeshDenoiseResult),
             .LastMeshCurvatureResult =
@@ -144,6 +148,13 @@ bool IsEditorClusteringAvailable(
          context.Clustering != nullptr && context.Clustering->Available();
 }
 
+bool IsEditorPointCloudConsolidationAvailable(
+    const EditorGeometryProcessingContext &context) noexcept {
+  return (!context.AttachmentActive || context.AttachmentActive()) &&
+         context.PointCloudConsolidation != nullptr &&
+         context.PointCloudConsolidation->Available();
+}
+
 KMeansRunCompleted SubmitKMeansRun(
     const EditorGeometryProcessingContext &context, const RunKMeans &command) {
   KMeansRunCompleted result{
@@ -162,6 +173,33 @@ KMeansRunCompleted SubmitKMeansRun(
   result.Correlation = context.Clustering->RunKMeans(command);
   result.Status = KMeansRunStatus::Queued;
   result.Message = "K-Means runtime job queued.";
+  return result;
+}
+
+PointCloudConsolidationResult SubmitEditorPointCloudConsolidation(
+    const EditorGeometryProcessingContext &context,
+    PointCloudConsolidationRequest request) {
+  PointCloudConsolidationResult result{
+      .World = context.World,
+      .Status = PointCloudConsolidationRunStatus::ModuleUnavailable,
+      .StableEntityId = request.StableEntityId,
+      .Config = request.Config,
+      .StrategyToken = std::string{StableToken(request.Config.Strategy)},
+      .Error = Core::ErrorCode::Unknown,
+      .Message = "Point-cloud consolidation service is unavailable.",
+  };
+  if (!IsEditorPointCloudConsolidationAvailable(context))
+    return result;
+
+  result.Correlation =
+      context.PointCloudConsolidation->Run(std::move(request));
+  if (!result.Correlation.IsValid()) {
+    result.Message = "Point-cloud consolidation command could not be queued.";
+    return result;
+  }
+  result.Status = PointCloudConsolidationRunStatus::Queued;
+  result.Error = Core::ErrorCode::Success;
+  result.Message = "Point-cloud consolidation runtime job queued.";
   return result;
 }
 
@@ -201,6 +239,13 @@ KMeansRunCompleted SubmitKMeansRun(
     const EditorGeometryProcessingCommands &commands,
     const RunKMeans &command) {
   return SubmitKMeansRun(ContextOrEmpty(commands), command);
+}
+
+PointCloudConsolidationResult SubmitEditorPointCloudConsolidation(
+    const EditorGeometryProcessingCommands &commands,
+    PointCloudConsolidationRequest request) {
+  return SubmitEditorPointCloudConsolidation(ContextOrEmpty(commands),
+                                             std::move(request));
 }
 
 Geometry::ConstPropertySet ResolveEditorSelectedMeshVertexProperties(
@@ -344,6 +389,20 @@ RuntimeEngineConfigApplyResult ApplyEditorClusteringConfig(
 std::optional<ClusteringConfig> GetEditorClusteringConfig(
     const EditorGeometryProcessingCommands &commands) noexcept {
   return GetEditorClusteringConfig(ContextOrEmpty(commands));
+}
+
+RuntimeEngineConfigApplyResult ApplyEditorPointCloudConsolidationConfig(
+    const EditorGeometryProcessingCommands &commands,
+    const PointCloudConsolidationConfig &config,
+    std::string sourceId) {
+  return ApplyEditorPointCloudConsolidationConfig(
+      ContextOrEmpty(commands), config, std::move(sourceId));
+}
+
+std::optional<PointCloudConsolidationConfig>
+GetEditorPointCloudConsolidationConfig(
+    const EditorGeometryProcessingCommands &commands) noexcept {
+  return GetEditorPointCloudConsolidationConfig(ContextOrEmpty(commands));
 }
 
 std::optional<EditorProgressivePoissonConfig>

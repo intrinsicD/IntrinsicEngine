@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-ubsan",
+    "--target",
+    "IntrinsicCpuTests"
+  ],
+  "command_display": "cmake --build --preset ci-ubsan --target IntrinsicCpuTests",
+  "cwd": ".",
+  "duration_ms": 609768,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T22:51:44Z",
+  "label": "build-ci-ubsan-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T22:41:35Z",
+  "stderr_path": "tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.stdout.log",
+  "stdout_sha256": "85f510950d287fb21103e80c86763a8f2e1616bc90db211cf452dc2c2dbdd11b",
+  "task_id": "BUG-123"
+}

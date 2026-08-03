@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "mkdir -p build/ci/custody/METHOD-019/confirmation-singleton && python3 - <<\"PY\"\nimport json\nfrom pathlib import Path\nsrc=Path(\"build/ci/custody/METHOD-019/confirmation-raw/geometry.lop_family.comparison.smoke.json\")\ndst=Path(\"build/ci/custody/METHOD-019/confirmation-singleton/geometry.lop_family.comparison.smoke.json\")\nd=json.loads(src.read_text())\nraw={k:d[k] for k in (\"benchmark_id\",\"method\",\"backend\",\"dataset\",\"commit\",\"metrics\",\"diagnostics\")}\nraw[\"status\"]=d[\"execution_status\"]\ndst.write_text(json.dumps(raw,indent=2,sort_keys=True)+\"\\n\")\nPY\npython3 tools/benchmark/seal_benchmark_results.py --root build/ci/custody/METHOD-019/confirmation-singleton --manifests-root benchmarks --run-id method-019-confirmation-v1 --attempt-id attempt-001 --source-state clean_commit --source-revision cfd0d9bdebe6c46969394d61593bf4305365ebec --claim-eligible --replace && python3 tools/benchmark/validate_benchmark_results.py --root build/ci/custody/METHOD-019/confirmation-singleton --manifests-root benchmarks --strict"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'mkdir -p build/ci/custody/METHOD-019/confirmation-singleton && python3 - <<\"PY\"\nimport json\nfrom pathlib import Path\nsrc=Path(\"build/ci/custody/METHOD-019/confirmation-raw/geometry.lop_family.comparison.smoke.json\")\ndst=Path(\"build/ci/custody/METHOD-019/confirmation-singleton/geometry.lop_family.comparison.smoke.json\")\nd=json.loads(src.read_text())\nraw={k:d[k] for k in (\"benchmark_id\",\"method\",\"backend\",\"dataset\",\"commit\",\"metrics\",\"diagnostics\")}\nraw[\"status\"]=d[\"execution_status\"]\ndst.write_text(json.dumps(raw,indent=2,sort_keys=True)+\"\\n\")\nPY\npython3 tools/benchmark/seal_benchmark_results.py --root build/ci/custody/METHOD-019/confirmation-singleton --manifests-root benchmarks --run-id method-019-confirmation-v1 --attempt-id attempt-001 --source-state clean_commit --source-revision cfd0d9bdebe6c46969394d61593bf4305365ebec --claim-eligible --replace && python3 tools/benchmark/validate_benchmark_results.py --root build/ci/custody/METHOD-019/confirmation-singleton --manifests-root benchmarks --strict'",
+  "cwd": ".",
+  "duration_ms": 144,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T21:27:53Z",
+  "label": "confirmation-clean-seal",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T21:27:53Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/confirmation-clean-seal.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/confirmation-clean-seal.stdout.log",
+  "stdout_sha256": "adfa47d4bb7b2f8b54ba3e9bf6d9d595fed6796ebdd88ccb37a0dd886e573070",
+  "task_id": "METHOD-019"
+}

@@ -13,8 +13,6 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam](GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
-  (gates `methods/METHOD-015`; framework24 port-gap follow-up).
 - [GEOM-059 — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam](GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
   (framework24 port-gap follow-up).
 - [GEOM-060 — Permutohedral lattice fast high-dimensional filtering seam](GEOM-060-permutohedral-lattice-highdim-filtering.md)
@@ -23,10 +21,7 @@ map.
 - [GEOM-061 — Point-cloud grid-downsampling reduction strategies](GEOM-061-grid-downsampling-reduction-strategies.md)
   (index-returning per-cell reduction extending retired GEOM-016's voxel
   downsampling; framework24 port-gap follow-up).
-- [GEOM-062 — Point-set projection and weighting kernels seam](GEOM-062-point-set-projection-weighting-kernels.md)
-  (reusable `Geometry.PointCloud.Kernels`: radial weights, LOP repulsion, WLOP
-  density weights; gates the `methods/METHOD-016..018` LOP consolidation family).
-- [GEOM-064 — Parameterization optimization kernels seam](GEOM-064-parameterization-optimization-kernels.md)
+- [GEOM-064 — Parameterization optimization kernels seam](../../active/GEOM-064-parameterization-optimization-kernels.md)
   (reusable `Geometry.Parameterization.Optimize`: local rotation fit,
   symmetric-Dirichlet energy/proxy, injective line search; gates ARAP
   `methods/METHOD-021` and SLIM `methods/METHOD-022`).
@@ -69,8 +64,8 @@ retired; see the retired entries below.
 
 A second port-gap sweep (2026-07-07, direct comparison against the
 `framework24` checkout of `bcg_framework`) seeded the remaining
-research-numerics gaps that the 2026-06-26 review did not cover: `GEOM-058`
-(Gaussian mixtures + Anderson-accelerated EM), `GEOM-059` (kernel
+research-numerics gaps that the 2026-06-26 review did not cover: retired
+`GEOM-058` (Gaussian mixtures + Anderson-accelerated EM), `GEOM-059` (kernel
 matrices/Nyström/Gaussian-process interpolation), `GEOM-060` (permutohedral
 lattice filtering), and `GEOM-061` (grid-downsampling reduction strategies),
 plus the method packages `methods/METHOD-015` (Coherent Point Drift family)
@@ -94,8 +89,8 @@ curvature ideas remain deliberately un-opened: current `METHOD-017` consumes
 the fitted density/closed-form attraction term, not those derivatives. No
 standalone Gaussian-differential or general constraint framework was opened.
 
-`GEOM-062` (`Geometry.PointCloud.Kernels`) is the follow-on shared-weighting
-seam factored out of the LOP consolidation family so `methods/METHOD-016`
+Retired `GEOM-062` (`Geometry.PointCloud.Kernels`) is the shared-weighting seam
+factored out of the LOP consolidation family so `methods/METHOD-016`
 (WLOP/LOP), `methods/METHOD-017` (CLOP), and `methods/METHOD-018`
 (EAR/anisotropic) reuse one tested radial-weight/repulsion/density-weight core
 instead of each re-deriving the bcg density and repulsion math privately.
@@ -205,6 +200,15 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [GEOM-062 — Point-set projection and weighting kernels seam](../../done/GEOM-062-point-set-projection-weighting-kernels.md)
+  (done, 2026-08-01, `CPUContracted`): adds compactly supported radial weights,
+  finite WLOP repulsion primitives, and deterministic direct/reciprocal local
+  density weights for `METHOD-016`/`017`/`018`.
+- [GEOM-058 — Gaussian mixture models and Anderson-accelerated EM seam](../../done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
+  (done, 2026-08-01, `CPUContracted`): adds narrow deterministic
+  `Geometry.GaussianMixture` and `Geometry.FixedPoint.Anderson` modules plus
+  seeded k-means++ initialization; these are the shared numerical prerequisites
+  for the CPD and LOP-consolidation method families.
 - [DOCS-003 — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template](../../archive/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) (done).
 - [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](../../archive/GEOM-020-sparse-direct-factorization-seam.md) (done).
 - [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](../../archive/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md) (done).

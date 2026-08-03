@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.ExperimentCustody.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.ExperimentCustody.py",
+  "cwd": ".",
+  "duration_ms": 9007,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T15:47:17Z",
+  "label": "experiment-custody-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T15:47:08Z",
+  "stderr_path": "tasks/evidence/BUG-126/commands/experiment-custody-regression.stderr.log",
+  "stderr_sha256": "6841a9d632cad14b21c395d6e774b60c86c774381986d314e86664f680d680fa",
+  "stdout_path": "tasks/evidence/BUG-126/commands/experiment-custody-regression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-126"
+}

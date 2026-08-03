@@ -515,6 +515,42 @@ contracts: [method.engine-integration]
 
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_byte_identical_parallel_retired_task_is_grandfathered(self) -> None:
+        source = (
+            REPO_ROOT
+            / "tasks/done/BUG-126-claim-custody-historical-source-seals.md"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            target = root / "done" / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(source, target)
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_changed_parallel_retired_task_must_enroll(self) -> None:
+        source = (
+            REPO_ROOT
+            / "tasks/done/BUG-126-claim-custody-historical-source-seals.md"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            target = root / "done" / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(source, target)
+            target.write_text(
+                target.read_text(encoding="utf-8")
+                + "\n<!-- post-policy semantic edit -->\n",
+                encoding="utf-8",
+            )
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("outside the prospective contract baseline", result.stdout)
+
     def test_changed_legacy_task_must_enroll(self) -> None:
         source = (
             REPO_ROOT

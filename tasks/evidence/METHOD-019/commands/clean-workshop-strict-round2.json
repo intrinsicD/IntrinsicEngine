@@ -1,0 +1,22 @@
+{
+  "command": [
+    "bash",
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "bash tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 1065,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T23:58:31Z",
+  "label": "clean-workshop-strict-round2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T23:58:30Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/clean-workshop-strict-round2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/clean-workshop-strict-round2.stdout.log",
+  "stdout_sha256": "e9263be0e76c830d5a1b9e954f7ad95cf125d19c1490369e6518db1193c869d9",
+  "task_id": "METHOD-019"
+}

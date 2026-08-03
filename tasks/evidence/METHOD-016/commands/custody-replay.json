@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "cmake --build --preset ci --target IntrinsicBenchmarkSmoke && mkdir -p build/ci/custody/METHOD-016/replay-raw build/ci/custody/METHOD-016/replay-singleton && env GIT_COMMIT=89193bef887bac1d3876b9e8cb29cc43bd9ca9bf build/ci/bin/IntrinsicBenchmarkSmoke build/ci/custody/METHOD-016/replay-raw && cp build/ci/custody/METHOD-016/replay-raw/geometry.locally_optimal_projection.reference.smoke.json build/ci/custody/METHOD-016/replay-singleton/geometry.locally_optimal_projection.reference.smoke.json && python3 tools/benchmark/seal_benchmark_results.py --root build/ci/custody/METHOD-016/replay-singleton --manifests-root benchmarks --run-id replay-run-001 --attempt-id replay-attempt-001 --source-state clean_commit --source-revision 89193bef887bac1d3876b9e8cb29cc43bd9ca9bf --claim-eligible --replace && python3 tools/benchmark/validate_benchmark_results.py --root build/ci/custody/METHOD-016/replay-singleton --manifests-root benchmarks --strict"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'cmake --build --preset ci --target IntrinsicBenchmarkSmoke && mkdir -p build/ci/custody/METHOD-016/replay-raw build/ci/custody/METHOD-016/replay-singleton && env GIT_COMMIT=89193bef887bac1d3876b9e8cb29cc43bd9ca9bf build/ci/bin/IntrinsicBenchmarkSmoke build/ci/custody/METHOD-016/replay-raw && cp build/ci/custody/METHOD-016/replay-raw/geometry.locally_optimal_projection.reference.smoke.json build/ci/custody/METHOD-016/replay-singleton/geometry.locally_optimal_projection.reference.smoke.json && python3 tools/benchmark/seal_benchmark_results.py --root build/ci/custody/METHOD-016/replay-singleton --manifests-root benchmarks --run-id replay-run-001 --attempt-id replay-attempt-001 --source-state clean_commit --source-revision 89193bef887bac1d3876b9e8cb29cc43bd9ca9bf --claim-eligible --replace && python3 tools/benchmark/validate_benchmark_results.py --root build/ci/custody/METHOD-016/replay-singleton --manifests-root benchmarks --strict'",
+  "cwd": ".",
+  "duration_ms": 6602,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T14:14:50Z",
+  "label": "custody-replay",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T14:14:44Z",
+  "stderr_path": "tasks/evidence/METHOD-016/commands/custody-replay.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-016/commands/custody-replay.stdout.log",
+  "stdout_sha256": "f71413b254a07f930caaf7a94acfcb7ac15462edaea4012f29a63ab10a288ebf",
+  "task_id": "METHOD-016"
+}

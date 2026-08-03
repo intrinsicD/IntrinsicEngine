@@ -1,0 +1,478 @@
+schema_version: 1
+task_id: METHOD-019
+workflow_profile: claim-grade
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T23:59:12Z'
+claim_eligible: true
+source:
+  base_ref: 515abbda
+  base_revision: 515abbdabdfbe992d5a8bd030119cced1fa4eed5
+  head_revision: 29e32756f185a82001bd1fb0e49681365c66a1a5
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: c456c3e4a8a79044f8ccbc9b9d7f69d14435b55a5ad959ea73cf941b054ff306
+  - path: ara/staging/observations.yaml
+    sha256: ab05c40270fa1d45200812675bda1674825656878d6a9dd958911de63d88c202
+  - path: benchmarks/CMakeLists.txt
+    sha256: d1a31d7d4388d50fb3a7a82943db22c6570dc79b5b00e275deffb67fb7ba4d3f
+  - path: benchmarks/geometry/Bench.LopFamilyComparisonSmoke.hpp
+    sha256: 97e24b9d3f4d30433c2f4f6f1e24842583d2f40c0d883570c384b45a636c3dda
+  - path: benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp
+    sha256: d81dc0c6b0156ee81c6f6043eb274ab5521fe2e0bbe1003316b2d53e7460e213
+  - path: benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml
+    sha256: 72807a914d77045a9996e9f4ba96ce300f3e70b0dac009ba13ce5b12c3fb7825
+  - path: benchmarks/runners/BenchmarkSmokeRunner.cpp
+    sha256: ebe4f57bc262b7ceb55aa8c1a3a6f361d8fd3cc3f0c9bc002308ac597eb7ea96
+  - path: docs/architecture/runtime.md
+    sha256: 261882123b7e01807624beed379fe080f538b91c444426af04c92c67e9616e2d
+  - path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+    sha256: b22c14f275306a6af59bc2c796cfc31587ddbf9db358a43518c0645e98d626c8
+  - path: methods/geometry/continuous_lop/README.md
+    sha256: 29047e9a08d11a9a60836656bf3cafaab532e6df4f247fae7ce3f14b64b9d81c
+  - path: methods/geometry/continuous_lop/benchmarks/README.md
+    sha256: 10dccd198aaaff4c8123d4dafb201124dbc0f182f572ab2574757d87909e0c29
+  - path: methods/geometry/continuous_lop/method.yaml
+    sha256: 7717841ecd5475c62e58c2c2549eeb5f351d1d4b0fc58f1176cfaf97747a25b3
+  - path: methods/geometry/continuous_lop/paper.md
+    sha256: 1b2abd707f683c122eda925773c1cd75f2d73ea99ada2cea1b2c106ba04a82b3
+  - path: methods/geometry/continuous_lop/reports/README.md
+    sha256: 5f546e31dff740e9180f105b78b89cab101fcfb1534a7ad0c507f6368c00b344
+  - path: methods/geometry/edge_aware_resampling/README.md
+    sha256: 7b4bb159541c470ba79481c432e5bc8fa0ce9f1f995640114aa70fad39a2d38a
+  - path: methods/geometry/edge_aware_resampling/benchmarks/README.md
+    sha256: e10ff69dfd2baff97ec94dc2c0fca98a4df48e18a87198820f0b513617309e10
+  - path: methods/geometry/edge_aware_resampling/method.yaml
+    sha256: a4abc849da59ed25bb2823fed120904cd0cb12337f3be0bfcfc712c06424ac97
+  - path: methods/geometry/edge_aware_resampling/paper.md
+    sha256: 7dce31900455ebb18638d69db3f3a28e01ac76aa34abf074fb1df1101ad57de5
+  - path: methods/geometry/edge_aware_resampling/reports/README.md
+    sha256: 662708320dc80b8d393079a661427b14cbf2e248eab430542e38cdb8ff9d8d35
+  - path: methods/geometry/locally_optimal_projection/README.md
+    sha256: 9c6e54da3c906c00dfb443e892d10e04ff017d97643f623340546839b624ac3d
+  - path: methods/geometry/locally_optimal_projection/benchmarks/README.md
+    sha256: 01e6fbc064da79a9e659c05392a77b7cdbdb7305d7094b86dc3b714de6011fb9
+  - path: methods/geometry/locally_optimal_projection/method.yaml
+    sha256: b11b104c683b2851ddd34dc91dc27ca8f738cc34195523aa58db5c1f203ba96e
+  - path: methods/geometry/locally_optimal_projection/paper.md
+    sha256: 38d86999e5b68863f2107786edeef45a7b86f50cd4a2c4edaa1bdbe9fb7f0f76
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-019-protocol.md
+    sha256: 0d58f67dd1d4af8066e2662a5fe115a069a4f2ad65ea50e9c37f3801f131bcd0
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-019-result.md
+    sha256: c2df8be95bba987d6a7179b11855c51c57eeeeab8b650fa7b7078cb230e395fb
+  - path: methods/geometry/locally_optimal_projection/reports/README.md
+    sha256: e6a326616b9c1844b6694974fc7a4f8eee785a95e56c6ee815999d16d8cbd3d3
+  - path: src/geometry/Geometry.GaussianMixture.cpp
+    sha256: 3073e159d45abdd82854af8b7f4907d7349a5ac50e50663a848c07dd5fbb301a
+  - path: src/geometry/Geometry.KDTree.cpp
+    sha256: 5ab92b1f8eb8030ddbc7f3a7045f1f0b642dd525846c99019024523a3515c560
+  - path: src/geometry/Geometry.KDTree.cppm
+    sha256: 139fb1b4f1175eb14f80567d6e8c4111e07dfbd61fd965aeaacd503e543d5c35
+  - path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+    sha256: 6f4bb0bcad9431cc54653e1ec3e84cd0e9bef32c0aabd6ca2429934d9ed82939
+  - path: src/geometry/Geometry.PointCloud.Consolidation.cppm
+    sha256: 44640287e56943ac31af420d3861f90f81f88f6da96184d99b3a211464de8b2e
+  - path: src/geometry/Geometry.PointCloud.Kernels.cpp
+    sha256: 54ebd4d0304b6c0a4eab84ee9154df244ab5ad8b36a08f07671d0955da97850f
+  - path: src/geometry/Geometry.PointCloud.Kernels.cppm
+    sha256: 464d8aa1590f7b3c3497b865f0a798cf614ff771f827de3ce4f9f952fcebc1a4
+  - path: src/runtime/README.md
+    sha256: d14c3a96b8e989170b8baece72c3b42d6a9753741144149302be9b62638cf7d5
+  - path: src/runtime/Runtime.JobService.cpp
+    sha256: c35dee2e03d929309620c6ac98da4ab4f0b651ec80115d35190092e919efbbea
+  - path: src/runtime/Runtime.JobService.cppm
+    sha256: 90d05a9e59aa9ab39f49fdd803ba196dd1348cb8e3b4df6d291ef4340aa07698
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 6ec73b5385359974d3adb30bd90f774ebbf958d40fe734d361c893c5f60aee4c
+  - path: tasks/backlog/README.md
+    sha256: 998c501bf63a9c60678ac384fa9f303b046463b6c427a831893d356b51cb3844
+  - path: tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 288883a5b0f6c6f25346a08b4e512d700709409e01766c81803c057996561b68
+  - path: tasks/backlog/methods/README.md
+    sha256: 9b079feb3695e2c8fe3a4062b794a31feda59c5243a99ab19e9cc19e67150976
+  - path: tasks/done/BUG-123-retired-scene-save-terminal-event-race.md
+    sha256: 8ac65deddbbe8e281500fb392107c1d5fcea52b7b94cdada3a2b7223a3df4e62
+  - path: tasks/done/METHOD-019-lop-family-optimized-cpu-backend.md
+    sha256: 41a775bc02cdc249c8140e9cc48f70b9e3806613b0e8f67e90a5e362813aa91c
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 14d391b5b85af8f171a9e47330f6b7af894a9baee0ee84a81620807afe82f63b
+  - path: tasks/evidence/BUG-123/commands/build-ci-asan-cpu.json
+    sha256: 57752657c61676048ce9045a51c81bee49394686dbb240a6acb444a92f960873
+  - path: tasks/evidence/BUG-123/commands/build-ci-asan-cpu.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/build-ci-asan-cpu.stdout.log
+    sha256: 6f6c52ff6208ccbccc704cf406c69420ccf7917f22332371ac3be7f3ddfa8c33
+  - path: tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.json
+    sha256: 543e289a13d16d64bb406aedb0847e438344d0f25706c355299bcea9f3b38584
+  - path: tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.stdout.log
+    sha256: 85f510950d287fb21103e80c86763a8f2e1616bc90db211cf452dc2c2dbdd11b
+  - path: tasks/evidence/BUG-123/commands/build-intrinsic-tests.json
+    sha256: c0ef014c7d682ad6f22fc7109b9cf1f2f8822315aec2a904d16efdb925dc50f8
+  - path: tasks/evidence/BUG-123/commands/build-intrinsic-tests.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/build-intrinsic-tests.stdout.log
+    sha256: 5fea1df41e67246e3cd2ea0d4b26738123869722b0ac7270913345417f814baa
+  - path: tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.json
+    sha256: fd58403d5fba621085f7aac4f14de67acd30091ba7501b90170797f2bae8ff0a
+  - path: tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.stdout.log
+    sha256: 501807c366bde24fdb503d95ffbacf3feda5a4109060631358c5f9fe7cc3c5ce
+  - path: tasks/evidence/BUG-123/commands/ci-ubsan-cpu-ctest.json
+    sha256: 1e33289cbeb4fd365d07d145a237652a8938485e761fff4644c7666ef4fcd68c
+  - path: tasks/evidence/BUG-123/commands/ci-ubsan-cpu-ctest.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/ci-ubsan-cpu-ctest.stdout.log
+    sha256: 5fa61ef92fe6dab77079dd4aea45ec5f8ae70bf86f6816cf18a163990e0425b5
+  - path: tasks/evidence/BUG-123/commands/diff-check.json
+    sha256: 8070198c7544221b687e6bbd2b9d4eaa9083a07e3b7308b02f58083020396fd0
+  - path: tasks/evidence/BUG-123/commands/diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/docs-links.json
+    sha256: d98f9b8728a8899510ffe351d4559b26da8430f9779375e2fb5d6f0776c5769c
+  - path: tasks/evidence/BUG-123/commands/docs-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/docs-links.stdout.log
+    sha256: d46564581cc9c2e6693215e2fc93b61d316131408f4f708382bc8e2e5573abfa
+  - path: tasks/evidence/BUG-123/commands/focused-job-scene-contracts.json
+    sha256: 4a8ab9e9ab5b45d1e7e066b21b3d1bf041147dd8b30641a35bc7eedeed3b2f02
+  - path: tasks/evidence/BUG-123/commands/focused-job-scene-contracts.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/focused-job-scene-contracts.stdout.log
+    sha256: e7d14e5823b15a768eec35983e14ac3df2cb650eb0a10fa7f8188d51a0513467
+  - path: tasks/evidence/BUG-123/commands/forced-interleaving-repeat.json
+    sha256: e15a2e0908f79a3f9218907380f5666727e43d424672a86b55679ee6e64a0c7f
+  - path: tasks/evidence/BUG-123/commands/forced-interleaving-repeat.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/forced-interleaving-repeat.stdout.log
+    sha256: f4fd92507c1dcf4da737215d24e79387d2665f4f917665c018aed2076e4d20e2
+  - path: tasks/evidence/BUG-123/commands/full-cpu-supported-ctest.json
+    sha256: da7d355556d8aca9fa24410b97d82c29eee1dc1a36473eaa94c9725b0be59bf0
+  - path: tasks/evidence/BUG-123/commands/full-cpu-supported-ctest.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/full-cpu-supported-ctest.stdout.log
+    sha256: cf2b1bcb0d75f0629018dc2fe25caedb60ddb24740a221b4604cd7bac3cff186
+  - path: tasks/evidence/BUG-123/commands/layering.json
+    sha256: d1ec4bd8fc85bcd5e4f7dc53de7d14e8c967fb966177065f830109ace6a09ea1
+  - path: tasks/evidence/BUG-123/commands/layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/layering.stdout.log
+    sha256: 7aa895ba9ce2969a7a497dd56e55011571fd04d09d313d35f136ae20736f94e0
+  - path: tasks/evidence/BUG-123/commands/module-inventory-freshness.json
+    sha256: 145092af7dddaafda23cab177c3755906d1c0afbc91df1141239450093cc7a61
+  - path: tasks/evidence/BUG-123/commands/module-inventory-freshness.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/module-inventory-freshness.stdout.log
+    sha256: 29a4efaf5fc98a0fb820783a47cca8440c6a41334d2d3bb2d3a16916a5afbd94
+  - path: tasks/evidence/BUG-123/commands/scene-save-contract-repeat-final.json
+    sha256: b79a50ce7ec795efb9abd422680691e78f122ca6dca800d02c6058d5a4e16faf
+  - path: tasks/evidence/BUG-123/commands/scene-save-contract-repeat-final.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/scene-save-contract-repeat-final.stdout.log
+    sha256: d464fbf1554b54e63c0397823175c857e369fafd86ceb4e346b0dfb54549f4e3
+  - path: tasks/evidence/BUG-123/commands/scene-save-contract-repeat.json
+    sha256: 360ebd836e9cb2fe0e234589e6803d67f842b454ce8f8f403fbc9ca45f3b7314
+  - path: tasks/evidence/BUG-123/commands/scene-save-contract-repeat.stderr.log
+    sha256: e09f8829012e1592c122bb507a8dcc910618b1afc2f50adfe58e585718f43d27
+  - path: tasks/evidence/BUG-123/commands/scene-save-contract-repeat.stdout.log
+    sha256: c42a35efae0e7772fdb85fcdbfcdf4c0d2ce74edf74d0e21fad7acda2b4d47d3
+  - path: tasks/evidence/BUG-123/commands/session-brief-freshness.json
+    sha256: 25d8e2d28e81c7e63c399b44fcc7960af16273a1f61c64d1b0d77a5f6ef59c8b
+  - path: tasks/evidence/BUG-123/commands/session-brief-freshness.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/session-brief-freshness.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/BUG-123/commands/task-policy.json
+    sha256: f7e5c634a6958781bcf9fa6997b5d83e0e59e9b9f06e9ec8076ffe6bfabc3d61
+  - path: tasks/evidence/BUG-123/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/task-policy.stdout.log
+    sha256: 1788a9af683dd809f4c9a79f6b65dc4af735f8b60ec8664dfe1b5103377187b6
+  - path: tasks/evidence/BUG-123/commands/task-schema.json
+    sha256: 35f0ee302f84f6d253fa20ce09edb7553ef76faa07e33220a443f9874fe9deed
+  - path: tasks/evidence/BUG-123/commands/task-schema.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/task-schema.stdout.log
+    sha256: 4354bbfad1002c3cc2f739a9116d8cc04d873fdaa52b76ca5c00a328dd20a666
+  - path: tasks/evidence/BUG-123/commands/test-layout.json
+    sha256: c39fc29cde6b3bfe8842a41b7e82063fc4702a1c470142de53e376ddf49186d2
+  - path: tasks/evidence/BUG-123/commands/test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-123/commands/test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/BUG-123/handoff.jsonl
+    sha256: 4b91aa0f55fadf066670fdff37f79552716dea506f2badade745b0af8bd20cdb
+  - path: tasks/evidence/BUG-123/report.yaml
+    sha256: 5176e31ed1478864ef1fae5932fe209053d0cbaf30f2cb79ad69478a7321d19e
+  - path: tasks/evidence/BUG-123/reviews.jsonl
+    sha256: e9941aa6821245077d7467a6add25682ad7594895d725d1d846170942a832e36
+  - path: tests/contract/runtime/Test.RuntimeJobService.cpp
+    sha256: 5f4805b96c91d3253826830a870c5499d458d9dfd2418a153c628f4414261370
+  - path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: 93f50a4cbe56787a9441c4b9138623a0763e71f2cf817c051af902f55c6cd8f7
+  - path: tests/unit/geometry/Test.PointCloudKernels.cpp
+    sha256: c6e3fbd8f3cb58f4da88bd45674df6f9f9c10d5e879610edf277452227c02197
+  - path: tests/unit/geometry/Test_KDTree.cpp
+    sha256: 54cbf0574f043189b34ecea59ef73616412b9831e6e3a2017eb5d00c5e6168e8
+  content_digest: f4489b624c56c6fb1ac29d15856fc10b09d34b43d13f1773108f1dbba2d04fb9
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - benchmarks/CMakeLists.txt
+  - benchmarks/geometry/Bench.LopFamilyComparisonSmoke.hpp
+  - benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp
+  - benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml
+  - benchmarks/runners/BenchmarkSmokeRunner.cpp
+  - docs/architecture/runtime.md
+  - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+  - methods/geometry/continuous_lop/README.md
+  - methods/geometry/continuous_lop/benchmarks/README.md
+  - methods/geometry/continuous_lop/method.yaml
+  - methods/geometry/continuous_lop/paper.md
+  - methods/geometry/continuous_lop/reports/README.md
+  - methods/geometry/edge_aware_resampling/README.md
+  - methods/geometry/edge_aware_resampling/benchmarks/README.md
+  - methods/geometry/edge_aware_resampling/method.yaml
+  - methods/geometry/edge_aware_resampling/paper.md
+  - methods/geometry/edge_aware_resampling/reports/README.md
+  - methods/geometry/locally_optimal_projection/README.md
+  - methods/geometry/locally_optimal_projection/benchmarks/README.md
+  - methods/geometry/locally_optimal_projection/method.yaml
+  - methods/geometry/locally_optimal_projection/paper.md
+  - methods/geometry/locally_optimal_projection/reports/METHOD-019-protocol.md
+  - methods/geometry/locally_optimal_projection/reports/METHOD-019-result.md
+  - methods/geometry/locally_optimal_projection/reports/README.md
+  - src/geometry/Geometry.GaussianMixture.cpp
+  - src/geometry/Geometry.KDTree.cpp
+  - src/geometry/Geometry.KDTree.cppm
+  - src/geometry/Geometry.PointCloud.Consolidation.cpp
+  - src/geometry/Geometry.PointCloud.Consolidation.cppm
+  - src/geometry/Geometry.PointCloud.Kernels.cpp
+  - src/geometry/Geometry.PointCloud.Kernels.cppm
+  - src/runtime/README.md
+  - src/runtime/Runtime.JobService.cpp
+  - src/runtime/Runtime.JobService.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/README.md
+  - tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/methods/README.md
+  - tasks/done/BUG-123-retired-scene-save-terminal-event-race.md
+  - tasks/done/METHOD-019-lop-family-optimized-cpu-backend.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/BUG-123/commands/build-ci-asan-cpu.json
+  - tasks/evidence/BUG-123/commands/build-ci-asan-cpu.stderr.log
+  - tasks/evidence/BUG-123/commands/build-ci-asan-cpu.stdout.log
+  - tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.json
+  - tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.stderr.log
+  - tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.stdout.log
+  - tasks/evidence/BUG-123/commands/build-intrinsic-tests.json
+  - tasks/evidence/BUG-123/commands/build-intrinsic-tests.stderr.log
+  - tasks/evidence/BUG-123/commands/build-intrinsic-tests.stdout.log
+  - tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.json
+  - tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.stderr.log
+  - tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.stdout.log
+  - tasks/evidence/BUG-123/commands/ci-ubsan-cpu-ctest.json
+  - tasks/evidence/BUG-123/commands/ci-ubsan-cpu-ctest.stderr.log
+  - tasks/evidence/BUG-123/commands/ci-ubsan-cpu-ctest.stdout.log
+  - tasks/evidence/BUG-123/commands/diff-check.json
+  - tasks/evidence/BUG-123/commands/diff-check.stderr.log
+  - tasks/evidence/BUG-123/commands/diff-check.stdout.log
+  - tasks/evidence/BUG-123/commands/docs-links.json
+  - tasks/evidence/BUG-123/commands/docs-links.stderr.log
+  - tasks/evidence/BUG-123/commands/docs-links.stdout.log
+  - tasks/evidence/BUG-123/commands/focused-job-scene-contracts.json
+  - tasks/evidence/BUG-123/commands/focused-job-scene-contracts.stderr.log
+  - tasks/evidence/BUG-123/commands/focused-job-scene-contracts.stdout.log
+  - tasks/evidence/BUG-123/commands/forced-interleaving-repeat.json
+  - tasks/evidence/BUG-123/commands/forced-interleaving-repeat.stderr.log
+  - tasks/evidence/BUG-123/commands/forced-interleaving-repeat.stdout.log
+  - tasks/evidence/BUG-123/commands/full-cpu-supported-ctest.json
+  - tasks/evidence/BUG-123/commands/full-cpu-supported-ctest.stderr.log
+  - tasks/evidence/BUG-123/commands/full-cpu-supported-ctest.stdout.log
+  - tasks/evidence/BUG-123/commands/layering.json
+  - tasks/evidence/BUG-123/commands/layering.stderr.log
+  - tasks/evidence/BUG-123/commands/layering.stdout.log
+  - tasks/evidence/BUG-123/commands/module-inventory-freshness.json
+  - tasks/evidence/BUG-123/commands/module-inventory-freshness.stderr.log
+  - tasks/evidence/BUG-123/commands/module-inventory-freshness.stdout.log
+  - tasks/evidence/BUG-123/commands/scene-save-contract-repeat-final.json
+  - tasks/evidence/BUG-123/commands/scene-save-contract-repeat-final.stderr.log
+  - tasks/evidence/BUG-123/commands/scene-save-contract-repeat-final.stdout.log
+  - tasks/evidence/BUG-123/commands/scene-save-contract-repeat.json
+  - tasks/evidence/BUG-123/commands/scene-save-contract-repeat.stderr.log
+  - tasks/evidence/BUG-123/commands/scene-save-contract-repeat.stdout.log
+  - tasks/evidence/BUG-123/commands/session-brief-freshness.json
+  - tasks/evidence/BUG-123/commands/session-brief-freshness.stderr.log
+  - tasks/evidence/BUG-123/commands/session-brief-freshness.stdout.log
+  - tasks/evidence/BUG-123/commands/task-policy.json
+  - tasks/evidence/BUG-123/commands/task-policy.stderr.log
+  - tasks/evidence/BUG-123/commands/task-policy.stdout.log
+  - tasks/evidence/BUG-123/commands/task-schema.json
+  - tasks/evidence/BUG-123/commands/task-schema.stderr.log
+  - tasks/evidence/BUG-123/commands/task-schema.stdout.log
+  - tasks/evidence/BUG-123/commands/test-layout.json
+  - tasks/evidence/BUG-123/commands/test-layout.stderr.log
+  - tasks/evidence/BUG-123/commands/test-layout.stdout.log
+  - tasks/evidence/BUG-123/handoff.jsonl
+  - tasks/evidence/BUG-123/report.yaml
+  - tasks/evidence/BUG-123/reviews.jsonl
+  - tests/contract/runtime/Test.RuntimeJobService.cpp
+  - tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  - tests/unit/geometry/Test.PointCloudKernels.cpp
+  - tests/unit/geometry/Test_KDTree.cpp
+  layers:
+  - benchmarks
+  - geometry
+  - methods
+  - runtime
+  - tasks
+  - tests
+  modules:
+  - Extrinsic.Runtime.JobService
+  - Geometry.GaussianMixture
+  - Geometry.KDTree
+  - Geometry.PointCloud.Consolidation
+  - Geometry.PointCloud.Kernels
+extension_seam: ConsolidateCpuOptimizedCandidate is a comparison-only validation seam over the existing
+  strategy API; shared KD-tree, kernel scratch, and GMM factorization reuse add no backend registry or
+  public selector.
+future_change_plan: METHOD-020 may add the first public backend axis only with a real parity-proven Vulkan
+  implementation; GEOM-060/061 adoption remains a separately preregistered and benchmarked follow-up.
+acceptance:
+- criterion: All four strategies are evaluated. Every exposed optimized strategy
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Comparison implementation identity is asserted by tests and results;
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The comparison manifest and emitted results validate, and the README
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every exposed optimized strategy meets the frozen `<= 0.80` paired-median
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: If no strategy passes both gates, retire with the validated comparison
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Public API still exposes only `std`/`glm`/scalar types.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/METHOD-019/commands/ara-claims-final.json
+- receipt: tasks/evidence/METHOD-019/commands/ara-claims.json
+- receipt: tasks/evidence/METHOD-019/commands/benchmark-manifests-final.json
+- receipt: tasks/evidence/METHOD-019/commands/benchmark-manifests.json
+- receipt: tasks/evidence/METHOD-019/commands/benchmark-result-final.json
+- receipt: tasks/evidence/METHOD-019/commands/benchmark-results.json
+- receipt: tasks/evidence/METHOD-019/commands/build-ci-asan-cpu.json
+- receipt: tasks/evidence/METHOD-019/commands/build-ci-ubsan-cpu.json
+- receipt: tasks/evidence/METHOD-019/commands/ci-asan-cpu-ctest-post-bug123.json
+- receipt: tasks/evidence/METHOD-019/commands/ci-asan-cpu-ctest.json
+- receipt: tasks/evidence/METHOD-019/commands/ci-ubsan-cpu-ctest-post-bug123.json
+- receipt: tasks/evidence/METHOD-019/commands/ci-ubsan-cpu-ctest.json
+- receipt: tasks/evidence/METHOD-019/commands/claim-custody-final.json
+- receipt: tasks/evidence/METHOD-019/commands/clean-workshop-strict-round2.json
+- receipt: tasks/evidence/METHOD-019/commands/configure-ci-asan.json
+- receipt: tasks/evidence/METHOD-019/commands/configure-ci-ubsan.json
+- receipt: tasks/evidence/METHOD-019/commands/confirmation-benchmark.json
+- receipt: tasks/evidence/METHOD-019/commands/confirmation-clean-seal.json
+- receipt: tasks/evidence/METHOD-019/commands/diff-check-final.json
+- receipt: tasks/evidence/METHOD-019/commands/diff-check.json
+- receipt: tasks/evidence/METHOD-019/commands/docs-links-final.json
+- receipt: tasks/evidence/METHOD-019/commands/docs-links-retirement.json
+- receipt: tasks/evidence/METHOD-019/commands/docs-links-strict-round2.json
+- receipt: tasks/evidence/METHOD-019/commands/experiment-completion-final.json
+- receipt: tasks/evidence/METHOD-019/commands/focused-tests-post-bug123.json
+- receipt: tasks/evidence/METHOD-019/commands/focused-tests.json
+- receipt: tasks/evidence/METHOD-019/commands/full-cpu-supported-ctest.json
+- receipt: tasks/evidence/METHOD-019/commands/full-cpu-supported-post-bug123.json
+- receipt: tasks/evidence/METHOD-019/commands/layering.json
+- receipt: tasks/evidence/METHOD-019/commands/method-manifests-final.json
+- receipt: tasks/evidence/METHOD-019/commands/method-manifests.json
+- receipt: tasks/evidence/METHOD-019/commands/module-inventory-final.json
+- receipt: tasks/evidence/METHOD-019/commands/session-brief-final.json
+- receipt: tasks/evidence/METHOD-019/commands/state-links-final.json
+- receipt: tasks/evidence/METHOD-019/commands/task-policy-final.json
+- receipt: tasks/evidence/METHOD-019/commands/task-schema-final.json
+- receipt: tasks/evidence/METHOD-019/commands/test-layout.json
+- receipt: tasks/evidence/METHOD-019/commands/ubsan-bug123-repeat-post-fix.json
+- receipt: tasks/evidence/METHOD-019/commands/ubsan-bug123-repeat.json
+changed_public_contracts:
+- The ordinary Consolidate API remains cpu_reference-only; the comparison seam returns candidate identity
+  plus exact state, shape, numeric parity, determinism, fallback, and adoption diagnostics.
+- BUG-123's independently reviewed gate repair makes JobService completion include settlement of any required
+  unpublished main-thread finalizer.
+diagnostics_and_previews:
+- Per-strategy paired medians were LOP 0.961823997, WLOP 0.966844794, CLOP 0.998817796, and EAR 1.037145476,
+  with exact output parity and zero fallback; all candidates remain validation-only.
+- The benchmark and runtime lifecycle discovery receipts preserve failed diagnostics as optional while
+  post-repair required receipts pass.
+- Round-two strict docs-link and clean-workshop receipts close the stale BUG-123 retirement-link finding.
+benchmark_or_parity_evidence:
+- 'tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml: all negative-confirmation gates independently
+  accepted; minimum candidate/reference ratio 0.961823997 > 0.80, maximum parity failure 0, adopted count
+  0.'
+docs_sync:
+  task_file: tasks/done/METHOD-019-lop-family-optimized-cpu-backend.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Timing evidence is bounded to the declared smoke fixture, compiler, build, and host; it supports only
+  non-adoption, not cross-host performance or a general impossibility claim.
+- No scanner corpus, multithread scaling, public optimized backend, runtime/UI backend token, or GPU/Vulkan
+  implementation is covered.
+- The completion surface includes BUG-123, an independently reviewed runtime gate repair discovered by
+  METHOD-019 sanitizer verification; it does not alter consolidation semantics.
+skipped_checks:
+- check: promoted-vulkan
+  reason: Not run for METHOD-019 because the task is CPU-only and adopted no GPU or runtime/UI backend
+    path.
+artifacts:
+- path: tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json
+  sha256: aaa357e69c31bb64d166ed3d45c2627c72b46977ef3b1b4cd049fe3b6711475f
+  kind: file
+- path: tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml
+  sha256: 3a8baf18b27ec592f58b5afac288fac3817a7abcb94515e20cbf90d6b935485d
+  kind: file
+- path: tasks/evidence/METHOD-019/experiment/runs/run-001/audit.json
+  sha256: 8bf19d01995aa15820d1c3c960f1a3fdebd8bb70464174c5ab539393bf341623
+  kind: file
+- path: methods/geometry/locally_optimal_projection/reports/METHOD-019-protocol.md
+  sha256: 0d58f67dd1d4af8066e2662a5fe115a069a4f2ad65ea50e9c37f3801f131bcd0
+  kind: file
+- path: methods/geometry/locally_optimal_projection/reports/METHOD-019-result.md
+  sha256: c2df8be95bba987d6a7179b11855c51c57eeeeab8b650fa7b7078cb230e395fb
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/METHOD-019/handoff.jsonl
+review: tasks/evidence/METHOD-019/reviews.jsonl
+experiment_root: tasks/evidence/METHOD-019/experiment

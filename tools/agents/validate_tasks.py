@@ -487,6 +487,7 @@ def validate_front_matter(
     contract_legacy_hashes: dict[str, str] = {}
     contract_consumed_hashes: dict[str, str] = {}
     contract_source_hashes: dict[str, str] = {}
+    contract_parallel_retired_hashes: dict[str, str] = {}
     if CONTRACT_LEGACY_INVENTORY.is_file():
         try:
             inventory = json.loads(
@@ -504,6 +505,61 @@ def validate_front_matter(
                 contract_source_hashes = task_snapshot_hashes_at_revision(
                     inventory["source_revision"]
                 )
+                parallel_retired = inventory.get("parallel_retired", {})
+                if not isinstance(parallel_retired, dict):
+                    raise ValueError("parallel_retired must be a mapping")
+                if parallel_retired:
+                    parallel_policy_task = inventory.get("parallel_policy_task")
+                    if not isinstance(parallel_policy_task, str) or not re.fullmatch(
+                        r"[A-Z]+-[0-9]+[A-Z0-9-]*", parallel_policy_task
+                    ):
+                        raise ValueError(
+                            "parallel_retired requires a parallel_policy_task ID"
+                        )
+                    if set(parallel_retired) != {"source_revision", "tasks"}:
+                        raise ValueError(
+                            "parallel_retired must contain only source_revision "
+                            "and tasks"
+                        )
+                    parallel_revision = parallel_retired.get("source_revision")
+                    parallel_tasks = parallel_retired.get("tasks")
+                    if not isinstance(parallel_revision, str) or not isinstance(
+                        parallel_tasks, dict
+                    ):
+                        raise ValueError(
+                            "parallel_retired requires a source_revision and "
+                            "tasks mapping"
+                        )
+                    parallel_source_hashes = task_snapshot_hashes_at_revision(
+                        parallel_revision
+                    )
+                    for rel, expected_hash in parallel_tasks.items():
+                        rel_path = Path(rel) if isinstance(rel, str) else Path()
+                        if (
+                            not isinstance(rel, str)
+                            or not rel
+                            or rel_path.is_absolute()
+                            or ".." in rel_path.parts
+                            or rel_path.parts[0] not in {"done", "archive"}
+                            or not isinstance(expected_hash, str)
+                            or not re.fullmatch(r"[0-9a-f]{64}", expected_hash)
+                        ):
+                            raise ValueError(
+                                "parallel_retired tasks must map done/archive "
+                                "relative paths to 64-hex SHA-256 values"
+                            )
+                        source_hash = parallel_source_hashes.get(f"tasks/{rel}")
+                        if source_hash != expected_hash:
+                            raise ValueError(
+                                f"parallel_retired entry `{rel}` does not match "
+                                "its source_revision"
+                            )
+                        if f"tasks/{rel}" in contract_source_hashes:
+                            raise ValueError(
+                                f"parallel_retired entry `{rel}` already exists "
+                                "in the primary source_revision"
+                            )
+                    contract_parallel_retired_hashes = parallel_tasks
                 overlap = set(contract_legacy_hashes) & set(
                     contract_consumed_hashes
                 )
@@ -645,7 +701,9 @@ def validate_front_matter(
         if lifecycle in {"active", "backlog"}:
             expected_legacy_hash = contract_legacy_hashes.get(rel)
         elif lifecycle in {"done", "archive"}:
-            expected_legacy_hash = contract_source_hashes.get(f"tasks/{rel}")
+            expected_legacy_hash = contract_parallel_retired_hashes.get(
+                rel, contract_source_hashes.get(f"tasks/{rel}")
+            )
         else:
             expected_legacy_hash = None
 

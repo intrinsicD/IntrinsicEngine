@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "ctest --test-dir build/ci --output-on-failure -L geometry --no-tests=error --timeout 60"
+  ],
+  "command_display": "bash -lc 'ctest --test-dir build/ci --output-on-failure -L geometry --no-tests=error --timeout 60'",
+  "cwd": ".",
+  "duration_ms": 22098,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T11:56:32Z",
+  "label": "geometry-cpu-gate-review2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T11:56:10Z",
+  "stderr_path": "tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.stdout.log",
+  "stdout_sha256": "18e2499244a0a34e317c7c4b70a757989e5ad1e5ca7336aeb2eee83f11a114aa",
+  "task_id": "GEOM-058"
+}

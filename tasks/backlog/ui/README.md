@@ -30,12 +30,6 @@ map.
   facade retirement from `RUNTIME-202`. It consumes existing canonical
   metadata/cache results first and adds only concrete feature-owned derived
   readiness work when required).
-- [UI-035 — Sandbox point-cloud consolidation editor panel](UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
-  (LOP/WLOP/CLOP/EAR CPU-reference strategy and parameter controls driving the
-  post-facade `RUNTIME-175` runtime-owned config and explicit typed operation;
-  this task owns visible UI parity after that dependency retires. METHOD-019/020
-  may add only backends that pass their evidence gates; uses the app-owned
-  editor structure retired by `ARCH-006`).
 
 Further UI children open from the deferred triggers recorded by the retired
 RORG-031F seed and from reproducible workflow audits.
@@ -194,6 +188,11 @@ split; narratives live in the retirement log.
   Poisson operation under Mesh, Graph, and PointCloud with copied finite-source
   readiness, disabled reasons, shared config/run routing, and existing result
   visualization channels.
+- [UI-035 — Sandbox point-cloud consolidation editor panel](../../done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
+  (done, 2026-08-01, `Operational`): the app-owned registered window exposes
+  LOP/WLOP/CLOP/EAR through the shared validated config and typed async runtime
+  operation, reports exact CPU-reference diagnostics, and uses the common
+  undo/redo history path without importing lower layers.
 - [UI-036 — Sandbox parameterization editor panel and resizable UV split view](../../done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
   (done, 2026-07-15, `Operational`): delivered implemented-strategy controls,
   validated config-lane apply/undo, aggregate diagnostics, and a resizable

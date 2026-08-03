@@ -1,0 +1,81 @@
+schema_version: 1
+task_id: METHOD-018
+run_id: run-001
+attempt_id: attempt-001
+created_at: '2026-08-01T17:16:39Z'
+protocol_digest: e71d6ce1bb2315e4d8a4a37b9f9fd9c44874a88da866fc678f4a6249201760b3
+provenance:
+  source:
+    revision: 840afb7abb1dcf6bad1590d626fb4da8bdc5d329
+    clean: true
+  task_sha256: 5ff5b05c4892e82ae68ae6144d7cd34bfb2e0ddb6c2d89645fc918da486d1b9a
+  implementation_digest: 126200e42f3d0f6b05250a97c6003ccb2667e8c37154b2303e6c3979d291f143
+  datasets:
+  - id: ear-screening-v1
+    path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: 6d0f83e40de1a51601bd72b3aca0504b11fa417dc90def17a735b6e10de1d5d9
+    split: screening
+  - id: ear-confirmation-v1
+    path: benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp
+    sha256: 436f2f7bd95863e3a0f453d24bf2aa293db8ce9798324425db9b9e503ddff60a
+    split: confirmation
+resolved_config:
+  path: benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml
+  sha256: bca8fdbe4b9782fb9b391321129d52e2aa76633a2c74541d4fb44bd2f2b88e80
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+raw_rows:
+  path: tasks/evidence/METHOD-018/experiment/runs/run-001/benchmark_raw_rows.jsonl
+  sha256: e64ff80359152de9c57968499ac00d1a0ce9e1b3be2f552f0562d525edc39b7d
+  row_count: 1
+summaries:
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+  value: 0.007731229
+gates:
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.03
+  observed: 0.007731229
+  passed: true
+diagnostics:
+- confirmation-status=passed
+- confirmation-cohort=ear-v1
+- literature-boundary=original-ear-two-stage-reference
+links:
+- path: tasks/evidence/METHOD-018/experiment/protocol.yaml
+  sha256: e9299e564ac52c563caab1e466b2fb6206db79ce6555a457f1054f407f020186
+- path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: 6d0f83e40de1a51601bd72b3aca0504b11fa417dc90def17a735b6e10de1d5d9
+- path: benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp
+  sha256: 436f2f7bd95863e3a0f453d24bf2aa293db8ce9798324425db9b9e503ddff60a
+- path: benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml
+  sha256: bca8fdbe4b9782fb9b391321129d52e2aa76633a2c74541d4fb44bd2f2b88e80
+- path: tasks/evidence/METHOD-018/experiment/inputs/benchmark_result.json
+  sha256: a5b4464e255ca6896c54fde33e3dc7e0ed2b7605f1e53c2405105fcd600c0424
+visual: false
+previews: []
+replay_command:
+- env
+- GIT_COMMIT=840afb7abb1dcf6bad1590d626fb4da8bdc5d329
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- build/ci/custody/METHOD-018/confirmation-raw
+view_command:
+- python3
+- -m
+- json.tool
+- tasks/evidence/METHOD-018/experiment/inputs/benchmark_result.json
+smoke_receipts:
+- tasks/evidence/METHOD-018/commands/custody-replay.json
+claim_authorized: false
+benchmark_result:
+  path: tasks/evidence/METHOD-018/experiment/inputs/benchmark_result.json
+  sha256: a5b4464e255ca6896c54fde33e3dc7e0ed2b7605f1e53c2405105fcd600c0424
+  manifests_root: benchmarks
+  benchmark_id: geometry.edge_aware_resampling.reference.smoke
+  run_id: run-001
+  attempt_id: attempt-001
+  status: passed
+  claim_eligible: true

@@ -117,6 +117,16 @@ move its original path/hash to `consumed`; the validator rejects both stale
 live entries and replay of consumed bytes. Historical task contents are not
 backfilled.
 
+When a branch that genuinely retired work before the policy effective point is
+merged after that point, `parallel_retired` may bind those byte-identical
+`done/` or `archive/` records to one exact 40-hex revision from the parallel
+history and their SHA-256 digests, with `parallel_policy_task` naming the
+high-risk task that reviewed the exception. This is a path-scoped historical
+baseline, not a second effective date: it cannot cover active/backlog work,
+every entry is verified against Git, and any later byte change still enrolls
+prospectively. Preserve sealed task/experiment bytes; do not rewrite custody
+hashes to make a parallel merge pass.
+
 `tools/agents/validate_tasks.py --strict` applies this gate before the ordinary
 done/archive format exemptions, resolves declared IDs against the catalog, and
 validates each catalog source/proof path. Add a catalog entry only for a

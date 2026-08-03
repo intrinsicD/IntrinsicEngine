@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/experiment_custody.py",
+    "validate",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/experiment_custody.py validate --root .",
+  "cwd": ".",
+  "duration_ms": 447,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T23:46:44Z",
+  "label": "claim-custody-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T23:46:43Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/claim-custody-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/claim-custody-final.stdout.log",
+  "stdout_sha256": "a581dbc05e06a5de33c7f0f25dad6834d4bd6d7b97ea141127b2da35a773381d",
+  "task_id": "METHOD-019"
+}

@@ -1,0 +1,98 @@
+schema_version: 2
+task_id: METHOD-018
+protocol_id: edge-aware-resampling-reference-confirmation-v1
+profile: claim-grade
+state: frozen
+question: Does the deterministic CPU-reference EAR implementation satisfy its frozen correctness bounds
+  on a confirmation cohort disjoint from unit-test screening fixtures?
+hypothesis: The confirmation smoke reports quality_error_l2 at or below 0.03 and passes its anisotropic-denoising,
+  edge-preservation, normal-angle, progressive-insertion, uniformity, normal-source, determinism, and
+  fail-closed gates.
+claim_boundary: Checked-in analytic noisy-dihedral fixtures on the serial cpu_reference backend only;
+  no scanner-data generalization, alternative later-method equivalence, runtime, UI, optimized-CPU, GPU,
+  or performance claim.
+evidence_phase: confirmation
+claim_eligible: true
+datasets:
+- id: ear-screening-v1
+  path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: 6d0f83e40de1a51601bd72b3aca0504b11fa417dc90def17a735b6e10de1d5d9
+  split: screening
+- id: ear-confirmation-v1
+  path: benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp
+  sha256: 436f2f7bd95863e3a0f453d24bf2aa293db8ce9798324425db9b9e503ddff60a
+  split: confirmation
+disjoint_splits:
+- left: screening
+  right: confirmation
+  method: The confirmation cohort uses different dihedral dimensions, spacing, support radii, noise sequence,
+    seed, target count, and feature-nearness gate from screening.
+seeds:
+- 17
+- 53
+input_policy: Use only the checked-in analytic fixtures declared above. Screening observations may not
+  tune frozen confirmation fixtures, parameters, or thresholds after protocol freeze.
+comparators:
+- id: raw-noisy-dihedral
+  budget: matched-input-points
+- id: isotropic-wlop-reference
+  budget: matched-input-points-seed-and-projection-rounds
+- id: anisotropic-wlop-reference
+  budget: matched-input-points-seed-and-projection-rounds
+primary_metrics:
+- name: quality_error_l2
+  direction: minimize
+  unit: world-units
+  statistical_unit: confirmation-cohort
+statistical_tests:
+- name: deterministic-descriptive-bound
+  alpha: null
+summaries:
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+killing_gates:
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.03
+screening_confirmation_policy: Unit-test fixtures establish contracts only. The benchmark confirmation
+  cohort is frozen before execution, and a failed confirmation gate refutes the hypothesis rather than
+  triggering retuning.
+resources:
+  cpu_threads: 1
+  gpu: false
+command:
+- env
+- GIT_COMMIT=840afb7abb1dcf6bad1590d626fb4da8bdc5d329
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- build/ci/custody/METHOD-018/confirmation-raw
+expected_artifacts:
+- tasks/evidence/METHOD-018/experiment/inputs/benchmark_result.json
+- tasks/evidence/METHOD-018/experiment/runs/run-001/bundle.yaml
+blockers: []
+source:
+  revision: 840afb7abb1dcf6bad1590d626fb4da8bdc5d329
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml
+  sha256: bca8fdbe4b9782fb9b391321129d52e2aa76633a2c74541d4fb44bd2f2b88e80
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+implementation:
+- path: src/geometry/Geometry.PointCloud.Consolidation.cppm
+  sha256: 1fa6998ae100e2d4cc7eeb412b9e916c8e329da2d227f14f9bb327cc5eae4310
+- path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+  sha256: 6ca14253c41396005db2be646dfb087a87a6c3d632758127ca0674b35c264f82
+- path: src/geometry/Geometry.PointCloud.Kernels.cppm
+  sha256: 28cb6c49a971543ebcb7a9dd71fa21a8b3fa1b0e45a76433e5b4d3b271897d06
+- path: src/geometry/Geometry.PointCloud.Kernels.cpp
+  sha256: adde73c38237cbd65ced82e403d16f1ee0f23c873c23033f55e1209280f9cda4
+- path: src/geometry/Geometry.PointCloud.Normals.cppm
+  sha256: 86f49c99708cdce389282dba3097bc76088c6e9e0d68fb3c4bfff42c7f5f5147
+- path: src/geometry/Geometry.PointCloud.Normals.cpp
+  sha256: 4eaecaa92630a97749a9c1ae917e4b971884cdc1fe78dfba401448cd978b4700
+- path: benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp
+  sha256: 436f2f7bd95863e3a0f453d24bf2aa293db8ce9798324425db9b9e503ddff60a
+frozen_at: '2026-08-01T17:13:48Z'
+protocol_digest: e71d6ce1bb2315e4d8a4a37b9f9fd9c44874a88da866fc678f4a6249201760b3

@@ -70,6 +70,8 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
@@ -1917,6 +1919,58 @@ namespace Extrinsic::Runtime
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
         return GetClusteringConfig(
+            context.EngineConfigControlState->ActiveConfig);
+    }
+
+    RuntimeEngineConfigApplyResult ApplyEditorPointCloudConsolidationConfig(
+        const EditorGeometryProcessingContext& context,
+        const PointCloudConsolidationConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        if (context.EngineConfigControlState == nullptr ||
+            !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset ||
+            !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate =
+            context.EngineConfigControlState->ActiveConfig;
+        SetPointCloudConsolidationConfig(candidate, config);
+        if (sourceId.empty())
+            sourceId = std::string{kPointCloudConsolidationConfigSectionName};
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate),
+            sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    bool IsValidEditorPointCloudConsolidationConfig(
+        const PointCloudConsolidationConfig& config)
+    {
+        const Core::Config::EngineConfigSectionValidationResult validation =
+            ValidatePointCloudConsolidationConfigSection(
+                SerializePointCloudConsolidationConfig(config),
+                SerializePointCloudConsolidationConfig(
+                    PointCloudConsolidationConfig{}),
+                "editor.point_cloud_consolidation");
+        return validation.State == Core::Config::EngineConfigState::Valid;
+    }
+
+    std::optional<PointCloudConsolidationConfig>
+    GetEditorPointCloudConsolidationConfig(
+        const EditorGeometryProcessingContext& context) noexcept
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetPointCloudConsolidationConfig(
             context.EngineConfigControlState->ActiveConfig);
     }
 

@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -84,6 +85,74 @@ namespace Geometry::KMeans
                 centroids.push_back(points[farthestIndex]);
             }
 
+            return centroids;
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> InitializeKMeansPlusPlus(
+            std::span<const glm::vec3> points,
+            const uint32_t k,
+            const uint32_t seed)
+        {
+            std::mt19937 rng(seed);
+            std::uniform_int_distribution<std::size_t> firstDistribution(
+                0u, points.size() - 1u);
+            const std::size_t firstIndex = firstDistribution(rng);
+
+            std::vector<glm::vec3> centroids{};
+            centroids.reserve(k);
+            centroids.push_back(points[firstIndex]);
+
+            std::vector<float> minDistances(
+                points.size(),
+                std::numeric_limits<float>::max());
+            std::vector<bool> chosen(points.size(), false);
+            chosen[firstIndex] = true;
+
+            while (centroids.size() < k)
+            {
+                double totalWeight = 0.0;
+                for (std::size_t i = 0u; i < points.size(); ++i)
+                {
+                    minDistances[i] = std::min(
+                        minDistances[i],
+                        SquaredDistance(points[i], centroids.back()));
+                    if (!chosen[i])
+                        totalWeight +=
+                            static_cast<double>(minDistances[i]);
+                }
+
+                std::size_t nextIndex = points.size();
+                if (totalWeight > 0.0 && std::isfinite(totalWeight))
+                {
+                    std::uniform_real_distribution<double> distribution(
+                        0.0, totalWeight);
+                    const double threshold = distribution(rng);
+                    double cumulative = 0.0;
+                    for (std::size_t i = 0u; i < points.size(); ++i)
+                    {
+                        if (chosen[i])
+                            continue;
+                        cumulative +=
+                            static_cast<double>(minDistances[i]);
+                        if (cumulative > threshold)
+                        {
+                            nextIndex = i;
+                            break;
+                        }
+                    }
+                }
+                if (nextIndex == points.size())
+                {
+                    const auto unchosen = std::find(
+                        chosen.begin(), chosen.end(), false);
+                    if (unchosen == chosen.end())
+                        break;
+                    nextIndex = static_cast<std::size_t>(
+                        std::distance(chosen.begin(), unchosen));
+                }
+                chosen[nextIndex] = true;
+                centroids.push_back(points[nextIndex]);
+            }
             return centroids;
         }
 
@@ -265,9 +334,18 @@ namespace Geometry::KMeans
             return seeds;
         }
 
-        return (params.Init == Initialization::Random)
-            ? InitializeRandom(points, clusterCount, params.Seed)
-            : InitializeHierarchical(points, clusterCount);
+        switch (params.Init)
+        {
+        case Initialization::Random:
+            return InitializeRandom(
+                points, clusterCount, params.Seed);
+        case Initialization::Hierarchical:
+            return InitializeHierarchical(points, clusterCount);
+        case Initialization::KMeansPlusPlus:
+            return InitializeKMeansPlusPlus(
+                points, clusterCount, params.Seed);
+        }
+        return {};
     }
 
     std::vector<glm::vec3> RecomputeCentroids(

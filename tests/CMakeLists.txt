@@ -271,6 +271,8 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeRenderRecipeActivation.cpp
         Test.RuntimeCameraFocusCommand.cpp
         Test.ClusteringModule.cpp
+        Test.PointCloudConsolidationConfig.cpp
+        Test.PointCloudConsolidationModule.cpp
         Test.RuntimeCommandBus.cpp
         Test.RuntimeJobService.cpp
         Test.RuntimeKernelEvents.cpp
@@ -332,6 +334,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxAppComposition.cpp
             Test.SandboxEditorPresentation.cpp
             Test.SandboxParameterizationPanel.cpp
+            Test.SandboxPointCloudConsolidationPanel.cpp
     )
     intrinsic_test_object_lib(SandboxEditorIntegrationTestObjs
         SOURCES
@@ -441,6 +444,7 @@ set(_geometry_test_files
     Test.PointCloudConversion.cpp
     Test_MeshBuilder.cpp
     Test_GeometryProcessing.cpp
+    Test.GaussianMixture.cpp
     Test_SurfaceReconstruction.cpp
     Test_MeshQuality.cpp
     Test_MeshAnalysis.cpp
@@ -485,7 +489,9 @@ set(_geometry_test_files
     Test.Sampling.cpp
     Test.SurfaceSampling.cpp
     Test.PointCloudNormals.cpp
+    Test.PointCloudConsolidation.cpp
     Test.PointCloudFeatures.cpp
+    Test.PointCloudKernels.cpp
     Test_Registration.cpp
     Test_PointCloudRobustness.cpp
     Test.PointCloudOutlierRemoval.cpp

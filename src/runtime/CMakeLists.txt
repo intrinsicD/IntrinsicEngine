@@ -22,6 +22,8 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringConfig.cppm
         Runtime.ProgressivePoissonConfig.cppm
         Runtime.ParameterizationConfig.cppm
+        Runtime.PointCloudConsolidationConfig.cppm
+        Runtime.PointCloudConsolidationModule.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.EditorCommon.cppm
         Runtime.EditorWorkspaceAttachment.cppm
@@ -110,6 +112,8 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringConfig.cpp
         Runtime.ProgressivePoissonConfig.cpp
         Runtime.ParameterizationConfig.cpp
+        Runtime.PointCloudConsolidationConfig.cpp
+        Runtime.PointCloudConsolidationModule.cpp
         internal/Runtime.FeatureConfigCodecs.Detail.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.EditorCommon.Public.cpp

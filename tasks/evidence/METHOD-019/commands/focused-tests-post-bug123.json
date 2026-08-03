@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "PointCloudConsolidation|PointCloudKernels|KDTree|IntrinsicBenchmarkSmoke",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'PointCloudConsolidation|PointCloudKernels|KDTree|IntrinsicBenchmarkSmoke' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 991,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T23:18:31Z",
+  "label": "focused-tests-post-bug123",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T23:18:30Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/focused-tests-post-bug123.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/focused-tests-post-bug123.stdout.log",
+  "stdout_sha256": "8682a0e9cc610431d6b4f83d89bb5e14e11268d11d2c9df19036b4660d9810bd",
+  "task_id": "METHOD-019"
+}

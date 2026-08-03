@@ -1,0 +1,194 @@
+Internal ctest changing into directory: /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+Test project /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci
+      Start 1067: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate
+ 1/92 Test #1067: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate ..........................   Passed    0.02 sec
+      Start 1068: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState
+ 2/92 Test #1068: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState ..............   Passed    0.01 sec
+      Start 1069: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters
+ 3/92 Test #1069: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters ....................   Passed    0.00 sec
+      Start 1070: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder
+ 4/92 Test #1070: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder ....................   Passed    0.00 sec
+      Start 1071: RuntimeJobService.CancelBeforeStartPreventsWork
+ 5/92 Test #1071: RuntimeJobService.CancelBeforeStartPreventsWork .....................................   Passed    0.02 sec
+      Start 1072: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion
+ 6/92 Test #1072: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion .......................   Passed    0.02 sec
+      Start 1073: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication
+ 7/92 Test #1073: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication ..................   Passed    0.02 sec
+      Start 1074: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope
+ 8/92 Test #1074: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope .........................   Passed    0.02 sec
+      Start 1075: RuntimeJobService.ReapCompletedRemovesTerminalRecords
+ 9/92 Test #1075: RuntimeJobService.ReapCompletedRemovesTerminalRecords ...............................   Passed    0.02 sec
+      Start 1076: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread
+10/92 Test #1076: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread ..............   Passed    0.04 sec
+      Start 1077: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes
+11/92 Test #1077: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes ....................   Passed    0.02 sec
+      Start 1078: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish
+12/92 Test #1078: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish ....................   Passed    0.01 sec
+      Start 1079: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving
+13/92 Test #1079: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving .....................   Passed    0.02 sec
+      Start 1080: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking
+14/92 Test #1080: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking ....................   Passed    0.02 sec
+      Start 1081: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate
+15/92 Test #1081: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate ....................   Passed    0.02 sec
+      Start 1082: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce
+16/92 Test #1082: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce .................   Passed    0.02 sec
+      Start 1083: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread
+17/92 Test #1083: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread ...............   Passed    0.02 sec
+      Start 1084: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion
+18/92 Test #1084: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion ...   Passed    0.01 sec
+      Start 1085: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+19/92 Test #1085: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing .........   Passed    0.02 sec
+      Start 1086: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce
+20/92 Test #1086: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce .......................   Passed    0.02 sec
+      Start 1087: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak
+21/92 Test #1087: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak ....................   Passed    0.02 sec
+      Start 1088: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain
+22/92 Test #1088: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain .....................   Passed    0.02 sec
+      Start 1089: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer
+23/92 Test #1089: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer ......................   Passed    0.02 sec
+      Start 1090: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder
+24/92 Test #1090: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder .....................   Passed    0.02 sec
+      Start 1163: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate
+25/92 Test #1163: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate ..........................   Passed    0.02 sec
+      Start 1164: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState
+26/92 Test #1164: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState ..............   Passed    0.01 sec
+      Start 1165: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters
+27/92 Test #1165: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters ....................   Passed    0.00 sec
+      Start 1166: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder
+28/92 Test #1166: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder ....................   Passed    0.00 sec
+      Start 1167: RuntimeJobService.CancelBeforeStartPreventsWork
+29/92 Test #1167: RuntimeJobService.CancelBeforeStartPreventsWork .....................................   Passed    0.02 sec
+      Start 1168: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion
+30/92 Test #1168: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion .......................   Passed    0.02 sec
+      Start 1169: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication
+31/92 Test #1169: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication ..................   Passed    0.02 sec
+      Start 1170: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope
+32/92 Test #1170: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope .........................   Passed    0.02 sec
+      Start 1171: RuntimeJobService.ReapCompletedRemovesTerminalRecords
+33/92 Test #1171: RuntimeJobService.ReapCompletedRemovesTerminalRecords ...............................   Passed    0.02 sec
+      Start 1172: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread
+34/92 Test #1172: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread ..............   Passed    0.04 sec
+      Start 1173: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes
+35/92 Test #1173: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes ....................   Passed    0.02 sec
+      Start 1174: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish
+36/92 Test #1174: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish ....................   Passed    0.02 sec
+      Start 1175: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving
+37/92 Test #1175: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving .....................   Passed    0.01 sec
+      Start 1176: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking
+38/92 Test #1176: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking ....................   Passed    0.02 sec
+      Start 1177: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate
+39/92 Test #1177: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate ....................   Passed    0.02 sec
+      Start 1178: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce
+40/92 Test #1178: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce .................   Passed    0.02 sec
+      Start 1179: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread
+41/92 Test #1179: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread ...............   Passed    0.02 sec
+      Start 1180: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion
+42/92 Test #1180: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion ...   Passed    0.02 sec
+      Start 1181: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+43/92 Test #1181: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing .........   Passed    0.02 sec
+      Start 1182: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce
+44/92 Test #1182: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce .......................   Passed    0.02 sec
+      Start 1183: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak
+45/92 Test #1183: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak ....................   Passed    0.02 sec
+      Start 1184: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain
+46/92 Test #1184: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain .....................   Passed    0.02 sec
+      Start 1185: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer
+47/92 Test #1185: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer ......................   Passed    0.02 sec
+      Start 1186: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder
+48/92 Test #1186: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder .....................   Passed    0.02 sec
+      Start 1187: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge
+49/92 Test #1187: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge ..........................   Passed    0.02 sec
+      Start 1220: RuntimeSceneLifecycle.AsyncWaitAllowsCompletionBeyondLegacyFrameBudget
+50/92 Test #1220: RuntimeSceneLifecycle.AsyncWaitAllowsCompletionBeyondLegacyFrameBudget ..............   Passed    0.37 sec
+      Start 1221: RuntimeSceneLifecycle.AsyncWaitReportsElapsedTimeout
+51/92 Test #1221: RuntimeSceneLifecycle.AsyncWaitReportsElapsedTimeout ................................   Passed    0.05 sec
+      Start 1222: RuntimeSceneLifecycle.EngineRunsWithoutOptionalAsyncWorkModule
+52/92 Test #1222: RuntimeSceneLifecycle.EngineRunsWithoutOptionalAsyncWorkModule ......................   Passed    0.04 sec
+      Start 1223: RuntimeSceneLifecycle.NewSceneDocumentClearsSceneSelectionAndExtractionSidecars
+53/92 Test #1223: RuntimeSceneLifecycle.NewSceneDocumentClearsSceneSelectionAndExtractionSidecars .....   Passed    0.07 sec
+      Start 1224: RuntimeSceneLifecycle.QueuedSceneSaveWritesSnapshotAndMarksHistoryOnCompletion
+54/92 Test #1224: RuntimeSceneLifecycle.QueuedSceneSaveWritesSnapshotAndMarksHistoryOnCompletion ......   Passed    0.04 sec
+      Start 1225: RuntimeSceneLifecycle.QueuedSceneLoadInvalidDocumentFailsClosed
+55/92 Test #1225: RuntimeSceneLifecycle.QueuedSceneLoadInvalidDocumentFailsClosed .....................   Passed    0.04 sec
+      Start 1226: RuntimeSceneLifecycle.QueuedSceneLoadAppliesParsedSceneOnMainThread
+56/92 Test #1226: RuntimeSceneLifecycle.QueuedSceneLoadAppliesParsedSceneOnMainThread .................   Passed    0.04 sec
+      Start 1227: RuntimeSceneLifecycle.QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply
+57/92 Test #1227: RuntimeSceneLifecycle.QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply ............   Passed    0.04 sec
+      Start 1228: RuntimeSceneLifecycle.QueuedSceneLoadIsDiscardedByDrainRevalidationAlone
+58/92 Test #1228: RuntimeSceneLifecycle.QueuedSceneLoadIsDiscardedByDrainRevalidationAlone ............   Passed    0.04 sec
+      Start 1229: RuntimeSceneLifecycle.QueuedSceneLoadRejectsAwayAndBackBindingEpoch
+59/92 Test #1229: RuntimeSceneLifecycle.QueuedSceneLoadRejectsAwayAndBackBindingEpoch .................   Passed    0.04 sec
+      Start 1230: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+60/92 Test #1230: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ..................   Passed    0.04 sec
+      Start 1231: SceneDocumentModule.PublishesExactServicesAndWithdraws
+61/92 Test #1231: SceneDocumentModule.PublishesExactServicesAndWithdraws ..............................   Passed    0.00 sec
+      Start 1232: SceneDocumentModule.QueuedDocumentIoFailsClosedBeforeResolution
+62/92 Test #1232: SceneDocumentModule.QueuedDocumentIoFailsClosedBeforeResolution .....................   Passed    0.00 sec
+      Start 1233: SceneDocumentModule.DuplicateHistoryPublicationRollsBackPartialModuleService
+63/92 Test #1233: SceneDocumentModule.DuplicateHistoryPublicationRollsBackPartialModuleService ........   Passed    0.00 sec
+      Start 1234: SceneDocumentModule.ReplacementParticipantsAreDeterministicAndHandleScoped
+64/92 Test #1234: SceneDocumentModule.ReplacementParticipantsAreDeterministicAndHandleScoped ..........   Passed    0.00 sec
+      Start 1235: SceneDocumentModule.ParseFailureRunsNoParticipantAndPreservesDocumentState
+65/92 Test #1235: SceneDocumentModule.ParseFailureRunsNoParticipantAndPreservesDocumentState ..........   Passed    0.00 sec
+      Start 1236: SceneDocumentModule.DirectValidationResetsOneBindingWithoutStateResurrection
+66/92 Test #1236: SceneDocumentModule.DirectValidationResetsOneBindingWithoutStateResurrection ........   Passed    0.00 sec
+      Start 1237: SceneDocumentModule.LateQueuedCompletionCannotOutliveModuleState
+67/92 Test #1237: SceneDocumentModule.LateQueuedCompletionCannotOutliveModuleState ....................   Passed    0.02 sec
+      Start 1238: SceneDocumentModule.WorldRebindResetsFileEventAndItsSequence
+68/92 Test #1238: SceneDocumentModule.WorldRebindResetsFileEventAndItsSequence ........................   Passed    0.05 sec
+      Start 1239: SceneDocumentModule.RealEngineRunProvidesOperationalDocumentOwner
+69/92 Test #1239: SceneDocumentModule.RealEngineRunProvidesOperationalDocumentOwner ...................   Passed    0.10 sec
+      Start 1240: SceneDocumentModule.EngineReplacementParticipantsResetAcrossReinitialize
+70/92 Test #1240: SceneDocumentModule.EngineReplacementParticipantsResetAcrossReinitialize ............   Passed    0.10 sec
+      Start 1283: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge
+71/92 Test #1283: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge ..........................   Passed    0.02 sec
+      Start 1316: RuntimeSceneLifecycle.AsyncWaitAllowsCompletionBeyondLegacyFrameBudget
+72/92 Test #1316: RuntimeSceneLifecycle.AsyncWaitAllowsCompletionBeyondLegacyFrameBudget ..............   Passed    0.41 sec
+      Start 1317: RuntimeSceneLifecycle.AsyncWaitReportsElapsedTimeout
+73/92 Test #1317: RuntimeSceneLifecycle.AsyncWaitReportsElapsedTimeout ................................   Passed    0.05 sec
+      Start 1318: RuntimeSceneLifecycle.EngineRunsWithoutOptionalAsyncWorkModule
+74/92 Test #1318: RuntimeSceneLifecycle.EngineRunsWithoutOptionalAsyncWorkModule ......................   Passed    0.04 sec
+      Start 1319: RuntimeSceneLifecycle.NewSceneDocumentClearsSceneSelectionAndExtractionSidecars
+75/92 Test #1319: RuntimeSceneLifecycle.NewSceneDocumentClearsSceneSelectionAndExtractionSidecars .....   Passed    0.06 sec
+      Start 1320: RuntimeSceneLifecycle.QueuedSceneSaveWritesSnapshotAndMarksHistoryOnCompletion
+76/92 Test #1320: RuntimeSceneLifecycle.QueuedSceneSaveWritesSnapshotAndMarksHistoryOnCompletion ......   Passed    0.04 sec
+      Start 1321: RuntimeSceneLifecycle.QueuedSceneLoadInvalidDocumentFailsClosed
+77/92 Test #1321: RuntimeSceneLifecycle.QueuedSceneLoadInvalidDocumentFailsClosed .....................   Passed    0.04 sec
+      Start 1322: RuntimeSceneLifecycle.QueuedSceneLoadAppliesParsedSceneOnMainThread
+78/92 Test #1322: RuntimeSceneLifecycle.QueuedSceneLoadAppliesParsedSceneOnMainThread .................   Passed    0.05 sec
+      Start 1323: RuntimeSceneLifecycle.QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply
+79/92 Test #1323: RuntimeSceneLifecycle.QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply ............   Passed    0.07 sec
+      Start 1324: RuntimeSceneLifecycle.QueuedSceneLoadIsDiscardedByDrainRevalidationAlone
+80/92 Test #1324: RuntimeSceneLifecycle.QueuedSceneLoadIsDiscardedByDrainRevalidationAlone ............   Passed    0.05 sec
+      Start 1325: RuntimeSceneLifecycle.QueuedSceneLoadRejectsAwayAndBackBindingEpoch
+81/92 Test #1325: RuntimeSceneLifecycle.QueuedSceneLoadRejectsAwayAndBackBindingEpoch .................   Passed    0.07 sec
+      Start 1326: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent
+82/92 Test #1326: RuntimeSceneLifecycle.RetiredQueuedSceneSavePublishesTerminalEvent ..................   Passed    0.05 sec
+      Start 1327: SceneDocumentModule.PublishesExactServicesAndWithdraws
+83/92 Test #1327: SceneDocumentModule.PublishesExactServicesAndWithdraws ..............................   Passed    0.01 sec
+      Start 1328: SceneDocumentModule.QueuedDocumentIoFailsClosedBeforeResolution
+84/92 Test #1328: SceneDocumentModule.QueuedDocumentIoFailsClosedBeforeResolution .....................   Passed    0.01 sec
+      Start 1329: SceneDocumentModule.DuplicateHistoryPublicationRollsBackPartialModuleService
+85/92 Test #1329: SceneDocumentModule.DuplicateHistoryPublicationRollsBackPartialModuleService ........   Passed    0.01 sec
+      Start 1330: SceneDocumentModule.ReplacementParticipantsAreDeterministicAndHandleScoped
+86/92 Test #1330: SceneDocumentModule.ReplacementParticipantsAreDeterministicAndHandleScoped ..........   Passed    0.01 sec
+      Start 1331: SceneDocumentModule.ParseFailureRunsNoParticipantAndPreservesDocumentState
+87/92 Test #1331: SceneDocumentModule.ParseFailureRunsNoParticipantAndPreservesDocumentState ..........   Passed    0.01 sec
+      Start 1332: SceneDocumentModule.DirectValidationResetsOneBindingWithoutStateResurrection
+88/92 Test #1332: SceneDocumentModule.DirectValidationResetsOneBindingWithoutStateResurrection ........   Passed    0.01 sec
+      Start 1333: SceneDocumentModule.LateQueuedCompletionCannotOutliveModuleState
+89/92 Test #1333: SceneDocumentModule.LateQueuedCompletionCannotOutliveModuleState ....................   Passed    0.03 sec
+      Start 1334: SceneDocumentModule.WorldRebindResetsFileEventAndItsSequence
+90/92 Test #1334: SceneDocumentModule.WorldRebindResetsFileEventAndItsSequence ........................   Passed    0.07 sec
+      Start 1335: SceneDocumentModule.RealEngineRunProvidesOperationalDocumentOwner
+91/92 Test #1335: SceneDocumentModule.RealEngineRunProvidesOperationalDocumentOwner ...................   Passed    0.12 sec
+      Start 1336: SceneDocumentModule.EngineReplacementParticipantsResetAcrossReinitialize
+92/92 Test #1336: SceneDocumentModule.EngineReplacementParticipantsResetAcrossReinitialize ............   Passed    0.10 sec
+
+100% tests passed, 0 tests failed out of 92
+
+Label Time Summary:
+contract    =   4.38 sec*proc (92 tests)
+runtime     =   4.38 sec*proc (92 tests)
+
+Total Test time (real) =   3.41 sec

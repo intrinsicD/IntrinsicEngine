@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "build/ci-fast",
+    "--target",
+    "IntrinsicSandboxEditorIntegrationTests",
+    "-j4"
+  ],
+  "command_display": "cmake --build build/ci-fast --target IntrinsicSandboxEditorIntegrationTests -j4",
+  "cwd": ".",
+  "duration_ms": 6934,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:06:25Z",
+  "label": "focused-app-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:06:18Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/focused-app-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/focused-app-build.stdout.log",
+  "stdout_sha256": "1940a70b9aa30a43c863094af6d84f22b2973fafc6a7af475e64a6d5d9076dc4",
+  "task_id": "UI-035"
+}

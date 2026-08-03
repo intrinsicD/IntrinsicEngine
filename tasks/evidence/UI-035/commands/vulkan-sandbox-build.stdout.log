@@ -1,0 +1,1599 @@
+[0/2] Re-checking globbed directories...
+[1/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/external/vcpkg-installed/ci-vulkan/x64-linux/share/imgui/backends/imgui_impl_vulkan.cpp for CXX dependencies
+[2/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/external/vcpkg-installed/ci-vulkan/x64-linux/share/imgui/backends/imgui_impl_glfw.cpp for CXX dependencies
+[3/1578] Generating CXX dyndep file CMakeFiles/imgui_lib.dir/CXX.dd
+[4/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp for CXX dependencies
+[5/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/build/ci-vulkan/generated/deps/tinygltf_impl.cpp for CXX dependencies
+[6/1578] Generating CXX dyndep file CMakeFiles/tinygltf.dir/CXX.dd
+[7/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.EngineLoad.cpp for CXX dependencies
+[8/1578] Generating CXX dyndep file CMakeFiles/IntrinsicProgressivePoissonReference.dir/CXX.dd
+[9/1578] Building CXX object CMakeFiles/imgui_lib.dir/external/vcpkg-installed/ci-vulkan/x64-linux/share/imgui/backends/imgui_impl_glfw.cpp.o
+[10/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Hazards.cpp for CXX dependencies
+[11/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.cpp for CXX dependencies
+[12/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.TaskGraph.cpp for CXX dependencies
+[13/1578] Building CXX object CMakeFiles/imgui_lib.dir/external/vcpkg-installed/ci-vulkan/x64-linux/share/imgui/backends/imgui_impl_vulkan.cpp.o
+[14/1578] Linking CXX static library lib/libimgui_lib.a
+[15/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameGraph.cpp for CXX dependencies
+[16/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameLoop.cpp for CXX dependencies
+[17/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Filesystem.PathResolver.cpp for CXX dependencies
+[18/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Filesystem.cpp for CXX dependencies
+[19/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.IOBackend.cpp for CXX dependencies
+[20/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Logging.cpp for CXX dependencies
+[21/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Process.cpp for CXX dependencies
+[22/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Telemetry.cpp for CXX dependencies
+[23/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.CounterEvent.cpp for CXX dependencies
+[24/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Dispatch.cpp for CXX dependencies
+[25/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Job.cpp for CXX dependencies
+[26/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Lifecycle.cpp for CXX dependencies
+[27/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Stats.cpp for CXX dependencies
+[28/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.WaitToken.cpp for CXX dependencies
+[29/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Worker.cpp for CXX dependencies
+[30/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.BoundedHeap.cppm for CXX dependencies
+[31/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.IndexedHeap.cppm for CXX dependencies
+[32/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.Window.cppm for CXX dependencies
+[33/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.Simulation.cppm for CXX dependencies
+[34/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.Render.cppm for CXX dependencies
+[35/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.EngineLoad.cppm for CXX dependencies
+[36/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Config.Engine.cppm for CXX dependencies
+[37/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Types.cppm for CXX dependencies
+[38/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.cppm for CXX dependencies
+[39/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Hazards.cppm for CXX dependencies
+[40/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Policy.cppm for CXX dependencies
+[41/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.Compiler.cppm for CXX dependencies
+[42/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.Scheduler.DomainGraph.cppm for CXX dependencies
+[43/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Dag.TaskGraph.cppm for CXX dependencies
+[44/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameGraph.cppm for CXX dependencies
+[45/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.IOBackend.cppm for CXX dependencies
+[46/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.RingBuffer.cppm for CXX dependencies
+[47/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Process.cppm for CXX dependencies
+[48/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.ResourcePool.cppm for CXX dependencies
+[49/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Telemetry.cppm for CXX dependencies
+[50/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.CallbackRegistry.cppm for CXX dependencies
+[51/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Error.cppm for CXX dependencies
+[52/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameLoop.cppm for CXX dependencies
+[53/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Geometry2D.cppm for CXX dependencies
+[54/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.FrameClock.cppm for CXX dependencies
+[55/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Filesystem.PathResolver.cppm for CXX dependencies
+[56/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Filesystem.cppm for CXX dependencies
+[57/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Hash.cppm for CXX dependencies
+[58/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.HandleLease.cppm for CXX dependencies
+[59/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Logging.cppm for CXX dependencies
+[60/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.LockFreeQueue.cppm for CXX dependencies
+[61/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.cppm for CXX dependencies
+[62/1578] Building CXX object CMakeFiles/IntrinsicProgressivePoissonReference.dir/methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp.o
+[63/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.Common.cppm for CXX dependencies
+[64/1578] Linking CXX static library lib/libIntrinsicProgressivePoissonReference.a
+[65/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.LinearArena.cppm for CXX dependencies
+[66/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.ScopeStack.cppm for CXX dependencies
+[67/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.Polymorphic.cppm for CXX dependencies
+[68/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.StrongHandle.cppm for CXX dependencies
+[69/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.cppm for CXX dependencies
+[70/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.CounterEvent.cppm for CXX dependencies
+[71/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Internal.cppm for CXX dependencies
+[72/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.LocalTask.cppm for CXX dependencies
+[73/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.Internal.cpp for CXX dependencies
+[74/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Tasks.LocalTask.cpp for CXX dependencies
+[75/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.ScopeStack.cpp for CXX dependencies
+[76/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.Polymorphic.cpp for CXX dependencies
+[77/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/core/Core.Memory.LinearArena.cpp for CXX dependencies
+[78/1578] Generating CXX dyndep file src/core/CMakeFiles/ExtrinsicCore.dir/CXX.dd
+[79/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.AABB.cpp for CXX dependencies
+[80/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.BVH.cpp for CXX dependencies
+[81/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.BoundedHeap.cppm.o
+[82/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.Window.cppm.o
+[83/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IndexedHeap.cppm.o
+[84/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.Simulation.cppm.o
+[85/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.RingBuffer.cppm.o
+[86/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.Render.cppm.o
+[87/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Error.cppm.o
+[88/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IOBackend.cppm.o
+[89/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.Engine.cppm.o
+[90/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Process.cppm.o
+[91/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.EngineLoad.cppm.o
+[92/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.ResourcePool.cppm.o
+[93/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IOBackend.cpp.o
+[94/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameLoop.cppm.o
+[95/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameLoop.cpp.o
+[96/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Geometry2D.cppm.o
+[97/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Hash.cppm.o
+[98/1578] Building CXX object CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o
+[99/1578] Linking CXX static library lib/libtinygltf.a
+[100/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameClock.cppm.o
+[101/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Telemetry.cppm.o
+[102/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.PathResolver.cppm.o
+[103/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.HandleLease.cppm.o
+[104/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.cppm.o
+[105/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.LockFreeQueue.cppm.o
+[106/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.Common.cppm.o
+[107/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Logging.cppm.o
+[108/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.EngineLoad.cpp.o
+[109/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Telemetry.cpp.o
+[110/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.LinearArena.cppm.o
+[111/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Process.cpp.o
+[112/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Logging.cpp.o
+[113/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.PathResolver.cpp.o
+[114/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.StrongHandle.cppm.o
+[115/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.Polymorphic.cppm.o
+[116/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Types.cppm.o
+[117/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.CallbackRegistry.cppm.o
+[118/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Policy.cppm.o
+[119/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Hazards.cppm.o
+[120/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Compiler.cppm.o
+[121/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.ScopeStack.cppm.o
+[122/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.cppm.o
+[123/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.LocalTask.cppm.o
+[124/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.ScopeStack.cpp.o
+[125/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.DomainGraph.cppm.o
+[126/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.cppm.o
+[127/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.LinearArena.cpp.o
+[128/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Internal.cppm.o
+[129/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Job.cpp.o
+[130/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.cppm.o
+[131/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Dispatch.cpp.o
+[132/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.cpp.o
+[133/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Hazards.cpp.o
+[134/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Stats.cpp.o
+[135/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Lifecycle.cpp.o
+[136/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.WaitToken.cpp.o
+[137/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Worker.cpp.o
+[138/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.cpp.o
+[139/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.LocalTask.cpp.o
+[140/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.Polymorphic.cpp.o
+[141/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Capsule.cpp for CXX dependencies
+[142/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ContactManifold.cpp for CXX dependencies
+[143/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.CounterEvent.cppm.o
+[144/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Containment.cpp for CXX dependencies
+[145/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ConvexHull.cpp for CXX dependencies
+[146/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ConvexHullBuilder.cpp for CXX dependencies
+[147/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Curve.cpp for CXX dependencies
+[148/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Cylinder.cpp for CXX dependencies
+[149/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.DomainViews.cpp for CXX dependencies
+[150/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.TaskGraph.cppm.o
+[151/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Ellipsoid.cpp for CXX dependencies
+[152/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Internal.cpp.o
+[153/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.CounterEvent.cpp.o
+[154/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.FixedPoint.Anderson.cpp for CXX dependencies
+[155/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.EPA.cpp for CXX dependencies
+[156/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Frustum.cpp for CXX dependencies
+[157/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.GaussianMixture.cpp for CXX dependencies
+[158/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.GJK.cpp for CXX dependencies
+[159/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.IO.cpp for CXX dependencies
+[160/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.ShortestPath.cpp for CXX dependencies
+[161/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Utils.cpp for CXX dependencies
+[162/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Vertex.Normals.cpp for CXX dependencies
+[163/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Grid.cpp for CXX dependencies
+[164/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.cpp for CXX dependencies
+[165/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cpp for CXX dependencies
+[166/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Analysis.cpp for CXX dependencies
+[167/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Boundary.cpp for CXX dependencies
+[168/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Boolean.cpp for CXX dependencies
+[169/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.CatmullClark.cpp for CXX dependencies
+[170/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Builder.cpp for CXX dependencies
+[171/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Curvature.cpp for CXX dependencies
+[172/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.DEC.cpp for CXX dependencies
+[173/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Geodesic.cpp for CXX dependencies
+[174/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.IO.cpp for CXX dependencies
+[175/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp for CXX dependencies
+[176/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Quality.cpp for CXX dependencies
+[177/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Remeshing.cpp for CXX dependencies
+[178/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Repair.cpp for CXX dependencies
+[179/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Simplification.cpp for CXX dependencies
+[180/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cpp for CXX dependencies
+[181/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp for CXX dependencies
+[182/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Subdivision.cpp for CXX dependencies
+[183/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp for CXX dependencies
+[184/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Utils.cpp for CXX dependencies
+[185/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cpp for CXX dependencies
+[186/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cpp for CXX dependencies
+[187/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.cpp for CXX dependencies
+[188/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HtexPatch.cpp for CXX dependencies
+[189/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ImplicitPlaneField.cpp for CXX dependencies
+[190/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.KDTree.cpp for CXX dependencies
+[191/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.KMeans.cpp for CXX dependencies
+[192/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Linalg.cpp for CXX dependencies
+[193/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MarchingCubes.cpp for CXX dependencies
+[194/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Mesh.Conversion.cpp for CXX dependencies
+[195/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshClosestFace.cpp for CXX dependencies
+[196/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshSoup.cpp for CXX dependencies
+[197/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.OBB.cpp for CXX dependencies
+[198/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Octree.cpp for CXX dependencies
+[199/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Overlap.cpp for CXX dependencies
+[200/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PCA.cpp for CXX dependencies
+[201/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Diagnostics.cpp for CXX dependencies
+[202/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Bff.cpp for CXX dependencies
+[203/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Harmonic.cpp for CXX dependencies
+[204/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Plane.cpp for CXX dependencies
+[205/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Consolidation.cpp for CXX dependencies
+[206/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Conversion.cpp for CXX dependencies
+[207/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Features.cpp for CXX dependencies
+[208/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.IO.cpp for CXX dependencies
+[209/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Kernels.cpp for CXX dependencies
+[210/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Normals.cpp for CXX dependencies
+[211/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.QualityMetrics.cpp for CXX dependencies
+[212/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.SurfaceSampling.cpp for CXX dependencies
+[213/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Utils.cpp for CXX dependencies
+[214/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.cpp for CXX dependencies
+[215/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Properties.cpp for CXX dependencies
+[216/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Quadric.cpp for CXX dependencies
+[217/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Queries.cpp for CXX dependencies
+[218/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Raycast.cpp for CXX dependencies
+[219/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Registration.cpp for CXX dependencies
+[220/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Robust.cpp for CXX dependencies
+[221/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.RobustPredicates.cpp for CXX dependencies
+[222/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Rotation.cpp for CXX dependencies
+[223/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.RotationAveraging.cpp for CXX dependencies
+[224/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sampling.cpp for CXX dependencies
+[225/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SDF.cpp for CXX dependencies
+[226/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Segment.cpp for CXX dependencies
+[227/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameGraph.cppm.o
+[228/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sphere.Sampling.cpp for CXX dependencies
+[229/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sphere.cpp for CXX dependencies
+[230/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Statistics.cpp for CXX dependencies
+[231/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Support.cpp for CXX dependencies
+[232/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SurfaceReconstruction.cpp for CXX dependencies
+[233/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sparse.cpp for CXX dependencies
+[234/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Triangle.cpp for CXX dependencies
+[235/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.UvAtlas.cpp for CXX dependencies
+[236/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Validation.cpp for CXX dependencies
+[237/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.AABB.cppm for CXX dependencies
+[238/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.BVH.cppm for CXX dependencies
+[239/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Capsule.cppm for CXX dependencies
+[240/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Circulators.cppm for CXX dependencies
+[241/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ContactManifold.cppm for CXX dependencies
+[242/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Containment.cppm for CXX dependencies
+[243/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ConvexHull.cppm for CXX dependencies
+[244/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ConvexHullBuilder.cppm for CXX dependencies
+[245/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Curve.cppm for CXX dependencies
+[246/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Cylinder.cppm for CXX dependencies
+[247/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.DomainViews.cppm for CXX dependencies
+[248/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.EPA.cppm for CXX dependencies
+[249/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.FixedPoint.Anderson.cppm for CXX dependencies
+[250/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Ellipsoid.cppm for CXX dependencies
+[251/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Frustum.cppm for CXX dependencies
+[252/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.GaussianMixture.cppm for CXX dependencies
+[253/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.IO.cppm for CXX dependencies
+[254/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.GJK.cppm for CXX dependencies
+[255/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.ShortestPath.cppm for CXX dependencies
+[256/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Utils.cppm for CXX dependencies
+[257/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Vertex.Normals.cppm for CXX dependencies
+[258/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.cppm for CXX dependencies
+[259/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Grid.cppm for CXX dependencies
+[260/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Analysis.cppm for CXX dependencies
+[261/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm for CXX dependencies
+[262/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Boolean.cppm for CXX dependencies
+[263/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Boundary.cppm for CXX dependencies
+[264/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Builder.cppm for CXX dependencies
+[265/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.CatmullClark.cppm for CXX dependencies
+[266/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.DEC.cppm for CXX dependencies
+[267/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Curvature.cppm for CXX dependencies
+[268/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm for CXX dependencies
+[269/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.IO.cppm for CXX dependencies
+[270/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Quality.cppm for CXX dependencies
+[271/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm for CXX dependencies
+[272/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Remeshing.cppm for CXX dependencies
+[273/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Repair.cppm for CXX dependencies
+[274/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Simplification.cppm for CXX dependencies
+[275/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cppm for CXX dependencies
+[276/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm for CXX dependencies
+[277/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm for CXX dependencies
+[278/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm for CXX dependencies
+[279/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Utils.cppm for CXX dependencies
+[280/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cppm for CXX dependencies
+[281/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm for CXX dependencies
+[282/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Handle.cppm for CXX dependencies
+[283/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.TaskGraph.cpp.o
+[284/1578] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameGraph.cpp.o
+[285/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.cppm for CXX dependencies
+[286/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm for CXX dependencies
+[287/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HtexPatch.cppm for CXX dependencies
+[288/1578] Linking CXX static library lib/libExtrinsicCore.a
+[289/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.ImplicitPlaneField.cppm for CXX dependencies
+[290/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IntersectionClassification.cppm for CXX dependencies
+[291/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.KDTree.cppm for CXX dependencies
+[292/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.LinearSolver.cppm for CXX dependencies
+[293/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.KMeans.cppm for CXX dependencies
+[294/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MarchingCubes.cppm for CXX dependencies
+[295/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Mesh.Conversion.cppm for CXX dependencies
+[296/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshOperator.cppm for CXX dependencies
+[297/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Linalg.cppm for CXX dependencies
+[298/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshClosestFace.cppm for CXX dependencies
+[299/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.MeshSoup.cppm for CXX dependencies
+[300/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.OBB.cppm for CXX dependencies
+[301/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Octree.cppm for CXX dependencies
+[302/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Overlap.cppm for CXX dependencies
+[303/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PCA.cppm for CXX dependencies
+[304/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Diagnostics.cppm for CXX dependencies
+[305/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Bff.cppm for CXX dependencies
+[306/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Parameterization.Harmonic.cppm for CXX dependencies
+[307/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Plane.cppm for CXX dependencies
+[308/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Consolidation.cppm for CXX dependencies
+[309/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Conversion.cppm for CXX dependencies
+[310/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Features.cppm for CXX dependencies
+[311/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.IO.cppm for CXX dependencies
+[312/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Kernels.cppm for CXX dependencies
+[313/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Normals.cppm for CXX dependencies
+[314/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.SurfaceSampling.cppm for CXX dependencies
+[315/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Primitives.cppm for CXX dependencies
+[316/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.QualityMetrics.cppm for CXX dependencies
+[317/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Utils.cppm for CXX dependencies
+[318/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.cppm for CXX dependencies
+[319/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Quadric.cppm for CXX dependencies
+[320/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Properties.cppm for CXX dependencies
+[321/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Queries.cppm for CXX dependencies
+[322/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Robust.cppm for CXX dependencies
+[323/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Ray.cppm for CXX dependencies
+[324/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Raycast.cppm for CXX dependencies
+[325/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Registration.cppm for CXX dependencies
+[326/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.RobustPredicates.cppm for CXX dependencies
+[327/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Rotation.cppm for CXX dependencies
+[328/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.RotationAveraging.cppm for CXX dependencies
+[329/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sampling.cppm for CXX dependencies
+[330/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SDFContact.cppm for CXX dependencies
+[331/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SDF.cppm for CXX dependencies
+[332/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Segment.cppm for CXX dependencies
+[333/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SpatialQueries.cppm for CXX dependencies
+[334/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sphere.Sampling.cppm for CXX dependencies
+[335/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sparse.cppm for CXX dependencies
+[336/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Sphere.cppm for CXX dependencies
+[337/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Statistics.cppm for CXX dependencies
+[338/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Support.cppm for CXX dependencies
+[339/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Triangle.cppm for CXX dependencies
+[340/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.SurfaceReconstruction.cppm for CXX dependencies
+[341/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.cppm for CXX dependencies
+[342/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.UvAtlas.cppm for CXX dependencies
+[343/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Graph.Fwd.cppm for CXX dependencies
+[344/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.HalfedgeMesh.Fwd.cppm for CXX dependencies
+[345/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.PointCloud.Fwd.cppm for CXX dependencies
+[346/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.Validation.cppm for CXX dependencies
+[347/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.EventBus.cpp for CXX dependencies
+[348/1578] Generating CXX dyndep file src/geometry/CMakeFiles/IntrinsicGeometry.dir/CXX.dd
+[349/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.ImportRouter.cpp for CXX dependencies
+[350/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.LoadPipeline.cpp for CXX dependencies
+[351/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.ModelTexturePayload.cpp for CXX dependencies
+[352/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Capsule.cppm.o
+[353/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Curve.cppm.o
+[354/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.AABB.cppm.o
+[355/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Cylinder.cppm.o
+[356/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.FixedPoint.Anderson.cppm.o
+[357/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Ellipsoid.cppm.o
+[358/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Curve.cpp.o
+[359/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Handle.cppm.o
+[360/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.AABB.cpp.o
+[361/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.FixedPoint.Anderson.cpp.o
+[362/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.LinearSolver.cppm.o
+[363/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshOperator.cppm.o
+[364/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.IO.cppm.o
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:149:21: warning: TU local entity 'NormalizeExtension' is exposed [-WTU-local-entity-exposure]
+  149 |         extension = NormalizeExtension(extension);
+      |                     ^
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:157:17: warning: TU local entity 'ExtensionEquals' is exposed [-WTU-local-entity-exposure]
+  157 |             if (ExtensionEquals(extension, format.CanonicalExtension))
+      |                 ^
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:163:21: warning: TU local entity 'ExtensionEquals' is exposed [-WTU-local-entity-exposure]
+  163 |                 if (ExtensionEquals(extension, alias))
+      |                     ^
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:196:16: warning: TU local entity 'HasDomain' is exposed [-WTU-local-entity-exposure]
+  196 |         return HasDomain(ImportDomainsForExtension(extension), domain);
+      |                ^
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/geometry/Geometry.IO.cppm:201:16: warning: TU local entity 'HasDomain' is exposed [-WTU-local-entity-exposure]
+  201 |         return HasDomain(ExportDomainsForExtension(extension), domain);
+      |                ^
+5 warnings generated.
+[365/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.GaussianMixture.cppm.o
+[366/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PCA.cppm.o
+[367/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.OBB.cppm.o
+[368/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Plane.cppm.o
+[369/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PCA.cpp.o
+[370/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Ellipsoid.cpp.o
+[371/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.OBB.cpp.o
+[372/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Plane.cpp.o
+[373/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cppm.o
+[374/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ConvexHull.cppm.o
+[375/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Frustum.cppm.o
+[376/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Quadric.cppm.o
+[377/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ConvexHull.cpp.o
+[378/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Frustum.cpp.o
+[379/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Robust.cppm.o
+[380/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Ray.cppm.o
+[381/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Robust.cpp.o
+[382/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.cppm.o
+[383/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.RobustPredicates.cppm.o
+[384/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Properties.cppm.o
+[385/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Rotation.cppm.o
+[386/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.RobustPredicates.cpp.o
+[387/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Circulators.cppm.o
+[388/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Properties.cpp.o
+[389/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Rotation.cpp.o
+[390/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.IO.cppm.o
+[391/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.IntersectionClassification.cppm.o
+[392/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Grid.cppm.o
+[393/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Grid.cpp.o
+[394/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.RotationAveraging.cppm.o
+[395/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshSoup.cppm.o
+[396/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.RotationAveraging.cpp.o
+[397/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.IO.cpp.o
+[398/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sampling.cppm.o
+[399/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshSoup.cpp.o
+[400/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Segment.cppm.o
+[401/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sampling.cpp.o
+[402/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Capsule.cpp.o
+[403/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Segment.cpp.o
+[404/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Queries.cppm.o
+[405/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sphere.cppm.o
+[406/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sparse.cppm.o
+[407/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Queries.cpp.o
+[408/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Cylinder.cpp.o
+[409/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sphere.cpp.o
+[410/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sphere.Sampling.cppm.o
+[411/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Statistics.cppm.o
+[412/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Statistics.cpp.o
+[413/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sphere.Sampling.cpp.o
+[414/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Fwd.cppm.o
+[415/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Triangle.cppm.o
+[416/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Triangle.cpp.o
+[417/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Primitives.cppm.o
+[418/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cpp.o
+[419/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.cppm.o
+[420/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Sparse.cpp.o
+[421/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.IO.cppm.o
+[422/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SDF.cppm.o
+[423/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Octree.cppm.o
+[424/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.cpp.o
+[425/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SDF.cpp.o
+[426/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Utils.cppm.o
+[427/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.IO.cpp.o
+[428/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Vertex.Normals.cppm.o
+[429/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Containment.cppm.o
+[430/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Containment.cpp.o
+[431/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Fwd.cppm.o
+[432/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Support.cppm.o
+[433/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Validation.cppm.o
+[434/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Vertex.Normals.cpp.o
+[435/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Support.cpp.o
+[436/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Validation.cpp.o
+[437/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Quadric.cpp.o
+[438/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Fwd.cppm.o
+[439/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.cppm.o
+[440/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.GJK.cppm.o
+[441/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Raycast.cppm.o
+[442/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.cppm.o
+[443/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.GJK.cpp.o
+[444/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Raycast.cpp.o
+[445/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.cpp.o
+[446/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.cpp.o
+[447/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.DomainViews.cppm.o
+[448/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.DomainViews.cpp.o
+[449/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.ShortestPath.cppm.o
+[450/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Analysis.cppm.o
+[451/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Boolean.cppm.o
+[452/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ConvexHullBuilder.cppm.o
+[453/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Boundary.cppm.o
+[454/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.ShortestPath.cpp.o
+[455/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Boundary.cpp.o
+[456/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CatmullClark.cppm.o
+[457/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Builder.cppm.o
+[458/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.DEC.cppm.o
+[459/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.EPA.cppm.o
+[460/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ConvexHullBuilder.cpp.o
+[461/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Geodesic.cppm.o
+[462/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Curvature.cppm.o
+[463/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Remeshing.cppm.o
+[464/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.EPA.cpp.o
+[465/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Quality.cppm.o
+[466/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.SignedHeatMethod.cppm.o
+[467/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Simplification.cppm.o
+[468/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Repair.cppm.o
+[469/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm.o
+[470/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Subdivision.cppm.o
+[471/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Smoothing.cppm.o
+[472/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Vertices.Normals.cppm.o
+[473/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ContactManifold.cppm.o
+[474/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Builder.cpp.o
+[475/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.VectorHeatMethod.cppm.o
+[476/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Vertices.Normals.cpp.o
+[477/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ContactManifold.cpp.o
+[478/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HtexPatch.cppm.o
+[479/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MarchingCubes.cppm.o
+[480/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Overlap.cppm.o
+[481/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Mesh.Conversion.cppm.o
+[482/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HtexPatch.cpp.o
+[483/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MarchingCubes.cpp.o
+[484/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Mesh.Conversion.cpp.o
+[485/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Overlap.cpp.o
+[486/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Diagnostics.cppm.o
+[487/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Octree.cpp.o
+[488/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Consolidation.cppm.o
+[489/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Bff.cppm.o
+[490/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Harmonic.cppm.o
+[491/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Conversion.cppm.o
+[492/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Features.cppm.o
+[493/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ImplicitPlaneField.cppm.o
+[494/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Harmonic.cpp.o
+[495/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Conversion.cpp.o
+[496/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.IO.cppm.o
+[497/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.SurfaceSampling.cppm.o
+[498/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Parameterization.cppm.o
+[499/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.QualityMetrics.cppm.o
+[500/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Utils.cppm.o
+[501/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.QualityMetrics.cpp.o
+[502/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SpatialQueries.cppm.o
+[503/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.IO.cpp.o
+[504/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Utils.cpp.o
+[505/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.BVH.cppm.o
+[506/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SDFContact.cppm.o
+[507/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.BVH.cpp.o
+[508/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.KDTree.cppm.o
+[509/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SurfaceReconstruction.cppm.o
+[510/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.KDTree.cpp.o
+[511/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Graph.Utils.cpp.o
+[512/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshClosestFace.cppm.o
+[513/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.cpp.o
+[514/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Features.cpp.o
+[515/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.MeshClosestFace.cpp.o
+[516/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.ImplicitPlaneField.cpp.o
+[517/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.KMeans.cppm.o
+[518/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Utils.cppm.o
+[519/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.GaussianMixture.cpp.o
+[520/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm.o
+[521/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Kernels.cppm.o
+[522/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Analysis.cpp.o
+[523/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Boolean.cpp.o
+[524/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.AdaptiveRemeshing.cpp.o
+[525/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CatmullClark.cpp.o
+[526/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Curvature.cpp.o
+[527/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.DEC.cpp.o
+[528/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Geodesic.cpp.o
+[529/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Quality.cpp.o
+[530/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Remeshing.cpp.o
+[531/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Parameterization.cpp.o
+[532/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Repair.cpp.o
+[533/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Simplification.cpp.o
+[534/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.SignedHeatMethod.cpp.o
+[535/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Smoothing.cpp.o
+[536/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp.o
+[537/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Subdivision.cpp.o
+[538/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Diagnostics.cpp.o
+[539/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.KMeans.cpp.o
+[540/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.VectorHeatMethod.cpp.o
+[541/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.Utils.cpp.o
+[542/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Kernels.cpp.o
+[543/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Parameterization.Bff.cpp.o
+[544/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.PathIndex.cpp for CXX dependencies
+[545/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.PayloadStore.cpp for CXX dependencies
+[546/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.Registry.cpp for CXX dependencies
+[547/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.Service.cpp for CXX dependencies
+[548/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.EventBus.cppm for CXX dependencies
+[549/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.GeometryPayload.cppm for CXX dependencies
+[550/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.ImportRouter.cppm for CXX dependencies
+[551/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.LoadPipeline.cppm for CXX dependencies
+[552/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.ModelTexturePayload.cppm for CXX dependencies
+[553/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.OperationStatus.cppm for CXX dependencies
+[554/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.PathIndex.cppm for CXX dependencies
+[555/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.PayloadStore.cppm for CXX dependencies
+[556/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.Registry.cppm for CXX dependencies
+[557/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.Service.cppm for CXX dependencies
+[558/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/assets/Asset.TypePool.cppm for CXX dependencies
+[559/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.SurfaceSampling.cpp.o
+[560/1578] Generating CXX dyndep file src/assets/CMakeFiles/ExtrinsicAssets.dir/CXX.dd
+[561/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/ECS.Scene.Bootstrap.cpp for CXX dependencies
+[562/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.OperationStatus.cppm.o
+[563/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.ImportRouter.cppm.o
+[564/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.Registry.cppm.o
+[565/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.UvAtlas.cppm.o
+[566/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.Registry.cpp.o
+[567/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.ImportRouter.cpp.o
+[568/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.EventBus.cppm.o
+[569/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.PathIndex.cppm.o
+[570/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.EventBus.cpp.o
+[571/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.PathIndex.cpp.o
+[572/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.TypePool.cppm.o
+[573/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Normals.cppm.o
+[574/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.LoadPipeline.cppm.o
+[575/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.GeometryPayload.cppm.o
+[576/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.UvAtlas.cpp.o
+[577/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.cppm.o
+[578/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Consolidation.cpp.o
+[579/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.PointCloud.Normals.cpp.o
+[580/1578] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.SurfaceReconstruction.cpp.o
+[581/1578] Linking CXX static library lib/libIntrinsicGeometry.a
+[582/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/ECS.Scene.Registry.cpp for CXX dependencies
+[583/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.ModelTexturePayload.cppm.o
+[584/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Hierarchy/ECS.Hierarchy.Structure.cpp for CXX dependencies
+[585/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cpp for CXX dependencies
+[586/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Collider.cpp for CXX dependencies
+[587/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.GeometrySources.cpp for CXX dependencies
+[588/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.LoadPipeline.cpp.o
+[589/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.StableId.cpp for CXX dependencies
+[590/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.RigidBody.cpp for CXX dependencies
+[591/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Transform.Local.cpp for CXX dependencies
+[592/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp for CXX dependencies
+[593/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Systems/ECS.System.BoundsPropagation.cpp for CXX dependencies
+[594/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Systems/ECS.System.RenderSync.cpp for CXX dependencies
+[595/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Systems/ECS.System.TransformHierarchy.cpp for CXX dependencies
+[596/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/ECS.Scene.Registry.cppm for CXX dependencies
+[597/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/ECS.Scene.Handle.cppm for CXX dependencies
+[598/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/ECS.Scene.Bootstrap.cppm for CXX dependencies
+[599/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Hierarchy/ECS.Hierarchy.Structure.cppm for CXX dependencies
+[600/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cppm for CXX dependencies
+[601/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.AssetInstance.cppm for CXX dependencies
+[602/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Culling.Local.cppm for CXX dependencies
+[603/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Collider.cppm for CXX dependencies
+[604/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Culling.World.cppm for CXX dependencies
+[605/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Culling.Proxy.cppm for CXX dependencies
+[606/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.DirtyTags.cppm for CXX dependencies
+[607/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.GeometrySources.cppm for CXX dependencies
+[608/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Hierarchy.cppm for CXX dependencies
+[609/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cppm for CXX dependencies
+[610/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Light.cppm for CXX dependencies
+[611/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.MetaData.cppm for CXX dependencies
+[612/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm for CXX dependencies
+[613/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.RigidBody.cppm for CXX dependencies
+[614/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Selection.cppm for CXX dependencies
+[615/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.ModelTexturePayload.cpp.o
+[616/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.ShadowCaster.cppm for CXX dependencies
+[617/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.StableId.cppm for CXX dependencies
+[618/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Events/ECS.Events.cppm for CXX dependencies
+[619/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Transform.Local.cppm for CXX dependencies
+[620/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Components/ECS.Component.Transform.World.cppm for CXX dependencies
+[621/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Systems/ECS.System.BoundsPropagation.cppm for CXX dependencies
+[622/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Systems/ECS.System.RenderSync.cppm for CXX dependencies
+[623/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/ecs/Systems/ECS.System.TransformHierarchy.cppm for CXX dependencies
+[624/1578] Generating CXX dyndep file src/ecs/CMakeFiles/ExtrinsicECS.dir/CXX.dd
+[625/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/physics/Physics.World.cppm for CXX dependencies
+[626/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/physics/Physics.World.cpp for CXX dependencies
+[627/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.AssetInstance.cppm.o
+[628/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Culling.Local.cppm.o
+[629/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Culling.World.cppm.o
+[630/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Culling.Proxy.cppm.o
+[631/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.PayloadStore.cppm.o
+[632/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Collider.cppm.o
+[633/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/ECS.Scene.Handle.cppm.o
+[634/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.PayloadStore.cpp.o
+[635/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Collider.cpp.o
+[636/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.DirtyTags.cppm.o
+[637/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.Service.cppm.o
+[638/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/ECS.Scene.Registry.cppm.o
+[639/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Hierarchy/ECS.Hierarchy.Mutation.cppm.o
+[640/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/ECS.Scene.Bootstrap.cppm.o
+[641/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Hierarchy.cppm.o
+[642/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.GeometrySources.cppm.o
+[643/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/ECS.Scene.Registry.cpp.o
+[644/1578] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.Service.cpp.o
+[645/1578] Linking CXX static library lib/libExtrinsicAssets.a
+[646/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.GeometrySources.cpp.o
+[647/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Light.cppm.o
+[648/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.ProceduralGeometryRef.cppm.o
+[649/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Hierarchy/ECS.Hierarchy.Structure.cppm.o
+[650/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.MetaData.cppm.o
+[651/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Selection.cppm.o
+[652/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.ShadowCaster.cppm.o
+[653/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.StableId.cppm.o
+[654/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.StableId.cpp.o
+[655/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.RigidBody.cppm.o
+[656/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Transform.Local.cppm.o
+[657/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.RigidBody.cpp.o
+[658/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.GeometrySourcesPopulate.cppm.o
+[659/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Transform.World.cppm.o
+[660/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Hierarchy/ECS.Hierarchy.Structure.cpp.o
+[661/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.Transform.Local.cpp.o
+[662/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Events/ECS.Events.cppm.o
+[663/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/ECS.Scene.Bootstrap.cpp.o
+[664/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Hierarchy/ECS.Hierarchy.Mutation.cpp.o
+[665/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.GeometrySourcesPopulate.cpp.o
+[666/1578] Generating CXX dyndep file src/physics/CMakeFiles/ExtrinsicPhysics.dir/CXX.dd
+[667/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Systems/ECS.System.BoundsPropagation.cppm.o
+[668/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.CommandContext.cpp for CXX dependencies
+[669/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.BufferTransfer.cpp for CXX dependencies
+[670/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Device.cpp for CXX dependencies
+[671/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.BufferManager.cpp for CXX dependencies
+[672/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.TextureManager.cpp for CXX dependencies
+[673/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.SamplerManager.cpp for CXX dependencies
+[674/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.PipelineManager.cpp for CXX dependencies
+[675/1578] Building CXX object src/physics/CMakeFiles/ExtrinsicPhysics.dir/Physics.World.cppm.o
+[676/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.PipelineRegistry.cpp for CXX dependencies
+[677/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Profiler.cpp for CXX dependencies
+[678/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.TextureUpload.cpp for CXX dependencies
+[679/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.BufferView.cppm for CXX dependencies
+[680/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.BufferTransfer.cppm for CXX dependencies
+[681/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Descriptors.cppm for CXX dependencies
+[682/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Handles.cppm for CXX dependencies
+[683/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.QueueAffinity.cppm for CXX dependencies
+[684/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.TimelineSemaphore.cppm for CXX dependencies
+[685/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Transfer.cppm for CXX dependencies
+[686/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.TransferQueue.cppm for CXX dependencies
+[687/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.TextureUpload.cppm for CXX dependencies
+[688/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Profiler.cppm for CXX dependencies
+[689/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Bindless.cppm for CXX dependencies
+[690/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Types.cppm for CXX dependencies
+[691/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.CommandContext.cppm for CXX dependencies
+[692/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.FrameHandle.cppm for CXX dependencies
+[693/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.Device.cppm for CXX dependencies
+[694/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.BufferManager.cppm for CXX dependencies
+[695/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.TextureManager.cppm for CXX dependencies
+[696/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.SamplerManager.cppm for CXX dependencies
+[697/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.PipelineManager.cppm for CXX dependencies
+[698/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/rhi/RHI.PipelineRegistry.cppm for CXX dependencies
+[699/1578] Generating CXX dyndep file src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/CXX.dd
+[700/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Systems/ECS.System.RenderSync.cppm.o
+[701/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Handles.cppm.o
+[702/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.BufferView.cppm.o
+[703/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.QueueAffinity.cppm.o
+[704/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Descriptors.cppm.o
+[705/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TimelineSemaphore.cppm.o
+[706/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Systems/ECS.System.TransformHierarchy.cppm.o
+[707/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Transfer.cppm.o
+[708/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.BufferTransfer.cppm.o
+[709/1578] Building CXX object src/physics/CMakeFiles/ExtrinsicPhysics.dir/Physics.World.cpp.o
+[710/1578] Linking CXX static library lib/libExtrinsicPhysics.a
+[711/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Systems/ECS.System.RenderSync.cpp.o
+[712/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.BufferTransfer.cpp.o
+[713/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TextureUpload.cppm.o
+[714/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TransferQueue.cppm.o
+[715/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Systems/ECS.System.BoundsPropagation.cpp.o
+[716/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Bindless.cppm.o
+[717/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.FrameHandle.cppm.o
+[718/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TextureUpload.cpp.o
+[719/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/assets/Graphics.GpuAssetCache.cpp for CXX dependencies
+[720/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/assets/Graphics.GpuAssetCache.cppm for CXX dependencies
+[721/1578] Generating CXX dyndep file src/graphics/assets/CMakeFiles/ExtrinsicGraphicsAssets.dir/CXX.dd
+[722/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.CameraSnapshots.cpp for CXX dependencies
+[723/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cpp for CXX dependencies
+[724/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp for CXX dependencies
+[725/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderCommandRouter.cpp for CXX dependencies
+[726/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderRecipeConfig.cpp for CXX dependencies
+[727/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderPrepPipeline.cpp for CXX dependencies
+[728/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderingContract.cpp for CXX dependencies
+[729/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cpp for CXX dependencies
+[730/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp for CXX dependencies
+[731/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.FrameRecipe.cpp for CXX dependencies
+[732/1578] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Systems/ECS.System.TransformHierarchy.cpp.o
+[733/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.Renderer.cpp for CXX dependencies
+[734/1578] Linking CXX static library lib/libExtrinsicECS.a
+[735/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp for CXX dependencies
+[736/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp for CXX dependencies
+[737/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.GpuTransfer.cpp for CXX dependencies
+[738/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.GeometryResidency.cpp for CXX dependencies
+[739/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.PropertyTextureBake.cpp for CXX dependencies
+[740/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.GpuWorld.cpp for CXX dependencies
+[741/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.MaterialSystem.cpp for CXX dependencies
+[742/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.VisualizationPackets.cpp for CXX dependencies
+[743/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cpp for CXX dependencies
+[744/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ColormapSystem.cpp for CXX dependencies
+[745/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.GpuScene.cpp for CXX dependencies
+[746/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp for CXX dependencies
+[747/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.CullingSystem.cpp for CXX dependencies
+[748/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.DebugViewSystem.cpp for CXX dependencies
+[749/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ImGuiOverlaySystem.cpp for CXX dependencies
+[750/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp for CXX dependencies
+[751/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Types.cppm.o
+[752/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ForwardSystem.cpp for CXX dependencies
+[753/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.SelectionSystem.cpp for CXX dependencies
+[754/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.LightSystem.cpp for CXX dependencies
+[755/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.SpatialDebugVisualizers.cpp for CXX dependencies
+[756/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.DeferredSystem.cpp for CXX dependencies
+[757/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.PostProcessSystem.cpp for CXX dependencies
+[758/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ShadowSystem.cpp for CXX dependencies
+[759/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.Reconstruction.cpp for CXX dependencies
+[760/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.HZB.cpp for CXX dependencies
+[761/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.LightClusters.cpp for CXX dependencies
+[762/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.TransformSyncSystem.cpp for CXX dependencies
+[763/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.UvView.cpp for CXX dependencies
+[764/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp for CXX dependencies
+[765/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Backends/Null/Backends.Null.cpp for CXX dependencies
+[766/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Backends/Null/Backends.Null.Bindless.cpp for CXX dependencies
+[767/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Culling.cpp for CXX dependencies
+[768/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Backends/Null/Backends.Null.Profiler.cpp for CXX dependencies
+[769/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp for CXX dependencies
+[770/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.DepthPrepass.cpp for CXX dependencies
+[771/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Backends/Null/Backends.Null.Transfer.cpp for CXX dependencies
+[772/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Deferred.Lighting.cpp for CXX dependencies
+[773/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.DebugView.cpp for CXX dependencies
+[774/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Forward.Line.cpp for CXX dependencies
+[775/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Forward.Point.cpp for CXX dependencies
+[776/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Forward.Surface.cpp for CXX dependencies
+[777/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cpp for CXX dependencies
+[778/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.ImGui.cpp for CXX dependencies
+[779/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cpp for CXX dependencies
+[780/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cpp for CXX dependencies
+[781/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cpp for CXX dependencies
+[782/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cpp for CXX dependencies
+[783/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Present.cpp for CXX dependencies
+[784/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.EdgeId.cpp for CXX dependencies
+[785/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp for CXX dependencies
+[786/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp for CXX dependencies
+[787/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.PointId.cpp for CXX dependencies
+[788/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Shadows.cpp for CXX dependencies
+[789/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.Outline.cpp for CXX dependencies
+[790/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cpp for CXX dependencies
+[791/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.VisualizationOverlay.cpp for CXX dependencies
+[792/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.Colormap.cppm for CXX dependencies
+[793/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.CameraSnapshots.cppm for CXX dependencies
+[794/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm for CXX dependencies
+[795/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm for CXX dependencies
+[796/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.FrameRecipe.cppm for CXX dependencies
+[797/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderRecipeConfig.cppm for CXX dependencies
+[798/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderCommandRouter.cppm for CXX dependencies
+[799/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderingContract.cppm for CXX dependencies
+[800/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderPrepPipeline.cppm for CXX dependencies
+[801/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm for CXX dependencies
+[802/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm for CXX dependencies
+[803/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderFrameInput.cppm for CXX dependencies
+[804/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.Renderer.cppm for CXX dependencies
+[805/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.RenderWorld.cppm for CXX dependencies
+[806/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.GpuTransfer.cppm for CXX dependencies
+[807/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.GeometryResidency.cppm for CXX dependencies
+[808/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.Material.cppm for CXX dependencies
+[809/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.GpuWorld.cppm for CXX dependencies
+[810/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.PropertyTextureBake.cppm for CXX dependencies
+[811/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.MaterialSystem.cppm for CXX dependencies
+[812/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ColormapSystem.cppm for CXX dependencies
+[813/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.VisualizationPackets.cppm for CXX dependencies
+[814/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm for CXX dependencies
+[815/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm for CXX dependencies
+[816/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.DebugViewSystem.cppm for CXX dependencies
+[817/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.CullingSystem.cppm for CXX dependencies
+[818/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm for CXX dependencies
+[819/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm for CXX dependencies
+[820/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.LightSystem.cppm for CXX dependencies
+[821/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.SelectionSystem.cppm for CXX dependencies
+[822/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ForwardSystem.cppm for CXX dependencies
+[823/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm for CXX dependencies
+[824/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.GpuScene.cppm for CXX dependencies
+[825/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.DeferredSystem.cppm for CXX dependencies
+[826/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.PostProcessSystem.cppm for CXX dependencies
+[827/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.Reconstruction.cppm for CXX dependencies
+[828/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.ShadowSystem.cppm for CXX dependencies
+[829/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.HZB.cppm for CXX dependencies
+[830/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.LightClusters.cppm for CXX dependencies
+[831/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.UvView.cppm for CXX dependencies
+[832/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.TransformSyncSystem.cppm for CXX dependencies
+[833/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm for CXX dependencies
+[834/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm for CXX dependencies
+[835/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Components/Graphics.Component.Material.cppm for CXX dependencies
+[836/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm for CXX dependencies
+[837/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Components/Graphics.Component.RenderGeometry.cppm for CXX dependencies
+[838/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm for CXX dependencies
+[839/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Culling.cppm for CXX dependencies
+[840/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Backends/Null/Backends.Null.cppm for CXX dependencies
+[841/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.DepthPrepass.cppm for CXX dependencies
+[842/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Deferred.Lighting.cppm for CXX dependencies
+[843/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cppm for CXX dependencies
+[844/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.DebugView.cppm for CXX dependencies
+[845/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Forward.Line.cppm for CXX dependencies
+[846/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Forward.Point.cppm for CXX dependencies
+[847/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.ImGui.cppm for CXX dependencies
+[848/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Forward.Surface.cppm for CXX dependencies
+[849/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cppm for CXX dependencies
+[850/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cppm for CXX dependencies
+[851/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cppm for CXX dependencies
+[852/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cppm for CXX dependencies
+[853/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Present.cppm for CXX dependencies
+[854/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cppm for CXX dependencies
+[855/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.EdgeId.cppm for CXX dependencies
+[856/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.EntityId.cppm for CXX dependencies
+[857/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.FaceId.cppm for CXX dependencies
+[858/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.Outline.cppm for CXX dependencies
+[859/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Selection.PointId.cppm for CXX dependencies
+[860/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.Shadows.cppm for CXX dependencies
+[861/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cppm for CXX dependencies
+[862/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/renderer/Passes/Pass.VisualizationOverlay.cppm for CXX dependencies
+[863/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Mappings.cpp for CXX dependencies
+[864/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.DiagnosticsLogging.cpp for CXX dependencies
+[865/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Staging.cpp for CXX dependencies
+[866/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Bindless.cpp for CXX dependencies
+[867/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Profiler.cpp for CXX dependencies
+[868/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Transfer.cpp for CXX dependencies
+[869/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.OperationalStatus.cpp for CXX dependencies
+[870/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.CommandContext.cpp for CXX dependencies
+[871/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.cppm for CXX dependencies
+[872/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Vma.cpp for CXX dependencies
+[873/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Device.cpp for CXX dependencies
+[874/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.CommandPools.cppm for CXX dependencies
+[875/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Descriptors.cppm for CXX dependencies
+[876/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.CommandContext.cppm.o
+[877/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Device.cppm for CXX dependencies
+[878/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Memory.cppm for CXX dependencies
+[879/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Diagnostics.cppm for CXX dependencies
+[880/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.CommandContext.cpp.o
+[881/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.OperationalStatus.cppm for CXX dependencies
+[882/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Pipelines.cppm for CXX dependencies
+[883/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Surface.cppm for CXX dependencies
+[884/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Queues.cppm for CXX dependencies
+[885/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Swapchain.cppm for CXX dependencies
+[886/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Sync.cppm for CXX dependencies
+[887/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/vulkan/Backends.Vulkan.Transfer.cppm for CXX dependencies
+[888/1578] Generating CXX dyndep file src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/CXX.dd
+[889/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.Barriers.cpp for CXX dependencies
+[890/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.cpp for CXX dependencies
+[891/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Profiler.cppm.o
+[892/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.DiagnosticsLogging.cpp.o
+[893/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Descriptors.cppm.o
+[894/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Profiler.cpp.o
+[895/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Vma.cpp.o
+[896/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Queues.cppm.o
+[897/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Pipelines.cppm.o
+[898/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Surface.cppm.o
+[899/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Swapchain.cppm.o
+[900/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Sync.cppm.o
+[901/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp for CXX dependencies
+[902/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cpp for CXX dependencies
+[903/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.Executor.cpp for CXX dependencies
+[904/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.cppm for CXX dependencies
+[905/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.Resources.cppm for CXX dependencies
+[906/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm for CXX dependencies
+[907/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm for CXX dependencies
+[908/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm for CXX dependencies
+[909/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cppm for CXX dependencies
+[910/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/graphics/framegraph/Graphics.RenderGraph.Executor.cppm for CXX dependencies
+[911/1578] Generating CXX dyndep file src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/CXX.dd
+[912/1578] Generating CXX dyndep file src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/CXX.dd
+[913/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/Platform.CreateWindow.cpp for CXX dependencies
+[914/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Colormap.cppm.o
+[915/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Device.cppm.o
+[916/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Device.cpp.o
+[917/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Diagnostics.cppm.o
+[918/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderingContract.cppm.o
+[919/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CameraSnapshots.cppm.o
+[920/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.BufferManager.cppm.o
+[921/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TextureManager.cppm.o
+[922/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.SamplerManager.cppm.o
+[923/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.PipelineManager.cppm.o
+[924/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.BufferManager.cpp.o
+[925/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TextureManager.cpp.o
+[926/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.SamplerManager.cpp.o
+[927/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.PipelineManager.cpp.o
+[928/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CameraSnapshots.cpp.o
+[929/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderingContract.cpp.o
+[930/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderRecipeConfig.cppm.o
+[931/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ComputeParallelPrimitives.cppm.o
+[932/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.PipelineRegistry.cppm.o
+[933/1578] Building CXX object src/graphics/assets/CMakeFiles/ExtrinsicGraphicsAssets.dir/Graphics.GpuAssetCache.cppm.o
+[934/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ComputeParallelPrimitives.cpp.o
+[935/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderFrameInput.cppm.o
+[936/1578] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.PipelineRegistry.cpp.o
+[937/1578] Linking CXX static library lib/libExtrinsicRHI.a
+[938/1578] Building CXX object src/graphics/assets/CMakeFiles/ExtrinsicGraphicsAssets.dir/Graphics.GpuAssetCache.cpp.o
+[939/1578] Linking CXX static library lib/libExtrinsicGraphicsAssets.a
+[940/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Material.cppm.o
+[941/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PropertyTextureBake.cppm.o
+[942/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuTransfer.cppm.o
+[943/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PropertyTextureBake.cpp.o
+[944/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderRecipeConfig.cpp.o
+[945/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationPackets.cppm.o
+[946/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuTransfer.cpp.o
+[947/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationPackets.cpp.o
+[948/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ColormapSystem.cppm.o
+[949/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ImGuiOverlaySystem.cppm.o
+[950/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SelectionSystem.cppm.o
+[951/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationPropertyBufferResidency.cppm.o
+[952/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ColormapSystem.cpp.o
+[953/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SelectionSystem.cpp.o
+[954/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ImGuiOverlaySystem.cpp.o
+[955/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationPropertyBufferResidency.cpp.o
+[956/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ForwardSystem.cppm.o
+[957/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ForwardSystem.cpp.o
+[958/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuScene.cppm.o
+[959/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ImGuiUploadHelper.cppm.o
+[960/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.MaterialSystem.cppm.o
+[961/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DeferredSystem.cppm.o
+[962/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ImGuiUploadHelper.cpp.o
+[963/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuScene.cpp.o
+[964/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DeferredSystem.cpp.o
+[965/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.MaterialSystem.cpp.o
+[966/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PostProcessSystem.cppm.o
+[967/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Reconstruction.cppm.o
+[968/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.HZB.cppm.o
+[969/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ShadowSystem.cppm.o
+[970/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PostProcessSystem.cpp.o
+[971/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.HZB.cpp.o
+[972/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Reconstruction.cpp.o
+[973/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ShadowSystem.cpp.o
+[974/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Components/Graphics.Component.GpuSceneSlot.cppm.o
+[975/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Components/Graphics.Component.GpuSceneSlot.cpp.o
+[976/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Components/Graphics.Component.RenderGeometry.cppm.o
+[977/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationOverlayUploadHelper.cppm.o
+[978/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Components/Graphics.Component.Material.cppm.o
+[979/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Components/Graphics.Component.VisualizationConfig.cppm.o
+[980/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.ImGui.cppm.o
+[981/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.ImGui.cpp.o
+[982/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.Bloom.cppm.o
+[983/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.Bloom.cpp.o
+[984/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.FXAA.cppm.o
+[985/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.FXAA.cpp.o
+[986/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.Histogram.cppm.o
+[987/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.Histogram.cpp.o
+[988/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationOverlayUploadHelper.cpp.o
+[989/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.SMAA.cppm.o
+[990/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.ToneMap.cppm.o
+[991/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.SMAA.cpp.o
+[992/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.ToneMap.cpp.o
+[993/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Present.cppm.o
+[994/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Present.cpp.o
+[995/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Memory.cppm.o
+[996/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.VisualizationOverlay.cppm.o
+[997/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.CommandPools.cppm.o
+[998/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.VisualizationOverlay.cpp.o
+[999/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.OperationalStatus.cppm.o
+[1000/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.cppm.o
+[1001/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuWorld.cppm.o
+[1002/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.cppm.o
+[1003/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.cpp.o
+[1004/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuWorld.cpp.o
+[1005/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Transfer.cppm.o
+[1006/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.Bindless.cpp.o
+[1007/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.Profiler.cpp.o
+[1008/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.Transfer.cpp.o
+[1009/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GeometryResidency.cppm.o
+[1010/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.LightSystem.cppm.o
+[1011/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GeometryResidency.cpp.o
+[1012/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CullingSystem.cppm.o
+[1013/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationSyncSystem.cppm.o
+[1014/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.LightSystem.cpp.o
+[1015/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderWorld.cppm.o
+[1016/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.LightClusters.cppm.o
+[1017/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CullingSystem.cpp.o
+[1018/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationSyncSystem.cpp.o
+[1019/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.LightClusters.cpp.o
+[1020/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CurrentRendererContractAdapter.cppm.o
+[1021/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SpatialDebugVisualizers.cppm.o
+[1022/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CurrentRendererContractAdapter.cpp.o
+[1023/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SharedRenderRecipeExecution.cppm.o
+[1024/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SpatialDebugVisualizers.cpp.o
+[1025/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.TransformSyncSystem.cppm.o
+[1026/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SharedRenderRecipeExecution.cpp.o
+[1027/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.UvView.cppm.o
+[1028/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.TransformSyncSystem.cpp.o
+[1029/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.TransientDebugUploadHelper.cppm.o
+[1030/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.UvView.cpp.o
+[1031/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Culling.cppm.o
+[1032/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Culling.cpp.o
+[1033/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DepthPrepass.cppm.o
+[1034/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DepthPrepass.cpp.o
+[1035/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Deferred.GBuffers.cppm.o
+[1036/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Deferred.GBuffers.cpp.o
+[1037/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.TransientDebugUploadHelper.cpp.o
+[1038/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Deferred.Lighting.cppm.o
+[1039/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Line.cppm.o
+[1040/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Deferred.Lighting.cpp.o
+[1041/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Line.cpp.o
+[1042/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Point.cppm.o
+[1043/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Surface.cppm.o
+[1044/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Point.cpp.o
+[1045/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Surface.cpp.o
+[1046/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.EdgeId.cppm.o
+[1047/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.EntityId.cppm.o
+[1048/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.EdgeId.cpp.o
+[1049/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.EntityId.cpp.o
+[1050/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.FaceId.cppm.o
+[1051/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.Outline.cppm.o
+[1052/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.FaceId.cpp.o
+[1053/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.PointId.cppm.o
+[1054/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.PointId.cpp.o
+[1055/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderSubsystemRegistry.cppm.o
+[1056/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Shadows.cppm.o
+[1057/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Shadows.cpp.o
+[1058/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.Outline.cpp.o
+[1059/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Mappings.cpp.o
+[1060/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.TransientDebug.Surface.cppm.o
+[1061/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderSubsystemRegistry.cpp.o
+[1062/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.TransientDebug.Surface.cpp.o
+[1063/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Staging.cpp.o
+[1064/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderPrepPipeline.cppm.o
+[1065/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Bindless.cpp.o
+[1066/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Profiler.cpp.o
+[1067/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.OperationalStatus.cpp.o
+[1068/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.CommandContext.cpp.o
+[1069/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderPrepPipeline.cpp.o
+[1070/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Barriers.cppm.o
+[1071/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Transfer.cpp.o
+[1072/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/Platform.Input.cpp for CXX dependencies
+[1073/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/backends/null/Platform.Backend.Null.cpp for CXX dependencies
+[1074/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Resources.cppm.o
+[1075/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/backends/glfw/Platform.Backend.Glfw.cpp for CXX dependencies
+[1076/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp for CXX dependencies
+[1077/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/Platform.Input.cppm for CXX dependencies
+[1078/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/Platform.IWindow.cppm for CXX dependencies
+[1079/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/backends/null/Platform.Backend.Null.cppm for CXX dependencies
+[1080/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.TransientAllocator.cppm.o
+[1081/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm for CXX dependencies
+[1082/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AsyncWorkModule.cpp for CXX dependencies
+[1083/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/platform/backends/glfw/Platform.Backend.Glfw.cppm for CXX dependencies
+[1084/1578] Generating CXX dyndep file src/platform/CMakeFiles/ExtrinsicPlatform.dir/CXX.dd
+[1085/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowModule.cpp for CXX dependencies
+[1086/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/Platform.Input.cppm.o
+[1087/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowImportExecutor.cpp for CXX dependencies
+[1088/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/Platform.Input.cpp.o
+[1089/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetIngestStateMachine.cpp for CXX dependencies
+[1090/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cpp for CXX dependencies
+[1091/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp for CXX dependencies
+[1092/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowModelTextureDecode.cpp for CXX dependencies
+[1093/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp for CXX dependencies
+[1094/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowTextureResidency.cpp for CXX dependencies
+[1095/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.CommandBus.cpp for CXX dependencies
+[1096/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Pass.cppm.o
+[1097/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.DeviceBootstrap.cpp for CXX dependencies
+[1098/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.JobService.cpp for CXX dependencies
+[1099/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp for CXX dependencies
+[1100/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp for CXX dependencies
+[1101/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp for CXX dependencies
+[1102/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryPresentation.cpp for CXX dependencies
+[1103/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp for CXX dependencies
+[1104/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderArtifactPublication.cpp for CXX dependencies
+[1105/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp for CXX dependencies
+[1106/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ProgressivePoissonConfig.cpp for CXX dependencies
+[1107/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ParameterizationConfig.cpp for CXX dependencies
+[1108/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.PointCloudConsolidationConfig.cpp for CXX dependencies
+[1109/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.PointCloudConsolidationModule.cpp for CXX dependencies
+[1110/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp for CXX dependencies
+[1111/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorCommandHistory.cpp for CXX dependencies
+[1112/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorCommon.Public.cpp for CXX dependencies
+[1113/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorWorkspaceAttachment.cpp for CXX dependencies
+[1114/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorJobProjection.Public.cpp for CXX dependencies
+[1115/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.SceneEditingOperations.Public.cpp for CXX dependencies
+[1116/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/Platform.IWindow.cppm.o
+[1117/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Compiler.cppm.o
+[1118/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.SceneEditingOperations.Actions.cpp for CXX dependencies
+[1119/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Executor.cppm.o
+[1120/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/backends/glfw/Platform.Backend.Glfw.cppm.o
+[1121/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/backends/null/Platform.Backend.Null.cppm.o
+[1122/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Device.cppm.o
+[1123/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/Platform.CreateWindow.cpp.o
+[1124/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.cppm.o
+[1125/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/backends/glfw/Platform.Backend.Glfw.cpp.o
+[1126/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/backends/null/Platform.Backend.Null.cpp.o
+[1127/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderCommandRouter.cppm.o
+[1128/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderCommandRouter.cpp.o
+[1129/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.FrameRecipe.cppm.o
+[1130/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Barriers.cpp.o
+[1131/1578] Building CXX object src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/Backends.Vulkan.Device.cpp.o
+[1132/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.FrameRecipe.cpp.o
+[1133/1578] Linking CXX static library lib/libExtrinsicBackendsVulkan.a
+[1134/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.cpp.o
+[1135/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.TransientAllocator.cpp.o
+[1136/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Executor.cpp.o
+[1137/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm.o
+[1138/1578] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp.o
+[1139/1578] Linking CXX static library lib/libExtrinsicPlatform.a
+[1140/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.SceneEditingOperations.Debug.cpp for CXX dependencies
+[1141/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryProcessingOperations.Public.cpp for CXX dependencies
+[1142/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VisualizationEditingOperations.Public.cpp for CXX dependencies
+[1143/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp for CXX dependencies
+[1144/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VisualizationEditingOperations.Debug.cpp for CXX dependencies
+[1145/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderRecipeEditingOperations.Public.cpp for CXX dependencies
+[1146/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorWorkspaceSnapshots.Public.cpp for CXX dependencies
+[1147/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp for CXX dependencies
+[1148/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp for CXX dependencies
+[1149/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/internal/Runtime.EditorWorkspaceSession.cpp for CXX dependencies
+[1150/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryProcessingOperations.cpp for CXX dependencies
+[1151/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp for CXX dependencies
+[1152/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ParameterizationOperations.cpp for CXX dependencies
+[1153/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderRecipeEditingOperations.cpp for CXX dependencies
+[1154/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderRecipeEditingOperations.Debug.cpp for CXX dependencies
+[1155/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Editor/Runtime.EditorPropertyWidgets.cpp for CXX dependencies
+[1156/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Editor/Runtime.EditorUiHost.cpp for CXX dependencies
+[1157/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Editor/Runtime.EditorUiModule.cpp for CXX dependencies
+[1158/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Editor/Runtime.EditorWindowRegistry.cpp for CXX dependencies
+[1159/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.Engine.cpp for CXX dependencies
+[1160/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EngineConfigBoot.cpp for CXX dependencies
+[1161/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EngineConfigControl.cpp for CXX dependencies
+[1162/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.FramePacingDiagnostics.cpp for CXX dependencies
+[1163/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.InputActions.cpp for CXX dependencies
+[1164/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.KernelEvents.cpp for CXX dependencies
+[1165/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ServiceRegistry.cpp for CXX dependencies
+[1166/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.WorldRegistry.cpp for CXX dependencies
+[1167/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryAvailability.cpp for CXX dependencies
+[1168/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.PhysicsBridge.cpp for CXX dependencies
+[1169/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Scene/Runtime.SceneDocumentModule.cpp for CXX dependencies
+[1170/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DebugViewSystem.cppm.o
+[1171/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Scene/Runtime.SceneInteractionModule.cpp for CXX dependencies
+[1172/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DebugView.cppm.o
+[1173/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DebugView.cpp.o
+[1174/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.SceneSerialization.cpp for CXX dependencies
+[1175/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Cameras/Runtime.CameraModule.cpp for CXX dependencies
+[1176/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Cameras/Runtime.CameraControllers.cpp for CXX dependencies
+[1177/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Cameras/Runtime.CameraFocusCommand.cpp for CXX dependencies
+[1178/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Gizmos/Runtime.GizmoInteraction.cpp for CXX dependencies
+[1179/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/ImGui/Runtime.ImGuiAdapter.cpp for CXX dependencies
+[1180/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryPlanBuilders.Graph.cpp for CXX dependencies
+[1181/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryPlanBuilders.Mesh.cpp for CXX dependencies
+[1182/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp for CXX dependencies
+[1183/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryPlanBuilders.PointCloud.cpp for CXX dependencies
+[1184/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryPlanBuilders.Procedural.cpp for CXX dependencies
+[1185/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.MeshSurfaceTopology.cpp for CXX dependencies
+[1186/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.PrimitiveSelectionRefinement.cpp for CXX dependencies
+[1187/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ReferenceScene.cpp for CXX dependencies
+[1188/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderRecipeActivation.cpp for CXX dependencies
+[1189/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderExtraction.cpp for CXX dependencies
+[1190/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderExtraction.Recipes.cpp for CXX dependencies
+[1191/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderExtraction.Geometry.cpp for CXX dependencies
+[1192/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderExtractionService.cpp for CXX dependencies
+[1193/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderWorldPool.cpp for CXX dependencies
+[1194/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.SelectionController.cpp for CXX dependencies
+[1195/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DebugViewSystem.cpp.o
+[1196/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.StableEntityLookup.cpp for CXX dependencies
+[1197/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.TextureBakeModule.cpp for CXX dependencies
+[1198/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VertexAttributeBinding.cpp for CXX dependencies
+[1199/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VertexChannelStreams.cpp for CXX dependencies
+[1200/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Visualization/Runtime.VisualizationRecipes.cpp for CXX dependencies
+[1201/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AsyncWorkModule.cppm for CXX dependencies
+[1202/1578] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Compiler.cpp.o
+[1203/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowModule.cppm for CXX dependencies
+[1204/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetIngestStateMachine.cppm for CXX dependencies
+[1205/1578] Linking CXX static library lib/libExtrinsicGraphicsRenderGraph.a
+[1206/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.CommandBus.cppm for CXX dependencies
+[1207/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.DeviceBootstrap.cppm for CXX dependencies
+[1208/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.JobService.cppm for CXX dependencies
+[1209/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cppm for CXX dependencies
+[1210/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm for CXX dependencies
+[1211/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryPresentation.cppm for CXX dependencies
+[1212/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderArtifactPublication.cppm for CXX dependencies
+[1213/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm for CXX dependencies
+[1214/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm for CXX dependencies
+[1215/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ProgressivePoissonConfig.cppm for CXX dependencies
+[1216/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ParameterizationConfig.cppm for CXX dependencies
+[1217/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.PointCloudConsolidationConfig.cppm for CXX dependencies
+[1218/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.PointCloudConsolidationModule.cppm for CXX dependencies
+[1219/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorCommon.cppm for CXX dependencies
+[1220/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorCommandHistory.cppm for CXX dependencies
+[1221/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorWorkspaceAttachment.cppm for CXX dependencies
+[1222/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorJobProjection.cppm for CXX dependencies
+[1223/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EditorWorkspaceSnapshots.cppm for CXX dependencies
+[1224/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.SceneEditingOperations.cppm for CXX dependencies
+[1225/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryProcessingOperations.cppm for CXX dependencies
+[1226/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VisualizationEditingOperations.cppm for CXX dependencies
+[1227/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Editor/Runtime.EditorPropertyWidgets.cppm for CXX dependencies
+[1228/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderRecipeEditingOperations.cppm for CXX dependencies
+[1229/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Editor/Runtime.EditorUiHost.cppm for CXX dependencies
+[1230/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Editor/Runtime.EditorUiModule.cppm for CXX dependencies
+[1231/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Editor/Runtime.EditorWindowRegistry.cppm for CXX dependencies
+[1232/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.Engine.cppm for CXX dependencies
+[1233/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EngineConfigBoot.cppm for CXX dependencies
+[1234/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.EngineConfigControl.cppm for CXX dependencies
+[1235/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.FramePacingDiagnostics.cppm for CXX dependencies
+[1236/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.InputActions.cppm for CXX dependencies
+[1237/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.KernelEvents.cppm for CXX dependencies
+[1238/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.Module.cppm for CXX dependencies
+[1239/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ServiceRegistry.cppm for CXX dependencies
+[1240/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.WorldHandle.cppm for CXX dependencies
+[1241/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.WorldRegistry.cppm for CXX dependencies
+[1242/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.PhysicsBridge.cppm for CXX dependencies
+[1243/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryAvailability.cppm for CXX dependencies
+[1244/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.SceneSerialization.cppm for CXX dependencies
+[1245/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Scene/Runtime.SceneInteractionModule.cppm for CXX dependencies
+[1246/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Scene/Runtime.SceneDocumentModule.cppm for CXX dependencies
+[1247/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Cameras/Runtime.CameraModule.cppm for CXX dependencies
+[1248/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Cameras/Runtime.CameraFocusCommand.cppm for CXX dependencies
+[1249/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Cameras/Runtime.CameraControllers.cppm for CXX dependencies
+[1250/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Gizmos/Runtime.GizmoInteraction.cppm for CXX dependencies
+[1251/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/ImGui/Runtime.ImGuiAdapter.cppm for CXX dependencies
+[1252/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.MeshPrimitiveView.cppm for CXX dependencies
+[1253/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.MeshSurfaceTopology.cppm for CXX dependencies
+[1254/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.ReferenceScene.cppm for CXX dependencies
+[1255/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.PrimitiveSelectionRefinement.cppm for CXX dependencies
+[1256/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderRecipeActivation.cppm for CXX dependencies
+[1257/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderWorldPool.cppm for CXX dependencies
+[1258/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderExtraction.cppm for CXX dependencies
+[1259/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.SelectionController.cppm for CXX dependencies
+[1260/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.StableEntityLookup.cppm for CXX dependencies
+[1261/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VertexAttributeBinding.cppm for CXX dependencies
+[1262/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.TextureBakeModule.cppm for CXX dependencies
+[1263/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VertexChannelBindings.cppm for CXX dependencies
+[1264/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.VertexChannelStreams.cppm for CXX dependencies
+[1265/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm for CXX dependencies
+[1266/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Visualization/Runtime.VisualizationRecipes.cppm for CXX dependencies
+[1267/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm for CXX dependencies
+[1268/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowImportExecutor.cppm for CXX dependencies
+[1269/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/internal/Runtime.EditorFeatures.Detail.cppm for CXX dependencies
+[1270/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowGeometryMaterialization.cppm for CXX dependencies
+[1271/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowModelTextureDecode.cppm for CXX dependencies
+[1272/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowRecipePolicies.cppm for CXX dependencies
+[1273/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowModelMaterialization.cppm for CXX dependencies
+[1274/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.GeometryPlanBuilders.cppm for CXX dependencies
+[1275/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.AssetWorkflowTextureResidency.cppm for CXX dependencies
+[1276/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[1277/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.EditorController.cpp for CXX dependencies
+[1278/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.EditorShell.cpp for CXX dependencies
+[1279/1578] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[1280/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp for CXX dependencies
+[1281/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp for CXX dependencies
+[1282/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetIngestStateMachine.cppm.o
+[1283/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringGpuBackend.cppm.o
+[1284/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.DeviceBootstrap.cppm.o
+[1285/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetIngestStateMachine.cpp.o
+[1286/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderArtifactPublication.cppm.o
+[1287/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ProgressivePoissonGpuBackend.cppm.o
+[1288/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.DeviceBootstrap.cpp.o
+[1289/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderArtifactPublication.cpp.o
+[1290/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ProgressivePoissonConfig.cppm.o
+[1291/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ParameterizationConfig.cppm.o
+[1292/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.PointCloudConsolidationConfig.cppm.o
+[1293/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorCommon.cppm.o
+[1294/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorCommon.Public.cpp.o
+[1295/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ProgressivePoissonGpuBackend.cpp.o
+[1296/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorPropertyWidgets.cppm.o
+[1297/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWindowRegistry.cppm.o
+[1298/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EngineConfigBoot.cppm.o
+[1299/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWindowRegistry.cpp.o
+[1300/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorPropertyWidgets.cpp.o
+[1301/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EngineConfigBoot.cpp.o
+[1302/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.InputActions.cppm.o
+[1303/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorUiHost.cppm.o
+[1304/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.InputActions.cpp.o
+[1305/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorUiHost.cpp.o
+[1306/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.WorldHandle.cppm.o
+[1307/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cppm.o
+[1308/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ServiceRegistry.cppm.o
+[1309/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.KernelEvents.cppm.o
+[1310/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ServiceRegistry.cpp.o
+[1311/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryAvailability.cppm.o
+[1312/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.KernelEvents.cpp.o
+[1313/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryPresentation.cppm.o
+[1314/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryAvailability.cpp.o
+[1315/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.FramePacingDiagnostics.cppm.o
+[1316/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.FramePacingDiagnostics.cpp.o
+[1317/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryPresentation.cpp.o
+[1318/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.JobService.cppm.o
+[1319/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.PhysicsBridge.cppm.o
+[1320/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SceneSerialization.cppm.o
+[1321/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.PhysicsBridge.cpp.o
+[1322/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.JobService.cpp.o
+/tmp/intrinsic-geometry-e2e.GJlhXS/src/runtime/Runtime.JobService.cpp:800:32: warning: enumeration values 'AwaitingDependencies', 'AwaitingApply', and 'StaleDiscarded' not handled in switch [-Wswitch]
+  800 |             switch (job->State.load(std::memory_order_acquire))
+      |                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[1323/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorJobProjection.cppm.o
+[1324/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorJobProjection.Public.cpp.o
+[1325/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.WorldRegistry.cppm.o
+[1326/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Cameras/Runtime.CameraControllers.cppm.o
+[1327/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.WorldRegistry.cpp.o
+[1328/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Cameras/Runtime.CameraControllers.cpp.o
+[1329/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SceneSerialization.cpp.o
+[1330/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.MeshPrimitiveView.cppm.o
+[1331/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.MeshSurfaceTopology.cppm.o
+[1332/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.MeshSurfaceTopology.cpp.o
+[1333/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.CommandBus.cppm.o
+[1334/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.PrimitiveSelectionRefinement.cppm.o
+[1335/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorWorkspaceAttachment.cppm.o
+[1336/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ReferenceScene.cppm.o
+[1337/1578] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o
+[1338/1578] Linking CXX static library lib/libExtrinsicGraphics.a
+[1339/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderWorldPool.cppm.o
+[1340/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.CommandBus.cpp.o
+[1341/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderWorldPool.cpp.o
+[1342/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VertexAttributeBinding.cppm.o
+[1343/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.StableEntityLookup.cppm.o
+[1344/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VertexAttributeBinding.cpp.o
+[1345/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ReferenceScene.cpp.o
+[1346/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SelectionController.cppm.o
+[1347/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.PrimitiveSelectionRefinement.cpp.o
+[1348/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.StableEntityLookup.cpp.o
+[1349/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorCommandHistory.cppm.o
+[1350/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SelectionController.cpp.o
+[1351/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Cameras/Runtime.CameraFocusCommand.cppm.o
+[1352/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorCommandHistory.cpp.o
+[1353/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderRecipeActivation.cppm.o
+[1354/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Cameras/Runtime.CameraFocusCommand.cpp.o
+[1355/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Gizmos/Runtime.GizmoInteraction.cppm.o
+[1356/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderRecipeActivation.cpp.o
+[1357/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VertexChannelBindings.cppm.o
+[1358/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VertexChannelStreams.cppm.o
+[1359/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VertexChannelStreams.cpp.o
+[1360/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Gizmos/Runtime.GizmoInteraction.cpp.o
+[1361/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowGeometryMaterialization.cppm.o
+[1362/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowGeometryMaterialization.cpp.o
+[1363/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowModelTextureDecode.cppm.o
+[1364/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Visualization/Runtime.VisualizationRecipes.cppm.o
+[1365/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SceneEditingOperations.cppm.o
+[1366/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SceneEditingOperations.Debug.cpp.o
+[1367/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Visualization/Runtime.VisualizationRecipes.cpp.o
+[1368/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowModelTextureDecode.cpp.o
+[1369/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryPlanBuilders.cppm.o
+[1370/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowTextureResidency.cppm.o
+[1371/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryPlanBuilders.Graph.cpp.o
+[1372/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowTextureResidency.cpp.o
+[1373/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryPlanBuilders.Mesh.cpp.o
+[1374/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp.o
+[1375/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryPlanBuilders.Procedural.cpp.o
+[1376/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp for CXX dependencies
+[1377/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Sandbox.ConfigSections.cpp for CXX dependencies
+[1378/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryPlanBuilders.PointCloud.cpp.o
+[1379/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Sandbox.cpp for CXX dependencies
+[1380/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.EditorController.cppm for CXX dependencies
+[1381/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.EditorShell.cppm for CXX dependencies
+[1382/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm for CXX dependencies
+[1383/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm for CXX dependencies
+[1384/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Sandbox.ConfigSections.cppm for CXX dependencies
+[1385/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm for CXX dependencies
+[1386/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/Sandbox.cppm for CXX dependencies
+[1387/1578] Generating CXX dyndep file src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/CXX.dd
+[1388/1578] Compiling GLSL -> SPV: cluster_grid_build.comp
+[1389/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.Module.cppm.o
+[1390/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorController.cppm.o
+[1391/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.cppm.o
+[1392/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AsyncWorkModule.cppm.o
+[1393/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AsyncWorkModule.cpp.o
+[1394/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderExtraction.cppm.o
+[1395/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.PointCloudConsolidationModule.cppm.o
+[1396/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.PointCloudConsolidationModule.cpp.o
+[1397/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorUiModule.cppm.o
+[1398/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringModule.cppm.o
+[1399/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.Engine.cppm.o
+[1400/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp.o
+[1401/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EngineConfigControl.cppm.o
+[1402/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringModule.cpp.o
+[1403/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringGpuState.cpp.o
+[1404/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EngineConfigControl.cpp.o
+[1405/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderExtractionService.cpp.o
+[1406/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringConfig.cppm.o
+[1407/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneDocumentModule.cppm.o
+[1408/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneInteractionModule.cppm.o
+[1409/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderRecipeEditingOperations.cppm.o
+[1410/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneInteractionModule.cpp.o
+[1411/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneDocumentModule.cpp.o
+[1412/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderRecipeEditingOperations.cpp.o
+[1413/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderRecipeEditingOperations.Debug.cpp.o
+[1414/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Cameras/Runtime.CameraModule.cppm.o
+[1415/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Cameras/Runtime.CameraModule.cpp.o
+[1416/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/ImGui/Runtime.ImGuiAdapter.cppm.o
+[1417/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorUiModule.cpp.o
+[1418/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/internal/Runtime.FeatureConfigCodecs.Detail.cppm.o
+[1419/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringConfig.cpp.o
+[1420/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/ImGui/Runtime.ImGuiAdapter.cpp.o
+[1421/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ProgressivePoissonConfig.cpp.o
+[1422/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ParameterizationConfig.cpp.o
+[1423/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.PointCloudConsolidationConfig.cpp.o
+[1424/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.TextureBakeModule.cppm.o
+[1425/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o
+[1426/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.TextureBakeModule.cpp.o
+[1427/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderExtraction.Internal.cpp.o
+[1428/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryProcessingOperations.cppm.o
+[1429/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderExtraction.cpp.o
+[1430/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowModule.cppm.o
+[1431/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderExtraction.Recipes.cpp.o
+[1432/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowModelMaterialization.cppm.o
+[1433/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ParameterizationOperations.cpp.o
+[1434/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.Engine.cpp.o
+[1435/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderExtraction.Geometry.cpp.o
+[1436/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryProcessingOperations.cpp.o
+[1437/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowModelMaterialization.cpp.o
+[1438/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.cpp.o
+[1439/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.ConfigSections.cppm.o
+[1440/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.ConfigSections.cpp.o
+[1441/1578] Compiling GLSL -> SPV: culling/instance_cull.comp
+[1442/1578] Compiling GLSL -> SPV: debug_surface.frag
+[1443/1578] Compiling GLSL -> SPV: debug_surface.vert
+[1444/1578] Compiling GLSL -> SPV: debug_view.comp
+[1445/1578] Compiling GLSL -> SPV: debug_view.frag
+[1446/1578] Compiling GLSL -> SPV: debug_view.vert
+[1447/1578] Compiling GLSL -> SPV: deferred/default_debug_gbuffer.frag
+[1448/1578] Compiling GLSL -> SPV: deferred/gbuffer.frag
+[1449/1578] Compiling GLSL -> SPV: deferred/gbuffer.vert
+[1450/1578] Compiling GLSL -> SPV: deferred/lighting.frag
+[1451/1578] Compiling GLSL -> SPV: deferred_lighting.frag
+[1452/1578] Compiling GLSL -> SPV: depth_prepass.vert
+[1453/1578] Compiling GLSL -> SPV: forward/default_debug_surface.frag
+[1454/1578] Compiling GLSL -> SPV: forward/default_debug_surface.vert
+[1455/1578] Compiling GLSL -> SPV: forward/line.frag
+[1456/1578] Compiling GLSL -> SPV: forward/line.vert
+[1457/1578] Compiling GLSL -> SPV: forward/point.frag
+[1458/1578] Compiling GLSL -> SPV: forward/point.vert
+[1459/1578] Compiling GLSL -> SPV: hzb_build.comp
+[1460/1578] Compiling GLSL -> SPV: imgui.frag
+[1461/1578] Compiling GLSL -> SPV: imgui.vert
+[1462/1578] Compiling GLSL -> SPV: instance_cull.comp
+[1463/1578] Compiling GLSL -> SPV: instance_cull_multigeo.comp
+[1464/1578] Compiling GLSL -> SPV: kmeans_assign.comp
+[1465/1578] Compiling GLSL -> SPV: kmeans_reset.comp
+[1466/1578] Compiling GLSL -> SPV: kmeans_update.comp
+[1467/1578] Compiling GLSL -> SPV: light_cluster_assign.comp
+[1468/1578] Compiling GLSL -> SPV: line.frag
+[1469/1578] Compiling GLSL -> SPV: line.vert
+[1470/1578] Compiling GLSL -> SPV: parallel_compact_by_flags.comp
+[1471/1578] Compiling GLSL -> SPV: parallel_count_to_dispatch_args.comp
+[1472/1578] Compiling GLSL -> SPV: parallel_prefix_scan.comp
+[1473/1578] Compiling GLSL -> SPV: parallel_scan_add_offsets.comp
+[1474/1578] Compiling GLSL -> SPV: parallel_segmented_float_reduce.comp
+[1475/1578] Compiling GLSL -> SPV: pick_id.frag
+[1476/1578] Compiling GLSL -> SPV: pick_id.vert
+[1477/1578] Compiling GLSL -> SPV: pick_line.frag
+[1478/1578] Compiling GLSL -> SPV: pick_line.vert
+[1479/1578] Compiling GLSL -> SPV: pick_mesh.frag
+[1480/1578] Compiling GLSL -> SPV: pick_mesh.vert
+[1481/1578] Compiling GLSL -> SPV: pick_point.frag
+[1482/1578] Compiling GLSL -> SPV: pick_point.vert
+[1483/1578] Compiling GLSL -> SPV: point.frag
+[1484/1578] Compiling GLSL -> SPV: point.vert
+[1485/1578] Compiling GLSL -> SPV: point_flatdisc.frag
+[1486/1578] Compiling GLSL -> SPV: point_flatdisc.vert
+[1487/1578] Compiling GLSL -> SPV: point_retained.frag
+[1488/1578] Compiling GLSL -> SPV: point_retained.vert
+[1489/1578] Compiling GLSL -> SPV: point_sphere.frag
+[1490/1578] Compiling GLSL -> SPV: point_sphere.vert
+[1491/1578] Compiling GLSL -> SPV: point_surfel.frag
+[1492/1578] Compiling GLSL -> SPV: point_surfel.vert
+[1493/1578] Compiling GLSL -> SPV: post_bloom_downsample.frag
+[1494/1578] Compiling GLSL -> SPV: post_bloom_upsample.frag
+[1495/1578] Compiling GLSL -> SPV: post_fullscreen.vert
+[1496/1578] Compiling GLSL -> SPV: post_fxaa.frag
+[1497/1578] Compiling GLSL -> SPV: post_histogram.comp
+[1498/1578] Compiling GLSL -> SPV: post_smaa_blend.frag
+[1499/1578] Compiling GLSL -> SPV: post_smaa_edge.frag
+[1500/1578] Compiling GLSL -> SPV: post_smaa_resolve.frag
+[1501/1578] Compiling GLSL -> SPV: post_tonemap.frag
+[1502/1578] Compiling GLSL -> SPV: present.frag
+[1503/1578] Compiling GLSL -> SPV: present.vert
+[1504/1578] Compiling GLSL -> SPV: progressive_poisson_accept_phase.comp
+[1505/1578] Compiling GLSL -> SPV: progressive_poisson_build_cells.comp
+[1506/1578] Compiling GLSL -> SPV: property_texture_bake.frag
+[1507/1578] Compiling GLSL -> SPV: property_texture_bake.vert
+[1508/1578] Compiling GLSL -> SPV: property_texture_bake_dilate.frag
+[1509/1578] Compiling GLSL -> SPV: scene_update.comp
+[1510/1578] Compiling GLSL -> SPV: selection/edge_id.frag
+[1511/1578] Compiling GLSL -> SPV: selection/edge_id.vert
+[1512/1578] Compiling GLSL -> SPV: selection/entity_id.frag
+[1513/1578] Compiling GLSL -> SPV: selection/entity_id.vert
+[1514/1578] Compiling GLSL -> SPV: selection/entity_id_outline.frag
+[1515/1578] Compiling GLSL -> SPV: selection/face_id.frag
+[1516/1578] Compiling GLSL -> SPV: selection/face_id.vert
+[1517/1578] Compiling GLSL -> SPV: selection/point_id.frag
+[1518/1578] Compiling GLSL -> SPV: selection/point_id.vert
+[1519/1578] Compiling GLSL -> SPV: selection_outline.frag
+[1520/1578] Compiling GLSL -> SPV: shadow_depth.vert
+[1521/1578] Compiling GLSL -> SPV: surface.frag
+[1522/1578] Compiling GLSL -> SPV: surface.vert
+[1523/1578] Compiling GLSL -> SPV: surface_gbuffer.frag
+[1524/1578] Compiling GLSL -> SPV: tests/hzb_conservatism_smoke.comp
+[1525/1578] Compiling GLSL -> SPV: transient_debug_line.frag
+[1526/1578] Compiling GLSL -> SPV: transient_debug_line.vert
+[1527/1578] Compiling GLSL -> SPV: transient_debug_point.frag
+[1528/1578] Compiling GLSL -> SPV: transient_debug_point.vert
+[1529/1578] Compiling GLSL -> SPV: transient_debug_triangle.frag
+[1530/1578] Compiling GLSL -> SPV: transient_debug_triangle.vert
+[1531/1578] Compiling GLSL -> SPV: triangle.frag
+[1532/1578] Compiling GLSL -> SPV: triangle.vert
+[1533/1578] Compiling GLSL -> SPV: uv_view/background.frag
+[1534/1578] Compiling GLSL -> SPV: uv_view/background.vert
+[1535/1578] Compiling GLSL -> SPV: uv_view/fill.frag
+[1536/1578] Compiling GLSL -> SPV: uv_view/line.frag
+[1537/1578] Compiling GLSL -> SPV: uv_view/mesh.vert
+[1538/1578] Compiling GLSL -> SPV: visualization_isoline.frag
+[1539/1578] Compiling GLSL -> SPV: visualization_isoline.vert
+[1540/1578] Compiling GLSL -> SPV: visualization_vector_field.frag
+[1541/1578] Compiling GLSL -> SPV: visualization_vector_field.vert
+[1542/1578] Scanning /tmp/intrinsic-geometry-e2e.GJlhXS/src/app/Sandbox/main.cpp for CXX dependencies
+[1543/1578] Generating CXX dyndep file src/app/Sandbox/CMakeFiles/ExtrinsicSandbox.dir/CXX.dd
+[1544/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowRecipePolicies.cppm.o
+[1545/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandbox.dir/main.cpp.o
+[1546/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowRecipePolicies.cpp.o
+[1547/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SceneEditingOperations.Actions.cpp.o
+[1548/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowImportExecutor.cppm.o
+[1549/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowModule.cpp.o
+[1550/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.AssetWorkflowImportExecutor.cpp.o
+[1551/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryProcessingOperations.Mesh.cpp.o
+[1552/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VisualizationEditingOperations.cppm.o
+[1553/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VisualizationEditingOperations.Debug.cpp.o
+[1554/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VisualizationEditingOperations.Actions.cpp.o
+[1555/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorWorkspaceSnapshots.cppm.o
+[1556/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cppm.o
+[1557/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o
+[1558/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/internal/Runtime.EditorFeatures.Detail.cppm.o
+[1559/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorWorkspaceSnapshots.Models.cpp.o
+[1560/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cppm.o
+[1561/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/internal/Runtime.EditorFeatureContextAdapters.cpp.o
+[1562/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cppm.o
+[1563/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/internal/Runtime.EditorWorkspaceSession.cpp.o
+[1564/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cppm.o
+[1565/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorController.cpp.o
+[1566/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o
+[1567/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cpp.o
+[1568/1578] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o
+[1569/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm.o
+[1570/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorWorkspaceAttachment.cpp.o
+[1571/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.VisualizationEditingOperations.Public.cpp.o
+[1572/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SceneEditingOperations.Public.cpp.o
+[1573/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.GeometryProcessingOperations.Public.cpp.o
+[1574/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderRecipeEditingOperations.Public.cpp.o
+[1575/1578] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.EditorWorkspaceSnapshots.Public.cpp.o
+[1576/1578] Linking CXX static library lib/libExtrinsicRuntime.a
+[1577/1578] Linking CXX static library lib/libExtrinsicSandboxEditor.a
+[1578/1578] Linking CXX executable bin/ExtrinsicSandbox

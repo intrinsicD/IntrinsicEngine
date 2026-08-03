@@ -1,0 +1,11 @@
+Workflow evidence findings:
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (GPU/Vulkan execution was not run because stale overwrite, lifetime, and editor readiness are backend-neutral CPU/runtime contracts.)
+ [WARNING] skipped_checks[0]: explicitly skipped: cxx-build (No engine source, module, CMake, or compiled test changed; the complete Python custody/workflow suites and strict repository validators are the strongest relevant gates.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (CPU-reference geometry numerics add no RHI, shader, device, or runtime behavior)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (Pure CPU geometry numerics add no device, RHI, shader, or runtime behavior)
+ [WARNING] skipped_checks[0]: explicitly skipped: C++ build and CTest (No engine source, CMake input, module surface, dependency edge, or compiled test changed; focused Python tooling, live graph generation, real Mermaid rendering, and strict structural gates are the strongest relevant subset.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (Cleanup does not change the implemented byte layout, shader inputs, or promoted backend)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No Vulkan backend behavior, RHI contract, shader, or promoted-device composition changed.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No backend or command-recording behavior changed; this slice only moved the existing renderer-hook lifecycle into its sole production owner)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No graphics/RHI/backend/shader/byte-layout behavior changed; CPU and sanitizer owner-level tests cover the relocated runtime policy)
+Workflow evidence validation: 0 error(s), 9 warning(s).

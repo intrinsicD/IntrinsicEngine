@@ -17,7 +17,9 @@ target_sources(${target_name}
         Geometry.DomainViews.cppm
         Geometry.EPA.cppm
         Geometry.Ellipsoid.cppm
+        Geometry.FixedPoint.Anderson.cppm
         Geometry.Frustum.cppm
+        Geometry.GaussianMixture.cppm
         Geometry.GJK.cppm
         Geometry.Graph.IO.cppm
         Geometry.Graph.ShortestPath.cppm
@@ -70,9 +72,11 @@ target_sources(${target_name}
         Geometry.Parameterization.Bff.cppm
         Geometry.Parameterization.Harmonic.cppm
         Geometry.Plane.cppm
+        Geometry.PointCloud.Consolidation.cppm
         Geometry.PointCloud.Conversion.cppm
         Geometry.PointCloud.Features.cppm
         Geometry.PointCloud.IO.cppm
+        Geometry.PointCloud.Kernels.cppm
         Geometry.PointCloud.Normals.cppm
         Geometry.PointCloud.QualityMetrics.cppm
         Geometry.PointCloud.SurfaceSampling.cppm
@@ -117,7 +121,9 @@ target_sources(${target_name}
         Geometry.DomainViews.cpp
         Geometry.Ellipsoid.cpp
         Geometry.EPA.cpp
+        Geometry.FixedPoint.Anderson.cpp
         Geometry.Frustum.cpp
+        Geometry.GaussianMixture.cpp
         Geometry.GJK.cpp
         Geometry.Graph.IO.cpp
         Geometry.Graph.ShortestPath.cpp
@@ -165,9 +171,11 @@ target_sources(${target_name}
         Geometry.Parameterization.Bff.cpp
         Geometry.Parameterization.Harmonic.cpp
         Geometry.Plane.cpp
+        Geometry.PointCloud.Consolidation.cpp
         Geometry.PointCloud.Conversion.cpp
         Geometry.PointCloud.Features.cpp
         Geometry.PointCloud.IO.cpp
+        Geometry.PointCloud.Kernels.cpp
         Geometry.PointCloud.Normals.cpp
         Geometry.PointCloud.QualityMetrics.cpp
         Geometry.PointCloud.SurfaceSampling.cpp

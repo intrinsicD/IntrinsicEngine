@@ -1,0 +1,24 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointCloudConsolidationConfig.*:PointCloudConsolidationModule.*
+[==========] Running 4 tests from 2 test suites.
+[----------] Global test environment set-up.
+[----------] 1 test from PointCloudConsolidationConfig
+[ RUN      ] PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField
+[       OK ] PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField (0 ms)
+[----------] 1 test from PointCloudConsolidationConfig (0 ms total)
+
+[----------] 3 tests from PointCloudConsolidationModule
+[ RUN      ] PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo (36 ms)
+[ RUN      ] PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback (34 ms)
+[ RUN      ] PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput (28 ms)
+[----------] 3 tests from PointCloudConsolidationModule (99 ms total)
+
+[----------] Global test environment tear-down
+[==========] 4 tests from 2 test suites ran. (100 ms total)
+[  PASSED  ] 4 tests.

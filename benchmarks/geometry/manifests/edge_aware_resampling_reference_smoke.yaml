@@ -1,0 +1,22 @@
+# METHOD-018 — deterministic EAR CPU-reference correctness smoke.
+benchmark_id: geometry.edge_aware_resampling.reference.smoke
+method: geometry.edge_aware_resampling
+dataset: builtin.noisy_dihedral.ear.confirmation.v1
+params:
+  intent: correctness
+  seed: 53
+  strategy: ear
+  isotropic_contrast_strategy: wlop
+  normal_source: authored
+  support_radius: 0.62
+  normal_angle_degrees: 15
+  edge_sensitivity: 5
+  target_insertions: 8
+  warmup_iterations: 1
+  measured_iterations: 4
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 1000
+  quality_error_l2_max: 0.03

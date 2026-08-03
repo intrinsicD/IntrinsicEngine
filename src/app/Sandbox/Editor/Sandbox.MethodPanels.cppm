@@ -14,8 +14,10 @@ module;
 export module Extrinsic.Sandbox.Editor.MethodPanels;
 
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Sandbox.Editor.Shell;
 
 export namespace Extrinsic::Sandbox::Editor
@@ -62,6 +64,79 @@ export namespace Extrinsic::Sandbox::Editor
         const SandboxEditorContext& context,
         std::uint32_t stableEntityId,
         const SandboxParameterizationPanelConfig& config);
+
+    using SandboxPointCloudConsolidationPanelConfig =
+        Runtime::PointCloudConsolidationConfig;
+
+    struct SandboxPointCloudConsolidationStrategyOption
+    {
+        Runtime::PointCloudConsolidationStrategy Strategy{
+            Runtime::PointCloudConsolidationStrategy::Wlop};
+        std::string_view Label{};
+        std::string_view StableToken{};
+        bool Available{false};
+    };
+
+    [[nodiscard]]
+    std::array<SandboxPointCloudConsolidationStrategyOption, 4u>
+    SandboxPointCloudConsolidationStrategyOptions() noexcept;
+
+    struct SandboxPointCloudConsolidationPanelApplyRequest
+    {
+        Runtime::PointCloudConsolidationConfig Config{};
+        Runtime::PointCloudConsolidationRequest Execute{};
+        std::string SourceId{
+            "sandbox.point_cloud_consolidation.panel"};
+    };
+
+    [[nodiscard]]
+    std::optional<SandboxPointCloudConsolidationPanelApplyRequest>
+    BuildSandboxPointCloudConsolidationPanelApplyRequest(
+        std::uint32_t stableEntityId,
+        const SandboxPointCloudConsolidationPanelConfig& config);
+
+    struct SandboxPointCloudConsolidationPanelActionResult
+    {
+        Runtime::RuntimeEngineConfigApplyResult Config{};
+        std::optional<Runtime::PointCloudConsolidationResult> Submission{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Config.Succeeded() && Submission.has_value() &&
+                   Submission->Status ==
+                       Runtime::PointCloudConsolidationRunStatus::Queued;
+        }
+    };
+
+    [[nodiscard]] SandboxPointCloudConsolidationPanelActionResult
+    ApplySandboxPointCloudConsolidationPanelAction(
+        const SandboxEditorContext& context,
+        std::uint32_t stableEntityId,
+        const SandboxPointCloudConsolidationPanelConfig& config);
+
+    struct SandboxPointCloudConsolidationResultSummary
+    {
+        bool Succeeded{false};
+        bool Queued{false};
+        std::string Status{};
+        std::string ImplementationId{};
+        std::string StrategyToken{};
+        std::string Message{};
+        std::uint32_t InputPointCount{0u};
+        std::uint32_t OutputPointCount{0u};
+        std::uint32_t Iterations{0u};
+        bool Converged{false};
+        double AverageDisplacement{0.0};
+        double MaxDisplacement{0.0};
+        bool UsedAuthoredNormals{false};
+        bool EstimatedNormals{false};
+        std::uint32_t NormalRefinementIterations{0u};
+        std::uint32_t InsertedPointCount{0u};
+    };
+
+    [[nodiscard]] SandboxPointCloudConsolidationResultSummary
+    BuildSandboxPointCloudConsolidationResultSummary(
+        const Runtime::PointCloudConsolidationResult& result);
 
     struct SandboxParameterizationUvPane
     {

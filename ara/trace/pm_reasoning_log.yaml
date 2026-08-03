@@ -1291,6 +1291,27 @@ entries:
       - "Left O87, O89, O90, and O93 staged and non-stale; one additional instance of the typed operation shape does not commit the repository to O93's universal architecture statement."
       - "Preserved the dirty root planning records instead of fast-forwarding across overlapping ARA/task files; implementation truth remains origin/main and no duplicate code edit is warranted."
       - "Recorded no Vulkan or performance claim; METHOD-014 still owns operational Progressive Poisson Vulkan compute parity."
+  - turn: "2026-08-02_002#1"
+    notes:
+      - "Routed the user's inability to locate LOP after loading a mesh as open question N341 because it exposes an unresolved domain-discoverability workflow, not a method-correctness failure."
+      - "Recorded the main/feature branch, menu registration, runtime domain gate, and conversion-action inspection as an AI action rather than an experiment because no code or test was executed."
+      - "Staged O108 as a constraint: cardinality-changing point-cloud consolidation must not silently mutate mesh topology; no user choice between domain guidance and explicit conversion has been made."
+      - "Did not flag C22-C24 as contradictory because those claims explicitly exclude runtime/UI; the current mismatch is branch publication and mesh-first discoverability."
+      - "Did not crystallize O108 or mark unrelated observations stale; this turn supplies neither adoption nor a closure signal for those topics."
+  - turn: "2026-08-02_002#2"
+    notes:
+      - "Recorded the user's explicit no-converter instruction as resolved decision N342 and used it to resolve N341."
+      - "Flagged staged O108 as conflicting and stale rather than silently rewriting it; its conversion recommendation was an AI inference that the user rejected."
+      - "Recorded N343 as a dead end because exact ActiveDomain eligibility contradicts the already-retired GeometryAvailability consumer contract."
+      - "Kept the cardinality hazard as a publication-policy constraint: same-cardinality mesh/graph edits preserve topology and properties, while cardinality-changing publication fails closed for topology-bearing entities."
+      - "No research claim was added: the focused 10/10 tests diagnose existing source capabilities and the missing LOP domain coverage rather than establishing a new public capability."
+  - turn: "2026-08-02_002#3"
+    notes:
+      - "Routed the user's contract-discoverability and scaling question as open question N344; no workflow policy was adopted in this turn."
+      - "Staged O109 as architecture because the four-level AGENTS/catalog/task/proof chain is an AI design recommendation awaiting user selection."
+      - "Staged O110 separately as a constraint because task retirement and contract-narrowing rules can be accepted or rejected independently of the catalog shape."
+      - "Did not edit AGENTS.md, task templates, skills, validators, or review docs: the user requested a workflow recommendation, not implementation."
+      - "Did not crystallize O109/O110 or revisit unrelated staged observations; neither verbal affirmation nor artifact commitment exists yet."
   - turn: "2026-08-03_002#1"
     notes:
       - "Routed RUNTIME-208 task selection as decision N336, the rejected descriptor-only connectivity assumption as dead end N337, and the corrected implementation/verification as experiment N338."

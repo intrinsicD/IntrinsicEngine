@@ -191,11 +191,13 @@ immutable; changing it invalidates its digest and requires a new run identity.
 `init-run` creates a non-overwriting canonical run root and binds the frozen
 protocol, task hash, source, config, environment, datasets, and implementation.
 Claim-eligible initialization requires a clean worktree and an exact commit.
-Each sealed implementation file must also exist with the declared hash in that
-exact source commit. The declared repository-relative path is looked up
-lexically in the Git tree, so a current-worktree symlink cannot redirect the
-revision check. Matching only the current clean worktree is insufficient.
-Scratch-phase protocols can never be claim eligible.
+Every declared dataset, config, environment, and implementation file must
+exist with its declared hash in that exact source commit. Those input seals
+continue to validate against the fixed revision after later commits change or
+remove the current-worktree paths. The declared repository-relative path is
+looked up lexically in the Git tree, so a current-worktree symlink cannot
+redirect the revision check. Matching only the current clean worktree is
+insufficient. Scratch-phase protocols can never be claim eligible.
 
 Run validation compares the recorded task identity, claim eligibility, source,
 config, environment, dataset seals, implementation digest, and exact command
@@ -217,8 +219,11 @@ frozen column/statistic definitions, and then recomputes gate dispositions
 using the frozen metric, operator, and threshold. Bundle source, task,
 implementation, dataset, resolved-config, and environment provenance must
 exactly equal the initialized frozen run. The audit also validates links and
-smoke receipts and writes a separate terminal audit receipt; neither bundle nor
-audit may authorize a claim.
+smoke receipts and writes a separate terminal audit receipt. A bundle link that
+names one of the protocol's sealed inputs may resolve at the fixed clean source
+revision when the current path has changed. Raw rows, results, receipts,
+previews, audits, and all other post-run evidence remain current-tree artifacts
+with no historical fallback; neither bundle nor audit may authorize a claim.
 
 Workflow completion for `claim-grade` and `protected` profiles invokes the
 experiment-custody completion gate. At least one canonical run must bind a

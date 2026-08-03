@@ -1,0 +1,20 @@
+{
+  "command": [
+    "build/ci/bin/IntrinsicSandboxEditorIntegrationTests",
+    "--gtest_filter=SandboxConfigSections.*:SandboxPointCloudConsolidationPanel.*"
+  ],
+  "command_display": "build/ci/bin/IntrinsicSandboxEditorIntegrationTests '--gtest_filter=SandboxConfigSections.*:SandboxPointCloudConsolidationPanel.*'",
+  "cwd": ".",
+  "duration_ms": 185,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:50:47Z",
+  "label": "focused-config-ui-integration",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:50:47Z",
+  "stderr_path": "tasks/evidence/RUNTIME-175/commands/focused-config-ui-integration.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-175/commands/focused-config-ui-integration.stdout.log",
+  "stdout_sha256": "f397e367a806caa320e1c8f43cb0898231d49bf8a9e19fc87b3f59f6c994cfc8",
+  "task_id": "RUNTIME-175"
+}

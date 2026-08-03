@@ -1,8 +1,35 @@
 {
   "consumed": {
+    "backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md": "46a2655c95708d21258bab08cb439b85b9ec13d91cbed7cad6c42e4a23d8f285",
+    "backlog/geometry/GEOM-058-gaussian-mixture-em-anderson-acceleration.md": "20eee030a2e27ec49c8a963690c1f57bc4dcddecaa98b8d25f3f47b372d63069",
+    "backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md": "7b0def9dc7308a13e3fe9a45bd5e50df1580b4192148c7be1ad7af5fce7bd08a",
+    "backlog/geometry/GEOM-064-parameterization-optimization-kernels.md": "58f048797dbd3e28da27f275311ff9fc5fc35122a8763bcf7700d4a8cd26e851",
+    "backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md": "47a2c5f15c12278286ba1bfe7cc20792f02d49681604c311721c6400962fb3f4",
+    "backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md": "0f7a6d3efc64873d75952f861eafc8b8148d27f3e7d4a3fc6b53d7f51fe72e1d",
+    "backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md": "029ef982367c0803ab5e93869bd746ef02d6a1983d5b2aa0a316dc155c672484",
+    "backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md": "480b74f8a7cd406d66381714215edfae95cd2e0ab74fd3f8dc65b6be66230094",
+    "backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md": "59f3922e957e63fad70626410fadb830ba2395dc9079485a61d0f63d8a045d9e",
+    "backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md": "e4301a1fcf62ee0a95c0365be429a989e4f38372810eca9197c3c787a0422c1e",
     "backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md": "ae1644b7ad871f02a1831f7dff154af631ff8fc16036fe8dfeb92d3fa0695fd6"
   },
   "effective_date": "2026-08-02",
+  "parallel_retired": {
+    "source_revision": "515db69fe1f655fd3267f98870e5a487a41f13e1",
+    "tasks": {
+      "done/BUG-123-retired-scene-save-terminal-event-race.md": "8ac65deddbbe8e281500fb392107c1d5fcea52b7b94cdada3a2b7223a3df4e62",
+      "done/BUG-126-claim-custody-historical-source-seals.md": "03b9c4945f621f63080c78067f360ebd8677386be62333355a898b1db23e885b",
+      "done/BUG-127-task-claim-multiline-dependency-front-matter.md": "34bda981511d9cd1adc13b121db4d588188dff967f0bc2d33bad6ccc14752bd4",
+      "done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md": "043ecf83e9d1776b37ab03f7474ce6e4e394e0666db14d6942a7086c8e062740",
+      "done/GEOM-062-point-set-projection-weighting-kernels.md": "3bfa0d6d2966022b8fd1623a648bb7a736318d99de04798df30f89fb7e443dad",
+      "done/METHOD-016-locally-optimal-projection-reference-backend.md": "92e040436ecba2f4ddf86f53b9c8f9743b341add18af20e06d10171ee9c27543",
+      "done/METHOD-017-continuous-lop-clop-reference-backend.md": "694bf66bf1383ace12c9015414a59d3883ff9d05fb36fae586caa638a6212aa5",
+      "done/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md": "5ff5b05c4892e82ae68ae6144d7cd34bfb2e0ddb6c2d89645fc918da486d1b9a",
+      "done/METHOD-019-lop-family-optimized-cpu-backend.md": "41a775bc02cdc249c8140e9cc48f70b9e3806613b0e8f67e90a5e362813aa91c",
+      "done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md": "9a8c90f925c6cac908a3fc2c14d21b90d4edf4234d053a72c8ead9b6487e9bcf",
+      "done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md": "f6be56d7a8b398289297bf536a80b02a4a4f893899fb885f40994f992d280ed2"
+    }
+  },
+  "parallel_policy_task": "BUG-128",
   "policy_task": "PROC-030",
   "schema_version": 1,
   "source_revision": "577b45837d47e731f4495c8ab4ea1570bdc63911",
@@ -21,16 +48,12 @@
     "backlog/bugs/BUG-119-check-task-state-links-docs-sync-env-assertion.md": "425561854319a4c967a6f2e23b5c84d705c5486fb18fed7e735ae60fc07bb2b8",
     "backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md": "68f1f10ebed33fff64d056aeb326e424973c25fc50e1b85283af991470897fb7",
     "backlog/bugs/BUG-122-runtime-asset-asan-test-lifetimes.md": "747f06d6789274d5522ba18db0a0eac26e936eb7e3a507fce04bf4d283e3664d",
-    "backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md": "46a2655c95708d21258bab08cb439b85b9ec13d91cbed7cad6c42e4a23d8f285",
     "backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md": "0c67d456def018c4a9ac5de59eae234e16082e9773d0ddd872449c757ffaa742",
     "backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md": "96e0817fc8ef0da504deb323cb1e6c96b2593b1c44d35add8c10fdd82ec3990c",
     "backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md": "ba21eb05f409a3d11f610e4906adb4f4c358585ed4605af063c350d6fb46716e",
-    "backlog/geometry/GEOM-058-gaussian-mixture-em-anderson-acceleration.md": "20eee030a2e27ec49c8a963690c1f57bc4dcddecaa98b8d25f3f47b372d63069",
     "backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md": "43bf79a7666f0331d889c67de95932af2165ca00340a040e9217128ba9d5e932",
     "backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md": "6b65282c0606e37abbf1499c02fee42bbb94194e3777d7290e628b7698c50a9a",
     "backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md": "c63d7c3986478dcc55b7727aa9c72cc5c68fc52ade4b9deec95fd1a12d472f01",
-    "backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md": "7b0def9dc7308a13e3fe9a45bd5e50df1580b4192148c7be1ad7af5fce7bd08a",
-    "backlog/geometry/GEOM-064-parameterization-optimization-kernels.md": "58f048797dbd3e28da27f275311ff9fc5fc35122a8763bcf7700d4a8cd26e851",
     "backlog/geometry/GEOM-065-invariant-aware-scientific-field-mip-pyramids.md": "5d9b1f891093ec92b7086de4397113f1c0afc6acc59c63ce3ed2d669dd5c20bf",
     "backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md": "ba1b3932e12f2a5db44ba432ea101257fd06f719991821d3c0d806e03e9b9147",
     "backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md": "b3e079857be710d26b0be684d2f256b7b91b76ad516a07c86471e8b87df067d4",
@@ -48,10 +71,6 @@
     "backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md": "f6d53f5356db47471605472fe8ba3305731f96f928eb95928f6aa61742ae0c55",
     "backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md": "34530a1495d6deb2c64c92cb1b72dfd6597769706edb1c4f164c6f2009654b4b",
     "backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md": "b2c5b4d6fe5c2742b944a70421cd5fdafd3dff7e08d451772b293a08a0ee53a0",
-    "backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md": "47a2c5f15c12278286ba1bfe7cc20792f02d49681604c311721c6400962fb3f4",
-    "backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md": "0f7a6d3efc64873d75952f861eafc8b8148d27f3e7d4a3fc6b53d7f51fe72e1d",
-    "backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md": "029ef982367c0803ab5e93869bd746ef02d6a1983d5b2aa0a316dc155c672484",
-    "backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md": "480b74f8a7cd406d66381714215edfae95cd2e0ab74fd3f8dc65b6be66230094",
     "backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md": "a88457ccfb16c762b15a51b922483a397f23a2062253dfbda4bc4e90851d1cc3",
     "backlog/methods/METHOD-021-arap-parameterization-reference-backend.md": "3a18ffab1713fed759f4ec5b38fbe8312d1ef169beeda7554a82ec0a7d775745",
     "backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md": "3157953cc5c98bf1ce281cb374990b0be1970ffaa84474232f8de8f2e42fb2a0",
@@ -77,8 +96,6 @@
     "backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md": "002abb089b6bf82f36c0542f86a27b5257d18940e3d3d2c5cc85806ff184b13d",
     "backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md": "3a037abd7612f4e51b6b2d810f1020b485063b9518117b3eb1e68ea44bbc3ed9",
     "backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md": "f1d3dd8b13137da01dbe9a011da090b9f4c93a105f07e34de4d5ee2ee3eba33e",
-    "backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md": "59f3922e957e63fad70626410fadb830ba2395dc9079485a61d0f63d8a045d9e",
-    "backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md": "e4301a1fcf62ee0a95c0365be429a989e4f38372810eca9197c3c787a0422c1e",
     "backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md": "900b23e61ead50e8ce418aab90f3d09af5e5b69bffc22621d20e1287897a2318"
   }
 }

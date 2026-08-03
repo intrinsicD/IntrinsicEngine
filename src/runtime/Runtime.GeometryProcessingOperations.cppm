@@ -31,6 +31,8 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 export import Extrinsic.Runtime.ParameterizationConfig;
+export import Extrinsic.Runtime.PointCloudConsolidationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
 export import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
@@ -891,10 +893,12 @@ export namespace Extrinsic::Runtime
         EditorCommandHistory* CommandHistory{nullptr};
         RHI::IDevice* Device{nullptr};
         ClusteringService* Clustering{nullptr};
+        PointCloudConsolidationService* PointCloudConsolidation{nullptr};
         EditorParameterizationUvViewCommandSurface ParameterizationUvViewCommands{};
         EditorJobCommandSurface JobCommands{};
         EditorMethodResultSinks MethodResultSinks{};
         const KMeansRunCompleted* LastKMeansResult{nullptr};
+        const PointCloudConsolidationResult* LastPointCloudConsolidationResult{nullptr};
         const EditorMeshDenoiseResult* LastMeshDenoiseResult{nullptr};
         const EditorMeshCurvatureResult* LastMeshCurvatureResult{nullptr};
         const EditorMeshRemeshResult* LastMeshRemeshResult{nullptr};
@@ -954,9 +958,15 @@ export namespace Extrinsic::Runtime
         const EditorGeometryProcessingContext& context) noexcept;
     [[nodiscard]] bool
     IsEditorClusteringAvailable(const EditorGeometryProcessingContext& context) noexcept;
+    [[nodiscard]] bool IsEditorPointCloudConsolidationAvailable(
+        const EditorGeometryProcessingContext& context) noexcept;
     [[nodiscard]] KMeansRunCompleted
     SubmitKMeansRun(const EditorGeometryProcessingContext& context,
                     const RunKMeans& command);
+    [[nodiscard]] PointCloudConsolidationResult
+    SubmitEditorPointCloudConsolidation(
+        const EditorGeometryProcessingContext& context,
+        PointCloudConsolidationRequest request);
 
     [[nodiscard]] Geometry::ConstPropertySet
     ResolveEditorSelectedMeshVertexProperties(const EditorGeometryProcessingContext& context);
@@ -1177,12 +1187,29 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<ClusteringConfig>
     GetEditorClusteringConfig(const EditorGeometryProcessingContext& context) noexcept;
 
+    [[nodiscard]] RuntimeEngineConfigApplyResult
+    ApplyEditorPointCloudConsolidationConfig(
+        const EditorGeometryProcessingContext& context,
+        const PointCloudConsolidationConfig& config,
+        std::string sourceId = "sandbox.point_cloud_consolidation");
+
+    [[nodiscard]] bool IsValidEditorPointCloudConsolidationConfig(
+        const PointCloudConsolidationConfig& config);
+
+    [[nodiscard]] std::optional<PointCloudConsolidationConfig>
+    GetEditorPointCloudConsolidationConfig(
+        const EditorGeometryProcessingContext& context) noexcept;
+
     [[nodiscard]] std::optional<EditorProgressivePoissonConfig>
     GetEditorProgressivePoissonConfig(const EditorGeometryProcessingContext& context) noexcept;
 
     [[nodiscard]] KMeansRunCompleted
     SubmitKMeansRun(const EditorGeometryProcessingCommands& commands,
                     const RunKMeans& command);
+    [[nodiscard]] PointCloudConsolidationResult
+    SubmitEditorPointCloudConsolidation(
+        const EditorGeometryProcessingCommands& commands,
+        PointCloudConsolidationRequest request);
     [[nodiscard]] Geometry::ConstPropertySet
     ResolveEditorSelectedMeshVertexProperties(
         const EditorGeometryProcessingCommands& commands);
@@ -1257,6 +1284,14 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<ClusteringConfig>
     GetEditorClusteringConfig(
         const EditorGeometryProcessingCommands& commands) noexcept;
+    [[nodiscard]] RuntimeEngineConfigApplyResult
+    ApplyEditorPointCloudConsolidationConfig(
+        const EditorGeometryProcessingCommands& commands,
+        const PointCloudConsolidationConfig& config,
+        std::string sourceId = "sandbox.point_cloud_consolidation");
+    [[nodiscard]] std::optional<PointCloudConsolidationConfig>
+    GetEditorPointCloudConsolidationConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept;
     [[nodiscard]] std::optional<EditorProgressivePoissonConfig>
     GetEditorProgressivePoissonConfig(
         const EditorGeometryProcessingCommands& commands) noexcept;
@@ -1264,6 +1299,7 @@ export namespace Extrinsic::Runtime
     struct EditorGeometryProcessingResultsSnapshot
     {
         std::optional<KMeansRunCompleted> LastKMeansResult{};
+        std::optional<PointCloudConsolidationResult> LastPointCloudConsolidationResult{};
         std::optional<EditorMeshDenoiseResult> LastMeshDenoiseResult{};
         std::optional<EditorMeshCurvatureResult> LastMeshCurvatureResult{};
         std::optional<EditorMeshRemeshResult> LastMeshRemeshResult{};
@@ -1286,6 +1322,7 @@ export namespace Extrinsic::Runtime
         EditorGeometryProcessingResultsSnapshot Results{};
         bool ConfigCommandsAvailable{false};
         bool ClusteringAvailable{false};
+        bool PointCloudConsolidationAvailable{false};
     };
 
     [[nodiscard]] EditorGeometryProcessingPreparedFrame

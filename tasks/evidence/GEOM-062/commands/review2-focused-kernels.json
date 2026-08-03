@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "PointCloudKernels",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R PointCloudKernels -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 178,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:39:31Z",
+  "label": "review2-focused-kernels",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:39:31Z",
+  "stderr_path": "tasks/evidence/GEOM-062/commands/review2-focused-kernels.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-062/commands/review2-focused-kernels.stdout.log",
+  "stdout_sha256": "686d19fac9f8c454ef67f924f23e9872f1266f6ba8a9cfcd93eaf5be1e970d4a",
+  "task_id": "GEOM-062"
+}

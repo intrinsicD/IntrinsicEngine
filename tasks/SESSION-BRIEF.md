@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GEOM-064` — Parameterization optimization kernels seam (tasks/active/GEOM-064-parameterization-optimization-kernels.md)
 
 ## Theme B — Rendering modernization
 
@@ -44,11 +44,11 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-109` — Voxel downsampling invalid-input and deterministic-cell ordering (tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md)
 - unblocked: `BUG-110` — Implicit smoothing applies boundary pins after rather than during solve (tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
-- unblocked: `BUG-123` — Retired queued scene save intermittently loses its terminal event (tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md)
 - unblocked: `BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot (tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md)
 
 ## Theme H — Agentic workflow hardening
 
+- unblocked: `BUG-128` — Parallel pre-policy retired task baselines (tasks/backlog/bugs/BUG-128-parallel-prepolicy-retired-task-baselines.md)
 - blocked by `CI-012`: `BUILD-005` — Define hermetic toolchain and action identity (tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md)
 - blocked by `CI-013`: `BUILD-006` — Run a C++23-module build and cache backend bake-off (tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md)
 - unblocked: `CI-012` — Compile a versioned verification evidence graph (tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md)
@@ -66,12 +66,9 @@ the authoritative open/unblocked view.
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- unblocked: `GEOM-058` — Gaussian mixture models and Anderson-accelerated EM seam (tasks/backlog/geometry/GEOM-058-gaussian-mixture-em-anderson-acceleration.md)
 - unblocked: `GEOM-059` — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam (tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
 - unblocked: `GEOM-060` — Permutohedral lattice fast high-dimensional filtering seam (tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md)
 - blocked by `BUG-109`: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
-- unblocked: `GEOM-062` — Point-set projection and weighting kernels seam (tasks/backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md)
-- unblocked: `GEOM-064` — Parameterization optimization kernels seam (tasks/backlog/geometry/GEOM-064-parameterization-optimization-kernels.md)
 - blocked by `REVIEW-003`: `GEOM-065` — Invariant-aware scientific-field mip pyramids (tasks/backlog/geometry/GEOM-065-invariant-aware-scientific-field-mip-pyramids.md)
 - unblocked: `GEOM-068` — Weighted Dijkstra edge-cost contract (tasks/backlog/geometry/GEOM-068-weighted-dijkstra-edge-cost-contract.md)
 - blocked by `GEOM-068`: `GEOM-069` — A* graph shortest path (tasks/backlog/geometry/GEOM-069-astar-graph-shortest-path.md)
@@ -85,12 +82,8 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-006` — Surface cross-field design CPU reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
-- blocked by `GEOM-058`: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
-- blocked by `GEOM-062`: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
-- blocked by `METHOD-016`: `METHOD-017` — Continuous LOP (CLOP) reference backend (tasks/backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md)
-- blocked by `METHOD-016`: `METHOD-018` — Edge-Aware Resampling (EAR) and anisotropic feature-preserving LOP reference backend (tasks/backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md)
-- blocked by `METHOD-016`: `METHOD-019` — LOP-family optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md)
-- blocked by `METHOD-019`: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
+- unblocked: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
+- unblocked: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
 - blocked by `GEOM-064`: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
 - blocked by `GEOM-064`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
@@ -106,12 +99,10 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
-- blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-- blocked by `RUNTIME-175`: `RUNTIME-206` — LOP family element-domain source integration (tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md)
+- unblocked: `RUNTIME-206` — LOP family element-domain source integration (tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md)
 - blocked by `BUG-096`: `RUNTIME-207` — ICP element-domain source integration (tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md)
 - unblocked: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
-- blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 - blocked by `RUNTIME-206`: `UI-039` — LOP family multi-domain discovery (tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md)
 - blocked by `RUNTIME-207`: `UI-040` — ICP compatible-source selection and discovery (tasks/backlog/ui/UI-040-icp-compatible-source-selection.md)
 - blocked by `RUNTIME-209`: `UI-041` — Point-set outlier multi-domain panel (tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md)

@@ -28,9 +28,9 @@ input policy similarly imports `Extrinsic.Runtime.InputActions` and registers
 against the published `RuntimeInputActionRegistry`, with no Engine forwarding
 method.
 `Sandbox.ConfigSections` is the pre-boot composition surface for the current
-`sandbox.clustering`, `sandbox.progressive_poisson`, and
-`sandbox.parameterization` records. Their runtime feature modules own the typed
-DTOs/codecs. `main.cpp` constructs the
+`sandbox.clustering`, `sandbox.progressive_poisson`,
+`sandbox.parameterization`, and `sandbox.point_cloud_consolidation` records.
+Their runtime feature modules own the typed DTOs/codecs. `main.cpp` constructs the
 app-composed `Runtime::EngineConfigControl` first, gives it the registered
 Sandbox section registry, resolves boot config through that exact control's
 `SectionRegistry()`, and then moves the same control object into
@@ -100,7 +100,8 @@ Runtime exposes presentation-free workspace snapshots, job projections, and
 focused scene, geometry, visualization, and render-recipe operations. The shell
 copies prepared bindings/snapshots into app-owned `SandboxEditorContext` and
 `SandboxEditorFrame` records. `Sandbox.Editor.MethodPanels` owns the K-Means,
-Progressive Poisson, and parameterization ImGui controls and registers seven
+Progressive Poisson, parameterization, and point-cloud consolidation ImGui
+controls and registers eight
 domain windows through the shell's context-aware contribution seam. Progressive
 Poisson appears under Mesh, Graph, and PointCloud Processing and all three
 registrations share one copied readiness model, validated config/apply path,
@@ -182,6 +183,22 @@ surfaces, and the sandbox app
 still does not own selection, ECS mutation, method jobs, rendering, or asset
 state.
 
+`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` exposes exactly
+the four promoted CPU-reference strategies. Shared controls cover support
+radius, repulsion, stopping criteria, target count, and seed; strategy-specific
+controls cover WLOP anisotropy, CLOP mixture fitting, and EAR normal policy,
+refinement, and edge sensitivity. The window keeps a panel-local draft and
+validates it through `Runtime.GeometryProcessingOperations` before applying the
+registered `sandbox.point_cloud_consolidation` section with the `Editor`
+source. Running submits that same typed value to
+`PointCloudConsolidationService`; completion reports the actual
+`cpu_reference` identity, strategy, convergence/displacement, normal, and
+insertion diagnostics. The runtime then performs the single `GeometrySources`
+mutation, so the viewport observes the consolidated cloud and the window's
+undo/redo affordances use the shared document history. If config control, the
+service, a selected point cloud, or a valid strategy is unavailable, controls
+fail closed rather than using a panel-private path.
+
 `Mesh > Processing > Parameterize (UV)` exposes exactly the four CPU strategies
 implemented by `Runtime.GeometryProcessingOperations`: LSCM, harmonic cotangent, uniform Tutte, and
 Boundary First Flattening. Its controls keep an explicit panel-local draft for
@@ -249,9 +266,9 @@ durable `StableId`, `Selection::SelectableTag`, and white
 `VisualizationConfig`. Reference content renders without `CameraModule`.
 
 The default module list explicitly composes `AsyncWorkModule`, `CameraModule`,
-`ClusteringModule`, `EditorUiModule`, `SceneDocumentModule`, and
-`SceneInteractionModule`, followed by `AssetWorkflowModule`. Camera remains
-optional at the runtime contract:
+`ClusteringModule`, `PointCloudConsolidationModule`, `EditorUiModule`,
+`SceneDocumentModule`, and `SceneInteractionModule`, followed by
+`AssetWorkflowModule`. Camera remains optional at the runtime contract:
 when omitted, Sandbox policy registration omits `F` and autofocus, editor
 camera controls report unavailable, and workflow-provided import auto-selection
 plus non-camera behavior continue. When interaction/selection alone is omitted,

@@ -1,0 +1,31 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxConfigSections.*:SandboxPointCloudConsolidationPanel.*
+[==========] Running 6 tests from 2 test suites.
+[----------] Global test environment set-up.
+[----------] 2 tests from SandboxConfigSections
+[ RUN      ] SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun (39 ms)
+[ RUN      ] SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState (91 ms)
+[----------] 2 tests from SandboxConfigSections (130 ms total)
+
+[----------] 4 tests from SandboxPointCloudConsolidationPanel
+[ RUN      ] SandboxPointCloudConsolidationPanel.RegistrationIsStableAndIdempotent
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxPointCloudConsolidationPanel.RegistrationIsStableAndIdempotent (27 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed
+[       OK ] SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed (0 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure
+[       OK ] SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure (0 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace (21 ms)
+[----------] 4 tests from SandboxPointCloudConsolidationPanel (49 ms total)
+
+[----------] Global test environment tear-down
+[==========] 6 tests from 2 test suites ran. (180 ms total)
+[  PASSED  ] 6 tests.

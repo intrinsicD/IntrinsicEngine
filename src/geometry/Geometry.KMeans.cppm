@@ -25,6 +25,7 @@ export namespace Geometry::KMeans
     {
         Random = 0,
         Hierarchical = 1,
+        KMeansPlusPlus = 2,
     };
 
     struct KMeansParams
@@ -99,7 +100,8 @@ export namespace Geometry::KMeans
         CpuScratch* cpuScratch);
 
     // Build an initial centroid set from either persistent ECS-provided seeds
-    // or the algorithm's configured seeding policy.
+    // or the algorithm's configured seeding policy. KMeansPlusPlus uses the
+    // seeded D² distribution and is deterministic for identical inputs/seed.
     [[nodiscard]] std::vector<glm::vec3> BuildInitialCentroids(
         std::span<const glm::vec3> points,
         std::span<const glm::vec3> initialCentroids,

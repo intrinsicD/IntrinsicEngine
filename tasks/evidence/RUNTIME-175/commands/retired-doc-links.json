@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 623,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:59:28Z",
+  "label": "retired-doc-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:59:27Z",
+  "stderr_path": "tasks/evidence/RUNTIME-175/commands/retired-doc-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-175/commands/retired-doc-links.stdout.log",
+  "stdout_sha256": "244c5bb21e323536d34f64de5b5745c2ea0728e011f03c374899b6c31a1d07cf",
+  "task_id": "RUNTIME-175"
+}

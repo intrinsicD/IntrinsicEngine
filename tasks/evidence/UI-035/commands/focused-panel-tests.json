@@ -1,0 +1,20 @@
+{
+  "command": [
+    "build/ci-fast/bin/IntrinsicSandboxEditorIntegrationTests",
+    "--gtest_filter=SandboxPointCloudConsolidationPanel.*:SandboxEditorPresentation.*"
+  ],
+  "command_display": "build/ci-fast/bin/IntrinsicSandboxEditorIntegrationTests '--gtest_filter=SandboxPointCloudConsolidationPanel.*:SandboxEditorPresentation.*'",
+  "cwd": ".",
+  "duration_ms": 680,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:06:26Z",
+  "label": "focused-panel-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:06:25Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/focused-panel-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/focused-panel-tests.stdout.log",
+  "stdout_sha256": "947da45ba685b2a03683f82f3bfdcc1f6d0290b9e26cd002574bcd077575da88",
+  "task_id": "UI-035"
+}

@@ -1697,3 +1697,147 @@ observations:
     promoted_to: "logic/claims.md:C21"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O104
+    timestamp: "2026-08-01T15:00+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-016 now has a bounded deterministic CPU reference contract for
+      LOP/WLOP, including a direct one-step equation oracle, in-support outlier
+      behavior, an executable resource guard, concurrent-call isolation, and a
+      confirmation cohort distinct from unit-test screening data.
+    context: >
+      The first claim-grade custody audit rejected duplicated screening and
+      confirmation fixtures plus validation-only replay. The revised evidence
+      executes a disjoint built-in cohort and binds its schema-v2 quality gate
+      to an exact clean source revision.
+    potential_type: claim
+    bound_to: [N312, N313]
+    promoted: true
+    promoted_to: "logic/claims.md:C22"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O105
+    timestamp: "2026-08-01T17:19+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-017 now has a deterministic CPU reference for Continuous LOP that
+      evaluates the original three-term Gaussian-product attraction against a
+      fitted Gaussian mixture, retains the shared repulsion contract, and
+      exposes bounded component work and fail-closed diagnostics.
+    context: >
+      The independently audited confirmation cohort exercises disjoint plane
+      and sphere samples, WLOP parity, compact/rich mixture work, outliers, and
+      invalid component counts. It binds the exact original CLOP equations;
+      hierarchical EM, scanner-data generalization, and the later
+      incomplete-gamma kernels remain outside this claim.
+    potential_type: claim
+    bound_to: [N312, N313]
+    promoted: true
+    promoted_to: "logic/claims.md:C23"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O106
+    timestamp: "2026-08-01T19:11+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-018 now has a deterministic CPU reference for anisotropic WLOP
+      and the original two-stage Edge-Aware Resampling algorithm, including
+      oriented-normal policy, bilateral refinement, anisotropic projection,
+      progressive insertion, and explicit failure diagnostics.
+    context: >
+      Unit screening and the independently accepted disjoint confirmation run
+      pass the frozen edge, flat-region, exact-count, uniformity,
+      normal-source, and failure gates. The audit recomputes quality-error L2
+      `0.007731229 <= 0.03` at the exact clean source revision.
+    potential_type: claim
+    bound_to: [N312, N313]
+    promoted: true
+    promoted_to: "logic/claims.md:C24"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O107
+    timestamp: "2026-08-01T21:31+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-019's four execution-only optimized CPU candidates preserve the
+      frozen LOP/WLOP/CLOP/EAR reference parity and deterministic identity,
+      but none reaches the preregistered 0.80 paired-median runtime ratio; no
+      optimized strategy is adopted or exposed through method, runtime, config,
+      or UI surfaces.
+    context: >
+      The claim-eligible clean-commit confirmation reports exact position and
+      normal RMS deltas of zero and LOP/WLOP/CLOP/EAR ratios 0.961823997,
+      0.966844794, 0.998817796, and 1.037145476. The result retains the
+      candidates as negative benchmark evidence and does not retune the
+      fixtures, threshold, or literature-derived method boundary.
+    potential_type: claim
+    bound_to: [N312, N313]
+    promoted: true
+    promoted_to: "logic/claims.md:C25"
+    crystallized_via: artifact-commitment
+    stale: false
+  # CONFLICT: see N342; the user explicitly selected capability-driven reuse and no converter.
+  - id: O108
+    timestamp: "2026-08-02T12:21+02:00"
+    provenance: ai-suggested
+    content: >
+      LOP-family consolidation should not silently treat a selected mesh as a
+      mutable point cloud: the method can resample cardinality and does not
+      preserve mesh topology. A mesh-first editor workflow therefore needs an
+      explicit non-destructive conversion or surface-sampling step that creates
+      a separate point-cloud entity, plus domain-specific discoverability.
+    context: >
+      The user loaded a mesh and could not find LOP. Source inspection showed
+      that main does not yet contain the feature-branch panel, the panel is
+      registered under PointCloud / Processing, the runtime accepts only a
+      PointCloud GeometrySources domain, and no general mesh-to-point-cloud
+      editor action currently exists.
+    potential_type: constraint
+    bound_to: [N341, N342]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: true
+  - id: O109
+    timestamp: "2026-08-02T13:49+02:00"
+    provenance: ai-suggested
+    content: >
+      Reusable engine contracts should use a four-level discovery and
+      enforcement chain: AGENTS.md states one global applicability obligation;
+      a stable canonical architecture catalog owns contract identifiers and
+      links; each task declares the applicable identifiers and, for methods,
+      an end-to-end data-domain integration matrix; executable contract tests,
+      validators, and review evidence enforce the mechanically checkable parts.
+      Skills route and summarize this chain but are not independent authorities.
+    context: >
+      The LOP integration followed a point-cloud-only task even though canonical
+      geometry and runtime documentation already distinguished exact provenance
+      from available source capabilities. The current task template has only a
+      free-form Context prompt, and the method template covers scientific
+      correctness without requiring ECS/runtime/UI domain coverage.
+    potential_type: architecture
+    bound_to: [N344]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O110
+    timestamp: "2026-08-02T13:49+02:00"
+    provenance: ai-suggested
+    content: >
+      A task that establishes or changes a reusable contract should not retire
+      until the canonical contract entry, owning documentation, and at least
+      one executable proof are present. A consuming task must preserve every
+      declared contract or explicitly change the canonical contract through a
+      reviewed decision; narrowing the contract only in task wording is not a
+      valid override.
+    context: >
+      RUNTIME-175 and UI-035 were retired against their narrowed task wording,
+      while the earlier GeometryAvailability consumer contract lived outside
+      their acceptance criteria and had no LOP mesh/graph integration proof.
+    potential_type: constraint
+    bound_to: [N343, N344]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

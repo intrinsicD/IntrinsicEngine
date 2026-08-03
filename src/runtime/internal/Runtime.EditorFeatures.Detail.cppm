@@ -41,6 +41,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -99,6 +100,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         RHI::IDevice* Device{nullptr};
         TextureBakeService* TextureBake{nullptr};
         ClusteringService* Clustering{nullptr};
+        PointCloudConsolidationService* PointCloudConsolidation{nullptr};
         EditorAssetImportCommandSurface AssetImportCommands{};
         EditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         EditorSceneFileCommandSurface SceneFileCommands{};
@@ -115,6 +117,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         const EditorFileImportResult* LastAssetImportResult{nullptr};
         const EditorSceneFileResult* LastSceneFileResult{nullptr};
         const KMeansRunCompleted* LastKMeansResult{nullptr};
+        const PointCloudConsolidationResult* LastPointCloudConsolidationResult{nullptr};
         const EditorMeshDenoiseResult* LastMeshDenoiseResult{nullptr};
         const EditorMeshCurvatureResult* LastMeshCurvatureResult{nullptr};
         const EditorMeshRemeshResult* LastMeshRemeshResult{nullptr};
@@ -256,6 +259,10 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         std::optional<KMeansRunCompleted> m_LastKMeansResult{};
         ClusteringService* m_ClusteringService{};
         KernelEventSubscription m_KMeansCompletionSubscription{};
+        PointCloudConsolidationService* m_PointCloudConsolidationService{};
+        KernelEventSubscription m_PointCloudConsolidationCompletionSubscription{};
+        std::optional<PointCloudConsolidationResult>
+            m_LastPointCloudConsolidationResult{};
         std::optional<EditorMeshDenoiseResult> m_LastMeshDenoiseResult{};
         std::optional<EditorMeshCurvatureResult> m_LastMeshCurvatureResult{};
         std::optional<EditorMeshRemeshResult> m_LastMeshRemeshResult{};

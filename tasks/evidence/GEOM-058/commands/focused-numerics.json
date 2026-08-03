@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "GaussianMixture|Anderson",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'GaussianMixture|Anderson' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 583,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T11:29:31Z",
+  "label": "focused-numerics",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T11:29:30Z",
+  "stderr_path": "tasks/evidence/GEOM-058/commands/focused-numerics.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-058/commands/focused-numerics.stdout.log",
+  "stdout_sha256": "321b673e52321ab9911419db85c723d38ee2654ab58ea4923b7c7a1ada5005ff",
+  "task_id": "GEOM-058"
+}

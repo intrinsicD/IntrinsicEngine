@@ -1,0 +1,81 @@
+schema_version: 1
+task_id: METHOD-017
+run_id: run-001
+attempt_id: attempt-001
+created_at: '2026-08-01T15:09:00Z'
+protocol_digest: 991ddff57b43e8bd0ef281b93100f1f34bcaf61f1a803ee8319a4d86d470267a
+provenance:
+  source:
+    revision: 26c6133f78071a7a029995a4941ba5099fd360f2
+    clean: true
+  task_sha256: 694bf66bf1383ace12c9015414a59d3883ff9d05fb36fae586caa638a6212aa5
+  implementation_digest: 16f92e5e494ffff50643e4fda4177aec81ee054092de9148368b4fd0a79841db
+  datasets:
+  - id: clop-screening-v1
+    path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: c83ca9f02295b681d885244b3460f68d243fd858b23a75f1b491c5832e06d490
+    split: screening
+  - id: clop-confirmation-v1
+    path: benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp
+    sha256: 1c3b50b35a5f7e6c154414fd2c0dcb4f0d9b25f74967c4fdde3c7654d47da289
+    split: confirmation
+resolved_config:
+  path: benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml
+  sha256: 9e0c41a9efb44df2a07869610a2a8ea468308d3c7d92ea7c32231fa3f10047d4
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+raw_rows:
+  path: tasks/evidence/METHOD-017/experiment/runs/run-001/benchmark_raw_rows.jsonl
+  sha256: 5d28563cbc9d9aee161c6929d896d13091bc20167a01706b50115b6e4426f09d
+  row_count: 1
+summaries:
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+  value: 0.015830867
+gates:
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.03
+  observed: 0.015830867
+  passed: true
+diagnostics:
+- confirmation-status=passed
+- confirmation-cohort=clop-v1
+- literature-boundary=original-clop-gaussian-product
+links:
+- path: tasks/evidence/METHOD-017/experiment/protocol.yaml
+  sha256: 64ed47b0f377d21cbe9366203d0ca2ebffa70592c1d3be81bab694321d9c9034
+- path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: c83ca9f02295b681d885244b3460f68d243fd858b23a75f1b491c5832e06d490
+- path: benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp
+  sha256: 1c3b50b35a5f7e6c154414fd2c0dcb4f0d9b25f74967c4fdde3c7654d47da289
+- path: benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml
+  sha256: 9e0c41a9efb44df2a07869610a2a8ea468308d3c7d92ea7c32231fa3f10047d4
+- path: tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json
+  sha256: 769abc0800102aeb6d8d713811034f25823595a67f2635baca6788dfc407b444
+visual: false
+previews: []
+replay_command:
+- env
+- GIT_COMMIT=26c6133f78071a7a029995a4941ba5099fd360f2
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- build/ci/custody/METHOD-017/confirmation-raw
+view_command:
+- python3
+- -m
+- json.tool
+- tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json
+smoke_receipts:
+- tasks/evidence/METHOD-017/commands/custody-replay.json
+claim_authorized: false
+benchmark_result:
+  path: tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json
+  sha256: 769abc0800102aeb6d8d713811034f25823595a67f2635baca6788dfc407b444
+  manifests_root: benchmarks
+  benchmark_id: geometry.continuous_lop.reference.smoke
+  run_id: run-001
+  attempt_id: attempt-001
+  status: passed
+  claim_eligible: true

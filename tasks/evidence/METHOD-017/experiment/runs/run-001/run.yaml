@@ -1,0 +1,38 @@
+schema_version: 1
+task_id: METHOD-017
+run_id: run-001
+attempt_id: attempt-001
+status: initialized
+initialized_at: '2026-08-01T15:00:50Z'
+claim_eligible: true
+protocol_path: tasks/evidence/METHOD-017/experiment/protocol.yaml
+protocol_digest: 991ddff57b43e8bd0ef281b93100f1f34bcaf61f1a803ee8319a4d86d470267a
+task_path: tasks/done/METHOD-017-continuous-lop-clop-reference-backend.md
+task_sha256: 694bf66bf1383ace12c9015414a59d3883ff9d05fb36fae586caa638a6212aa5
+source:
+  revision: 26c6133f78071a7a029995a4941ba5099fd360f2
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml
+  sha256: 9e0c41a9efb44df2a07869610a2a8ea468308d3c7d92ea7c32231fa3f10047d4
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+datasets:
+- id: clop-screening-v1
+  path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: c83ca9f02295b681d885244b3460f68d243fd858b23a75f1b491c5832e06d490
+  split: screening
+- id: clop-confirmation-v1
+  path: benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp
+  sha256: 1c3b50b35a5f7e6c154414fd2c0dcb4f0d9b25f74967c4fdde3c7654d47da289
+  split: confirmation
+implementation_digest: 16f92e5e494ffff50643e4fda4177aec81ee054092de9148368b4fd0a79841db
+command:
+- env
+- GIT_COMMIT=26c6133f78071a7a029995a4941ba5099fd360f2
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- build/ci/custody/METHOD-017/confirmation-raw
+cell_journal: tasks/evidence/METHOD-017/experiment/runs/run-001/cells.jsonl
+bundle: tasks/evidence/METHOD-017/experiment/runs/run-001/bundle.yaml
+audit: tasks/evidence/METHOD-017/experiment/runs/run-001/audit.json

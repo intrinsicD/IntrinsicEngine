@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "python3 tools/agents/validate_tasks.py --root tasks --strict"
+  ],
+  "command_display": "bash -lc 'python3 tools/agents/validate_tasks.py --root tasks --strict'",
+  "cwd": ".",
+  "duration_ms": 169,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T23:02:09Z",
+  "label": "task-schema",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T23:02:08Z",
+  "stderr_path": "tasks/evidence/BUG-123/commands/task-schema.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-123/commands/task-schema.stdout.log",
+  "stdout_sha256": "4354bbfad1002c3cc2f739a9116d8cc04d873fdaa52b76ca5c00a328dd20a666",
+  "task_id": "BUG-123"
+}

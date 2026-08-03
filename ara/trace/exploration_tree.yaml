@@ -8090,3 +8090,77 @@ tree:
       defect, so no duplicate implementation patch or unsafe dirty-worktree
       fast-forward was made.
     status: resolved
+  - id: N341
+    type: question
+    title: "Make LOP discoverable from a mesh-first workflow"
+    provenance: user
+    timestamp: "2026-08-02T12:21+02:00"
+    description: >
+      Determine whether the final LOP-family integration should remain an
+      explicitly point-cloud-only action with clearer domain guidance, or add
+      a non-destructive mesh-surface sampling/conversion action that creates a
+      separate point-cloud entity before consolidation. The current main build
+      has no LOP panel, and the feature branch rejects selected mesh domains.
+    resolution: >
+      Resolved by N342: mesh, graph, and point-cloud entities expose the
+      point-like element domains needed by consolidation directly; no
+      conversion entity belongs in the workflow.
+    status: resolved
+  # CONFLICT: see O108; the user explicitly rejected the staged converter proposal.
+  - id: N342
+    type: decision
+    title: "Use existing geometric element domains as method inputs"
+    provenance: user
+    timestamp: "2026-08-02T12:33+02:00"
+    also_depends_on: [N341]
+    choice: >
+      Discover and execute methods from the geometric element domains already
+      exposed by an entity. A mesh supplies vertex, edge, halfedge, and face
+      data; a graph supplies its point and topology data; a point cloud supplies
+      points. LOP-family methods therefore consume the available point-like
+      source of the selected entity without creating a converted entity.
+    alternatives:
+      - "Keep LOP as an exact PointCloud-entity-only action."
+      - "Create a separate point-cloud entity through conversion or surface sampling."
+    evidence:
+      - "User direction: ok we dont need any converter."
+      - "docs/architecture/geometry-api-style.md"
+      - "tasks/archive/RUNTIME-117-geometry-availability-render-lane-resolver.md"
+      - "tasks/archive/RUNTIME-118-geometry-availability-consumer-migration.md"
+      - "src/runtime/README.md"
+    status: resolved
+  - id: N343
+    type: dead_end
+    title: "Reject exact ActiveDomain as LOP input eligibility"
+    provenance: ai-executed
+    timestamp: "2026-08-02T12:33+02:00"
+    also_depends_on: [N341, N342]
+    hypothesis: >
+      Requiring ActiveDomain == PointCloud is a valid way to protect LOP
+      consolidation from unsafe mesh or graph writeback.
+    failure_mode: >
+      The exact-domain check confuses entity provenance with source capability
+      and contradicts the GeometryAvailability contract. Focused tests confirm
+      that meshes and graphs expose point-consumer lanes, while the LOP runtime,
+      UI registration, and tests were narrowed to point-cloud entities. The
+      legitimate cardinality/topology constraint was therefore enforced at the
+      wrong boundary.
+    lesson: >
+      Method eligibility must use the least-structured source capability it
+      needs. Publication must separately preserve topology and properties for
+      same-cardinality edits and fail closed on topology-bearing entities when
+      an operation changes cardinality.
+    status: resolved
+  - id: N344
+    type: question
+    title: "Make reusable contracts discoverable as the repository grows"
+    provenance: user
+    timestamp: "2026-08-02T13:49+02:00"
+    also_depends_on: [N342, N343]
+    description: >
+      Decide how repository-wide and subsystem contracts should be surfaced to
+      task authors and reviewers: which obligation belongs in AGENTS.md, which
+      contract references belong in task creation, and how additional
+      contracts remain discoverable without duplicating their content across
+      prompts, skills, and task files.
+    status: open

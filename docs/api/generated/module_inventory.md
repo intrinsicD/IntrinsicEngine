@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 103 |
+| `geometry` | 108 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 71 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 70 |
+| `runtime` | 72 |
 
 ## Modules
 
@@ -125,8 +125,10 @@ Root scanned: `src`
 | `Geometry.DomainViews` | `src/geometry/Geometry.DomainViews.cppm` | `geometry` |
 | `Geometry.EPA` | `src/geometry/Geometry.EPA.cppm` | `geometry` |
 | `Geometry.Ellipsoid` | `src/geometry/Geometry.Ellipsoid.cppm` | `geometry` |
+| `Geometry.FixedPoint.Anderson` | `src/geometry/Geometry.FixedPoint.Anderson.cppm` | `geometry` |
 | `Geometry.Frustum` | `src/geometry/Geometry.Frustum.cppm` | `geometry` |
 | `Geometry.GJK` | `src/geometry/Geometry.GJK.cppm` | `geometry` |
+| `Geometry.GaussianMixture` | `src/geometry/Geometry.GaussianMixture.cppm` | `geometry` |
 | `Geometry.Graph.Fwd` | `src/geometry/Geometry.Graph.Fwd.cppm` | `geometry` |
 | `Geometry.Graph.IO` | `src/geometry/Geometry.Graph.IO.cppm` | `geometry` |
 | `Geometry.Graph.ShortestPath` | `src/geometry/Geometry.Graph.ShortestPath.cppm` | `geometry` |
@@ -179,11 +181,14 @@ Root scanned: `src`
 | `Geometry.Parameterization.Bff` | `src/geometry/Geometry.Parameterization.Bff.cppm` | `geometry` |
 | `Geometry.Parameterization.Diagnostics` | `src/geometry/Geometry.Parameterization.Diagnostics.cppm` | `geometry` |
 | `Geometry.Parameterization.Harmonic` | `src/geometry/Geometry.Parameterization.Harmonic.cppm` | `geometry` |
+| `Geometry.Parameterization.Optimize` | `src/geometry/Geometry.Parameterization.Optimize.cppm` | `geometry` |
 | `Geometry.Plane` | `src/geometry/Geometry.Plane.cppm` | `geometry` |
+| `Geometry.PointCloud.Consolidation` | `src/geometry/Geometry.PointCloud.Consolidation.cppm` | `geometry` |
 | `Geometry.PointCloud.Conversion` | `src/geometry/Geometry.PointCloud.Conversion.cppm` | `geometry` |
 | `Geometry.PointCloud.Features` | `src/geometry/Geometry.PointCloud.Features.cppm` | `geometry` |
 | `Geometry.PointCloud.Fwd` | `src/geometry/Geometry.PointCloud.Fwd.cppm` | `geometry` |
 | `Geometry.PointCloud.IO` | `src/geometry/Geometry.PointCloud.IO.cppm` | `geometry` |
+| `Geometry.PointCloud.Kernels` | `src/geometry/Geometry.PointCloud.Kernels.cppm` | `geometry` |
 | `Geometry.PointCloud.Normals` | `src/geometry/Geometry.PointCloud.Normals.cppm` | `geometry` |
 | `Geometry.PointCloud.QualityMetrics` | `src/geometry/Geometry.PointCloud.QualityMetrics.cppm` | `geometry` |
 | `Geometry.PointCloud.SurfaceSampling` | `src/geometry/Geometry.PointCloud.SurfaceSampling.cppm` | `geometry` |
@@ -376,6 +381,8 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
 | `Extrinsic.Runtime.ParameterizationConfig` | `src/runtime/Runtime.ParameterizationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointCloudConsolidationConfig` | `src/runtime/Runtime.PointCloudConsolidationConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointCloudConsolidationModule` | `src/runtime/Runtime.PointCloudConsolidationModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
@@ -404,4 +411,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **377**
+Total modules: **384**

@@ -322,6 +322,12 @@ namespace Extrinsic::Runtime
         // and the completion-queue mutex has been released. Contract tests use
         // this to force main-thread drain/worker-return interleavings.
         std::function<void(JobToken)> AfterCompletionQueued{};
+
+        // Invoked on the worker after an unpublished terminal state becomes
+        // visible but before its main-thread finalizer is queued. Contract
+        // tests use this to force the cancellation/finalizer ordering without
+        // sleeps or scheduler timing assumptions.
+        std::function<void(JobToken)> BeforeWorkerUnpublishedQueued{};
     };
 
     export class JobService
@@ -338,6 +344,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t CancelAllForWorld(WorldHandle world);
         [[nodiscard]] std::uint64_t CancelAll();
 
+        // A terminal state that still owes an unpublished main-thread
+        // finalizer is not complete until that finalizer has run.
         [[nodiscard]] bool IsComplete(JobToken token) const;
         [[nodiscard]] JobState GetState(JobToken token) const;
 

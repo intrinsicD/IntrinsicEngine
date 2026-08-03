@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "cmake --build --preset ci-ubsan --target IntrinsicGeometryTests && ctest --test-dir build/ci-ubsan --output-on-failure -R '^(AndersonAcceleration|GaussianMixture)\\.' --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "bash -lc 'cmake --build --preset ci-ubsan --target IntrinsicGeometryTests && ctest --test-dir build/ci-ubsan --output-on-failure -R '\"'\"'^(AndersonAcceleration|GaussianMixture)\\.'\"'\"' --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 6241,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:07:29Z",
+  "label": "ubsan-extreme-scale-review3",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:07:22Z",
+  "stderr_path": "tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.stdout.log",
+  "stdout_sha256": "0eeb81a1a73d44de352e159be45bbc3cd73d7779bb9934cc4115a50b26a6a459",
+  "task_id": "GEOM-058"
+}

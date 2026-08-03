@@ -5,18 +5,17 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-128` — Parallel pre-policy retired task baselines](BUG-128-parallel-prepolicy-retired-task-baselines.md):
+  the prospective contract inventory currently has one main-line baseline, so
+  merging byte-identical task records retired and scientifically sealed on a
+  parallel pre-policy branch either forces post-run edits or fails strict task
+  validation; bind only those exact retired paths to an immutable parallel
+  revision while preserving prospective enrollment for every later change.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
   resolve without that flag; align the fixture and counter contract without
   deleting meaningful unsupported-path coverage or weakening the gate.
-- [`BUG-123` — Retired queued scene save intermittently loses its terminal event](BUG-123-retired-scene-save-terminal-event-race.md):
-  world cancellation can leave the queued save task `Cancelled` while its
-  unpublished finalizer fails to publish the required exactly-once terminal
-  `RuntimeSceneFileEvent`. The RUNTIME-191 full CPU gate reproduced the loss
-  twice, and a focused repeat passed nine iterations before failing the tenth;
-  replace the timing race with a deterministic interlock and repair the
-  cancellation/completion ordering without sleeps or quarantine.
 - [`BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state](BUG-122-runtime-asset-asan-test-lifetimes.md):
   one shutdown test lets a queued hook retain loop-local synchronization state,
   while three progressive model-scene tests retain pointers into temporary
@@ -65,6 +64,26 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-01: [`BUG-123` — Retired queued scene save intermittently
+  loses its terminal event](../../done/BUG-123-retired-scene-save-terminal-event-race.md).
+  `IsComplete()` and terminal reaping now wait for a finalizer-owning job's
+  main-thread reconciliation. The forced ordering and original scene-save
+  selectors each pass 200 registered executions, and the normal, ASan, and
+  UBSan CPU gates are green without weakened assertions.
+
+- Closed 2026-08-01: [`BUG-127` — Task claim corrupts multiline dependency
+  front matter](../../done/BUG-127-task-claim-multiline-dependency-front-matter.md).
+  Claim metadata insertion now advances past the complete multiline
+  `depends_on` sequence before writing workflow fields; the eight-case
+  regression suite preserves inline and multiline dependencies plus every
+  existing concurrency contract.
+
+- Closed 2026-08-01: [`BUG-126` — Claim custody validates historical source
+  seals against the current worktree](../../done/BUG-126-claim-custody-historical-source-seals.md).
+  Clean claim-grade inputs now validate at their exact source revision, while
+  post-run evidence remains current-only. Both 28-case tooling suites and the
+  global METHOD-016/METHOD-017 custody/workflow gates pass.
 
 - Closed 2026-08-01: [`BUG-125` — Queued-import contracts raced asynchronous state transitions](../../done/BUG-125-queued-import-contract-state-observation-races.md).
   Test-only decode/read interlocks now order the active-world transition and

@@ -1,0 +1,98 @@
+schema_version: 2
+task_id: METHOD-017
+protocol_id: continuous-lop-reference-confirmation-v1
+profile: claim-grade
+state: frozen
+question: Does the deterministic CPU-reference CLOP implementation satisfy its frozen correctness bounds
+  on a confirmation cohort disjoint from unit-test screening fixtures?
+hypothesis: The confirmation smoke reports quality_error_l2 at or below 0.03 and passes its denoising,
+  WLOP-parity, mixture-resolution, uniformity, outlier, convergence, and fail-closed gates.
+claim_boundary: Checked-in analytic plane, sphere, nonuniform-sampling, and in-support-outlier fixtures
+  on the serial cpu_reference backend only; no scanner-data, incomplete-gamma-kernel, performance, runtime,
+  UI, optimized-CPU, or GPU claim.
+evidence_phase: confirmation
+claim_eligible: true
+datasets:
+- id: clop-screening-v1
+  path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: c83ca9f02295b681d885244b3460f68d243fd858b23a75f1b491c5832e06d490
+  split: screening
+- id: clop-confirmation-v1
+  path: benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp
+  sha256: 1c3b50b35a5f7e6c154414fd2c0dcb4f0d9b25f74967c4fdde3c7654d47da289
+  split: confirmation
+disjoint_splits:
+- left: screening
+  right: confirmation
+  method: The confirmation cohort uses different plane-grid dimensions, sphere sample counts, spatial
+    scales, noise equations, seeds, mixture resolutions, nonuniformity geometry, and in-support-outlier
+    locations from screening.
+seeds:
+- 17
+- 41
+input_policy: Use only the checked-in analytic fixtures declared above. Screening observations may not
+  tune frozen confirmation fixtures, parameters, or thresholds after protocol freeze.
+comparators:
+- id: raw-analytic-surface-error
+  budget: matched-input-points
+- id: wlop-discrete-reference
+  budget: matched-target-count-seed-support-and-projection-iterations
+- id: compact-clop-mixture
+  budget: matched-target-count-seed-support-and-projection-iterations
+primary_metrics:
+- name: quality_error_l2
+  direction: minimize
+  unit: world-units
+  statistical_unit: confirmation-cohort
+statistical_tests:
+- name: deterministic-descriptive-bound
+  alpha: null
+summaries:
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+killing_gates:
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.03
+screening_confirmation_policy: Unit-test fixtures establish contracts only. The benchmark confirmation
+  cohort is frozen before execution, and a failed confirmation gate refutes the hypothesis rather than
+  triggering retuning.
+resources:
+  cpu_threads: 1
+  gpu: false
+command:
+- env
+- GIT_COMMIT=26c6133f78071a7a029995a4941ba5099fd360f2
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- build/ci/custody/METHOD-017/confirmation-raw
+expected_artifacts:
+- tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json
+- tasks/evidence/METHOD-017/experiment/runs/run-001/bundle.yaml
+blockers: []
+source:
+  revision: 26c6133f78071a7a029995a4941ba5099fd360f2
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml
+  sha256: 9e0c41a9efb44df2a07869610a2a8ea468308d3c7d92ea7c32231fa3f10047d4
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+implementation:
+- path: src/geometry/Geometry.PointCloud.Consolidation.cppm
+  sha256: 1e9bafd3cfd519c949b37b5de237715f8c46f94d0932143da74f71f3ebcd5a62
+- path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+  sha256: afb4485672f7fb2c88ced7e0104d6a02bc72ab0b4a7488e577da5f60b72dbec2
+- path: src/geometry/Geometry.GaussianMixture.cppm
+  sha256: 2ac493058efd783f8385664c80e3ee0dd91f326b3bfe58795030f1b21310f77c
+- path: src/geometry/Geometry.GaussianMixture.cpp
+  sha256: 2fd1334d770322e4742a2904f62ab767a6040a4212eb03f3d06e23f1252e9dcf
+- path: src/geometry/Geometry.PointCloud.Kernels.cppm
+  sha256: ccfa9aa393e23dd3a26357a75a7f7e15b75f37e5edc53db3298fa8dbc5f7b19a
+- path: src/geometry/Geometry.PointCloud.Kernels.cpp
+  sha256: 12af3735071129039d3436438bafb35f303b883765500a2c1e271d36cdaa86c8
+- path: benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp
+  sha256: 1c3b50b35a5f7e6c154414fd2c0dcb4f0d9b25f74967c4fdde3c7654d47da289
+frozen_at: '2026-08-01T15:00:28Z'
+protocol_digest: 991ddff57b43e8bd0ef281b93100f1f34bcaf61f1a803ee8319a4d86d470267a

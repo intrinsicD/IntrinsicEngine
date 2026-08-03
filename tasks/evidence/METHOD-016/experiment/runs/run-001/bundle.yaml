@@ -1,0 +1,88 @@
+schema_version: 1
+task_id: METHOD-016
+run_id: run-001
+attempt_id: attempt-001
+created_at: '2026-08-01T14:16:16Z'
+protocol_digest: aa491b7b5b106374cfdee017759eaccb31220bea06108ef2690b7ca2883da704
+provenance:
+  source:
+    revision: 89193bef887bac1d3876b9e8cb29cc43bd9ca9bf
+    clean: true
+  task_sha256: 92e040436ecba2f4ddf86f53b9c8f9743b341add18af20e06d10171ee9c27543
+  implementation_digest: e1fbe99058afce08f3adc90fba7e3bc45d1002681be7aaf21c2db173095a2d15
+  datasets:
+  - id: lop-wlop-screening-v1
+    path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: b4051e975686affc19b38062853eded5fbddc7dd4634e1a48ec86041cb7841f8
+    split: screening
+  - id: lop-wlop-confirmation-v2
+    path: benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
+    sha256: 78df47006a902e92e0efe4e9f6e68a796d7a8185a90a8e2c7173cb620c9a5263
+    split: confirmation
+resolved_config:
+  path: benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml
+  sha256: 2ff28bf453268a783f7795dc6190219c6243c26f50dda99a460d40f405725159
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+raw_rows:
+  path: tasks/evidence/METHOD-016/experiment/runs/run-001/benchmark_raw_rows.jsonl
+  sha256: 8600b81eda4f62bafb6f8fc72f80626a1776f55d52131300fee14ca17f992e70
+  row_count: 1
+summaries:
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+  value: 0.020443686
+gates:
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.03
+  observed: 0.020443686
+  passed: true
+diagnostics:
+- confirmation-status=passed
+- confirmation-cohort=lop-wlop-v2
+links:
+- path: tasks/evidence/METHOD-016/experiment/protocol.yaml
+  sha256: 389ea3a9edb49efb65185648e004fde083337ed69683520818d8edde52991a6f
+- path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: b4051e975686affc19b38062853eded5fbddc7dd4634e1a48ec86041cb7841f8
+- path: benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
+  sha256: 78df47006a902e92e0efe4e9f6e68a796d7a8185a90a8e2c7173cb620c9a5263
+- path: benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml
+  sha256: 2ff28bf453268a783f7795dc6190219c6243c26f50dda99a460d40f405725159
+- path: tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json
+  sha256: e10594506d031b5be393e0a25e4f23de7e8c4db89ba5cebc6be32a5f88bfeb10
+visual: false
+previews: []
+replay_command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- cmake --build --preset ci --target IntrinsicBenchmarkSmoke && mkdir -p build/ci/custody/METHOD-016/replay-raw
+  build/ci/custody/METHOD-016/replay-singleton && env GIT_COMMIT=89193bef887bac1d3876b9e8cb29cc43bd9ca9bf
+  build/ci/bin/IntrinsicBenchmarkSmoke build/ci/custody/METHOD-016/replay-raw && cp build/ci/custody/METHOD-016/replay-raw/geometry.locally_optimal_projection.reference.smoke.json
+  build/ci/custody/METHOD-016/replay-singleton/geometry.locally_optimal_projection.reference.smoke.json
+  && python3 tools/benchmark/seal_benchmark_results.py --root build/ci/custody/METHOD-016/replay-singleton
+  --manifests-root benchmarks --run-id replay-run-001 --attempt-id replay-attempt-001 --source-state clean_commit
+  --source-revision 89193bef887bac1d3876b9e8cb29cc43bd9ca9bf --claim-eligible --replace && python3 tools/benchmark/validate_benchmark_results.py
+  --root build/ci/custody/METHOD-016/replay-singleton --manifests-root benchmarks --strict
+view_command:
+- python3
+- -m
+- json.tool
+- tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json
+smoke_receipts:
+- tasks/evidence/METHOD-016/commands/custody-replay.json
+claim_authorized: false
+benchmark_result:
+  path: tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json
+  sha256: e10594506d031b5be393e0a25e4f23de7e8c4db89ba5cebc6be32a5f88bfeb10
+  manifests_root: benchmarks
+  benchmark_id: geometry.locally_optimal_projection.reference.smoke
+  run_id: run-001
+  attempt_id: attempt-001
+  status: passed
+  claim_eligible: true

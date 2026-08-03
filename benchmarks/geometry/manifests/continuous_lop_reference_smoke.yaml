@@ -1,0 +1,19 @@
+# METHOD-017 — deterministic CLOP CPU-reference correctness smoke.
+benchmark_id: geometry.continuous_lop.reference.smoke
+method: geometry.continuous_lop
+dataset: builtin.noisy_plane_sphere.clop.confirmation.v1
+params:
+  intent: correctness
+  seed: 41
+  strategy: clop
+  rich_mixture_component_count: 28
+  compact_mixture_component_count: 8
+  sphere_mixture_component_count: 72
+  warmup_iterations: 1
+  measured_iterations: 4
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 1000
+  quality_error_l2_max: 0.03

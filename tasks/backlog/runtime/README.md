@@ -518,7 +518,7 @@ owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
   service-owned private state at `CPUContracted`; retired `RUNTIME-129`
   subsequently supplied the production Vulkan wiring.
 
-### bcg geometry-processing port integration (seeded 2026-06-26)
+### Retired bcg geometry-processing port integration (seeded 2026-06-26)
 
 Core/runtime work paired with the `bcg_code_base` geometry port gaps tracked in
 [`tasks/backlog/geometry/README.md`](../geometry/README.md). The core container
@@ -531,21 +531,19 @@ consumer lives here because `runtime` owns composition over `geometry`.
 `Extrinsic.Runtime.SpatialDebugClosestFace`. Editor method windows for the
 ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
-- [`RUNTIME-175 — Point-cloud consolidation runtime operation and config lane`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-  is the engine-integration leaf for the LOP consolidation method family
-  (`methods/METHOD-016..018`): a runtime-owned config value/schema/codec and
-  typed operation, with app-owned section registration/default aggregation on
-  the generic CORE-009 lane. Config preview/apply is non-destructive; a
-  separate explicit operation uses canonical `JobService`, current-generation
-  revalidation, the common mutation transaction, `GeometrySources` writeback,
-  and CPU-reference diagnostics. It is
-  gated on `CORE-009` for the section substrate and on
-  `methods/METHOD-016..018` for the four reference strategies. No placeholder
-  backend selector or RHI adapter lands here; METHOD-019/020 extend the
-  delivered surface only for backends that pass their evidence gates. Mirrors
-  retired `RUNTIME-134` progressive-Poisson playground. The dependent
-  `ui/UI-035` task owns the Sandbox panel and visible UI parity; RUNTIME-175
-  does not make that downstream task part of its own acceptance criteria.
+- [Retired `RUNTIME-175`](../../done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+  is the engine-integration leaf for the LOP
+  consolidation method family
+  (`methods/METHOD-016..018`): a runtime-owned
+  `sandbox.point_cloud_consolidation` section registered by Sandbox on the
+  generic CORE-009 config lane, an `EngineConfigControl` hot-apply path, and a
+  post-`RUNTIME-202` typed `IRuntimeModule` operation using canonical
+  `JobService` plus the common mutation transaction and existing
+  `GeometrySources` ECS components. The four CPU-reference strategies are now
+  accepted prerequisites. No placeholder backend selector or RHI adapter
+  lands here; METHOD-019/020 extend the delivered surface only for backends
+  that pass their evidence gates. The Sandbox panel is retired
+  [`UI-035`](../../done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md).
 
 ### Retired normal-orientation presentation plan
 
@@ -692,6 +690,13 @@ these as runtime work when scheduling and review:
 
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
+
+- [RUNTIME-175 — Point-cloud consolidation runtime operation and config lane](../../done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+  (done, 2026-08-01, `Operational`): one runtime-owned config/module/service
+  path runs the promoted LOP/WLOP/CLOP/EAR CPU references asynchronously,
+  rejects stale source snapshots, publishes through one undoable
+  `GeometrySources` mutation, and serves config-file, agent/programmatic, and
+  retired UI-035 callers without a placeholder backend axis.
 
 - [RUNTIME-146 — Extract engine config boot into a free-standing module](../../archive/RUNTIME-146-extract-engine-config-boot-module.md)
   (done, 2026-07-08, `Operational`): boot-time config resolution now lives in

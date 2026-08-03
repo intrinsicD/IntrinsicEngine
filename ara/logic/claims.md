@@ -633,3 +633,119 @@
 - **Tags**: app, runtime, UI, geometry, methods, progressive Poisson,
   element sources, config, diagnostics, CPU, retirement
 - **From staging**: O103
+## C22: LOP and WLOP have a deterministic CPU reference contract
+- **Statement**: On the checked-in analytic screening fixtures and the
+  independently parameterized built-in confirmation cohort, the METHOD-016
+  CPU reference implements finite deterministic LOP/WLOP consolidation,
+  improves the declared plane/sphere error and repulsion-uniformity measures,
+  and fails closed for invalid or resource-bounded requests.
+- **Status**: supported — Clang 23 CPU correctness, serial ASan/UBSan geometry
+  groups, and independently accepted schema-v2 claim-grade confirmation
+  evidence; no scanner-data generalization, runtime/UI, GPU, optimized-backend,
+  or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The one-step equation oracle diverges; identical
+  seeded calls differ under repetition or concurrent callers; finite supported
+  fixtures produce non-finite output; invalid/resource-bounded requests publish
+  positions; or the disjoint confirmation cohort exceeds quality-error L2
+  `0.03` or loses its denoising/uniformity/outlier gates.
+- **Proof**: [tasks/done/METHOD-016-locally-optimal-projection-reference-backend.md,
+  src/geometry/Geometry.PointCloud.Consolidation.cpp,
+  tests/unit/geometry/Test.PointCloudConsolidation.cpp,
+  benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml,
+  tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json,
+  tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml]
+- **Dependencies**: []
+- **Tags**: geometry, point cloud, LOP, WLOP, CPU reference, deterministic
+- **From staging**: O104
+
+## C23: Continuous LOP has a deterministic original-equation CPU reference
+- **Statement**: On the checked-in analytic screening fixtures and disjoint
+  built-in confirmation cohort, METHOD-017 fits a deterministic Gaussian
+  mixture and evaluates the original CLOP three-Gaussian-product attraction
+  with the shared finite repulsion contract, bounded component work, and
+  fail-closed invalid-input handling.
+- **Status**: supported — Clang 23 CPU correctness, serial ASan/UBSan geometry
+  groups, and independently accepted schema-v2 claim-grade confirmation
+  evidence; no hierarchical-EM equivalence, scanner-data generalization,
+  incomplete-gamma extension, runtime/UI, GPU, optimized-backend, or
+  performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The Gaussian-product equation oracle diverges;
+  identical seeded calls differ under repetition or concurrent callers;
+  finite supported fixtures produce non-finite output; invalid mixture bounds
+  publish positions; or the disjoint confirmation cohort exceeds
+  quality-error L2 `0.03` or loses its plane/sphere denoising, WLOP-parity,
+  component-work, uniformity, outlier, convergence, or failure-state gates.
+- **Proof**: [tasks/done/METHOD-017-continuous-lop-clop-reference-backend.md,
+  src/geometry/Geometry.PointCloud.Consolidation.cpp,
+  tests/unit/geometry/Test.PointCloudConsolidation.cpp,
+  benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml,
+  tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json,
+  tasks/evidence/METHOD-017/experiment/runs/run-001/bundle.yaml,
+  tasks/evidence/METHOD-017/experiment/runs/run-001/audit.json]
+- **Dependencies**: [C22]
+- **Tags**: geometry, point cloud, CLOP, Gaussian mixture, CPU reference,
+  deterministic
+- **From staging**: O105
+
+## C24: Edge-Aware Resampling has a deterministic original-equation CPU reference
+- **Statement**: On the checked-in analytic screening fixtures and disjoint
+  built-in confirmation cohort, METHOD-018 implements deterministic
+  anisotropic WLOP and the original two-stage EAR reference, consumes valid
+  oriented normals without mutation or estimates them through the shared
+  normal contract, preserves the declared dihedral feature contrast, and
+  returns the requested progressive-insertion count with explicit fail-closed
+  states.
+- **Status**: supported — Clang 23 CPU correctness, serial ASan/UBSan geometry
+  groups, and independently accepted schema-v2 claim-grade confirmation
+  evidence; no later-method equivalence, scanner-data generalization,
+  runtime/UI, GPU, optimized-backend, or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The directional-weight or signed bilateral-normal
+  equation oracle diverges; identical seeded calls differ under repetition or
+  concurrent callers; authored normals are mutated; unsupported or invalid
+  normal/input/resource states publish positions; the confirmation cohort
+  exceeds quality-error L2 `0.03`, fails its edge/flat-region/count/uniformity
+  gates, or places fewer than all eight inserted samples near the feature.
+- **Proof**: [tasks/done/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md,
+  src/geometry/Geometry.PointCloud.Consolidation.cpp,
+  src/geometry/Geometry.PointCloud.Kernels.cpp,
+  tests/unit/geometry/Test.PointCloudConsolidation.cpp,
+  benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml,
+  tasks/evidence/METHOD-018/experiment/inputs/benchmark_result.json,
+  tasks/evidence/METHOD-018/experiment/runs/run-001/bundle.yaml,
+  tasks/evidence/METHOD-018/experiment/runs/run-001/audit.json]
+- **Dependencies**: [C22]
+- **Tags**: geometry, point cloud, EAR, anisotropic WLOP, CPU reference,
+  deterministic
+- **From staging**: O106
+
+## C25: Exact execution-only LOP-family candidates provide useful CPU acceleration
+- **Statement**: Exact traversal-scratch, sorted-neighborhood reuse,
+  Gaussian-product cache, underflow-only pruning, and local EAR scan changes
+  were expected to preserve the LOP/WLOP/CLOP/EAR reference results while
+  reducing at least one strategy's paired median runtime ratio to `<= 0.80`.
+- **Status**: refuted — on the preregistered single-thread Clang 23 confirmation
+  run at clean implementation revision `cfd0d9bd`, all four candidates passed
+  parity but the LOP/WLOP/CLOP/EAR ratios were respectively `0.961823997`,
+  `0.966844794`, `0.998817796`, and `1.037145476`; no strategy was adopted and
+  no public optimized backend/config/UI token was added
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The hypothesis required at least one strategy to
+  retain the frozen parity, determinism, identity, and no-fallback contract
+  while reporting a paired median optimized/reference runtime ratio `<= 0.80`
+  on the fixed confirmation suite.
+- **Proof**: [methods/geometry/locally_optimal_projection/reports/METHOD-019-result.md,
+  benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml,
+  tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json,
+  tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl,
+  tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml]
+- **Dependencies**: [C22, C23, C24]
+- **Tags**: geometry, point cloud, LOP, WLOP, CLOP, EAR, optimized CPU,
+  negative result
+- **From staging**: O107

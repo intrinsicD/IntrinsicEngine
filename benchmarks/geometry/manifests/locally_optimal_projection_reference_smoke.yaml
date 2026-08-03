@@ -1,0 +1,21 @@
+# METHOD-016 — deterministic LOP/WLOP CPU-reference correctness smoke.
+benchmark_id: geometry.locally_optimal_projection.reference.smoke
+method: geometry.locally_optimal_projection
+dataset: builtin.noisy_plane_sphere.lop_family.confirmation.v2
+params:
+  intent: correctness
+  seed: 29
+  strategies:
+    - lop
+    - wlop
+  support_radius_plane: 0.58
+  support_radius_sphere: 0.82
+  repulsion_weight_uniformity: 0.45
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 500
+  quality_error_l2_max: 0.03

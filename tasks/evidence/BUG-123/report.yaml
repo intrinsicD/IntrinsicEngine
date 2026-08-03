@@ -1,0 +1,123 @@
+schema_version: 1
+task_id: BUG-123
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T23:06:48Z'
+claim_eligible: false
+source:
+  base_ref: 8c5b1ba3
+  base_revision: 8c5b1ba3839563c5eb361361dfae306cabe1a8b8
+  head_revision: 475f08a1ad0a4cbbbb439d058b87fc8ca67191dd
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: docs/architecture/runtime.md
+    sha256: 261882123b7e01807624beed379fe080f538b91c444426af04c92c67e9616e2d
+  - path: src/runtime/README.md
+    sha256: d14c3a96b8e989170b8baece72c3b42d6a9753741144149302be9b62638cf7d5
+  - path: src/runtime/Runtime.JobService.cpp
+    sha256: c35dee2e03d929309620c6ac98da4ab4f0b651ec80115d35190092e919efbbea
+  - path: src/runtime/Runtime.JobService.cppm
+    sha256: 90d05a9e59aa9ab39f49fdd803ba196dd1348cb8e3b4df6d291ef4340aa07698
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 1a3f54b96473d13ecb5e4a9984a6c398fc9b4a0675f27caf4af7618462e1f735
+  - path: tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 288883a5b0f6c6f25346a08b4e512d700709409e01766c81803c057996561b68
+  - path: tasks/done/BUG-123-retired-scene-save-terminal-event-race.md
+    sha256: 8ac65deddbbe8e281500fb392107c1d5fcea52b7b94cdada3a2b7223a3df4e62
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 2973740c4d623bc2af815e2c239152dff37a9406f26534209e024e44d758f687
+  - path: tests/contract/runtime/Test.RuntimeJobService.cpp
+    sha256: 5f4805b96c91d3253826830a870c5499d458d9dfd2418a153c628f4414261370
+  content_digest: 2d3cc90b714a941a121f0553095b281af66d00586a39c24f81c2b75c4b06e606
+touched:
+  paths:
+  - docs/architecture/runtime.md
+  - src/runtime/README.md
+  - src/runtime/Runtime.JobService.cpp
+  - src/runtime/Runtime.JobService.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-123-retired-scene-save-terminal-event-race.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.RuntimeJobService.cpp
+  layers:
+  - runtime
+  - tests
+  modules:
+  - Extrinsic.Runtime.JobService
+extension_seam: JobServiceTestHooks::BeforeWorkerUnpublishedQueued forces the worker-terminal/finalizer-queue
+  ordering only in contract tests.
+future_change_plan: New unpublished-finalizer consumers use the existing JobDesc callback and inherit
+  IsComplete/ReapCompleted settlement; add no parallel completion registry.
+acceptance:
+- criterion: Every retired queued scene save publishes exactly one terminal event.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No timeout, label, quarantine, or assertion is weakened.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The fix introduces no runtime layering violation.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-123/commands/build-ci-asan-cpu.json
+- receipt: tasks/evidence/BUG-123/commands/build-ci-ubsan-cpu.json
+- receipt: tasks/evidence/BUG-123/commands/build-intrinsic-tests.json
+- receipt: tasks/evidence/BUG-123/commands/ci-asan-cpu-ctest.json
+- receipt: tasks/evidence/BUG-123/commands/ci-ubsan-cpu-ctest.json
+- receipt: tasks/evidence/BUG-123/commands/diff-check.json
+- receipt: tasks/evidence/BUG-123/commands/docs-links.json
+- receipt: tasks/evidence/BUG-123/commands/focused-job-scene-contracts.json
+- receipt: tasks/evidence/BUG-123/commands/forced-interleaving-repeat.json
+- receipt: tasks/evidence/BUG-123/commands/full-cpu-supported-ctest.json
+- receipt: tasks/evidence/BUG-123/commands/layering.json
+- receipt: tasks/evidence/BUG-123/commands/module-inventory-freshness.json
+- receipt: tasks/evidence/BUG-123/commands/scene-save-contract-repeat-final.json
+- receipt: tasks/evidence/BUG-123/commands/scene-save-contract-repeat.json
+- receipt: tasks/evidence/BUG-123/commands/session-brief-freshness.json
+- receipt: tasks/evidence/BUG-123/commands/task-policy.json
+- receipt: tasks/evidence/BUG-123/commands/task-schema.json
+- receipt: tasks/evidence/BUG-123/commands/test-layout.json
+changed_public_contracts:
+- JobService::IsComplete and ReapCompleted treat a required unpublished main-thread finalizer as part
+  of job completion.
+diagnostics_and_previews:
+- The deterministic two-gate contract proves Cancelled is visible while completion and reaping remain
+  false until the exactly-once finalizer runs.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-123-retired-scene-save-terminal-event-race.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- SnapshotAll and GetState may expose a terminal enum before finalizer settlement by design; callers requiring
+  reconciled completion must use IsComplete.
+skipped_checks: []
+artifacts:
+- path: tests/contract/runtime/Test.RuntimeJobService.cpp
+  sha256: 5f4805b96c91d3253826830a870c5499d458d9dfd2418a153c628f4414261370
+  kind: file
+- path: tasks/evidence/BUG-123/commands/ci-ubsan-cpu-ctest.json
+  sha256: 1e33289cbeb4fd365d07d145a237652a8938485e761fff4644c7666ef4fcd68c
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-123/handoff.jsonl
+review: tasks/evidence/BUG-123/reviews.jsonl

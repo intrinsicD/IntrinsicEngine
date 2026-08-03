@@ -307,7 +307,7 @@ true
         visual: bool = False,
         preview: str | None = None,
         smoke: bool = True,
-        link: str | None = None,
+        link: str | list[str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         raw, receipt = self.raw_and_receipt()
         command = [
@@ -337,8 +337,9 @@ true
             command.append("--visual")
         if preview:
             command.extend(["--preview", preview])
-        if link:
-            command.extend(["--link", link])
+        links = [link] if isinstance(link, str) else (link or [])
+        for value in links:
+            command.extend(["--link", value])
         return invoke(self.repo, *command)
 
     def audit(self) -> subprocess.CompletedProcess[str]:
@@ -668,6 +669,53 @@ class ExperimentCustodyTests(unittest.TestCase):
             result = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("hash mismatch", result.stdout)
+
+    def test_clean_claim_run_keeps_historical_source_seals_after_later_commit(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            self.assertEqual(fixture.freeze(commit=True).returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(fixture.cell("completed").returncode, 0)
+            source_link = fixture.implementation.relative_to(fixture.repo).as_posix()
+            evidence_link = (
+                fixture.run_root / "smoke.json"
+            ).relative_to(fixture.repo).as_posix()
+            self.assertEqual(
+                fixture.bundle(link=[source_link, evidence_link]).returncode,
+                0,
+            )
+            self.assertEqual(fixture.audit().returncode, 0)
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "seal official evidence")
+
+            for path, payload in (
+                (fixture.data_screen, '{"rows":[10,20]}\n'),
+                (fixture.data_confirm, '{"rows":[30,40]}\n'),
+                (fixture.config, "iterations: 999\n"),
+                (fixture.environment, '{"python":"3.13"}\n'),
+                (fixture.implementation, "def run(): return 2\n"),
+            ):
+                path.write_text(payload, encoding="utf-8")
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "evolve source inputs")
+
+            validation = invoke(
+                fixture.repo, "validate", "--root", str(fixture.repo)
+            )
+            completion = fixture.completion()
+            (fixture.run_root / "smoke.json").write_text(
+                '{"exit_code":0,"tampered":true}\n', encoding="utf-8"
+            )
+            tampered = invoke(
+                fixture.repo, "validate", "--root", str(fixture.repo)
+            )
+        self.assertEqual(validation.returncode, 0, validation.stdout)
+        self.assertEqual(completion.returncode, 0, completion.stdout)
+        self.assertEqual(tampered.returncode, 1, tampered.stdout)
+        self.assertIn("hash mismatch", tampered.stdout)
 
     def test_run_bindings_must_equal_frozen_protocol(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

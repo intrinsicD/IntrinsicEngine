@@ -1,0 +1,20 @@
+{
+  "command": [
+    "vulkaninfo",
+    "--summary"
+  ],
+  "command_display": "vulkaninfo --summary",
+  "cwd": ".",
+  "duration_ms": 220,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:35:17Z",
+  "label": "vulkan-host-probe",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:35:16Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/vulkan-host-probe.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/vulkan-host-probe.stdout.log",
+  "stdout_sha256": "20330c75028fee49142bb2cb1354bd075d119545c197a4c5f02e076d14c2161d",
+  "task_id": "UI-035"
+}

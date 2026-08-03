@@ -1,0 +1,108 @@
+schema_version: 1
+task_id: METHOD-019
+run_id: run-001
+attempt_id: attempt-001
+created_at: '2026-08-01T23:30:48Z'
+protocol_digest: b912a481725591d8434963e2016e4deffe21a31b388c039fe7d8b2d65b1df70c
+provenance:
+  source:
+    revision: cfd0d9bdebe6c46969394d61593bf4305365ebec
+    clean: true
+  task_sha256: 41a775bc02cdc249c8140e9cc48f70b9e3806613b0e8f67e90a5e362813aa91c
+  implementation_digest: fef6dd79d0d1ca97ea309b82a99e53b289babdd9ab53a29bf50ef41736111af3
+  datasets:
+  - id: lop-family-screening-v1
+    path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: 93f50a4cbe56787a9441c4b9138623a0763e71f2cf817c051af902f55c6cd8f7
+    split: screening
+  - id: lop-family-confirmation-v1
+    path: benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp
+    sha256: d81dc0c6b0156ee81c6f6043eb274ab5521fe2e0bbe1003316b2d53e7460e213
+    split: confirmation
+resolved_config:
+  path: benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml
+  sha256: 72807a914d77045a9996e9f4ba96ce300f3e70b0dac009ba13ce5b12c3fb7825
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+raw_rows:
+  path: tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl
+  sha256: 1d489d5fc02ba2145d112b9b9be50aee29c36b27c8a1614176ad1be64e96de53
+  row_count: 4
+summaries:
+- name: minimum_median_runtime_ratio
+  column: median_runtime_ratio
+  statistic: min
+  value: 0.961823997
+- name: maximum_parity_failure
+  column: parity_failure
+  statistic: max
+  value: 0.0
+- name: adopted_strategy_count
+  column: adopted
+  statistic: sum
+  value: 0.0
+gates:
+- metric: minimum_median_runtime_ratio
+  operator: '>'
+  threshold: 0.8
+  observed: 0.961823997
+  passed: true
+- metric: maximum_parity_failure
+  operator: ==
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: adopted_strategy_count
+  operator: ==
+  threshold: 0
+  observed: 0.0
+  passed: true
+diagnostics:
+- conclusion=no-strategy-adopted
+- parity=max-rms-and-linf-delta-zero
+- fallback=none
+- candidate-scope=validation-only
+- literature-boundary=original-lop-wlop-clop-ear-objectives-execution-only
+links:
+- path: tasks/evidence/METHOD-019/experiment/protocol.yaml
+  sha256: 426d3c49d6d7903117d90b4f929bfa79df79bb7bdbbf763c359eaf54e50c68f8
+- path: methods/geometry/locally_optimal_projection/reports/METHOD-019-protocol.md
+  sha256: 0d58f67dd1d4af8066e2662a5fe115a069a4f2ad65ea50e9c37f3801f131bcd0
+- path: methods/geometry/locally_optimal_projection/reports/METHOD-019-result.md
+  sha256: c2df8be95bba987d6a7179b11855c51c57eeeeab8b650fa7b7078cb230e395fb
+- path: benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml
+  sha256: 72807a914d77045a9996e9f4ba96ce300f3e70b0dac009ba13ce5b12c3fb7825
+- path: benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp
+  sha256: d81dc0c6b0156ee81c6f6043eb274ab5521fe2e0bbe1003316b2d53e7460e213
+- path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: 93f50a4cbe56787a9441c4b9138623a0763e71f2cf817c051af902f55c6cd8f7
+- path: tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json
+  sha256: aaa357e69c31bb64d166ed3d45c2627c72b46977ef3b1b4cd049fe3b6711475f
+- path: tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl
+  sha256: 1d489d5fc02ba2145d112b9b9be50aee29c36b27c8a1614176ad1be64e96de53
+visual: false
+previews: []
+replay_command:
+- env
+- GIT_COMMIT=cfd0d9bdebe6c46969394d61593bf4305365ebec
+- python3
+- tools/benchmark/run_and_seal.py
+- --executable
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- --output
+- build/ci/custody/METHOD-019/confirmation-raw
+- --manifests-root
+- benchmarks
+- --run-id
+- method-019-confirmation-v1
+- --attempt-id
+- attempt-001
+view_command:
+- python3
+- -m
+- json.tool
+- tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json
+smoke_receipts:
+- tasks/evidence/METHOD-019/commands/confirmation-clean-seal.json
+claim_authorized: false

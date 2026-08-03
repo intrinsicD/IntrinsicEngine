@@ -1,0 +1,38 @@
+schema_version: 1
+task_id: METHOD-016
+run_id: run-001
+attempt_id: attempt-001
+status: initialized
+initialized_at: '2026-08-01T14:12:48Z'
+claim_eligible: true
+protocol_path: tasks/evidence/METHOD-016/experiment/protocol.yaml
+protocol_digest: aa491b7b5b106374cfdee017759eaccb31220bea06108ef2690b7ca2883da704
+task_path: tasks/done/METHOD-016-locally-optimal-projection-reference-backend.md
+task_sha256: 92e040436ecba2f4ddf86f53b9c8f9743b341add18af20e06d10171ee9c27543
+source:
+  revision: 89193bef887bac1d3876b9e8cb29cc43bd9ca9bf
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml
+  sha256: 2ff28bf453268a783f7795dc6190219c6243c26f50dda99a460d40f405725159
+environment:
+  path: CMakePresets.json
+  sha256: ce06a71a49b95c0fced3256fb61a3dce46c1e58cf1f6d72f1564767bbdacde4f
+datasets:
+- id: lop-wlop-screening-v1
+  path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  sha256: b4051e975686affc19b38062853eded5fbddc7dd4634e1a48ec86041cb7841f8
+  split: screening
+- id: lop-wlop-confirmation-v2
+  path: benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp
+  sha256: 78df47006a902e92e0efe4e9f6e68a796d7a8185a90a8e2c7173cb620c9a5263
+  split: confirmation
+implementation_digest: e1fbe99058afce08f3adc90fba7e3bc45d1002681be7aaf21c2db173095a2d15
+command:
+- env
+- GIT_COMMIT=89193bef887bac1d3876b9e8cb29cc43bd9ca9bf
+- build/ci/bin/IntrinsicBenchmarkSmoke
+- build/ci/custody/METHOD-016/confirmation-raw
+cell_journal: tasks/evidence/METHOD-016/experiment/runs/run-001/cells.jsonl
+bundle: tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml
+audit: tasks/evidence/METHOD-016/experiment/runs/run-001/audit.json

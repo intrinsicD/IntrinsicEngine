@@ -1,0 +1,89 @@
+session:
+  id: "2026-08-02_002"
+  date: "2026-08-02"
+  started: "2026-08-02T12:21+02:00"
+  last_turn: "2026-08-02T13:49+02:00"
+  turn_count: 3
+  summary: "Diagnosed the LOP contract regression and opened a scalable contract-discovery workflow with a staged catalog/task/test enforcement proposal."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: "N341"
+    routing: direct
+    provenance: user
+    summary: "Asked where LOP is after loading a mesh, exposing an unresolved mesh-first discovery path."
+  - turn: 1
+    type: observation
+    id: "O108"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Keep LOP point-cloud-safe and require explicit conversion plus domain guidance for mesh-first use."
+  - turn: 2
+    type: decision
+    id: "N342"
+    routing: direct
+    provenance: user
+    summary: "Use each entity's existing geometric element sources for method input; do not add a converter."
+  - turn: 2
+    type: dead_end
+    id: "N343"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected exact ActiveDomain == PointCloud as LOP eligibility; capability and writeback policy are separate concerns."
+  - turn: 3
+    type: question
+    id: "N344"
+    routing: direct
+    provenance: user
+    summary: "Asked where reusable contracts should live and how task authors discover them as their number grows."
+  - turn: 3
+    type: observation
+    id: "O109"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Proposed a four-level AGENTS/catalog/task/executable-proof contract chain."
+  - turn: 3
+    type: observation
+    id: "O110"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Proposed a retirement gate and explicit canonical-change rule for reusable contracts."
+
+ai_actions:
+  - turn: 1
+    action: "Compared main with the geometry feature branch, traced LOP menu registration and runtime domain validation, and audited existing mesh-to-point-cloud conversion and sampling surfaces."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 2
+    action: "Audited the geometry source-capability contract, traced the LOP runtime/writeback/UI gates, compared the clustering precedent, and ran the focused ECS/runtime capability tests."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 3
+    action: "Audited AGENTS.md routing, task and method templates, task-format policy, architecture index, review checklists, validators, and the relevant specialist skills for existing contract-discovery hooks."
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "when i load a mesh, they are nowhere to be found"
+  - turn: 1
+    excerpt: "The completed panel exists only on the unmerged feature branch and is registered under PointCloud / Processing; runtime rejects mesh-domain input."
+  - turn: 2
+    excerpt: "ok we dont need any converter"
+  - turn: 2
+    excerpt: "The existing contract distinguishes exact entity provenance from available element-domain sources; the LOP slice used the former as a capability gate."
+  - turn: 3
+    excerpt: "do we put it into the task creation skill so that it is in the task or do we put it into AGENTS.md? what if we get more such contracts?"
+
+open_threads:
+  - "Finish the remaining geometry work before merging and pushing the feature branch, unless the user changes that terminal condition."
+  - "Repair and re-review RUNTIME-175/UI-035 so LOP uses point-source capability, domain-aware writeback, and mesh/graph/point-cloud UI discovery before final integration."
+  - "GEOM-064 remains active; ARAP/SLIM method/runtime/UI integration remains pending."
+  - "Decide whether to adopt the staged contract catalog, task declaration, method integration matrix, and executable retirement gate."
+
+ai_suggestions_pending:
+  - "Keep contract prose canonical in architecture docs; put only the universal applicability rule in AGENTS.md and references in tasks."
+  - "Require method tasks to enumerate accepted entity/source domains, runtime binding, UI discovery, writeback policy, and one test per supported domain."

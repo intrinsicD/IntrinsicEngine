@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "timeout --signal=INT 8s build/ci-vulkan/bin/ExtrinsicSandbox; code=$?; test \"$code\" -eq 124"
+  ],
+  "command_display": "bash -c 'timeout --signal=INT 8s build/ci-vulkan/bin/ExtrinsicSandbox; code=$?; test \"$code\" -eq 124'",
+  "cwd": ".",
+  "duration_ms": 8103,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:35:25Z",
+  "label": "vulkan-sandbox-launch",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:35:17Z",
+  "stderr_path": "tasks/evidence/UI-035/commands/vulkan-sandbox-launch.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-035/commands/vulkan-sandbox-launch.stdout.log",
+  "stdout_sha256": "c765c5a07e44a1550d303558f530db49f73f48d8a6c639cc798121a757a60632",
+  "task_id": "UI-035"
+}

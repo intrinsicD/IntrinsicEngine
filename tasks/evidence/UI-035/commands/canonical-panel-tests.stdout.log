@@ -1,0 +1,72 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxPointCloudConsolidationPanel.*:SandboxEditorPresentation.*
+[==========] Running 22 tests from 2 test suites.
+[----------] Global test environment set-up.
+[----------] 18 tests from SandboxEditorPresentation
+[ RUN      ] SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible (39 ms)
+[ RUN      ] SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows (35 ms)
+[ RUN      ] SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+[       OK ] SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication (1 ms)
+[ RUN      ] SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+[       OK ] SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication (1 ms)
+[ RUN      ] SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+[       OK ] SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly (16 ms)
+[ RUN      ] SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+[       OK ] SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell (113 ms)
+[ RUN      ] SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+[       OK ] SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus (0 ms)
+[ RUN      ] SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame (30 ms)
+[ RUN      ] SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl (211 ms)
+[ RUN      ] SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+[       OK ] SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls (4 ms)
+[ RUN      ] SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[33m[WARN] [Runtime] Asset import failed: path='/tmp/intrinsic-arch-006-missing.ply' requested_payload=PointCloud ingest_diagnostic=MissingFile error=FileNotFound[0m
+[       OK ] SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel (20 ms)
+[ RUN      ] SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback (20 ms)
+[ RUN      ] SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy (47 ms)
+[ RUN      ] SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows (18 ms)
+[ RUN      ] SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+[       OK ] SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow (3 ms)
+[ RUN      ] SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry (18 ms)
+[ RUN      ] SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext (19 ms)
+[ RUN      ] SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+[       OK ] SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath (20 ms)
+[----------] 18 tests from SandboxEditorPresentation (625 ms total)
+
+[----------] 4 tests from SandboxPointCloudConsolidationPanel
+[ RUN      ] SandboxPointCloudConsolidationPanel.RegistrationIsStableAndIdempotent
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxPointCloudConsolidationPanel.RegistrationIsStableAndIdempotent (19 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed
+[       OK ] SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed (0 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure
+[       OK ] SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure (0 ms)
+[ RUN      ] SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace (22 ms)
+[----------] 4 tests from SandboxPointCloudConsolidationPanel (42 ms total)
+
+[----------] Global test environment tear-down
+[==========] 22 tests from 2 test suites ran. (667 ms total)
+[  PASSED  ] 22 tests.

@@ -11,6 +11,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 
 // Private codec implementation seam. The feature modules above own every
@@ -27,6 +28,9 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
     using Runtime::ParameterizationUvBackgroundMode;
     using Runtime::ParameterizationUvConfig;
     using Runtime::ParameterizationUvRenderMode;
+    using Runtime::PointCloudConsolidationConfig;
+    using Runtime::PointCloudConsolidationNormalSource;
+    using Runtime::PointCloudConsolidationStrategy;
     using Runtime::ProgressivePoissonPlaygroundBackend;
     using Runtime::ProgressivePoissonPlaygroundChannel;
     using Runtime::ProgressivePoissonPlaygroundConfig;
@@ -38,6 +42,9 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
     using Runtime::kParameterizationConfigSectionName;
     using Runtime::kParameterizationConfigSectionSchemaId;
     using Runtime::kParameterizationConfigSectionSchemaVersion;
+    using Runtime::kPointCloudConsolidationConfigSectionName;
+    using Runtime::kPointCloudConsolidationConfigSectionSchemaId;
+    using Runtime::kPointCloudConsolidationConfigSectionSchemaVersion;
     using Runtime::kProgressivePoissonConfigSectionName;
     using Runtime::kProgressivePoissonConfigSectionSchemaId;
     using Runtime::kProgressivePoissonConfigSectionSchemaVersion;
@@ -53,6 +60,8 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
         const ProgressivePoissonPlaygroundConfig& config);
     [[nodiscard]] std::string SerializeParameterizationConfigImpl(
         const ParameterizationConfig& config);
+    [[nodiscard]] std::string SerializePointCloudConsolidationConfigImpl(
+        const PointCloudConsolidationConfig& config);
 
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
     ValidateClusteringConfigSectionImpl(
@@ -66,6 +75,11 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
         std::string_view diagnosticSubject);
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
     ValidateParameterizationConfigSectionImpl(
+        std::string_view documentPayloadJson,
+        std::string_view referencePayloadJson,
+        std::string_view diagnosticSubject);
+    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+    ValidatePointCloudConsolidationConfigSectionImpl(
         std::string_view documentPayloadJson,
         std::string_view referencePayloadJson,
         std::string_view diagnosticSubject);
@@ -89,6 +103,13 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
         Core::Config::EngineConfig& config,
         const ParameterizationConfig& value);
 
+    [[nodiscard]] std::optional<PointCloudConsolidationConfig>
+    GetPointCloudConsolidationConfigImpl(
+        const Core::Config::EngineConfig& config);
+    void SetPointCloudConsolidationConfigImpl(
+        Core::Config::EngineConfig& config,
+        const PointCloudConsolidationConfig& value);
+
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakeClusteringConfigSectionRegistrationImpl(
         Core::Config::EngineConfigSectionChangedCallback onChanged = {});
@@ -97,5 +118,8 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
         Core::Config::EngineConfigSectionChangedCallback onChanged = {});
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakeParameterizationConfigSectionRegistrationImpl(
+        Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+    MakePointCloudConsolidationConfigSectionRegistrationImpl(
         Core::Config::EngineConfigSectionChangedCallback onChanged = {});
 }

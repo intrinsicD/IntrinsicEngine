@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "-j4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests -j4",
+  "cwd": ".",
+  "duration_ms": 50880,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T19:52:18Z",
+  "label": "canonical-intrinsic-tests-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T19:51:27Z",
+  "stderr_path": "tasks/evidence/RUNTIME-175/commands/canonical-intrinsic-tests-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-175/commands/canonical-intrinsic-tests-build.stdout.log",
+  "stdout_sha256": "54cb4b2d901b7cf1f650e8cd922d1fe14037cbf8d283738af22fa8372affc373",
+  "task_id": "RUNTIME-175"
+}

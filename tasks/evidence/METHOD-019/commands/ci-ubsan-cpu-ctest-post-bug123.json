@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 91919,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T23:25:58Z",
+  "label": "ci-ubsan-cpu-ctest-post-bug123",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T23:24:26Z",
+  "stderr_path": "tasks/evidence/METHOD-019/commands/ci-ubsan-cpu-ctest-post-bug123.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-019/commands/ci-ubsan-cpu-ctest-post-bug123.stdout.log",
+  "stdout_sha256": "8639dfba1c9a3a83ebe7703e41f93167def4309582582a0689683844e2896801",
+  "task_id": "METHOD-019"
+}

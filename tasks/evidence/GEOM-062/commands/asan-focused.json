@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=OFF && cmake --build --preset ci-asan --target IntrinsicGeometryTests && ctest --test-dir build/ci-asan --output-on-failure -R '^PointCloudKernels\\.' --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "bash -lc 'cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=OFF && cmake --build --preset ci-asan --target IntrinsicGeometryTests && ctest --test-dir build/ci-asan --output-on-failure -R '\"'\"'^PointCloudKernels\\.'\"'\"' --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 17190,
+  "exit_code": 0,
+  "finished_at": "2026-08-01T12:21:03Z",
+  "label": "asan-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-01T12:20:45Z",
+  "stderr_path": "tasks/evidence/GEOM-062/commands/asan-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-062/commands/asan-focused.stdout.log",
+  "stdout_sha256": "a3ce2926c2291a95f75d1fa4d6219c12505e075910b9c54299be1b867a565b8d",
+  "task_id": "GEOM-062"
+}

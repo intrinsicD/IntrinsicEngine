@@ -1,0 +1,110 @@
+schema_version: 1
+task_id: BUG-126
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T15:51:14Z'
+claim_eligible: false
+source:
+  base_ref: ce41c60f
+  base_revision: ce41c60ff5ff78d2561a1e0af89781d48fb6a3e6
+  head_revision: 0ff3d783644501efc7c05002758eeb8848d448b2
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: docs/agent/workflow-evidence.md
+    sha256: c0683d98be18223f92fac56964e1b6fea4620f3f8931b03e38a2c236e35b6c5e
+  - path: tasks/backlog/bugs/index.md
+    sha256: f33fb85f3c696e6ee8da9807307ea0a51b2350c332bae0a67a75664e9b07e2cc
+  - path: tasks/done/BUG-126-claim-custody-historical-source-seals.md
+    sha256: 03b9c4945f621f63080c78067f360ebd8677386be62333355a898b1db23e885b
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: a1ff0989e60f5b31c0011cb12f9bc34225ac0e598034799850c784141bdbc795
+  - path: tests/regression/tooling/Test.ExperimentCustody.py
+    sha256: 0118bb2016d99985fa09789c8be75a57a365de5c34e4baa90f523788c4cb0b45
+  - path: tools/agents/experiment_custody.py
+    sha256: d965ea1e8b76eb578b2d82a30ff0dbbc0114e44f129e0ad56fcdc013079e24cd
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: c0683d98be18223f92fac56964e1b6fea4620f3f8931b03e38a2c236e35b6c5e
+  content_digest: 36bd027fdcbc7a4a318f23c5de24736cd0fdac6813587d39fdd1b768b21fdfc6
+touched:
+  paths:
+  - docs/agent/workflow-evidence.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-126-claim-custody-historical-source-seals.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/regression/tooling/Test.ExperimentCustody.py
+  - tools/agents/experiment_custody.py
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  layers:
+  - tooling
+  modules:
+  - tools.agents.experiment_custody
+extension_seam: Existing exact-revision blob lookup now serves every declared clean claim input; bundle
+  fallback is restricted by the frozen protocol's source-path set.
+future_change_plan: If historical benchmark-manifest validation later drifts, extend the benchmark bridge
+  separately without broadening evidence-artifact fallback.
+acceptance:
+- criterion: Global `experiment_custody.py validate` accepts METHOD-016 and METHOD-017
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A changed historical source declaration or changed current evidence
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Strict task/docs/layering checks remain green.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-126/commands/experiment-custody-regression.json
+- receipt: tasks/evidence/BUG-126/commands/global-experiment-custody.json
+- receipt: tasks/evidence/BUG-126/commands/global-workflow-evidence.json
+- receipt: tasks/evidence/BUG-126/commands/workflow-evidence-regression.json
+changed_public_contracts:
+- Clean claim-eligible dataset/config/environment/implementation seals validate at their exact source
+  revision; non-claim and post-run evidence remain current-only.
+diagnostics_and_previews:
+- Historical missing/hash-drift diagnostics name the claim-eligible source revision boundary; current
+  evidence links retain missing/hash-mismatch failures.
+benchmark_or_parity_evidence:
+- 'Not applicable: this is strict workflow tooling, with METHOD-016 and METHOD-017 global custody validation
+  as the real historical-evidence regression.'
+docs_sync:
+  task_file: tasks/done/BUG-126-claim-custody-historical-source-seals.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- The source/evidence classification depends on paths declared in the frozen protocol; arbitrary bundle
+  links intentionally remain current-only.
+skipped_checks:
+- check: cxx-build
+  reason: No engine source, module, CMake, or compiled test changed; the complete Python custody/workflow
+    suites and strict repository validators are the strongest relevant gates.
+artifacts:
+- path: tasks/evidence/BUG-126/commands/experiment-custody-regression.json
+  sha256: 3ca4b0ed90e3346dc3aa2b831902a2d8c8d4a0684cab8767eb27e396e1d997af
+  kind: file
+- path: tasks/evidence/BUG-126/commands/workflow-evidence-regression.json
+  sha256: 72c2e279db8989cd843b7053da55b8944b72a807c4f9acdf800d002b32659967
+  kind: file
+- path: tasks/evidence/BUG-126/commands/global-experiment-custody.json
+  sha256: b856610f78a5ad519fdc9f14607f5af4767a30cff20a0f91f48d40b1f6e1bf7e
+  kind: file
+- path: tasks/evidence/BUG-126/commands/global-workflow-evidence.json
+  sha256: 6dd6496b1249a73ef6e0a2674072eaf9761113c613b0ef84a069d20790d44352
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-126/handoff.jsonl
+review: tasks/evidence/BUG-126/reviews.jsonl

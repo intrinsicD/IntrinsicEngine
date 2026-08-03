@@ -1,0 +1,389 @@
+schema_version: 1
+task_id: GEOM-062
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-01T12:45:42Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: fb494cfc7cdc319fcb050a73b2e291ff73cc6d1d
+  head_revision: 11366d9a772d7312022e55845fda2792dcf6540a
+  branch: feature/lop-consolidation-e2e
+  worktree: /tmp/intrinsic-geometry-e2e.GJlhXS
+  dirty: false
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: 102eb64852e879a114d4b5151131530a25b4720be1a33d61e1591287043a0698
+  - path: docs/architecture/geometry.md
+    sha256: eb3c65d1777fafb03cfeafb1d7cb9b27fc1fbe2f85ed2b40411561672120025f
+  - path: src/geometry/CMakeLists.txt
+    sha256: 7702840bb6c49fdd1027974eb96cf69b1d9548c37d84565c22b4c70a133deafd
+  - path: src/geometry/Geometry.FixedPoint.Anderson.cpp
+    sha256: 54199dfecfc7d3098a22d2d70a71a32ca14bb61690eb6b1d022e688f69ba5941
+  - path: src/geometry/Geometry.FixedPoint.Anderson.cppm
+    sha256: c2a4f44c04a52c6746d80e7c07b462f349d9221102808d9808a7a6e1346434b2
+  - path: src/geometry/Geometry.GaussianMixture.cpp
+    sha256: 2fd1334d770322e4742a2904f62ab767a6040a4212eb03f3d06e23f1252e9dcf
+  - path: src/geometry/Geometry.GaussianMixture.cppm
+    sha256: 2ac493058efd783f8385664c80e3ee0dd91f326b3bfe58795030f1b21310f77c
+  - path: src/geometry/Geometry.KMeans.cpp
+    sha256: b6ca51c9e49593cfa06845c6a0bb946b08fd8c935e260886bdc4abd5ad55af5b
+  - path: src/geometry/Geometry.KMeans.cppm
+    sha256: 3304d60b0143a432854a3d74c4bc7970185f0957edecb36580fade188f04c2eb
+  - path: src/geometry/Geometry.PointCloud.Kernels.cpp
+    sha256: 12af3735071129039d3436438bafb35f303b883765500a2c1e271d36cdaa86c8
+  - path: src/geometry/Geometry.PointCloud.Kernels.cppm
+    sha256: ccfa9aa393e23dd3a26357a75a7f7e15b75f37e5edc53db3298fa8dbc5f7b19a
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 2b9ce9203302012ffe7f5406b578abe59104f25ae9029a1c214a5ba75f93650e
+  - path: tasks/backlog/geometry/README.md
+    sha256: e0129ffe20d7c814aa38bf6538a53cd29e75c6c60c55f83ef1a5ac7bfa9de5d6
+  - path: tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
+    sha256: 043ecf83e9d1776b37ab03f7474ce6e4e394e0666db14d6942a7086c8e062740
+  - path: tasks/done/GEOM-062-point-set-projection-weighting-kernels.md
+    sha256: 3bfa0d6d2966022b8fd1623a648bb7a736318d99de04798df30f89fb7e443dad
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: da772a41580c231a1becb73ef9b70ecc36d30235bfba41bfcbadbc0a2c3a40de
+  - path: tasks/evidence/GEOM-058/commands/aggregate-geometry-review3.json
+    sha256: e61de74828c0e0794fd0f11eebda990e46d7a38b507efcd92797412e7e8f82d6
+  - path: tasks/evidence/GEOM-058/commands/aggregate-geometry-review3.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/aggregate-geometry-review3.stdout.log
+    sha256: d637874d9b17801fd5e5a5e2f1913efa1cadebd93c0f963420d5218808cdd907
+  - path: tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.json
+    sha256: ada13cc833c2f361898a01349ff4fd71d3b286dfd25632136a5d2ceb9d0dfe19
+  - path: tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.stdout.log
+    sha256: 1f293c7dd01bee53e83363e804a410e42b74da8bd9901fbce6e0a609d6e4ddad
+  - path: tasks/evidence/GEOM-058/commands/asan-focused-review2.json
+    sha256: 8413e34fb9c7f638d07013900029f871134a241a276db4adf2f93be9d41a61fa
+  - path: tasks/evidence/GEOM-058/commands/asan-focused-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/asan-focused-review2.stdout.log
+    sha256: 072486ccd1dd5df277c3f1b41392e646853fddb8a0fc472c838c61fbec633c65
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.json
+    sha256: 7a96d811209fac3556b50ca42e7d27207e29c9eeb9232e19c37ccd9be7881c93
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.stdout.log
+    sha256: 5b33cfcc08b592884e64e3de0d03f71deb1996b25eb4a03a8e08a3b8e666e141
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.json
+    sha256: 6c340bf9deccbb1e440821b25887bc41bf80663f19491864082964b82a6caecf
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.stdout.log
+    sha256: 348adf6ea71625176a7d36fe64a05c37cc71e7040ab8f91ff7a2b551fe4fdfd6
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests.json
+    sha256: 777567955f9a9f9c3f420c480e95c7830c92aeeb1f7a389ea3ebfc20f5bb510a
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/build-intrinsic-tests.stdout.log
+    sha256: 5724d178d1a3f2b073b30fb3c4e22f00f481ef6896aa43a5cd6e9adad41abda7
+  - path: tasks/evidence/GEOM-058/commands/doc-links-review2.json
+    sha256: 349e6f3604d3948805ea0c5523a34369451654ebc36d4763f79924da368011af
+  - path: tasks/evidence/GEOM-058/commands/doc-links-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/doc-links-review2.stdout.log
+    sha256: b3ac04e75bcfc58176fc63687ec3450e0745963cdb0485796e741db304295663
+  - path: tasks/evidence/GEOM-058/commands/doc-links.json
+    sha256: 426c9cc6d25e053dea31533d061a559cd124c91cee1d9adf3c8beb51adf316aa
+  - path: tasks/evidence/GEOM-058/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/doc-links.stdout.log
+    sha256: b3ac04e75bcfc58176fc63687ec3450e0745963cdb0485796e741db304295663
+  - path: tasks/evidence/GEOM-058/commands/focused-extreme-scale-review3.json
+    sha256: 6dac3a18907bcf931cbfd6638c1e0f8ea53f794ce23af4cbffffd35c643fdb5a
+  - path: tasks/evidence/GEOM-058/commands/focused-extreme-scale-review3.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/focused-extreme-scale-review3.stdout.log
+    sha256: 440d904bcc92871a79f54e7636beebb7d361150eb6fbdd518fc4a6f3ad06727a
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics-final.json
+    sha256: 4ea31c23650045977c7c81531ef8674c2d950d983973d417ce56171e33550f6b
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics-final.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics-final.stdout.log
+    sha256: a1575b609aae99d376f0218f33df43f48a493dd5d0075d15cef7378d537f02ba
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.json
+    sha256: 4c80e4bfff4a1deb188bf8ae8be2d3240eadde901aca4da8708a365bede58644
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.stdout.log
+    sha256: 63b530a3fa9f22a5043c2fe3ae8de3b9f288094cac9a3c59894ed2b302b58cae
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics.json
+    sha256: f344398b2013b1890c84d9d9bfd4089ffe0df0875f031bb3b5a0e9c7d13c6441
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/focused-numerics.stdout.log
+    sha256: 321b673e52321ab9911419db85c723d38ee2654ab58ea4923b7c7a1ada5005ff
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-final.json
+    sha256: 5a7e26c50ea697d39c9360adb98c0f07fc5e79498f60fa19190f447759676f79
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-final.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-final.stdout.log
+    sha256: 6bdcde169854502f839f265691200d8328eac31a4959ac68aab9194fde8b15b5
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.json
+    sha256: 281c24febf8065051a1d75594de868571c637538b6429db48c8ff5d516f840f9
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.stdout.log
+    sha256: 18e2499244a0a34e317c7c4b70a757989e5ad1e5ca7336aeb2eee83f11a114aa
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate.json
+    sha256: 9feb7f238eec2002cad61eb5c32ccba387dc46f7a34cebcd70c1b7b56979d1ff
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-gate.stdout.log
+    sha256: 52504f0ad64363c4e5ccd10172afd93222ee9a5d2f333136c3b52ec10a050661
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-policy-gate-review2.json
+    sha256: f0a916ca6a3f8f9ecb0e65f5be0e5f78ca53252acbed295a759aa17095cad9f1
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-policy-gate-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/geometry-cpu-policy-gate-review2.stdout.log
+    sha256: 8c62ef8d46887c0005150c4c18b8e9803dfbc122de5328cf0721ea8346c9e44a
+  - path: tasks/evidence/GEOM-058/commands/layering-review2.json
+    sha256: 5159f7fcba2e89c9bdf9c6db93d09cdd13bbfba4c3cae2daf5c75ddb27250a65
+  - path: tasks/evidence/GEOM-058/commands/layering-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/layering-review2.stdout.log
+    sha256: 0b9ddf96eb212fb3f6becd9b93894c6388c56d267d83a8d4d97d5613be9f32b1
+  - path: tasks/evidence/GEOM-058/commands/layering.json
+    sha256: 664ece3c05b994059408f3cdabe700ba39f3d14460cf3d19b966b0ddd642ab89
+  - path: tasks/evidence/GEOM-058/commands/layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/layering.stdout.log
+    sha256: 0b9ddf96eb212fb3f6becd9b93894c6388c56d267d83a8d4d97d5613be9f32b1
+  - path: tasks/evidence/GEOM-058/commands/module-inventory-review2.json
+    sha256: 4a97da7b2f1d1e26fcc80ff469c43aab610071f96bad22f919ae3d22db776b68
+  - path: tasks/evidence/GEOM-058/commands/module-inventory-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/module-inventory-review2.stdout.log
+    sha256: 29a4efaf5fc98a0fb820783a47cca8440c6a41334d2d3bb2d3a16916a5afbd94
+  - path: tasks/evidence/GEOM-058/commands/task-policy-review2.json
+    sha256: f10d2ba3c2bb3c358a0543676a6a41ba852f7d8d7a74e2135485f831926f72b0
+  - path: tasks/evidence/GEOM-058/commands/task-policy-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/task-policy-review2.stdout.log
+    sha256: 0d9c832638fae80b9957b4f307d33b5b7d9a65dbaabb734e9c2a5695aaaa1aae
+  - path: tasks/evidence/GEOM-058/commands/task-policy.json
+    sha256: da6c56f94333ef4b74aa5aa95161d5bf21e6f90125d12ca1205f1f95d4cb2d5a
+  - path: tasks/evidence/GEOM-058/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/task-policy.stdout.log
+    sha256: 0d9c832638fae80b9957b4f307d33b5b7d9a65dbaabb734e9c2a5695aaaa1aae
+  - path: tasks/evidence/GEOM-058/commands/test-layout-review2.json
+    sha256: 67d63c6f7c5a68e4680dac557ddc92dd2d9b34ea56130197de31f40ab4edbb59
+  - path: tasks/evidence/GEOM-058/commands/test-layout-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/test-layout-review2.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.json
+    sha256: 1db9918c9fd747177f5f9615f3c4bf383eb88a9fa09091e5528708d23d5d6bc8
+  - path: tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.stdout.log
+    sha256: 0eeb81a1a73d44de352e159be45bbc3cd73d7779bb9934cc4115a50b26a6a459
+  - path: tasks/evidence/GEOM-058/commands/ubsan-focused-review2.json
+    sha256: 437d3373b2357aac4ea538f4f50f36dd2c8256e4dc3f698a6ac3b57e999d086c
+  - path: tasks/evidence/GEOM-058/commands/ubsan-focused-review2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/GEOM-058/commands/ubsan-focused-review2.stdout.log
+    sha256: a27372e2cc0821d39bc05c0fcf2e83a59b1b8bf602a162d5f49e1f4e03ca06fd
+  - path: tasks/evidence/GEOM-058/handoff.jsonl
+    sha256: 9872be7e3ec4d55c8ea532caee8566840e0e898f9cb4bba594e08d1a2ccbb315
+  - path: tasks/evidence/GEOM-058/report.yaml
+    sha256: f1400f3c33f68ce3d9a34ac31268f8760346fd675caf216d3f4c0e506a9625b3
+  - path: tasks/evidence/GEOM-058/reviews.jsonl
+    sha256: 775865dee75f538b82c4a9dd8bcdf4c22882c030275ebed05a07b94fce7f41c9
+  - path: tests/CMakeLists.txt
+    sha256: 5cd723cf2468dec9b414fe85d0c77a15f781803308eb55afda2604d2dd1b762e
+  - path: tests/unit/geometry/Test.GaussianMixture.cpp
+    sha256: 72ee70a9241b8bb7397044f7159bbe9d3ecd3cbe3a506b0b1ee3aead36de61f4
+  - path: tests/unit/geometry/Test.PointCloudKernels.cpp
+    sha256: faa97e2eb36cd027b9136f9b97071c1c615238336c3061bb194a874f3c3d3526
+  content_digest: 9cde354428abb1d922c9619cf3ac916d72f9576f0022db60f4d9083f9635c4f0
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/geometry.md
+  - src/geometry/CMakeLists.txt
+  - src/geometry/Geometry.FixedPoint.Anderson.cpp
+  - src/geometry/Geometry.FixedPoint.Anderson.cppm
+  - src/geometry/Geometry.GaussianMixture.cpp
+  - src/geometry/Geometry.GaussianMixture.cppm
+  - src/geometry/Geometry.KMeans.cpp
+  - src/geometry/Geometry.KMeans.cppm
+  - src/geometry/Geometry.PointCloud.Kernels.cpp
+  - src/geometry/Geometry.PointCloud.Kernels.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/geometry/README.md
+  - tasks/done/GEOM-058-gaussian-mixture-em-anderson-acceleration.md
+  - tasks/done/GEOM-062-point-set-projection-weighting-kernels.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/GEOM-058/commands/aggregate-geometry-review3.json
+  - tasks/evidence/GEOM-058/commands/aggregate-geometry-review3.stderr.log
+  - tasks/evidence/GEOM-058/commands/aggregate-geometry-review3.stdout.log
+  - tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.json
+  - tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.stderr.log
+  - tasks/evidence/GEOM-058/commands/asan-extreme-scale-review3.stdout.log
+  - tasks/evidence/GEOM-058/commands/asan-focused-review2.json
+  - tasks/evidence/GEOM-058/commands/asan-focused-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/asan-focused-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.json
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.stderr.log
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests-final.stdout.log
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.json
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests.json
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests.stderr.log
+  - tasks/evidence/GEOM-058/commands/build-intrinsic-tests.stdout.log
+  - tasks/evidence/GEOM-058/commands/doc-links-review2.json
+  - tasks/evidence/GEOM-058/commands/doc-links-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/doc-links-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/doc-links.json
+  - tasks/evidence/GEOM-058/commands/doc-links.stderr.log
+  - tasks/evidence/GEOM-058/commands/doc-links.stdout.log
+  - tasks/evidence/GEOM-058/commands/focused-extreme-scale-review3.json
+  - tasks/evidence/GEOM-058/commands/focused-extreme-scale-review3.stderr.log
+  - tasks/evidence/GEOM-058/commands/focused-extreme-scale-review3.stdout.log
+  - tasks/evidence/GEOM-058/commands/focused-numerics-final.json
+  - tasks/evidence/GEOM-058/commands/focused-numerics-final.stderr.log
+  - tasks/evidence/GEOM-058/commands/focused-numerics-final.stdout.log
+  - tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.json
+  - tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.stderr.log
+  - tasks/evidence/GEOM-058/commands/focused-numerics-review2-retry.stdout.log
+  - tasks/evidence/GEOM-058/commands/focused-numerics.json
+  - tasks/evidence/GEOM-058/commands/focused-numerics.stderr.log
+  - tasks/evidence/GEOM-058/commands/focused-numerics.stdout.log
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate-final.json
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate-final.stderr.log
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate-final.stdout.log
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.json
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate.json
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate.stderr.log
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-gate.stdout.log
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-policy-gate-review2.json
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-policy-gate-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/geometry-cpu-policy-gate-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/layering-review2.json
+  - tasks/evidence/GEOM-058/commands/layering-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/layering-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/layering.json
+  - tasks/evidence/GEOM-058/commands/layering.stderr.log
+  - tasks/evidence/GEOM-058/commands/layering.stdout.log
+  - tasks/evidence/GEOM-058/commands/module-inventory-review2.json
+  - tasks/evidence/GEOM-058/commands/module-inventory-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/module-inventory-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/task-policy-review2.json
+  - tasks/evidence/GEOM-058/commands/task-policy-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/task-policy-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/task-policy.json
+  - tasks/evidence/GEOM-058/commands/task-policy.stderr.log
+  - tasks/evidence/GEOM-058/commands/task-policy.stdout.log
+  - tasks/evidence/GEOM-058/commands/test-layout-review2.json
+  - tasks/evidence/GEOM-058/commands/test-layout-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/test-layout-review2.stdout.log
+  - tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.json
+  - tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.stderr.log
+  - tasks/evidence/GEOM-058/commands/ubsan-extreme-scale-review3.stdout.log
+  - tasks/evidence/GEOM-058/commands/ubsan-focused-review2.json
+  - tasks/evidence/GEOM-058/commands/ubsan-focused-review2.stderr.log
+  - tasks/evidence/GEOM-058/commands/ubsan-focused-review2.stdout.log
+  - tasks/evidence/GEOM-058/handoff.jsonl
+  - tasks/evidence/GEOM-058/report.yaml
+  - tasks/evidence/GEOM-058/reviews.jsonl
+  - tests/CMakeLists.txt
+  - tests/unit/geometry/Test.GaussianMixture.cpp
+  - tests/unit/geometry/Test.PointCloudKernels.cpp
+  layers:
+  - geometry
+  modules:
+  - Geometry.PointCloud.Kernels
+extension_seam: Stateless radial weights, finite repulsion primitives, and deterministic KD-tree density
+  records consumed by the LOP-family methods
+future_change_plan: METHOD-016 owns projection control flow; METHOD-018 may add the justified directional
+  weight without moving iteration or normal ownership into this module
+acceptance:
+- criterion: Public surface exposes only `std`/`glm`/scalar types (no Eigen).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: All listed tests pass in the default CPU gate.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: '`METHOD-016` can express its attraction/repulsion/density weighting against this surface
+    without private weight math.'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Layering check passes (`geometry -> core` only).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GEOM-062/commands/asan-focused.json
+- receipt: tasks/evidence/GEOM-062/commands/build-intrinsic-tests.json
+- receipt: tasks/evidence/GEOM-062/commands/configure-ci.json
+- receipt: tasks/evidence/GEOM-062/commands/doc-links-final.json
+- receipt: tasks/evidence/GEOM-062/commands/doc-links.json
+- receipt: tasks/evidence/GEOM-062/commands/focused-kernels.json
+- receipt: tasks/evidence/GEOM-062/commands/geometry-cpu-gate.json
+- receipt: tasks/evidence/GEOM-062/commands/layering-final.json
+- receipt: tasks/evidence/GEOM-062/commands/layering.json
+- receipt: tasks/evidence/GEOM-062/commands/module-inventory-final.json
+- receipt: tasks/evidence/GEOM-062/commands/module-inventory.json
+- receipt: tasks/evidence/GEOM-062/commands/review2-asan-focused.json
+- receipt: tasks/evidence/GEOM-062/commands/review2-focused-kernels.json
+- receipt: tasks/evidence/GEOM-062/commands/review2-geometry-cpu-gate.json
+- receipt: tasks/evidence/GEOM-062/commands/review2-ubsan-focused.json
+- receipt: tasks/evidence/GEOM-062/commands/task-policy-final.json
+- receipt: tasks/evidence/GEOM-062/commands/task-policy.json
+- receipt: tasks/evidence/GEOM-062/commands/test-layout.json
+- receipt: tasks/evidence/GEOM-062/commands/ubsan-focused.json
+changed_public_contracts:
+- Compact-support Gaussian, ThetaLop, and WendlandC2 weights; normalized linear repulsion and derivative;
+  direct or reciprocal local density with structured failure diagnostics
+diagnostics_and_previews:
+- DensityWeightStatus and query/contribution/empty-neighborhood counters fail closed without partial weights
+  or NaN/Inf; extreme support and float/double broad-phase boundaries are regression-covered
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GEOM-062-point-set-projection-weighting-kernels.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- The supplied-index overload deliberately requires exact ordered point coordinates; callers with transformed
+  or reordered points must rebuild their KD-tree
+skipped_checks:
+- check: gpu-vulkan
+  reason: Pure CPU geometry numerics add no device, RHI, shader, or runtime behavior
+artifacts:
+- path: tests/unit/geometry/Test.PointCloudKernels.cpp
+  sha256: faa97e2eb36cd027b9136f9b97071c1c615238336c3061bb194a874f3c3d3526
+  kind: file
+- path: src/geometry/Geometry.PointCloud.Kernels.cppm
+  sha256: ccfa9aa393e23dd3a26357a75a7f7e15b75f37e5edc53db3298fa8dbc5f7b19a
+  kind: file
+- path: src/geometry/Geometry.PointCloud.Kernels.cpp
+  sha256: 12af3735071129039d3436438bafb35f303b883765500a2c1e271d36cdaa86c8
+  kind: file
+- path: tasks/done/GEOM-062-point-set-projection-weighting-kernels.md
+  sha256: 3bfa0d6d2966022b8fd1623a648bb7a736318d99de04798df30f89fb7e443dad
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GEOM-062/handoff.jsonl
+review: tasks/evidence/GEOM-062/reviews.jsonl
