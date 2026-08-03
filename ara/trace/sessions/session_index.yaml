@@ -209,3 +209,10 @@ sessions:
     events_count: 12
     claims_touched: [C11, C16]
     open_threads: 6
+  - id: "2026-08-02_001"
+    date: "2026-08-02"
+    summary: "Diagnosed the LOP contract regression and opened a scalable contract-discovery workflow with a staged catalog/task/test enforcement proposal."
+    turn_count: 3
+    events_count: 7
+    claims_touched: []
+    open_threads: 4

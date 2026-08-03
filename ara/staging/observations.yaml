@@ -1430,3 +1430,68 @@ observations:
     promoted_to: "logic/claims.md:C20"
     crystallized_via: artifact-commitment
     stale: false
+  # CONFLICT: see N318; the user explicitly selected capability-driven reuse and no converter.
+  - id: O92
+    timestamp: "2026-08-02T12:21+02:00"
+    provenance: ai-suggested
+    content: >
+      LOP-family consolidation should not silently treat a selected mesh as a
+      mutable point cloud: the method can resample cardinality and does not
+      preserve mesh topology. A mesh-first editor workflow therefore needs an
+      explicit non-destructive conversion or surface-sampling step that creates
+      a separate point-cloud entity, plus domain-specific discoverability.
+    context: >
+      The user loaded a mesh and could not find LOP. Source inspection showed
+      that main does not yet contain the feature-branch panel, the panel is
+      registered under PointCloud / Processing, the runtime accepts only a
+      PointCloud GeometrySources domain, and no general mesh-to-point-cloud
+      editor action currently exists.
+    potential_type: constraint
+    bound_to: [N317, N318]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: true
+  - id: O93
+    timestamp: "2026-08-02T13:49+02:00"
+    provenance: ai-suggested
+    content: >
+      Reusable engine contracts should use a four-level discovery and
+      enforcement chain: AGENTS.md states one global applicability obligation;
+      a stable canonical architecture catalog owns contract identifiers and
+      links; each task declares the applicable identifiers and, for methods,
+      an end-to-end data-domain integration matrix; executable contract tests,
+      validators, and review evidence enforce the mechanically checkable parts.
+      Skills route and summarize this chain but are not independent authorities.
+    context: >
+      The LOP integration followed a point-cloud-only task even though canonical
+      geometry and runtime documentation already distinguished exact provenance
+      from available source capabilities. The current task template has only a
+      free-form Context prompt, and the method template covers scientific
+      correctness without requiring ECS/runtime/UI domain coverage.
+    potential_type: architecture
+    bound_to: [N320]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O94
+    timestamp: "2026-08-02T13:49+02:00"
+    provenance: ai-suggested
+    content: >
+      A task that establishes or changes a reusable contract should not retire
+      until the canonical contract entry, owning documentation, and at least
+      one executable proof are present. A consuming task must preserve every
+      declared contract or explicitly change the canonical contract through a
+      reviewed decision; narrowing the contract only in task wording is not a
+      valid override.
+    context: >
+      RUNTIME-175 and UI-035 were retired against their narrowed task wording,
+      while the earlier GeometryAvailability consumer contract lived outside
+      their acceptance criteria and had no LOP mesh/graph integration proof.
+    potential_type: constraint
+    bound_to: [N319, N320]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

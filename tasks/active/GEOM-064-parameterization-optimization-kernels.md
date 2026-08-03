@@ -5,10 +5,13 @@ depends_on: [GEOM-018]
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner: "Codex-GeometryE2E"
+owner: "Codex-LocalMerge"
 branch: "feature/lop-consolidation-e2e"
 worktree: "/tmp/intrinsic-geometry-e2e.GJlhXS"
-claimed_at: "2026-08-02T00:02:58Z"
+claimed_at: "2026-08-03T11:45:54Z"
+contract_schema: 1
+contracts: []
+contract_review: "Pure geometry-owned numerical kernels do not consume or publish ECS element domains and do not bind a method into runtime, config, or UI."
 maturity_target: CPUContracted
 ---
 # GEOM-064 — Parameterization optimization kernels seam
@@ -16,6 +19,9 @@ maturity_target: CPUContracted
 ## Status
 - Active. The literature/reference contract below was frozen before source
   implementation on 2026-08-02.
+- A draft module interface and implementation are checkpointed, but they are
+  not registered in CMake, covered by the required tests, or evidence-eligible.
+  Every actionable checkbox remains open and no `CPUContracted` claim is made.
 
 ## Goal
 - Add a reusable geometry-owned kernel seam for iterative distortion-minimizing
