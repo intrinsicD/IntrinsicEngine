@@ -1350,7 +1350,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O88
     timestamp: "2026-08-01T09:38+02:00"
     provenance: user-revised
@@ -1392,7 +1392,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O90
     timestamp: "2026-08-01T15:21+02:00"
     provenance: ai-suggested
@@ -1413,7 +1413,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O91
     timestamp: "2026-08-02T00:53+02:00"
     provenance: user-revised

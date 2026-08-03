@@ -1361,3 +1361,11 @@ entries:
       - "Corrected C17's moved RUNTIME-206 proof path without rewriting its historical revision-bounded audit statement."
       - "Kept UI-039 and the audited RUNTIME/GEOM/UI refactor chain open; excluded interactive UI, GPU/Vulkan, optimized-backend, and performance interpretations."
       - "Did not promote unrelated staged observations or find a contradiction; A29 refines C18's physical source matrix and preserves O108's recorded rejected-converter conflict."
+  - turn: "2026-08-04_001#1"
+    notes:
+      - "Routed the preservation of independently accepted task histories as decision N357 and the exact combined-tree verification as experiment N358."
+      - "Added no staged observation or capability claim: C27 and C28 already describe the bounded PHYSICS-004 and RUNTIME-206 CPU/Null surfaces, and this turn only reconfirmed their integration."
+      - "Kept PHYSICS-004 active because a driver self-review cannot satisfy its independent high-risk fixed-surface acceptance gate; RUNTIME-206 remains retired and untouched."
+      - "Marked O87, O89, and O90 stale after three later session-days without promotion, reference, or an open-thread match; left O93 active because fewer than three later session-days have elapsed."
+      - "Recorded the 4,077-case CPU result and 55-case ASan/UBSan selectors as merge evidence only; no GPU/Vulkan or performance interpretation was added."
+      - "Recorded local main integration at 9702c88f and explicitly noted that no remote push was requested or performed."

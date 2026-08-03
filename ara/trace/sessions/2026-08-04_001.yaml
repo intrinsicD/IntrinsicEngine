@@ -1,0 +1,52 @@
+session:
+  id: "2026-08-04_001"
+  date: "2026-08-04"
+  started: "2026-08-04T01:10+02:00"
+  last_turn: "2026-08-04T01:10+02:00"
+  turn_count: 1
+  summary: "Preserved the accepted RUNTIME-206 history, verified its combined surface with PHYSICS-004, and merged PHYSICS-004 into local main pending independent review."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N357"
+    routing: direct
+    provenance: ai-executed
+    summary: "Preserved RUNTIME-206 and PHYSICS-004 as independent task histories while integrating both into local main."
+  - turn: 1
+    type: experiment
+    id: "N358"
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified the combined source with 4,077 CPU tests plus 55 focused CI, ASan, and UBSan cases."
+
+ai_actions:
+  - turn: 1
+    action: "Committed PHYSICS-004, integrated the existing RUNTIME-206 origin/main merge while preserving concurrent ARA records, captured merged CPU and sanitizer evidence, sealed the high-risk draft report, and merged the feature branch into local main."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/evidence/PHYSICS-004/"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-08-04_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/staging/observations.yaml"
+
+claims_touched:
+  - id: C27
+    action: confirmed
+    turn: 1
+  - id: C28
+    action: confirmed
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "RUNTIME-206 was already accepted and merged on origin/main, so its history and evidence were preserved instead of duplicated."
+  - turn: 1
+    excerpt: "PHYSICS-004 is merged locally but remains active until an independent reviewer accepts its exact fixed surface."
+
+open_threads:
+  - "An independent reviewer must accept or request revisions on PHYSICS-004 revision ea5c87da/content digest 72f344b4 before retirement."
+
+ai_suggestions_pending: []

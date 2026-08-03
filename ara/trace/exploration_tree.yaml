@@ -8451,3 +8451,49 @@ tree:
       behavior. UI-039 still owns interactive property discovery; GPU/Vulkan,
       optimized execution, and performance remain outside this result.
     status: resolved
+  - id: N357
+    type: decision
+    title: "Preserve independent task histories while integrating main"
+    provenance: ai-executed
+    timestamp: "2026-08-04T01:10+02:00"
+    also_depends_on: [N354, N356]
+    choice: >
+      Treat RUNTIME-206 as already completed on origin/main, integrate that
+      exact merge into the PHYSICS-004 branch, preserve both append-only ARA
+      ID ranges and evidence trails, then merge PHYSICS-004 into local main as
+      a separate non-fast-forward task history.
+    alternatives:
+      - "Reapply or recommit RUNTIME-206 even though origin/main already contains its accepted retirement."
+      - "Squash PHYSICS-004 and RUNTIME-206 into one indistinguishable history."
+      - "Resolve concurrent ARA additions by dropping or renumbering an already published task record."
+    evidence:
+      - "f3933a37: existing RUNTIME-206 integration merge on origin/main"
+      - "597d06ee: accepted RUNTIME-206 completion evidence"
+      - "ba395d1e: PHYSICS-004 implementation commit"
+      - "e804abcb: origin/main integration preserving C27/C28, O113-O115, and N353-N356"
+      - "9702c88f: local-main PHYSICS-004 merge"
+    status: resolved
+  - id: N358
+    type: experiment
+    title: "Verify combined PHYSICS-004 and RUNTIME-206 main surface"
+    provenance: ai-executed
+    timestamp: "2026-08-04T01:10+02:00"
+    also_depends_on: [N354, N356, N357]
+    evidence:
+      - "tasks/evidence/PHYSICS-004/commands/merged-ci-build.json: combined IntrinsicTests build passed"
+      - "tasks/evidence/PHYSICS-004/commands/merged-focused-tests.json: 55/55 passed"
+      - "tasks/evidence/PHYSICS-004/commands/merged-ci-tests.json: 4,077/4,077 passed with one policy GLFW/LSan skip"
+      - "tasks/evidence/PHYSICS-004/commands/merged-asan-focused.json: 55/55 passed"
+      - "tasks/evidence/PHYSICS-004/commands/merged-ubsan-focused.json: 55/55 passed"
+      - "tasks/evidence/PHYSICS-004/commands/merged-structural.json: strict structural bundle passed"
+      - "tasks/evidence/PHYSICS-004/report.yaml: clean revision ea5c87da and content digest 72f344b4"
+    result: >
+      The exact combined source built with the canonical Clang 23 ci preset,
+      passed the 55-case physics/runtime/domain integration selector, passed
+      all 4,077 CPU-supported tests, passed the same 55 cases under ASan and
+      UBSan, and passed strict task, layering, documentation, layout, hygiene,
+      ARA, skill-mirror, clean-workshop, and diff checks. Local main now
+      contains RUNTIME-206 and PHYSICS-004 at 9702c88f. PHYSICS-004 remains
+      active pending its required independent high-risk fixed-surface review;
+      no remote push was performed.
+    status: resolved
