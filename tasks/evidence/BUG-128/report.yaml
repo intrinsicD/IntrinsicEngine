@@ -1,0 +1,103 @@
+schema_version: 1
+task_id: BUG-128
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-03T15:39:37Z'
+claim_eligible: false
+source:
+  base_ref: 299644a3701844223957ede95d19dbdb88a92d67
+  base_revision: 299644a3701844223957ede95d19dbdb88a92d67
+  head_revision: 456cb4b6578ca85f1287b2560edbbd84c900129a
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: tasks/SESSION-BRIEF.md
+    sha256: aba42386cad616babd01dbfee3122baec9344a83f1a9c4cfd0fd96773e09b4ce
+  - path: tasks/backlog/bugs/index.md
+    sha256: b5d6224fdba708a2869488d278b22f3f092e9cc714761764f8f9189589e38024
+  - path: tasks/done/BUG-128-parallel-prepolicy-retired-task-baselines.md
+    sha256: 85ae2bb28588c293993d2c9ef3d7c7ca68c02d3eb3af82677650ba5af99af7b0
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: deb247efab0aca63f20e5c4984ad4c6c7b617b290ec335dd7beaeab5ce1c675e
+  content_digest: ffc3736e68e50bf321730903d3da83af66434452d813f474bd544041cd944726
+touched:
+  paths:
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-128-parallel-prepolicy-retired-task-baselines.md
+  - tasks/done/RETIREMENT-LOG.md
+  layers:
+  - agent-workflow
+  modules:
+  - task-contract-validator
+extension_seam: Exact path/revision/SHA-256 entries in the contract legacy inventory
+future_change_plan: Add another parallel baseline only through a separately reviewed high-risk policy
+  task and an immutable source revision
+acceptance:
+- criterion: All pre-policy feature task records retain their sealed bytes.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Claim-grade custody validates without changing any official run or
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: New, edited, promoted, or open task records remain prospective.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-128/commands/doc-links.json
+- receipt: tasks/evidence/BUG-128/commands/docs-sync.json
+- receipt: tasks/evidence/BUG-128/commands/session-brief.json
+- receipt: tasks/evidence/BUG-128/commands/skill-mirrors.json
+- receipt: tasks/evidence/BUG-128/commands/task-policy-retired.json
+- receipt: tasks/evidence/BUG-128/commands/task-policy.json
+- receipt: tasks/evidence/BUG-128/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-128/commands/task-validation-retired.json
+- receipt: tasks/evidence/BUG-128/commands/task-validation.json
+- receipt: tasks/evidence/BUG-128/commands/validate-regression.json
+- receipt: tasks/evidence/BUG-128/commands/workflow-validation.json
+changed_public_contracts:
+- Only byte-identical done/archive records from the named immutable parallel revision bypass prospective
+  contract enrollment
+diagnostics_and_previews:
+- Malformed, missing, open-lifecycle, source-mismatched, or later-edited records fail strict task validation
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-128-parallel-prepolicy-retired-task-baselines.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- The immutable source commit must remain available to Git; missing history fails validation closed
+skipped_checks:
+- check: build-and-ctest
+  reason: No C++ production, test-registration, build, shader, or runtime source changed; the Python validator
+    regression and strict structural gates are the relevant executable proof
+artifacts:
+- path: tools/agents/validate_tasks.py
+  sha256: 99adb7899c9df88569bd4d76c913d022f3d5d20dcd9894077acb237130b1084d
+  kind: file
+- path: tests/regression/tooling/Test.ValidateTasks.py
+  sha256: 3f90557fd26211bf7fda80f656976cb48da3bf976d1b0e5e7b85c5d61c22f7cc
+  kind: file
+- path: tools/agents/contract_legacy_tasks.json
+  sha256: 385e7af3ed5927562a3fdeccad4068dd5c516c20cc779bafb3811432c1a6322f
+  kind: file
+- path: docs/agent/task-format.md
+  sha256: 4ae8cbb9638d4f9d2ee1a446721a456d8d274f6f48d364b6e2c63181f6029e82
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-128/handoff.jsonl
+review: tasks/evidence/BUG-128/reviews.jsonl
