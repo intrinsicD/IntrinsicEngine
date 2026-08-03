@@ -1,0 +1,216 @@
+schema_version: 1
+task_id: RUNTIME-208
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-03T00:18:11Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 614a59bf25cefd97bee9659f4a1b6782358e47b6
+  head_revision: 919b4fc01e45c227fa981321a0828b759133f285
+  branch: runtime/runtime-208-element-domain-publication
+  worktree: /tmp/intrinsic-runtime208.qxtdIf
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: 652c4b9532132249d5451a38d9433561793fcc11c8174d3646b18d26b654b99a
+  - path: ara/staging/observations.yaml
+    sha256: 08aa55a5c790420b974ba6846d880ea51f4e1c1546ce166e97672b2e34d14b88
+  - path: docs/architecture/engine-config.md
+    sha256: 283a6267cfcb2543ede8de03d3e86beefd640a9dcd290ca2d4f7d40be28ee1b3
+  - path: docs/architecture/runtime-config-control.md
+    sha256: c17c85c91d2a38579201be6b0b075f341b8cffb88603493395c00edf910e646b
+  - path: docs/architecture/runtime.md
+    sha256: 4fc0335c8f00850c972ca0ec5fd9213cac4335395827ab6a374543cece0752b4
+  - path: docs/methods/index.md
+    sha256: 7904e507cc4d2b15faf7352430d8050f3ad5187037bc11cabaea96279db8ff48
+  - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+    sha256: e3f51352a6549dbc9fa1fdfa135287f0fc98ef35fcddc296a2c43bc740b3d6c3
+  - path: docs/reviews/2026-08-03-runtime-208-clean-workshop-review.md
+    sha256: 629a1366569feef30a55e128890cfa38d961b5864c4240fde9a8d0dd5ca1d82f
+  - path: methods/geometry/progressive_poisson/README.md
+    sha256: 8d72b97970432743418fd6e37ceafff757cabfb2121594e23462028cc15bce19
+  - path: methods/geometry/progressive_poisson/method.yaml
+    sha256: 287eace13c2af9f5fc9af76c061a3d724b3b8a6773bae067816cbeea1788cfb4
+  - path: methods/geometry/progressive_poisson/paper.md
+    sha256: 977bffd610cd62588d5c2f40cf96fd9d2f10ac3bc8b668765775308061fd476d
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: a049ee3da707e69d92e466f15574cd37779e037840d956147ff693e183f89aed
+  - path: src/app/Sandbox/README.md
+    sha256: 1d9cddaaf823b2a78d138480960e963952fe36fdd955bb022810b90fce086dc6
+  - path: src/runtime/README.md
+    sha256: 08cd67bfa2e68d934c1b001ae6b30d165e1284e8fc76a416e5c7d50644764d1b
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 8439869eae7cf7398eab0b5dcd8fcb43e9b2f3a0e52c918436d59f8f4096fd49
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: d9fab40697cf4bb416c877e655eac57e465337173041bfee52c20163800bf302
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cpp
+    sha256: 4707b10498a4ca0f26a939b3fe0e1e56e7ebfe8bbbf0135cd2d715f03ab36f4b
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cppm
+    sha256: 01cc94f4ba6147ea07a0904d3d061859908e262153dbfaf4a60d5d27d5575982
+  - path: src/runtime/Runtime.ProgressivePoissonConfig.cppm
+    sha256: c7457ce1e9d11816a8f7fa0e25b977eb3242785e097a1e20051909a9643f8a72
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: f607ac3a41a948d7954c6ee0b2298118307bf9b38b62acc069a5623c4ff6074c
+  - path: tasks/SESSION-BRIEF.md
+    sha256: a5e99fcac808ef52d0c60e337f46df9d684d83aaf17bbefb6b2e4cce19c26433
+  - path: tasks/backlog/runtime/README.md
+    sha256: e9b922cc5cfedaffd4a4d2061d3ea3b69715e9fa32e838504fb315121cf79aae
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 7ed6fb1a0631b6681d165aaf867e3ddf9c22d0617e161450e13f6210e1e36338
+  - path: tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md
+    sha256: 4191387dc98f2e8c733b07585ede4368cb076022b05efcae994139b7a22b6622
+  - path: tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    sha256: e5ddbf743339f377361c0f6d7cf87c877046892a5dbc06352529e1ed2dec515c
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: ec63e5e9ee5e441c2967a066ccbc1ee54e018c7c8390ef88ea0b13fd2128b5a1
+  - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    sha256: 7318753147976e426c695d3ce28ab6218980b1ad8becaa2c203b8ed38aea0b52
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 55867670f5793723f6e77f951645de4bb2d02011e3ceace399fb8db42d10ed94
+  content_digest: dde96f297de30e243043d2bfcbba7ad4ad76788291d9789053c53fc1d738e311
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - docs/architecture/engine-config.md
+  - docs/architecture/runtime-config-control.md
+  - docs/architecture/runtime.md
+  - docs/methods/index.md
+  - docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  - docs/reviews/2026-08-03-runtime-208-clean-workshop-review.md
+  - methods/geometry/progressive_poisson/README.md
+  - methods/geometry/progressive_poisson/method.yaml
+  - methods/geometry/progressive_poisson/paper.md
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/README.md
+  - src/runtime/README.md
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Runtime.ProgressivePoissonConfig.cppm
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md
+  - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  layers:
+  - app
+  - methods
+  - runtime
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots.Models
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Runtime.ProgressivePoissonConfig
+extension_seam: The existing typed EditorProgressivePoisson operation/config and GeometryElementDomain
+  resolver now provide one shared Vertices-source worker, publisher, and history mutation for mesh, graph,
+  and point-cloud provenance.
+future_change_plan: UI-038 registers the existing generic readiness and operation under the Graph panel;
+  METHOD-014 may replace the declared requested-GPU CPU fallback only after operational Vulkan compute-result
+  parity plugs into this same publisher.
+acceptance:
+- criterion: Progressive Poisson is runnable from every `Vertices` source with no converter and with source-cardinality
+    publication.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Mesh and graph topology/cardinality are unchanged on every backend path.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Obsolete surface-generation controls cannot trigger hidden conversion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-claims-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-claims-seal.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-claims.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-build.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-configure.json
+- receipt: tasks/evidence/RUNTIME-208/commands/asan-tests.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ci-build.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ci-configure.json
+- receipt: tasks/evidence/RUNTIME-208/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-208/commands/cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-report-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-seal.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-208/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-208/commands/docs-sync.json
+- receipt: tasks/evidence/RUNTIME-208/commands/focused-tests.json
+- receipt: tasks/evidence/RUNTIME-208/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-208/commands/method-manifests.json
+- receipt: tasks/evidence/RUNTIME-208/commands/module-inventory.json
+- receipt: tasks/evidence/RUNTIME-208/commands/root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-208/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy-report-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy-seal.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-state-links.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-validation-report-fix.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-validation-seal.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-validation.json
+- receipt: tasks/evidence/RUNTIME-208/commands/test-layout.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-configure.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ubsan-tests.json
+changed_public_contracts:
+- Progressive Poisson consumes canonical mesh, graph, or point-cloud Vertices directly and publishes source-cardinality
+  v:poisson_level, v:poisson_rank, v:poisson_splat_radius, and v:poisson_prefix_visible without domain
+  replacement or topology mutation.
+- The playground channel token is Rank; the obsolete Phase token and mesh-surface-generation fields are
+  rejected/diagnosed and omitted from canonical serialization.
+diagnostics_and_previews:
+- Unknown removed mesh-surface fields produce UnknownField diagnostics; the obsolete Phase token produces
+  InvalidValue and falls back canonically to Level.
+- Requested gpu_vulkan_compute remains an explicit reported CPU-reference fallback until METHOD-014 closes
+  operational compute parity.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- METHOD-014 still owns operational Vulkan compute-result parity, and UI-038 still owns Graph-panel registration;
+  neither surface is claimed by RUNTIME-208.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No shader, RHI, Vulkan backend, byte-layout, or compute-execution behavior changed; requested
+    GPU execution deliberately follows the tested CPU-reference fallback path and METHOD-014 retains parity
+    ownership.
+artifacts:
+- path: tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md
+  sha256: 4191387dc98f2e8c733b07585ede4368cb076022b05efcae994139b7a22b6622
+  kind: file
+- path: methods/geometry/progressive_poisson/method.yaml
+  sha256: 287eace13c2af9f5fc9af76c061a3d724b3b8a6773bae067816cbeea1788cfb4
+  kind: file
+- path: tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  sha256: e5ddbf743339f377361c0f6d7cf87c877046892a5dbc06352529e1ed2dec515c
+  kind: file
+- path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  sha256: 55867670f5793723f6e77f951645de4bb2d02011e3ceace399fb8db42d10ed94
+  kind: file
+- path: docs/reviews/2026-08-03-runtime-208-clean-workshop-review.md
+  sha256: 629a1366569feef30a55e128890cfa38d961b5864c4240fde9a8d0dd5ca1d82f
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-208/handoff.jsonl
+review: tasks/evidence/RUNTIME-208/reviews.jsonl
