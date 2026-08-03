@@ -55,9 +55,11 @@ source/projected density weights.
 
 `Extrinsic.Runtime.PointCloudConsolidationModule` exposes LOP and WLOP through
 the asynchronous typed operation. The shared validated configuration is the
-`sandbox.point_cloud_consolidation` application section; successful results
-replace the selected point cloud through `GeometrySources` with undo/redo.
-The interactive surface is
-`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` in the Sandbox;
-its LOP and WLOP controls apply through that same registered config lane and
-display the returned CPU-reference identity and convergence diagnostics.
+`sandbox.point_cloud_consolidation` application section. A request names a
+finite `vec3` property on any resolved mesh, graph, or point-cloud element
+domain; a face-center property is a valid sample set and no `VertexProperty` or
+container conversion is required. Same-cardinality output updates named
+properties on the originating domain with undo/redo. Mesh/graph count changes
+are rejected before scheduling; canonical point-cloud replacement remains the
+explicit count-changing path. `UI-039` owns property-aware Sandbox discovery;
+until it lands, the existing PointCloud panel is the only interactive entry.

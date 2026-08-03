@@ -7,26 +7,33 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-### Method element-domain integration (audited 2026-08-02)
+### Method property-domain integration (audited 2026-08-02, clarified 2026-08-03)
 
 The contract audit in
 [`docs/reviews/2026-08-02-method-engine-integration-contract-audit.md`](../../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md)
-found five bounded integration gaps. Runtime fixes precede their paired UI
-tasks; graph-capable fixes also wait for `HARDEN-087` to align physical ECS
-materialization with the element-domain contract:
+was re-audited after clarifying that typed properties, not `Vertices` or
+handle-specific property wrappers, are the semantic boundary. Runtime fixes
+precede their paired UI tasks; graph-capable fixes also wait for `HARDEN-087`
+to align physical ECS materialization with the element-domain contract:
 
-- [RUNTIME-206 — LOP family element-domain source integration](RUNTIME-206-lop-element-domain-source-integration.md)
-  accepts Mesh/Graph/PointCloud `Vertices`, preserves richer topology, and
-  gates count-changing publication by source capability after `RUNTIME-175`.
 - [RUNTIME-207 — ICP element-domain source integration](RUNTIME-207-icp-element-domain-source-integration.md)
-  accepts all mixed vertex-source pairs and adds the shared config lane after
-  `BUG-096` makes point-to-plane readiness truthful.
+  accepts arbitrary mixed property-domain pairs and adds the shared config lane
+  after `BUG-096` makes point-to-plane readiness truthful.
 - [RUNTIME-209 — Point-set outlier analysis and publication split](RUNTIME-209-point-set-outlier-analysis-publication.md)
-  exposes topology-safe detection on all vertex sources and retains explicit
-  destructive removal only for point clouds.
+  exposes topology-safe detection on all typed sample properties and retains
+  explicit destructive removal only for point clouds.
 - [RUNTIME-210 — Signed Heat runtime and config integration](RUNTIME-210-signed-heat-runtime-config-integration.md)
   adds the missing mesh-only RuntimeModule/config/publication path for the
   existing CPU reference.
+- [RUNTIME-211 — K-Means property-domain integration](RUNTIME-211-kmeans-property-domain-integration.md)
+  removes the three vertex-like domain switches from the canonical CPU/Vulkan
+  clustering path and publishes named outputs to any originating domain.
+- [RUNTIME-212 — Progressive Poisson property-domain publication](RUNTIME-212-progressive-poisson-property-domain-publication.md)
+  extends retired `RUNTIME-208` without rewriting it: arbitrary typed sample
+  properties receive the same source-cardinality hierarchy attributes.
+- [RUNTIME-213 — Point-set normal property-domain integration](RUNTIME-213-point-normal-property-domain-integration.md)
+  exposes the generic span-based normal estimator on every element domain while
+  retaining genuinely topology-aware mesh/graph methods.
 
 ### Runtime abstraction consolidation (seeded 2026-07-24)
 
@@ -36,6 +43,12 @@ production owners while preserving public behavior first.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-206` — LOP family element-domain source integration](../../done/RUNTIME-206-lop-element-domain-source-integration.md)
+  makes the existing LOP/WLOP/CLOP/EAR runtime operation accept named finite
+  `vec3` properties on every resolved element domain, preserves richer
+  topology/custom properties for same-cardinality output, and rejects
+  topology-bearing count changes before submission. `UI-039` owns the matching
+  property-aware Sandbox discovery.
 - [`RUNTIME-208` — Progressive Poisson element-domain publication](../../done/RUNTIME-208-progressive-poisson-element-domain-publication.md)
   removed implicit mesh surface sampling/domain replacement. Mesh, graph, and
   point-cloud `Vertices` now share one runtime/config/publication path with

@@ -18,8 +18,8 @@ maturity_target: Operational
 ## Goal
 
 - Let users discover ICP from Mesh, Graph, and PointCloud contexts and select
-  any compatible source/target pair using the validated `RUNTIME-207` config,
-  readiness, and transform-only command path.
+  any compatible source/target entity plus typed property pair using the
+  validated `RUNTIME-207` config, readiness, and transform-only command path.
 
 ## Non-goals
 
@@ -37,22 +37,22 @@ maturity_target: Operational
 
 | Field | Disposition |
 | --- | --- |
-| Least-structured input | Two vertex-position sources; target normals for normal-dependent variants. |
-| Compatible entity sources | Every mesh/graph/point-cloud source-target pairing. |
+| Least-structured input | Two finite selected `vec3` properties; a same-domain target-normal property for normal-dependent variants. |
+| Compatible entity sources | Every pair of resolved mesh/graph/point-cloud element-domain properties. |
 | RuntimeModule | Consume `RUNTIME-207` entity options, readiness, config, submit, trajectory, and transform history. |
 | Config/agent | Panel edits/applies the same validated ICP config. |
 | UI | Add appropriate domain menu entries opening one shared cross-domain registration window. |
 | Publication | Show source-transform-only consequences; never mutate geometry or target transform. |
-| End-to-end tests | Domain menu discovery, 3x3 pair selection/readiness, config parity, run/trajectory, undo/redo. |
+| End-to-end tests | Domain menu discovery, cross-provenance and non-vertex property selection/readiness, config parity, run/trajectory, undo/redo. |
 
 ## Required changes
 
 - [ ] Register stable Mesh, Graph, and PointCloud Processing entries that open
       one shared ICP window; retain a View alias only if existing compatibility
       tests/users require it.
-- [ ] Populate both entity selectors from runtime-compatible vertex sources and
-      display domain badges, counts, normal readiness, transform readiness, and
-      exact disabled reasons.
+- [ ] Populate both entity/property selectors from runtime catalogs and display
+      provenance, element-domain, value-count, normal readiness, transform
+      readiness, and exact disabled reasons.
 - [ ] Route parameter edits through the shared runtime config preview/apply path
       and submit only the typed registration command.
 - [ ] Preserve trajectory scrubbing and source-transform undo/redo without
@@ -60,7 +60,8 @@ maturity_target: Operational
 
 ## Tests
 
-- [ ] Assert all domain menu entries and selector options for the 3x3 matrix.
+- [ ] Assert all domain menu entries, every provenance pairing, and
+      representative vertex/edge/halfedge/face property selector options.
 - [ ] Cover point-to-point success for mixed domains, point-to-plane normal
       readiness, same-entity rejection, and stale/missing entity diagnostics.
 - [ ] Verify config/agent/UI parity and source-transform-only undo/redo.
@@ -72,8 +73,8 @@ maturity_target: Operational
 
 ## Acceptance criteria
 
-- [ ] Mesh, graph, and point-cloud entities are all selectable as either ICP
-      operand when their required vertex data is valid.
+- [ ] Any compatible typed property on mesh, graph, or point-cloud entities is
+      selectable as either ICP operand.
 - [ ] Panel availability and diagnostics exactly match runtime readiness.
 - [ ] No converter or UI-private mutation path exists.
 

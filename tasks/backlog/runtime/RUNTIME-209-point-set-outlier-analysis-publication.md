@@ -18,9 +18,9 @@ maturity_target: Operational
 ## Goal
 
 - Separate statistical/radius outlier detection from destructive removal so
-  every `Vertices` source can publish a same-cardinality outlier mask while
-  explicit cardinality reduction remains restricted to topology-free point
-  clouds.
+  every caller-selected finite `vec3` property on a resolved element domain
+  can publish a same-cardinality outlier mask while explicit cardinality
+  reduction remains restricted to topology-free point clouds.
 
 ## Non-goals
 
@@ -32,7 +32,8 @@ maturity_target: Operational
 
 - The current command rejects mesh/graph provenance and immediately compacts a
   point cloud. Its statistical and radius kernels first compute rejected input
-  indices, which are valid analysis results for any vertex-position source.
+  indices, which are valid analysis results for any typed sample property,
+  including mesh face centers.
 - Review Rusu et al.'s statistical neighborhood formulation (DOI
   `10.1016/j.robot.2008.08.005`) and the official PCL behavior references for
   StatisticalOutlierRemoval
@@ -48,22 +49,23 @@ maturity_target: Operational
 
 | Field | Disposition |
 | --- | --- |
-| Least-structured input | Finite vertex positions plus neighborhood parameters. |
-| Compatible entity sources | Mesh vertices, graph nodes, and point-cloud points for detection; point cloud only for destructive compaction. |
+| Least-structured input | A caller-selected finite `Property<vec3>` plus neighborhood parameters. |
+| Compatible entity sources | Every resolved mesh/graph/point-cloud element domain for detection; point-cloud points only for destructive compaction. |
 | RuntimeModule | Extend the existing geometry-processing outlier command/job path with explicit Analyze and Remove modes. |
 | Config/agent | Add one validated point-set-outlier config used by UI, agents, and direct commands. |
 | UI | `UI-041` provides Detect on all domains and explicit Remove only for point clouds. |
-| Publication | Analyze writes same-count `v:is_outlier` and score/diagnostic properties; Remove compacts only point-cloud `Vertices` through history. |
-| End-to-end tests | Three-domain analysis, point-cloud-only removal, config parity, async staleness, and UI readiness tests. |
+| Publication | Analyze writes named same-domain mask and score/diagnostic properties; Remove compacts only point-cloud `Vertices` through history. |
+| End-to-end tests | All property-domain families including face centers, point-cloud-only removal, config parity, async staleness, and UI readiness tests. |
 
 ## Required changes
 
-- [ ] Introduce an explicit operation mode and source-capability record; Analyze
-      resolves any canonical `Vertices`, while Remove additionally requires
-      topology-free point-cloud provenance.
+- [ ] Introduce an explicit operation mode and property-aware capability
+      record; Analyze resolves a canonical `GeometryPropertyRef` on any element
+      domain, while Remove additionally requires topology-free point-cloud
+      provenance and canonical point properties.
 - [ ] Publish deterministic same-cardinality mask and available score data to
-      the originating vertex source without changing topology, element order,
-      or unrelated properties.
+      the originating property domain without changing topology, element
+      order, or unrelated properties.
 - [ ] Preserve point-cloud removal as a separate undoable mutation consuming
       the analysis result/current generation; fail closed for graph/mesh Remove
       with an actionable shared diagnostic.
@@ -74,8 +76,9 @@ maturity_target: Operational
 
 ## Tests
 
-- [ ] Parameterize statistical and radius Analyze over mesh, graph, and point
-      cloud and compare masks/diagnostics for identical positions.
+- [ ] Parameterize statistical and radius Analyze over every physical
+      property-domain family, including mesh face centers, and compare
+      masks/diagnostics for identical values.
 - [ ] Verify Analyze preserves all topology/cardinality and undo/redo restores
       target properties exactly.
 - [ ] Verify Remove succeeds and round-trips only for point clouds; graph/mesh
@@ -90,7 +93,7 @@ maturity_target: Operational
 
 ## Acceptance criteria
 
-- [ ] Outlier detection is available for every valid `Vertices` source.
+- [ ] Outlier detection is available for every valid typed sample property.
 - [ ] Destructive removal is explicit and cannot damage graph/mesh topology.
 - [ ] All callers share the same config, readiness, diagnostics, and history
       behavior.

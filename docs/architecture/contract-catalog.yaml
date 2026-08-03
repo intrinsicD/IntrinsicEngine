@@ -13,7 +13,7 @@ contracts:
     owner: ecs-geometry-runtime
     source: docs/architecture/geometry-api-style.md
     applies_when:
-      - A method or operation consumes vertices, halfedges, edges, or faces from an ECS geometry entity.
+      - A method or operation consumes a typed property on vertices, halfedges, edges, or faces, or consumes adjacency between those domains, from an ECS geometry entity.
       - Runtime or UI eligibility is selected from geometry provenance or element-domain availability.
       - Results are published back to an ECS geometry source or change its topology or cardinality.
     proofs:
@@ -22,6 +22,7 @@ contracts:
       - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
       - tests/contract/runtime/Test.GraphGeometryExtraction.cpp
       - tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
+      - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
   geometry.parameterization-optimization:
     owner: geometry
     source: docs/architecture/parameterization-mapping-roadmap.md

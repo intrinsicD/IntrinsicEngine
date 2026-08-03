@@ -47,6 +47,12 @@ map.
 - [GEOM-072 — Catmull-Clark crease masks](GEOM-072-catmull-clark-crease-masks.md)
   (opt-in crease stencils and multi-iteration tag propagation; depends on
   `GEOM-071`).
+- [GEOM-073 — Point-analysis property/span contracts](GEOM-073-point-analysis-property-span-contracts.md)
+  (adds generic property/span entry points to container-bound point utility and
+  feature APIs while retaining `Cloud` convenience adapters).
+- [GEOM-074 — Graph property and adjacency contracts](GEOM-074-graph-property-adjacency-contracts.md)
+  (lets graph algorithms consume named properties plus adjacency so equivalent
+  mesh primal graphs enter without conversion).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -131,6 +137,10 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 - GEOM-071 extracts plain, lossless sharp-feature facts into Simplification;
   GEOM-072 is its named second adopter and owns Catmull-Clark crease stencils
   and tag propagation.
+- GEOM-073 and GEOM-074 close the clarified property-domain contract at the
+  geometry API boundary: point-set values are not `Cloud`/vertex provenance,
+  and graph adjacency is not `Graph` provenance. Compatibility overloads stay
+  right-sized and numerical algorithms remain unchanged.
 - Retired GEOM-063 and GEOM-064 are the parameterization-family seams that realize
   Packs 3–4 of the
   [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).

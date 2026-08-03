@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <string>
@@ -42,6 +44,21 @@ namespace Runtime = Extrinsic::Runtime;
 namespace
 {
     using namespace std::chrono_literals;
+
+    struct OpaqueDomainValue
+    {
+        std::uint32_t Id{0u};
+
+        [[nodiscard]] bool operator==(
+            const OpaqueDomainValue&) const noexcept = default;
+    };
+
+    struct DomainSourceEntities
+    {
+        ECS::EntityHandle Mesh{ECS::InvalidEntityHandle};
+        ECS::EntityHandle Graph{ECS::InvalidEntityHandle};
+        ECS::EntityHandle PointCloud{ECS::InvalidEntityHandle};
+    };
 
     [[nodiscard]] CoreConfig::EngineConfig HeadlessConfig(
         const unsigned workers = 2u)
@@ -88,6 +105,189 @@ namespace
         for (std::size_t index = 0u; index < positions.size(); ++index)
             provenance[index] = static_cast<std::uint32_t>(index);
         return entity;
+    }
+
+    void SetVec3Property(
+        Geometry::PropertySet& properties,
+        const std::string& name,
+        const std::vector<glm::vec3>& values)
+    {
+        auto property = properties.GetOrAdd<glm::vec3>(
+            name, glm::vec3{0.0f});
+        property.Vector() = values;
+    }
+
+    void SetSequentialProperty(
+        Geometry::PropertySet& properties,
+        const std::string& name,
+        const std::uint32_t offset)
+    {
+        auto property = properties.GetOrAdd<std::uint32_t>(name, 0u);
+        for (std::size_t index = 0u; index < properties.Size(); ++index)
+        {
+            property[index] = offset + static_cast<std::uint32_t>(index);
+        }
+    }
+
+    [[nodiscard]] DomainSourceEntities AddDomainSources(
+        ECS::Scene::Registry& scene)
+    {
+        const std::vector<glm::vec3> samples = NoisyPlane();
+
+        const ECS::EntityHandle mesh = scene.Create();
+        auto& meshVertices = scene.Raw().emplace<GS::Vertices>(mesh);
+        meshVertices.Properties.Resize(samples.size());
+        SetVec3Property(
+            meshVertices.Properties,
+            std::string{GS::PropertyNames::kPosition},
+            samples);
+        SetVec3Property(meshVertices.Properties, "sample:position", samples);
+
+        auto& meshEdges = scene.Raw().emplace<GS::Edges>(mesh);
+        meshEdges.Properties.Resize(samples.size());
+        SetSequentialProperty(
+            meshEdges.Properties,
+            std::string{GS::PropertyNames::kEdgeV0},
+            100u);
+        SetSequentialProperty(
+            meshEdges.Properties,
+            std::string{GS::PropertyNames::kEdgeV1},
+            200u);
+        SetVec3Property(meshEdges.Properties, "sample:position", samples);
+
+        auto& meshHalfedges = scene.Raw().emplace<GS::Halfedges>(mesh);
+        meshHalfedges.Properties.Resize(samples.size());
+        SetSequentialProperty(
+            meshHalfedges.Properties,
+            std::string{GS::PropertyNames::kHalfedgeToVertex},
+            300u);
+        SetSequentialProperty(
+            meshHalfedges.Properties,
+            std::string{GS::PropertyNames::kHalfedgeNext},
+            400u);
+        SetSequentialProperty(
+            meshHalfedges.Properties,
+            std::string{GS::PropertyNames::kHalfedgeFace},
+            500u);
+        SetVec3Property(
+            meshHalfedges.Properties, "sample:position", samples);
+
+        auto& meshFaces = scene.Raw().emplace<GS::Faces>(mesh);
+        meshFaces.Properties.Resize(samples.size());
+        SetSequentialProperty(
+            meshFaces.Properties,
+            std::string{GS::PropertyNames::kFaceHalfedge},
+            600u);
+        SetVec3Property(meshFaces.Properties, "f:center", samples);
+        SetVec3Property(meshFaces.Properties, "sample:position", samples);
+        auto opaque = meshFaces.Properties.GetOrAdd<OpaqueDomainValue>(
+            "f:opaque", OpaqueDomainValue{});
+        for (std::size_t index = 0u; index < samples.size(); ++index)
+        {
+            opaque[index].Id = 700u + static_cast<std::uint32_t>(index);
+        }
+        scene.Raw().emplace<GS::HasMeshTopology>(mesh);
+
+        const ECS::EntityHandle graph = scene.Create();
+        auto& graphVertices = scene.Raw().emplace<GS::Vertices>(graph);
+        graphVertices.Properties.Resize(samples.size());
+        SetVec3Property(
+            graphVertices.Properties,
+            std::string{GS::PropertyNames::kPosition},
+            samples);
+        SetVec3Property(graphVertices.Properties, "sample:position", samples);
+
+        auto& graphEdges = scene.Raw().emplace<GS::Edges>(graph);
+        graphEdges.Properties.Resize(samples.size());
+        SetSequentialProperty(
+            graphEdges.Properties,
+            std::string{GS::PropertyNames::kEdgeV0},
+            800u);
+        SetSequentialProperty(
+            graphEdges.Properties,
+            std::string{GS::PropertyNames::kEdgeV1},
+            900u);
+        SetVec3Property(graphEdges.Properties, "sample:position", samples);
+
+        auto& graphHalfedges = scene.Raw().emplace<GS::Halfedges>(graph);
+        graphHalfedges.Properties.Resize(samples.size());
+        SetSequentialProperty(
+            graphHalfedges.Properties,
+            std::string{GS::PropertyNames::kHalfedgeConnectivity},
+            1'000u);
+        SetVec3Property(
+            graphHalfedges.Properties, "sample:position", samples);
+        scene.Raw().emplace<GS::HasGraphTopology>(graph);
+
+        const ECS::EntityHandle pointCloud = AddPointCloud(scene, samples);
+        SetVec3Property(
+            scene.Raw().get<GS::Vertices>(pointCloud).Properties,
+            "sample:position",
+            samples);
+
+        return DomainSourceEntities{
+            .Mesh = mesh,
+            .Graph = graph,
+            .PointCloud = pointCloud,
+        };
+    }
+
+    [[nodiscard]] Geometry::PropertySet& ResolveTestPropertySet(
+        ECS::Scene::Registry& scene,
+        const ECS::EntityHandle entity,
+        const Runtime::GeometryElementDomain domain)
+    {
+        switch (domain)
+        {
+        case Runtime::GeometryElementDomain::MeshVertex:
+        case Runtime::GeometryElementDomain::GraphNode:
+        case Runtime::GeometryElementDomain::PointCloudPoint:
+            return scene.Raw().get<GS::Vertices>(entity).Properties;
+        case Runtime::GeometryElementDomain::MeshEdge:
+        case Runtime::GeometryElementDomain::GraphEdge:
+            return scene.Raw().get<GS::Edges>(entity).Properties;
+        case Runtime::GeometryElementDomain::MeshHalfedge:
+        case Runtime::GeometryElementDomain::GraphHalfedge:
+            return scene.Raw().get<GS::Halfedges>(entity).Properties;
+        case Runtime::GeometryElementDomain::MeshFace:
+            return scene.Raw().get<GS::Faces>(entity).Properties;
+        case Runtime::GeometryElementDomain::Unknown:
+            break;
+        }
+        std::terminate();
+    }
+
+    [[nodiscard]] Runtime::PointCloudConsolidationConfig
+    SameCardinalityConfig()
+    {
+        return Runtime::PointCloudConsolidationConfig{
+            .Strategy = Runtime::PointCloudConsolidationStrategy::Wlop,
+            .SupportRadius = 0.65,
+            .RepulsionWeight = 0.0,
+            .MaxIterations = 1u,
+            .ConvergenceTolerance = 1.0,
+            .TargetPointCount = 0u,
+            .Seed = 17u,
+            .NormalRefinementRounds = 1u,
+        };
+    }
+
+    [[nodiscard]] Runtime::PointCloudConsolidationRequest MakeDomainRequest(
+        const ECS::EntityHandle entity,
+        const Runtime::GeometryElementDomain domain,
+        std::string inputName,
+        std::string outputName)
+    {
+        Runtime::PointCloudConsolidationPropertyRefs properties =
+            Runtime::MakePointCloudConsolidationPropertyRefs(
+                domain, std::move(inputName), std::nullopt);
+        properties.OutputPositions.Name = std::move(outputName);
+        return Runtime::PointCloudConsolidationRequest{
+            .StableEntityId =
+                Runtime::SelectionController::ToStableEntityId(entity),
+            .Properties = std::move(properties),
+            .Config = SameCardinalityConfig(),
+        };
     }
 
     [[nodiscard]] Runtime::PointCloudConsolidationRequest MakeRequest(
@@ -177,6 +377,12 @@ namespace
         : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        explicit ConsolidationStaleSourceApp(
+            const Runtime::GeometryElementDomain domain)
+            : Domain(domain)
+        {
+        }
+
         void Resolve() override
         {
             auto& engine = Kernel();
@@ -189,7 +395,26 @@ namespace
                 engine.RequestExit();
                 return;
             }
-            Entity = AddPointCloud(*Scene, NoisyPlane());
+            const DomainSourceEntities sources = AddDomainSources(*Scene);
+            switch (Domain)
+            {
+            case Runtime::GeometryElementDomain::MeshFace:
+                Entity = sources.Mesh;
+                InputProperty = "f:center";
+                break;
+            case Runtime::GeometryElementDomain::GraphNode:
+                Entity = sources.Graph;
+                InputProperty = std::string{GS::PropertyNames::kPosition};
+                break;
+            case Runtime::GeometryElementDomain::PointCloudPoint:
+                Entity = sources.PointCloud;
+                InputProperty = std::string{GS::PropertyNames::kPosition};
+                break;
+            default:
+                MissingService = true;
+                engine.RequestExit();
+                return;
+            }
             CompletionSubscription = Service->SubscribeCompleted(
                 [this](const Runtime::PointCloudConsolidationResult& result)
                 {
@@ -203,7 +428,8 @@ namespace
                     while (!ReleaseBlocker.load(std::memory_order_acquire))
                         std::this_thread::sleep_for(1ms);
                 });
-            Correlation = Service->Run(MakeRequest(Entity));
+            Correlation = Service->Run(MakeDomainRequest(
+                Entity, Domain, InputProperty, "lop:stale_output"));
         }
 
         void Frame(double, double) override
@@ -225,11 +451,9 @@ namespace
                     });
                 if (found != jobs.end())
                 {
-                    auto position =
-                        Scene->Raw()
-                            .get<GS::Vertices>(Entity)
-                            .Properties.Get<glm::vec3>(
-                                GS::PropertyNames::kPosition);
+                    auto position = ResolveTestPropertySet(
+                        *Scene, Entity, Domain)
+                        .Get<glm::vec3>(InputProperty);
                     position[0].z += 10.0f;
                     Mutated = true;
                     ReleaseBlocker.store(true, std::memory_order_release);
@@ -258,6 +482,9 @@ namespace
         Runtime::PointCloudConsolidationService* Service{};
         ECS::Scene::Registry* Scene{};
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        Runtime::GeometryElementDomain Domain{
+            Runtime::GeometryElementDomain::Unknown};
+        std::string InputProperty{};
         Runtime::KernelEventSubscription CompletionSubscription{};
         Runtime::CommandCorrelationId Correlation{};
         std::optional<Runtime::PointCloudConsolidationResult> Completion{};
@@ -266,6 +493,137 @@ namespace
         std::uint32_t Ticks{0u};
         bool MissingService{false};
         bool Mutated{false};
+        bool TimedOut{false};
+    };
+
+    class ConsolidationPropertyDomainsApp final
+        : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        void Resolve() override
+        {
+            auto& engine = Kernel();
+            Service = engine.Services().Find<
+                Runtime::PointCloudConsolidationService>();
+            Scene = engine.Worlds().Get(engine.ActiveWorld());
+            if (Service == nullptr || !Service->Available() || Scene == nullptr)
+            {
+                MissingService = true;
+                engine.RequestExit();
+                return;
+            }
+
+            Sources = AddDomainSources(*Scene);
+            MeshEdgeTopologyBefore =
+                Scene->Raw()
+                    .get<GS::Edges>(Sources.Mesh)
+                    .Properties.Get<std::uint32_t>(
+                        GS::PropertyNames::kEdgeV0)
+                    .Vector();
+            MeshHalfedgeTopologyBefore =
+                Scene->Raw()
+                    .get<GS::Halfedges>(Sources.Mesh)
+                    .Properties.Get<std::uint32_t>(
+                        GS::PropertyNames::kHalfedgeToVertex)
+                    .Vector();
+            MeshFaceTopologyBefore =
+                Scene->Raw()
+                    .get<GS::Faces>(Sources.Mesh)
+                    .Properties.Get<std::uint32_t>(
+                        GS::PropertyNames::kFaceHalfedge)
+                    .Vector();
+            MeshOpaqueBefore =
+                Scene->Raw()
+                    .get<GS::Faces>(Sources.Mesh)
+                    .Properties.Get<OpaqueDomainValue>("f:opaque")
+                    .Vector();
+            GraphEdgeTopologyBefore =
+                Scene->Raw()
+                    .get<GS::Edges>(Sources.Graph)
+                    .Properties.Get<std::uint32_t>(
+                        GS::PropertyNames::kEdgeV0)
+                    .Vector();
+            GraphHalfedgeTopologyBefore =
+                Scene->Raw()
+                    .get<GS::Halfedges>(Sources.Graph)
+                    .Properties.Get<std::uint32_t>(
+                        GS::PropertyNames::kHalfedgeConnectivity)
+                    .Vector();
+            CompletionSubscription = Service->SubscribeCompleted(
+                [this](const Runtime::PointCloudConsolidationResult& result)
+                {
+                    Completions.push_back(result);
+                });
+
+            Correlations.push_back(Service->Run(MakeDomainRequest(
+                Sources.Mesh,
+                Runtime::GeometryElementDomain::MeshVertex,
+                std::string{GS::PropertyNames::kPosition},
+                "lop:mesh_vertex")));
+            Correlations.push_back(Service->Run(MakeDomainRequest(
+                Sources.Mesh,
+                Runtime::GeometryElementDomain::MeshFace,
+                "f:center",
+                "lop:mesh_face")));
+            Correlations.push_back(Service->Run(MakeDomainRequest(
+                Sources.Graph,
+                Runtime::GeometryElementDomain::GraphNode,
+                std::string{GS::PropertyNames::kPosition},
+                "lop:graph_node")));
+            Correlations.push_back(Service->Run(MakeDomainRequest(
+                Sources.PointCloud,
+                Runtime::GeometryElementDomain::PointCloudPoint,
+                std::string{GS::PropertyNames::kPosition},
+                "lop:point")));
+
+            Runtime::PointCloudConsolidationRequest rejected =
+                MakeDomainRequest(
+                    Sources.Mesh,
+                    Runtime::GeometryElementDomain::MeshFace,
+                    "f:center",
+                    "lop:rejected");
+            rejected.Config.TargetPointCount = 16u;
+            RejectedCorrelation = Service->Run(std::move(rejected));
+        }
+
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++Ticks;
+            if (Completions.size() == 5u)
+            {
+                Stats = Service->Stats();
+                engine.RequestExit();
+            }
+            else if (Ticks > 320u)
+            {
+                TimedOut = true;
+                engine.RequestExit();
+            }
+        }
+
+        void Shutdown() override
+        {
+            if (Service != nullptr)
+                Service->Unsubscribe(CompletionSubscription);
+        }
+
+        Runtime::PointCloudConsolidationService* Service{};
+        ECS::Scene::Registry* Scene{};
+        DomainSourceEntities Sources{};
+        Runtime::KernelEventSubscription CompletionSubscription{};
+        std::vector<Runtime::CommandCorrelationId> Correlations{};
+        Runtime::CommandCorrelationId RejectedCorrelation{};
+        std::vector<Runtime::PointCloudConsolidationResult> Completions{};
+        Runtime::PointCloudConsolidationModuleStats Stats{};
+        std::vector<std::uint32_t> MeshEdgeTopologyBefore{};
+        std::vector<std::uint32_t> MeshHalfedgeTopologyBefore{};
+        std::vector<std::uint32_t> MeshFaceTopologyBefore{};
+        std::vector<OpaqueDomainValue> MeshOpaqueBefore{};
+        std::vector<std::uint32_t> GraphEdgeTopologyBefore{};
+        std::vector<std::uint32_t> GraphHalfedgeTopologyBefore{};
+        std::uint32_t Ticks{0u};
+        bool MissingService{false};
         bool TimedOut{false};
     };
 
@@ -328,6 +686,68 @@ namespace
         bool MissingService{false};
         bool TimedOut{false};
     };
+}
+
+TEST(PointCloudConsolidationModule,
+     AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain)
+{
+    ECS::Scene::Registry scene{};
+    const DomainSourceEntities sources = AddDomainSources(scene);
+    const std::array<std::pair<Runtime::GeometryElementDomain,
+                               ECS::EntityHandle>,
+                     8u>
+        cases{{
+            {Runtime::GeometryElementDomain::MeshVertex, sources.Mesh},
+            {Runtime::GeometryElementDomain::MeshEdge, sources.Mesh},
+            {Runtime::GeometryElementDomain::MeshHalfedge, sources.Mesh},
+            {Runtime::GeometryElementDomain::MeshFace, sources.Mesh},
+            {Runtime::GeometryElementDomain::GraphNode, sources.Graph},
+            {Runtime::GeometryElementDomain::GraphHalfedge, sources.Graph},
+            {Runtime::GeometryElementDomain::GraphEdge, sources.Graph},
+            {Runtime::GeometryElementDomain::PointCloudPoint,
+             sources.PointCloud},
+        }};
+
+    std::optional<std::string> topologyRejection{};
+    for (const auto& [domain, entity] : cases)
+    {
+        SCOPED_TRACE(std::string{Runtime::ToString(domain)});
+        const Runtime::GeometryEntityAvailability availability =
+            Runtime::BuildGeometryAvailability(scene.Raw(), entity);
+        Runtime::PointCloudConsolidationPropertyRefs properties =
+            Runtime::MakePointCloudConsolidationPropertyRefs(
+                domain, "sample:position", std::nullopt);
+        properties.OutputPositions.Name = "sample:lop";
+
+        const Runtime::PointCloudConsolidationAvailability sameCount =
+            Runtime::ResolvePointCloudConsolidationAvailability(
+                availability, properties, SameCardinalityConfig());
+        EXPECT_TRUE(sameCount.Available) << sameCount.Message;
+        EXPECT_EQ(sameCount.InputPointCount, NoisyPlane().size());
+        EXPECT_FALSE(sameCount.CardinalityChanging);
+
+        Runtime::PointCloudConsolidationConfig countChanging =
+            SameCardinalityConfig();
+        countChanging.TargetPointCount = 16u;
+        properties.OutputPositions.Name =
+            std::string{GS::PropertyNames::kPosition};
+        const Runtime::PointCloudConsolidationAvailability resized =
+            Runtime::ResolvePointCloudConsolidationAvailability(
+                availability, properties, countChanging);
+        if (domain == Runtime::GeometryElementDomain::PointCloudPoint)
+        {
+            EXPECT_TRUE(resized.Available) << resized.Message;
+        }
+        else
+        {
+            EXPECT_FALSE(resized.Available);
+            EXPECT_TRUE(resized.CardinalityChanging);
+            if (!topologyRejection.has_value())
+                topologyRejection = resized.Message;
+            else
+                EXPECT_EQ(resized.Message, *topologyRejection);
+        }
+    }
 }
 
 TEST(PointCloudConsolidationModule,
@@ -399,29 +819,171 @@ TEST(PointCloudConsolidationModule,
     engine.Shutdown();
 }
 
-TEST(PointCloudConsolidationModule, SourceMutationDropsQueuedWriteback)
+TEST(PointCloudConsolidationModule,
+     ExecutesMeshGraphPointAndFacePropertiesWithoutTopologyConversion)
 {
-    auto app = std::make_unique<ConsolidationStaleSourceApp>();
-    ConsolidationStaleSourceApp* appPtr = app.get();
+    auto app = std::make_unique<ConsolidationPropertyDomainsApp>();
+    ConsolidationPropertyDomainsApp* appPtr = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine{
-        HeadlessConfig(1u), std::move(app)};
+        HeadlessConfig(), std::move(app)};
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
     engine.Run();
 
     EXPECT_FALSE(appPtr->MissingService);
     EXPECT_FALSE(appPtr->TimedOut);
-    EXPECT_TRUE(appPtr->Mutated);
-    ASSERT_TRUE(appPtr->Completion.has_value());
-    EXPECT_EQ(appPtr->Completion->Correlation, appPtr->Correlation);
-    EXPECT_EQ(appPtr->Completion->Status,
-              Runtime::PointCloudConsolidationRunStatus::StaleSource);
-    EXPECT_EQ(appPtr->Scene->Raw()
-                  .get<GS::Vertices>(appPtr->Entity)
-                  .Properties.Size(),
-              25u);
+    ASSERT_EQ(appPtr->Correlations.size(), 4u);
+    EXPECT_TRUE(std::all_of(
+        appPtr->Correlations.begin(),
+        appPtr->Correlations.end(),
+        [](const Runtime::CommandCorrelationId correlation)
+        {
+            return correlation.IsValid();
+        }));
+    ASSERT_TRUE(appPtr->RejectedCorrelation.IsValid());
+    ASSERT_EQ(appPtr->Completions.size(), 5u);
+    EXPECT_EQ(appPtr->Stats.CommandsHandled, 5u);
+    EXPECT_EQ(appPtr->Stats.JobsSubmitted, 4u);
+    EXPECT_EQ(appPtr->Stats.ResultsCommitted, 4u);
+
+    const auto rejected = std::find_if(
+        appPtr->Completions.begin(),
+        appPtr->Completions.end(),
+        [appPtr](const Runtime::PointCloudConsolidationResult& result)
+        {
+            return result.Correlation == appPtr->RejectedCorrelation;
+        });
+    ASSERT_NE(rejected, appPtr->Completions.end());
+    EXPECT_EQ(rejected->Status,
+              Runtime::PointCloudConsolidationRunStatus::
+                  UnsupportedPropertySource);
+    EXPECT_NE(rejected->Message.find("topology-bearing element domain"),
+              std::string::npos);
+    for (const Runtime::PointCloudConsolidationResult& result :
+         appPtr->Completions)
+    {
+        if (result.Correlation != appPtr->RejectedCorrelation)
+        {
+            EXPECT_TRUE(result.Succeeded()) << result.Message;
+            EXPECT_EQ(result.InputPointCount, NoisyPlane().size());
+            EXPECT_EQ(result.OutputPointCount, NoisyPlane().size());
+        }
+    }
+
+    ECS::Scene::Registry& scene = *appPtr->Scene;
+    const auto& meshVertices =
+        scene.Raw().get<GS::Vertices>(appPtr->Sources.Mesh).Properties;
+    const auto& meshEdges =
+        scene.Raw().get<GS::Edges>(appPtr->Sources.Mesh).Properties;
+    const auto& meshHalfedges =
+        scene.Raw().get<GS::Halfedges>(appPtr->Sources.Mesh).Properties;
+    const auto& meshFaces =
+        scene.Raw().get<GS::Faces>(appPtr->Sources.Mesh).Properties;
+    const auto& graphVertices =
+        scene.Raw().get<GS::Vertices>(appPtr->Sources.Graph).Properties;
+    const auto& graphEdges =
+        scene.Raw().get<GS::Edges>(appPtr->Sources.Graph).Properties;
+    const auto& graphHalfedges =
+        scene.Raw().get<GS::Halfedges>(appPtr->Sources.Graph).Properties;
+    const auto& pointVertices =
+        scene.Raw().get<GS::Vertices>(appPtr->Sources.PointCloud).Properties;
+
+    EXPECT_TRUE(meshVertices.Get<glm::vec3>("lop:mesh_vertex"));
+    EXPECT_TRUE(meshFaces.Get<glm::vec3>("lop:mesh_face"));
+    EXPECT_TRUE(graphVertices.Get<glm::vec3>("lop:graph_node"));
+    EXPECT_TRUE(pointVertices.Get<glm::vec3>("lop:point"));
+    EXPECT_FALSE(meshFaces.Exists("lop:rejected"));
+    EXPECT_EQ(meshEdges.Get<std::uint32_t>(GS::PropertyNames::kEdgeV0).Vector(),
+              appPtr->MeshEdgeTopologyBefore);
+    EXPECT_EQ(meshHalfedges
+                  .Get<std::uint32_t>(GS::PropertyNames::kHalfedgeToVertex)
+                  .Vector(),
+              appPtr->MeshHalfedgeTopologyBefore);
+    EXPECT_EQ(meshFaces
+                  .Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge)
+                  .Vector(),
+              appPtr->MeshFaceTopologyBefore);
+    EXPECT_EQ(meshFaces.Get<OpaqueDomainValue>("f:opaque").Vector(),
+              appPtr->MeshOpaqueBefore);
+    EXPECT_EQ(graphEdges
+                  .Get<std::uint32_t>(GS::PropertyNames::kEdgeV0)
+                  .Vector(),
+              appPtr->GraphEdgeTopologyBefore);
+    EXPECT_EQ(graphHalfedges
+                  .Get<std::uint32_t>(
+                      GS::PropertyNames::kHalfedgeConnectivity)
+                  .Vector(),
+              appPtr->GraphHalfedgeTopologyBefore);
+    EXPECT_TRUE(scene.Raw().all_of<GS::HasMeshTopology>(appPtr->Sources.Mesh));
+    EXPECT_TRUE(
+        scene.Raw().all_of<GS::HasGraphTopology>(appPtr->Sources.Graph));
+
+    Runtime::EditorCommandHistory* history =
+        engine.Services().Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    ASSERT_EQ(history->UndoCount(), 4u);
+    for (std::size_t index = 0u; index < 4u; ++index)
+    {
+        EXPECT_EQ(history->Undo().Status,
+                  Runtime::EditorCommandHistoryStatus::Undone);
+    }
+    EXPECT_FALSE(meshVertices.Exists("lop:mesh_vertex"));
+    EXPECT_FALSE(meshFaces.Exists("lop:mesh_face"));
+    EXPECT_FALSE(graphVertices.Exists("lop:graph_node"));
+    EXPECT_FALSE(pointVertices.Exists("lop:point"));
+    EXPECT_EQ(meshFaces.Get<OpaqueDomainValue>("f:opaque").Vector(),
+              appPtr->MeshOpaqueBefore);
+
+    for (std::size_t index = 0u; index < 4u; ++index)
+    {
+        EXPECT_EQ(history->Redo().Status,
+                  Runtime::EditorCommandHistoryStatus::Redone);
+    }
+    EXPECT_TRUE(meshVertices.Exists("lop:mesh_vertex"));
+    EXPECT_TRUE(meshFaces.Exists("lop:mesh_face"));
+    EXPECT_TRUE(graphVertices.Exists("lop:graph_node"));
+    EXPECT_TRUE(pointVertices.Exists("lop:point"));
+    EXPECT_EQ(meshFaces
+                  .Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge)
+                  .Vector(),
+              appPtr->MeshFaceTopologyBefore);
+    EXPECT_EQ(meshFaces.Get<OpaqueDomainValue>("f:opaque").Vector(),
+              appPtr->MeshOpaqueBefore);
 
     engine.Shutdown();
+}
+
+TEST(PointCloudConsolidationModule, SourceMutationDropsQueuedWriteback)
+{
+    for (const Runtime::GeometryElementDomain domain : {
+             Runtime::GeometryElementDomain::MeshFace,
+             Runtime::GeometryElementDomain::GraphNode,
+             Runtime::GeometryElementDomain::PointCloudPoint})
+    {
+        SCOPED_TRACE(std::string{Runtime::ToString(domain)});
+        auto app = std::make_unique<ConsolidationStaleSourceApp>(domain);
+        ConsolidationStaleSourceApp* appPtr = app.get();
+        Intrinsic::Tests::RuntimeTestKernel engine{
+            HeadlessConfig(1u), std::move(app)};
+        engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+        engine.Initialize();
+        engine.Run();
+
+        EXPECT_FALSE(appPtr->MissingService);
+        EXPECT_FALSE(appPtr->TimedOut);
+        EXPECT_TRUE(appPtr->Mutated);
+        ASSERT_TRUE(appPtr->Completion.has_value());
+        EXPECT_EQ(appPtr->Completion->Correlation, appPtr->Correlation);
+        EXPECT_EQ(appPtr->Completion->Status,
+                  Runtime::PointCloudConsolidationRunStatus::StaleSource);
+        const Geometry::PropertySet& properties = ResolveTestPropertySet(
+            *appPtr->Scene, appPtr->Entity, domain);
+        EXPECT_EQ(properties.Size(), NoisyPlane().size());
+        EXPECT_FALSE(properties.Exists("lop:stale_output"));
+
+        engine.Shutdown();
+    }
 }
 
 TEST(PointCloudConsolidationModule,

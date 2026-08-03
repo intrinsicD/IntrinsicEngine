@@ -356,13 +356,17 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 (`CORE-007`) are retired, as is compiled-plan efficiency (`CORE-008`).
 
 The 2026-08-02 element-domain/method-integration audit opened foundational
-`HARDEN-087`, now retired, plus the bounded `RUNTIME-206..210` and
-`UI-038..042` runtime/UI pairs under Themes D/I. The `RUNTIME-208`/`UI-038`
-Progressive Poisson pair is retired; see the
+`HARDEN-087`, now retired, plus `RUNTIME-206..210` and `UI-038..042`. Its
+2026-08-03 clarification made typed properties—not `Vertices` or
+handle-specific wrappers—the semantic boundary and opened
+`RUNTIME-211..213`, `UI-043..045`, and geometry API closures `GEOM-073..074`.
+The `RUNTIME-208`/`UI-038` Progressive Poisson provenance pair remains valid
+retired work; `RUNTIME-212`/`UI-044` own the newly explicit property-domain
+extension without rewriting that history. See the
 [runtime](runtime/README.md) and [UI](ui/README.md) indexes for the dependency
 split and the
 [audit](../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md)
-for the exhaustive scoped inventory.
+for the revised scoped inventory.
 
 Open members (kernel-seam priority set first):
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)

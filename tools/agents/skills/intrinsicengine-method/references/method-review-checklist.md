@@ -16,14 +16,19 @@ Use this checklist when reviewing method/paper implementation tasks.
       domain contract from the contract catalog.
 - [ ] The least-structured input is explicit; runtime and UI accept every ECS
       source satisfying it rather than gating on narrower provenance.
+- [ ] Point-set eligibility is expressed as compatible typed properties/spans
+      on any element domain, never `Vertices`, point-cloud provenance, or a
+      handle-specific property wrapper. Graph eligibility adds only named
+      adjacency/properties and includes meshes satisfying them.
 - [ ] `RuntimeModule`, config/agent, UI, publication/cardinality, and end-to-end
       test rows are implemented, explicitly inapplicable by contract, or owned
       by named follow-up tasks.
 - [ ] UI discovery covers each appropriate geometric domain and uses the same
       runtime availability/readiness path as non-UI controls.
-- [ ] Same-cardinality results publish to the originating element domain;
-      topology/cardinality changes are explicit owning operations and do not
-      silently discard richer source data.
+- [ ] Same-cardinality results update only named properties on the originating
+      element domain and preserve unrelated data; topology/cardinality changes
+      are explicit owning operations and do not silently discard richer source
+      data.
 
 ## Robustness and correctness
 

@@ -207,6 +207,33 @@ Method/paper work must follow this order:
 6. Add GPU backend only after reference parity exists.
 7. Document numerical limitations and diagnostics.
 
+Geometry method binding follows the canonical property-domain substitutability
+contract in `docs/architecture/geometry-api-style.md`:
+
+- A point-set method consumes the compatible typed `Property<T>` /
+  `ConstProperty<T>` (or span) it names on any resolved element domain. It must
+  not require point-cloud provenance, a `Vertices` component, or a
+  `VertexProperty` wrapper merely because points were used during development;
+  mesh face centers, edge samples, and halfedge samples are valid when they
+  satisfy the typed input contract.
+- A graph method adds only the node/edge/halfedge adjacency and properties its
+  algorithm actually needs. A mesh satisfying those sources must be accepted
+  without mesh-to-graph conversion. Mesh-only eligibility is valid only when
+  faces or surface topology are semantic inputs.
+- Same-cardinality results publish only named output properties on the
+  originating element domain and preserve unrelated properties/topology.
+  Topology/cardinality changes require an explicit owning operation and must
+  never silently replace a richer entity.
+- Runtime, config/agent, and UI availability must reuse the same canonical
+  property/topology preflight. Every appropriate provenance menu must expose
+  compatible property domains; handle-specific property aliases are
+  conveniences, not discovery filters.
+
+Every new or materially changed geometry-method task must declare
+`geometry.element-domain-sources` and `method.engine-integration` when
+applicable, spell out these decisions in its `## Engine integration` matrix,
+and name follow-up tasks for deferred runtime/config/UI/publication rows.
+
 Method manifests live at `methods/**/method.yaml` and are validated by
 `python3 tools/agents/validate_method_manifests.py`.
 

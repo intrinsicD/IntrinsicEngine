@@ -1,7 +1,9 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -10,6 +12,7 @@ export module Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
+export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
@@ -27,7 +30,7 @@ export namespace Extrinsic::Runtime
         MissingScene,
         InvalidProcessingParameters,
         StaleEntity,
-        UnsupportedPointCloud,
+        UnsupportedPropertySource,
         GeometryProcessingFailed,
         Cancelled,
         StaleSource,
@@ -38,9 +41,57 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view ToString(
         PointCloudConsolidationRunStatus status) noexcept;
 
+    struct PointCloudConsolidationPropertyRefs
+    {
+        GeometryPropertyRef InputPositions{
+            .Domain = GeometryElementDomain::PointCloudPoint,
+            .Name = "v:position",
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
+        };
+        std::optional<GeometryPropertyRef> InputNormals{
+            GeometryPropertyRef{
+                .Domain = GeometryElementDomain::PointCloudPoint,
+                .Name = "v:normal",
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            }};
+        GeometryPropertyRef OutputPositions{
+            .Domain = GeometryElementDomain::PointCloudPoint,
+            .Name = "v:position",
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
+        };
+        std::optional<GeometryPropertyRef> OutputNormals{
+            GeometryPropertyRef{
+                .Domain = GeometryElementDomain::PointCloudPoint,
+                .Name = "v:normal",
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            }};
+    };
+
+    [[nodiscard]] PointCloudConsolidationPropertyRefs
+    MakePointCloudConsolidationPropertyRefs(
+        GeometryElementDomain domain,
+        std::string positionPropertyName,
+        std::optional<std::string> normalPropertyName = std::nullopt);
+
+    struct PointCloudConsolidationAvailability
+    {
+        bool Available{false};
+        std::size_t InputPointCount{0u};
+        bool CardinalityChanging{false};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+    };
+
+    [[nodiscard]] PointCloudConsolidationAvailability
+    ResolvePointCloudConsolidationAvailability(
+        const GeometryEntityAvailability& availability,
+        const PointCloudConsolidationPropertyRefs& properties,
+        const PointCloudConsolidationConfig& config);
+
     struct PointCloudConsolidationRequest
     {
         std::uint32_t StableEntityId{0u};
+        PointCloudConsolidationPropertyRefs Properties{};
         PointCloudConsolidationConfig Config{};
     };
 
@@ -51,6 +102,7 @@ export namespace Extrinsic::Runtime
         PointCloudConsolidationRunStatus Status{
             PointCloudConsolidationRunStatus::Queued};
         std::uint32_t StableEntityId{0u};
+        PointCloudConsolidationPropertyRefs Properties{};
         PointCloudConsolidationConfig Config{};
         std::string ImplementationId{"cpu_reference"};
         std::string StrategyToken{"wlop"};
