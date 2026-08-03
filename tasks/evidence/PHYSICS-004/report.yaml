@@ -3,28 +3,28 @@ task_id: PHYSICS-004
 workflow_profile: high-risk
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-03T21:02:24Z'
+generated_at: '2026-08-03T23:08:52Z'
 claim_eligible: false
 source:
   base_ref: origin/main
-  base_revision: 19554530c62fe4033be381a068442689104a56d7
-  head_revision: 19554530c62fe4033be381a068442689104a56d7
+  base_revision: f3933a37e59ed1289e6281a9314014bf026e0574
+  head_revision: ea5c87daa09a0dac0ae78c41024e266f4af07554
   branch: feature/physics-004-runtime-module
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: ara/logic/claims.md
-    sha256: 1f3ec7190785ad0dd21a25990724b63b0fe51aaae998216770f8e0a02c840640
+    sha256: 040b841d01fcf38ad2a0a7a9997787c2c796ead6b84a2b6ffc4b2656a1040f9c
   - path: ara/staging/observations.yaml
-    sha256: 327a6c70cdb9dca32c0424c6d9b3437f13cb58c583e16ad13414b9bbb30d1538
+    sha256: ec2b1aab6f08c38dfa38bf727356d20e07770ba0bbaaa48fe3decb978aaf9d75
   - path: ara/trace/exploration_tree.yaml
-    sha256: 462a0fbc23e2dce0f2721845f0728150b25c29a322fff88e1c554541ac099c25
+    sha256: 9dccecc1602a3e0e8147a3be730aa633102f69b8a54af69c3f44a22238a6c5c2
   - path: ara/trace/pm_reasoning_log.yaml
-    sha256: 3e413b8876844fbcba877c3ad9ef2150e40995bae32a1baf8296aea92b498d77
+    sha256: 590015004e8cbe96079a73f07ed441bf2a8116ccbd22876c4e7cca2a508271cd
   - path: ara/trace/sessions/2026-08-03_001.yaml
     sha256: bab5cfebe2d50813d473304f67862d32dd8ca79ae7fa7ec104dddbe853a4a4f3
   - path: ara/trace/sessions/session_index.yaml
-    sha256: 2b5ea9f931815a977e411e089369bbfd6ddaa02625e8ad4592ff8691a9ce0980
+    sha256: 967880d45def4a368969b9108e7b5b2aba2857ff0143d72f0126dfb920c4a0de
   - path: docs/adr/0027-right-sized-runtime-composition.md
     sha256: 9c8d3eb2b3ffab49f7647b46a99c94f8ea6ed8c845698833ca570baf76308188
   - path: docs/api/generated/module_inventory.md
@@ -36,7 +36,7 @@ source:
   - path: docs/architecture/runtime-config-control.md
     sha256: 10a4a6633d08ef205da71d1fb4a36764967b4db6768c570e516e7035b0baa84a
   - path: docs/architecture/runtime.md
-    sha256: f92f766e32aba4bc6582349d0b474f796669962b81d4d465f2552cea8e75ce3b
+    sha256: 2502de4ce5521fcb6d072d813185764a560bae6b1d2f6dfd0e0685492b98c629
   - path: docs/migration/nonlegacy-parity-matrix.md
     sha256: 32aef07ea711b4f6ec81123d51a9d98c79fc29debc150c862c63a75a0494e1bb
   - path: docs/reviews/2026-08-03-physics-004-clean-workshop-review.md
@@ -52,7 +52,7 @@ source:
   - path: src/runtime/CMakeLists.txt
     sha256: 267b6f076e68a0b35da3e6c37ae8b825847e33b0cc25987d329bb2fd7969314b
   - path: src/runtime/README.md
-    sha256: bf7cd8d5c7432fff34036ce64f0e8c73e88bf8d2b8e8a86e88944303a50683f6
+    sha256: c07b39f6e7a2f380672c21069abbb8b62d51634f356a27a41a548a1b1650eacb
   - path: src/runtime/Runtime.Engine.cpp
     sha256: 0326d0d34cd0538e38cab3db1f3c932adab6a117328311239bffc324bc69d302
   - path: src/runtime/Runtime.Module.cppm
@@ -66,13 +66,13 @@ source:
   - path: src/runtime/Runtime.PhysicsModule.cppm
     sha256: 95b59bcefef6bffd6450decb980ad849799d86ae6da80f89131661f8b8526fbc
   - path: tasks/SESSION-BRIEF.md
-    sha256: 33a9595655cf6b180d1a8efe73c3ae2fc13412e4a81c1f08bfcbfb6125e59075
+    sha256: 2b94ffb31fb741f3ed0544ef45b29097bdc9e6e25f89f4cb025216a111f54625
   - path: tasks/active/PHYSICS-004-operational-runtime-physics-module.md
     sha256: 43d466256663a94358f200f55079fef2c95aee5c2c6d1df643193681da95df23
   - path: tasks/active/README.md
     sha256: 548905c5b1852787b927142df975fe3fe39b5e0b32c5ee3aec365dd787ee80f7
   - path: tasks/backlog/README.md
-    sha256: b5a1f28fc5bf4781120d3b1e70c7eddc42b704e95e7727f623fe0fa19041d30e
+    sha256: 78dd0aefdd919acc62c7d526d77b8925a9632cffa46d7cab12a4d1864fa7b228
   - path: tasks/backlog/physics/README.md
     sha256: a69ef62ba7d2c720a6c56889a37e8dcdef776cb3c3d7f87d1a8430819a62cfe2
   - path: tests/CMakeLists.txt
@@ -89,7 +89,7 @@ source:
     sha256: dd59255ec57e9e801d244bd9fc0a0b756ed55159fd83f0dd8973d37c0caf3a73
   - path: tools/agents/contract_legacy_tasks.json
     sha256: 28b86aeca712858669a000d436638f2847b02c677428dafc7e29ab6b1c5f4cf7
-  content_digest: 4cfe1f52eabad7734e2ff082481666192463e5021907544548011d3f8ec5a072
+  content_digest: 72f344b425aa3dbc233327136dc9aa0c7923cb694bc007a9bab218adef34c69d
 touched:
   paths:
   - ara/logic/claims.md
@@ -188,6 +188,14 @@ commands:
 - receipt: tasks/evidence/PHYSICS-004/commands/final-validate-tasks.json
 - receipt: tasks/evidence/PHYSICS-004/commands/final-workflow-validation.json
 - receipt: tasks/evidence/PHYSICS-004/commands/focused-physics-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/merged-asan-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/merged-asan-focused.json
+- receipt: tasks/evidence/PHYSICS-004/commands/merged-ci-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/merged-ci-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/merged-focused-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/merged-structural.json
+- receipt: tasks/evidence/PHYSICS-004/commands/merged-ubsan-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/merged-ubsan-focused.json
 - receipt: tasks/evidence/PHYSICS-004/commands/module-inventory.json
 - receipt: tasks/evidence/PHYSICS-004/commands/root-hygiene.json
 - receipt: tasks/evidence/PHYSICS-004/commands/sandbox-dev-build.json
@@ -217,7 +225,7 @@ artifacts:
   sha256: 6b9eab24bc2543543180dc5a2679df81638a27f8b6ed8e8588a771eb71fc8c63
   kind: file
 - path: ara/logic/claims.md
-  sha256: 1f3ec7190785ad0dd21a25990724b63b0fe51aaae998216770f8e0a02c840640
+  sha256: 040b841d01fcf38ad2a0a7a9997787c2c796ead6b84a2b6ffc4b2656a1040f9c
   kind: file
 self_review:
   completed: true
