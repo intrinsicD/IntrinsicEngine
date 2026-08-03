@@ -1899,5 +1899,44 @@ observations:
     bound_to: [N354]
     promoted: true
     promoted_to: "logic/claims.md:C27"
+  - id: O114
+    timestamp: "2026-08-03T23:39+02:00"
+    provenance: user
+    content: >
+      Geometry-method applicability follows the least structured data domain:
+      meshes satisfy mesh, graph, and point-set requirements; graphs satisfy
+      graph and point-set requirements; and point-set methods accept typed
+      Property or ConstProperty values from any originating element domain,
+      including face centers, rather than requiring VertexProperty, exact
+      provenance, or conversion. Graph methods likewise require only their
+      named adjacency and property inputs, so compatible meshes qualify.
+    context: >
+      The user explicitly clarified the meshes > graphs > point clouds
+      capability hierarchy after the earlier LOP integration incorrectly made
+      a container/wrapper identity part of method eligibility. Canonical agent,
+      method, geometry API, task, and review contracts now encode this rule.
+    potential_type: architecture
+    bound_to: [N355]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A29"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O115
+    timestamp: "2026-08-03T23:39+02:00"
+    provenance: ai-executed
+    content: >
+      RUNTIME-206 executes LOP-family same-cardinality publication, exact
+      history, and stale-source rejection on all eight mesh, graph, and
+      point-cloud element domains, while rejecting topology-bearing count
+      changes and oversized CLOP mixtures before queueing.
+    context: >
+      The generic GeometryPropertyRef runtime path and its final review fixes
+      passed the exact five-case module selector, complete CPU/Null suite, and
+      complete isolated ASan and UBSan CPU cohorts. UI-039 retains interactive
+      property discovery; GPU/performance work is excluded.
+    potential_type: claim
+    bound_to: [N355, N356]
+    promoted: true
+    promoted_to: "logic/claims.md:C28"
     crystallized_via: artifact-commitment
     stale: false

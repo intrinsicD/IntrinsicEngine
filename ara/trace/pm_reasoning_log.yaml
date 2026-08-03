@@ -1353,3 +1353,11 @@ entries:
       - "Kept C27 explicit about pending independent high-risk task acceptance and excluded GPU/Vulkan physics, persistence, contact events, dedicated UI, and performance."
       - "Kept O87, O89, O90, and O93 staged and non-stale; PHYSICS-004 does not settle their editor-locality, live-agent-plan, or universal method-operation topics."
       - "Did not modify stale observations or identify a contradiction with existing claims; the historical PhysicsBridge records remain accurate for their original revisions."
+  - turn: "2026-08-03_003#1"
+    notes:
+      - "Allocated N355-N356, O114-O115, A29, and C28 after accounting for concurrent PHYSICS-004 reservations N353-N354, O113, and C27 in the primary worktree."
+      - "Routed the user's exact meshes > graphs > point sets choice as decision N355, then crystallized O114 to A29 through verbal affirmation with user provenance."
+      - "Routed the final-source implementation and focused/full CPU, ASan, and UBSan result as experiment N356; staged O115 and crystallized it to bounded capability claim C28 through artifact commitment."
+      - "Corrected C17's moved RUNTIME-206 proof path without rewriting its historical revision-bounded audit statement."
+      - "Kept UI-039 and the audited RUNTIME/GEOM/UI refactor chain open; excluded interactive UI, GPU/Vulkan, optimized-backend, and performance interpretations."
+      - "Did not promote unrelated staged observations or find a contradiction; A29 refines C18's physical source matrix and preserves O108's recorded rejected-converter conflict."

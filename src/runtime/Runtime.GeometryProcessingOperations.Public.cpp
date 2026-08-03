@@ -183,6 +183,7 @@ PointCloudConsolidationResult SubmitEditorPointCloudConsolidation(
       .World = context.World,
       .Status = PointCloudConsolidationRunStatus::ModuleUnavailable,
       .StableEntityId = request.StableEntityId,
+      .Properties = request.Properties,
       .Config = request.Config,
       .StrategyToken = std::string{StableToken(request.Config.Strategy)},
       .Error = Core::ErrorCode::Unknown,

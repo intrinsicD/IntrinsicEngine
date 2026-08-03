@@ -63,10 +63,11 @@ determinism, and fail-closed identity. Its runtime is descriptive only.
 Select `ear` (or anisotropic `wlop`) in
 `sandbox.point_cloud_consolidation`. The runtime operation honors the same
 authored-or-estimated normal policy, runs the CPU reference asynchronously,
-and publishes the pointer-free normal/refinement diagnostics with the undoable
-point-cloud mutation.
-The interactive surface is
-`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` in the Sandbox;
-its EAR controls expose the shared normal-source, angle, refinement, and edge
-sensitivity values through the registered config lane and report authored or
-estimated normal use plus feature-directed insertions.
+and publishes pointer-free normal/refinement diagnostics. Input positions and
+optional normals are named, count-matched `vec3` properties on any one resolved
+element domain; they need not be vertex properties. Same-cardinality output is
+undoable on that originating domain. EAR growth is topology-changing and is
+therefore accepted only for the topology-free point-cloud point domain through
+canonical full-source replacement. `UI-039` owns property-aware Sandbox
+discovery; the current PointCloud panel continues to expose the shared
+normal-source, angle, refinement, and edge-sensitivity config lane meanwhile.

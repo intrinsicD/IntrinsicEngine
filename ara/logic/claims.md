@@ -465,7 +465,7 @@
 - **Proof**: [docs/reviews/2026-08-02-method-engine-integration-contract-audit.md,
   docs/architecture/contract-catalog.yaml,
   tasks/done/HARDEN-087-unified-geometry-element-source-components.md,
-  tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md,
+  tasks/done/RUNTIME-206-lop-element-domain-source-integration.md,
   tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md,
   tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
   tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md,
@@ -822,3 +822,38 @@
 - **Dependencies**: []
 - **Tags**: runtime, physics, ECS, fixed step, config, CPU, Null, Operational
 - **From staging**: O113
+## C28: LOP-family runtime publication accepts every geometry element domain
+- **Statement**: `PointCloudConsolidationService` resolves a caller-selected
+  finite `vec3` property on mesh vertices, edges, halfedges, or faces; graph
+  nodes, edges, or halfedges; and point-cloud points. A same-cardinality
+  LOP/WLOP/CLOP/EAR result publishes only named output properties to the
+  originating element-domain `PropertySet`, participates in exact undo/redo,
+  and rejects stale source values. Topology-bearing cardinality changes and a
+  CLOP component count larger than the selected input fail before job
+  submission; only canonical point-cloud position replacement may change
+  cardinality.
+- **Status**: supported — Clang 23 exact module 5/5, complete CPU/Null 4,075
+  pass plus one policy skip, ASan 2,670/2,670, and UBSan 2,669 pass plus one
+  policy skip; property-aware Sandbox discovery remains with `UI-039`, and no
+  GPU/Vulkan, optimized-backend, or performance claim is made
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Any compatible element-domain property is
+  rejected because of its container, provenance, or handle wrapper; an
+  accepted same-cardinality result publishes outside its originating domain,
+  loses unrelated properties/topology, lacks exact history, or survives a
+  selected-property mutation; a topology-bearing count change or oversized
+  CLOP mixture reaches the job queue; or a non-canonical point-cloud property
+  is resized.
+- **Proof**: [tasks/done/RUNTIME-206-lop-element-domain-source-integration.md,
+  src/runtime/Runtime.PointCloudConsolidationModule.cppm,
+  src/runtime/Runtime.PointCloudConsolidationModule.cpp,
+  tests/contract/runtime/Test.PointCloudConsolidationModule.cpp,
+  tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.json,
+  tasks/evidence/RUNTIME-206/commands/cpu-tests-r2.json,
+  tasks/evidence/RUNTIME-206/commands/asan-tests-r2.json,
+  tasks/evidence/RUNTIME-206/commands/ubsan-tests-r2.json]
+- **Dependencies**: [C18, C22, C23, C24]
+- **Tags**: runtime, geometry, point set, property domains, LOP, WLOP, CLOP,
+  EAR, CPU, undo, stale writeback
+- **From staging**: O115

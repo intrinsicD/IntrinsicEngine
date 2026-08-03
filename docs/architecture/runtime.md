@@ -241,6 +241,15 @@ presentation changes before publication and before every history transition.
 The snapshot comparison includes the production typed mesh/graph connectivity
 records; an erased property type it cannot compare rejects the transition
 rather than accepting descriptor equality.
+LOP-family consolidation uses the broader property-domain form of the same
+contract. Its request carries named finite `vec3` input/output properties on
+any resolved mesh, graph, or point-cloud element domain, so a mesh face-center
+property is a valid point set without becoming a vertex property or a new
+entity. Same-cardinality publication changes only the named output properties;
+exact topology and unrelated/custom property storage remain owned by the
+source. Mesh/graph count changes fail during the shared availability preflight
+before a job is queued. Only a topology-free point-cloud point domain may take
+the existing canonical full-source replacement path, with exact undo/redo.
 Geometry-presentation slot edits additionally validate and monotonically
 advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The
@@ -783,17 +792,19 @@ separate validated binding.
 Runtime geometry extraction, method readiness, property resolution, history,
 and editor snapshots consume the shared ECS element sources through
 `BuildSourceAvailability`. Physical capability and semantic provenance remain
-separate: mesh vertices, graph nodes, and point-cloud points all resolve through
-`VertexSource`, while logical `GraphNode` publication additionally requires
-graph provenance. Graph algorithms that need adjacency read the real
-`HalfedgeSource` `h:connectivity` property; runtime does not reconstruct it from
-edge endpoints or convert the entity into another geometry kind. The canonical
-property vocabulary includes `GraphHalfedge` alongside `GraphNode` and
-`GraphEdge`; availability, job scopes, property catalogs, scene wire values,
-and Sandbox graph-domain models all resolve that domain to the graph entity's
-physical `Halfedges` source. Connectivity properties remain visible as
-catalogued internal/connectivity rows and are not offered as visualization
-attributes.
+separate. Point-set methods resolve their named typed property through any of
+the canonical logical domains; they do not use `VertexSource` or provenance as
+the eligibility boundary. Mesh vertices, graph nodes, and point-cloud points
+share `VertexSource`, while mesh/graph edges and halfedges and mesh faces expose
+their own property sets. Graph algorithms that need adjacency read the real
+`HalfedgeSource` connectivity plus the named edge/node properties, and a mesh
+may satisfy the same graph contract from its existing sources; runtime neither
+reconstructs adjacency from a weaker input nor converts the entity. The
+canonical property vocabulary includes `GraphHalfedge` alongside `GraphNode`
+and `GraphEdge`; availability, job scopes, property catalogs, scene wire
+values, and Sandbox graph-domain models resolve each logical domain to its
+physical source. Connectivity properties remain visible as catalogued
+internal/connectivity rows and are not offered as visualization attributes.
 
 Scene JSON version 2 remains backend-neutral. Version 2 makes graph halfedge
 connectivity mandatory so a loaded graph satisfies the same

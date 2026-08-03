@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-206`](RUNTIME-206-lop-element-domain-source-integration.md) — LOP
+family element-domain source integration completed on 2026-08-03 at
+`Operational`. The runtime now resolves named finite `vec3` input/output
+properties across mesh vertices, edges, halfedges, and faces; graph nodes,
+edges, and halfedges; and point-cloud points through one availability, async
+worker, stale-result, publication, and history path. A mesh face-center
+property is therefore a first-class point set without conversion or a
+`VertexProperty` requirement. Same-cardinality publication changes only named
+properties and preserves topology plus unrelated/custom erased values;
+topology-bearing count changes fail before queueing, while canonical
+point-cloud replacement retains exact undo/redo. The exact module selector
+passed 5/5; the full CPU selector selected 4,076 and passed 4,075 with its
+expected GLFW/LSan skip; ASan passed 2,670/2,670; and UBSan passed 2,669 with
+its LSan-only skip. Strict architecture, task/docs, method-manifest, inventory,
+ARA, clean-workshop, and independent fixed-surface review gates close the
+runtime correction. `UI-039` retains property-aware Sandbox discovery, and no
+GPU or performance claim is made.
+
 [`GEOM-064`](GEOM-064-parameterization-optimization-kernels.md) — the shared
 parameterization optimization-kernel seam completed on 2026-08-03 at
 `CPUContracted`. `Geometry.Parameterization.Optimize` now owns deterministic

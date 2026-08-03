@@ -1,0 +1,304 @@
+schema_version: 1
+task_id: RUNTIME-206
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-03T21:53:28Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 19554530c62fe4033be381a068442689104a56d7
+  head_revision: add2522413378ae6be1fec6aa58181e654be7bd3
+  branch: runtime/runtime-206-lop-domain-sources
+  worktree: /tmp/intrinsic-runtime206.ZvbjE9
+  dirty: false
+  surface:
+  - path: AGENTS.md
+    sha256: 6e4ddc7e426989a7aaceb160ffe1d90cd37e10c6314f477bdb6ff46f318d1305
+  - path: ara/logic/claims.md
+    sha256: 0b9273de052f2b37ba7ed33a3677bad58a79ecd9fe9f74017b65f261f316ed08
+  - path: ara/logic/solution/architecture.md
+    sha256: 2680525469b0fafe3ed0b14504a7a0bf7f14667624412628c9e303644e2ae5d3
+  - path: ara/staging/observations.yaml
+    sha256: e864aa7c5420ab61ba70ec7b9c3666506669fdd3546104f6f9664119010ef9ea
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 5ceedf0baa78f8e227296a5f619f4f11555fd6d7592a31cbaddd9d2691d2bfa6
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: e42e6a2268804a966cc83513f47d956b9620c1571237c86ded9b836aa2bce5a9
+  - path: ara/trace/sessions/2026-08-03_003.yaml
+    sha256: cf06075ed59d8705087334f2eaa8e0f93ce179260f5b569689bb88125f573baa
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: ffad58966788445d667278d175d9a9da1e0d5f0b8c2a2e128cb9abd416b9b19e
+  - path: docs/agent/method-review-checklist.md
+    sha256: 02019d31d98f609891e66ffdf1677e777b14859edbb86c7cba612fd4956d97f3
+  - path: docs/agent/method-workflow.md
+    sha256: 7a592300752a6c3a2322e0775729d7fb80da11b11ea4e32c91f93aa4af9fd6b1
+  - path: docs/agent/task-format.md
+    sha256: 94a60a0780a8fa0e2b9f35336f45406e98c5d8057e278fef2e85f639e75ef04c
+  - path: docs/architecture/contract-catalog.yaml
+    sha256: e9340e4803bb65ec7dfe70a7cc16e7fdc200172cfa778d2b4984c7f81eca7798
+  - path: docs/architecture/geometry-api-style.md
+    sha256: c44e81a2977b0a94872a3860bbba4081e77336b5cbc3afee73c8fc6a209088fa
+  - path: docs/architecture/method-api-contract.md
+    sha256: 36d5936bbab5f5f28425458e1e5f470727a5b3c22b8e77466ef6c9209748c511
+  - path: docs/architecture/runtime.md
+    sha256: 88099fbadeb189c9acaf1a5afd4398c073c267fb6d210782da063f7a8e0f3960
+  - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+    sha256: 67c51349cafe6bddf365712106b66a3fd2e8e6fd94cc8ddd2757f24d73e7e853
+  - path: docs/reviews/2026-08-03-runtime-206-clean-workshop-review.md
+    sha256: f144938fa40119c2b4146c62ae8a9fbd5c14b4a7e5844c679d797b116d81e1d8
+  - path: methods/geometry/continuous_lop/README.md
+    sha256: 7df0d8e6f54080cc455a336411672640d0c71b122f1dc74ffb7efffb28ef58e3
+  - path: methods/geometry/edge_aware_resampling/README.md
+    sha256: c8b25f324aad72d18628c50c97b1b719686358e91794fe364cadccc02232b2df
+  - path: methods/geometry/locally_optimal_projection/README.md
+    sha256: 979497eacfca062efb345cf699c76a8bc80e13efbe689de065b673c931f69e72
+  - path: src/runtime/README.md
+    sha256: 365079bc79e3f5ed326842ed240bcdaebee2d3a9799df81f8344c2cdc7ae7561
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: 901daec9bc2e5622466478ebe9fc805f6b3e9e01d925eaf201ec4677d1f1c480
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
+    sha256: c30e52ae520c259ccd59ea5130000838c0948238ef1c1bab90ca3fd948f18977
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
+    sha256: 9f275853ca9715845128aee9b836c5a577fc79047701cb235b301a1ce7b63ef9
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 05b3c797e616433d728f530abaabc804b8f2a15f63d13b0a54a08b508e1ece74
+  - path: tasks/backlog/README.md
+    sha256: d9d784cf2e171525a9ba58d672d7e6ad7db0707fcc19c713a0f73b2d8015c60f
+  - path: tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+    sha256: c22d856ff83d0c2735fb05e612f63834b07ecd045c0128864340881cc3b71269
+  - path: tasks/backlog/geometry/GEOM-074-graph-property-adjacency-contracts.md
+    sha256: 50a30edb2d85126770996c48a3616009dd06ac2e65a590f578312ccb1675c433
+  - path: tasks/backlog/geometry/README.md
+    sha256: af4a6826a9766bdb815123da8d9bc519148053739138d76fb8dc78d794c0bb66
+  - path: tasks/backlog/runtime/README.md
+    sha256: 3035a0a416a15927de5fe11271a4173357b586e839a5046d7bd272be4d13969c
+  - path: tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md
+    sha256: null
+  - path: tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md
+    sha256: 4e1d8387b1fda2a1994d23123be93858ca4661a22789275f99a47e30ca45158d
+  - path: tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md
+    sha256: e0c35971d0cc45c3323feb5aaa3113bb089295ff494f75cbcc61b3974457f9f9
+  - path: tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md
+    sha256: d39af940c861b6652ad699be0961a0d378d203c7d025eed2ebde273c33635bda
+  - path: tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md
+    sha256: 8c53114a45018229f4d6f3424abe9471d999e0f2a9e1f23e403e9ccd0ffefa46
+  - path: tasks/backlog/runtime/RUNTIME-213-point-normal-property-domain-integration.md
+    sha256: 2c97070731b972282dc2048851d3d33644e0d76f2a7d531c5d41c3186154c0a0
+  - path: tasks/backlog/ui/README.md
+    sha256: 6692d9aca79012afcc0ea21396d88f56e7ae100945ddcaa185c25c594293c471
+  - path: tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md
+    sha256: f509db929b144518bad260f45315aed73edc0c390a51630db1830188c0af8548
+  - path: tasks/backlog/ui/UI-040-icp-compatible-source-selection.md
+    sha256: 7cb14500ee50576914bf8770021fae88549a0a757444a3aa9bfeab3413ebc196
+  - path: tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md
+    sha256: fcb1c81d8bc765d533ad2967e8986c3c534a8573fbd9847916aa1c5d82cf4e7c
+  - path: tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md
+    sha256: 8cabdf885c5c5d5ce5df25c34258834edf834091f6b90bf620d748f1fe87abcf
+  - path: tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md
+    sha256: 2171c79d8d4429ad35de013f59ac5b78bf0f2e1bf8d884686b1c21b6c2afb444
+  - path: tasks/backlog/ui/UI-045-point-normal-property-domain-panel.md
+    sha256: 2be370e01dc0799ea023c31f589b281407c126ef01d0ed0083eff10dd96230ae
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 7aab05e5c2766316c0bd5eb2589b5ae40efebf650bd2acd963cacb230393d938
+  - path: tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
+    sha256: 704d2644c454bd2628a32f897fe7eea62f301e5c0319c72436cd34981780949c
+  - path: tasks/templates/task.md
+    sha256: c586c2c7fbf8e83e33df410475e14e7aff3d2f11e9e6d1740354b8c070510359
+  - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+    sha256: 7beaeae8e3ba02f429cb39c1e56c81f46826e39ad50cec630600a45a60228019
+  - path: tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
+    sha256: 02019d31d98f609891e66ffdf1677e777b14859edbb86c7cba612fd4956d97f3
+  - path: tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+    sha256: 348182de6f55c00e81d06f53e19ac1c56dfc42aa003a28ace7853a529cbf7a25
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+    sha256: 80578695edb8a1c2ecf8b8e40eba70f2e575ca474c98ee6849707424aec94ec9
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
+    sha256: c586c2c7fbf8e83e33df410475e14e7aff3d2f11e9e6d1740354b8c070510359
+  content_digest: 6e8b5e116f00de84b6d5005dabebfa0277b13fca8ce73bb4a459af3b0618dc8e
+touched:
+  paths:
+  - AGENTS.md
+  - ara/logic/claims.md
+  - ara/logic/solution/architecture.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-03_003.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/agent/method-review-checklist.md
+  - docs/agent/method-workflow.md
+  - docs/agent/task-format.md
+  - docs/architecture/contract-catalog.yaml
+  - docs/architecture/geometry-api-style.md
+  - docs/architecture/method-api-contract.md
+  - docs/architecture/runtime.md
+  - docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  - docs/reviews/2026-08-03-runtime-206-clean-workshop-review.md
+  - methods/geometry/continuous_lop/README.md
+  - methods/geometry/edge_aware_resampling/README.md
+  - methods/geometry/locally_optimal_projection/README.md
+  - src/runtime/README.md
+  - src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/README.md
+  - tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+  - tasks/backlog/geometry/GEOM-074-graph-property-adjacency-contracts.md
+  - tasks/backlog/geometry/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md
+  - tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md
+  - tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md
+  - tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md
+  - tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md
+  - tasks/backlog/runtime/RUNTIME-213-point-normal-property-domain-integration.md
+  - tasks/backlog/ui/README.md
+  - tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md
+  - tasks/backlog/ui/UI-040-icp-compatible-source-selection.md
+  - tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md
+  - tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md
+  - tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md
+  - tasks/backlog/ui/UI-045-point-normal-property-domain-panel.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
+  - tasks/templates/task.md
+  - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+  - tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
+  - tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
+  layers:
+  - methods
+  - runtime
+  modules:
+  - Extrinsic.Runtime.PointCloudConsolidationModule
+extension_seam: The existing GeometryPropertyRef/GeometryAvailability vocabulary and PointCloudConsolidationService
+  now provide one typed-property preflight, worker, publisher, and history path for every geometry element
+  domain.
+future_change_plan: UI-039 consumes the exported property-aware preflight for Sandbox discovery; RUNTIME-207,
+  RUNTIME-209, RUNTIME-211..213, UI-040..045, and GEOM-073..074 own the audited remaining restrictions.
+acceptance:
+- criterion: LOP-family eligibility depends on a usable typed property on a resolved
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Mesh and graph entities retain topology; no implicit conversion exists.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every control surface uses one validated config/operation path and every
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-206/commands/ara-claims-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ara-claims.json
+- receipt: tasks/evidence/RUNTIME-206/commands/asan-build-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/asan-build.json
+- receipt: tasks/evidence/RUNTIME-206/commands/asan-configure.json
+- receipt: tasks/evidence/RUNTIME-206/commands/asan-tests-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/asan-tests.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ci-build-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ci-build.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ci-configure.json
+- receipt: tasks/evidence/RUNTIME-206/commands/clean-workshop-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-206/commands/cpu-tests-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-206/commands/diff-check-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/diff-check-worktree-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/diff-check-worktree-r3.json
+- receipt: tasks/evidence/RUNTIME-206/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-206/commands/doc-links-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-206/commands/docs-sync-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/docs-sync.json
+- receipt: tasks/evidence/RUNTIME-206/commands/focused-module-tests-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.json
+- receipt: tasks/evidence/RUNTIME-206/commands/focused-tests.json
+- receipt: tasks/evidence/RUNTIME-206/commands/layering-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-206/commands/method-manifests-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/method-manifests.json
+- receipt: tasks/evidence/RUNTIME-206/commands/module-inventory.json
+- receipt: tasks/evidence/RUNTIME-206/commands/root-hygiene-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-206/commands/session-brief-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-206/commands/skill-mirrors-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/skill-mirrors.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-maturity-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-maturity.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-policy-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-policy-r3.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-state-links-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-state-links-r3.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-state-links.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-validation-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-validation-r3.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-validation.json
+- receipt: tasks/evidence/RUNTIME-206/commands/test-layout-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/test-layout.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ubsan-build-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ubsan-configure.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ubsan-tests-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ubsan-tests.json
+changed_public_contracts:
+- Point-set method eligibility is a compatible typed Property<T>/ConstProperty<T> or span on any resolved
+  element domain, never point-cloud provenance, Vertices, or a handle-specific property wrapper.
+- Same-cardinality LOP-family output updates only named vec3 properties on the originating domain; topology-bearing
+  cardinality changes reject before submission and canonical point-cloud replacement remains explicit.
+- AGENTS.md, method/task workflows, review checklists, the contract catalog, and the task template now
+  make the property-domain contract prospective and reviewable.
+diagnostics_and_previews:
+- Invalid/missing/non-finite properties, authored-normal requirements, incompatible output types, deleted
+  slots, oversized CLOP mixtures, and topology-bearing count changes fail through the one exported availability
+  result used by direct and queued callers.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- UI-039 still owns interactive property selection/discovery; this runtime task does not claim that the
+  current PointCloud-only panel is complete.
+- No optimized/GPU backend or performance claim is made; existing CPU-reference strategy selection is
+  unchanged.
+- Arbitrary-domain authored/estimated normal publication uses the same generic path but is not independently
+  executed for every element domain in this slice.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No shader, RHI, Vulkan backend, byte-layout, or GPU execution behavior changed; full CPU plus
+    isolated ASan/UBSan gates exercise the shared runtime/property/history path.
+artifacts:
+- path: tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
+  sha256: 704d2644c454bd2628a32f897fe7eea62f301e5c0319c72436cd34981780949c
+  kind: file
+- path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+  sha256: 7beaeae8e3ba02f429cb39c1e56c81f46826e39ad50cec630600a45a60228019
+  kind: file
+- path: docs/reviews/2026-08-03-runtime-206-clean-workshop-review.md
+  sha256: f144938fa40119c2b4146c62ae8a9fbd5c14b4a7e5844c679d797b116d81e1d8
+  kind: file
+- path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  sha256: 67c51349cafe6bddf365712106b66a3fd2e8e6fd94cc8ddd2757f24d73e7e853
+  kind: file
+- path: ara/logic/claims.md
+  sha256: 0b9273de052f2b37ba7ed33a3677bad58a79ecd9fe9f74017b65f261f316ed08
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-206/handoff.jsonl
+review: tasks/evidence/RUNTIME-206/reviews.jsonl
