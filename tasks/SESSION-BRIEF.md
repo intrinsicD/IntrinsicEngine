@@ -47,6 +47,21 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-123` — Retired queued scene save intermittently loses its terminal event (tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md)
 - unblocked: `BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot (tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md)
 
+## Theme H — Agentic workflow hardening
+
+- blocked by `CI-012`: `BUILD-005` — Define hermetic toolchain and action identity (tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md)
+- blocked by `CI-013`: `BUILD-006` — Run a C++23-module build and cache backend bake-off (tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md)
+- unblocked: `CI-012` — Compile a versioned verification evidence graph (tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md)
+- blocked by `CI-012`: `CI-013` — Add unified verifier profiles and receipts (tasks/backlog/process/CI-013-unified-verifier-profiles-and-receipts.md)
+- blocked by `CI-012`: `CI-014` — Derive the static build and contract impact graph (tasks/backlog/process/CI-014-static-build-contract-impact-graph.md)
+- blocked by `CI-012`: `CI-015` — Add digest-keyed test inventory and deterministic sharding (tasks/backlog/process/CI-015-digest-test-inventory-and-sharding.md)
+- blocked by `CI-015`: `CI-016` — Add a content-addressed build and test result cache (tasks/backlog/process/CI-016-content-addressed-build-test-result-cache.md)
+- blocked by `CI-012`: `CI-017` — Establish a test-quality and fault-detection oracle (tasks/backlog/process/CI-017-test-quality-and-fault-detection-oracle.md)
+- blocked by `CI-013`: `CI-018` — Admit hybrid impact-based verification selection (tasks/backlog/process/CI-018-hybrid-impact-selection-admission.md)
+- blocked by `BUILD-006`: `CI-019` — Make CI thin and run full confidence once per merge group (tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md)
+- blocked by `CI-019`: `CI-020` — Cut over verification and retire legacy policy (tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md)
+- blocked by `CI-013`: `PROC-031` — Bind agent workflow to unified verification receipts (tasks/backlog/process/PROC-031-agent-verification-receipts.md)
+
 ## Theme I — Research method implementation
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)

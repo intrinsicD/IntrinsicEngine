@@ -387,3 +387,41 @@
   tests/regression/tooling/Test.ValidateTasks.py,
   tasks/done/PROC-030-contract-applicability-and-method-integration.md]
 - **From staging**: O94
+
+## A27: Verification Plans Derive from One Evidence Graph
+- **Decision**: Local edit, pull-request, merge-group, scheduled-deep, and
+  agent verification plans derive from one schema-versioned evidence graph
+  linking source/build inputs, target and module closure, stable contracts and
+  proofs, logical test cases, variants, capabilities/resources, and
+  revision-bound results. One verifier produces plans and receipts; CTest
+  labels, workflow YAML, task prose, and human-readable commands remain
+  projections rather than independent routing authorities.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N333, N334, N335,
+  docs/architecture/verification-evidence-architecture.md,
+  tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md,
+  tasks/backlog/process/CI-013-unified-verifier-profiles-and-receipts.md,
+  tasks/backlog/process/CI-014-static-build-contract-impact-graph.md,
+  tasks/backlog/process/CI-015-digest-test-inventory-and-sharding.md,
+  tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md,
+  tasks/backlog/process/PROC-031-agent-verification-receipts.md]
+- **From staging**: O97
+
+## A28: Select the Build Backend Through a Named-Module Bake-Off
+- **Decision**: The production build/action-cache backend is not selected from
+  remote-cache capability alone. A frozen matched bake-off must prove
+  exported-interface and layout invalidation, toolchain/flag/sysroot isolation,
+  cross-root and cross-machine reuse, clean-versus-cached output and logical
+  test parity, failure behavior, developer tooling, operating cost, and
+  rollback. The simplest passing path is retained and rejected experiment
+  adapters are deleted; CMake/Ninja remains valid if no candidate clears every
+  killing gate.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N333, N334, N335,
+  docs/architecture/verification-evidence-architecture.md,
+  tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md,
+  tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md,
+  tasks/backlog/process/CI-016-content-addressed-build-test-result-cache.md]
+- **From staging**: O100

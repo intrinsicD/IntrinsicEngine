@@ -91,6 +91,7 @@ Status labels:
 | `legacy-rendering-architecture-migration.md` | migration | Specific to the source-tree migration phase. |
 | `legacy-task-graphs-migration.md` | migration | Specific to the source-tree migration phase. |
 | `vectorfield-overlay-lifecycle-invariants.md` | legacy-background | Subsystem-specific historical notes. |
+| [`verification-evidence-architecture.md`](verification-evidence-architecture.md) | roadmap | Planned unified test/CI/agent evidence graph, verifier profiles, quality admission, migration gates, and bound `CI-012..020` / `BUILD-005..006` / `PROC-031` task DAG. |
 
 ## Notes
 

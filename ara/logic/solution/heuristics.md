@@ -232,3 +232,23 @@
   tasks/done/PROC-029-intrinsicengine-architecture-diagram-skill.md,
   N302, N303]
 - **From staging**: O80
+
+## H16: Shadow Every Verification Optimization Against Full Confidence
+- **Rationale**: Admit selection, grouping/sharding, result caching, slow-lane
+  movement, or variant reduction only after a matched control preserves exact
+  logical inventory and per-case status, contract proofs, production regions
+  and branch arms, mutation/fault-seed detection, required sanitizer and
+  capability evidence, and reliability while meeting predeclared wall-latency
+  and executed-work gates. This catches optimizations that are fast only
+  because they silently stopped observing a failure class.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [docs/architecture/verification-evidence-architecture.md,
+  tasks/backlog/process/CI-015-digest-test-inventory-and-sharding.md,
+  tasks/backlog/process/CI-016-content-addressed-build-test-result-cache.md,
+  tasks/backlog/process/CI-017-test-quality-and-fault-detection-oracle.md,
+  tasks/backlog/process/CI-018-hybrid-impact-selection-admission.md,
+  tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md,
+  N334, N335]
+- **From staging**: O99

@@ -97,7 +97,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O10
     timestamp: "2026-07-10T13:24"
     provenance: ai-executed
@@ -141,7 +141,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O14
     timestamp: "2026-07-13T01:00"
     provenance: ai-executed
@@ -420,7 +420,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O39
     timestamp: "2026-07-15T20:39+02:00"
     provenance: ai-suggested
@@ -757,7 +757,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O58
     timestamp: "2026-07-23T01:31+02:00"
     provenance: ai-suggested
@@ -775,7 +775,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O59
     timestamp: "2026-07-23T08:31+02:00"
     provenance: ai-executed
@@ -1150,7 +1150,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O78
     timestamp: "2026-07-30T21:13+02:00"
     provenance: ai-suggested
@@ -1551,5 +1551,106 @@ observations:
     bound_to: [N330, N331, N332]
     promoted: true
     promoted_to: "logic/claims.md:C18"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O97
+    timestamp: "2026-08-03T01:51+02:00"
+    provenance: ai-suggested
+    content: >
+      Test and CI policy should be one typed evidence graph linking changed
+      sources and module targets to contract IDs, test cases, build variants,
+      capabilities, resources, and revision-bound results. One executable
+      verifier should derive local-edit, pull-request, merge-queue, scheduled,
+      and agent plans from that graph; workflow YAML, task prose, and path maps
+      should not each encode a second routing truth.
+    context: >
+      The current audit found fast CPU execution already near 20-30 seconds but
+      clean CPU/sanitizer compilation near 25-30 minutes, alongside separate
+      CMake registration, touched-scope, workflow, and agent-command policy.
+    potential_type: architecture
+    bound_to: [N333]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A27"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O98
+    timestamp: "2026-08-03T01:51+02:00"
+    provenance: ai-suggested
+    content: >
+      Parallelism can reduce wall latency but cannot reduce total test work.
+      Preserving confidence while reducing both requires exact action and
+      hermetic-test memoization, removal of duplicate same-variant work,
+      full-matrix batching at a merge queue, or selectively omitting work only
+      after full-suite shadow evidence establishes equivalent fault signal.
+    context: >
+      The redesign explicitly separates edit-to-signal p95 from CPU/GPU minutes
+      per accepted change and rejects treating more runners as a total-cost
+      optimization.
+    potential_type: constraint
+    bound_to: [N333]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K28"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O99
+    timestamp: "2026-08-03T01:51+02:00"
+    provenance: ai-suggested
+    content: >
+      Admit test selection, grouping, result caching, slow-cohort movement, or
+      variant reduction only through matched full-suite shadow runs that retain
+      logical inventory and status parity, lose no covered production regions
+      or branch arms, do not reduce mutation or fault-seed detection, record
+      selection misses and flakes, and demonstrate both p95-latency and total-
+      compute improvement.
+    context: >
+      This extends the repository's existing inventory, coverage-parity, timing,
+      and fail-closed practices into one quality-preserving admission rule for
+      future test/CI optimization.
+    potential_type: heuristic
+    bound_to: [N333]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H16"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O100
+    timestamp: "2026-08-03T01:51+02:00"
+    provenance: ai-suggested
+    content: >
+      The build backend should be selected by a named-module correctness and
+      latency bake-off rather than by remote-cache capability alone. A
+      REAPI-native hermetic action graph is preferred only if cross-path and
+      cross-machine cache reuse, exported-interface and layout invalidation,
+      compiler/flag/sysroot variant isolation, clean-build output parity, and
+      required developer tooling all pass; otherwise retain CMake/Ninja's
+      proven scan-and-collate module graph and improve the layers above it.
+    context: >
+      Current CMake documentation treats named-module compilation as a dynamic,
+      partially sequential dependency graph, while remote-action systems offer
+      content-addressed caching and distributed execution but require a
+      repository-specific Clang-module proof before adoption.
+    potential_type: architecture
+    bound_to: [N333]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A28"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O101
+    timestamp: "2026-08-03T02:28+02:00"
+    provenance: ai-suggested
+    content: >
+      On a matched accepted-change corpus, the planned verification redesign
+      targets implementation-unit edit p95 at or below 10 seconds,
+      module-interface edit p95 at or below 60 seconds, focused pull-request
+      p95 at or below 3 minutes, broad pull-request p95 at or below 8 minutes,
+      merge-group p95 at or below 10 minutes, and at least 50 percent less
+      executed action time without regression in the declared quality oracle.
+    context: >
+      The architecture roadmap records these as untested program targets and
+      binds measurement and killing gates to BUILD-006, CI-017, CI-018, and
+      CI-020 rather than describing current capability.
+    potential_type: claim
+    bound_to: [N333, N334, N335]
+    promoted: true
+    promoted_to: "logic/claims.md:C19"
     crystallized_via: artifact-commitment
     stale: false

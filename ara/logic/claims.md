@@ -526,3 +526,29 @@
 - **Tags**: ecs, geometry, runtime, UI, element sources, graph halfedges,
   CPU, ASan, UBSan, retirement
 - **From staging**: O96
+
+## C19: Verification redesign latency and total-work targets are achievable
+- **Statement**: On a matched accepted-change corpus, the planned verification
+  system can reach implementation-unit edit p95 at or below 10 seconds,
+  module-interface edit p95 at or below 60 seconds, focused pull-request p95 at
+  or below 3 minutes, broad pull-request p95 at or below 8 minutes,
+  merge-group p95 at or below 10 minutes, and at least 50 percent less executed
+  action time while every CI-017/CI-018 quality-admission dimension remains
+  non-regressed.
+- **Status**: hypothesis — target declaration only; no implementation or matched
+  measurement exists
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Frozen claim-grade matched results miss any
+  declared p95 or executed-work threshold, require a quality/capability gate to
+  be weakened, show an unexplained selection/cache divergence, or cannot
+  reproduce the target under the declared environment and workload identities.
+- **Proof**: [docs/architecture/verification-evidence-architecture.md,
+  tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md,
+  tasks/backlog/process/CI-017-test-quality-and-fault-detection-oracle.md,
+  tasks/backlog/process/CI-018-hybrid-impact-selection-admission.md,
+  tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md,
+  N334, N335]
+- **Dependencies**: []
+- **Tags**: CI, testing, latency, total work, quality admission, hypothesis
+- **From staging**: O101

@@ -7907,3 +7907,88 @@ tree:
       promoted Vulkan was not run because no graphics/RHI/backend surface
       changed, and no GPU/Vulkan or performance claim is made.
     status: resolved
+  - id: N333
+    type: question
+    title: "Redesign test, CI, and agent verification for fast trustworthy iteration"
+    provenance: user
+    timestamp: "2026-08-03T01:51+02:00"
+    description: >
+      Determine how IntrinsicEngine's test system, CI topology, and necessary
+      agent workflow could be redesigned from first principles to minimize
+      edit-to-signal latency and total test work without weakening test quality,
+      coverage, sanitizer evidence, or GPU/Vulkan confidence.
+    status: resolved
+  - id: N334
+    type: decision
+    title: "Commit the verification redesign as bound architecture and tasks"
+    provenance: user
+    timestamp: "2026-08-03T02:28+02:00"
+    also_depends_on: [N333]
+    choice: >
+      Adopt the proposed evidence-graph, quality-admission, hermetic reuse,
+      merge-batching, and revision-bound agent direction by creating the
+      complete dependency-ordered backlog and binding it in one architecture
+      roadmap before implementation begins.
+    alternatives:
+      - "Leave the redesign as conversational guidance without executable task ownership."
+      - "Open one umbrella task that mixes schema, build, test, CI, quality, and agent cutover."
+      - "Edit current workflow commands incrementally without a shared target architecture or deletion gate."
+    evidence:
+      - "User direction: please create all tasks to do this correctly and bind them together in an architecture file."
+      - "N333"
+      - "O97"
+      - "O98"
+      - "O99"
+      - "O100"
+    status: resolved
+  - id: N335
+    type: experiment
+    title: "Author and validate the verification redesign roadmap"
+    provenance: ai-executed
+    timestamp: "2026-08-03T02:28+02:00"
+    also_depends_on: [N334]
+    evidence:
+      - "docs/architecture/verification-evidence-architecture.md"
+      - "tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md"
+      - "tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md"
+      - "tasks/backlog/process/README.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "validate_tasks.py --strict: 203 task files, 0 findings"
+      - "check_task_policy.py --strict: 0 findings"
+      - "check_task_state_links.py --strict: 0 findings"
+      - "check_doc_links.py: 3,079 relative links, 0 broken"
+      - "check_layering.py --strict: 0 violations"
+      - "check_test_layout.py --strict: 0 findings"
+      - "Mermaid CLI rendered both roadmap diagrams successfully"
+    result: >
+      Created one roadmap and twelve right-sized, dependency-ordered Theme H
+      tasks spanning the evidence graph, unified verifier, static impact,
+      digest inventory/sharding, hermetic action identity, named-module backend
+      bake-off, exact result caching, test-quality oracle, hybrid-selection
+      admission, thin merge-queue CI, agent receipts, and final legacy
+      retirement. CI-012 is the sole unblocked entry task; strict task, state,
+      docs, layering, layout, hygiene, and Mermaid checks passed. No engine,
+      build, test, or workflow implementation changed, so no latency,
+      correctness, sanitizer, Vulkan, or capability target is claimed as met.
+    status: resolved
+  - id: N340
+    type: experiment
+    title: "Confirm RUNTIME-208 is merged and regression-clean"
+    provenance: ai-executed
+    timestamp: "2026-08-03T12:27+02:00"
+    also_depends_on: [N330, N332]
+    evidence:
+      - "origin/main contains merge 95e8435fa02bad0d29af32534982233ea880758a and the accepted RUNTIME-208 fixed-surface review"
+      - "ctest --test-dir build/ci --output-on-failure -R ProgressivePoisson -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120: 45/45 passed in 1.64 seconds"
+      - "python3 tools/repo/check_layering.py --root src --strict: 735 files, 0 violations"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict: 191 tasks, 0 findings"
+      - "python3 tools/agents/check_task_policy.py --root . --strict: 0 findings"
+      - "python3 tools/agents/workflow_evidence.py validate --root . --require-complete RUNTIME-208: 0 errors"
+    result: >
+      The attached backlog task came from a dirty main checkout fourteen commits
+      behind origin/main. RUNTIME-208 was already implemented, accepted by an
+      independent fixed-surface review, retired, and merged upstream. A fresh
+      focused regression and strict structural/evidence audit found no residual
+      defect, so no duplicate implementation patch or unsafe dirty-worktree
+      fast-forward was made.
+    status: resolved

@@ -422,12 +422,19 @@ control surface" proposal was dropped (all members had retired); the `I` letter
 instead names the research/method implementation theme created by the retired
 `PROC-024` (see Theme I above and the retirement log).
 
-Open `PROC-028` is the single explicitly batched workflow-hardening member. It
-implements the already accepted generated task-evidence decisions and closes
-the bounded review, benchmark-result, claim-grade experiment, protected-run,
-portable-bundle, and concurrent-ownership gaps recorded by the 2026-07-29
-four-repository audit. It is process/tooling/docs/CI-policy work only and may
-not modify engine source.
+`PROC-028` and its contract-applicability follow-up `PROC-030` are retired.
+Their generated evidence, fixed-surface review, experiment custody, and
+contract-discovery rules remain the foundation for new process work.
+
+The planned verification redesign is now the open Theme H program. Its
+authoritative architecture, quality/admission rules, migration sequence, and
+dependency DAG live in
+[`verification-evidence-architecture.md`](../../docs/architecture/verification-evidence-architecture.md),
+with the twelve open `CI-012..020`, `BUILD-005..006`, and `PROC-031` members
+indexed under [`process/`](process/README.md). The program keeps current gates
+authoritative through shadow admission, chooses any C++23-module build backend
+through a claim-grade bake-off, and forbids legacy policy deletion until the
+final `CI-020` cutover gate.
 
 The CI-latency track is also Theme H because fast, trustworthy agent feedback is
 workflow infrastructure. `CI-003` is retired after capturing the 2026-07-09

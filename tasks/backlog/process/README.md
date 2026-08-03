@@ -15,7 +15,35 @@ map.
 
 ## Tasks
 
-No process tasks are currently open.
+The verification redesign is bound by the
+[`verification-evidence-architecture.md`](../../../docs/architecture/verification-evidence-architecture.md)
+roadmap. That document is the authoritative dependency and admission map; this
+index lists its open implementation tasks without duplicating the design.
+
+- [`CI-012 — Compile a versioned verification evidence graph`](CI-012-versioned-verification-evidence-graph.md)
+  is the unblocked compatibility foundation.
+- [`CI-013 — Add unified verifier profiles and receipts`](CI-013-unified-verifier-profiles-and-receipts.md)
+  depends on `CI-012`.
+- [`CI-014 — Derive the static build and contract impact graph`](CI-014-static-build-contract-impact-graph.md)
+  depends on `CI-012` and `CI-013`.
+- [`CI-015 — Add digest-keyed test inventory and deterministic sharding`](CI-015-digest-test-inventory-and-sharding.md)
+  depends on `CI-012` and `CI-013`.
+- [`BUILD-005 — Define hermetic toolchain and action identity`](BUILD-005-hermetic-toolchain-action-identity.md)
+  depends on `CI-012`.
+- [`BUILD-006 — Run a C++23-module build and cache backend bake-off`](BUILD-006-cxx23-module-build-backend-bakeoff.md)
+  depends on `CI-013`, `CI-014`, and `BUILD-005`.
+- [`CI-016 — Add a content-addressed build and test result cache`](CI-016-content-addressed-build-test-result-cache.md)
+  depends on `CI-015`, `BUILD-005`, and `BUILD-006`.
+- [`CI-017 — Establish a test-quality and fault-detection oracle`](CI-017-test-quality-and-fault-detection-oracle.md)
+  depends on `CI-012` and `CI-015`.
+- [`CI-018 — Admit hybrid impact-based verification selection`](CI-018-hybrid-impact-selection-admission.md)
+  depends on `CI-013`, `CI-014`, and `CI-017`.
+- [`CI-019 — Make CI thin and run full confidence once per merge group`](CI-019-thin-ci-merge-queue-topology.md)
+  depends on `BUILD-006`, `CI-016`, and `CI-018`.
+- [`PROC-031 — Bind agent workflow to unified verification receipts`](PROC-031-agent-verification-receipts.md)
+  depends on `CI-013` and `CI-018`.
+- [`CI-020 — Cut over verification and retire legacy policy`](CI-020-verification-cutover-and-legacy-retirement.md)
+  is the final retirement gate and depends on `CI-019` and `PROC-031`.
 
 ## Retired
 
@@ -36,6 +64,11 @@ retirement log.
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
+- The planned verification redesign preserves the retired `CI-003..011` and
+  `BUILD-004` evidence surfaces, establishes exact build/test reuse and hybrid
+  impact selection only through matched admission, moves the complete required
+  matrix to one merge-group execution, binds agents to the same receipts, and
+  retires dual policy only in `CI-020`.
 - Retired `PROC-028` implements the already accepted `N123..N125`
   evidence-report decisions and the bounded `N290`/`O71..O75`
   cross-repository workflow findings without replacing the existing task,

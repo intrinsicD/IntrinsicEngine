@@ -367,3 +367,22 @@
   tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md,
   docs/adr/0008-spatial-debug-visualizer-adapters.md]
 - **From staging**: O85
+
+## K28: Total Verification Work Falls Only Through Proven Equivalence or Omission
+- **Constraint**: Parallelism may reduce wall latency but does not reduce total
+  verification work. Without weakening confidence, total work may fall only by
+  reusing an exactly equivalent hermetic action/test result, removing duplicate
+  execution of the same variant and input identity, running the full required
+  matrix once per merge batch, or omitting an impact-excluded action after a
+  matched full-control admission. Unknown inputs broaden or fail; unaudited
+  global-state, concurrency, filesystem, GPU/Vulkan, timing, and stochastic
+  tests remain isolated and non-cacheable by default.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N333, N334, N335,
+  docs/architecture/verification-evidence-architecture.md,
+  tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md,
+  tasks/backlog/process/CI-016-content-addressed-build-test-result-cache.md,
+  tasks/backlog/process/CI-018-hybrid-impact-selection-admission.md,
+  tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md]
+- **From staging**: O98
