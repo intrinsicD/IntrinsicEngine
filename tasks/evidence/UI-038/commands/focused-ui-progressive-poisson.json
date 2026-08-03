@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "SandboxEditorProgressivePoisson",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R SandboxEditorProgressivePoisson -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 826,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T07:49:20Z",
+  "label": "focused-ui-progressive-poisson",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T07:49:19Z",
+  "stderr_path": "tasks/evidence/UI-038/commands/focused-ui-progressive-poisson.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-038/commands/focused-ui-progressive-poisson.stdout.log",
+  "stdout_sha256": "ee5f920187e11738f52f8eb4c433ad6196d022957bf1d42215c2453c34cd7db8",
+  "task_id": "UI-038"
+}

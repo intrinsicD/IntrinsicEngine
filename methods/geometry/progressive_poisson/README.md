@@ -25,9 +25,11 @@ dedicated readback targets and blocking result reads with one shared async
 three-range transfer batch; METHOD-014 retains compute execution and public
 CPU/GPU parity.
 
-## Enabling work (engine backlog)
+## Related engine work
 
-- **GEOM-035** — triangle-mesh → point-cloud surface sampling (mesh input path).
+- **GEOM-035** — explicit triangle-mesh surface-candidate generation for
+  experiments that need a new point-cloud dataset; it is not an implicit input
+  path for this finite-set method.
 - **GEOM-036** — blue-noise quality metrics (RDF/RAPS/periodogram/NN-CV/min-dist).
 - **GRAPHICS-108** — reusable Vulkan compute scan + stream-compaction primitives.
 - **RUNTIME-133** — figure/data export (CSV/JSON) for reproducible plots.
@@ -38,36 +40,33 @@ CPU/GPU parity.
 
 ## Interactive usage
 
-`RUNTIME-134` Slices A-D.1 expose the CPU reference backend in the Sandbox
-PointCloud and Mesh processing windows. The runtime command validates selected
-point-cloud `GeometrySources`, or samples a selected editable mesh surface to a
-point cloud through `GEOM-035` (`Geometry.PointCloud.SurfaceSampling`), forwards
-every reference `Config` knob
+The runtime command accepts the existing `Vertices` component of mesh, graph,
+and point-cloud entities through one typed operation. The Sandbox exposes that
+same operation under Mesh, Graph, and PointCloud Processing, with copied
+readiness explaining missing, wrongly typed, empty, or non-finite
+`v:position` data. No lane surface-samples, reorders, replaces, or changes the
+provenance of the source component. The command forwards every
+reference `Config` knob
 (`dimension`, `grid_width`, `max_levels`, `hash_load_factor`, `radius_alpha`,
 `randomize_grid_origin`, `grid_origin_seed`, `shuffle_within_levels`,
 `shuffle_seed`) plus the backend request (`cpu_reference` or
 `gpu_vulkan_compute`) through a typed command DTO and the engine config-control
-field `sandbox.progressive_poisson`, and publishes per-point float properties for
-visualization:
+field `sandbox.progressive_poisson`, and publishes source-cardinality vertex
+float properties for visualization:
 
-- `p:poisson_level`
-- `p:poisson_phase`
-- `p:poisson_splat_radius`
-- `p:poisson_prefix_visible`
+- `v:poisson_level`
+- `v:poisson_rank`
+- `v:poisson_splat_radius`
+- `v:poisson_prefix_visible`
 
 The prefix property uses `0` as hidden and `1` as visible; a requested prefix
-count of `0` means all accepted points. `p:poisson_phase` is a deterministic
-display bucket derived from level-local rank modulo the 2D/3D phase count because
-the CPU reference result does not expose its internal conflict-resolution phase
-as a stable public output yet.
-
-Mesh runs expose additional surface-sampling controls (`sample_count`, `seed`,
-`min_triangle_area`, and `interpolate_vertex_normals`) and publish the sampled
-cloud back onto the selected entity for point rendering. The runtime result
-reports the written sample count, accepted triangle count, rejected face count,
-and total sampled surface area. It also carries requested backend id, actual
-backend id, CPU fallback reason when present, and accepted-point counts per
-progressive level for the Sandbox readout. As of METHOD-013 Slice D.1,
+count of `0` means all accepted points. Accepted inputs store zero-based global
+progressive rank, accepted hierarchy level, introduction-level splat radius,
+and prefix visibility. Inputs outside the accepted subset retain deterministic
+sentinels: rank `-1`, level `-1`, radius `0`, and visibility `0`. The runtime
+result carries requested backend id, actual backend id, CPU fallback reason when
+present, and accepted-point counts per progressive level for the Sandbox
+readout. As of METHOD-013 Slice D.1,
 requesting `gpu_vulkan_compute` builds against a runtime recordable dispatch
 contract (`Runtime.ProgressivePoissonGpuBackend`) that pins storage-buffer
 layout, BDA push/state records, shader asset paths, per-level build/accept
@@ -81,6 +80,12 @@ Vulkan smoke seeds a CPU-reference-shaped payload into the production-shaped
 buffers and proves the transfer/parser seam. It is not compute parity: public
 Sandbox execution still returns the CPU reference fallback until METHOD-014
 proves the Vulkan compute output path against the CPU reference.
+
+The panel deliberately uses *existing input vertices*, *accepted subset*,
+*hierarchy level*, and *prefix* terminology. That follows the finite-candidate
+subset and progressive-prefix framing in Yuksel, Dieckmann--Klein, Brandt et
+al., and Christensen et al.; Brandt et al.'s surface-candidate rasterization is
+an upstream dataset-construction stage, not a panel-side conversion rule.
 
 Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::PreviewEngineConfigControlDocument` and
@@ -104,4 +109,11 @@ introduction-level splat-radius semantics (conservative for finer prefixes);
 
 - Sibling repository `code/progressive_poisson.{h,cu}`, `paper.tex`, `FIGURES.md`,
   `OPEN_DECISIONS.md`.
+- Brandt et al., *Visibility-Aware Progressive Farthest Point Sampling on the GPU*, CGF
+  2019, DOI `10.1111/cgf.13848`.
+- Yuksel, *Sample Elimination for Generating Poisson Disk Sample Sets*, CGF
+  2015, DOI `10.1111/cgf.12538`.
+- Dieckmann and Klein, *Hierarchical Additive Poisson Disk Sampling*, VMV 2018,
+  DOI `10.2312/vmv.20181256`.
+- Christensen et al., *Progressive Multi-Jittered Sample Sequences*, EGSR 2018.
 - `docs/agent/method-workflow.md` and `AGENTS.md` §6 (method implementation protocol).

@@ -1,0 +1,6 @@
+[check_layering] Scan root: /tmp/intrinsic-runtime208.qxtdIf/src
+[check_layering] Files scanned: 735
+[check_layering] References scanned: 6914 import/include, 85 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.

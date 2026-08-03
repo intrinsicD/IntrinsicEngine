@@ -22,7 +22,7 @@ export namespace Extrinsic::Runtime
     enum class ProgressivePoissonPlaygroundChannel : std::uint32_t
     {
         Level = 0,
-        Phase = 1,
+        Rank = 1,
         SplatRadius = 2,
         PrefixVisible = 3,
     };
@@ -49,10 +49,6 @@ export namespace Extrinsic::Runtime
             ProgressivePoissonPlaygroundChannel::Level};
         ProgressivePoissonPlaygroundBackend Backend{
             ProgressivePoissonPlaygroundBackend::CpuReference};
-        std::uint32_t MeshSurfaceSampleCount{4096u};
-        std::uint32_t MeshSurfaceSampleSeed{1337u};
-        double MeshSurfaceMinTriangleArea{1.0e-14};
-        bool MeshSurfaceInterpolateNormals{true};
         bool AutoRunOnEdit{true};
         double DebounceSeconds{0.25};
     };

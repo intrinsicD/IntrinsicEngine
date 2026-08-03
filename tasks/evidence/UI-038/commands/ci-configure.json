@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 2580,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T07:48:40Z",
+  "label": "ci-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T07:48:38Z",
+  "stderr_path": "tasks/evidence/UI-038/commands/ci-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-038/commands/ci-configure.stdout.log",
+  "stdout_sha256": "e6db25526720dabb3c94a5d4a5557877116584f2ca5168e1da44dde88b291d75",
+  "task_id": "UI-038"
+}

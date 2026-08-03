@@ -22,10 +22,6 @@ map.
 - [UI-039 — LOP family multi-domain discovery](UI-039-lop-multi-domain-discovery.md)
   (extends the `UI-035` panel across Mesh/Graph/PointCloud through
   topology-safe `RUNTIME-206` publication).
-- [UI-038 — Progressive Poisson multi-domain panel](UI-038-progressive-poisson-multi-domain-panel.md)
-  (supersedes the former converter-confirmation plan: the corrected
-  `RUNTIME-208` operation consumes existing `Vertices` and never converts a
-  mesh or graph).
 - [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)
   (one shared readiness value reused by each feature-owned typed operation for
   mesh, UV, bake, point-cloud, registration, and parameterization actions;
@@ -53,6 +49,11 @@ retired under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
 
+- UI-038 is retired at `Operational`. Progressive Poisson is discoverable
+  under Mesh, Graph, and PointCloud Processing through one shared app state,
+  copied runtime readiness/config/run path, and the source-cardinality result
+  channels delivered by `RUNTIME-208`; no converter, surface-sampling controls,
+  or topology replacement remains in the panel.
 - UI-034 is retired under Theme F. It adopts the framework24 viewer
   interaction/layout conventions through the ADR-0024 EditorUiModule/panel
   registry direction: structured domain-window contributions, lazy window
@@ -188,6 +189,11 @@ retired under the runtime backlog as `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [UI-038 — Progressive Poisson multi-domain panel](../../done/UI-038-progressive-poisson-multi-domain-panel.md)
+  (done, 2026-08-03, `Operational`): exposes one non-destructive Progressive
+  Poisson operation under Mesh, Graph, and PointCloud with copied finite-source
+  readiness, disabled reasons, shared config/run routing, and existing result
+  visualization channels.
 - [UI-036 — Sandbox parameterization editor panel and resizable UV split view](../../done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
   (done, 2026-07-15, `Operational`): delivered implemented-strategy controls,
   validated config-lane apply/undo, aggregate diagnostics, and a resizable

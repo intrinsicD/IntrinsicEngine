@@ -68,7 +68,7 @@ namespace Extrinsic::Sandbox::Editor
         constexpr std::array<Runtime::EditorProgressivePoissonChannel, 4>
             kProgressivePoissonChannels{
                 Runtime::EditorProgressivePoissonChannel::Level,
-                Runtime::EditorProgressivePoissonChannel::Phase,
+                Runtime::EditorProgressivePoissonChannel::Rank,
                 Runtime::EditorProgressivePoissonChannel::SplatRadius,
                 Runtime::EditorProgressivePoissonChannel::PrefixVisible,
             };
@@ -223,6 +223,20 @@ namespace Extrinsic::Sandbox::Editor
         {
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
                 ImGui::SetTooltip("%s", text);
+        }
+
+        void DrawProgressivePoissonDisabledRun(
+            const std::string_view disabledReason)
+        {
+            ImGui::BeginDisabled();
+            (void)ImGui::Button(
+                "Run Progressive Poisson##ProgressivePoisson");
+            ImGui::EndDisabled();
+            DrawDisabledReasonTooltip(disabledReason);
+            if (!disabledReason.empty())
+                ImGui::TextDisabled("%.*s",
+                                    static_cast<int>(disabledReason.size()),
+                                    disabledReason.data());
         }
 
         [[nodiscard]] std::string FormatLevelCounts(
@@ -559,10 +573,6 @@ namespace Extrinsic::Sandbox::Editor
             std::int32_t PrefixCount{0};
             std::int32_t Channel{0};
             std::int32_t Backend{0};
-            std::int32_t MeshSurfaceSampleCount{4096};
-            std::int32_t MeshSurfaceSampleSeed{1337};
-            float MeshSurfaceMinTriangleArea{1.0e-14f};
-            bool MeshSurfaceInterpolateNormals{true};
             bool AutoRunOnEdit{true};
             float DebounceSeconds{0.25f};
             bool AutoRunPending{false};
@@ -623,6 +633,11 @@ namespace Extrinsic::Sandbox::Editor
                 "pointcloud.processing.progressive_poisson",
                 {"PointCloud", "Processing"},
                 "PointCloud / Processing / Progressive Poisson");
+            RegisterProgressivePoissonWindow(
+                Runtime::EditorDomainWindowKind::Graph,
+                "graph.processing.progressive_poisson",
+                {"Graph", "Processing"},
+                "Graph / Processing / Progressive Poisson");
             RegisterProgressivePoissonWindow(
                 Runtime::EditorDomainWindowKind::Mesh,
                 "mesh.processing.progressive_poisson",
@@ -766,8 +781,12 @@ namespace Extrinsic::Sandbox::Editor
                 if (!DomainWindowReady(model) ||
                     !model.Processing.HasSelectedEntity)
                 {
-                    ImGui::TextDisabled(
-                        "Select a matching domain entity to inspect processing affordances.");
+                    const std::string_view disabledReason =
+                        model.Diagnostics.empty()
+                            ? "Select a matching domain entity with finite vertex positions."
+                            : std::string_view{
+                                  model.Diagnostics.front().Message};
+                    DrawProgressivePoissonDisabledRun(disabledReason);
                 }
                 else
                 {
@@ -1063,14 +1082,6 @@ namespace Extrinsic::Sandbox::Editor
             state.PrefixCount = static_cast<std::int32_t>(config.PrefixCount);
             state.Channel = ProgressivePoissonChannelIndex(config.Channel);
             state.Backend = ProgressivePoissonBackendIndex(config.Backend);
-            state.MeshSurfaceSampleCount =
-                static_cast<std::int32_t>(config.MeshSurfaceSampleCount);
-            state.MeshSurfaceSampleSeed =
-                static_cast<std::int32_t>(config.MeshSurfaceSampleSeed);
-            state.MeshSurfaceMinTriangleArea =
-                static_cast<float>(config.MeshSurfaceMinTriangleArea);
-            state.MeshSurfaceInterpolateNormals =
-                config.MeshSurfaceInterpolateNormals;
             state.AutoRunOnEdit = config.AutoRunOnEdit;
             state.DebounceSeconds =
                 static_cast<float>(config.DebounceSeconds);
@@ -1102,14 +1113,6 @@ namespace Extrinsic::Sandbox::Editor
                     ProgressivePoisson.Channel),
                 .Backend = ProgressivePoissonBackendFromIndex(
                     ProgressivePoisson.Backend),
-                .MeshSurfaceSampleCount = static_cast<std::uint32_t>(
-                    ProgressivePoisson.MeshSurfaceSampleCount),
-                .MeshSurfaceSampleSeed = static_cast<std::uint32_t>(
-                    ProgressivePoisson.MeshSurfaceSampleSeed),
-                .MeshSurfaceMinTriangleArea = static_cast<double>(
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea),
-                .MeshSurfaceInterpolateNormals =
-                    ProgressivePoisson.MeshSurfaceInterpolateNormals,
                 .AutoRunOnEdit = ProgressivePoisson.AutoRunOnEdit,
                 .DebounceSeconds = static_cast<double>(
                     ProgressivePoisson.DebounceSeconds),
@@ -1123,15 +1126,18 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::EditorGeometryProcessingModel& processing =
                 model.Processing;
             ImGui::SeparatorText("Progressive Poisson");
-            const bool meshInput =
-                model.Kind == Runtime::EditorDomainWindowKind::Mesh;
-            const bool available = meshInput
-                ? processing.MeshProgressivePoissonAvailable
-                : processing.PointCloudProgressivePoissonAvailable;
+            ImGui::TextWrapped(
+                "Orders the selected entity's existing finite Vertices; "
+                "source topology and cardinality are preserved.");
+            const bool available = processing.ProgressivePoissonAvailable;
             if (!available)
             {
-                ImGui::TextDisabled(
-                    "Progressive Poisson is unavailable for this selection.");
+                const std::string_view disabledReason =
+                    processing.ProgressivePoissonDisabledReason.empty()
+                        ? "Progressive Poisson is unavailable for this selection."
+                        : std::string_view{
+                              processing.ProgressivePoissonDisabledReason};
+                DrawProgressivePoissonDisabledRun(disabledReason);
                 return;
             }
 
@@ -1143,7 +1149,7 @@ namespace Extrinsic::Sandbox::Editor
                 context.GeometryConfigCommandsAvailable;
             if (!configControlAvailable)
             {
-                ImGui::TextDisabled(
+                DrawProgressivePoissonDisabledRun(
                     "Progressive Poisson requires engine config-control.");
                 return;
             }
@@ -1183,7 +1189,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
             DrawProgressivePoissonTooltip(
-                "Input dimensionality used by the reference sampler.");
+                "Interpret the existing vertex positions in 2D (XY) or 3D.");
 
             ProgressivePoisson.GridWidth =
                 std::clamp(ProgressivePoisson.GridWidth, 1, 4096);
@@ -1217,23 +1223,6 @@ namespace Extrinsic::Sandbox::Editor
                 0,
                 static_cast<std::int32_t>(
                     kProgressivePoissonBackends.size() - 1u));
-            if (meshInput)
-            {
-                ProgressivePoisson.MeshSurfaceSampleCount = std::clamp(
-                    ProgressivePoisson.MeshSurfaceSampleCount,
-                    1,
-                    10'000'000);
-                ProgressivePoisson.MeshSurfaceSampleSeed = std::clamp(
-                    ProgressivePoisson.MeshSurfaceSampleSeed,
-                    0,
-                    std::numeric_limits<std::int32_t>::max());
-                if (!std::isfinite(
-                        ProgressivePoisson.MeshSurfaceMinTriangleArea) ||
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea <= 0.0f)
-                {
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea = 1.0e-14f;
-                }
-            }
             ProgressivePoisson.DebounceSeconds = std::clamp(
                 ProgressivePoisson.DebounceSeconds,
                 0.0f,
@@ -1254,7 +1243,7 @@ namespace Extrinsic::Sandbox::Editor
                 1,
                 32);
             DrawProgressivePoissonTooltip(
-                "Maximum progressive hierarchy levels to emit.");
+                "Maximum hierarchy depth for ordering the existing finite input set.");
             configChanged |= ImGui::DragFloat(
                 "Hash load##ProgressivePoisson",
                 &ProgressivePoisson.HashLoadFactor,
@@ -1304,7 +1293,7 @@ namespace Extrinsic::Sandbox::Editor
                 0,
                 10'000'000);
             DrawProgressivePoissonTooltip(
-                "Visible prefix count; zero shows all accepted points.");
+                "Leading accepted input vertices to display; zero displays every accepted vertex.");
             configChanged |= ImGui::Checkbox(
                 "Auto run on edit##ProgressivePoisson",
                 &ProgressivePoisson.AutoRunOnEdit);
@@ -1318,46 +1307,6 @@ namespace Extrinsic::Sandbox::Editor
                 10.0f);
             DrawProgressivePoissonTooltip(
                 "Delay after the last edit before auto-running.");
-
-            if (meshInput)
-            {
-                ImGui::SeparatorText("Surface input");
-                configChanged |= ImGui::DragInt(
-                    "Surface samples##ProgressivePoisson",
-                    &ProgressivePoisson.MeshSurfaceSampleCount,
-                    1.0f,
-                    1,
-                    10'000'000);
-                DrawProgressivePoissonTooltip(
-                    "Number of deterministic points sampled from the mesh surface.");
-                configChanged |= ImGui::DragInt(
-                    "Surface seed##ProgressivePoisson",
-                    &ProgressivePoisson.MeshSurfaceSampleSeed,
-                    1.0f,
-                    0,
-                    std::numeric_limits<std::int32_t>::max());
-                DrawProgressivePoissonTooltip(
-                    "Seed for deterministic mesh surface sampling.");
-                configChanged |= ImGui::InputFloat(
-                    "Min triangle area##ProgressivePoisson",
-                    &ProgressivePoisson.MeshSurfaceMinTriangleArea,
-                    0.0f,
-                    0.0f,
-                    "%.3e");
-                DrawProgressivePoissonTooltip(
-                    "Triangles below this area are rejected before sampling.");
-                if (!std::isfinite(
-                        ProgressivePoisson.MeshSurfaceMinTriangleArea) ||
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea <= 0.0f)
-                {
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea = 1.0e-14f;
-                }
-                configChanged |= ImGui::Checkbox(
-                    "Interpolate normals##ProgressivePoisson",
-                    &ProgressivePoisson.MeshSurfaceInterpolateNormals);
-                DrawProgressivePoissonTooltip(
-                    "Interpolate vertex normals onto sampled surface points.");
-            }
 
             const Runtime::EditorProgressivePoissonChannel channel =
                 ProgressivePoissonChannelFromIndex(
@@ -1388,7 +1337,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
             DrawProgressivePoissonTooltip(
-                "Scalar property used for point color visualization.");
+                "Published source-cardinality level, rank, introduction-radius, or prefix-visibility scalar; rejected inputs retain documented sentinels.");
 
             const Runtime::EditorProgressivePoissonBackend backend =
                 ProgressivePoissonBackendFromIndex(
@@ -1419,7 +1368,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
             DrawProgressivePoissonTooltip(
-                "Requested method backend; the result reports the actual backend and any CPU fallback.");
+                "Request CPU reference or Vulkan compute; result status reports the actual backend and any CPU fallback reason.");
 
             const auto applyConfig = [&]()
             {
@@ -2487,15 +2436,6 @@ namespace Extrinsic::Sandbox::Editor
                         result.AlphaDefaulted ? "yes" : "no",
                         result.ClampedGridWidth ? "yes" : "no",
                         result.ClampedMaxLevels ? "yes" : "no");
-                }
-                if (result.MeshSurfaceSamplingUsed)
-                {
-                    ImGui::Text(
-                        "Surface samples %u  triangles %u/%u  area %.6f",
-                        result.MeshSurfaceSampleCount,
-                        result.MeshSurfaceAcceptedTriangleCount,
-                        result.MeshSurfaceTotalFaceCount,
-                        result.MeshSurfaceArea);
                 }
             }
             if (!result.BackendFallbackReason.empty())

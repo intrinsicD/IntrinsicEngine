@@ -6943,7 +6943,9 @@ GetEditorGeometryProcessingMenuItems(
         case EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
             return Domain::PointCloudPoints;
         case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
-            return Domain::MeshVertices | Domain::PointCloudPoints;
+            return Domain::MeshVertices |
+                   Domain::GraphVertices |
+                   Domain::PointCloudPoints;
         }
         return Domain::None;
     }

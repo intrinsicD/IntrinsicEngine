@@ -1654,3 +1654,46 @@ observations:
     promoted_to: "logic/claims.md:C19"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O102
+    timestamp: "2026-08-03T02:10+02:00"
+    provenance: ai-executed
+    content: >
+      The production Progressive Poisson runtime now consumes the existing
+      Vertices source of mesh, graph, and point-cloud entities through one
+      direct, queued, config-controlled, and requested-GPU-fallback operation
+      path. It publishes deterministic source-cardinality level, rank, radius,
+      and prefix-visibility channels without replacing the source domain or
+      changing topology, element order, provenance, presentation, or unrelated
+      properties.
+    context: >
+      RUNTIME-208 resolves the runtime portion of the audited integration gap.
+      Focused, complete CPU, ASan, and UBSan contracts passed. METHOD-014 still
+      owns operational GPU compute/parity, and UI-038 still owns Graph-panel
+      registration, so neither is claimed here.
+    potential_type: claim
+    bound_to: [N330, N336, N337, N338]
+    promoted: true
+    promoted_to: "logic/claims.md:C20"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O103
+    timestamp: "2026-08-03T09:54+02:00"
+    provenance: ai-executed
+    content: >
+      The Sandbox exposes Progressive Poisson under Mesh, Graph, and PointCloud
+      Processing through one shared app state and the same copied runtime
+      readiness, validated config/apply/run operation, diagnostics, backend
+      fallback status, and source-cardinality result channels. Invalid vertex
+      positions fail closed with an explicit reason, and the panel performs no
+      geometry conversion or topology mutation.
+    context: >
+      UI-038 completed the UI portion of the audited Progressive Poisson
+      integration gap after RUNTIME-208 supplied canonical vertex-domain
+      execution/publication. Focused and complete CPU plus real headless ImGui
+      tests passed; METHOD-014 still owns operational Vulkan compute/parity.
+    potential_type: claim
+    bound_to: [N330, N336, N338, N339]
+    promoted: true
+    promoted_to: "logic/claims.md:C21"
+    crystallized_via: artifact-commitment
+    stale: false

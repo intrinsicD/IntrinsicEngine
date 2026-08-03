@@ -67,7 +67,10 @@ This index is the canonical entry point for method/paper implementation document
   subsampling via phase-parallel spatial hashing: given an unordered point set
   in R^d (d in {2,3}) it computes a progressive ordering of an accepted subset
   such that every prefix `[0,k)` is a Poisson-disk sampling at its hierarchy
-  level. It is delivered by
+  level. Runtime passes existing mesh, graph, or point-cloud vertex positions
+  through the same finite-set contract and publishes source-cardinality rank,
+  level, radius, and prefix-visibility attributes without surface generation or
+  entity-domain conversion. It is delivered by
   [`METHOD-012`](../../tasks/archive/METHOD-012-progressive-poisson-disk-cpu-reference.md)
   at `CPUContracted`; correctness lives in
   [`Test.ProgressivePoissonReference.cpp`](../../tests/unit/geometry/Test.ProgressivePoissonReference.cpp)

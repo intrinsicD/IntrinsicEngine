@@ -467,10 +467,10 @@
   tasks/done/HARDEN-087-unified-geometry-element-source-components.md,
   tasks/backlog/runtime/RUNTIME-206-lop-element-domain-source-integration.md,
   tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md,
-  tasks/backlog/runtime/RUNTIME-208-progressive-poisson-element-domain-publication.md,
+  tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
   tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md,
   tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md,
-  tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md,
+  tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
   tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md,
   tasks/backlog/ui/UI-040-icp-compatible-source-selection.md,
   tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md,
@@ -552,3 +552,84 @@
 - **Dependencies**: []
 - **Tags**: CI, testing, latency, total work, quality admission, hypothesis
 - **From staging**: O101
+## C20: Progressive Poisson publishes on every canonical vertex source
+- **Statement**: The production Progressive Poisson runtime operation accepts
+  the existing `Vertices` source of point-cloud, graph, and mesh entities
+  through one direct/queued/config-controlled operation path. It publishes
+  source-cardinality `v:poisson_level`, `v:poisson_rank`,
+  `v:poisson_splat_radius`, and `v:poisson_prefix_visible` properties, including
+  deterministic rejected-sample sentinels, without replacing the source domain
+  or changing topology, source order, provenance, presentation, or unrelated
+  properties. Requested GPU execution remains an explicit CPU-reference
+  fallback through the same publication path.
+- **Status**: supported — 46/46 focused runtime/UI contracts; 4,003 passed plus
+  one policy-defined skip from 4,004 selected CPU tests; 2,656/2,656 ASan; and
+  2,655 passed plus one LSan-only skip from 2,656 selected UBSan tests. This
+  makes no operational GPU/Vulkan compute, backend-parity, performance, or
+  Graph-panel claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A valid mesh, graph, or point-cloud entity with a
+  canonical `Vertices` source cannot execute Progressive Poisson; two source
+  domains use different operation/publication paths or produce different
+  deterministic channels for identical positions and parameters; publication
+  changes source cardinality, topology, element order, provenance,
+  presentation, or unrelated properties; rejected vertices lack the documented
+  sentinels; a same-cardinality typed connectivity edit is overwritten rather
+  than rejected as stale; config/agent execution bypasses validation; or a
+  requested GPU backend reports operational GPU execution rather than the
+  declared CPU fallback.
+- **Proof**: [tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
+  methods/geometry/progressive_poisson/method.yaml,
+  methods/geometry/progressive_poisson/paper.md,
+  src/runtime/Runtime.ProgressivePoissonConfig.cppm,
+  src/runtime/Runtime.GeometryProcessingOperations.cppm,
+  src/runtime/Runtime.GeometryProcessingOperations.cpp,
+  src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp,
+  src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
+  tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp,
+  tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
+  tests/contract/runtime/Test.SandboxEditorModels.cpp,
+  tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
+  docs/reviews/2026-08-03-runtime-208-clean-workshop-review.md]
+- **Dependencies**: [C17, C18]
+- **Tags**: runtime, geometry, methods, progressive Poisson, element sources,
+  config, history, CPU, ASan, UBSan, retirement
+- **From staging**: O102
+
+## C21: Progressive Poisson has one three-domain Sandbox panel path
+- **Statement**: The Sandbox registers Progressive Poisson under Mesh, Graph,
+  and PointCloud Processing through one shared app-owned panel state and the
+  same runtime-owned copied readiness, validated config/apply/run operation,
+  diagnostics, backend-fallback status, and source-cardinality
+  rank/level/splat-radius/prefix-visibility channels. Missing, empty,
+  wrong-typed, and non-finite vertex positions disable execution with an
+  explicit copied reason. No registration converts the entity, samples a mesh
+  surface, replaces topology, or publishes result properties from the app.
+- **Status**: supported — 3/3 focused headless ImGui and 33/33 Progressive
+  Poisson cases passed; the default CPU-supported selector selected 4,006,
+  passed 4,005, and explicitly skipped one environment-gated
+  GLFW/LeakSanitizer case. This makes
+  no operational GPU/Vulkan compute, backend-parity, or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A loaded valid mesh, graph, or point cloud lacks
+  the Progressive Poisson domain-menu registration; a domain owns a separate
+  config or execution implementation; malformed vertex positions leave Run
+  enabled or provide no reason; the panel exposes conversion/surface-sampling
+  controls, changes topology/cardinality, or publishes properties directly;
+  or result-channel/backend-fallback status differs by registration.
+- **Proof**: [tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
+  tasks/evidence/UI-038/report.yaml,
+  src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
+  src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp,
+  src/runtime/Runtime.GeometryProcessingOperations.cppm,
+  tests/contract/runtime/Test.SandboxEditorModels.cpp,
+  tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
+  methods/geometry/progressive_poisson/README.md,
+  docs/architecture/runtime.md,
+  docs/reviews/2026-08-02-method-engine-integration-contract-audit.md]
+- **Dependencies**: [C18, C20]
+- **Tags**: app, runtime, UI, geometry, methods, progressive Poisson,
+  element sources, config, diagnostics, CPU, retirement
+- **From staging**: O103

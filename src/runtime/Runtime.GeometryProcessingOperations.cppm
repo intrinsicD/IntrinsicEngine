@@ -182,7 +182,7 @@ export namespace Extrinsic::Runtime
     enum class EditorProgressivePoissonChannel : std::uint8_t
     {
         Level,
-        Phase,
+        Rank,
         SplatRadius,
         PrefixVisible,
     };
@@ -219,10 +219,6 @@ export namespace Extrinsic::Runtime
         std::uint32_t PrefixCount{0u}; // 0 means all accepted points.
         EditorProgressivePoissonChannel Channel{EditorProgressivePoissonChannel::Level};
         EditorProgressivePoissonBackend Backend{EditorProgressivePoissonBackend::CpuReference};
-        std::uint32_t MeshSurfaceSampleCount{4096u};
-        std::uint32_t MeshSurfaceSampleSeed{1337u};
-        double MeshSurfaceMinTriangleArea{1.0e-14};
-        bool MeshSurfaceInterpolateNormals{true};
         bool AutoRunOnEdit{true};
         double DebounceSeconds{0.25};
     };
@@ -260,12 +256,6 @@ export namespace Extrinsic::Runtime
         bool AlphaDefaulted{false};
         bool ClampedGridWidth{false};
         bool ClampedMaxLevels{false};
-        bool MeshSurfaceSamplingUsed{false};
-        std::uint32_t MeshSurfaceSampleCount{0u};
-        std::uint32_t MeshSurfaceTotalFaceCount{0u};
-        std::uint32_t MeshSurfaceAcceptedTriangleCount{0u};
-        std::uint32_t MeshSurfaceRejectedFaceCount{0u};
-        double MeshSurfaceArea{0.0};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -822,8 +812,8 @@ export namespace Extrinsic::Runtime
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
         bool PointCloudOutlierRemovalAvailable{false};
-        bool PointCloudProgressivePoissonAvailable{false};
-        bool MeshProgressivePoissonAvailable{false};
+        bool ProgressivePoissonAvailable{false};
+        std::string ProgressivePoissonDisabledReason{};
         std::optional<KMeansRunCompleted> LastKMeansResult{};
         std::optional<EditorMeshDenoiseResult> LastMeshDenoiseResult{};
         std::optional<EditorMeshCurvatureResult> LastMeshCurvatureResult{};

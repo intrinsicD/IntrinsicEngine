@@ -182,7 +182,7 @@ main-thread apply callback.
 `ARCH-012` supersedes Sandbox composition with `ClusteringModule` and
 `JobService`, while the standalone command helper keeps the async/immediate
 fallback for isolated tests and uncomposed callers. Slice B applies the model to
-Progressive Poisson point-cloud and mesh-surface CPU sampling,
+Progressive Poisson mesh, graph, and point-cloud vertex-set CPU sampling,
 Slice C applies it to mesh denoise/remesh/simplify commands, and Slice D
 applies it to ICP registration alignment while preserving the existing
 immediate fallback for tests and callers without an engine job surface. Slices
@@ -453,34 +453,34 @@ history seam; `GEOM-016` owns the removal algorithm and its diagnostics.
 ### Sandbox Editor Progressive Poisson Sampling
 
 `RUNTIME-134` Slices A-D.1 add a progressive Poisson sampling playground at
-`PointCloud > Processing > Progressive Poisson Sampling` and
-`Mesh > Processing > Progressive Poisson Sampling`. The
-focused geometry-operation surface exports
+`PointCloud > Processing > Progressive Poisson Sampling`,
+`Graph > Processing > Progressive Poisson Sampling`, and
+`Mesh > Processing > Progressive Poisson Sampling`. The three windows consume
+one copied availability/disabled-reason projection and one validated
+config/apply/run operation. The focused geometry-operation surface exports
 `EditorProgressivePoissonChannel`,
 `EditorProgressivePoissonConfig`,
 `EditorProgressivePoissonCommand`,
 `EditorProgressivePoissonResult`, and
-`ApplyEditorProgressivePoissonCommand(...)`. Runtime validates selected
-point-cloud `GeometrySources`, or reconstructs a selected editable mesh and
-samples its triangle surface through `Geometry.PointCloud.SurfaceSampling`
-before calling the METHOD-012 CPU reference backend. The command publishes
-deterministic per-point float properties:
+`ApplyEditorProgressivePoissonCommand(...)`. Runtime validates the existing
+`Vertices` source on mesh, graph, or point-cloud entities and passes its
+`v:position` span directly to the METHOD-012 CPU reference backend. It performs
+no surface sampling, source reordering, provenance rewrite, or entity-domain
+replacement. The command publishes deterministic source-cardinality vertex
+float properties:
 
-- `p:poisson_level`
-- `p:poisson_phase`
-- `p:poisson_splat_radius`
-- `p:poisson_prefix_visible`
+- `v:poisson_level`
+- `v:poisson_rank`
+- `v:poisson_splat_radius`
+- `v:poisson_prefix_visible`
 
 The UI exposes the reference sampler knobs (`dimension`, `grid_width`,
 `max_levels`, `hash_load_factor`, `radius_alpha`, grid-origin randomization and
 seed, shuffle toggle and seed), plus a prefix count, color-channel selector, and
-CPU/Vulkan-compute backend selector.
-Mesh selections also expose surface sample count, surface seed, minimum triangle
-area, and vertex-normal interpolation controls. Successful mesh runs publish the
-sampled cloud back onto the selected entity via `GeometrySources::PopulateFromCloud`,
-remove the stale surface render hint, enable point rendering, and report the
-surface-sampling diagnostics in `EditorProgressivePoissonResult`.
-Successful point-cloud and mesh runs also report requested method backend,
+CPU/Vulkan-compute backend selector. Successful runs preserve all source
+components, topology, vertex ordering, provenance, and non-target properties;
+they add point visualization without removing an existing mesh or graph render
+hint. All three source domains report requested method backend,
 actual method backend, CPU fallback reason when present, and accepted-point
 counts per progressive level, so the UI can show backend identity and
 level-distribution readouts without querying method internals.
@@ -488,10 +488,9 @@ level-distribution readouts without querying method internals.
 The command routes `VisualizationConfig` to the selected scalar channel so
 existing point colormap extraction handles the display. Prefix count `0` shows
 every accepted point; positive values clamp to the accepted count and drive
-`p:poisson_prefix_visible`. The published `p:poisson_phase` is a deterministic
-display bucket derived from level-local rank modulo the 2D/3D phase count because
-the CPU reference backend does not yet export internal phase assignments as a
-stable method result.
+`v:poisson_prefix_visible`. Accepted inputs store their global progressive rank,
+accepted level, and introduction-level radius. Rejected inputs remain in place
+with rank `-1`, level `-1`, radius `0`, and prefix visibility `0`.
 
 Slice C routes the same knobs through the engine config-control facade as
 the registered `sandbox.progressive_poisson` application section: widget edits
@@ -502,7 +501,7 @@ hot-apply it with
 `EngineConfigControl::ApplyEngineConfigHotSubset(...)`, and then schedule
 a debounced rerun when `auto_run_on_edit` is enabled. The explicit Run button
 uses the same config path before invoking the sampler command. The command only
-composes runtime-owned ECS state and the public method/surface-sampling APIs; it
+composes runtime-owned ECS state and the public method API; it
 does not add sampler logic to UI code or call renderer/RHI upload APIs directly.
 METHOD-013 extends the command/config seam with a backend request
 (`CpuReference` or `VulkanCompute`) and reports requested backend, actual backend,

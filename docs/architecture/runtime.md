@@ -228,13 +228,16 @@ properties plus the optional current normal property. Clustering likewise
 captures exact input points and the optional label/color/scalar output cohort;
 its CPU and Vulkan completions enter the transaction when document history is
 composed, while the module stays independently usable without it.
-Progressive Poisson point publication stages its four optional scalar
-properties and entity visualization before committing them together. Its
-mesh-surface lane captures the complete authoritative geometry-source and
-owned presentation cohort, so the destructive mesh-to-point-cloud conversion
-restores the original domain, properties, topology, and render hints on undo.
-Both immediate and queued lanes reject intervening source, output, or owned
+Progressive Poisson vertex publication stages its four optional scalar
+properties and entity visualization before committing them together. One
+element-domain lane consumes the existing `Vertices` source for mesh, graph,
+and point-cloud entities; it preserves topology, element order, provenance,
+non-target properties, and existing surface/edge presentation. Both immediate
+and queued lanes reject intervening source, output, topology, or owned
 presentation changes before publication and before every history transition.
+The snapshot comparison includes the production typed mesh/graph connectivity
+records; an erased property type it cannot compare rejects the transition
+rather than accepting descriptor equality.
 Geometry-presentation slot edits additionally validate and monotonically
 advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The
@@ -412,8 +415,11 @@ registry. Mesh Appearance forwards the workspace's callback-scoped borrowed
 selected-mesh vertex-property view to the runtime-owned generic scalar-property
 widget; app presentation does not retain that view or import geometry directly.
 `Extrinsic.Sandbox.Editor.MethodPanels` registers
-the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
-Progressive Poisson windows from the application layer. Their ImGui state and
+the K-Means and Progressive Poisson windows for PointCloud, Graph, and Mesh
+plus the mesh parameterization window from the application layer. All three
+Progressive Poisson registrations consume the same copied readiness/config/run
+surface; readiness resolves a non-empty finite `vec3` `v:position` property and
+supplies a disabled reason without exposing ECS state to the app. Their ImGui state and
 result presentation are app-owned, while model construction, command execution,
 job scheduling, config validation, and result publication remain runtime-owned.
 `Extrinsic.Sandbox.Editor.MeshProcessingPanels` applies the same boundary to ICP

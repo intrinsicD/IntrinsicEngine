@@ -1,0 +1,34 @@
+[check_root_hygiene] Root: /tmp/intrinsic-runtime208.qxtdIf
+[check_root_hygiene] Root markdown files:
+  - AGENTS.md: allowed
+  - CLAUDE.md: allowed
+  - README.md: allowed
+[check_root_hygiene] Root allowlist: /tmp/intrinsic-runtime208.qxtdIf/tools/repo/root_allowlist.yaml
+[check_root_hygiene] Allowed repository entries present:
+  - .claude/
+  - .codex/
+  - .github/
+  - .gitignore
+  - .mcp.json
+  - AGENTS.md
+  - CLAUDE.md
+  - CMakeLists.txt
+  - CMakePresets.json
+  - README.md
+  - ara/
+  - assets/
+  - benchmarks/
+  - cmake/
+  - docs/
+  - lsan.supp
+  - methods/
+  - research/
+  - src/
+  - tasks/
+  - tests/
+  - tools/
+  - vcpkg-configuration.json
+  - vcpkg.json
+[check_root_hygiene] Ignored named local entries:
+  - build/
+[check_root_hygiene] Root entries match repository-owned policy.
