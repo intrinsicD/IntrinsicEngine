@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `UI-038` — Progressive Poisson multi-domain panel (tasks/active/UI-038-progressive-poisson-multi-domain-panel.md)
 
 ## Theme B — Rendering modernization
 
@@ -97,7 +97,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
-- unblocked: `UI-038` — Progressive Poisson multi-domain panel (tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md)
 - blocked by `RUNTIME-206`: `UI-039` — LOP family multi-domain discovery (tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md)
 - blocked by `RUNTIME-207`: `UI-040` — ICP compatible-source selection and discovery (tasks/backlog/ui/UI-040-icp-compatible-source-selection.md)
 - blocked by `RUNTIME-209`: `UI-041` — Point-set outlier multi-domain panel (tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md)

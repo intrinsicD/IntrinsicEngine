@@ -5,15 +5,21 @@ depends_on: [RUNTIME-208]
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-UI038"
+branch: "ui/ui-038-progressive-poisson-panel"
+worktree: "/tmp/intrinsic-ui038.h8R1Tp"
+claimed_at: "2026-08-03T07:00:37Z"
 contract_schema: 1
 contracts: [geometry.element-domain-sources, method.engine-integration]
 maturity_target: Operational
 ---
 # UI-038 — Progressive Poisson multi-domain panel
+
+## Status
+
+- In progress on 2026-08-03. The slice reuses the `RUNTIME-208` typed
+  operation/readiness model and existing domain-panel registration; it adds no
+  app-owned method state, backend seam, or geometry conversion.
 
 ## Goal
 

@@ -11,7 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`UI-038`](UI-038-progressive-poisson-multi-domain-panel.md) — Progressive
+  Poisson multi-domain panel (`Codex-UI038`, in progress).
 
 ## History
 

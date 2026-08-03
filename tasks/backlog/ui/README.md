@@ -22,10 +22,6 @@ map.
 - [UI-039 — LOP family multi-domain discovery](UI-039-lop-multi-domain-discovery.md)
   (extends the `UI-035` panel across Mesh/Graph/PointCloud through
   topology-safe `RUNTIME-206` publication).
-- [UI-038 — Progressive Poisson multi-domain panel](UI-038-progressive-poisson-multi-domain-panel.md)
-  (supersedes the former converter-confirmation plan: the corrected
-  `RUNTIME-208` operation consumes existing `Vertices` and never converts a
-  mesh or graph).
 - [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)
   (one shared readiness value reused by each feature-owned typed operation for
   mesh, UV, bake, point-cloud, registration, and parameterization actions;
