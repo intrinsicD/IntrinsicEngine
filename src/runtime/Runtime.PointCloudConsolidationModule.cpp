@@ -583,6 +583,15 @@ namespace Extrinsic::Runtime
                     "Point-set consolidation requires between two and one million finite vec3 values in the selected position property.",
                     elementCount);
             }
+            if (config.Strategy ==
+                    PointCloudConsolidationStrategy::Clop &&
+                config.ClopMixtureComponentCount > elementCount)
+            {
+                return UnavailableConsolidation(
+                    Core::ErrorCode::InvalidArgument,
+                    "CLOP mixture component count cannot exceed the selected input property's element count.",
+                    elementCount);
+            }
 
             const bool authoredNormalsRequired =
                 RequiresAuthoredNormals(config);

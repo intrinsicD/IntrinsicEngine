@@ -30,6 +30,10 @@
   a resolved element domain. Mesh faces, mesh/graph edges and halfedges,
   mesh/graph vertex-like domains, and point-cloud points all enter the same
   validation and CPU-reference worker.
+- Publication, undo/redo, and stale-source rejection execute against each of
+  the eight mutable property-domain resolver branches. CLOP availability also
+  rejects a mixture-component count larger than the selected property before
+  work reaches the job queue.
 - Same-cardinality publication stages only the named output properties on the
   originating `PropertySet`; unrelated properties, including erased custom
   values, and all topology components remain untouched. Cardinality-changing

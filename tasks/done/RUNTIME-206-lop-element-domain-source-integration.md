@@ -23,15 +23,16 @@ maturity_target: Operational
   LOP-family worker, and publishes same-cardinality named outputs to the
   originating `PropertySet` without topology conversion. Mesh/graph count
   changes fail before submission; canonical point-cloud replacement retains
-  exact undo/redo. Focused coverage passed 13/13, the full CPU selector selected
-  4,076 tests and passed 4,075 with its policy-defined GLFW/LSan skip, ASan
-  passed 2,670/2,670, and UBSan passed 2,669 with the LSan-only case skipped.
+  exact undo/redo. The exact module selector passed 5/5; the full CPU selector
+  selected 4,076 tests and passed 4,075 with its policy-defined GLFW/LSan skip;
+  ASan passed 2,670/2,670; and UBSan passed 2,669 with the LSan-only case
+  skipped.
   Strict architecture, task, documentation, method-manifest, inventory, ARA,
   and independent fixed-surface review evidence close the runtime correction.
   `UI-039` owns property-aware Sandbox discovery; no GPU backend or performance
   claim is made.
-- Commit: pending the implementation/evidence checkpoint; the accepted review
-  under `tasks/evidence/RUNTIME-206/` provides the exact source identity.
+- Implementation checkpoints: `15b6008c` and `cf59aeae`; the review-correction
+  and evidence-seal revisions are bound under `tasks/evidence/RUNTIME-206/`.
 
 ## Goal
 
@@ -100,17 +101,16 @@ maturity_target: Operational
 
 ## Tests
 
-- [x] Add parameterized runtime contracts that run a same-cardinality strategy
-      from mesh vertex, graph node, and point-cloud point defaults plus at least
-      one non-vertex domain property (mesh face centers), and verify identical
-      kernel inputs plus source-correct publication.
+- [x] Add runtime contracts that run a same-cardinality strategy from every
+      mesh, graph, and point-cloud element domain, including mesh-face centers,
+      and verify source-correct publication plus exact undo/redo on all eight.
 - [x] Prove mesh/graph topology and non-target properties survive apply, undo,
       and redo byte-for-byte, including unrelated custom properties whose value
       kinds are not part of the runtime primitive catalog.
 - [x] Prove topology-bearing count changes fail before work is queued while an
       equivalent point-cloud request remains supported.
-- [x] Cover stale async completion and config/agent/direct-command parity for
-      all three source domains.
+- [x] Cover stale async completion on all eight element domains and preserve
+      config/agent/direct-command parity through one availability preflight.
 
 ## Docs
 

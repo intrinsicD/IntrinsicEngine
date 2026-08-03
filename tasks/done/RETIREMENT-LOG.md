@@ -18,10 +18,10 @@ property is therefore a first-class point set without conversion or a
 `VertexProperty` requirement. Same-cardinality publication changes only named
 properties and preserves topology plus unrelated/custom erased values;
 topology-bearing count changes fail before queueing, while canonical
-point-cloud replacement retains exact undo/redo. The focused runtime set passed
-13/13; the full CPU selector selected 4,076 and passed 4,075 with its expected
-GLFW/LSan skip; ASan passed 2,670/2,670; and UBSan passed 2,669 with its
-LSan-only skip. Strict architecture, task/docs, method-manifest, inventory,
+point-cloud replacement retains exact undo/redo. The exact module selector
+passed 5/5; the full CPU selector selected 4,076 and passed 4,075 with its
+expected GLFW/LSan skip; ASan passed 2,670/2,670; and UBSan passed 2,669 with
+its LSan-only skip. Strict architecture, task/docs, method-manifest, inventory,
 ARA, clean-workshop, and independent fixed-surface review gates close the
 runtime correction. `UI-039` retains property-aware Sandbox discovery, and no
 GPU or performance claim is made.

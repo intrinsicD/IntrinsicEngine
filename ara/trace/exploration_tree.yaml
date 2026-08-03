@@ -8355,3 +8355,50 @@ tree:
       performance claims remain outside this closure, and no remote push was
       performed.
     status: resolved
+  - id: N355
+    type: decision
+    title: "Bind geometry methods to least-structured domain requirements"
+    provenance: user
+    timestamp: "2026-08-03T23:39+02:00"
+    also_depends_on: [N329, N332, N342]
+    choice: >
+      Treat meshes as satisfying mesh, graph, and point-set inputs and graphs
+      as satisfying graph and point-set inputs. Point-set methods consume typed
+      properties or spans from any originating element domain, including face
+      centers, while graph methods add only named adjacency/property
+      requirements. Preserve same-cardinality output on that domain and never
+      require a VertexProperty identity or implicit converter.
+    alternatives:
+      - "Gate methods on exact mesh, graph, or point-cloud entity provenance."
+      - "Restrict point-set inputs to Vertices or VertexProperty wrappers."
+      - "Materialize separate converted entities before cross-domain method use."
+    evidence:
+      - "User direction: meshes > graphs > point clouds; methods require domains and named properties, not a particular property wrapper."
+      - "AGENTS.md"
+      - "docs/architecture/geometry-api-style.md"
+      - "docs/architecture/method-api-contract.md"
+    status: resolved
+  - id: N356
+    type: experiment
+    title: "Execute LOP publication across all element domains"
+    provenance: ai-executed
+    timestamp: "2026-08-03T23:39+02:00"
+    also_depends_on: [N332, N355]
+    evidence:
+      - "tasks/done/RUNTIME-206-lop-element-domain-source-integration.md"
+      - "src/runtime/Runtime.PointCloudConsolidationModule.cpp"
+      - "tests/contract/runtime/Test.PointCloudConsolidationModule.cpp"
+      - "tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.json: 5/5 passed"
+      - "tasks/evidence/RUNTIME-206/commands/cpu-tests-r2.json: 4,075 passed with one policy GLFW/LSan skip"
+      - "tasks/evidence/RUNTIME-206/commands/asan-tests-r2.json: 2,670/2,670 passed"
+      - "tasks/evidence/RUNTIME-206/commands/ubsan-tests-r2.json: 2,669 passed with one policy LSan-only skip"
+    result: >
+      One GeometryPropertyRef path now preflights, snapshots, executes,
+      publishes, rejects stale work, and owns history for mesh vertex, edge,
+      halfedge, and face; graph node, edge, and halfedge; and point-cloud point
+      properties. The final review correction also rejects an oversized CLOP
+      mixture before queueing. Topology and unrelated/custom properties remain
+      intact, and count-changing publication remains explicit point-cloud-only
+      behavior. UI-039 still owns interactive property discovery; GPU/Vulkan,
+      optimized execution, and performance remain outside this result.
+    status: resolved
