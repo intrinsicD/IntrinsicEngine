@@ -260,6 +260,18 @@ TEST(ParameterizationOptimize, ReflectionUsesProperRotationButTripsBarrier)
         glm::determinant(fit.Faces[0u].Rotation),
         1.0,
         kTolerance);
+    EXPECT_TRUE(Param::AssembleProxySystem(
+        reference,
+        reflected,
+        fit,
+        Param::ProxyEnergy::Arap).Succeeded());
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            reflected,
+            fit,
+            Param::ProxyEnergy::SymmetricDirichlet).Status,
+        Param::OptimizationStatus::NonInjectiveInput);
 
     const Param::SymmetricDirichletResult optimization =
         Param::EvaluateSymmetricDirichlet(reference, reflected);
@@ -702,6 +714,52 @@ TEST(ParameterizationOptimize, PublicRecordsAreRevalidatedBeforeIndexing)
             reference,
             uvs,
             nonFiniteFit,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
+
+    Param::LocalFitResult nonOrthogonalFit = fits;
+    nonOrthogonalFit.Faces[0u].Rotation = glm::dmat2{0.0};
+    nonOrthogonalFit.Faces[0u].Rotation[0u][0u] = 2.0;
+    nonOrthogonalFit.Faces[0u].Rotation[1u][1u] = 0.5;
+    ASSERT_NEAR(
+        glm::determinant(nonOrthogonalFit.Faces[0u].Rotation),
+        1.0,
+        kTolerance);
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            uvs,
+            nonOrthogonalFit,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
+
+    Param::LocalFitResult mismatchedJacobian = fits;
+    mismatchedJacobian.Faces[0u].Jacobian[0u][0u] += 0.25;
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            uvs,
+            mismatchedJacobian,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
+
+    Param::LocalFitResult mismatchedDeterminant = fits;
+    mismatchedDeterminant.Faces[0u].Determinant += 0.25;
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            uvs,
+            mismatchedDeterminant,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
+
+    Param::LocalFitResult mismatchedSvd = fits;
+    mismatchedSvd.Faces[0u].SignedSingularValues.x += 0.25;
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            uvs,
+            mismatchedSvd,
             Param::ProxyEnergy::Arap).Status,
         Param::OptimizationStatus::InvalidProxyInput);
 }

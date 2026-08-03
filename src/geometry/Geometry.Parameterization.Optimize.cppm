@@ -182,6 +182,8 @@ export namespace Geometry::Parameterization
     /// Assemble the area-weighted ARAP (W=I) or SLIM gradient-matching proxy.
     /// A finite non-negative proximalWeight adds lambda*I and
     /// lambda*currentUvs to the normal equations; the method owner chooses it.
+    /// The public local-fit record is revalidated against currentUvs, including
+    /// its Jacobian, determinant, orthogonal factors, and signed SVD identity.
     [[nodiscard]] ProxySystem AssembleProxySystem(
         const OptimizationReference& reference,
         std::span<const glm::dvec2> currentUvs,

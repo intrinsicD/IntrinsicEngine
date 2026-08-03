@@ -225,8 +225,57 @@ namespace Geometry::Parameterization
                 && ValidateUvs(reference, uvs, status);
         }
 
+        [[nodiscard]] glm::dmat2 ComputeJacobian(
+            const OptimizationTriangleReference& face,
+            std::span<const glm::dvec2> uvs) noexcept;
+
+        [[nodiscard]] bool NearlyEqual(
+            const double left,
+            const double right,
+            const double tolerance = 1.0e-8) noexcept
+        {
+            const double scale = std::max({
+                1.0, std::abs(left), std::abs(right)});
+            return std::abs(left - right) <= tolerance * scale;
+        }
+
+        [[nodiscard]] bool MatricesNearlyEqual(
+            const glm::dmat2& left,
+            const glm::dmat2& right,
+            const double tolerance = 1.0e-8) noexcept
+        {
+            double scale = 1.0;
+            double maximumError = 0.0;
+            for (std::size_t row = 0u; row < 2u; ++row)
+            {
+                for (std::size_t column = 0u; column < 2u; ++column)
+                {
+                    scale = std::max({
+                        scale,
+                        std::abs(Element(left, row, column)),
+                        std::abs(Element(right, row, column))});
+                    maximumError = std::max(
+                        maximumError,
+                        std::abs(
+                            Element(left, row, column)
+                            - Element(right, row, column)));
+                }
+            }
+            return IsFinite(scale) && IsFinite(maximumError)
+                && maximumError <= tolerance * scale;
+        }
+
+        [[nodiscard]] bool IsOrthogonal(
+            const glm::dmat2& matrix) noexcept
+        {
+            return MatricesNearlyEqual(
+                glm::transpose(matrix) * matrix,
+                glm::dmat2{1.0});
+        }
+
         [[nodiscard]] bool ValidateLocalFits(
             const OptimizationReference& reference,
+            const std::span<const glm::dvec2> currentUvs,
             const LocalFitResult& localFits) noexcept
         {
             if (!localFits.Succeeded()
@@ -248,19 +297,50 @@ namespace Geometry::Parameterization
                     return false;
                 if (!fit.Active)
                     continue;
+                const glm::dmat2 expectedJacobian = ComputeJacobian(
+                    reference.Faces[faceIndex], currentUvs);
+                const double expectedDeterminant =
+                    Determinant(expectedJacobian);
+                glm::dmat2 signedSingularValues{0.0};
+                signedSingularValues[0u][0u] =
+                    fit.SignedSingularValues.x;
+                signedSingularValues[1u][1u] =
+                    fit.SignedSingularValues.y;
+                const glm::dmat2 reconstructedJacobian =
+                    fit.LeftSingularVectors
+                    * signedSingularValues
+                    * glm::transpose(fit.LeftSingularVectors)
+                    * fit.Rotation;
+                const double singularProduct =
+                    fit.SignedSingularValues.x
+                    * fit.SignedSingularValues.y;
                 if (!IsFinite(fit.Jacobian)
                     || !IsFinite(fit.Rotation)
                     || !IsFinite(fit.LeftSingularVectors)
                     || !IsFinite(fit.SignedSingularValues)
                     || !IsFinite(fit.Determinant)
+                    || !IsFinite(expectedJacobian)
+                    || !IsFinite(expectedDeterminant)
+                    || !IsFinite(reconstructedJacobian)
+                    || !IsFinite(singularProduct)
                     || fit.SignedSingularValues.x <= 0.0
                     || fit.SignedSingularValues.y == 0.0
-                    || std::abs(Determinant(fit.Rotation) - 1.0) > 1.0e-8)
+                    || !NearlyEqual(Determinant(fit.Rotation), 1.0)
+                    || !IsOrthogonal(fit.Rotation)
+                    || !IsOrthogonal(fit.LeftSingularVectors)
+                    || !MatricesNearlyEqual(
+                        fit.Jacobian, expectedJacobian)
+                    || !NearlyEqual(
+                        fit.Determinant, expectedDeterminant)
+                    || !NearlyEqual(
+                        singularProduct, expectedDeterminant)
+                    || !MatricesNearlyEqual(
+                        reconstructedJacobian, expectedJacobian))
                 {
                     return false;
                 }
                 ++activeFaceCount;
-                if (fit.Determinant < 0.0)
+                if (expectedDeterminant < 0.0)
                     ++reflectedFaceCount;
             }
             return activeFaceCount == localFits.ActiveFaceCount
@@ -918,7 +998,7 @@ namespace Geometry::Parameterization
         }
         if (!ValidateReferenceAndUvs(reference, currentUvs, result.Status))
             return result;
-        if (!ValidateLocalFits(reference, localFits))
+        if (!ValidateLocalFits(reference, currentUvs, localFits))
         {
             result.Status = OptimizationStatus::InvalidProxyInput;
             return result;

@@ -173,7 +173,7 @@ completed_on: 2026-08-03
 ## Verification
 
 The Clang-23 `ci` preset built `IntrinsicTests`. After the independent review
-revision, the focused parameterization selector selected 69 registered cases,
+revisions, the focused parameterization selector selected 69 registered cases,
 passed 68, and skipped one opt-in Vulkan case; all ten new CPU cases passed. The
 default CPU-supported selector selected 4,074 cases, passed 4,073, and made one
 expected GLFW/LSan self-skip. The ten new cases also pass under isolated ASan
