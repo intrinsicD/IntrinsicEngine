@@ -184,6 +184,8 @@ export namespace Geometry::Parameterization
     /// lambda*currentUvs to the normal equations; the method owner chooses it.
     /// The public local-fit record is revalidated against currentUvs, including
     /// its Jacobian, determinant, orthogonal factors, and signed SVD identity.
+    /// Quantity-relative checks preserve sign distinctions down to the
+    /// supported determinant threshold instead of imposing a unit-scale floor.
     [[nodiscard]] ProxySystem AssembleProxySystem(
         const OptimizationReference& reference,
         std::span<const glm::dvec2> currentUvs,

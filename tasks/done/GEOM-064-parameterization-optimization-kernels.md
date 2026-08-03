@@ -152,7 +152,9 @@ completed_on: 2026-08-03
       are serial and own no scheduler/thread-count axis.
 - [x] Fail-closed: non-triangle faces, non-finite input, empty meshes, and
       caller-forged public reference/local-fit records return explicit failure
-      states before allocation or indexing, with no NaN/Inf payload escape.
+      states before allocation or indexing, with no NaN/Inf payload escape;
+      scale-relative validation rejects sign-changing field corruption even
+      near the supported singular threshold.
 
 ## Docs
 - [x] Interface documentation per `docs/architecture/geometry-api-style.md`:
@@ -178,7 +180,9 @@ passed 68, and skipped one opt-in Vulkan case; all ten new CPU cases passed. The
 default CPU-supported selector selected 4,074 cases, passed 4,073, and made one
 expected GLFW/LSan self-skip. The ten new cases also pass under isolated ASan
 and UBSan binaries, including forged-record indexing and the ratio-extreme
-`1e-200` flip-root regressions.
+`1e-200` flip-root regressions. The forged-fit coverage includes sign-changing
+determinant, signed-singular-value, and Jacobian corruption at a supported
+`2e-12` singular value.
 Strict layering, test-layout, module-inventory,
 task-policy, task-schema/state, and docs-link gates close the structural
 evidence; GPU/Vulkan execution is not applicable to this pure CPU seam.

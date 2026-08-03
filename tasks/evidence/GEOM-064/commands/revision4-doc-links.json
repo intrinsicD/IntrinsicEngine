@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 777,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T17:23:44Z",
+  "label": "revision4-doc-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T17:23:43Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/revision4-doc-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/revision4-doc-links.stdout.log",
+  "stdout_sha256": "d24dcfc4b6ab1e36ace309a579bd27aff3ec6df515b531b0c311e956222d7b5c",
+  "task_id": "GEOM-064"
+}

@@ -762,4 +762,52 @@ TEST(ParameterizationOptimize, PublicRecordsAreRevalidatedBeforeIndexing)
             mismatchedSvd,
             Param::ProxyEnergy::Arap).Status,
         Param::OptimizationStatus::InvalidProxyInput);
+
+    const std::vector<glm::dvec2> nearThresholdUvs{
+        glm::dvec2{0.0, 0.0},
+        glm::dvec2{1.0, 0.0},
+        glm::dvec2{0.0, 2.0e-12},
+    };
+    const Param::LocalFitResult nearThresholdFits =
+        Param::FitLocalModels(reference, nearThresholdUvs);
+    ASSERT_TRUE(nearThresholdFits.Succeeded());
+    ASSERT_GT(nearThresholdFits.Faces[0u].Determinant, 0.0);
+    ASSERT_GT(
+        nearThresholdFits.Faces[0u].SignedSingularValues.y,
+        0.0);
+    ASSERT_TRUE(Param::AssembleProxySystem(
+        reference,
+        nearThresholdUvs,
+        nearThresholdFits,
+        Param::ProxyEnergy::Arap).Succeeded());
+
+    Param::LocalFitResult signFlippedDeterminant = nearThresholdFits;
+    signFlippedDeterminant.Faces[0u].Determinant *= -1.0;
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            nearThresholdUvs,
+            signFlippedDeterminant,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
+
+    Param::LocalFitResult signFlippedSingularValue = nearThresholdFits;
+    signFlippedSingularValue.Faces[0u].SignedSingularValues.y *= -1.0;
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            nearThresholdUvs,
+            signFlippedSingularValue,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
+
+    Param::LocalFitResult signFlippedJacobian = nearThresholdFits;
+    signFlippedJacobian.Faces[0u].Jacobian[1u][1u] *= -1.0;
+    EXPECT_EQ(
+        Param::AssembleProxySystem(
+            reference,
+            nearThresholdUvs,
+            signFlippedJacobian,
+            Param::ProxyEnergy::Arap).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
 }

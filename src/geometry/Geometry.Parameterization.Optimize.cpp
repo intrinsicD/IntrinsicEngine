@@ -234,9 +234,11 @@ namespace Geometry::Parameterization
             const double right,
             const double tolerance = 1.0e-8) noexcept
         {
-            const double scale = std::max({
-                1.0, std::abs(left), std::abs(right)});
-            return std::abs(left - right) <= tolerance * scale;
+            if (left == right)
+                return true;
+            const double scale = std::max(std::abs(left), std::abs(right));
+            return scale > 0.0
+                && std::abs(left / scale - right / scale) <= tolerance;
         }
 
         [[nodiscard]] bool MatricesNearlyEqual(
@@ -244,8 +246,7 @@ namespace Geometry::Parameterization
             const glm::dmat2& right,
             const double tolerance = 1.0e-8) noexcept
         {
-            double scale = 1.0;
-            double maximumError = 0.0;
+            double scale = 0.0;
             for (std::size_t row = 0u; row < 2u; ++row)
             {
                 for (std::size_t column = 0u; column < 2u; ++column)
@@ -254,15 +255,46 @@ namespace Geometry::Parameterization
                         scale,
                         std::abs(Element(left, row, column)),
                         std::abs(Element(right, row, column))});
-                    maximumError = std::max(
-                        maximumError,
-                        std::abs(
-                            Element(left, row, column)
-                            - Element(right, row, column)));
                 }
             }
-            return IsFinite(scale) && IsFinite(maximumError)
-                && maximumError <= tolerance * scale;
+            if (!IsFinite(scale) || scale == 0.0)
+                return scale == 0.0;
+
+            double maximumRelativeError = 0.0;
+            for (std::size_t row = 0u; row < 2u; ++row)
+            {
+                for (std::size_t column = 0u; column < 2u; ++column)
+                {
+                    maximumRelativeError = std::max(
+                        maximumRelativeError,
+                        std::abs(
+                            Element(left, row, column) / scale
+                            - Element(right, row, column) / scale));
+                }
+            }
+            return IsFinite(maximumRelativeError)
+                && maximumRelativeError <= tolerance;
+        }
+
+        [[nodiscard]] bool MatricesComponentwiseNearlyEqual(
+            const glm::dmat2& left,
+            const glm::dmat2& right,
+            const double tolerance = 1.0e-8) noexcept
+        {
+            for (std::size_t row = 0u; row < 2u; ++row)
+            {
+                for (std::size_t column = 0u; column < 2u; ++column)
+                {
+                    if (!NearlyEqual(
+                            Element(left, row, column),
+                            Element(right, row, column),
+                            tolerance))
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
 
         [[nodiscard]] bool IsOrthogonal(
@@ -325,10 +357,14 @@ namespace Geometry::Parameterization
                     || !IsFinite(singularProduct)
                     || fit.SignedSingularValues.x <= 0.0
                     || fit.SignedSingularValues.y == 0.0
+                    || (fit.Determinant < 0.0)
+                        != (expectedDeterminant < 0.0)
+                    || (fit.SignedSingularValues.y < 0.0)
+                        != (expectedDeterminant < 0.0)
                     || !NearlyEqual(Determinant(fit.Rotation), 1.0)
                     || !IsOrthogonal(fit.Rotation)
                     || !IsOrthogonal(fit.LeftSingularVectors)
-                    || !MatricesNearlyEqual(
+                    || !MatricesComponentwiseNearlyEqual(
                         fit.Jacobian, expectedJacobian)
                     || !NearlyEqual(
                         fit.Determinant, expectedDeterminant)

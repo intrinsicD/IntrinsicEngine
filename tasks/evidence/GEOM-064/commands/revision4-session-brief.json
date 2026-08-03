@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/generate_session_brief.py"
+  ],
+  "command_display": "python3 tools/agents/generate_session_brief.py",
+  "cwd": ".",
+  "duration_ms": 116,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T17:23:52Z",
+  "label": "revision4-session-brief",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T17:23:51Z",
+  "stderr_path": "tasks/evidence/GEOM-064/commands/revision4-session-brief.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-064/commands/revision4-session-brief.stdout.log",
+  "stdout_sha256": "7a5f818ad85b71fe0309072626f0ce3cb01deafada7f214f64cb4d8befd913f6",
+  "task_id": "GEOM-064"
+}

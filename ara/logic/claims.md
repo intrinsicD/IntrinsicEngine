@@ -776,10 +776,10 @@
   src/geometry/Geometry.Parameterization.Optimize.cppm,
   src/geometry/Geometry.Parameterization.Optimize.cpp,
   tests/unit/geometry/Test.ParameterizationOptimize.cpp,
-  tasks/evidence/GEOM-064/commands/revision3-parameterization-tests.json,
-  tasks/evidence/GEOM-064/commands/revision3-cpu-tests.json,
-  tasks/evidence/GEOM-064/commands/revision3-asan-parameterization-tests.json,
-  tasks/evidence/GEOM-064/commands/revision3-ubsan-parameterization-tests.json]
+  tasks/evidence/GEOM-064/commands/revision4-parameterization-tests.json,
+  tasks/evidence/GEOM-064/commands/revision4-cpu-tests.json,
+  tasks/evidence/GEOM-064/commands/revision4-asan-parameterization-tests.json,
+  tasks/evidence/GEOM-064/commands/revision4-ubsan-parameterization-tests.json]
 - **Dependencies**: []
 - **Tags**: geometry, parameterization, ARAP, SLIM, CPU, deterministic,
   local injectivity
