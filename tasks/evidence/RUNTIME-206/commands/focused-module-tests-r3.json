@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^PointCloudConsolidationModule\\.",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^PointCloudConsolidationModule\\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 524,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T21:32:04Z",
+  "label": "focused-module-tests-r3",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T21:32:04Z",
+  "stderr_path": "tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.stdout.log",
+  "stdout_sha256": "9730be36f412bb1db2493a5f2dd11811b53b036dc9724f6a534bbd62a8f9888e",
+  "task_id": "RUNTIME-206"
+}

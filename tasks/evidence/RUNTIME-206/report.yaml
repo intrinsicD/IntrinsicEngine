@@ -3,18 +3,32 @@ task_id: RUNTIME-206
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-03T21:10:43Z'
+generated_at: '2026-08-03T21:46:36Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 19554530c62fe4033be381a068442689104a56d7
-  head_revision: 15b6008c3411cbaee3c9663bfe7756ad2483f55e
+  head_revision: 1dbbb3f018c1a47aa641225f68f971a5472f36d9
   branch: runtime/runtime-206-lop-domain-sources
   worktree: /tmp/intrinsic-runtime206.ZvbjE9
   dirty: true
   surface:
   - path: AGENTS.md
     sha256: 6e4ddc7e426989a7aaceb160ffe1d90cd37e10c6314f477bdb6ff46f318d1305
+  - path: ara/logic/claims.md
+    sha256: 0b9273de052f2b37ba7ed33a3677bad58a79ecd9fe9f74017b65f261f316ed08
+  - path: ara/logic/solution/architecture.md
+    sha256: 2680525469b0fafe3ed0b14504a7a0bf7f14667624412628c9e303644e2ae5d3
+  - path: ara/staging/observations.yaml
+    sha256: e864aa7c5420ab61ba70ec7b9c3666506669fdd3546104f6f9664119010ef9ea
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 5ceedf0baa78f8e227296a5f619f4f11555fd6d7592a31cbaddd9d2691d2bfa6
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: e42e6a2268804a966cc83513f47d956b9620c1571237c86ded9b836aa2bce5a9
+  - path: ara/trace/sessions/2026-08-03_003.yaml
+    sha256: cf06075ed59d8705087334f2eaa8e0f93ce179260f5b569689bb88125f573baa
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: ffad58966788445d667278d175d9a9da1e0d5f0b8c2a2e128cb9abd416b9b19e
   - path: docs/agent/method-review-checklist.md
     sha256: 02019d31d98f609891e66ffdf1677e777b14859edbb86c7cba612fd4956d97f3
   - path: docs/agent/method-workflow.md
@@ -32,7 +46,7 @@ source:
   - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
     sha256: 67c51349cafe6bddf365712106b66a3fd2e8e6fd94cc8ddd2757f24d73e7e853
   - path: docs/reviews/2026-08-03-runtime-206-clean-workshop-review.md
-    sha256: 24eda282a02ffcd3e3267075e4f3ca3c140d707fd7ad3e18d07342dc1eb108ed
+    sha256: f144938fa40119c2b4146c62ae8a9fbd5c14b4a7e5844c679d797b116d81e1d8
   - path: methods/geometry/continuous_lop/README.md
     sha256: 7df0d8e6f54080cc455a336411672640d0c71b122f1dc74ffb7efffb28ef58e3
   - path: methods/geometry/edge_aware_resampling/README.md
@@ -44,7 +58,7 @@ source:
   - path: src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
     sha256: 901daec9bc2e5622466478ebe9fc805f6b3e9e01d925eaf201ec4677d1f1c480
   - path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
-    sha256: 17d7fc26c921d152a26d550fe4b57909b4925a1fd69efde79718e1522ac370b3
+    sha256: c30e52ae520c259ccd59ea5130000838c0948238ef1c1bab90ca3fd948f18977
   - path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
     sha256: 9f275853ca9715845128aee9b836c5a577fc79047701cb235b301a1ce7b63ef9
   - path: tasks/SESSION-BRIEF.md
@@ -86,13 +100,13 @@ source:
   - path: tasks/backlog/ui/UI-045-point-normal-property-domain-panel.md
     sha256: 2be370e01dc0799ea023c31f589b281407c126ef01d0ed0083eff10dd96230ae
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: 0153a08441077f8f01d61950dce8c2c9fa934d2625690141b50f788d01a28b41
+    sha256: 7aab05e5c2766316c0bd5eb2589b5ae40efebf650bd2acd963cacb230393d938
   - path: tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
-    sha256: 126b462671216b62db32fea34794f504bdbe101434d2c329928945ac286e3e36
+    sha256: 21a8fc20943fd8714d8adc7008b9f91274926273f299b5acd651495ef8fc3b88
   - path: tasks/templates/task.md
     sha256: c586c2c7fbf8e83e33df410475e14e7aff3d2f11e9e6d1740354b8c070510359
   - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
-    sha256: af12f586652af516ce17560d1f2124942322b8b76579e0feb957faff45d3cde6
+    sha256: 7beaeae8e3ba02f429cb39c1e56c81f46826e39ad50cec630600a45a60228019
   - path: tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
     sha256: 02019d31d98f609891e66ffdf1677e777b14859edbb86c7cba612fd4956d97f3
   - path: tools/agents/skills/intrinsicengine-method/references/method-workflow.md
@@ -101,10 +115,17 @@ source:
     sha256: 80578695edb8a1c2ecf8b8e40eba70f2e575ca474c98ee6849707424aec94ec9
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
     sha256: c586c2c7fbf8e83e33df410475e14e7aff3d2f11e9e6d1740354b8c070510359
-  content_digest: 79726b5e06a720f84652a06d4b51cc105b5e5c07b4427df2c0bd113462bffd16
+  content_digest: a407b9e71f233aff125e6af81a5e9d7e15cae0bb2fb8c717e87003f3ceecc42c
 touched:
   paths:
   - AGENTS.md
+  - ara/logic/claims.md
+  - ara/logic/solution/architecture.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-03_003.yaml
+  - ara/trace/sessions/session_index.yaml
   - docs/agent/method-review-checklist.md
   - docs/agent/method-workflow.md
   - docs/agent/task-format.md
@@ -175,31 +196,55 @@ acceptance:
   evidence: []
   reason: null
 commands:
+- receipt: tasks/evidence/RUNTIME-206/commands/ara-claims-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/ara-claims.json
+- receipt: tasks/evidence/RUNTIME-206/commands/asan-build-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/asan-build.json
 - receipt: tasks/evidence/RUNTIME-206/commands/asan-configure.json
+- receipt: tasks/evidence/RUNTIME-206/commands/asan-tests-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/asan-tests.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ci-build-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/ci-build.json
 - receipt: tasks/evidence/RUNTIME-206/commands/ci-configure.json
+- receipt: tasks/evidence/RUNTIME-206/commands/clean-workshop-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-206/commands/cpu-tests-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-206/commands/diff-check-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/diff-check-worktree-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-206/commands/doc-links-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-206/commands/docs-sync-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/docs-sync.json
+- receipt: tasks/evidence/RUNTIME-206/commands/focused-module-tests-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.json
 - receipt: tasks/evidence/RUNTIME-206/commands/focused-tests.json
+- receipt: tasks/evidence/RUNTIME-206/commands/layering-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-206/commands/method-manifests-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/method-manifests.json
 - receipt: tasks/evidence/RUNTIME-206/commands/module-inventory.json
+- receipt: tasks/evidence/RUNTIME-206/commands/root-hygiene-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-206/commands/session-brief-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-206/commands/skill-mirrors-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/skill-mirrors.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-maturity-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-maturity.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-policy-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-state-links-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-state-links.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-validation-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-validation.json
+- receipt: tasks/evidence/RUNTIME-206/commands/test-layout-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/test-layout.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ubsan-build-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/ubsan-build.json
 - receipt: tasks/evidence/RUNTIME-206/commands/ubsan-configure.json
+- receipt: tasks/evidence/RUNTIME-206/commands/ubsan-tests-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/ubsan-tests.json
 changed_public_contracts:
 - Point-set method eligibility is a compatible typed Property<T>/ConstProperty<T> or span on any resolved
@@ -210,8 +255,8 @@ changed_public_contracts:
   make the property-domain contract prospective and reviewable.
 diagnostics_and_previews:
 - Invalid/missing/non-finite properties, authored-normal requirements, incompatible output types, deleted
-  slots, and topology-bearing count changes fail through the one exported availability result used by
-  direct and queued callers.
+  slots, oversized CLOP mixtures, and topology-bearing count changes fail through the one exported availability
+  result used by direct and queued callers.
 benchmark_or_parity_evidence: []
 docs_sync:
   task_file: tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
@@ -223,22 +268,27 @@ residual_risks:
   current PointCloud-only panel is complete.
 - No optimized/GPU backend or performance claim is made; existing CPU-reference strategy selection is
   unchanged.
+- Arbitrary-domain authored/estimated normal publication uses the same generic path but is not independently
+  executed for every element domain in this slice.
 skipped_checks:
 - check: gpu-vulkan
   reason: No shader, RHI, Vulkan backend, byte-layout, or GPU execution behavior changed; full CPU plus
     isolated ASan/UBSan gates exercise the shared runtime/property/history path.
 artifacts:
 - path: tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
-  sha256: 126b462671216b62db32fea34794f504bdbe101434d2c329928945ac286e3e36
+  sha256: 21a8fc20943fd8714d8adc7008b9f91274926273f299b5acd651495ef8fc3b88
   kind: file
 - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
-  sha256: af12f586652af516ce17560d1f2124942322b8b76579e0feb957faff45d3cde6
+  sha256: 7beaeae8e3ba02f429cb39c1e56c81f46826e39ad50cec630600a45a60228019
   kind: file
 - path: docs/reviews/2026-08-03-runtime-206-clean-workshop-review.md
-  sha256: 24eda282a02ffcd3e3267075e4f3ca3c140d707fd7ad3e18d07342dc1eb108ed
+  sha256: f144938fa40119c2b4146c62ae8a9fbd5c14b4a7e5844c679d797b116d81e1d8
   kind: file
 - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
   sha256: 67c51349cafe6bddf365712106b66a3fd2e8e6fd94cc8ddd2757f24d73e7e853
+  kind: file
+- path: ara/logic/claims.md
+  sha256: 0b9273de052f2b37ba7ed33a3677bad58a79ecd9fe9f74017b65f261f316ed08
   kind: file
 self_review:
   completed: true
