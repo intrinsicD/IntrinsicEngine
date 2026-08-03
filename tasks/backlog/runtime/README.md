@@ -39,8 +39,9 @@ production owners while preserving public behavior first.
 - [`RUNTIME-208` — Progressive Poisson element-domain publication](../../done/RUNTIME-208-progressive-poisson-element-domain-publication.md)
   removed implicit mesh surface sampling/domain replacement. Mesh, graph, and
   point-cloud `Vertices` now share one runtime/config/publication path with
-  source-cardinality hierarchy attributes and preserved topology; `UI-038`
-  owns the final Graph panel registration.
+  source-cardinality hierarchy attributes and preserved topology. Retired
+  [`UI-038`](../../done/UI-038-progressive-poisson-multi-domain-panel.md)
+  completed matching Mesh/Graph/PointCloud discovery and copied readiness.
 - [`RUNTIME-205` — Internalize SceneInteraction helpers](../../done/RUNTIME-205-internalize-scene-interaction-helpers.md)
   moved gizmo frame orchestration/scratch and pick correlation/refinement state
   directly into the sole production owner, `SceneInteractionModule`, then

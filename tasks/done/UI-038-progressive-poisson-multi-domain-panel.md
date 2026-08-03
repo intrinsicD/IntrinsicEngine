@@ -23,6 +23,8 @@ maturity_target: Operational
   non-finite vertex positions with the same disabled-reason tooltip convention;
   no app-owned method state, backend seam, geometry conversion, topology edit,
   or cardinality change was added.
+- Commit: implementation and recorded command evidence are bound to
+  `e9cf9e29`; the retirement/evidence commit is recorded by repository history.
 
 ## Goal
 
@@ -105,9 +107,9 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
-Recorded results: focused UI `3/3`, all Progressive Poisson `33/33`, and the
-default CPU-supported selector `4006/4006` passed; its environment-gated
-GLFW/LeakSanitizer case was explicitly skipped. Strict layering, method
+Recorded results: focused UI `3/3` and all Progressive Poisson `33/33` passed;
+the default CPU-supported selector selected `4006`, passed `4005`, and
+explicitly skipped its environment-gated GLFW/LeakSanitizer case. Strict layering, method
 manifest, task-policy, test-layout, and documentation-link checks passed after
 retirement bookkeeping.
 

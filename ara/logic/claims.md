@@ -470,7 +470,7 @@
   tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
   tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md,
   tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md,
-  tasks/backlog/ui/UI-038-progressive-poisson-multi-domain-panel.md,
+  tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
   tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md,
   tasks/backlog/ui/UI-040-icp-compatible-source-selection.md,
   tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md,
@@ -571,3 +571,40 @@
 - **Tags**: runtime, geometry, methods, progressive Poisson, element sources,
   config, history, CPU, ASan, UBSan, retirement
 - **From staging**: O102
+
+## C21: Progressive Poisson has one three-domain Sandbox panel path
+- **Statement**: The Sandbox registers Progressive Poisson under Mesh, Graph,
+  and PointCloud Processing through one shared app-owned panel state and the
+  same runtime-owned copied readiness, validated config/apply/run operation,
+  diagnostics, backend-fallback status, and source-cardinality
+  rank/level/splat-radius/prefix-visibility channels. Missing, empty,
+  wrong-typed, and non-finite vertex positions disable execution with an
+  explicit copied reason. No registration converts the entity, samples a mesh
+  surface, replaces topology, or publishes result properties from the app.
+- **Status**: supported — 3/3 focused headless ImGui and 33/33 Progressive
+  Poisson cases passed; the default CPU-supported selector selected 4,006,
+  passed 4,005, and explicitly skipped one environment-gated
+  GLFW/LeakSanitizer case. This makes
+  no operational GPU/Vulkan compute, backend-parity, or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A loaded valid mesh, graph, or point cloud lacks
+  the Progressive Poisson domain-menu registration; a domain owns a separate
+  config or execution implementation; malformed vertex positions leave Run
+  enabled or provide no reason; the panel exposes conversion/surface-sampling
+  controls, changes topology/cardinality, or publishes properties directly;
+  or result-channel/backend-fallback status differs by registration.
+- **Proof**: [tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
+  tasks/evidence/UI-038/report.yaml,
+  src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
+  src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp,
+  src/runtime/Runtime.GeometryProcessingOperations.cppm,
+  tests/contract/runtime/Test.SandboxEditorModels.cpp,
+  tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
+  methods/geometry/progressive_poisson/README.md,
+  docs/architecture/runtime.md,
+  docs/reviews/2026-08-02-method-engine-integration-contract-audit.md]
+- **Dependencies**: [C18, C20]
+- **Tags**: app, runtime, UI, geometry, methods, progressive Poisson,
+  element sources, config, diagnostics, CPU, retirement
+- **From staging**: O103

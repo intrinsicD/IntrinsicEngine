@@ -7979,3 +7979,29 @@ tree:
       comparison. No operational Vulkan, performance, or Graph-panel claim is
       made.
     status: resolved
+  - id: N339
+    type: experiment
+    title: "Verify three-domain Progressive Poisson UI integration"
+    provenance: ai-executed
+    timestamp: "2026-08-03T09:54+02:00"
+    also_depends_on: [N330, N336, N338]
+    evidence:
+      - "tasks/done/UI-038-progressive-poisson-multi-domain-panel.md"
+      - "methods/geometry/progressive_poisson/README.md"
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
+      - "src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorModels.cpp"
+      - "tests/integration/runtime/Test.SandboxEditorPresentation.cpp"
+      - "tasks/evidence/UI-038/commands/focused-ui-progressive-poisson.json: 3/3 passed"
+      - "tasks/evidence/UI-038/commands/progressive-poisson-regression.json: 33/33 passed"
+      - "tasks/evidence/UI-038/commands/full-cpu.json: 4,006 selected, 4,005 passed, and one environment-gated policy skip"
+    result: >
+      Progressive Poisson is registered under Mesh, Graph, and PointCloud
+      Processing through one shared panel state and one validated runtime
+      config/apply/run operation. Copied readiness rejects missing, empty,
+      wrong-typed, and non-finite vertex positions with explicit disabled
+      reasons; the panel retains source-cardinality result visualization and
+      has no conversion or topology-replacement path. CPU and headless ImGui
+      coverage passed. No GPU/Vulkan compute, parity, or performance claim is
+      made.
+    status: resolved

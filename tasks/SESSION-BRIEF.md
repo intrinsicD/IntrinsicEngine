@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `UI-038` — Progressive Poisson multi-domain panel (tasks/active/UI-038-progressive-poisson-multi-domain-panel.md)
+- none
 
 ## Theme B — Rendering modernization
 

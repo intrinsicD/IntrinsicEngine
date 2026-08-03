@@ -21,7 +21,9 @@ bounded runtime/UI pairs rather than duplicate METHOD implementations:
 
 - LOP family: `RUNTIME-206` → `UI-039` after the initial
   `RUNTIME-175`/`UI-035` integration.
-- Progressive Poisson: `RUNTIME-208` → re-scoped `UI-038`.
+- Progressive Poisson: retired `RUNTIME-208` → retired `UI-038`; one
+  non-destructive runtime/config/publication path is discoverable under all
+  three compatible vertex-source domains.
 - ICP: `RUNTIME-207` → `UI-040`, gated on `BUG-096`.
 - Statistical/radius outliers: `RUNTIME-209` → `UI-041`.
 - Signed Heat: `RUNTIME-210` → `UI-042`.
