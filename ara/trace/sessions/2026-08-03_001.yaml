@@ -2,9 +2,9 @@ session:
   id: "2026-08-03_001"
   date: "2026-08-03"
   started: "2026-08-03T01:51+02:00"
-  last_turn: "2026-08-03T14:32+02:00"
-  turn_count: 4
-  summary: "Taskized the verification redesign, reconciled origin/main and every local branch without breaking sealed evidence, and passed the complete CPU gate."
+  last_turn: "2026-08-03T19:35+02:00"
+  turn_count: 5
+  summary: "Taskized the verification redesign, reconciled every local branch, and retired BUG-128 plus GEOM-064 with accepted high-risk evidence and a green 4,074-case merged CPU gate."
 
 events_logged:
   - turn: 1
@@ -127,6 +127,36 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized exact, retired-only parallel-history baselines as K30 through BUG-128 implementation."
+  - turn: 5
+    type: decision
+    id: "N350"
+    routing: direct
+    provenance: user
+    summary: "Required BUG-128 and GEOM-064 to finish their high-risk closure before every local branch was merged into main again."
+  - turn: 5
+    type: experiment
+    id: "N349"
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed the deterministic GEOM-064 CPU optimization seam with focused, full-CPU, ASan, UBSan, and independently accepted evidence."
+  - turn: 5
+    type: dead_end
+    id: "N351"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected status-only, determinant-only, unit-floored, and globally normalized validation after adversarial numerical probes falsified each shortcut."
+  - turn: 5
+    type: experiment
+    id: "N352"
+    routing: direct
+    provenance: ai-executed
+    summary: "Accepted and retired both tasks, merged GEOM-064 at f29018d2, verified 69 focused and 4,074 CPU registrations, and proved all fifteen branches are on main."
+  - turn: 5
+    type: observation
+    id: "O112"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the bounded GEOM-064 deterministic CPU contract to C26 through artifact commitment."
 
 ai_actions:
   - turn: 1
@@ -197,11 +227,32 @@ ai_actions:
       - "ara/trace/sessions/2026-08-03_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 5
+    action: "Completed BUG-128 custody, implemented and independently reviewed four GEOM-064 hardening revisions, committed both accepted evidence surfaces, merged the sole uncontained feature branch, rebuilt IntrinsicTests, ran the focused and complete CPU gates, and passed strict structural, documentation, and workflow-evidence validation."
+    provenance: ai-executed
+    files_changed:
+      - "f29018d2 (merge commit)"
+      - "src/geometry/Geometry.Parameterization.Optimize.cppm"
+      - "src/geometry/Geometry.Parameterization.Optimize.cpp"
+      - "tests/unit/geometry/Test.ParameterizationOptimize.cpp"
+      - "tasks/done/GEOM-064-parameterization-optimization-kernels.md"
+      - "tasks/evidence/GEOM-064/"
+      - "tasks/done/BUG-128-parallel-prepolicy-retired-task-baselines.md"
+      - "tasks/evidence/BUG-128/"
+      - "ara/logic/claims.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-08-03_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
 claims_touched:
   - id: C19
     action: crystallized
     turn: 2
+  - id: C26
+    action: crystallized
+    turn: 5
 
 key_context:
   - turn: 1
@@ -228,12 +279,14 @@ key_context:
     excerpt: "Post-seal enrollment edits were reverted after custody correctly rejected changed task hashes; the final compatibility layer preserves exact retired bytes."
   - turn: 4
     excerpt: "Merge 872059d5 contains every local branch; 102/102 focused and 4,064/4,064 CPU-supported tests passed with one policy-defined skip."
+  - turn: 5
+    excerpt: "Independent review rejected three successive GEOM-064 surfaces before revision 4 closed public-record indexing, extreme-scale root, SO(2)/SVD provenance, and near-threshold sign-validation defects."
+  - turn: 5
+    excerpt: "Main f29018d2 contains all fifteen local branches; 69/69 focused and 4,074/4,074 CPU registrations passed with only their policy-defined opt-in/environment skips."
 
 open_threads:
   - "Implement CI-012 first; every other redesign task is dependency-gated on the compiled evidence-graph foundation or its descendants."
   - "Each task that lands a reusable verification contract must add canonical prose, a catalog entry, executable proof, and updated task contracts in the same reviewed change."
   - "C19 remains untested until BUILD-006, CI-017, CI-018, and CI-020 produce claim-grade matched evidence."
-  - "BUG-128 implementation is complete but remains active until a durable handoff and independent fixed-surface review satisfy its high-risk retirement profile."
-  - "GEOM-064 retains a checkpointed, unregistered draft and still owes CMake registration, correctness tests, verification, and high-risk completion evidence."
 
 ai_suggestions_pending: []

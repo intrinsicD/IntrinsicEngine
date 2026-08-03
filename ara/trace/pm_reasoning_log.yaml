@@ -1336,3 +1336,12 @@ entries:
       - "Kept O87, O89, O90, and O93 staged and non-stale; this merge does not adopt the universal operation envelope or the separate live-agent-plan architecture."
       - "Added no capability or performance claim: the 102/102 focused and 4,064/4,064 CPU results are bounded merge verification; sanitizer and GPU/Vulkan gates were not rerun."
       - "BUG-128 remains active despite complete implementation because high-risk retirement still requires a durable handoff and independent fixed-surface accepted review; GEOM-064 remains an unregistered draft."
+  - turn: "2026-08-03_001#5"
+    notes:
+      - "Routed the user's ordered finish-and-merge instruction as decision N350, preserved existing GEOM-064 experiment N349, recorded the rejected numerical shortcuts as dead end N351, and bound accepted retirement plus merged verification to N352."
+      - "Logged O112/C26 as crystallized through artifact commitment rather than creating a duplicate capability claim; C26 remains bounded to deterministic CPU kernels and excludes outer-loop convergence, global bijectivity, GPU/Vulkan, and performance."
+      - "Treated BUG-128 independent acceptance as closure of the already crystallized K30 workflow constraint, not as a new engine capability or research claim."
+      - "Kept O87, O89, O90, and O93 staged and non-stale: this task closure does not privatize the selected-model cache, implement live per-owner plans, or standardize every runtime method operation."
+      - "Recorded each rejected GEOM-064 review surface as useful negative evidence: public status was not provenance, global coefficient normalization lost a finite root, determinant one did not imply SO(2), and a unit tolerance floor hid near-threshold sign corruption."
+      - "Bound the final result to accepted high-risk reports, Clang 23 merged build, 69 focused registrations, 4,074 CPU registrations, premerge 10/10 ASan and UBSan cases, strict structural gates, and the fifteen-branch ancestry audit."
+      - "No GPU/Vulkan or performance claim was added, and no remote push was performed."

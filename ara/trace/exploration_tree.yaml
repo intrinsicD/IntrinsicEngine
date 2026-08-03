@@ -8286,3 +8286,72 @@ tree:
       global boundary bijectivity, runtime/UI integration, GPU execution, and
       performance remain explicitly outside this CPU-contract result.
     status: resolved
+  - id: N350
+    type: decision
+    title: "Finish high-risk task closure before reconsolidating main"
+    provenance: user
+    timestamp: "2026-08-03T19:35+02:00"
+    also_depends_on: [N345, N348, N349]
+    choice: >
+      Finish the remaining GEOM-064 and BUG-128 workflow work, commit each
+      exact accepted surface, and only then merge every local branch into
+      main again.
+    alternatives:
+      - "Merge GEOM-064 before its independent high-risk acceptance."
+      - "Leave either task or its evidence uncommitted on a side branch."
+      - "Merge only selected branches instead of reconciling the complete local branch set."
+    evidence:
+      - "User direction: finish the open work in GEOM-64 and BUG-128, then commit and merge into main again."
+      - "tasks/evidence/BUG-128/reviews.jsonl"
+      - "tasks/evidence/GEOM-064/reviews.jsonl"
+    status: resolved
+  - id: N351
+    type: dead_end
+    title: "Reject scale-insensitive provenance checks for public numerical records"
+    provenance: ai-executed
+    timestamp: "2026-08-03T19:35+02:00"
+    also_depends_on: [N349, N350]
+    hypothesis: >
+      A success status plus finite payloads, determinant-one rotation checks,
+      unit-floored approximate equality, and one global quadratic coefficient
+      normalization are sufficient to trust caller-mutable optimization
+      records and preserve every finite flip root.
+    failure_mode: >
+      Independent fixed-surface probes reached unchecked forged cardinalities,
+      erased a representable 1e-200 flip root, accepted determinant-one but
+      non-orthogonal Rotation=diag(2,0.5), and accepted sign-flipped 2e-12
+      determinant/signed-singular/Jacobian fields under a 1e-8 absolute floor.
+    lesson: >
+      Public aggregate status is not provenance. Consumers must revalidate
+      storage and numerical identities against current inputs; rotations need
+      orthogonality plus orientation, and scale-sensitive arithmetic must use
+      ratio-preserving or quantity-relative comparisons without a unit floor.
+    evidence:
+      - "tasks/evidence/GEOM-064/reviews.jsonl"
+      - "tasks/evidence/GEOM-064/handoff.jsonl"
+      - "tests/unit/geometry/Test.ParameterizationOptimize.cpp"
+    status: resolved
+  - id: N352
+    type: experiment
+    title: "Accept and merge BUG-128 and GEOM-064 on main"
+    provenance: ai-executed
+    timestamp: "2026-08-03T19:35+02:00"
+    also_depends_on: [N348, N349, N350, N351]
+    evidence:
+      - "3d0098e1: BUG-128 accepted closure evidence"
+      - "ee6c53ba: GEOM-064 accepted closure evidence"
+      - "f29018d2: GEOM-064 merge into main"
+      - "tasks/evidence/BUG-128/report.yaml and reviews.jsonl: high-risk workflow validation has zero errors"
+      - "tasks/evidence/GEOM-064/report.yaml and reviews.jsonl: revision-count four accepted; workflow validation has zero errors"
+      - "merged focused parameterization selector: 69/69 selected passed, with one opt-in Vulkan self-skip"
+      - "merged default CPU selector: 4,074/4,074 selected passed, with one expected GLFW/LSan self-skip"
+      - "GEOM-064 revision-4 ASan and UBSan binaries: 10/10 passed each"
+      - "strict task, state-link, schema, ARA, docs, layering, test-layout, root-hygiene, and module-inventory gates passed"
+    result: >
+      BUG-128 retired with accepted independent evidence, and GEOM-064 reached
+      its deterministic CPU contract after four independent review rounds.
+      Main now contains every one of the fifteen local branches, rebuilds with
+      Clang 23, and passes the focused and complete CPU gates. GPU/Vulkan and
+      performance claims remain outside this closure, and no remote push was
+      performed.
+    status: resolved
