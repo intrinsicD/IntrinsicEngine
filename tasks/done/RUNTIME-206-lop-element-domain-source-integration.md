@@ -31,8 +31,9 @@ maturity_target: Operational
   and independent fixed-surface review evidence close the runtime correction.
   `UI-039` owns property-aware Sandbox discovery; no GPU backend or performance
   claim is made.
-- Implementation checkpoints: `15b6008c` and `cf59aeae`; the review-correction
-  and evidence-seal revisions are bound under `tasks/evidence/RUNTIME-206/`.
+- Commit: implementation `15b6008c`, evidence `cf59aeae`, review correction
+  `1dbbb3f0`, and correction evidence `fe6eebd5`; the final seal is bound under
+  `tasks/evidence/RUNTIME-206/`.
 
 ## Goal
 
