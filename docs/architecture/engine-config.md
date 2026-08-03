@@ -108,6 +108,18 @@ imports the application DTO or field vocabulary.
         }
       },
       {
+        "name": "sandbox.physics",
+        "schema": "intrinsic.runtime.sandbox.physics",
+        "version": 1,
+        "payload": {
+          "enabled": false,
+          "fixed_delta_seconds": 0.0166666675,
+          "max_accumulated_seconds": 0.25,
+          "max_steps_per_frame": 8,
+          "gravity": [0.0, -9.80665, 0.0]
+        }
+      },
+      {
         "name": "sandbox.point_cloud_consolidation",
         "schema": "intrinsic.runtime.sandbox.point-cloud-consolidation",
         "version": 1,
@@ -165,7 +177,8 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 `poisson` and `app.sections[name=sandbox.parameterization].payload` as
 `parameterization`, and
 `app.sections[name=sandbox.point_cloud_consolidation].payload` as
-`consolidation`.
+`consolidation`, and `app.sections[name=sandbox.physics].payload` as
+`physics`.
 
 | Payload | Field | Values |
 |---|---|---|
@@ -196,6 +209,11 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `parameterization.bff` | `mode` | `automatic_conformal`, `target_lengths`, `target_angles` |
 | `parameterization.bff` | `boundary_data` | Finite number array interpreted as positive per-boundary-edge lengths or per-boundary-vertex exterior angles by `mode`; empty for `automatic_conformal`, non-empty for target modes, and target angles must sum to `2*pi` within `angle_sum_tolerance` |
 | `parameterization.bff` | `angle_sum_tolerance`, `degeneracy_tolerance` | Positive finite numbers no greater than `1e30` |
+| `physics` | `enabled` | Boolean; default `false` |
+| `physics` | `fixed_delta_seconds` | Finite number in `[1e-6, 1]` seconds |
+| `physics` | `max_accumulated_seconds` | Finite number in `[fixed_delta_seconds, 10]` seconds |
+| `physics` | `max_steps_per_frame` | Integer in `[1, 1024]` |
+| `physics` | `gravity` | Array of exactly three finite numbers, each in `[-100000, 100000]` |
 | `consolidation` | `strategy` | `lop`, `wlop`, `clop`, `ear`; all select the promoted CPU-reference implementation |
 | `consolidation` | `support_radius` | Finite number in `[1e-12, 1e12]`, in input world units |
 | `consolidation` | `repulsion_weight` | Finite number in `[0, 0.499999999999]` |
@@ -219,6 +237,12 @@ the caller-provided reference default. Unknown, duplicate, mismatched, or
 invalid records are diagnosed and do not replace that default. The registry is
 a deterministic name-sorted vector of plain descriptors: a canonical default
 record, a validator, and an optional non-failing post-commit callback.
+
+The Sandbox physics payload defaults disabled and round-trips the module's
+fixed-step policy. Enabling it causes the app-composed `PhysicsModule` to
+lazily create private state for encountered runtime worlds; disabling it
+clears those states. The config record never carries physics handles or solver
+objects.
 
 The Sandbox parameterization payload round-trips all four strategy selections,
 the UV-view controls, and the three typed parameter records so file/agent
@@ -278,9 +302,11 @@ method/playground state. The parameterization payload similarly holds the
 selected CPU strategy, typed values, and UV-view choices. Runtime and the
 Sandbox panel decode those payloads through
 the feature-owned `Extrinsic.Runtime.ClusteringConfig`,
-`Extrinsic.Runtime.ProgressivePoissonConfig`, and
-`Extrinsic.Runtime.ParameterizationConfig` modules; Core imports no Sandbox, runtime,
-graphics, or method types. See
+`Extrinsic.Runtime.ProgressivePoissonConfig`,
+`Extrinsic.Runtime.ParameterizationConfig`,
+`Extrinsic.Runtime.PointCloudConsolidationConfig`, and
+`Extrinsic.Runtime.PhysicsModule` modules; Core imports no Sandbox, runtime,
+graphics, physics, or method types. See
 [runtime config control](runtime-config-control.md).
 
 ## Diagnostics

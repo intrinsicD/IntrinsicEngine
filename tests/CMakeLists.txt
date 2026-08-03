@@ -402,18 +402,18 @@ intrinsic_test_object_lib(PhysicsWorldTestObjs
     DEPS ExtrinsicPhysics ExtrinsicCore IntrinsicGeometry
 )
 
-# --- Runtime physics bridge tests (runtime-owned ECS <-> physics composition) ---
+# --- Runtime physics module tests (runtime-owned ECS <-> physics composition) ---
 if(TARGET ExtrinsicRuntime)
-    set(_runtime_physics_bridge_test_files
-        Test.RuntimePhysicsBridge.cpp
+    set(_runtime_physics_module_test_files
+        Test.PhysicsModule.cpp
     )
-    intrinsic_resolve_test_sources(_runtime_physics_bridge_test_sources
+    intrinsic_resolve_test_sources(_runtime_physics_module_test_sources
         SEARCH_DIRS integration/runtime
-        FILES ${_runtime_physics_bridge_test_files}
+        FILES ${_runtime_physics_module_test_files}
     )
-    intrinsic_test_object_lib(RuntimePhysicsBridgeTestObjs
+    intrinsic_test_object_lib(RuntimePhysicsModuleTestObjs
         SOURCES
-            ${_runtime_physics_bridge_test_sources}
+            ${_runtime_physics_module_test_sources}
         DEPS ExtrinsicRuntime ExtrinsicPhysics ExtrinsicECS ExtrinsicCore glm::glm
     )
 endif()
@@ -1158,9 +1158,9 @@ if(INTRINSIC_GROUP_PURE_CTEST)
     )
 endif()
 
-if(TARGET RuntimePhysicsBridgeTestObjs)
-    intrinsic_test_executable(IntrinsicRuntimePhysicsBridgeTests
-        OBJECTS RuntimePhysicsBridgeTestObjs
+if(TARGET RuntimePhysicsModuleTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimePhysicsModuleTests
+        OBJECTS RuntimePhysicsModuleTestObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicPhysics ExtrinsicECS ExtrinsicCore
         LABELS integration runtime ecs physics
     )

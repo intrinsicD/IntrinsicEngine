@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-ubsan",
+    "--fresh",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+  ],
+  "command_display": "cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+  "cwd": ".",
+  "duration_ms": 8214,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:17:41Z",
+  "label": "ci-ubsan-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:17:32Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/ci-ubsan-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/ci-ubsan-configure.stdout.log",
+  "stdout_sha256": "a84bcf8eb699265145450b1a2396d444eb49d44a60c82a828995c7d135a13761",
+  "task_id": "PHYSICS-004"
+}

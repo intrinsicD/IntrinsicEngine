@@ -2,7 +2,16 @@
 id: PHYSICS-004
 theme: C
 depends_on: [PHYSICS-003]
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner: "codex-root"
+branch: "feature/physics-004-runtime-module"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-03T18:42:32Z"
 maturity_target: Operational
+contract_schema: 1
+contracts: [repo.task-contract-discovery]
 ---
 # PHYSICS-004 — Operational runtime physics module and bridge privatization
 
@@ -34,6 +43,24 @@ maturity_target: Operational
   consumers; any future command surface requires a separate task with a real
   caller.
 
+## Right-sizing
+
+- **Element:** `PhysicsModule` triggers the module/framework audit. The current
+  `IRuntimeModule` seam is already production-backed by multiple app-composed
+  owners; physics specifically needs its stable registration, dependency
+  resolution, frame-hook, world-event, and reverse-teardown contracts.
+- **Simpler alternative:** keep one deep `PhysicsModule`, move bridge state and
+  synchronization behind it as implementation detail, and use plain config and
+  diagnostics records. Do not add a physics service, registry, command bus, or
+  forwarding facade.
+- **Blast radius:** runtime composition, Sandbox/default configuration,
+  physics/runtime contract and integration tests, architecture/config docs,
+  and the generated module inventory. Confirm all import/link edges with the
+  strict layering gate.
+- **Reintroduction trigger:** add a separate service or command surface only
+  when a concrete second caller needs runtime mutation that validated config
+  apply cannot express.
+
 ## Slice plan
 
 - **Slice A — module composition.** Add the optional module, per-world state,
@@ -55,44 +82,44 @@ maturity_target: Operational
 
 ## Required changes
 
-- [ ] Add `PhysicsModule` as an `IRuntimeModule` with explicit dependencies,
+- [x] Add `PhysicsModule` as an `IRuntimeModule` with explicit dependencies,
       per-world physics state/sidecars, fixed-step accumulation, and teardown.
-- [ ] Synchronize CPU descriptors from ECS before steps and write dynamic
+- [x] Synchronize CPU descriptors from ECS before steps and write dynamic
       transforms back after steps with the existing dirty/generation contract.
-- [ ] Handle world create/replace/destroy, entity removal, invalid authoring,
+- [x] Handle world create/replace/destroy, entity removal, invalid authoring,
       step budget, and shutdown without leaking handles into ECS.
-- [ ] Register validated config and copied diagnostics through existing
+- [x] Register validated config and copied diagnostics through existing
       config/module seams; disabled configuration owns no active physics world.
-- [ ] Migrate direct `PhysicsBridge` tests to the composed module and a real
+- [x] Migrate direct `PhysicsBridge` tests to the composed module and a real
       Null-window `Engine::Run()` integration.
-- [ ] Privatize/delete the public `Runtime.PhysicsBridge` module after the
+- [x] Privatize/delete the public `Runtime.PhysicsBridge` module after the
       operational path and exact lifecycle parity pass.
 
 ## Tests
 
-- [ ] Module contracts cover authoring creation/update/removal, stable handle
+- [x] Module contracts cover authoring creation/update/removal, stable handle
       reuse, fixed-step accumulation, collision/solver stepping, dynamic-only
       writeback, invalid descriptors, and clear/shutdown.
-- [ ] Real Engine integration proves an authored dynamic body advances and
+- [x] Real Engine integration proves an authored dynamic body advances and
       writes back during `Engine::Run()` while static/kinematic bodies do not.
-- [ ] Config file, programmatic/agent apply, and UI control (if exposed) share
+- [x] Config file, programmatic/agent apply, and UI control (if exposed) share
       one validation/apply path.
-- [ ] Structural tests prove production composes `PhysicsModule` and no public
+- [x] Structural tests prove production composes `PhysicsModule` and no public
       `PhysicsBridge` import remains.
 
 ## Docs
 
-- [ ] Update physics/runtime architecture, config, and Sandbox documentation
+- [x] Update physics/runtime architecture, config, and Sandbox documentation
       with module lifecycle and disabled/default behavior.
-- [ ] Regenerate module inventory and refresh physics/task indexes.
+- [x] Regenerate module inventory and refresh physics/task indexes.
 
 ## Acceptance criteria
 
-- [ ] Physics authoring/simulation/writeback runs through a composed optional
+- [x] Physics authoring/simulation/writeback runs through a composed optional
       runtime module in the real engine loop.
-- [ ] Lower physics remains ECS/runtime/graphics-free and ECS stores no live
+- [x] Lower physics remains ECS/runtime/graphics-free and ECS stores no live
       physics handles.
-- [ ] The direct public bridge surface is deleted after module integration
+- [x] The direct public bridge surface is deleted after module integration
       tests preserve its behavior.
 
 ## Verification
@@ -100,11 +127,25 @@ maturity_target: Operational
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'PhysicsModule|RuntimePhysics|PhysicsBridge' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+ctest --test-dir build/ci --output-on-failure -R 'PhysicsModule|RuntimePhysics|PhysicsBridge|SandboxConfigSections|RuntimeEngineLayering' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Executed evidence is recorded under `tasks/evidence/PHYSICS-004/commands/`:
+
+- canonical unsanitized CPU gate: 4,075/4,075 tests passed (the opt-in
+  GLFW/LSan process was skipped by its own policy);
+- focused physics/config/layering selector: 43/43 tests passed, including the
+  real Null-window `Engine::Run()` case;
+- isolated ASan CPU gate: 2,669/2,669 tests passed, including the GLFW/LSan
+  process;
+- isolated UBSan CPU gate: 2,669/2,669 tests passed (the ASan-specific
+  GLFW/LSan process was skipped);
+- sanitized `ExtrinsicSandbox` production executable build and the strict
+  clean-workshop, layering, task-policy, doc-link, inventory, test-layout, and
+  root-hygiene gates passed.
 
 ## Forbidden changes
 
@@ -116,5 +157,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 
-- Target: `Operational` through the real CPU/Null engine loop; closure also
-  requires retirement of the public test-only bridge surface.
+- Reached: `Operational` through the real CPU/Null engine loop, with the public
+  test-only bridge surface retired.
+- Workflow status: technical acceptance and driver self-review are complete;
+  the task remains active until an independent high-risk review is accepted
+  against the final revision/content digest.

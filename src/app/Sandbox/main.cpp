@@ -26,6 +26,7 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -401,9 +402,18 @@ int main(int argc, char** argv)
         return 2;
     }
 
+    auto physicsModule =
+        std::make_unique<Extrinsic::Runtime::PhysicsModule>();
+    Extrinsic::Runtime::PhysicsModule* const physics = physicsModule.get();
     auto configControl =
         std::make_unique<Extrinsic::Runtime::EngineConfigControl>(
-            Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry());
+            Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry({
+                .Physics =
+                    [physics](const Extrinsic::Runtime::PhysicsModuleConfig& value)
+                    {
+                        (void)physics->ApplyConfig(value);
+                    },
+            }));
     auto boot = Extrinsic::Runtime::ResolveEngineConfigForBoot(
         args,
         configControl->SectionRegistry());
@@ -429,6 +439,7 @@ int main(int argc, char** argv)
     }
 
     engine.AddModule(std::move(configControl));
+    engine.AddModule(std::move(physicsModule));
     engine.EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Extrinsic::Runtime::CameraModule>();
     engine.EmplaceModule<Extrinsic::Runtime::ClusteringModule>();

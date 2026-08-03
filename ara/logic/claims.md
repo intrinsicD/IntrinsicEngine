@@ -784,3 +784,41 @@
 - **Tags**: geometry, parameterization, ARAP, SLIM, CPU, deterministic,
   local injectivity
 - **From staging**: O112
+
+## C27: Runtime physics is operational through the CPU/Null engine loop
+- **Statement**: With `sandbox.physics` enabled, the app-composed
+  `PhysicsModule` lazily owns isolated physics worlds and `StableId` sidecars
+  per encountered runtime world, synchronizes valid collider/rigid-body
+  authoring, executes a bounded fixed-step `Physics::World::SolveStep` lane
+  after promoted ECS simulation, writes only changed dynamic poses back with
+  transform dirty tags, and clears exact state on disable, world destruction,
+  and shutdown. Its public surface exposes config and copied diagnostics but no
+  physics world, body handle, parallel service, or exact self-publication.
+- **Status**: supported — Clang 23 focused and complete CPU/Null contracts,
+  complete ASan and UBSan CPU cohorts, and a linked Sandbox executable; the
+  task's independent high-risk acceptance remains pending, and no GPU/Vulkan
+  physics, persistence, contact-event, dedicated-UI, or performance claim is
+  made
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Enabling the validated config fails to create
+  isolated state for an active world; unchanged ECS authoring resets a
+  simulated pose or velocity; the fixed-step budget is unbounded; static or
+  kinematic ECS poses are overwritten; dynamic writeback omits dirty tags;
+  disable, world destruction, or shutdown retains owned state; the generic
+  Engine imports the concrete module; or the public module exposes live
+  physics handles/state or an unconsumed service publication.
+- **Proof**: [tasks/active/PHYSICS-004-operational-runtime-physics-module.md,
+  src/runtime/Runtime.PhysicsModule.cppm,
+  src/runtime/Runtime.PhysicsModule.cpp,
+  src/runtime/Runtime.Engine.cpp,
+  src/app/Sandbox/main.cpp,
+  tests/integration/runtime/Test.PhysicsModule.cpp,
+  tests/integration/runtime/Test.SandboxConfigSections.cpp,
+  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tasks/evidence/PHYSICS-004/commands/final-ci-tests.json,
+  tasks/evidence/PHYSICS-004/commands/final-ci-asan-tests.json,
+  tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-tests.json]
+- **Dependencies**: []
+- **Tags**: runtime, physics, ECS, fixed step, config, CPU, Null, Operational
+- **From staging**: O113

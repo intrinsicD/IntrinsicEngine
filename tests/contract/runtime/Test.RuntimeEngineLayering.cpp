@@ -129,6 +129,7 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
     const auto frameContext = runFrame.find("RuntimeFrameContext frameContext{};");
     const auto platformContract = runFrame.find("Core::ExecutePlatformBeginFrameContract(platformHooks");
     const auto fixedStep      = runFrame.find("RunFixedStepSimulationTicks(");
+    const auto simulation     = runFrame.find("FramePhase::Simulation");
     const auto uiBuild        = runFrame.find("FramePhase::UiBuild");
     const auto renderContract = runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
     const auto present = runFrame.find("m_Impl->m_Device->Present(frame);");
@@ -139,6 +140,7 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
     ASSERT_NE(frameContext, std::string::npos);
     ASSERT_NE(platformContract, std::string::npos);
     ASSERT_NE(fixedStep, std::string::npos);
+    ASSERT_NE(simulation, std::string::npos);
     ASSERT_NE(uiBuild, std::string::npos);
     ASSERT_NE(renderContract, std::string::npos);
     ASSERT_NE(present, std::string::npos);
@@ -147,11 +149,90 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
 
     EXPECT_LT(frameContext, platformContract);
     EXPECT_LT(platformContract, fixedStep);
-    EXPECT_LT(fixedStep, uiBuild);
+    EXPECT_LT(fixedStep, simulation);
+    EXPECT_LT(simulation, uiBuild);
     EXPECT_LT(uiBuild, renderContract);
     EXPECT_LT(renderContract, present);
     EXPECT_LT(present, maintenance);
     EXPECT_LT(maintenance, clockEnd);
+}
+
+TEST(RuntimeEngineLayering,
+     PhysicsModuleIsAppComposedAndThePublicBridgeSurfaceIsRetired)
+{
+    const auto root = RepoRoot();
+    const auto engineInterface =
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto moduleInterface =
+        ReadFile(root / "src/runtime/Runtime.PhysicsModule.cppm");
+    const auto moduleImpl =
+        ReadFile(root / "src/runtime/Runtime.PhysicsModule.cpp");
+    const auto runtimeCMake =
+        ReadFile(root / "src/runtime/CMakeLists.txt");
+    const auto sandboxMain =
+        ReadFile(root / "src/app/Sandbox/main.cpp");
+    const auto sandboxConfig =
+        ReadFile(root / "src/app/Sandbox/Sandbox.ConfigSections.cpp");
+
+    EXPECT_EQ(engineInterface.find("PhysicsModule"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("PhysicsModule"), std::string::npos);
+    EXPECT_NE(moduleInterface.find(
+                  "PhysicsModule final : public IRuntimeModule"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("import Extrinsic.Physics.World"),
+              std::string::npos);
+    EXPECT_EQ(moduleInterface.find("PhysicsService"), std::string::npos);
+    EXPECT_EQ(moduleInterface.find("GetWorld"), std::string::npos);
+    EXPECT_EQ(moduleInterface.find("BodyHandle"), std::string::npos);
+    EXPECT_EQ(moduleImpl.find("Provide<PhysicsModule>"), std::string::npos);
+
+    EXPECT_NE(runtimeCMake.find("Runtime.PhysicsModule.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.PhysicsModule.cpp"),
+              std::string::npos);
+    EXPECT_EQ(runtimeCMake.find("PhysicsBridge"), std::string::npos);
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.PhysicsBridge.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.PhysicsBridge.cpp"));
+
+    EXPECT_NE(sandboxMain.find(
+                  "import Extrinsic.Runtime.PhysicsModule"),
+              std::string::npos);
+    EXPECT_NE(sandboxMain.find(
+                  "engine.AddModule(std::move(physicsModule))"),
+              std::string::npos);
+    EXPECT_NE(sandboxConfig.find(
+                  "MakePhysicsModuleConfigSectionRegistration"),
+              std::string::npos);
+
+    const std::array<std::filesystem::path, 2u> scannedRoots{
+        std::filesystem::path{"src"},
+        std::filesystem::path{"tests"},
+    };
+    const std::string retiredBridgeImport =
+        "import Extrinsic.Runtime." "PhysicsBridge";
+    for (const std::filesystem::path& relativeRoot : scannedRoots)
+    {
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(root / relativeRoot))
+        {
+            if (!entry.is_regular_file())
+                continue;
+            const auto extension = entry.path().extension().string();
+            if (extension != ".cpp" && extension != ".cppm" &&
+                extension != ".h" && extension != ".hpp")
+            {
+                continue;
+            }
+            EXPECT_EQ(
+                ReadFile(entry.path()).find(retiredBridgeImport),
+                std::string::npos)
+                << entry.path();
+        }
+    }
 }
 
 TEST(RuntimeEngineLayering, RunFrameAppliesJobCompletionsWithBoundedBudget)

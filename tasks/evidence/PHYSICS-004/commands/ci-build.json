@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests -j 4",
+  "cwd": ".",
+  "duration_ms": 32961,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:39:32Z",
+  "label": "ci-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:38:59Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/ci-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/ci-build.stdout.log",
+  "stdout_sha256": "ea73019c89226aa6b160b8c98be9811531be3f4b738eee4ed763038d0db4bfd0",
+  "task_id": "PHYSICS-004"
+}

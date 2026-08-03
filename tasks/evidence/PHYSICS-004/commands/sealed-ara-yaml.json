@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-c",
+    "import pathlib,yaml; [yaml.safe_load(pathlib.Path(path).read_text()) for path in (\"ara/staging/observations.yaml\",\"ara/trace/exploration_tree.yaml\",\"ara/trace/pm_reasoning_log.yaml\",\"ara/trace/sessions/2026-08-03_001.yaml\",\"ara/trace/sessions/session_index.yaml\")]"
+  ],
+  "command_display": "python3 -c 'import pathlib,yaml; [yaml.safe_load(pathlib.Path(path).read_text()) for path in (\"ara/staging/observations.yaml\",\"ara/trace/exploration_tree.yaml\",\"ara/trace/pm_reasoning_log.yaml\",\"ara/trace/sessions/2026-08-03_001.yaml\",\"ara/trace/sessions/session_index.yaml\")]'",
+  "cwd": ".",
+  "duration_ms": 477,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T21:02:16Z",
+  "label": "sealed-ara-yaml",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T21:02:16Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/sealed-ara-yaml.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/sealed-ara-yaml.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PHYSICS-004"
+}

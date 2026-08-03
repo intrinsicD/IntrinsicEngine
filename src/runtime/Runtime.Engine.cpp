@@ -839,6 +839,15 @@ namespace Extrinsic::Runtime
                                     m_Impl->m_Accumulator,
                                     m_Impl->m_FixedDt,
                                     m_Impl->m_MaxSubSteps);
+        // Concrete app-owned simulation modules share this deterministic
+        // post-ECS/pre-event boundary and can stamp transform dirtiness early
+        // enough for the pre-render transform flush below.
+        RunRuntimeModuleFrameHooks(
+            FramePhase::Simulation,
+            frameDt,
+            m_Impl->m_Accumulator / m_Impl->m_FixedDt,
+            frameContext.EditorCapture,
+            pacing);
         pacing.FixedStepMicros = ElapsedMicros(fixedStepBegin);
 
         // ── Job completion gate (pre-pump B; ARCH-009 / ADR-0024 D8) ─────

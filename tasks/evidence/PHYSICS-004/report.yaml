@@ -1,0 +1,229 @@
+schema_version: 1
+task_id: PHYSICS-004
+workflow_profile: high-risk
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-03T21:02:24Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 19554530c62fe4033be381a068442689104a56d7
+  head_revision: 19554530c62fe4033be381a068442689104a56d7
+  branch: feature/physics-004-runtime-module
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/logic/claims.md
+    sha256: 1f3ec7190785ad0dd21a25990724b63b0fe51aaae998216770f8e0a02c840640
+  - path: ara/staging/observations.yaml
+    sha256: 327a6c70cdb9dca32c0424c6d9b3437f13cb58c583e16ad13414b9bbb30d1538
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 462a0fbc23e2dce0f2721845f0728150b25c29a322fff88e1c554541ac099c25
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: 3e413b8876844fbcba877c3ad9ef2150e40995bae32a1baf8296aea92b498d77
+  - path: ara/trace/sessions/2026-08-03_001.yaml
+    sha256: bab5cfebe2d50813d473304f67862d32dd8ca79ae7fa7ec104dddbe853a4a4f3
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: 2b5ea9f931815a977e411e089369bbfd6ddaa02625e8ad4592ff8691a9ce0980
+  - path: docs/adr/0027-right-sized-runtime-composition.md
+    sha256: 9c8d3eb2b3ffab49f7647b46a99c94f8ea6ed8c845698833ca570baf76308188
+  - path: docs/api/generated/module_inventory.md
+    sha256: 4155d29523159ee2bc9a7f2a69b76a06a1665e5de47dff134410d5aea50d939d
+  - path: docs/architecture/engine-config.md
+    sha256: bc0304ce87aa624261e3fc14b3412f9e2dc053113a2a8d11a48facbeec7064ee
+  - path: docs/architecture/physics.md
+    sha256: 30d95f157dab8fd166fdd8a7b15643ea604a5ef7ac2c840cf62d20aca600371b
+  - path: docs/architecture/runtime-config-control.md
+    sha256: 10a4a6633d08ef205da71d1fb4a36764967b4db6768c570e516e7035b0baa84a
+  - path: docs/architecture/runtime.md
+    sha256: f92f766e32aba4bc6582349d0b474f796669962b81d4d465f2552cea8e75ce3b
+  - path: docs/migration/nonlegacy-parity-matrix.md
+    sha256: 32aef07ea711b4f6ec81123d51a9d98c79fc29debc150c862c63a75a0494e1bb
+  - path: docs/reviews/2026-08-03-physics-004-clean-workshop-review.md
+    sha256: 6b9eab24bc2543543180dc5a2679df81638a27f8b6ed8e8588a771eb71fc8c63
+  - path: src/app/Sandbox/README.md
+    sha256: ec0b6465ed4842e518fef58d626dbeed638734671fc8eacc7fc63fe5be1e7527
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cpp
+    sha256: a937fe21f3c5e5e02c95daf712eff05194d1432c4bfb20b434f7fe42ffa91e8d
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cppm
+    sha256: 367ce0e59e36209e69105dbb86b0c3afff31d2d8e5e48965710e6ac2b402451e
+  - path: src/app/Sandbox/main.cpp
+    sha256: dc52a577f13256bf15fb67c89ea4b2962bf2d10138c096a375a2572c3dfbdef9
+  - path: src/runtime/CMakeLists.txt
+    sha256: 267b6f076e68a0b35da3e6c37ae8b825847e33b0cc25987d329bb2fd7969314b
+  - path: src/runtime/README.md
+    sha256: bf7cd8d5c7432fff34036ce64f0e8c73e88bf8d2b8e8a86e88944303a50683f6
+  - path: src/runtime/Runtime.Engine.cpp
+    sha256: 0326d0d34cd0538e38cab3db1f3c932adab6a117328311239bffc324bc69d302
+  - path: src/runtime/Runtime.Module.cppm
+    sha256: 1eacbe8a39551b28211557e7cacc2dd463c74ea668ceaaa31c7a4c1883a80d04
+  - path: src/runtime/Runtime.PhysicsBridge.cpp
+    sha256: null
+  - path: src/runtime/Runtime.PhysicsBridge.cppm
+    sha256: null
+  - path: src/runtime/Runtime.PhysicsModule.cpp
+    sha256: 3d01c997cadc1d46967b4695d85a16d97bb1ce2369bd24d731987c13bc1d77b8
+  - path: src/runtime/Runtime.PhysicsModule.cppm
+    sha256: 95b59bcefef6bffd6450decb980ad849799d86ae6da80f89131661f8b8526fbc
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 33a9595655cf6b180d1a8efe73c3ae2fc13412e4a81c1f08bfcbfb6125e59075
+  - path: tasks/active/PHYSICS-004-operational-runtime-physics-module.md
+    sha256: 43d466256663a94358f200f55079fef2c95aee5c2c6d1df643193681da95df23
+  - path: tasks/active/README.md
+    sha256: 548905c5b1852787b927142df975fe3fe39b5e0b32c5ee3aec365dd787ee80f7
+  - path: tasks/backlog/README.md
+    sha256: b5a1f28fc5bf4781120d3b1e70c7eddc42b704e95e7727f623fe0fa19041d30e
+  - path: tasks/backlog/physics/README.md
+    sha256: a69ef62ba7d2c720a6c56889a37e8dcdef776cb3c3d7f87d1a8430819a62cfe2
+  - path: tests/CMakeLists.txt
+    sha256: dd71b3b7db73beaf3a92f66803a12e1f448da6cca5036f40fd83d0bbda7d6e78
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: 9e87a72fc7afd6e7ad1a87473fad5bc643da4f1f49c2780e43447b62e8d4d730
+  - path: tests/contract/runtime/Test.RuntimeModule.cpp
+    sha256: 033aefee52617886120c19139d4248d03b604687b3b0b1d9d0ba55986858dc64
+  - path: tests/integration/runtime/Test.PhysicsModule.cpp
+    sha256: 3b35912f56c69359ab0af082efae841941e0a1a31ed8792cd23010ce5374598b
+  - path: tests/integration/runtime/Test.RuntimePhysicsBridge.cpp
+    sha256: null
+  - path: tests/integration/runtime/Test.SandboxConfigSections.cpp
+    sha256: dd59255ec57e9e801d244bd9fc0a0b756ed55159fd83f0dd8973d37c0caf3a73
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 28b86aeca712858669a000d436638f2847b02c677428dafc7e29ab6b1c5f4cf7
+  content_digest: 4cfe1f52eabad7734e2ff082481666192463e5021907544548011d3f8ec5a072
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-03_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/adr/0027-right-sized-runtime-composition.md
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/engine-config.md
+  - docs/architecture/physics.md
+  - docs/architecture/runtime-config-control.md
+  - docs/architecture/runtime.md
+  - docs/migration/nonlegacy-parity-matrix.md
+  - docs/reviews/2026-08-03-physics-004-clean-workshop-review.md
+  - src/app/Sandbox/README.md
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cppm
+  - src/app/Sandbox/main.cpp
+  - src/runtime/CMakeLists.txt
+  - src/runtime/README.md
+  - src/runtime/Runtime.Engine.cpp
+  - src/runtime/Runtime.Module.cppm
+  - src/runtime/Runtime.PhysicsBridge.cpp
+  - src/runtime/Runtime.PhysicsBridge.cppm
+  - src/runtime/Runtime.PhysicsModule.cpp
+  - src/runtime/Runtime.PhysicsModule.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/PHYSICS-004-operational-runtime-physics-module.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/physics/README.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeModule.cpp
+  - tests/integration/runtime/Test.PhysicsModule.cpp
+  - tests/integration/runtime/Test.RuntimePhysicsBridge.cpp
+  - tests/integration/runtime/Test.SandboxConfigSections.cpp
+  - tools/agents/contract_legacy_tasks.json
+  layers:
+  - app
+  - runtime
+  - tests
+  modules:
+  - Extrinsic.Runtime.PhysicsModule
+extension_seam: Existing IRuntimeModule lifecycle and generic FramePhase::Simulation hook
+future_change_plan: Add contact events or a separately discoverable physics service only when a concrete
+  production consumer and scoped follow-up task require them
+acceptance:
+- criterion: Physics authoring/simulation/writeback runs through a composed optional
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Lower physics remains ECS/runtime/graphics-free and ECS stores no live
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The direct public bridge surface is deleted after module integration
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-asan-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-asan-configure.json
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-asan-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-configure.json
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-ubsan-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-ubsan-configure.json
+- receipt: tasks/evidence/PHYSICS-004/commands/ci-ubsan-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/clean-workshop.json
+- receipt: tasks/evidence/PHYSICS-004/commands/diff-check.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-ara-claims.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-ci-asan-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-ci-asan-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-ci-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-ci-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-clean-workshop.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-diff-check.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-doc-links.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-focused-physics-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-layering.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-module-inventory.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-root-hygiene.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-sandbox-dev-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-session-brief.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-task-policy.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-test-layout.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-validate-tasks.json
+- receipt: tasks/evidence/PHYSICS-004/commands/final-workflow-validation.json
+- receipt: tasks/evidence/PHYSICS-004/commands/focused-physics-tests.json
+- receipt: tasks/evidence/PHYSICS-004/commands/module-inventory.json
+- receipt: tasks/evidence/PHYSICS-004/commands/root-hygiene.json
+- receipt: tasks/evidence/PHYSICS-004/commands/sandbox-dev-build.json
+- receipt: tasks/evidence/PHYSICS-004/commands/sealed-ara-yaml.json
+- receipt: tasks/evidence/PHYSICS-004/commands/sealed-diff-check.json
+- receipt: tasks/evidence/PHYSICS-004/commands/test-layout.json
+changed_public_contracts:
+- sandbox.physics schema v1, validated PhysicsModuleConfig apply, and copied PhysicsModuleSnapshot diagnostics;
+  no live physics world or body handle
+diagnostics_and_previews:
+- Per-world lifecycle, authoring sync, solver, fixed-step budget, and dynamic-only writeback counters
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/active/PHYSICS-004-operational-runtime-physics-module.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Independent high-risk fixed-surface review remains required before PHYSICS-004 retirement
+skipped_checks:
+- check: gpu-vulkan
+  reason: Outside this CPU/Null runtime-composition task
+- check: benchmark
+  reason: Not applicable because no performance claim is made
+artifacts:
+- path: docs/reviews/2026-08-03-physics-004-clean-workshop-review.md
+  sha256: 6b9eab24bc2543543180dc5a2679df81638a27f8b6ed8e8588a771eb71fc8c63
+  kind: file
+- path: ara/logic/claims.md
+  sha256: 1f3ec7190785ad0dd21a25990724b63b0fe51aaae998216770f8e0a02c840640
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/PHYSICS-004/handoff.jsonl
+review: tasks/evidence/PHYSICS-004/reviews.jsonl

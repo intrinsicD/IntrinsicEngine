@@ -1880,3 +1880,24 @@ observations:
     promoted_to: "logic/claims.md:C26"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O113
+    timestamp: "2026-08-03T22:58+02:00"
+    provenance: ai-executed
+    content: >
+      The app-composed PhysicsModule provides an Operational CPU/Null runtime
+      path for per-world ECS authoring synchronization, bounded fixed-step
+      physics solving, dynamic-only transform writeback, and exact
+      disable/world-destroy/shutdown cleanup without exposing physics worlds,
+      body handles, or an unconsumed service publication.
+    context: >
+      PHYSICS-004 replaced the test-only public PhysicsBridge, added the
+      default-disabled sandbox.physics config lane and generic Simulation hook,
+      and passed focused, complete CPU, ASan, UBSan, production-executable, and
+      strict structural verification. Independent high-risk task review remains
+      pending and no GPU/Vulkan physics or performance result is claimed.
+    potential_type: claim
+    bound_to: [N354]
+    promoted: true
+    promoted_to: "logic/claims.md:C27"
+    crystallized_via: artifact-commitment
+    stale: false

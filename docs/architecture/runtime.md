@@ -68,7 +68,7 @@ render-recipe capability and initialized-state observation; and registration-
 phase generic frame-hook and typed viewport-input-hook registrars. It does not
 expose `Engine&`. Resolve receives the same capability context with both hook
 registrars closed, so dependency resolution cannot mutate the finalized hook
-shape. The typed viewport context is separate from the five `FramePhase`
+shape. The typed viewport context is separate from the six `FramePhase`
 values and from
 `RuntimeFrameHookContext`: it exists only at the stable post-`UiEndCapture`,
 post-render-input-initialization, pre-gizmo insertion point.
@@ -83,7 +83,10 @@ subsequently retired its one-consumer BMI: `Engine::Impl` now owns only the
 same deterministic frame-hook and viewport-hook records, sorted by
 phase/module/registration sequence or module/registration sequence. There is
 no module sim-system registrar, descriptor/context, causal signal DAG, helper
-schedule object, or fixed-step schedule branch. Engine directly registers the
+schedule object, or fixed-step schedule branch. `PHYSICS-004` subsequently
+adds one runtime-owned implementor and one generic `Simulation` hook, bringing
+the current totals to eleven implementors and eight generic hooks without
+restoring any of those retired scheduling surfaces. Engine directly registers the
 three promoted ECS systems as the complete current fixed-step contribution.
 
 Two-phase `Provide`/`Require`/`OnResolve` remains behavior-backed: texture bake,
@@ -814,42 +817,37 @@ diagnostics, and generations are likewise runtime-only. Renderer/RHI resources,
 GPU handles, transient per-entity visualization recipes, camera controller state, and editor document
 history are runtime/graphics/editor state and are not scene-file contents.
 
-## Physics Bridge
+## Physics Module
 
-`Extrinsic.Runtime.PhysicsBridge` is the concrete runtime-owned ECS/physics
-composition seam added by `PHYSICS-001`.
+`Extrinsic.Runtime.PhysicsModule` is the optional app-composed ECS/physics
+owner. Sandbox places it after `EngineConfigControl`; `Engine` does not import
+or instantiate the concrete module. Instead, the engine invokes the generic
+`FramePhase::Simulation` hook immediately after its promoted ECS fixed-step
+bundle and before post-simulation event delivery and the pre-render transform
+flush.
 
-The bridge owns:
+The module privately owns one state record per encountered `WorldHandle`:
 
-- an `Extrinsic.Physics.World` instance;
-- a `StableId -> BodyHandle` sidecar keyed by
-  `Extrinsic.ECS.Component.StableId`;
-- fixed-step accumulator state;
-- synchronization, writeback, and ordering diagnostics.
+- an `Extrinsic.Physics.World`;
+- a `StableId -> BodyHandle` sidecar;
+- a fixed-step accumulator and descriptor-sync generation.
 
-`SyncAuthoring(Registry&)` scans ECS entities with collider or rigid-body
-authoring, sorts them by `entt` entity value for deterministic processing,
-requires a valid `StableId`, converts ECS collider/rigid-body/transform
-descriptors into `Physics::BodyDescriptor`, creates or updates world bodies,
-and destroys stale sidecar/world bodies when entities disappear or authoring
-becomes invalid. ECS components never receive physics handles.
+Each simulation hook deterministically synchronizes authored collider,
+rigid-body, and transform descriptors; updates only changed descriptors;
+executes a bounded number of `Physics::World::SolveStep` calls; and writes only
+dynamic poses back to ECS with the standard transform dirty/update tags.
+World-destroy and shutdown events remove the private states. Disabling the
+module also clears every state, so the default-disabled configuration owns no
+physics world.
 
-`TickFixedStep(Registry&, frameDeltaSeconds, config)` runs in this order:
-
-1. synchronize ECS authoring into the physics world;
-2. clamp and accumulate frame delta;
-3. execute zero or more fixed physics steps with `config.FixedDeltaSeconds`;
-4. write dynamic body poses back to ECS transforms;
-5. stamp `Transform::IsDirtyTag` and `Transform::WorldUpdatedTag` on dynamic
-   writeback.
-
-Static and kinematic bodies are not written back by this bridge; they are
-diagnosed as skipped writebacks. Contact event routing is intentionally not
-implemented here yet because broadphase/narrowphase contact records are owned
-by `PHYSICS-002`.
+The public surface is deliberately narrow: validated `PhysicsModuleConfig`
+apply and copied `PhysicsModuleSnapshot` diagnostics. No physics world, body
+handle, universal physics service, or unused module publication crosses the
+runtime boundary. The former
+test-only `Extrinsic.Runtime.PhysicsBridge` public module is retired.
 
 ## Related references
 
 - Historical details: `runtime-subsystem-boundaries.md` (`legacy-background`).
-- Physics bridge ownership: [physics.md](physics.md).
+- Physics module ownership: [physics.md](physics.md).
 - Layer policy: [layering.md](layering.md).

@@ -8355,3 +8355,53 @@ tree:
       performance claims remain outside this closure, and no remote push was
       performed.
     status: resolved
+  - id: N353
+    type: dead_end
+    title: "Reject unconsumed runtime physics self-publication"
+    provenance: ai-executed
+    timestamp: "2026-08-03T22:58+02:00"
+    hypothesis: >
+      Publishing the app-owned PhysicsModule itself through ServiceRegistry is
+      justified as a discovery surface for configuration and copied
+      diagnostics.
+    failure_mode: >
+      Final right-sizing review found no production lookup consumer. Sandbox
+      already owns the exact module instance, the validated EngineConfigControl
+      callback supplies mutation, and self-publication would create a
+      service-like public seam despite the task's explicit no-service scope.
+    lesson: >
+      An app-owned runtime module should publish an exact service only when a
+      present production consumer needs discovery. Direct app composition plus
+      validated config apply and copied diagnostics is the smaller sufficient
+      surface for PHYSICS-004.
+    evidence:
+      - "src/runtime/Runtime.PhysicsModule.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "docs/reviews/2026-08-03-physics-004-clean-workshop-review.md"
+    status: resolved
+  - id: N354
+    type: experiment
+    title: "Compose and verify PHYSICS-004 in the CPU/Null runtime"
+    provenance: ai-executed
+    timestamp: "2026-08-03T22:58+02:00"
+    also_depends_on: [N353]
+    evidence:
+      - "src/runtime/Runtime.PhysicsModule.cppm"
+      - "src/runtime/Runtime.PhysicsModule.cpp"
+      - "tests/integration/runtime/Test.PhysicsModule.cpp"
+      - "tasks/evidence/PHYSICS-004/commands/final-focused-physics-tests.json: 43/43 passed"
+      - "tasks/evidence/PHYSICS-004/commands/final-ci-tests.json: 4,075/4,075 passed"
+      - "tasks/evidence/PHYSICS-004/commands/final-ci-asan-tests.json: 2,669/2,669 passed"
+      - "tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-tests.json: 2,669/2,669 passed"
+      - "tasks/evidence/PHYSICS-004/commands/final-clean-workshop.json: strict structural review passed"
+    result: >
+      Sandbox now composes a default-disabled PhysicsModule. The real Null
+      Engine::Run path synchronizes ECS physics authoring into private
+      per-world state, executes bounded fixed SolveStep work after promoted ECS
+      simulation, writes only dynamic poses back with dirty tags, and clears
+      state on disable, world destruction, and shutdown. Focused, complete CPU,
+      ASan, UBSan, production-executable, and strict structural gates passed.
+      GPU/Vulkan physics, persistence, contact events, dedicated UI, and
+      performance remain outside the result; independent high-risk review is
+      still required before task retirement.
+    status: resolved

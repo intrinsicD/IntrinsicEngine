@@ -29,12 +29,23 @@ against the published `RuntimeInputActionRegistry`, with no Engine forwarding
 method.
 `Sandbox.ConfigSections` is the pre-boot composition surface for the current
 `sandbox.clustering`, `sandbox.progressive_poisson`,
-`sandbox.parameterization`, and `sandbox.point_cloud_consolidation` records.
+`sandbox.parameterization`, `sandbox.point_cloud_consolidation`, and
+`sandbox.physics` records.
 Their runtime feature modules own the typed DTOs/codecs. `main.cpp` constructs the
 app-composed `Runtime::EngineConfigControl` first, gives it the registered
 Sandbox section registry, resolves boot config through that exact control's
 `SectionRegistry()`, and then moves the same control object into
 `Engine::AddModule(...)`.
+
+Sandbox constructs the optional `Runtime::PhysicsModule` before that registry
+so the `sandbox.physics` post-commit callback can target the exact composed
+instance, then adds config control before physics for order-independent service
+resolution. Physics is disabled in the reference config. While disabled it
+owns no physics world; when enabled, its generic simulation hook performs
+per-world ECS authoring sync, bounded `SolveStep` execution, and dynamic-only
+transform writeback. No dedicated physics window exists, and any future UI
+must use the same validated engine-config lane as file, agent/CLI, and
+programmatic callers.
 
 The editor session resolves live recipe/config control through
 `Engine::Services().Find<EngineConfigControl>()`. When a host omits the optional
@@ -265,8 +276,8 @@ ordinary ECS mesh-domain `GeometrySources` entity with `RenderSurface`,
 durable `StableId`, `Selection::SelectableTag`, and white
 `VisualizationConfig`. Reference content renders without `CameraModule`.
 
-The default module list explicitly composes `AsyncWorkModule`, `CameraModule`,
-`ClusteringModule`, `PointCloudConsolidationModule`, `EditorUiModule`,
+The default module list explicitly composes `PhysicsModule`, `AsyncWorkModule`,
+`CameraModule`, `ClusteringModule`, `PointCloudConsolidationModule`, `EditorUiModule`,
 `SceneDocumentModule`, and `SceneInteractionModule`, followed by
 `AssetWorkflowModule`. Camera remains optional at the runtime contract:
 when omitted, Sandbox policy registration omits `F` and autofocus, editor

@@ -225,11 +225,11 @@ sessions:
     open_threads: 4
   - id: "2026-08-03_001"
     date: "2026-08-03"
-    summary: "Taskized the verification redesign, reconciled every local branch, and retired BUG-128 plus GEOM-064 with accepted high-risk evidence and a green 4,074-case merged CPU gate."
-    turn_count: 5
-    events_count: 25
-    claims_touched: [C19, C26]
-    open_threads: 3
+    summary: "Taskized verification redesign, reconciled every local branch, retired BUG-128 plus GEOM-064, and implemented PHYSICS-004's Operational CPU/Null runtime path pending independent review."
+    turn_count: 6
+    events_count: 28
+    claims_touched: [C19, C26, C27]
+    open_threads: 4
   - id: "2026-08-03_002"
     date: "2026-08-03"
     summary: "Retired the runtime and three-domain Sandbox halves of non-destructive canonical-vertex Progressive Poisson integration with complete CPU evidence."

@@ -8,6 +8,7 @@
     "backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md": "0f7a6d3efc64873d75952f861eafc8b8148d27f3e7d4a3fc6b53d7f51fe72e1d",
     "backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md": "029ef982367c0803ab5e93869bd746ef02d6a1983d5b2aa0a316dc155c672484",
     "backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md": "480b74f8a7cd406d66381714215edfae95cd2e0ab74fd3f8dc65b6be66230094",
+    "backlog/physics/PHYSICS-004-operational-runtime-physics-module.md": "77d2b29c6f1993311f8bed5782f61d3b668c122d6088f1085bba375d1e6f21b1",
     "backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md": "59f3922e957e63fad70626410fadb830ba2395dc9079485a61d0f63d8a045d9e",
     "backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md": "e4301a1fcf62ee0a95c0365be429a989e4f38372810eca9197c3c787a0422c1e",
     "backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md": "ae1644b7ad871f02a1831f7dff154af631ff8fc16036fe8dfeb92d3fa0695fd6"
@@ -87,7 +88,6 @@
     "backlog/methods/METHOD-034-ipsr-orientation-baseline.md": "a0d5912a58e4127eea0f3ff8943f9c617c78b76c9bf34f34e8db4dc272d79362",
     "backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md": "6e4cff6638ffe6001d948e0c64e680732fca93f03178193f38689a6cced212a2",
     "backlog/methods/METHOD-036-orientation-comparison-evidence.md": "6445166c0f19c84b1ff696e02dc6ce714f870b8e41da04b4fc9388bb6f1b475c",
-    "backlog/physics/PHYSICS-004-operational-runtime-physics-module.md": "77d2b29c6f1993311f8bed5782f61d3b668c122d6088f1085bba375d1e6f21b1",
     "backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md": "400f6efcbae0620ce0f8868f9afe3a1efbf010621ea1db7ce433ad546bdf5721",
     "backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md": "4dacf3a064ed50ef669248dc650022676963a63df470023f5cb8fda6337efac2",
     "backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md": "be453a41578f55154de10f7bc250d5e030a523fefd7dc00f44c7dcad73c88ab4",

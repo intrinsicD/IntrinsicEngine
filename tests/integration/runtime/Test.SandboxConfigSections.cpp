@@ -8,6 +8,7 @@
 #include <system_error>
 #include <utility>
 
+#include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
 #include "RuntimeTestModule.hpp"
@@ -20,6 +21,7 @@ import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Sandbox.ConfigSections;
@@ -119,6 +121,8 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     std::uint32_t progressivePoissonChanges = 0u;
     std::uint32_t parameterizationChanges = 0u;
     std::uint32_t pointCloudConsolidationChanges = 0u;
+    std::uint32_t physicsChanges = 0u;
+    Runtime::PhysicsModuleConfig lastPhysicsConfig{};
     auto configControl = std::make_unique<Runtime::EngineConfigControl>(
         Sandbox::CreateSandboxConfigSectionRegistry(
             Sandbox::SandboxConfigSectionCallbacks{
@@ -141,6 +145,12 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
                     [&](const auto&, const auto&)
                     {
                         ++pointCloudConsolidationChanges;
+                    },
+                .Physics =
+                    [&](const Runtime::PhysicsModuleConfig& value)
+                    {
+                        ++physicsChanges;
+                        lastPhysicsConfig = value;
                     },
             }));
 
@@ -184,6 +194,14 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     Runtime::SetPointCloudConsolidationConfig(
         fileConfig,
         pointCloudConsolidation);
+
+    Runtime::PhysicsModuleConfig physics{};
+    physics.Enabled = true;
+    physics.FixedDeltaSeconds = 0.02f;
+    physics.MaxAccumulatedSeconds = 0.2f;
+    physics.MaxStepsPerFrame = 3u;
+    physics.Gravity = glm::vec3{0.0f, -4.0f, 0.0f};
+    Runtime::SetPhysicsModuleConfig(fileConfig, physics);
 
     const ScopedConfigFile file{CoreConfig::SerializeEngineConfig(fileConfig)};
     const std::string filePath = file.Path().string();
@@ -233,10 +251,19 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_DOUBLE_EQ(
         bootPointCloudConsolidation->EarEdgeSensitivity,
         7.5);
+    const auto bootPhysics =
+        Runtime::GetPhysicsModuleConfig(boot.Config);
+    ASSERT_TRUE(bootPhysics.has_value());
+    EXPECT_TRUE(bootPhysics->Enabled);
+    EXPECT_FLOAT_EQ(bootPhysics->FixedDeltaSeconds, 0.02f);
+    EXPECT_FLOAT_EQ(bootPhysics->MaxAccumulatedSeconds, 0.2f);
+    EXPECT_EQ(bootPhysics->MaxStepsPerFrame, 3u);
+    EXPECT_FLOAT_EQ(bootPhysics->Gravity.y, -4.0f);
     EXPECT_EQ(clusteringChanges, 0u);
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 0u);
     EXPECT_EQ(pointCloudConsolidationChanges, 0u);
+    EXPECT_EQ(physicsChanges, 0u);
 
     Runtime::EngineConfigControl* const expectedConfigControl =
         configControl.get();
@@ -276,6 +303,12 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         candidate,
         *livePointCloudConsolidation);
 
+    auto livePhysics = Runtime::GetPhysicsModuleConfig(candidate);
+    ASSERT_TRUE(livePhysics.has_value());
+    livePhysics->MaxStepsPerFrame = 5u;
+    livePhysics->Gravity = glm::vec3{0.0f, -6.0f, 0.0f};
+    Runtime::SetPhysicsModuleConfig(candidate, *livePhysics);
+
     const CoreConfig::EngineConfigLoadResult preview =
         control->PreviewEngineConfigControlDocument(
             CoreConfig::SerializeEngineConfig(candidate),
@@ -294,10 +327,15 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         Runtime::kPointCloudConsolidationConfigSectionName));
     EXPECT_FALSE(apply.SectionChanged(
         Runtime::kProgressivePoissonConfigSectionName));
+    EXPECT_TRUE(apply.SectionChanged(
+        Runtime::kPhysicsModuleConfigSectionName));
     EXPECT_EQ(clusteringChanges, 1u);
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 1u);
     EXPECT_EQ(pointCloudConsolidationChanges, 1u);
+    EXPECT_EQ(physicsChanges, 1u);
+    EXPECT_EQ(lastPhysicsConfig.MaxStepsPerFrame, 5u);
+    EXPECT_FLOAT_EQ(lastPhysicsConfig.Gravity.y, -6.0f);
 
     const auto activeParameterization =
         Runtime::GetParameterizationConfig(engine.GetEngineConfig());
@@ -315,6 +353,12 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         Runtime::PointCloudConsolidationStrategy::Wlop);
     EXPECT_EQ(activePointCloudConsolidation->MaxIterations, 31u);
     EXPECT_EQ(activePointCloudConsolidation->Seed, 0xfedcba98u);
+    const auto activePhysics =
+        Runtime::GetPhysicsModuleConfig(engine.GetEngineConfig());
+    ASSERT_TRUE(activePhysics.has_value());
+    EXPECT_TRUE(activePhysics->Enabled);
+    EXPECT_EQ(activePhysics->MaxStepsPerFrame, 5u);
+    EXPECT_FLOAT_EQ(activePhysics->Gravity.y, -6.0f);
     Runtime::KMeansPropertyRefs properties = Runtime::MakeKMeansPropertyRefs(
         Runtime::GeometryElementDomain::MeshVertex);
     properties.OutputLabels.Name = "v:configured_cluster";
@@ -335,6 +379,62 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
 
     engine.Run();
     engine.Shutdown();
+}
+
+TEST(SandboxConfigSections,
+     PhysicsSourcesProduceIdenticalValidatedState)
+{
+    constexpr std::array sources{
+        Runtime::RuntimeConfigControlSource::Editor,
+        Runtime::RuntimeConfigControlSource::AgentCli,
+        Runtime::RuntimeConfigControlSource::Programmatic,
+    };
+    Runtime::PhysicsModuleConfig requested{};
+    requested.Enabled = true;
+    requested.FixedDeltaSeconds = 0.005f;
+    requested.MaxAccumulatedSeconds = 0.125f;
+    requested.MaxStepsPerFrame = 17u;
+    requested.Gravity = glm::vec3{1.0f, -3.0f, 2.0f};
+
+    std::optional<std::string> referenceSerialized{};
+    for (const Runtime::RuntimeConfigControlSource source : sources)
+    {
+        ConfigControlHarness harness{};
+        Runtime::EngineConfigControl& control = harness.Control();
+        CoreConfig::EngineConfig candidate =
+            control.GetEngineConfigControlState().ActiveConfig;
+        Runtime::SetPhysicsModuleConfig(candidate, requested);
+        const CoreConfig::EngineConfigLoadResult preview =
+            control.PreviewEngineConfigControlDocument(
+                CoreConfig::SerializeEngineConfig(candidate),
+                "physics-source-parity");
+        ASSERT_TRUE(CoreConfig::IsConfigUsable(preview));
+
+        const Runtime::RuntimeEngineConfigApplyResult applied =
+            control.ApplyEngineConfigHotSubset(preview, source);
+        ASSERT_TRUE(applied.Succeeded());
+        EXPECT_EQ(applied.Source, source);
+        EXPECT_TRUE(applied.SectionChanged(
+            Runtime::kPhysicsModuleConfigSectionName));
+
+        const auto active = Runtime::GetPhysicsModuleConfig(
+            control.GetEngineConfigControlState().ActiveConfig);
+        ASSERT_TRUE(active.has_value());
+        EXPECT_TRUE(active->Enabled);
+        EXPECT_FLOAT_EQ(active->FixedDeltaSeconds, 0.005f);
+        EXPECT_FLOAT_EQ(active->MaxAccumulatedSeconds, 0.125f);
+        EXPECT_EQ(active->MaxStepsPerFrame, 17u);
+        EXPECT_FLOAT_EQ(active->Gravity.x, requested.Gravity.x);
+        EXPECT_FLOAT_EQ(active->Gravity.y, requested.Gravity.y);
+        EXPECT_FLOAT_EQ(active->Gravity.z, requested.Gravity.z);
+
+        const std::string serialized = CoreConfig::SerializeEngineConfig(
+            control.GetEngineConfigControlState().ActiveConfig);
+        if (!referenceSerialized.has_value())
+            referenceSerialized = serialized;
+        else
+            EXPECT_EQ(serialized, *referenceSerialized);
+    }
 }
 
 TEST(SandboxConfigSections,

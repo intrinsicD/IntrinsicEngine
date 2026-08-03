@@ -5,6 +5,7 @@ export module Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 
@@ -17,6 +18,7 @@ export namespace Extrinsic::Sandbox
         Runtime::RuntimeEngineConfigSectionChangedCallback Parameterization{};
         Runtime::RuntimeEngineConfigSectionChangedCallback
             PointCloudConsolidation{};
+        Runtime::PhysicsModuleConfigChangedCallback Physics{};
     };
 
     [[nodiscard]] Runtime::RuntimeEngineConfigSectionRegistry
