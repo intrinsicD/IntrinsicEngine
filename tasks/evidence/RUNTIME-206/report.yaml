@@ -3,12 +3,12 @@ task_id: RUNTIME-206
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-03T21:46:36Z'
+generated_at: '2026-08-03T21:53:00Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 19554530c62fe4033be381a068442689104a56d7
-  head_revision: 1dbbb3f018c1a47aa641225f68f971a5472f36d9
+  head_revision: 5600fef10d1208316dc7810d05431002c718712a
   branch: runtime/runtime-206-lop-domain-sources
   worktree: /tmp/intrinsic-runtime206.ZvbjE9
   dirty: true
@@ -102,7 +102,7 @@ source:
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: 7aab05e5c2766316c0bd5eb2589b5ae40efebf650bd2acd963cacb230393d938
   - path: tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
-    sha256: 21a8fc20943fd8714d8adc7008b9f91274926273f299b5acd651495ef8fc3b88
+    sha256: 704d2644c454bd2628a32f897fe7eea62f301e5c0319c72436cd34981780949c
   - path: tasks/templates/task.md
     sha256: c586c2c7fbf8e83e33df410475e14e7aff3d2f11e9e6d1740354b8c070510359
   - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
@@ -115,7 +115,7 @@ source:
     sha256: 80578695edb8a1c2ecf8b8e40eba70f2e575ca474c98ee6849707424aec94ec9
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-template.md
     sha256: c586c2c7fbf8e83e33df410475e14e7aff3d2f11e9e6d1740354b8c070510359
-  content_digest: a407b9e71f233aff125e6af81a5e9d7e15cae0bb2fb8c717e87003f3ceecc42c
+  content_digest: 6e8b5e116f00de84b6d5005dabebfa0277b13fca8ce73bb4a459af3b0618dc8e
 touched:
   paths:
   - AGENTS.md
@@ -212,6 +212,7 @@ commands:
 - receipt: tasks/evidence/RUNTIME-206/commands/cpu-tests.json
 - receipt: tasks/evidence/RUNTIME-206/commands/diff-check-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/diff-check-worktree-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/diff-check-worktree-r3.json
 - receipt: tasks/evidence/RUNTIME-206/commands/diff-check.json
 - receipt: tasks/evidence/RUNTIME-206/commands/doc-links-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/doc-links.json
@@ -234,10 +235,13 @@ commands:
 - receipt: tasks/evidence/RUNTIME-206/commands/task-maturity-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-maturity.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-policy-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-policy-r3.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-policy.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-state-links-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-state-links-r3.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-state-links.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-validation-r2.json
+- receipt: tasks/evidence/RUNTIME-206/commands/task-validation-r3.json
 - receipt: tasks/evidence/RUNTIME-206/commands/task-validation.json
 - receipt: tasks/evidence/RUNTIME-206/commands/test-layout-r2.json
 - receipt: tasks/evidence/RUNTIME-206/commands/test-layout.json
@@ -276,7 +280,7 @@ skipped_checks:
     isolated ASan/UBSan gates exercise the shared runtime/property/history path.
 artifacts:
 - path: tasks/done/RUNTIME-206-lop-element-domain-source-integration.md
-  sha256: 21a8fc20943fd8714d8adc7008b9f91274926273f299b5acd651495ef8fc3b88
+  sha256: 704d2644c454bd2628a32f897fe7eea62f301e5c0319c72436cd34981780949c
   kind: file
 - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
   sha256: 7beaeae8e3ba02f429cb39c1e56c81f46826e39ad50cec630600a45a60228019
