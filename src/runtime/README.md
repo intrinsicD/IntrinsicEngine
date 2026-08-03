@@ -453,10 +453,11 @@ history seam; `GEOM-016` owns the removal algorithm and its diagnostics.
 ### Sandbox Editor Progressive Poisson Sampling
 
 `RUNTIME-134` Slices A-D.1 add a progressive Poisson sampling playground at
-`PointCloud > Processing > Progressive Poisson Sampling` and
-`Mesh > Processing > Progressive Poisson Sampling`; `UI-038` owns the matching
-Graph panel. The
-focused geometry-operation surface exports
+`PointCloud > Processing > Progressive Poisson Sampling`,
+`Graph > Processing > Progressive Poisson Sampling`, and
+`Mesh > Processing > Progressive Poisson Sampling`. The three windows consume
+one copied availability/disabled-reason projection and one validated
+config/apply/run operation. The focused geometry-operation surface exports
 `EditorProgressivePoissonChannel`,
 `EditorProgressivePoissonConfig`,
 `EditorProgressivePoissonCommand`,

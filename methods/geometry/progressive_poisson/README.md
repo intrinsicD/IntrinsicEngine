@@ -41,10 +41,11 @@ CPU/GPU parity.
 ## Interactive usage
 
 The runtime command accepts the existing `Vertices` component of mesh, graph,
-and point-cloud entities through one typed operation. The current Sandbox Mesh
-and PointCloud processing windows expose that operation; `UI-038` owns the
-matching Graph window registration. No lane surface-samples, reorders, replaces,
-or changes the provenance of the source component. The command forwards every
+and point-cloud entities through one typed operation. The Sandbox exposes that
+same operation under Mesh, Graph, and PointCloud Processing, with copied
+readiness explaining missing, wrongly typed, empty, or non-finite
+`v:position` data. No lane surface-samples, reorders, replaces, or changes the
+provenance of the source component. The command forwards every
 reference `Config` knob
 (`dimension`, `grid_width`, `max_levels`, `hash_load_factor`, `radius_alpha`,
 `randomize_grid_origin`, `grid_origin_seed`, `shuffle_within_levels`,
@@ -79,6 +80,12 @@ Vulkan smoke seeds a CPU-reference-shaped payload into the production-shaped
 buffers and proves the transfer/parser seam. It is not compute parity: public
 Sandbox execution still returns the CPU reference fallback until METHOD-014
 proves the Vulkan compute output path against the CPU reference.
+
+The panel deliberately uses *existing input vertices*, *accepted subset*,
+*hierarchy level*, and *prefix* terminology. That follows the finite-candidate
+subset and progressive-prefix framing in Yuksel, Dieckmann--Klein, Brandt et
+al., and Christensen et al.; Brandt et al.'s surface-candidate rasterization is
+an upstream dataset-construction stage, not a panel-side conversion rule.
 
 Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::PreviewEngineConfigControlDocument` and

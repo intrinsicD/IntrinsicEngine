@@ -3136,6 +3136,11 @@ namespace {
                     *context.Scene,
                     *selected);
 
+            const GS::ConstSourceView sourceView =
+                GS::BuildConstView(context.Scene->Raw(), *selected);
+            const GeometryEntityAvailability geometryAvailability =
+                BuildGeometryAvailability(sourceView);
+
             if (const auto* enrichment =
                     context.Scene->Raw().try_get<
                         AssetImportMeshEnrichmentState>(*selected))
@@ -3229,12 +3234,74 @@ namespace {
                 HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     EditorGeometryProcessingDomain::PointCloudPoints);
-            model.ProgressivePoissonAvailable =
+            const bool hasProgressivePoissonDomain =
                 HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     GetEditorSupportedGeometryProcessingDomains(
                         EditorGeometryProcessingAlgorithm::
                             ProgressivePoissonSampling));
+            GeometryElementDomain progressivePoissonDomain =
+                GeometryElementDomain::Unknown;
+            switch (geometryAvailability.Sources.ProvenanceDomain)
+            {
+            case GS::Domain::Mesh:
+                progressivePoissonDomain = GeometryElementDomain::MeshVertex;
+                break;
+            case GS::Domain::Graph:
+                progressivePoissonDomain = GeometryElementDomain::GraphNode;
+                break;
+            case GS::Domain::PointCloud:
+                progressivePoissonDomain =
+                    GeometryElementDomain::PointCloudPoint;
+                break;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                break;
+            }
+
+            const GeometryPropertyResolution progressivePoissonPositions =
+                ResolveGeometryProperty(
+                    geometryAvailability,
+                    progressivePoissonDomain,
+                    GS::PropertyNames::kPosition,
+                    Geometry::PropertyValueKind::Vec3,
+                    ResolveGeometryElementCount(
+                        geometryAvailability,
+                        progressivePoissonDomain),
+                    true);
+            model.ProgressivePoissonAvailable =
+                hasProgressivePoissonDomain &&
+                progressivePoissonPositions.Resolved() &&
+                progressivePoissonPositions.ElementCount > 0u;
+            if (!model.ProgressivePoissonAvailable)
+            {
+                using Status = GeometryPropertyResolutionStatus;
+                switch (progressivePoissonPositions.Status)
+                {
+                case Status::MissingProperty:
+                    model.ProgressivePoissonDisabledReason =
+                        "Progressive Poisson requires the v:position vertex property.";
+                    break;
+                case Status::ValueKindMismatch:
+                    model.ProgressivePoissonDisabledReason =
+                        "Progressive Poisson requires v:position to contain vec3 values.";
+                    break;
+                case Status::NonFiniteValues:
+                    model.ProgressivePoissonDisabledReason =
+                        "Progressive Poisson requires every v:position value to be finite.";
+                    break;
+                case Status::Resolved:
+                    model.ProgressivePoissonDisabledReason =
+                        "Progressive Poisson requires at least one vertex position.";
+                    break;
+                case Status::UnsupportedDomain:
+                case Status::MissingName:
+                case Status::ElementCountMismatch:
+                    model.ProgressivePoissonDisabledReason =
+                        "Progressive Poisson requires mesh, graph, or point-cloud Vertices GeometrySources.";
+                    break;
+                }
+            }
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;

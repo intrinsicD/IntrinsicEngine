@@ -1,0 +1,143 @@
+schema_version: 1
+task_id: UI-038
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-03T07:54:22Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 95e8435fa02bad0d29af32534982233ea880758a
+  head_revision: e9cf9e29c19f51fb41d70ec12e3217cc965855cb
+  branch: ui/ui-038-progressive-poisson-panel
+  worktree: /tmp/intrinsic-ui038.h8R1Tp
+  dirty: false
+  surface:
+  - path: docs/architecture/runtime.md
+    sha256: 558eab90d1e090bde535d335f170b96e7bc6005fbb392078b4617e3723c335e7
+  - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+    sha256: 392ff25b103d18f747617c2e0013e0bb5ff88368135e1940ec824e434d6a5225
+  - path: methods/geometry/progressive_poisson/README.md
+    sha256: 436d2c057adc49fac3c66531501f501d82ae3f055fcef1bf143590d91318f12e
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 3a5fe7e4477214e9b55064dbf73ae4f18a1bc16d1669c491cbc8e604bccfd440
+  - path: src/app/Sandbox/README.md
+    sha256: 20021975c446016fb7b0d7c662740a5a503357fb7d8c86b1d7555a6fef98ab6d
+  - path: src/runtime/README.md
+    sha256: 92d0a139d8c12f6504a97f858b9cfd4ce492909adfe498069f0a7cbb4162ebcb
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 2670e1d9d00436a34410e7f488eedafef1f684cc12788330609f7446221c7c64
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cppm
+    sha256: 71532e6318125229de2f064b497d3d8bcb9daf30b3a4e378f178f2500a770175
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 8e6f4e15c4b81761b3efd5d4fc8043152a867905d0091021409193fa012e5c31
+  - path: tasks/active/README.md
+    sha256: 6d62827b193e5d7aced29da46b0d403cf3e82a2b8917f5e7dc050a2a5554abf5
+  - path: tasks/active/UI-038-progressive-poisson-multi-domain-panel.md
+    sha256: 34ab5e0508645305adb678b22d88ff3d1325283c1a978ab48d3a12a100ed34d2
+  - path: tasks/backlog/ui/README.md
+    sha256: 71917280213ea188c69699e046b8ea9b98d93005b3bc3cd2af02fc6d629790be
+  - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    sha256: 2d7acad1e397144e0bf2d022eff9f24a2164fca3de0c24f0f72f1d6d94012918
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 883d0c4ff94c01861ab94ccdaa177b77fe7ac39178bfcfb2de8f1848d39095b2
+  content_digest: f2f7c78c091b72295f70b2376b1eed93d767904e96e95baff2f2bc37c4edf76a
+touched:
+  paths:
+  - docs/architecture/runtime.md
+  - docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  - methods/geometry/progressive_poisson/README.md
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/README.md
+  - src/runtime/README.md
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/active/UI-038-progressive-poisson-multi-domain-panel.md
+  - tasks/backlog/ui/README.md
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  layers:
+  - app
+  - docs
+  - methods
+  - runtime
+  - tests
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Sandbox.Editor.MethodPanels
+extension_seam: Additional compatible vertex-source domains reuse the same feature-owned panel registration,
+  copied readiness model, validated config, and runtime operation; no converter or per-domain algorithm
+  implementation is introduced.
+future_change_plan: METHOD-014 retains operational Vulkan compute and parity; future Progressive Poisson
+  UI work extends the shared typed state and runtime operation rather than adding app-owned execution
+  or geometry mutation.
+acceptance:
+- criterion: A loaded mesh, graph, or point cloud can discover and run Progressive
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The panel contains no converter path and cannot discard topology.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: UI/config/agent callers use one validated runtime operation.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/UI-038/commands/ci-build-intrinsic-tests.json
+- receipt: tasks/evidence/UI-038/commands/ci-configure.json
+- receipt: tasks/evidence/UI-038/commands/focused-ui-progressive-poisson.json
+- receipt: tasks/evidence/UI-038/commands/full-cpu.json
+- receipt: tasks/evidence/UI-038/commands/layering.json
+- receipt: tasks/evidence/UI-038/commands/method-manifests.json
+- receipt: tasks/evidence/UI-038/commands/progressive-poisson-regression.json
+- receipt: tasks/evidence/UI-038/commands/task-policy.json
+- receipt: tasks/evidence/UI-038/commands/test-layout.json
+changed_public_contracts:
+- EditorGeometryProcessingModel now carries ProgressivePoissonDisabledReason beside its copied availability
+  bit.
+diagnostics_and_previews:
+- Missing, empty, wrong-typed, non-finite, unsupported-source, and unavailable config-control states disable
+  Run and display the copied reason with the shared tooltip convention.
+benchmark_or_parity_evidence:
+- No performance or GPU parity claim; the UI/runtime readiness change is covered by CPU contract and headless
+  ImGui integration tests.
+docs_sync:
+  task_file: tasks/active/UI-038-progressive-poisson-multi-domain-panel.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Readiness scans selected v:position values for finiteness while building the copied domain model; this
+  is linear in vertex count and intentionally occurs only when that model is requested.
+skipped_checks:
+- check: GPU/Vulkan execution
+  reason: UI-038 changes app registration and copied CPU readiness only; METHOD-014 owns operational Vulkan
+    compute/parity.
+- check: Sanitizer variants
+  reason: The public-model field and ImGui registration change selected 4006 CPU cases, passed 4005,
+    and explicitly skipped the environment-gated GLFW/LeakSanitizer case; no ownership, allocator,
+    or backend lifetime changed.
+- check: Sandbox screenshots
+  reason: The repository has no checked-in Sandbox screenshot corpus; the real headless ImGui integration
+    test renders all three windows.
+artifacts:
+- path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  sha256: 883d0c4ff94c01861ab94ccdaa177b77fe7ac39178bfcfb2de8f1848d39095b2
+  kind: file
+- path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+  sha256: 2d7acad1e397144e0bf2d022eff9f24a2164fca3de0c24f0f72f1d6d94012918
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

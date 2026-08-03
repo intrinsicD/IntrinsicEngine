@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "ProgressivePoisson",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R ProgressivePoisson -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 1400,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T07:49:22Z",
+  "label": "progressive-poisson-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T07:49:20Z",
+  "stderr_path": "tasks/evidence/UI-038/commands/progressive-poisson-regression.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-038/commands/progressive-poisson-regression.stdout.log",
+  "stdout_sha256": "b24a4162f29a36d013a9a88dd6c2f8d1d760070bb17891546a61cb226263d649",
+  "task_id": "UI-038"
+}

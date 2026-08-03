@@ -813,6 +813,7 @@ export namespace Extrinsic::Runtime
         bool PointCloudVertexNormalsAvailable{false};
         bool PointCloudOutlierRemovalAvailable{false};
         bool ProgressivePoissonAvailable{false};
+        std::string ProgressivePoissonDisabledReason{};
         std::optional<KMeansRunCompleted> LastKMeansResult{};
         std::optional<EditorMeshDenoiseResult> LastMeshDenoiseResult{};
         std::optional<EditorMeshCurvatureResult> LastMeshCurvatureResult{};

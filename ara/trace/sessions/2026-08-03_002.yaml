@@ -2,9 +2,9 @@ session:
   id: "2026-08-03_002"
   date: "2026-08-03"
   started: "2026-08-03T02:59+02:00"
-  last_turn: "2026-08-03T02:59+02:00"
-  turn_count: 1
-  summary: "Implemented and verified RUNTIME-208 canonical-vertex Progressive Poisson publication, then closed the independent review's production-connectivity stale-state finding."
+  last_turn: "2026-08-03T09:54+02:00"
+  turn_count: 2
+  summary: "Retired the runtime and three-domain Sandbox halves of non-destructive canonical-vertex Progressive Poisson integration with complete CPU evidence."
 
 events_logged:
   - turn: 1
@@ -31,6 +31,18 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized canonical-source Progressive Poisson CPU publication to C20 through artifact commitment."
+  - turn: 2
+    type: experiment
+    id: "N339"
+    routing: direct
+    provenance: ai-executed
+    summary: "Registered and rendered one Progressive Poisson panel path under all three compatible vertex-source domains."
+  - turn: 2
+    type: observation
+    id: "O103"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the three-domain Sandbox operation/readiness capability to C21 through artifact commitment."
 
 ai_actions:
   - turn: 1
@@ -49,11 +61,30 @@ ai_actions:
       - "tasks/evidence/RUNTIME-208/"
       - "ara/logic/claims.md"
       - "ara/staging/observations.yaml"
+  - turn: 2
+    action: "Reviewed primary progressive sampling extensions, implemented the Graph registration and finite-position copied readiness, rendered all three real ImGui windows headlessly, ran focused and complete CPU gates, retired UI-038, and prepared the integration commit."
+    provenance: ai-executed
+    files_changed:
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
+      - "src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp"
+      - "src/runtime/Runtime.GeometryProcessingOperations.cppm"
+      - "tests/contract/runtime/Test.SandboxEditorModels.cpp"
+      - "tests/integration/runtime/Test.SandboxEditorPresentation.cpp"
+      - "methods/geometry/progressive_poisson/README.md"
+      - "docs/architecture/runtime.md"
+      - "docs/reviews/2026-08-02-method-engine-integration-contract-audit.md"
+      - "tasks/done/UI-038-progressive-poisson-multi-domain-panel.md"
+      - "tasks/evidence/UI-038/"
+      - "ara/logic/claims.md"
+      - "ara/staging/observations.yaml"
 
 claims_touched:
   - id: C20
     action: crystallized
     turn: 1
+  - id: C21
+    action: crystallized
+    turn: 2
 
 key_context:
   - turn: 1
@@ -62,10 +93,13 @@ key_context:
     excerpt: "The finite Progressive Poisson input is an existing point span; continuous mesh-surface candidate generation is a separate upstream concern in adjacent literature."
   - turn: 1
     excerpt: "Unknown erased geometry properties fail closed, while production typed connectivity is value-compared before publication and history transitions."
+  - turn: 2
+    excerpt: "A mesh, graph, or point cloud already supplies the canonical Vertices source; the panel discovers that source and never converts the entity."
+  - turn: 2
+    excerpt: "Finite-candidate subset ordering and progressive-prefix terminology apply to the panel; continuous surface candidate generation remains upstream."
 
 open_threads:
-  - "Obtain accepted independent fixed-surface review for the corrected RUNTIME-208 revision."
   - "METHOD-014 retains operational Progressive Poisson Vulkan compute/parity work."
-  - "UI-038 retains Progressive Poisson Graph-panel registration."
+  - "The remaining audited method-integration pairs are RUNTIME-206/UI-039, RUNTIME-207/UI-040, RUNTIME-209/UI-041, and RUNTIME-210/UI-042."
 
 ai_suggestions_pending: []

@@ -218,8 +218,8 @@ sessions:
     open_threads: 6
   - id: "2026-08-03_002"
     date: "2026-08-03"
-    summary: "Implemented and verified RUNTIME-208 canonical-vertex Progressive Poisson publication, then closed the independent review's production-connectivity stale-state finding."
-    turn_count: 1
-    events_count: 4
-    claims_touched: [C20]
-    open_threads: 3
+    summary: "Retired the runtime and three-domain Sandbox halves of non-destructive canonical-vertex Progressive Poisson integration with complete CPU evidence."
+    turn_count: 2
+    events_count: 6
+    claims_touched: [C20, C21]
+    open_threads: 2

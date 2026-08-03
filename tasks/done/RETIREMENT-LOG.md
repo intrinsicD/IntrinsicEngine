@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`UI-038`](UI-038-progressive-poisson-multi-domain-panel.md) — Progressive
+Poisson multi-domain panel completed on 2026-08-03 at `Operational`. The
+Sandbox now exposes one shared panel state under Mesh, Graph, and PointCloud
+Processing. Every registration consumes the same copied runtime readiness,
+validated config/apply/run operation, method diagnostics, backend-fallback
+status, and source-cardinality rank/level/radius/prefix visualization channels.
+Readiness fails closed with explicit reasons for missing, empty, wrongly typed,
+or non-finite `v:position` data. Terminology follows the finite-candidate,
+accepted-subset, hierarchy-level, and progressive-prefix framing in the
+reviewed Yuksel, Dieckmann--Klein, Brandt et al., and Christensen et al. work;
+surface candidate generation remains upstream and the UI contains no converter,
+surface-sampling controls, topology replacement, or app-owned publication.
+Focused UI coverage passed 3/3, all Progressive Poisson coverage passed 33/33,
+and the default CPU selector selected 4,006, passed 4,005, and explicitly
+skipped the environment-gated GLFW/LeakSanitizer case. Strict layering, method-manifest,
+task-policy, test-layout, documentation-link, workflow-evidence, inventory, and
+ARA gates close the task. No GPU/Vulkan compute, parity, or performance claim
+is made; `METHOD-014` retains that work.
+
 [`RUNTIME-208`](RUNTIME-208-progressive-poisson-element-domain-publication.md) —
 Progressive Poisson element-domain publication completed on 2026-08-03 at
 `Operational`. The runtime now consumes existing mesh, graph, and point-cloud

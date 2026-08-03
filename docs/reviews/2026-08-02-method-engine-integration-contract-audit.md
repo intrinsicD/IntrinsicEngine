@@ -55,7 +55,7 @@ still narrower than the shared `Vertices` capability.
 | K-Means | `GetEditorSupportedGeometryProcessingDomains`; three registrations in `Sandbox.MethodPanels.cpp`; runtime clustering contracts | Conforming. Mesh vertices, graph nodes, and point-cloud points are all advertised and registered. | None. |
 | Vertex normal estimation family | `GetEditorSupportedGeometryProcessingDomains`; Mesh/Graph/PointCloud normal registrations in `Sandbox.MeshProcessingPanels.cpp` | Conforming at the engine-integration level. Domain-specific kernels intentionally differ, but all compatible entity sources have a method path. | None. |
 | Mesh denoise, curvature, remesh, simplify, smooth, subdivide, repair, and parameterization operations | Runtime domain table plus Mesh Processing registrations | Conforming to stronger topology contracts. These operations use mesh adjacency/faces or mutate mesh topology; a point-span substitution is not claimed. | None. |
-| Progressive Poisson | `methods/geometry/progressive_poisson/method.yaml`; `ApplyEditorProgressivePoissonCommand`; two registrations in `Sandbox.MethodPanels.cpp` | **V1 runtime resolved by `RUNTIME-208`.** Mesh, graph, and point-cloud `Vertices` now enter one non-destructive runtime/config/publication path with source-cardinality attributes. The Graph panel remains intentionally unregistered. | Re-scoped `UI-038` owns the final three-domain UI registration. |
+| Progressive Poisson | `methods/geometry/progressive_poisson/method.yaml`; `ApplyEditorProgressivePoissonCommand`; three registrations in `Sandbox.MethodPanels.cpp` | **V1 resolved by `RUNTIME-208` + `UI-038`.** Mesh, graph, and point-cloud `Vertices` enter one non-destructive runtime/config/publication path with source-cardinality attributes and matching domain-menu discovery. Copied readiness validates finite source positions and reports disabled reasons. | None. |
 | LOP/WLOP/CLOP/EAR feature integration | `Runtime.PointCloudConsolidationModule.cpp` at feature revision `33930efa` (exact `Domain::PointCloud` checks and replacement `Vertices` state); PointCloud-only registration in `Sandbox.MethodPanels.cpp` | **Violation V2.** Point-set kernels are gated by point-cloud provenance. Compatible mesh/graph vertex sources are hidden, and publication does not distinguish topology-safe same-cardinality output from count-changing point-cloud output. | `RUNTIME-206` + `UI-039`. |
 | ICP registration | `ApplyEditorRegistrationCommand`; `view.registration` panel in `Sandbox.MeshProcessingPanels.cpp` | **Violation V3.** Both operands are point spans, but runtime and entity selectors require exact point-cloud provenance. Tunable parameters are also panel-local instead of a co-equal config lane. | `RUNTIME-207` + `UI-040` (after `BUG-096`). |
 | Statistical/radius outlier processing | `ApplyEditorPointCloudOutlierRemovalCommand`; PointCloud-only “Remove Outliers” controls in `Sandbox.DomainPanels.cpp` | **Violation V4.** Detection indices are meaningful for every vertex source, but eligibility is point-cloud-only and detection is inseparable from destructive compaction. | `RUNTIME-209` + `UI-041`. |
@@ -63,8 +63,8 @@ still narrower than the shared `Vertices` capability.
 
 The five method-integration violation rows are exhaustive for the stated scope;
 resolved V0 was their shared physical-source prerequisite, not a sixth method.
-`RUNTIME-208` resolves Progressive Poisson capability/publication while
-`UI-038` retains its Graph-panel closure. LOP still needs
+`RUNTIME-208` and `UI-038` resolve Progressive Poisson capability, publication,
+and three-domain discovery. LOP still needs
 capability/publication correction; ICP and outlier processing need capability
 plus control-surface correction; Signed Heat needs the missing end-to-end
 integration while retaining its real topology contract.

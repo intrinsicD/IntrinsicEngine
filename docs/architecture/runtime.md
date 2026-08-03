@@ -415,10 +415,11 @@ registry. Mesh Appearance forwards the workspace's callback-scoped borrowed
 selected-mesh vertex-property view to the runtime-owned generic scalar-property
 widget; app presentation does not retain that view or import geometry directly.
 `Extrinsic.Sandbox.Editor.MethodPanels` registers
-the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
-Progressive Poisson windows from the application layer. Runtime discovery and
-execution already support graph vertices; `UI-038` owns the corresponding
-Graph window registration. Their ImGui state and
+the K-Means and Progressive Poisson windows for PointCloud, Graph, and Mesh
+plus the mesh parameterization window from the application layer. All three
+Progressive Poisson registrations consume the same copied readiness/config/run
+surface; readiness resolves a non-empty finite `vec3` `v:position` property and
+supplies a disabled reason without exposing ECS state to the app. Their ImGui state and
 result presentation are app-owned, while model construction, command execution,
 job scheduling, config validation, and result publication remain runtime-owned.
 `Extrinsic.Sandbox.Editor.MeshProcessingPanels` applies the same boundary to ICP
