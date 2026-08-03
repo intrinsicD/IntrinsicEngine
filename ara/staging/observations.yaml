@@ -1553,7 +1553,7 @@ observations:
     promoted_to: "logic/claims.md:C18"
     crystallized_via: artifact-commitment
     stale: false
-  - id: O97
+  - id: O101
     timestamp: "2026-08-03T02:10+02:00"
     provenance: ai-executed
     content: >
