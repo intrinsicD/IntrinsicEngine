@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-208`](RUNTIME-208-progressive-poisson-element-domain-publication.md) —
+Progressive Poisson element-domain publication completed on 2026-08-03 at
+`Operational`. The runtime now consumes existing mesh, graph, and point-cloud
+`Vertices` through one direct/queued/config/backend path; it no longer samples
+a mesh surface or replaces the selected entity with a point cloud. Publication
+keeps source cardinality and element order while writing global rank, accepted
+level, introduction-level splat radius, and prefix visibility with explicit
+rejected-input sentinels. Mesh/graph topology, provenance, presentation, and
+non-target properties survive direct, queued, requested-GPU fallback, config,
+apply, undo, and redo paths. Obsolete surface-generation fields and the
+fabricated phase channel are diagnosed and dropped from the canonical config;
+the existing Mesh and PointCloud panels use the one copied readiness value,
+while `UI-038` owns the final Graph panel. Focused method/runtime/UI coverage
+passed 44/44, the default CPU selector passed 4,002/4,002 with its expected
+GLFW/LSan skip, and grouped ASan and UBSan each passed 2,654/2,654. Strict
+method-manifest, layering, task/docs, inventory, ARA, clean-workshop, and
+independent fixed-surface review gates close the correction. No Vulkan compute
+parity or performance claim is made.
+
 [`HARDEN-087`](HARDEN-087-unified-geometry-element-source-components.md) —
 unified geometry element-source components completed on 2026-08-02 at
 `Operational`. Point clouds, graphs, and meshes now share the physical

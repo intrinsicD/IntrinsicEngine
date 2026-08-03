@@ -3229,15 +3229,12 @@ namespace {
                 HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     EditorGeometryProcessingDomain::PointCloudPoints);
-            model.PointCloudProgressivePoissonAvailable =
+            model.ProgressivePoissonAvailable =
                 HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::PointCloudPoints);
-            model.MeshProgressivePoissonAvailable =
-                model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::MeshVertices);
+                    GetEditorSupportedGeometryProcessingDomains(
+                        EditorGeometryProcessingAlgorithm::
+                            ProgressivePoissonSampling));
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;

@@ -69,11 +69,12 @@ derived default frame recipe.
 three Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
 registrations in the application before config boot. The
 `sandbox.progressive_poisson` payload carries the interactive playground's
-reference-sampler knobs, prefix/color-channel selection, mesh surface-sampling
-input controls, and auto-run debounce settings. Applying it updates only the
-active generic record; the Sandbox Editor decodes that state and
-drives METHOD-012 through its runtime command surface. The block has no renderer
-side effects and no direct RHI/device traffic.
+reference-sampler knobs, prefix/color-channel selection, backend request, and
+auto-run debounce settings. Applying it updates only the active generic record;
+the Sandbox Editor decodes that state and drives METHOD-012 through its runtime
+command surface. Existing mesh, graph, and point-cloud `Vertices` are the input;
+the config contains no surface-generation or domain-conversion controls. The
+block has no renderer side effects and no direct RHI/device traffic.
 
 The `sandbox.parameterization` payload carries one of the implemented CPU strategy
 tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed

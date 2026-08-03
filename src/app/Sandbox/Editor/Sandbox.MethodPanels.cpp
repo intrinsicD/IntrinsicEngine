@@ -68,7 +68,7 @@ namespace Extrinsic::Sandbox::Editor
         constexpr std::array<Runtime::EditorProgressivePoissonChannel, 4>
             kProgressivePoissonChannels{
                 Runtime::EditorProgressivePoissonChannel::Level,
-                Runtime::EditorProgressivePoissonChannel::Phase,
+                Runtime::EditorProgressivePoissonChannel::Rank,
                 Runtime::EditorProgressivePoissonChannel::SplatRadius,
                 Runtime::EditorProgressivePoissonChannel::PrefixVisible,
             };
@@ -559,10 +559,6 @@ namespace Extrinsic::Sandbox::Editor
             std::int32_t PrefixCount{0};
             std::int32_t Channel{0};
             std::int32_t Backend{0};
-            std::int32_t MeshSurfaceSampleCount{4096};
-            std::int32_t MeshSurfaceSampleSeed{1337};
-            float MeshSurfaceMinTriangleArea{1.0e-14f};
-            bool MeshSurfaceInterpolateNormals{true};
             bool AutoRunOnEdit{true};
             float DebounceSeconds{0.25f};
             bool AutoRunPending{false};
@@ -1063,14 +1059,6 @@ namespace Extrinsic::Sandbox::Editor
             state.PrefixCount = static_cast<std::int32_t>(config.PrefixCount);
             state.Channel = ProgressivePoissonChannelIndex(config.Channel);
             state.Backend = ProgressivePoissonBackendIndex(config.Backend);
-            state.MeshSurfaceSampleCount =
-                static_cast<std::int32_t>(config.MeshSurfaceSampleCount);
-            state.MeshSurfaceSampleSeed =
-                static_cast<std::int32_t>(config.MeshSurfaceSampleSeed);
-            state.MeshSurfaceMinTriangleArea =
-                static_cast<float>(config.MeshSurfaceMinTriangleArea);
-            state.MeshSurfaceInterpolateNormals =
-                config.MeshSurfaceInterpolateNormals;
             state.AutoRunOnEdit = config.AutoRunOnEdit;
             state.DebounceSeconds =
                 static_cast<float>(config.DebounceSeconds);
@@ -1102,14 +1090,6 @@ namespace Extrinsic::Sandbox::Editor
                     ProgressivePoisson.Channel),
                 .Backend = ProgressivePoissonBackendFromIndex(
                     ProgressivePoisson.Backend),
-                .MeshSurfaceSampleCount = static_cast<std::uint32_t>(
-                    ProgressivePoisson.MeshSurfaceSampleCount),
-                .MeshSurfaceSampleSeed = static_cast<std::uint32_t>(
-                    ProgressivePoisson.MeshSurfaceSampleSeed),
-                .MeshSurfaceMinTriangleArea = static_cast<double>(
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea),
-                .MeshSurfaceInterpolateNormals =
-                    ProgressivePoisson.MeshSurfaceInterpolateNormals,
                 .AutoRunOnEdit = ProgressivePoisson.AutoRunOnEdit,
                 .DebounceSeconds = static_cast<double>(
                     ProgressivePoisson.DebounceSeconds),
@@ -1123,11 +1103,7 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::EditorGeometryProcessingModel& processing =
                 model.Processing;
             ImGui::SeparatorText("Progressive Poisson");
-            const bool meshInput =
-                model.Kind == Runtime::EditorDomainWindowKind::Mesh;
-            const bool available = meshInput
-                ? processing.MeshProgressivePoissonAvailable
-                : processing.PointCloudProgressivePoissonAvailable;
+            const bool available = processing.ProgressivePoissonAvailable;
             if (!available)
             {
                 ImGui::TextDisabled(
@@ -1217,23 +1193,6 @@ namespace Extrinsic::Sandbox::Editor
                 0,
                 static_cast<std::int32_t>(
                     kProgressivePoissonBackends.size() - 1u));
-            if (meshInput)
-            {
-                ProgressivePoisson.MeshSurfaceSampleCount = std::clamp(
-                    ProgressivePoisson.MeshSurfaceSampleCount,
-                    1,
-                    10'000'000);
-                ProgressivePoisson.MeshSurfaceSampleSeed = std::clamp(
-                    ProgressivePoisson.MeshSurfaceSampleSeed,
-                    0,
-                    std::numeric_limits<std::int32_t>::max());
-                if (!std::isfinite(
-                        ProgressivePoisson.MeshSurfaceMinTriangleArea) ||
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea <= 0.0f)
-                {
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea = 1.0e-14f;
-                }
-            }
             ProgressivePoisson.DebounceSeconds = std::clamp(
                 ProgressivePoisson.DebounceSeconds,
                 0.0f,
@@ -1318,46 +1277,6 @@ namespace Extrinsic::Sandbox::Editor
                 10.0f);
             DrawProgressivePoissonTooltip(
                 "Delay after the last edit before auto-running.");
-
-            if (meshInput)
-            {
-                ImGui::SeparatorText("Surface input");
-                configChanged |= ImGui::DragInt(
-                    "Surface samples##ProgressivePoisson",
-                    &ProgressivePoisson.MeshSurfaceSampleCount,
-                    1.0f,
-                    1,
-                    10'000'000);
-                DrawProgressivePoissonTooltip(
-                    "Number of deterministic points sampled from the mesh surface.");
-                configChanged |= ImGui::DragInt(
-                    "Surface seed##ProgressivePoisson",
-                    &ProgressivePoisson.MeshSurfaceSampleSeed,
-                    1.0f,
-                    0,
-                    std::numeric_limits<std::int32_t>::max());
-                DrawProgressivePoissonTooltip(
-                    "Seed for deterministic mesh surface sampling.");
-                configChanged |= ImGui::InputFloat(
-                    "Min triangle area##ProgressivePoisson",
-                    &ProgressivePoisson.MeshSurfaceMinTriangleArea,
-                    0.0f,
-                    0.0f,
-                    "%.3e");
-                DrawProgressivePoissonTooltip(
-                    "Triangles below this area are rejected before sampling.");
-                if (!std::isfinite(
-                        ProgressivePoisson.MeshSurfaceMinTriangleArea) ||
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea <= 0.0f)
-                {
-                    ProgressivePoisson.MeshSurfaceMinTriangleArea = 1.0e-14f;
-                }
-                configChanged |= ImGui::Checkbox(
-                    "Interpolate normals##ProgressivePoisson",
-                    &ProgressivePoisson.MeshSurfaceInterpolateNormals);
-                DrawProgressivePoissonTooltip(
-                    "Interpolate vertex normals onto sampled surface points.");
-            }
 
             const Runtime::EditorProgressivePoissonChannel channel =
                 ProgressivePoissonChannelFromIndex(
@@ -2487,15 +2406,6 @@ namespace Extrinsic::Sandbox::Editor
                         result.AlphaDefaulted ? "yes" : "no",
                         result.ClampedGridWidth ? "yes" : "no",
                         result.ClampedMaxLevels ? "yes" : "no");
-                }
-                if (result.MeshSurfaceSamplingUsed)
-                {
-                    ImGui::Text(
-                        "Surface samples %u  triangles %u/%u  area %.6f",
-                        result.MeshSurfaceSampleCount,
-                        result.MeshSurfaceAcceptedTriangleCount,
-                        result.MeshSurfaceTotalFaceCount,
-                        result.MeshSurfaceArea);
                 }
             }
             if (!result.BackendFallbackReason.empty())

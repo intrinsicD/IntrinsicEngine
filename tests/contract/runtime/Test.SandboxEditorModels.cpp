@@ -2323,7 +2323,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideLoopFeatureEdgesAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshSimplifyAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshProgressivePoissonAvailable);
+    EXPECT_TRUE(meshModel.Processing.ProgressivePoissonAvailable);
     EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.PointCloudVertexNormalsAvailable);
 
@@ -2346,10 +2346,11 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Domain::MeshVertices));
     const std::vector<Runtime::EditorGeometryProcessingEntry> graphEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(registry, graph);
-    ASSERT_EQ(graphEntries.size(), 3u);
+    ASSERT_EQ(graphEntries.size(), 4u);
     EXPECT_EQ(graphEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(graphEntries[1].Algorithm, Algorithm::NormalEstimation);
-    EXPECT_EQ(graphEntries[2].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(graphEntries[2].Algorithm, Algorithm::ProgressivePoissonSampling);
+    EXPECT_EQ(graphEntries[3].Algorithm, Algorithm::ShortestPath);
     const std::vector<Domain> graphKMeans =
         Runtime::GetAvailableEditorKMeansDomains(registry, graph);
     ASSERT_EQ(graphKMeans.size(), 1u);
@@ -2363,7 +2364,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_FALSE(graphModel.Processing.MeshProgressivePoissonAvailable);
+    EXPECT_TRUE(graphModel.Processing.ProgressivePoissonAvailable);
     EXPECT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(graphModel.Processing.PointCloudVertexNormalsAvailable);
 
@@ -2399,10 +2400,9 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_FALSE(cloudModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_FALSE(cloudModel.Processing.MeshProgressivePoissonAvailable);
     EXPECT_FALSE(cloudModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
-    EXPECT_TRUE(cloudModel.Processing.PointCloudProgressivePoissonAvailable);
+    EXPECT_TRUE(cloudModel.Processing.ProgressivePoissonAvailable);
 
     const ECS::EntityHandle empty = MakeSelectable(registry, "Empty");
     const Runtime::EditorGeometryProcessingCapabilities emptyCaps =

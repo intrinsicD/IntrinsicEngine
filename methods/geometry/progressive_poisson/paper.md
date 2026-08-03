@@ -80,9 +80,43 @@ cutoff — `draw(0, k)` — with no octree traversal or LOD data structures.
 - **Determinism.** Fixed `(points, config, seeds)` must reproduce identical `order`
   and `level_offsets`. Per-level grid-origin offsets derive deterministically from
   `grid_origin_seed`; within-level permutation from `shuffle_seed`.
-- **Inputs from meshes.** Triangle meshes are sampled to a dense surface cloud first
-  via GEOM-035 (area-weighted barycentric sampling), then fed to the sampler.
+- **Engine element-domain binding.** The runtime passes the existing `Vertices`
+  position buffer for mesh, graph, and point-cloud entities to the same method
+  entry point. The method neither generates surface samples nor replaces the
+  source entity domain. Experiments that require a newly generated surface
+  candidate set must materialize that dataset explicitly upstream and treat it
+  as a separate input artifact.
 - **Evaluation.** Quality metrics (RDF, RAPS, periodogram, NN-distance CV,
   min-distance ratio, coverage) come from GEOM-036; figure/data export from
   RUNTIME-133; interactive knob control from RUNTIME-134. See the sibling `FIGURES.md`
   for the exact figure specs and metric definitions.
+
+## Literature context and extensions
+
+The repository method is an unpublished in-house formulation. The following
+published methods are adjacent references, not provenance for its exact
+phase-parallel hashing algorithm:
+
+- Brandt et al., *Visibility-Aware Farthest Point Sampling on the GPU* (CGF
+  2019, DOI `10.1111/cgf.13848`) builds a visibility-aware progressive ordering
+  with a GPU farthest-point strategy. Its rasterized multi-view surface-candidate
+  construction is a separate pipeline stage; it does not justify hiding surface
+  generation inside a finite point-span method binding.
+- Yuksel, *Sample Elimination for Generating Poisson Disk Sample Sets* (CGF
+  2015, DOI `10.1111/cgf.12538`) eliminates candidates from a supplied finite set
+  and can order the survivors progressively. This is the closest published
+  contract analogy for preserving source identity while selecting a subset.
+- Dieckmann and Klein, *Hierarchical Additive Poisson Disk Sampling* (VMV 2018,
+  DOI `10.2312/vmv.20181256`) extends progressive Poisson construction with an
+  additive hierarchy. It is relevant to level semantics, but it does not change
+  this runtime's finite-input contract.
+- Christensen et al., *Progressive Multi-Jittered Sample Sequences* (EGSR 2018)
+  develops extensible progressive 2D sequences for rendering. It is useful
+  comparative context for prefix quality, not a mesh-to-point conversion rule.
+
+Primary sources:
+
+- https://onlinelibrary.wiley.com/doi/10.1111/cgf.13848
+- https://www.cemyuksel.com/research/sampleelimination/
+- https://diglib.eg.org/items/b2fb4e3e-9bdf-4a60-8761-98c70cde1fe8
+- https://graphics.pixar.com/library/ProgressiveMultiJitteredSampling/

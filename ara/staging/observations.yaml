@@ -1553,3 +1553,25 @@ observations:
     promoted_to: "logic/claims.md:C18"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O97
+    timestamp: "2026-08-03T02:10+02:00"
+    provenance: ai-executed
+    content: >
+      The production Progressive Poisson runtime now consumes the existing
+      Vertices source of mesh, graph, and point-cloud entities through one
+      direct, queued, config-controlled, and requested-GPU-fallback operation
+      path. It publishes deterministic source-cardinality level, rank, radius,
+      and prefix-visibility channels without replacing the source domain or
+      changing topology, element order, provenance, presentation, or unrelated
+      properties.
+    context: >
+      RUNTIME-208 resolves the runtime portion of the audited integration gap.
+      Focused, complete CPU, ASan, and UBSan contracts passed. METHOD-014 still
+      owns operational GPU compute/parity, and UI-038 still owns Graph-panel
+      registration, so neither is claimed here.
+    potential_type: claim
+    bound_to: [N330, N331, N332]
+    promoted: true
+    promoted_to: "logic/claims.md:C19"
+    crystallized_via: artifact-commitment
+    stale: false

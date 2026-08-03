@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`RUNTIME-208` — Progressive Poisson element-domain publication](RUNTIME-208-progressive-poisson-element-domain-publication.md)
-  (`in-progress`; owner `Codex-RUNTIME208`; branch
-  `runtime/runtime-208-element-domain-publication`; next gate: focused runtime
-  and Sandbox build plus the `ProgressivePoisson` CPU contract selection).
+No tasks are currently active.
 
 ## History
 

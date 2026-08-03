@@ -279,6 +279,40 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         SetFaces(faces, {0u});
     }
 
+void AddGraphSource(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity,
+        const std::vector<glm::vec3>& positions)
+    {
+        auto& raw = registry.Raw();
+        auto& vertices = raw.emplace<GS::Vertices>(entity);
+        SetPositions(vertices, positions);
+
+        std::vector<std::uint32_t> edgeV0{};
+        std::vector<std::uint32_t> edgeV1{};
+        std::vector<std::uint32_t> halfedgeTo{};
+        for (std::uint32_t index = 1u;
+             index < static_cast<std::uint32_t>(positions.size());
+             ++index)
+        {
+            edgeV0.push_back(index - 1u);
+            edgeV1.push_back(index);
+            halfedgeTo.push_back(index);
+            halfedgeTo.push_back(index - 1u);
+        }
+
+        auto& edges = raw.emplace<GS::Edges>(entity);
+        SetEdges(edges, edgeV0, edgeV1);
+        auto& halfedges = raw.emplace<GS::Halfedges>(entity);
+        SetHalfedges(
+            halfedges,
+            halfedgeTo,
+            std::vector<std::uint32_t>(halfedgeTo.size(), kInvalidIndex),
+            std::vector<std::uint32_t>(halfedgeTo.size(), kInvalidIndex));
+        raw.emplace<GS::HasGraphTopology>(entity);
+        raw.emplace<G::RenderEdges>(entity);
+    }
+
 void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
                                   const ECS::EntityHandle entity)
     {
@@ -340,7 +374,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
         .ShuffleWithinLevels = true,
         .ShuffleSeed = 23u,
         .PrefixCount = 3u,
-        .Channel = Runtime::EditorProgressivePoissonChannel::Phase,
+        .Channel = Runtime::EditorProgressivePoissonChannel::Rank,
     };
 
     const Runtime::EditorProgressivePoissonResult result =
@@ -357,11 +391,11 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
     EXPECT_GT(result.AcceptedCount, 0u);
     EXPECT_EQ(result.PrefixCount, std::min(3u, result.AcceptedCount));
     EXPECT_EQ(result.Channel,
-              Runtime::EditorProgressivePoissonChannel::Phase);
+              Runtime::EditorProgressivePoissonChannel::Rank);
     EXPECT_STREQ(
         Runtime::DebugNameForEditorProgressivePoissonChannel(
             result.Channel),
-        "Phase");
+        "Rank");
     EXPECT_EQ(result.BackendId, PPR::kBackendId);
     EXPECT_EQ(result.BackendDisplayName, "CPU reference");
     EXPECT_EQ(result.RequestedBackend,
@@ -377,16 +411,16 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
 
     Geometry::PropertySet& properties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
-    const auto levels = properties.Get<float>("p:poisson_level");
-    const auto phases = properties.Get<float>("p:poisson_phase");
-    const auto splats = properties.Get<float>("p:poisson_splat_radius");
-    const auto visible = properties.Get<float>("p:poisson_prefix_visible");
+    const auto levels = properties.Get<float>("v:poisson_level");
+    const auto ranks = properties.Get<float>("v:poisson_rank");
+    const auto splats = properties.Get<float>("v:poisson_splat_radius");
+    const auto visible = properties.Get<float>("v:poisson_prefix_visible");
     ASSERT_TRUE(levels);
-    ASSERT_TRUE(phases);
+    ASSERT_TRUE(ranks);
     ASSERT_TRUE(splats);
     ASSERT_TRUE(visible);
     ASSERT_EQ(levels.Vector().size(), positions.size());
-    ASSERT_EQ(phases.Vector().size(), positions.size());
+    ASSERT_EQ(ranks.Vector().size(), positions.size());
     ASSERT_EQ(splats.Vector().size(), positions.size());
     ASSERT_EQ(visible.Vector().size(), positions.size());
 
@@ -397,8 +431,8 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
         if (levels.Vector()[i] >= 0.0f)
         {
             ++acceptedFromProperties;
-            EXPECT_GE(phases.Vector()[i], 0.0f);
-            EXPECT_LT(phases.Vector()[i], 8.0f);
+            EXPECT_GE(ranks.Vector()[i], 0.0f);
+            EXPECT_LT(ranks.Vector()[i], 8.0f);
             EXPECT_GT(splats.Vector()[i], 0.0f);
         }
         if (visible.Vector()[i] > 0.5f)
@@ -414,18 +448,205 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
         registry.Raw().get<G::VisualizationConfig>(cloud);
     EXPECT_EQ(vis.Source, G::VisualizationConfig::ColorSource::ScalarField);
     EXPECT_EQ(vis.ScalarDomain, G::VisualizationConfig::Domain::Vertex);
-    EXPECT_EQ(vis.ScalarFieldName, "p:poisson_phase");
+    EXPECT_EQ(vis.ScalarFieldName, "v:poisson_rank");
 
     context.LastProgressivePoissonResult = &result;
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::PointCloud);
-    EXPECT_TRUE(model.Processing.PointCloudProgressivePoissonAvailable);
+    EXPECT_TRUE(model.Processing.ProgressivePoissonAvailable);
     ASSERT_TRUE(model.Processing.LastProgressivePoissonResult.has_value());
     EXPECT_TRUE(model.Processing.LastProgressivePoissonResult->Succeeded());
     EXPECT_EQ(model.Processing.LastProgressivePoissonResult->AcceptedCount,
               result.AcceptedCount);
+}
+
+TEST(SandboxEditorUi,
+     ProgressivePoissonPublishesIdenticalSourceCardinalityChannelsForEveryVertexDomain)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+
+    const std::vector<glm::vec3> positions{
+        {0.0f, 0.0f, 0.0f},
+        {0.25f, 0.0f, 0.0f},
+        {0.5f, 0.5f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    };
+    const std::vector<float> weights{
+        1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f};
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMesh");
+    AddTriangleMeshSource(registry, mesh);
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh), positions);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "PoissonGraph");
+    AddGraphSource(registry, graph, positions);
+
+    const ECS::EntityHandle cloud = MakePointCloudEntity(
+        registry,
+        "PoissonCloud",
+        positions);
+
+    for (const ECS::EntityHandle entity : {mesh, graph, cloud})
+    {
+        registry.Raw()
+            .get<GS::Vertices>(entity)
+            .Properties.GetOrAdd<float>("v:test_weight", 0.0f)
+            .Vector() = weights;
+        static_cast<void>(
+            registry.Raw()
+                .get<GS::Vertices>(entity)
+                .Properties.GetOrAdd<float>("p:poisson_phase", 9.0f));
+    }
+
+    const std::vector<std::uint32_t> meshEdgeV0 =
+        registry.Raw()
+            .get<GS::Edges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kEdgeV0)
+            .Vector();
+    const std::vector<std::uint32_t> graphHalfedgeTo =
+        registry.Raw()
+            .get<GS::Halfedges>(graph)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector();
+
+    const Runtime::EditorProgressivePoissonConfig config{
+        .Dimension = 2u,
+        .GridWidth = 3u,
+        .MaxLevels = 5u,
+        .HashLoadFactor = 0.75f,
+        .RadiusAlpha = 0.4f,
+        .RandomizeGridOrigin = false,
+        .ShuffleWithinLevels = true,
+        .ShuffleSeed = 37u,
+        .PrefixCount = 3u,
+        .Channel = Runtime::EditorProgressivePoissonChannel::Rank,
+    };
+    const std::array<ECS::EntityHandle, 3> entities{mesh, graph, cloud};
+    const std::array<GS::Domain, 3> domains{
+        GS::Domain::Mesh,
+        GS::Domain::Graph,
+        GS::Domain::PointCloud,
+    };
+
+    std::vector<float> expectedLevels{};
+    std::vector<float> expectedRanks{};
+    std::vector<float> expectedRadii{};
+    std::vector<float> expectedVisible{};
+    std::uint32_t expectedAccepted = 0u;
+    for (std::size_t domainIndex = 0u;
+         domainIndex < entities.size();
+         ++domainIndex)
+    {
+        const ECS::EntityHandle entity = entities[domainIndex];
+        const Runtime::EditorProgressivePoissonResult result =
+            Runtime::ApplyEditorProgressivePoissonCommand(
+                context,
+                Runtime::EditorProgressivePoissonCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(entity),
+                    .Config = config,
+                });
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.InputCount, positions.size());
+        ASSERT_LT(result.AcceptedCount, result.InputCount);
+
+        const GS::ConstSourceView view =
+            GS::BuildConstView(registry.Raw(), entity);
+        ASSERT_EQ(
+            GS::BuildSourceAvailability(view).ProvenanceDomain,
+            domains[domainIndex]);
+        ASSERT_NE(view.VertexSource, nullptr);
+        const Geometry::PropertySet& properties =
+            view.VertexSource->Properties;
+        const auto levels = properties.Get<float>("v:poisson_level");
+        const auto ranks = properties.Get<float>("v:poisson_rank");
+        const auto radii =
+            properties.Get<float>("v:poisson_splat_radius");
+        const auto visible =
+            properties.Get<float>("v:poisson_prefix_visible");
+        ASSERT_TRUE(levels);
+        ASSERT_TRUE(ranks);
+        ASSERT_TRUE(radii);
+        ASSERT_TRUE(visible);
+        ASSERT_EQ(levels.Vector().size(), positions.size());
+        ASSERT_EQ(ranks.Vector().size(), positions.size());
+        ASSERT_EQ(radii.Vector().size(), positions.size());
+        ASSERT_EQ(visible.Vector().size(), positions.size());
+        EXPECT_EQ(
+            properties.Get<glm::vec3>(PN::kPosition).Vector(),
+            positions);
+        EXPECT_EQ(
+            properties.Get<float>("v:test_weight").Vector(),
+            weights);
+        EXPECT_FALSE(properties.Exists("p:poisson_level"));
+        EXPECT_FALSE(properties.Exists("p:poisson_phase"));
+
+        std::size_t rejectedCount = 0u;
+        for (std::size_t index = 0u; index < positions.size(); ++index)
+        {
+            if (ranks.Vector()[index] < 0.0f)
+            {
+                ++rejectedCount;
+                EXPECT_FLOAT_EQ(levels.Vector()[index], -1.0f);
+                EXPECT_FLOAT_EQ(radii.Vector()[index], 0.0f);
+                EXPECT_FLOAT_EQ(visible.Vector()[index], 0.0f);
+            }
+            else
+            {
+                EXPECT_LT(
+                    ranks.Vector()[index],
+                    static_cast<float>(result.AcceptedCount));
+                EXPECT_GE(levels.Vector()[index], 0.0f);
+            }
+        }
+        EXPECT_EQ(
+            rejectedCount,
+            positions.size() - result.AcceptedCount);
+
+        if (domainIndex == 0u)
+        {
+            expectedAccepted = result.AcceptedCount;
+            expectedLevels = levels.Vector();
+            expectedRanks = ranks.Vector();
+            expectedRadii = radii.Vector();
+            expectedVisible = visible.Vector();
+        }
+        else
+        {
+            EXPECT_EQ(result.AcceptedCount, expectedAccepted);
+            EXPECT_EQ(levels.Vector(), expectedLevels);
+            EXPECT_EQ(ranks.Vector(), expectedRanks);
+            EXPECT_EQ(radii.Vector(), expectedRadii);
+            EXPECT_EQ(visible.Vector(), expectedVisible);
+        }
+    }
+
+    EXPECT_TRUE((registry.Raw().all_of<GS::Edges, GS::Halfedges, GS::Faces>(mesh)));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Edges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kEdgeV0)
+            .Vector(),
+        meshEdgeV0);
+    EXPECT_TRUE(registry.Raw().all_of<GS::HasGraphTopology>(graph));
+    EXPECT_TRUE((registry.Raw().all_of<GS::Edges, GS::Halfedges>(graph)));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderEdges>(graph));
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Halfedges>(graph)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector(),
+        graphHalfedgeTo);
 }
 TEST(SandboxEditorUi,
      ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState)
@@ -453,7 +674,7 @@ TEST(SandboxEditorUi,
         42.0f);
     registry.Raw()
         .get<GS::Vertices>(cloud)
-        .Properties.GetOrAdd<float>("p:poisson_level", 0.0f)
+        .Properties.GetOrAdd<float>("v:poisson_level", 0.0f)
         .Vector() = priorLevels;
     G::RenderPoints priorPoints{};
     priorPoints.Type = G::RenderPoints::RenderType::Flat;
@@ -486,7 +707,7 @@ TEST(SandboxEditorUi,
                     .PrefixCount = 3u,
                     .Channel =
                         Runtime::EditorProgressivePoissonChannel::
-                            Phase,
+                            Rank,
                 },
             });
     ASSERT_TRUE(result.Succeeded()) << result.Message;
@@ -495,25 +716,25 @@ TEST(SandboxEditorUi,
     const Geometry::PropertySet& appliedProperties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
     const std::vector<float> appliedLevels =
-        appliedProperties.Get<float>("p:poisson_level").Vector();
-    const std::vector<float> appliedPhases =
-        appliedProperties.Get<float>("p:poisson_phase").Vector();
+        appliedProperties.Get<float>("v:poisson_level").Vector();
+    const std::vector<float> appliedRanks =
+        appliedProperties.Get<float>("v:poisson_rank").Vector();
     ASSERT_EQ(
         registry.Raw().get<G::VisualizationConfig>(cloud).ScalarFieldName,
-        "p:poisson_phase");
+        "v:poisson_rank");
 
     EXPECT_EQ(
         history.Undo().Status,
         Runtime::EditorCommandHistoryStatus::Undone);
     const Geometry::PropertySet& undoneProperties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
-    ASSERT_TRUE(undoneProperties.Get<float>("p:poisson_level"));
+    ASSERT_TRUE(undoneProperties.Get<float>("v:poisson_level"));
     EXPECT_EQ(
-        undoneProperties.Get<float>("p:poisson_level").Vector(),
+        undoneProperties.Get<float>("v:poisson_level").Vector(),
         priorLevels);
-    EXPECT_FALSE(undoneProperties.Get<float>("p:poisson_phase"));
-    EXPECT_FALSE(undoneProperties.Get<float>("p:poisson_splat_radius"));
-    EXPECT_FALSE(undoneProperties.Get<float>("p:poisson_prefix_visible"));
+    EXPECT_FALSE(undoneProperties.Get<float>("v:poisson_rank"));
+    EXPECT_FALSE(undoneProperties.Get<float>("v:poisson_splat_radius"));
+    EXPECT_FALSE(undoneProperties.Get<float>("v:poisson_prefix_visible"));
     const G::RenderPoints& undonePoints =
         registry.Raw().get<G::RenderPoints>(cloud);
     EXPECT_EQ(undonePoints.Type, priorPoints.Type);
@@ -532,26 +753,27 @@ TEST(SandboxEditorUi,
         Runtime::EditorCommandHistoryStatus::Redone);
     Geometry::PropertySet& redoneProperties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
-    ASSERT_TRUE(redoneProperties.Get<float>("p:poisson_level"));
-    ASSERT_TRUE(redoneProperties.Get<float>("p:poisson_phase"));
+    ASSERT_TRUE(redoneProperties.Get<float>("v:poisson_level"));
+    ASSERT_TRUE(redoneProperties.Get<float>("v:poisson_rank"));
     EXPECT_EQ(
-        redoneProperties.Get<float>("p:poisson_level").Vector(),
+        redoneProperties.Get<float>("v:poisson_level").Vector(),
         appliedLevels);
     EXPECT_EQ(
-        redoneProperties.Get<float>("p:poisson_phase").Vector(),
-        appliedPhases);
+        redoneProperties.Get<float>("v:poisson_rank").Vector(),
+        appliedRanks);
 
-    redoneProperties.Get<float>("p:poisson_level")[0] += 1.0f;
+    redoneProperties.Get<float>("v:poisson_level")[0] += 1.0f;
     const float intervening =
-        redoneProperties.Get<float>("p:poisson_level")[0];
+        redoneProperties.Get<float>("v:poisson_level")[0];
     EXPECT_EQ(
         history.Undo().Status,
         Runtime::EditorCommandHistoryStatus::StaleEntity);
     EXPECT_EQ(
-        redoneProperties.Get<float>("p:poisson_level")[0],
+        redoneProperties.Get<float>("v:poisson_level")[0],
         intervening);
 }
-TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
+TEST(SandboxEditorUi,
+     ProgressivePoissonMeshVulkanRequestFallsBackWithoutDomainReplacement)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -560,17 +782,19 @@ TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
     Intrinsic::Tests::EditorFeatureTestContext context =
         MakeContext(registry, selection, true, nullptr, &device);
 
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
-    AddPointCloudSource(registry, cloud, 6u);
-    const std::vector<glm::vec3> positions{
-        {0.0f, 0.0f, 0.0f},
-        {0.25f, 0.0f, 0.0f},
-        {0.5f, 0.5f, 0.0f},
-        {1.0f, 0.0f, 0.0f},
-        {1.0f, 1.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f},
-    };
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    const std::vector<glm::vec3> positions =
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec3>(PN::kPosition)
+            .Vector();
+    const std::vector<std::uint32_t> halfedgeTo =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector();
 
     Runtime::EditorProgressivePoissonConfig config{};
     config.Dimension = 2u;
@@ -590,7 +814,7 @@ TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
             context,
             Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
+                    Runtime::SelectionController::ToStableEntityId(mesh),
                 .Config = config,
             });
 
@@ -624,6 +848,20 @@ TEST(SandboxEditorUi, ProgressivePoissonVulkanRequestFallsBackToCpuReference)
     EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
     EXPECT_EQ(result.LevelAcceptedCounts, direct.Diag.LevelCounts);
     EXPECT_EQ(result.PrefixCount, std::min(3u, direct.Diag.AcceptedCount));
+    EXPECT_EQ(
+        GS::BuildSourceAvailability(
+            GS::BuildConstView(registry.Raw(), mesh)).ProvenanceDomain,
+        GS::Domain::Mesh);
+    EXPECT_TRUE((
+        registry.Raw().all_of<GS::Edges, GS::Halfedges, GS::Faces>(mesh)));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector(),
+        halfedgeTo);
 }
 TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
 {
@@ -692,7 +930,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
 
     Geometry::PropertySet& properties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
-    const auto levels = properties.Get<float>("p:poisson_level");
+    const auto levels = properties.Get<float>("v:poisson_level");
     ASSERT_TRUE(levels);
     ASSERT_EQ(levels.Vector().size(), positions.size());
 
@@ -723,8 +961,6 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
             completedResult = std::move(result);
         };
 
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
-    AddPointCloudSource(registry, cloud, 6u);
     const std::vector<glm::vec3> positions{
         {0.0f, 0.0f, 0.0f},
         {0.25f, 0.0f, 0.0f},
@@ -733,6 +969,8 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
         {1.0f, 1.0f, 0.0f},
         {0.0f, 1.0f, 0.0f},
     };
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
+    AddPointCloudSource(registry, cloud, positions.size());
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
 
     const Runtime::EditorProgressivePoissonConfig config{
@@ -746,7 +984,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
         .ShuffleWithinLevels = false,
         .ShuffleSeed = 29u,
         .PrefixCount = 3u,
-        .Channel = Runtime::EditorProgressivePoissonChannel::Phase,
+        .Channel = Runtime::EditorProgressivePoissonChannel::Rank,
     };
 
     const Runtime::EditorProgressivePoissonResult result =
@@ -762,7 +1000,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
     EXPECT_NE(result.Message.find("queued"), std::string::npos);
     EXPECT_FALSE(registry.Raw()
                      .get<GS::Vertices>(cloud)
-                     .Properties.Get<float>("p:poisson_phase"));
+                     .Properties.Get<float>("v:poisson_rank"));
 
     Runtime::EditorJobQueueSnapshot queued =
         jobs.Snapshot();
@@ -775,7 +1013,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
 
     EXPECT_FALSE(registry.Raw()
                      .get<GS::Vertices>(cloud)
-                     .Properties.Get<float>("p:poisson_phase"));
+                     .Properties.Get<float>("v:poisson_rank"));
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::EditorJobQueueSnapshot done =
@@ -801,12 +1039,12 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
     EXPECT_EQ(completedResult->AcceptedCount, direct.Diag.AcceptedCount);
     EXPECT_EQ(completedResult->LevelAcceptedCounts, direct.Diag.LevelCounts);
 
-    const auto phases =
+    const auto ranks =
         registry.Raw()
             .get<GS::Vertices>(cloud)
-            .Properties.Get<float>("p:poisson_phase");
-    ASSERT_TRUE(phases);
-    EXPECT_EQ(phases.Vector().size(), positions.size());
+            .Properties.Get<float>("v:poisson_rank");
+    ASSERT_TRUE(ranks);
+    EXPECT_EQ(ranks.Vector().size(), positions.size());
 }
 TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply)
 {
@@ -869,7 +1107,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBefo
     EXPECT_FALSE(completedSinkCalled);
     EXPECT_FALSE(registry.Raw()
                      .get<GS::Vertices>(cloud)
-                     .Properties.Get<float>("p:poisson_level"));
+                     .Properties.Get<float>("v:poisson_level"));
 }
 TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply)
 {
@@ -889,6 +1127,16 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
     const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMesh");
     AddTriangleMeshSource(registry, mesh);
     registry.Raw().emplace<G::RenderSurface>(mesh);
+    const std::vector<glm::vec3> sourcePositions =
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec3>(PN::kPosition)
+            .Vector();
+    const std::vector<std::uint32_t> sourceHalfedgeTo =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector();
 
     const Runtime::EditorProgressivePoissonConfig config{
         .Dimension = 2u,
@@ -902,10 +1150,6 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
         .ShuffleSeed = 37u,
         .PrefixCount = 7u,
         .Channel = Runtime::EditorProgressivePoissonChannel::Level,
-        .MeshSurfaceSampleCount = 24u,
-        .MeshSurfaceSampleSeed = 41u,
-        .MeshSurfaceMinTriangleArea = 1.0e-14,
-        .MeshSurfaceInterpolateNormals = true,
     };
 
     const Runtime::EditorProgressivePoissonResult result =
@@ -918,12 +1162,18 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
             });
 
     EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_TRUE(result.MeshSurfaceSamplingUsed);
     EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<GS::Faces>(mesh));
+    EXPECT_FALSE(
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Exists("v:poisson_level"));
 
-    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<GS::Faces>(mesh));
+    const Runtime::EditorJobQueueSnapshot queued = jobs.Snapshot();
+    ASSERT_EQ(queued.Entries.size(), 1u);
+    EXPECT_EQ(
+        queued.Entries[0].Identity.Scope,
+        Runtime::EditorJobScope::MeshVertex);
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::EditorJobQueueSnapshot done =
@@ -932,26 +1182,31 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_TRUE(completedResult->MeshSurfaceSamplingUsed);
-    EXPECT_EQ(completedResult->MeshSurfaceSampleCount, 24u);
-    EXPECT_EQ(completedResult->MeshSurfaceAcceptedTriangleCount, 1u);
+    EXPECT_EQ(completedResult->InputCount, sourcePositions.size());
 
     const GS::ConstSourceView view = GS::BuildConstView(registry.Raw(), mesh);
     const GS::SourceAvailability availability =
         GS::BuildSourceAvailability(view);
-    EXPECT_EQ(availability.ProvenanceDomain, GS::Domain::PointCloud);
-    EXPECT_FALSE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_EQ(availability.ProvenanceDomain, GS::Domain::Mesh);
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE((registry.Raw().all_of<GS::Edges, GS::Halfedges, GS::Faces>(mesh)));
     ASSERT_NE(view.VertexSource, nullptr);
-    EXPECT_EQ(view.FaceSource, nullptr);
+    ASSERT_NE(view.FaceSource, nullptr);
 
     const auto positions =
         view.VertexSource->Properties.Get<glm::vec3>(PN::kPosition);
     const auto levels =
-        view.VertexSource->Properties.Get<float>("p:poisson_level");
+        view.VertexSource->Properties.Get<float>("v:poisson_level");
     ASSERT_TRUE(positions);
     ASSERT_TRUE(levels);
-    EXPECT_EQ(positions.Vector().size(), 24u);
-    EXPECT_EQ(levels.Vector().size(), 24u);
+    EXPECT_EQ(positions.Vector(), sourcePositions);
+    EXPECT_EQ(levels.Vector().size(), sourcePositions.size());
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector(),
+        sourceHalfedgeTo);
 }
 TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
 {
@@ -1015,7 +1270,7 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
     config.ShuffleWithinLevels = false;
     config.ShuffleSeed = 29u;
     config.PrefixCount = 3u;
-    config.Channel = Runtime::ProgressivePoissonPlaygroundChannel::Phase;
+    config.Channel = Runtime::ProgressivePoissonPlaygroundChannel::Rank;
     config.Backend =
         Runtime::ProgressivePoissonPlaygroundBackend::VulkanCompute;
     config.AutoRunOnEdit = true;
@@ -1038,7 +1293,7 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
     ASSERT_TRUE(activePoisson.has_value());
     EXPECT_EQ(activePoisson->GridWidth, 3u);
     EXPECT_EQ(activePoisson->Channel,
-              Runtime::ProgressivePoissonPlaygroundChannel::Phase);
+              Runtime::ProgressivePoissonPlaygroundChannel::Rank);
     EXPECT_EQ(activePoisson->Backend,
               Runtime::ProgressivePoissonPlaygroundBackend::VulkanCompute);
     EXPECT_TRUE(activePoisson->AutoRunOnEdit);
@@ -1056,8 +1311,6 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
     Intrinsic::Tests::EditorFeatureTestContext commandContext =
         MakeContext(registry, selection);
 
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
-    AddPointCloudSource(registry, cloud, 6u);
     const std::vector<glm::vec3> positions{
         {0.0f, 0.0f, 0.0f},
         {0.25f, 0.0f, 0.0f},
@@ -1066,7 +1319,13 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
         {1.0f, 1.0f, 0.0f},
         {0.0f, 1.0f, 0.0f},
     };
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    const ECS::EntityHandle graph = MakeSelectable(registry, "PoissonGraph");
+    AddGraphSource(registry, graph, positions);
+    const std::vector<std::uint32_t> edgeV0 =
+        registry.Raw()
+            .get<GS::Edges>(graph)
+            .Properties.Get<std::uint32_t>(PN::kEdgeV0)
+            .Vector();
 
     const Runtime::EditorProgressivePoissonConfig runtimeConfig =
         Runtime::MakeEditorProgressivePoissonConfig(*activePoisson);
@@ -1077,7 +1336,7 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
             commandContext,
             Runtime::EditorProgressivePoissonCommand{
                 .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
+                    Runtime::SelectionController::ToStableEntityId(graph),
                 .Config = runtimeConfig,
             });
     ASSERT_TRUE(result.Succeeded()) << result.Message;
@@ -1110,12 +1369,12 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
     EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
 
     Geometry::PropertySet& properties =
-        registry.Raw().get<GS::Vertices>(cloud).Properties;
-    const auto phases = properties.Get<float>("p:poisson_phase");
-    const auto visible = properties.Get<float>("p:poisson_prefix_visible");
-    ASSERT_TRUE(phases);
+        registry.Raw().get<GS::Vertices>(graph).Properties;
+    const auto ranks = properties.Get<float>("v:poisson_rank");
+    const auto visible = properties.Get<float>("v:poisson_prefix_visible");
+    ASSERT_TRUE(ranks);
     ASSERT_TRUE(visible);
-    ASSERT_EQ(phases.Vector().size(), positions.size());
+    ASSERT_EQ(ranks.Vector().size(), positions.size());
     ASSERT_EQ(visible.Vector().size(), positions.size());
     std::size_t visibleCount = 0u;
     for (float value : visible.Vector())
@@ -1126,6 +1385,19 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
         }
     }
     EXPECT_EQ(visibleCount, result.PrefixCount);
+    EXPECT_EQ(
+        GS::BuildSourceAvailability(
+            GS::BuildConstView(registry.Raw(), graph)).ProvenanceDomain,
+        GS::Domain::Graph);
+    EXPECT_TRUE(registry.Raw().all_of<GS::HasGraphTopology>(graph));
+    EXPECT_TRUE((registry.Raw().all_of<GS::Edges, GS::Halfedges>(graph)));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderEdges>(graph));
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Edges>(graph)
+            .Properties.Get<std::uint32_t>(PN::kEdgeV0)
+            .Vector(),
+        edgeV0);
 }
 
 TEST(SandboxEditorUi,
@@ -1184,10 +1456,11 @@ TEST(SandboxEditorUi,
     Runtime::ProgressivePoissonPlaygroundConfig reference{};
     reference.Dimension = 3u;
     reference.GridWidth = 11u;
+    reference.Channel = Runtime::ProgressivePoissonPlaygroundChannel::Rank;
 
     const Core::Config::EngineConfigSectionValidationResult validation =
         Runtime::ValidateProgressivePoissonConfigSection(
-            R"({"dimension":2,"grid_width":0,"unknown_field":true})",
+            R"({"dimension":2,"grid_width":0,"channel":"Phase","mesh_surface_sample_count":4096,"mesh_surface_seed":17,"mesh_surface_min_triangle_area":1e-14,"mesh_surface_interpolate_normals":true})",
             Runtime::SerializeProgressivePoissonPlaygroundConfig(reference),
             "app.sections.sandbox.progressive_poisson.payload");
 
@@ -1226,6 +1499,18 @@ TEST(SandboxEditorUi,
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->Dimension, 2u);
     EXPECT_EQ(decoded->GridWidth, 11u);
+    EXPECT_EQ(
+        decoded->Channel,
+        Runtime::ProgressivePoissonPlaygroundChannel::Rank);
+    EXPECT_EQ(
+        validation.CanonicalPayloadJson.find("mesh_surface"),
+        std::string::npos);
+    EXPECT_EQ(
+        validation.CanonicalPayloadJson.find("Phase"),
+        std::string::npos);
+    EXPECT_NE(
+        validation.CanonicalPayloadJson.find("Rank"),
+        std::string::npos);
 
     Runtime::RuntimeEngineConfigSectionRegistry registry{};
     ASSERT_TRUE(registry.Register(
@@ -1262,7 +1547,7 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(previewConfig->GridWidth, 11u);
 }
 
-TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
+TEST(SandboxEditorUi, ProgressivePoissonCommandUsesMeshVerticesWithoutDomainReplacement)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -1272,6 +1557,16 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
     AddTriangleMeshSource(registry, mesh);
     registry.Raw().emplace<G::RenderSurface>(mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::vector<glm::vec3> sourcePositions =
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<glm::vec3>(PN::kPosition)
+            .Vector();
+    const std::vector<std::uint32_t> sourceFaceHalfedges =
+        registry.Raw()
+            .get<GS::Faces>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kFaceHalfedge)
+            .Vector();
 
     const Runtime::EditorProgressivePoissonConfig config{
         .Dimension = 2u,
@@ -1285,10 +1580,6 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
         .ShuffleSeed = 37u,
         .PrefixCount = 7u,
         .Channel = Runtime::EditorProgressivePoissonChannel::Level,
-        .MeshSurfaceSampleCount = 32u,
-        .MeshSurfaceSampleSeed = 41u,
-        .MeshSurfaceMinTriangleArea = 1.0e-14,
-        .MeshSurfaceInterpolateNormals = true,
     };
 
     const Runtime::EditorProgressivePoissonResult result =
@@ -1301,13 +1592,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
             });
 
     ASSERT_TRUE(result.Succeeded()) << result.Message;
-    EXPECT_TRUE(result.MeshSurfaceSamplingUsed);
-    EXPECT_EQ(result.MeshSurfaceSampleCount, 32u);
-    EXPECT_EQ(result.MeshSurfaceTotalFaceCount, 1u);
-    EXPECT_EQ(result.MeshSurfaceAcceptedTriangleCount, 1u);
-    EXPECT_EQ(result.MeshSurfaceRejectedFaceCount, 0u);
-    EXPECT_GT(result.MeshSurfaceArea, 0.0);
-    EXPECT_EQ(result.InputCount, 32u);
+    EXPECT_EQ(result.InputCount, sourcePositions.size());
     EXPECT_GT(result.AcceptedCount, 0u);
     EXPECT_EQ(result.PrefixCount, std::min(7u, result.AcceptedCount));
 
@@ -1315,31 +1600,28 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
         GS::BuildConstView(registry.Raw(), mesh);
     const GS::SourceAvailability availability =
         GS::BuildSourceAvailability(view);
-    EXPECT_EQ(availability.ProvenanceDomain, GS::Domain::PointCloud);
+    EXPECT_EQ(availability.ProvenanceDomain, GS::Domain::Mesh);
     ASSERT_NE(view.VertexSource, nullptr);
-    EXPECT_EQ(view.HalfedgeSource, nullptr);
-    EXPECT_EQ(view.FaceSource, nullptr);
+    ASSERT_NE(view.HalfedgeSource, nullptr);
+    ASSERT_NE(view.FaceSource, nullptr);
 
     const Geometry::ConstPropertySet properties{
         view.VertexSource->Properties};
     const auto positions = properties.Get<glm::vec3>(PN::kPosition);
-    const auto normals = properties.Get<glm::vec3>(PN::kNormal);
-    const auto levels = properties.Get<float>("p:poisson_level");
-    const auto phases = properties.Get<float>("p:poisson_phase");
-    const auto splats = properties.Get<float>("p:poisson_splat_radius");
-    const auto visible = properties.Get<float>("p:poisson_prefix_visible");
+    const auto levels = properties.Get<float>("v:poisson_level");
+    const auto ranks = properties.Get<float>("v:poisson_rank");
+    const auto splats = properties.Get<float>("v:poisson_splat_radius");
+    const auto visible = properties.Get<float>("v:poisson_prefix_visible");
     ASSERT_TRUE(positions);
-    ASSERT_TRUE(normals);
     ASSERT_TRUE(levels);
-    ASSERT_TRUE(phases);
+    ASSERT_TRUE(ranks);
     ASSERT_TRUE(splats);
     ASSERT_TRUE(visible);
-    ASSERT_EQ(positions.Vector().size(), 32u);
-    EXPECT_EQ(normals.Vector().size(), 32u);
-    EXPECT_EQ(levels.Vector().size(), 32u);
-    EXPECT_EQ(phases.Vector().size(), 32u);
-    EXPECT_EQ(splats.Vector().size(), 32u);
-    EXPECT_EQ(visible.Vector().size(), 32u);
+    EXPECT_EQ(positions.Vector(), sourcePositions);
+    EXPECT_EQ(levels.Vector().size(), sourcePositions.size());
+    EXPECT_EQ(ranks.Vector().size(), sourcePositions.size());
+    EXPECT_EQ(splats.Vector().size(), sourcePositions.size());
+    EXPECT_EQ(visible.Vector().size(), sourcePositions.size());
 
     PPR::Config directConfig{};
     directConfig.Dimension = config.Dimension;
@@ -1361,21 +1643,27 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
     EXPECT_EQ(result.BackendDisplayName, "CPU reference");
     EXPECT_FLOAT_EQ(result.BaseRadius, direct.BaseRadius);
 
-    EXPECT_FALSE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Faces>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kFaceHalfedge)
+            .Vector(),
+        sourceFaceHalfedges);
 
     ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
     const G::VisualizationConfig& vis =
         registry.Raw().get<G::VisualizationConfig>(mesh);
     EXPECT_EQ(vis.Source, G::VisualizationConfig::ColorSource::ScalarField);
     EXPECT_EQ(vis.ScalarDomain, G::VisualizationConfig::Domain::Vertex);
-    EXPECT_EQ(vis.ScalarFieldName, "p:poisson_level");
+    EXPECT_EQ(vis.ScalarFieldName, "v:poisson_level");
 }
 TEST(SandboxEditorUi,
-     ProgressivePoissonMeshConversionHistoryRestoresDomainAndPresentation)
+     ProgressivePoissonMeshHistoryPreservesTopologyDomainAndPresentation)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -1407,6 +1695,11 @@ TEST(SandboxEditorUi,
             .get<GS::Vertices>(mesh)
             .Properties.Get<glm::vec2>("v:texcoord")
             .Vector();
+    const std::vector<std::uint32_t> priorHalfedgeTo =
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector();
 
     const Runtime::EditorProgressivePoissonResult result =
         Runtime::ApplyEditorProgressivePoissonCommand(
@@ -1427,19 +1720,22 @@ TEST(SandboxEditorUi,
                     .Channel =
                         Runtime::EditorProgressivePoissonChannel::
                             Level,
-                    .MeshSurfaceSampleCount = 16u,
-                    .MeshSurfaceSampleSeed = 41u,
-                    .MeshSurfaceMinTriangleArea = 1.0e-14,
-                    .MeshSurfaceInterpolateNormals = true,
                 },
             });
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(
         GS::BuildSourceAvailability(
             GS::BuildConstView(registry.Raw(), mesh)).ProvenanceDomain,
-        GS::Domain::PointCloud);
-    EXPECT_FALSE(registry.Raw().all_of<G::RenderSurface>(mesh));
+        GS::Domain::Mesh);
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
+    EXPECT_TRUE((registry.Raw().all_of<GS::Edges, GS::Halfedges, GS::Faces>(mesh)));
+    EXPECT_EQ(
+        registry.Raw()
+            .get<GS::Halfedges>(mesh)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector(),
+        priorHalfedgeTo);
 
     EXPECT_EQ(
         history.Undo().Status,
@@ -1477,16 +1773,146 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(
         GS::BuildSourceAvailability(
             GS::BuildConstView(registry.Raw(), mesh)).ProvenanceDomain,
-        GS::Domain::PointCloud);
-    registry.Raw().emplace<G::RenderSurface>(mesh);
+        GS::Domain::Mesh);
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
+    EXPECT_TRUE(
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Exists("v:poisson_level"));
+    registry.Raw()
+        .get<GS::Vertices>(mesh)
+        .Properties.Get<glm::vec2>("v:texcoord")[0]
+        .x += 0.125f;
     EXPECT_EQ(
         history.Undo().Status,
         Runtime::EditorCommandHistoryStatus::StaleEntity);
     EXPECT_EQ(
         GS::BuildSourceAvailability(
             GS::BuildConstView(registry.Raw(), mesh)).ProvenanceDomain,
-        GS::Domain::PointCloud);
+        GS::Domain::Mesh);
     EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
+}
+
+TEST(SandboxEditorUi,
+     ProgressivePoissonGraphHistoryPreservesTopologyOrderingAndProperties)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const std::vector<glm::vec3> positions{
+        {0.0f, 0.0f, 0.0f},
+        {0.25f, 0.0f, 0.0f},
+        {0.5f, 0.5f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+    };
+    const ECS::EntityHandle graph = MakeSelectable(registry, "PoissonGraphHistory");
+    AddGraphSource(registry, graph, positions);
+    const std::vector<float> priorWeights{5.0f, 4.0f, 3.0f, 2.0f, 1.0f};
+    registry.Raw()
+        .get<GS::Vertices>(graph)
+        .Properties.GetOrAdd<float>("v:test_weight", 0.0f)
+        .Vector() = priorWeights;
+    const std::vector<std::uint32_t> priorEdgeV0 =
+        registry.Raw()
+            .get<GS::Edges>(graph)
+            .Properties.Get<std::uint32_t>(PN::kEdgeV0)
+            .Vector();
+    const std::vector<std::uint32_t> priorHalfedgeTo =
+        registry.Raw()
+            .get<GS::Halfedges>(graph)
+            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Vector();
+
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
+            context,
+            Runtime::EditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(graph),
+                .Config = Runtime::EditorProgressivePoissonConfig{
+                    .Dimension = 2u,
+                    .GridWidth = 3u,
+                    .MaxLevels = 5u,
+                    .HashLoadFactor = 0.75f,
+                    .RadiusAlpha = 0.4f,
+                    .RandomizeGridOrigin = false,
+                    .ShuffleWithinLevels = false,
+                    .PrefixCount = 3u,
+                    .Channel =
+                        Runtime::EditorProgressivePoissonChannel::Rank,
+                },
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    ASSERT_TRUE(history.CanUndo());
+
+    const auto assertGraphState = [&]()
+    {
+        const GS::ConstSourceView view =
+            GS::BuildConstView(registry.Raw(), graph);
+        EXPECT_EQ(
+            GS::BuildSourceAvailability(view).ProvenanceDomain,
+            GS::Domain::Graph);
+        EXPECT_TRUE(registry.Raw().all_of<GS::HasGraphTopology>(graph));
+        EXPECT_TRUE((registry.Raw().all_of<GS::Edges, GS::Halfedges>(graph)));
+        EXPECT_TRUE(registry.Raw().all_of<G::RenderEdges>(graph));
+        EXPECT_EQ(
+            registry.Raw()
+                .get<GS::Vertices>(graph)
+                .Properties.Get<glm::vec3>(PN::kPosition)
+                .Vector(),
+            positions);
+        EXPECT_EQ(
+            registry.Raw()
+                .get<GS::Vertices>(graph)
+                .Properties.Get<float>("v:test_weight")
+                .Vector(),
+            priorWeights);
+        EXPECT_EQ(
+            registry.Raw()
+                .get<GS::Edges>(graph)
+                .Properties.Get<std::uint32_t>(PN::kEdgeV0)
+                .Vector(),
+            priorEdgeV0);
+        EXPECT_EQ(
+            registry.Raw()
+                .get<GS::Halfedges>(graph)
+                .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+                .Vector(),
+            priorHalfedgeTo);
+    };
+
+    assertGraphState();
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(graph));
+    EXPECT_TRUE(
+        registry.Raw()
+            .get<GS::Vertices>(graph)
+            .Properties.Exists("v:poisson_rank"));
+
+    EXPECT_EQ(
+        history.Undo().Status,
+        Runtime::EditorCommandHistoryStatus::Undone);
+    assertGraphState();
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderPoints>(graph));
+    EXPECT_FALSE(
+        registry.Raw()
+            .get<GS::Vertices>(graph)
+            .Properties.Exists("v:poisson_rank"));
+
+    EXPECT_EQ(
+        history.Redo().Status,
+        Runtime::EditorCommandHistoryStatus::Redone);
+    assertGraphState();
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(graph));
+    EXPECT_TRUE(
+        registry.Raw()
+            .get<GS::Vertices>(graph)
+            .Properties.Exists("v:poisson_rank"));
 }
 TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo)
 {

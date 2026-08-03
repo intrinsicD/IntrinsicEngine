@@ -10,12 +10,14 @@ paper:
   url: "https://github.com/intrinsicD/GPU-Accelerated-Progressive-Poisson-Disk-Sampling-via-Phase-Parallel-Spatial-Hashing"
 inputs:
   - "std::span<const glm::vec3> of points (any contiguous vec3 property buffer; not a specific container). z is ignored when Config.Dimension == 2"
+  - "Runtime binding: existing mesh Vertices, graph Vertices, or point-cloud Vertices are passed without surface generation, source reordering, or entity-domain conversion"
   - "Config knobs: dimension, grid_width, max_levels, hash_load_factor, radius_alpha, randomize_grid_origin, grid_origin_seed, shuffle_within_levels, shuffle_seed; runtime command/config may request cpu_reference or gpu_vulkan_compute"
 outputs:
   - "Progressive ordering: order[i] indexes the accepted input point at rank i"
   - "level_offsets: first rank of each hierarchy level (back() = accepted count M)"
   - "splat_radii: per-point introduction-level nearest-neighbor spacing"
   - "base_radius: Poisson radius at level 0 (r_L = base_radius / 2^L)"
+  - "Runtime publication: source-cardinality v:poisson_rank, v:poisson_level, v:poisson_splat_radius, and v:poisson_prefix_visible; rejected inputs use -1, -1, 0, and 0 respectively"
 metrics:
   - "poisson_disk_ratio_min"
   - "nn_distance_cv"

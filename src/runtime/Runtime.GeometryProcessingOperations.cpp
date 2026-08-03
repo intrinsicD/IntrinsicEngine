@@ -41,7 +41,6 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -81,16 +80,13 @@ import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.Curvature;
 import Geometry.CatmullClark;
-import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 import Geometry.HalfedgeMesh.SubdivisionSqrt3;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.Mesh.Conversion;
 import Geometry.MeshOperator;
 import Geometry.MeshSoup;
-import Geometry.PointCloud;
 import Geometry.PointCloud.Normals;
-import Geometry.PointCloud.SurfaceSampling;
 import Geometry.PointCloud.Utils;
 import Geometry.Properties;
 import Geometry.Registration;
@@ -114,7 +110,6 @@ namespace Extrinsic::Runtime
         namespace Sel = Extrinsic::ECS::Components::Selection;
         namespace G = Extrinsic::Graphics::Components;
         namespace A = Extrinsic::Assets;
-        namespace SurfaceSampling = Geometry::PointCloud::SurfaceSampling;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
         // RUNTIME-194 Slice B5d: the result payload for this file's method
@@ -195,13 +190,20 @@ namespace Extrinsic::Runtime
         }
 
         inline constexpr const char* kProgressivePoissonLevelProperty =
-            "p:poisson_level";
-        inline constexpr const char* kProgressivePoissonPhaseProperty =
-            "p:poisson_phase";
+            "v:poisson_level";
+        inline constexpr const char* kProgressivePoissonRankProperty =
+            "v:poisson_rank";
         inline constexpr const char* kProgressivePoissonSplatRadiusProperty =
-            "p:poisson_splat_radius";
+            "v:poisson_splat_radius";
         inline constexpr const char* kProgressivePoissonPrefixVisibleProperty =
-            "p:poisson_prefix_visible";
+            "v:poisson_prefix_visible";
+        inline constexpr std::array<std::string_view, 4>
+            kObsoleteProgressivePoissonProperties{
+                "p:poisson_level",
+                "p:poisson_phase",
+                "p:poisson_splat_radius",
+                "p:poisson_prefix_visible",
+            };
         inline constexpr const char* kProgressivePoissonCpuBackendDisplayName =
             "CPU reference";
         inline constexpr const char* kProgressivePoissonGpuBackendId =
@@ -242,8 +244,8 @@ namespace Extrinsic::Runtime
             {
             case EditorProgressivePoissonChannel::Level:
                 return kProgressivePoissonLevelProperty;
-            case EditorProgressivePoissonChannel::Phase:
-                return kProgressivePoissonPhaseProperty;
+            case EditorProgressivePoissonChannel::Rank:
+                return kProgressivePoissonRankProperty;
             case EditorProgressivePoissonChannel::SplatRadius:
                 return kProgressivePoissonSplatRadiusProperty;
             case EditorProgressivePoissonChannel::PrefixVisible:
@@ -278,22 +280,6 @@ namespace Extrinsic::Runtime
                    std::isfinite(config.RadiusAlpha);
         }
 
-        [[nodiscard]] bool IsValidProgressivePoissonMeshSurfaceConfig(
-            const EditorProgressivePoissonConfig& config) noexcept
-        {
-            return config.MeshSurfaceSampleCount > 0u &&
-                   std::isfinite(config.MeshSurfaceMinTriangleArea) &&
-                   config.MeshSurfaceMinTriangleArea > 0.0;
-        }
-
-        [[nodiscard]] std::uint32_t SaturatingUint32(
-            const std::size_t value) noexcept
-        {
-            return value > std::numeric_limits<std::uint32_t>::max()
-                ? std::numeric_limits<std::uint32_t>::max()
-                : static_cast<std::uint32_t>(value);
-        }
-
         [[nodiscard]] PPR::Config ToProgressivePoissonReferenceConfig(
             const EditorProgressivePoissonConfig& config) noexcept
         {
@@ -310,19 +296,6 @@ namespace Extrinsic::Runtime
             return out;
         }
 
-        [[nodiscard]] SurfaceSampling::Params ToProgressivePoissonSurfaceParams(
-            const EditorProgressivePoissonConfig& config) noexcept
-        {
-            SurfaceSampling::Params out{};
-            out.SampleCount =
-                static_cast<std::int64_t>(config.MeshSurfaceSampleCount);
-            out.Seed = config.MeshSurfaceSampleSeed;
-            out.MinTriangleArea = config.MeshSurfaceMinTriangleArea;
-            out.InterpolateVertexNormals =
-                config.MeshSurfaceInterpolateNormals;
-            return out;
-        }
-
         [[nodiscard]] std::uint32_t ClampProgressivePoissonPrefix(
             const std::uint32_t requested,
             const std::uint32_t accepted) noexcept
@@ -335,16 +308,14 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool PublishProgressivePoissonProperties(
             Geometry::PropertySet& properties,
             const PPR::Result& method,
-            const EditorProgressivePoissonConfig& config,
             const std::uint32_t prefixCount)
         {
             const std::size_t pointCount = properties.Size();
             std::vector<float> levels(pointCount, -1.0f);
-            std::vector<float> phases(pointCount, -1.0f);
+            std::vector<float> ranks(pointCount, -1.0f);
             std::vector<float> splatRadii(pointCount, 0.0f);
             std::vector<float> prefixVisible(pointCount, 0.0f);
 
-            const std::uint32_t phaseCount = config.Dimension == 3u ? 8u : 4u;
             for (std::size_t level = 0u;
                  level + 1u < method.LevelOffsets.size();
                  ++level)
@@ -360,8 +331,7 @@ namespace Extrinsic::Runtime
                         return false;
 
                     levels[pointIndex] = static_cast<float>(level);
-                    phases[pointIndex] = static_cast<float>(
-                        (rank - begin) % phaseCount);
+                    ranks[pointIndex] = static_cast<float>(rank);
                     if (rank < method.SplatRadii.size())
                         splatRadii[pointIndex] = method.SplatRadii[rank];
                     prefixVisible[pointIndex] = rank < prefixCount ? 1.0f : 0.0f;
@@ -371,8 +341,8 @@ namespace Extrinsic::Runtime
             auto levelProp = properties.GetOrAdd<float>(
                 kProgressivePoissonLevelProperty,
                 -1.0f);
-            auto phaseProp = properties.GetOrAdd<float>(
-                kProgressivePoissonPhaseProperty,
+            auto rankProp = properties.GetOrAdd<float>(
+                kProgressivePoissonRankProperty,
                 -1.0f);
             auto splatProp = properties.GetOrAdd<float>(
                 kProgressivePoissonSplatRadiusProperty,
@@ -380,13 +350,19 @@ namespace Extrinsic::Runtime
             auto prefixProp = properties.GetOrAdd<float>(
                 kProgressivePoissonPrefixVisibleProperty,
                 0.0f);
-            if (!levelProp || !phaseProp || !splatProp || !prefixProp)
+            if (!levelProp || !rankProp || !splatProp || !prefixProp)
                 return false;
 
             levelProp.Vector() = std::move(levels);
-            phaseProp.Vector() = std::move(phases);
+            rankProp.Vector() = std::move(ranks);
             splatProp.Vector() = std::move(splatRadii);
             prefixProp.Vector() = std::move(prefixVisible);
+            for (const std::string_view obsolete :
+                 kObsoleteProgressivePoissonProperties)
+            {
+                if (const auto id = properties.Registry().Find(obsolete))
+                    (void)properties.Registry().Remove(*id);
+            }
             return true;
         }
 
@@ -558,7 +534,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] EditorProgressivePoissonResult
         PublishProgressivePoissonComputedResult(
             Geometry::PropertySet& properties,
-            const EditorProgressivePoissonConfig& config,
             const PPR::Result& method,
             EditorProgressivePoissonResult result)
         {
@@ -568,7 +543,6 @@ namespace Extrinsic::Runtime
             if (!PublishProgressivePoissonProperties(
                     properties,
                     method,
-                    config,
                     result.PrefixCount))
             {
                 result.Status =
@@ -601,7 +575,6 @@ namespace Extrinsic::Runtime
                 ComputeProgressivePoissonCpuReference(positions, config, backend);
             return PublishProgressivePoissonComputedResult(
                 properties,
-                config,
                 computed.Method,
                 std::move(computed.Result));
         }
@@ -633,16 +606,6 @@ namespace Extrinsic::Runtime
                 result.Message += FormatProgressivePoissonLevelCounts(
                     result.LevelAcceptedCounts);
                 result.Message += "]";
-            }
-            if (result.MeshSurfaceSamplingUsed)
-            {
-                result.Message +=
-                    ", mesh samples=" +
-                    std::to_string(result.MeshSurfaceSampleCount) +
-                    ", accepted triangles=" +
-                    std::to_string(result.MeshSurfaceAcceptedTriangleCount) +
-                    "/" +
-                    std::to_string(result.MeshSurfaceTotalFaceCount);
             }
             if (!result.BackendFallbackReason.empty())
             {
@@ -1117,42 +1080,11 @@ namespace Extrinsic::Runtime
             state.Visualization = std::move(config);
         }
 
-        [[nodiscard]] ProgressivePoissonEntityState
-        MakeProgressivePoissonPointCloudState(
-            const ProgressivePoissonEntityState& before,
-            const Geometry::PointCloud::Cloud& cloud,
-            const EditorProgressivePoissonChannel channel)
-        {
-            ProgressivePoissonEntityState after = before;
-            entt::registry staged{};
-            const entt::entity entity = staged.create();
-            Geometry::PointCloud::Cloud published = cloud;
-            GS::PopulateFromCloud(staged, entity, published);
-            after.Vertices =
-                CaptureOptionalComponent<GS::Vertices>(staged, entity);
-            after.Edges.reset();
-            after.Halfedges.reset();
-            after.Faces.reset();
-            after.HasMeshTopology = false;
-            after.HasGraphTopology = false;
-            after.RenderSurface.reset();
-            ApplyProgressivePoissonVisualization(after, channel);
-            return after;
-        }
-
-        enum class ProgressivePoissonMutationScope : std::uint8_t
-        {
-            PointAttributes,
-            MeshToPointCloud,
-        };
-
         struct ProgressivePoissonMutationIdentity
         {
             ECS::Scene::Registry* Scene{nullptr};
             WorldHandle World{};
             std::uint32_t StableEntityId{0u};
-            ProgressivePoissonMutationScope Scope{
-                ProgressivePoissonMutationScope::PointAttributes};
         };
 
         void StampProgressivePoissonMutation(
@@ -1164,13 +1096,6 @@ namespace Extrinsic::Runtime
             if (!entity.has_value())
                 return;
 
-            if (identity.Scope ==
-                ProgressivePoissonMutationScope::MeshToPointCloud)
-            {
-                Dirty::MarkGpuDirty(raw, *entity);
-                Dirty::MarkVertexPositionsDirty(raw, *entity);
-                Dirty::MarkVertexNormalsDirty(raw, *entity);
-            }
             Dirty::MarkVertexAttributesDirty(raw, *entity);
         }
 
@@ -1178,7 +1103,6 @@ namespace Extrinsic::Runtime
         CommitProgressivePoissonMutation(
             const EditorGeometryProcessingContext& context,
             const std::uint32_t stableEntityId,
-            const ProgressivePoissonMutationScope scope,
             ProgressivePoissonEntityState before,
             ProgressivePoissonEntityState after)
         {
@@ -1192,7 +1116,6 @@ namespace Extrinsic::Runtime
                 .Scene = context.Scene,
                 .World = context.World,
                 .StableEntityId = stableEntityId,
-                .Scope = scope,
             };
 
             const auto validate =
@@ -1251,11 +1174,7 @@ namespace Extrinsic::Runtime
                 const EditorCommandHistoryResult history =
                     Internal::ExecuteUndoableEntityMutation(
                         *context.CommandHistory,
-                        scope ==
-                                ProgressivePoissonMutationScope::
-                                    MeshToPointCloud
-                            ? "Run progressive Poisson mesh sampling"
-                            : "Run progressive Poisson sampling",
+                        "Run progressive Poisson sampling",
                         identity,
                         beforeState,
                         beforeState,
@@ -1278,20 +1197,29 @@ namespace Extrinsic::Runtime
             return EditorCommandStatus::Applied;
         }
 
-        enum class EditorProgressivePoissonCpuJobSource : std::uint8_t
+        [[nodiscard]] std::optional<GeometryElementDomain>
+        ResolveProgressivePoissonVertexDomain(
+            const GeometryEntityAvailability& availability) noexcept
         {
-            PointCloud,
-            MeshSurface,
-        };
-
-        [[nodiscard]] EditorJobScope
-        ToProgressivePoissonJobScope(
-            const EditorProgressivePoissonCpuJobSource source) noexcept
-        {
-            return source ==
-                       EditorProgressivePoissonCpuJobSource::MeshSurface
-                ? EditorJobScope::MeshSurface
-                : EditorJobScope::PointCloudPoint;
+            GeometryElementDomain domain = GeometryElementDomain::Unknown;
+            switch (availability.Sources.ProvenanceDomain)
+            {
+            case GS::Domain::Mesh:
+                domain = GeometryElementDomain::MeshVertex;
+                break;
+            case GS::Domain::Graph:
+                domain = GeometryElementDomain::GraphNode;
+                break;
+            case GS::Domain::PointCloud:
+                domain = GeometryElementDomain::PointCloudPoint;
+                break;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                return std::nullopt;
+            }
+            return SupportsGeometryElementDomain(availability, domain)
+                ? std::optional{domain}
+                : std::nullopt;
         }
 
         [[nodiscard]] const char* ProgressivePoissonOutputName(
@@ -1308,72 +1236,12 @@ namespace Extrinsic::Runtime
                 : result.Error;
         }
 
-        void SetProgressivePoissonMeshSurfaceStats(
-            EditorProgressivePoissonResult& result,
-            const SurfaceSampling::Diagnostics& info)
-        {
-            result.MeshSurfaceSamplingUsed = true;
-            result.MeshSurfaceSampleCount =
-                SaturatingUint32(info.WrittenSampleCount);
-            result.MeshSurfaceTotalFaceCount =
-                SaturatingUint32(info.TotalFaceCount);
-            result.MeshSurfaceAcceptedTriangleCount =
-                SaturatingUint32(info.AcceptedTriangleCount);
-            result.MeshSurfaceRejectedFaceCount = SaturatingUint32(
-                info.RejectedNonTriangleFaceCount +
-                info.RejectedDegenerateTriangleCount +
-                info.RejectedNonFiniteTriangleCount);
-            result.MeshSurfaceArea = info.TotalSurfaceArea;
-        }
-
-        [[nodiscard]] EditorProgressivePoissonResult
-        MakeProgressivePoissonMeshSurfaceSamplingResult(
-            const EditorProgressivePoissonConfig& config,
-            const ProgressivePoissonBackendResolution& backend,
-            const SurfaceSampling::Result& sampled)
-        {
-            EditorProgressivePoissonResult result{};
-            result.Channel = config.Channel;
-            result.RequestedBackend = backend.Requested;
-            result.ActualBackend = backend.Actual;
-            result.RequestedBackendId =
-                ProgressivePoissonBackendId(backend.Requested);
-            result.RequestedBackendDisplayName =
-                ProgressivePoissonBackendDisplayName(backend.Requested);
-            result.BackendId = ProgressivePoissonBackendId(backend.Actual);
-            result.BackendDisplayName =
-                ProgressivePoissonBackendDisplayName(backend.Actual);
-            result.FellBackToCpu =
-                backend.Requested != backend.Actual &&
-                backend.Actual ==
-                    EditorProgressivePoissonBackend::CpuReference;
-            result.BackendFallbackReason = backend.FallbackReason;
-            SetProgressivePoissonMeshSurfaceStats(result, sampled.Info);
-            if (sampled.Succeeded())
-                return result;
-
-            result.Status =
-                sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
-                    ? EditorCommandStatus::InvalidProcessingParameters
-                    : EditorCommandStatus::GeometryProcessingFailed;
-            result.Error =
-                sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
-                    ? Core::ErrorCode::InvalidArgument
-                    : Core::ErrorCode::InvalidState;
-            result.Message =
-                "Progressive Poisson mesh surface sampling failed with ";
-            result.Message += std::string(SurfaceSampling::ToString(sampled.Status));
-            result.Message += ".";
-            return result;
-        }
-
         [[nodiscard]] EditorProgressivePoissonResult
         MakePendingProgressivePoissonCpuJobResult(
             const EditorProgressivePoissonCommand& command,
             const JobToken handle,
             const std::uint32_t inputCount,
-            const ProgressivePoissonBackendResolution& backend,
-            const EditorProgressivePoissonCpuJobSource source)
+            const ProgressivePoissonBackendResolution& backend)
         {
             EditorProgressivePoissonResult result{};
             result.Status = EditorCommandStatus::Pending;
@@ -1394,15 +1262,7 @@ namespace Extrinsic::Runtime
                     EditorProgressivePoissonBackend::CpuReference;
             result.BackendFallbackReason = backend.FallbackReason;
             result.Error = Core::ErrorCode::Success;
-            if (source == EditorProgressivePoissonCpuJobSource::MeshSurface)
-            {
-                result.MeshSurfaceSamplingUsed = true;
-                result.MeshSurfaceSampleCount =
-                    command.Config.MeshSurfaceSampleCount;
-            }
-            result.Message = source == EditorProgressivePoissonCpuJobSource::MeshSurface
-                ? "Progressive Poisson mesh CPU job queued"
-                : "Progressive Poisson CPU job queued";
+            result.Message = "Progressive Poisson CPU job queued";
             if (handle.IsValid())
             {
                 result.Message += " (job ";
@@ -1426,14 +1286,11 @@ namespace Extrinsic::Runtime
         struct EditorProgressivePoissonCpuJobState
         {
             EditorProgressivePoissonCommand Command{};
-            EditorProgressivePoissonCpuJobSource Source{
-                EditorProgressivePoissonCpuJobSource::PointCloud};
+            GeometryElementDomain Domain{GeometryElementDomain::Unknown};
             ProgressivePoissonBackendResolution Backend{};
             std::vector<glm::vec3> SnapshotPositions{};
             ProgressivePoissonEntitySnapshot BeforeState{};
-            Geometry::HalfedgeMesh::Mesh Mesh{};
             std::optional<PPR::Result> Method{};
-            std::optional<SurfaceSampling::Result> Sampled{};
             EditorProgressivePoissonResult Result{};
         };
 
@@ -1455,15 +1312,10 @@ namespace Extrinsic::Runtime
 
             const GS::ConstSourceView view =
                 GS::BuildConstView(raw, *entity);
-            const GS::SourceAvailability availability =
-                GS::BuildSourceAvailability(view);
-            const GS::Domain expectedDomain =
-                job.Source ==
-                        EditorProgressivePoissonCpuJobSource::
-                            MeshSurface
-                    ? GS::Domain::Mesh
-                    : GS::Domain::PointCloud;
-            if (availability.ProvenanceDomain != expectedDomain)
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(view);
+            if (ResolveProgressivePoissonVertexDomain(availability) !=
+                std::optional{job.Domain})
             {
                 return JobApplyValidation::StaleGeneration;
             }
@@ -1478,7 +1330,7 @@ namespace Extrinsic::Runtime
             return JobApplyValidation::Current;
         }
 
-        [[nodiscard]] Core::Result PublishProgressivePoissonPointCloudCpuJob(
+        [[nodiscard]] Core::Result PublishProgressivePoissonCpuJob(
             const EditorGeometryProcessingContext& context,
             const EditorProgressivePoissonCpuJobState& job)
         {
@@ -1502,7 +1354,6 @@ namespace Extrinsic::Runtime
             EditorProgressivePoissonResult result =
                 PublishProgressivePoissonComputedResult(
                     after.Vertices->Properties,
-                    job.Command.Config,
                     *job.Method,
                     job.Result);
             if (result.Succeeded())
@@ -1514,7 +1365,6 @@ namespace Extrinsic::Runtime
                     CommitProgressivePoissonMutation(
                         context,
                         job.Command.StableEntityId,
-                        ProgressivePoissonMutationScope::PointAttributes,
                         *job.BeforeState,
                         std::move(after));
                 if (committed != EditorCommandStatus::Applied)
@@ -1537,53 +1387,8 @@ namespace Extrinsic::Runtime
                 : Core::Err(ProgressivePoissonResultError(result));
         }
 
-        [[nodiscard]] Core::Result PublishProgressivePoissonMeshSurfaceCpuJob(
-            const EditorGeometryProcessingContext& context,
-            const EditorProgressivePoissonCpuJobState& job)
-        {
-            if (!job.Result.Succeeded())
-            {
-                PublishProgressivePoissonResultSink(context, job.Result);
-                return Core::Err(ProgressivePoissonResultError(job.Result));
-            }
-            if (!job.Sampled.has_value())
-                return Core::Err(Core::ErrorCode::Unknown);
-            if (context.Scene == nullptr)
-                return Core::Err(Core::ErrorCode::InvalidState);
-            if (job.BeforeState == nullptr)
-                return Core::Err(Core::ErrorCode::InvalidState);
-
-            EditorProgressivePoissonResult result = job.Result;
-            ProgressivePoissonEntityState after =
-                MakeProgressivePoissonPointCloudState(
-                    *job.BeforeState,
-                    job.Sampled->Cloud,
-                    job.Command.Config.Channel);
-            const EditorCommandStatus publishStatus =
-                CommitProgressivePoissonMutation(
-                    context,
-                    job.Command.StableEntityId,
-                    ProgressivePoissonMutationScope::MeshToPointCloud,
-                    *job.BeforeState,
-                    std::move(after));
-            if (publishStatus != EditorCommandStatus::Applied)
-            {
-                result.Status = publishStatus;
-                result.Error = Core::ErrorCode::Unknown;
-                result.Message =
-                    "Progressive Poisson mesh sample publication failed.";
-                PublishProgressivePoissonResultSink(context, result);
-                return Core::Err(Core::ErrorCode::Unknown);
-            }
-
-            AppendProgressivePoissonSuccessMessage(result);
-            InvalidateSelectedModelCache(context);
-            PublishProgressivePoissonResultSink(context, result);
-            return Core::Ok();
-        }
-
         [[nodiscard]] JobResultEnvelope
-        RunProgressivePoissonPointCloudCpuWorker(
+        RunProgressivePoissonCpuWorker(
             const std::shared_ptr<EditorProgressivePoissonCpuJobState>& state)
         {
             ProgressivePoissonComputedResult computed =
@@ -1603,60 +1408,12 @@ namespace Extrinsic::Runtime
                 });
         }
 
-        [[nodiscard]] JobResultEnvelope
-        RunProgressivePoissonMeshSurfaceCpuWorker(
-            const std::shared_ptr<EditorProgressivePoissonCpuJobState>& state)
-        {
-            SurfaceSampling::Result sampled =
-                SurfaceSampling::SampleTriangleMeshSurface(
-                    state->Mesh,
-                    ToProgressivePoissonSurfaceParams(state->Command.Config));
-            state->Result = MakeProgressivePoissonMeshSurfaceSamplingResult(
-                state->Command.Config,
-                state->Backend,
-                sampled);
-            if (!sampled.Succeeded())
-            {
-                state->Sampled = std::move(sampled);
-                return JobResultEnvelope::Make<EditorGeometryJobResult>(
-                    EditorGeometryJobResult{
-                        .Diagnostic = state->Result.Message,
-                    });
-            }
-
-            const std::span<const glm::vec3> sampledPositions =
-                sampled.Cloud.Positions();
-            ProgressivePoissonComputedResult computed =
-                ComputeProgressivePoissonCpuReference(
-                    sampledPositions,
-                    state->Command.Config,
-                    state->Backend);
-            state->Method = std::move(computed.Method);
-            EditorProgressivePoissonResult result =
-                std::move(computed.Result);
-            SetProgressivePoissonMeshSurfaceStats(result, sampled.Info);
-            result = PublishProgressivePoissonComputedResult(
-                sampled.Cloud.PointProperties(),
-                state->Command.Config,
-                *state->Method,
-                std::move(result));
-            state->Result = std::move(result);
-            state->Sampled = std::move(sampled);
-            return JobResultEnvelope::Make<EditorGeometryJobResult>(
-                EditorGeometryJobResult{
-                    .Diagnostic = state->Result.Succeeded()
-                        ? "Progressive Poisson mesh CPU result ready"
-                        : state->Result.Message,
-                });
-        }
-
         [[nodiscard]] EditorProgressivePoissonResult
         SubmitProgressivePoissonCpuDerivedJob(
             const EditorGeometryProcessingContext& context,
             const EditorProgressivePoissonCommand& command,
-            const EditorProgressivePoissonCpuJobSource source,
+            const GeometryElementDomain domain,
             std::vector<glm::vec3> snapshotPositions,
-            Geometry::HalfedgeMesh::Mesh mesh,
             ProgressivePoissonEntityState beforeState,
             const std::uint32_t inputCount,
             ProgressivePoissonBackendResolution backend)
@@ -1664,24 +1421,21 @@ namespace Extrinsic::Runtime
             auto state =
                 std::make_shared<EditorProgressivePoissonCpuJobState>();
             state->Command = command;
-            state->Source = source;
+            state->Domain = domain;
             state->Backend = std::move(backend);
             state->SnapshotPositions = std::move(snapshotPositions);
             state->BeforeState =
                 std::make_shared<ProgressivePoissonEntityState>(
                     std::move(beforeState));
-            state->Mesh = std::move(mesh);
 
             const EditorJobIdentity identity{
                 .EntityId = command.StableEntityId,
-                .Scope = ToProgressivePoissonJobScope(source),
+                .Scope = ToEditorJobScope(domain),
                 .OutputSemantic = GeometryPresentationSlotSemantic::PointScalarField,
                 .OutputName = ProgressivePoissonOutputName(command.Config),
             };
             JobDesc desc{
-                .DebugName = source == EditorProgressivePoissonCpuJobSource::MeshSurface
-                    ? "Sandbox.ProgressivePoisson.MeshCPU"
-                    : "Sandbox.ProgressivePoisson.CPU",
+                .DebugName = "Sandbox.ProgressivePoisson.CPU",
                 .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .Kind = RuntimeTaskKinds::GeometryProcess,
@@ -1691,10 +1445,7 @@ namespace Extrinsic::Runtime
                 .Work =
                     [state](const JobCancellation&) -> JobResultEnvelope
                     {
-                        return state->Source ==
-                                   EditorProgressivePoissonCpuJobSource::MeshSurface
-                            ? RunProgressivePoissonMeshSurfaceCpuWorker(state)
-                            : RunProgressivePoissonPointCloudCpuWorker(state);
+                        return RunProgressivePoissonCpuWorker(state);
                     },
                 .ValidateBeforeApply =
                     [context, state]()
@@ -1710,14 +1461,7 @@ namespace Extrinsic::Runtime
                         if (result.TryGet<EditorGeometryJobResult>() == nullptr)
                             return false;
                         const Core::Result published =
-                            state->Source ==
-                                    EditorProgressivePoissonCpuJobSource::MeshSurface
-                                ? PublishProgressivePoissonMeshSurfaceCpuJob(
-                                      context,
-                                      *state)
-                                : PublishProgressivePoissonPointCloudCpuJob(
-                                      context,
-                                      *state);
+                            PublishProgressivePoissonCpuJob(context, *state);
                         return published.has_value();
                     },
             };
@@ -1730,12 +1474,9 @@ namespace Extrinsic::Runtime
                         command,
                         active->Token,
                         inputCount,
-                        state->Backend,
-                        source);
+                        state->Backend);
                 pending.Message = BuildActiveDerivedJobMessage(
-                    source == EditorProgressivePoissonCpuJobSource::MeshSurface
-                        ? "Progressive Poisson mesh CPU"
-                        : "Progressive Poisson CPU",
+                    "Progressive Poisson CPU",
                     *active);
                 return pending;
             }
@@ -1756,8 +1497,7 @@ namespace Extrinsic::Runtime
                 command,
                 handle,
                 inputCount,
-                state->Backend,
-                source);
+                state->Backend);
         }
 
     }
@@ -1803,8 +1543,8 @@ namespace Extrinsic::Runtime
         {
         case EditorProgressivePoissonChannel::Level:
             return "Level";
-        case EditorProgressivePoissonChannel::Phase:
-            return "Phase";
+        case EditorProgressivePoissonChannel::Rank:
+            return "Rank";
         case EditorProgressivePoissonChannel::SplatRadius:
             return "Splat radius";
         case EditorProgressivePoissonChannel::PrefixVisible:
@@ -1833,8 +1573,8 @@ namespace Extrinsic::Runtime
         {
         case ProgressivePoissonPlaygroundChannel::Level:
             return EditorProgressivePoissonChannel::Level;
-        case ProgressivePoissonPlaygroundChannel::Phase:
-            return EditorProgressivePoissonChannel::Phase;
+        case ProgressivePoissonPlaygroundChannel::Rank:
+            return EditorProgressivePoissonChannel::Rank;
         case ProgressivePoissonPlaygroundChannel::SplatRadius:
             return EditorProgressivePoissonChannel::SplatRadius;
         case ProgressivePoissonPlaygroundChannel::PrefixVisible:
@@ -1851,8 +1591,8 @@ namespace Extrinsic::Runtime
         {
         case EditorProgressivePoissonChannel::Level:
             return ProgressivePoissonPlaygroundChannel::Level;
-        case EditorProgressivePoissonChannel::Phase:
-            return ProgressivePoissonPlaygroundChannel::Phase;
+        case EditorProgressivePoissonChannel::Rank:
+            return ProgressivePoissonPlaygroundChannel::Rank;
         case EditorProgressivePoissonChannel::SplatRadius:
             return ProgressivePoissonPlaygroundChannel::SplatRadius;
         case EditorProgressivePoissonChannel::PrefixVisible:
@@ -1904,10 +1644,6 @@ namespace Extrinsic::Runtime
             .PrefixCount = config.PrefixCount,
             .Channel = MakeEditorProgressivePoissonChannel(config.Channel),
             .Backend = MakeEditorProgressivePoissonBackend(config.Backend),
-            .MeshSurfaceSampleCount = config.MeshSurfaceSampleCount,
-            .MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed,
-            .MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea,
-            .MeshSurfaceInterpolateNormals = config.MeshSurfaceInterpolateNormals,
             .AutoRunOnEdit = config.AutoRunOnEdit,
             .DebounceSeconds = config.DebounceSeconds,
         };
@@ -1931,10 +1667,6 @@ namespace Extrinsic::Runtime
         out.PrefixCount = config.PrefixCount;
         out.Channel = MakeProgressivePoissonPlaygroundChannel(config.Channel);
         out.Backend = MakeProgressivePoissonPlaygroundBackend(config.Backend);
-        out.MeshSurfaceSampleCount = config.MeshSurfaceSampleCount;
-        out.MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed;
-        out.MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea;
-        out.MeshSurfaceInterpolateNormals = config.MeshSurfaceInterpolateNormals;
         out.AutoRunOnEdit = config.AutoRunOnEdit;
         out.DebounceSeconds = config.DebounceSeconds;
         return out;
@@ -1975,224 +1707,85 @@ namespace Extrinsic::Runtime
                 "Progressive Poisson target entity is stale or no longer live.");
         }
 
-        GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
-        const GS::SourceAvailability availability =
-            GS::BuildSourceAvailability(view);
-        if (availability.ProvenanceDomain != GS::Domain::PointCloud &&
-            availability.ProvenanceDomain != GS::Domain::Mesh)
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(view);
+        const std::optional<GeometryElementDomain> vertexDomain =
+            ResolveProgressivePoissonVertexDomain(availability);
+        if (!vertexDomain.has_value() || view.VertexSource == nullptr)
         {
             return MakeProgressivePoissonResult(
                 EditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson sampling requires selected point-cloud or mesh "
-                "GeometrySources.");
+                "Progressive Poisson sampling requires mesh, graph, or point-cloud "
+                "Vertices GeometrySources.");
         }
         const ProgressivePoissonEntityState beforeState =
             CaptureProgressivePoissonEntityState(raw, *entity);
-
-        if (availability.ProvenanceDomain == GS::Domain::PointCloud)
-        {
-            if (view.VertexSource == nullptr)
-            {
-                return MakeProgressivePoissonResult(
-                    EditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
-                    Core::ErrorCode::InvalidArgument,
-                    "Progressive Poisson sampling requires selected point-cloud "
-                    "vertices.");
-            }
-
-            std::optional<std::vector<glm::vec3>> positions =
-                CollectFiniteVertexPositions(view.VertexSource->Properties);
-            if (!positions.has_value())
-            {
-                return MakeProgressivePoissonResult(
-                    EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
-                    Core::ErrorCode::InvalidArgument,
-                    "Progressive Poisson sampling requires a non-empty finite v:position "
-                    "property.");
-            }
-
-            if (context.JobCommands.Available())
-            {
-                const std::uint32_t pointCount =
-                    static_cast<std::uint32_t>(positions->size());
-                const ProgressivePoissonBackendResolution backend =
-                    ResolveProgressivePoissonBackend(
-                        command.Config.Backend,
-                        command.Config,
-                        pointCount,
-                        context.Device);
-                return SubmitProgressivePoissonCpuDerivedJob(
-                    context,
-                    command,
-                    EditorProgressivePoissonCpuJobSource::PointCloud,
-                    std::move(*positions),
-                    Geometry::HalfedgeMesh::Mesh{},
-                    beforeState,
-                    pointCount,
-                    backend);
-            }
-
-            ProgressivePoissonEntityState afterState = beforeState;
-            if (!afterState.Vertices.has_value())
-            {
-                return MakeProgressivePoissonResult(
-                    EditorCommandStatus::UnsupportedGeometryDomain,
-                    command.Config.Channel,
-                    Core::ErrorCode::InvalidState,
-                    "Progressive Poisson point source state is unavailable.");
-            }
-            EditorProgressivePoissonResult result =
-                RunProgressivePoissonAndPublish(
-                    std::span<const glm::vec3>{
-                        positions->data(),
-                        positions->size()},
-                    afterState.Vertices->Properties,
-                    command.Config,
-                    context.Device);
-            if (!result.Succeeded())
-                return result;
-
-            ApplyProgressivePoissonVisualization(
-                afterState,
-                command.Config.Channel);
-            const EditorCommandStatus committed =
-                CommitProgressivePoissonMutation(
-                    context,
-                    command.StableEntityId,
-                    ProgressivePoissonMutationScope::PointAttributes,
-                    beforeState,
-                    std::move(afterState));
-            if (committed != EditorCommandStatus::Applied)
-            {
-                result.Status = committed;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Progressive Poisson point publication became stale.";
-                return result;
-            }
-
-            AppendProgressivePoissonSuccessMessage(result);
-            InvalidateSelectedModelCache(context);
-            return result;
-        }
-
-        if (!IsValidProgressivePoissonMeshSurfaceConfig(command.Config))
+        std::optional<std::vector<glm::vec3>> positions =
+            CollectFiniteVertexPositions(view.VertexSource->Properties);
+        if (!positions.has_value())
         {
             return MakeProgressivePoissonResult(
                 EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson mesh sampling requires a positive surface sample "
-                "count and finite positive minimum triangle area.");
-        }
-
-        const GS::ConstSourceView constView =
-            GS::BuildConstView(raw, *entity);
-        GeometryProcessingDetail::EditorMeshSourceSnapshot source =
-            GeometryProcessingDetail::BuildEditorMeshSourceSnapshot(constView);
-        if (source.Status != EditorCommandStatus::Applied)
-        {
-            return MakeProgressivePoissonResult(source.Status, command.Config.Channel, source.Error,
-                                                source.Diagnostic.empty()
-                                                    ? "Progressive Poisson mesh sampling could "
-                                                      "not build selected mesh GeometrySources."
-                                                    : source.Diagnostic);
+                "Progressive Poisson sampling requires a non-empty finite v:position "
+                "property at source cardinality.");
         }
 
         if (context.JobCommands.Available())
         {
+            const std::uint32_t pointCount =
+                static_cast<std::uint32_t>(positions->size());
             const ProgressivePoissonBackendResolution backend =
                 ResolveProgressivePoissonBackend(
                     command.Config.Backend,
                     command.Config,
-                    command.Config.MeshSurfaceSampleCount,
+                    pointCount,
                     context.Device);
             return SubmitProgressivePoissonCpuDerivedJob(
                 context,
                 command,
-                EditorProgressivePoissonCpuJobSource::MeshSurface,
-                std::move(source.BeforePositions),
-                std::move(source.Mesh),
+                *vertexDomain,
+                std::move(*positions),
                 beforeState,
-                command.Config.MeshSurfaceSampleCount,
+                pointCount,
                 backend);
         }
 
-        SurfaceSampling::Result sampled =
-            SurfaceSampling::SampleTriangleMeshSurface(
-                source.Mesh,
-                ToProgressivePoissonSurfaceParams(command.Config));
-        EditorProgressivePoissonResult result{};
-        result.Channel = command.Config.Channel;
-        result.MeshSurfaceSamplingUsed = true;
-        result.MeshSurfaceSampleCount =
-            SaturatingUint32(sampled.Info.WrittenSampleCount);
-        result.MeshSurfaceTotalFaceCount =
-            SaturatingUint32(sampled.Info.TotalFaceCount);
-        result.MeshSurfaceAcceptedTriangleCount =
-            SaturatingUint32(sampled.Info.AcceptedTriangleCount);
-        result.MeshSurfaceRejectedFaceCount = SaturatingUint32(
-            sampled.Info.RejectedNonTriangleFaceCount +
-            sampled.Info.RejectedDegenerateTriangleCount +
-            sampled.Info.RejectedNonFiniteTriangleCount);
-        result.MeshSurfaceArea = sampled.Info.TotalSurfaceArea;
-        if (!sampled.Succeeded())
+        ProgressivePoissonEntityState afterState = beforeState;
+        if (!afterState.Vertices.has_value())
         {
-            result.Status =
-                sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
-                    ? EditorCommandStatus::InvalidProcessingParameters
-                    : EditorCommandStatus::GeometryProcessingFailed;
-            result.Error =
-                sampled.Status == SurfaceSampling::SurfaceSamplingStatus::InvalidSampleCount
-                    ? Core::ErrorCode::InvalidArgument
-                    : Core::ErrorCode::InvalidState;
-            result.Message =
-                "Progressive Poisson mesh surface sampling failed with ";
-            result.Message += std::string(SurfaceSampling::ToString(sampled.Status));
-            result.Message += ".";
-            return result;
+            return MakeProgressivePoissonResult(
+                EditorCommandStatus::UnsupportedGeometryDomain,
+                command.Config.Channel,
+                Core::ErrorCode::InvalidState,
+                "Progressive Poisson vertex source state is unavailable.");
         }
-
-        const std::span<const glm::vec3> sampledPositions =
-            sampled.Cloud.Positions();
-        result = RunProgressivePoissonAndPublish(
-            sampledPositions,
-            sampled.Cloud.PointProperties(),
-            command.Config,
-            context.Device);
-        result.MeshSurfaceSamplingUsed = true;
-        result.MeshSurfaceSampleCount =
-            SaturatingUint32(sampled.Info.WrittenSampleCount);
-        result.MeshSurfaceTotalFaceCount =
-            SaturatingUint32(sampled.Info.TotalFaceCount);
-        result.MeshSurfaceAcceptedTriangleCount =
-            SaturatingUint32(sampled.Info.AcceptedTriangleCount);
-        result.MeshSurfaceRejectedFaceCount = SaturatingUint32(
-            sampled.Info.RejectedNonTriangleFaceCount +
-            sampled.Info.RejectedDegenerateTriangleCount +
-            sampled.Info.RejectedNonFiniteTriangleCount);
-        result.MeshSurfaceArea = sampled.Info.TotalSurfaceArea;
+        EditorProgressivePoissonResult result =
+            RunProgressivePoissonAndPublish(
+                std::span<const glm::vec3>{
+                    positions->data(),
+                    positions->size()},
+                afterState.Vertices->Properties,
+                command.Config,
+                context.Device);
         if (!result.Succeeded())
             return result;
 
-        ProgressivePoissonEntityState afterState =
-            MakeProgressivePoissonPointCloudState(
-                beforeState,
-                sampled.Cloud,
-                command.Config.Channel);
+        ApplyProgressivePoissonVisualization(afterState, command.Config.Channel);
         const EditorCommandStatus publishStatus =
             CommitProgressivePoissonMutation(
                 context,
                 command.StableEntityId,
-                ProgressivePoissonMutationScope::MeshToPointCloud,
                 beforeState,
                 std::move(afterState));
         if (publishStatus != EditorCommandStatus::Applied)
         {
             result.Status = publishStatus;
-            result.Error = Core::ErrorCode::Unknown;
+            result.Error = Core::ErrorCode::InvalidState;
             result.Message =
-                "Progressive Poisson mesh sample publication failed.";
+                "Progressive Poisson vertex publication became stale.";
             return result;
         }
 
