@@ -102,7 +102,7 @@ introduction-level splat-radius semantics (conservative for finer prefixes);
 
 - Sibling repository `code/progressive_poisson.{h,cu}`, `paper.tex`, `FIGURES.md`,
   `OPEN_DECISIONS.md`.
-- Brandt et al., *Visibility-Aware Farthest Point Sampling on the GPU*, CGF
+- Brandt et al., *Visibility-Aware Progressive Farthest Point Sampling on the GPU*, CGF
   2019, DOI `10.1111/cgf.13848`.
 - Yuksel, *Sample Elimination for Generating Poisson Disk Sample Sets*, CGF
   2015, DOI `10.1111/cgf.12538`.

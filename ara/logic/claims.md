@@ -527,7 +527,7 @@
   CPU, ASan, UBSan, retirement
 - **From staging**: O96
 
-## C19: Progressive Poisson publishes on every canonical vertex source
+## C20: Progressive Poisson publishes on every canonical vertex source
 - **Statement**: The production Progressive Poisson runtime operation accepts
   the existing `Vertices` source of point-cloud, graph, and mesh entities
   through one direct/queued/config-controlled operation path. It publishes
@@ -537,9 +537,11 @@
   or changing topology, source order, provenance, presentation, or unrelated
   properties. Requested GPU execution remains an explicit CPU-reference
   fallback through the same publication path.
-- **Status**: supported — 44 focused runtime/UI contracts, 4,002 complete CPU
-  tests, 2,654 ASan tests, and 2,654 UBSan tests; this makes no operational
-  GPU/Vulkan compute, backend-parity, performance, or Graph-panel claim
+- **Status**: supported — 46/46 focused runtime/UI contracts; 4,003 passed plus
+  one policy-defined skip from 4,004 selected CPU tests; 2,656/2,656 ASan; and
+  2,655 passed plus one LSan-only skip from 2,656 selected UBSan tests. This
+  makes no operational GPU/Vulkan compute, backend-parity, performance, or
+  Graph-panel claim
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: A valid mesh, graph, or point-cloud entity with a
@@ -548,9 +550,10 @@
   deterministic channels for identical positions and parameters; publication
   changes source cardinality, topology, element order, provenance,
   presentation, or unrelated properties; rejected vertices lack the documented
-  sentinels; config/agent execution bypasses validation; or a requested GPU
-  backend reports operational GPU execution rather than the declared CPU
-  fallback.
+  sentinels; a same-cardinality typed connectivity edit is overwritten rather
+  than rejected as stale; config/agent execution bypasses validation; or a
+  requested GPU backend reports operational GPU execution rather than the
+  declared CPU fallback.
 - **Proof**: [tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
   methods/geometry/progressive_poisson/method.yaml,
   methods/geometry/progressive_poisson/paper.md,
@@ -567,4 +570,4 @@
 - **Dependencies**: [C17, C18]
 - **Tags**: runtime, geometry, methods, progressive Poisson, element sources,
   config, history, CPU, ASan, UBSan, retirement
-- **From staging**: O101
+- **From staging**: O102

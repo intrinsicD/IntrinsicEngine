@@ -30,11 +30,18 @@
   domain but do not select distinct algorithms or publication code.
 - One captured mutation validates and restores the complete topology-bearing
   geometry-source cohort while changing only Progressive Poisson vertex outputs
-  and owned point/scalar visualization.
+  and owned point/scalar visualization. Production graph/mesh connectivity
+  records are value-compared; unrecognized erased property types fail closed
+  instead of admitting a descriptor-only stale match.
 - The config/agent, manual Run, debounced auto-run, queued CPU, and requested-
   GPU fallback routes enter the same typed operation; no conversion control or
   backend-specific publisher remains.
 
 ## Findings → follow-ups
 
-- No findings.
+- Independent fixed-surface round one found that erased production
+  connectivity was compared by descriptor only. The corrected comparator now
+  checks the typed vertex/halfedge/face connectivity values, the fixtures use
+  real `PopulateFromMesh`/`PopulateFromGraph` sources, and queued mesh/graph plus
+  history regressions prove same-cardinality edits are rejected without
+  overwrite.

@@ -21,8 +21,9 @@ apply, undo, and redo paths. Obsolete surface-generation fields and the
 fabricated phase channel are diagnosed and dropped from the canonical config;
 the existing Mesh and PointCloud panels use the one copied readiness value,
 while `UI-038` owns the final Graph panel. Focused method/runtime/UI coverage
-passed 44/44, the default CPU selector passed 4,002/4,002 with its expected
-GLFW/LSan skip, and grouped ASan and UBSan each passed 2,654/2,654. Strict
+passed 46/46. The default CPU selector selected 4,004 tests, passed 4,003, and
+skipped its expected GLFW/LSan case; grouped ASan passed 2,656/2,656, while
+grouped UBSan selected 2,656, passed 2,655, and skipped the LSan-only case. Strict
 method-manifest, layering, task/docs, inventory, ARA, clean-workshop, and
 independent fixed-surface review gates close the correction. No Vulkan compute
 parity or performance claim is made.

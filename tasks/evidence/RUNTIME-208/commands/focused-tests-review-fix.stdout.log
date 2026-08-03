@@ -1,0 +1,105 @@
+Internal ctest changing into directory: /tmp/intrinsic-runtime208.qxtdIf/build/ci
+Test project /tmp/intrinsic-runtime208.qxtdIf/build/ci
+      Start  475: ProgressivePoissonGpuBackend.PlansPerLevelBuildAcceptAndCompaction
+ 1/46 Test  #475: ProgressivePoissonGpuBackend.PlansPerLevelBuildAcceptAndCompaction ..................................   Passed    0.00 sec
+      Start  476: ProgressivePoissonGpuBackend.PlansThreeDimensionalEightPhaseDispatch
+ 2/46 Test  #476: ProgressivePoissonGpuBackend.PlansThreeDimensionalEightPhaseDispatch ................................   Passed    0.00 sec
+      Start  477: ProgressivePoissonGpuBackend.InvalidPlanInputsFailClosed
+ 3/46 Test  #477: ProgressivePoissonGpuBackend.InvalidPlanInputsFailClosed ............................................   Passed    0.00 sec
+      Start  478: ProgressivePoissonGpuBackend.BuildsBufferAndPipelineDescriptors
+ 4/46 Test  #478: ProgressivePoissonGpuBackend.BuildsBufferAndPipelineDescriptors .....................................   Passed    0.00 sec
+      Start  479: ProgressivePoissonGpuBackend.BuildsStateRecordFromRoleBuffers
+ 5/46 Test  #479: ProgressivePoissonGpuBackend.BuildsStateRecordFromRoleBuffers .......................................   Passed    0.00 sec
+      Start  480: ProgressivePoissonGpuBackend.RecordsMethodDispatchesAndDelegatesCompaction
+ 6/46 Test  #480: ProgressivePoissonGpuBackend.RecordsMethodDispatchesAndDelegatesCompaction ..........................   Passed    0.00 sec
+      Start  481: ProgressivePoissonGpuBackend.ExecutionAllocatesUploadsAndRecordsWithoutDuplicateReadbackCopies
+ 7/46 Test  #481: ProgressivePoissonGpuBackend.ExecutionAllocatesUploadsAndRecordsWithoutDuplicateReadbackCopies ......   Passed    0.00 sec
+      Start  482: ProgressivePoissonGpuBackend.RecordFailsClosedForInvalidResourcesAndUnavailableDevice
+ 8/46 Test  #482: ProgressivePoissonGpuBackend.RecordFailsClosedForInvalidResourcesAndUnavailableDevice ...............   Passed    0.00 sec
+      Start  483: ProgressivePoissonGpuBackend.ResolveReportsCpuFallbackUntilExecutionLands
+ 9/46 Test  #483: ProgressivePoissonGpuBackend.ResolveReportsCpuFallbackUntilExecutionLands ...........................   Passed    0.00 sec
+      Start  484: ProgressivePoissonGpuBackend.ExecutionFallsBackBeforeAllocationWhenDeviceUnavailable
+10/46 Test  #484: ProgressivePoissonGpuBackend.ExecutionFallsBackBeforeAllocationWhenDeviceUnavailable ................   Passed    0.00 sec
+      Start  485: ProgressivePoissonGpuBackend.SharedResultBatchParsesAcceptedPrefixAndValidatesShape
+11/46 Test  #485: ProgressivePoissonGpuBackend.SharedResultBatchParsesAcceptedPrefixAndValidatesShape .................   Passed    0.00 sec
+      Start  486: ProgressivePoissonGpuBackend.ReadbackRejectsInvalidOrDuplicateAcceptedIndices
+12/46 Test  #486: ProgressivePoissonGpuBackend.ReadbackRejectsInvalidOrDuplicateAcceptedIndices .......................   Passed    0.00 sec
+      Start  487: ProgressivePoissonGpuBackend.ParityDiagnosticsAcceptReferenceMatchAndPoissonGuarantee
+13/46 Test  #487: ProgressivePoissonGpuBackend.ParityDiagnosticsAcceptReferenceMatchAndPoissonGuarantee ...............   Passed    0.00 sec
+      Start  488: ProgressivePoissonGpuBackend.ParityDiagnosticsRecommendCpuFallbackOnMismatch
+14/46 Test  #488: ProgressivePoissonGpuBackend.ParityDiagnosticsRecommendCpuFallbackOnMismatch ........................   Passed    0.00 sec
+      Start  489: ProgressivePoissonGpuBackend.DebugNamesAreStable
+15/46 Test  #489: ProgressivePoissonGpuBackend.DebugNamesAreStable ....................................................   Passed    0.00 sec
+      Start  941: SandboxEditorUi.ProgressivePoissonCommandPublishesPointPropertiesAndVisualization
+16/46 Test  #941: SandboxEditorUi.ProgressivePoissonCommandPublishesPointPropertiesAndVisualization ...................   Passed    0.00 sec
+      Start  942: SandboxEditorUi.ProgressivePoissonPublishesIdenticalSourceCardinalityChannelsForEveryVertexDomain
+17/46 Test  #942: SandboxEditorUi.ProgressivePoissonPublishesIdenticalSourceCardinalityChannelsForEveryVertexDomain ...   Passed    0.00 sec
+      Start  943: SandboxEditorUi.ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState
+18/46 Test  #943: SandboxEditorUi.ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState ..............   Passed    0.00 sec
+      Start  944: SandboxEditorUi.ProgressivePoissonMeshVulkanRequestFallsBackWithoutDomainReplacement
+19/46 Test  #944: SandboxEditorUi.ProgressivePoissonMeshVulkanRequestFallsBackWithoutDomainReplacement ................   Passed    0.00 sec
+      Start  945: SandboxEditorUi.ProgressivePoissonCommandMatchesDirectMethodConfig
+20/46 Test  #945: SandboxEditorUi.ProgressivePoissonCommandMatchesDirectMethodConfig ..................................   Passed    0.00 sec
+      Start  946: SandboxEditorUi.ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply
+21/46 Test  #946: SandboxEditorUi.ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply .....................   Passed    0.01 sec
+      Start  947: SandboxEditorUi.ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply
+22/46 Test  #947: SandboxEditorUi.ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply ...................   Passed    0.01 sec
+      Start  948: SandboxEditorUi.ProgressivePoissonGraphCpuJobRejectsStaleProductionConnectivity
+23/46 Test  #948: SandboxEditorUi.ProgressivePoissonGraphCpuJobRejectsStaleProductionConnectivity .....................   Passed    0.01 sec
+      Start  949: SandboxEditorUi.ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply
+24/46 Test  #949: SandboxEditorUi.ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply .................   Passed    0.01 sec
+      Start  950: SandboxEditorUi.ProgressivePoissonMeshCpuJobRejectsStaleProductionConnectivity
+25/46 Test  #950: SandboxEditorUi.ProgressivePoissonMeshCpuJobRejectsStaleProductionConnectivity ......................   Passed    0.01 sec
+      Start  951: SandboxEditorUi.ProgressivePoissonConfigCommandRoutesThroughConfigControl
+26/46 Test  #951: SandboxEditorUi.ProgressivePoissonConfigCommandRoutesThroughConfigControl ...........................   Passed    0.01 sec
+      Start  953: SandboxEditorUi.ProgressivePoissonSectionValidationKeepsPerFieldReferenceFallback
+27/46 Test  #953: SandboxEditorUi.ProgressivePoissonSectionValidationKeepsPerFieldReferenceFallback ...................   Passed    0.00 sec
+      Start  954: SandboxEditorUi.ProgressivePoissonCommandUsesMeshVerticesWithoutDomainReplacement
+28/46 Test  #954: SandboxEditorUi.ProgressivePoissonCommandUsesMeshVerticesWithoutDomainReplacement ...................   Passed    0.00 sec
+      Start  955: SandboxEditorUi.ProgressivePoissonMeshHistoryPreservesTopologyDomainAndPresentation
+29/46 Test  #955: SandboxEditorUi.ProgressivePoissonMeshHistoryPreservesTopologyDomainAndPresentation .................   Passed    0.00 sec
+      Start  956: SandboxEditorUi.ProgressivePoissonGraphHistoryPreservesTopologyOrderingAndProperties
+30/46 Test  #956: SandboxEditorUi.ProgressivePoissonGraphHistoryPreservesTopologyOrderingAndProperties ................   Passed    0.00 sec
+      Start 1174: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+31/46 Test #1174: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows .......................   Passed    0.04 sec
+      Start 1177: SandboxEditorPresentation.ProgressivePoissonPanelUsesOneNonDestructiveConfigAndRunPath
+32/46 Test #1177: SandboxEditorPresentation.ProgressivePoissonPanelUsesOneNonDestructiveConfigAndRunPath ..............   Passed    0.00 sec
+      Start 1256: ProgressivePoissonReference.MinPairwiseFindsPairsBeyondAdjacentCells
+33/46 Test #1256: ProgressivePoissonReference.MinPairwiseFindsPairsBeyondAdjacentCells ................................   Passed    0.00 sec
+      Start 1257: ProgressivePoissonReference.DeterministicForFixedSeeds
+34/46 Test #1257: ProgressivePoissonReference.DeterministicForFixedSeeds ..............................................   Passed    0.26 sec
+      Start 1258: ProgressivePoissonReference.ShuffleSeedPermutesWithinLevelButKeepsBoundaries
+35/46 Test #1258: ProgressivePoissonReference.ShuffleSeedPermutesWithinLevelButKeepsBoundaries ........................   Passed    0.26 sec
+      Start 1259: ProgressivePoissonReference.EmptyInputIsValidAndEmpty
+36/46 Test #1259: ProgressivePoissonReference.EmptyInputIsValidAndEmpty ...............................................   Passed    0.00 sec
+      Start 1260: ProgressivePoissonReference.CoincidentPairAcceptsExactlyOne
+37/46 Test #1260: ProgressivePoissonReference.CoincidentPairAcceptsExactlyOne .........................................   Passed    0.01 sec
+      Start 1261: ProgressivePoissonReference.NonFiniteInputFailsClosed
+38/46 Test #1261: ProgressivePoissonReference.NonFiniteInputFailsClosed ...............................................   Passed    0.00 sec
+      Start 1262: ProgressivePoissonReference.InvalidDimensionFailsClosed
+39/46 Test #1262: ProgressivePoissonReference.InvalidDimensionFailsClosed .............................................   Passed    0.00 sec
+      Start 1263: ProgressivePoissonReference.TwoDimensionalIgnoresZComponent
+40/46 Test #1263: ProgressivePoissonReference.TwoDimensionalIgnoresZComponent .........................................   Passed    0.05 sec
+      Start 1264: ProgressivePoissonReference.ZeroGridWidthAndLevelsAreClamped
+41/46 Test #1264: ProgressivePoissonReference.ZeroGridWidthAndLevelsAreClamped ........................................   Passed    0.00 sec
+      Start 1265: ProgressivePoissonReference.AlphaOutOfRangeDefaultsToSqrtDOverTwo
+42/46 Test #1265: ProgressivePoissonReference.AlphaOutOfRangeDefaultsToSqrtDOverTwo ...................................   Passed    0.02 sec
+      Start 1266: Dimensions/ProgressivePoissonReferenceDim.SmallDeterministicCloudHoldsAtEveryLevelBoundary/2
+43/46 Test #1266: Dimensions/ProgressivePoissonReferenceDim.SmallDeterministicCloudHoldsAtEveryLevelBoundary/2 ........   Passed    0.00 sec
+      Start 1267: Dimensions/ProgressivePoissonReferenceDim.SmallDeterministicCloudHoldsAtEveryLevelBoundary/3
+44/46 Test #1267: Dimensions/ProgressivePoissonReferenceDim.SmallDeterministicCloudHoldsAtEveryLevelBoundary/3 ........   Passed    0.00 sec
+      Start 1268: Dimensions/ProgressivePoissonReferenceDim.MinPairwiseHelperEqualsBruteForce/2
+45/46 Test #1268: Dimensions/ProgressivePoissonReferenceDim.MinPairwiseHelperEqualsBruteForce/2 .......................   Passed    0.11 sec
+      Start 1269: Dimensions/ProgressivePoissonReferenceDim.MinPairwiseHelperEqualsBruteForce/3
+46/46 Test #1269: Dimensions/ProgressivePoissonReferenceDim.MinPairwiseHelperEqualsBruteForce/3 .......................   Passed    0.22 sec
+
+100% tests passed, 0 tests failed out of 46
+
+Label Time Summary:
+contract       =   0.17 sec*proc (30 tests)
+geometry       =   0.94 sec*proc (14 tests)
+integration    =   0.04 sec*proc (2 tests)
+runtime        =   0.21 sec*proc (32 tests)
+unit           =   0.94 sec*proc (14 tests)
+
+Total Test time (real) =   1.46 sec

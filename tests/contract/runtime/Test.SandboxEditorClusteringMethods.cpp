@@ -88,6 +88,7 @@ import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
@@ -122,9 +123,6 @@ namespace Tests = Extrinsic::Tests;
 
 namespace
 {
-constexpr std::uint32_t kInvalidIndex =
-        std::numeric_limits<std::uint32_t>::max();
-
 [[nodiscard]] std::uint32_t SumCounts(
         const std::vector<std::uint32_t>& counts)
     {
@@ -132,6 +130,19 @@ constexpr std::uint32_t kInvalidIndex =
         for (const std::uint32_t count : counts)
             sum += count;
         return sum;
+    }
+
+void ExpectSameHalfedgeConnectivity(
+        const std::vector<Geometry::Graph::HalfedgeConnectivity>& actual,
+        const std::vector<Geometry::Graph::HalfedgeConnectivity>& expected)
+    {
+        ASSERT_EQ(actual.size(), expected.size());
+        for (std::size_t index = 0u; index < expected.size(); ++index)
+        {
+            EXPECT_EQ(actual[index].Vertex, expected[index].Vertex);
+            EXPECT_EQ(actual[index].Next, expected[index].Next);
+            EXPECT_EQ(actual[index].Prev, expected[index].Prev);
+        }
     }
 
 [[nodiscard]] ECS::EntityHandle MakeSelectable(
@@ -206,77 +217,24 @@ void SetTexcoords(GS::Vertices& vertices,
     // An open grid-plane triangle mesh; its outer ring is an open boundary, so
     // texcoord-bearing boundary vertices are UV-seam vertices (UI-028).
 
-void SetEdges(GS::Edges& edges,
-                  const std::vector<std::uint32_t>& v0,
-                  const std::vector<std::uint32_t>& v1)
-    {
-        edges.Properties.Resize(v0.size());
-        auto p0 = edges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kEdgeV0},
-            0u);
-        auto p1 = edges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kEdgeV1},
-            0u);
-        p0.Vector() = v0;
-        p1.Vector() = v1;
-    }
-
-void SetHalfedges(GS::Halfedges& halfedges,
-                      const std::vector<std::uint32_t>& toVertex,
-                      const std::vector<std::uint32_t>& next,
-                      const std::vector<std::uint32_t>& face)
-    {
-        halfedges.Properties.Resize(toVertex.size());
-        auto to = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeToVertex},
-            kInvalidIndex);
-        auto nx = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeNext},
-            kInvalidIndex);
-        auto fa = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeFace},
-            kInvalidIndex);
-        to.Vector() = toVertex;
-        nx.Vector() = next;
-        fa.Vector() = face;
-    }
-
-void SetFaces(GS::Faces& faces,
-                  const std::vector<std::uint32_t>& faceHalfedge)
-    {
-        faces.Properties.Resize(faceHalfedge.size());
-        auto halfedge = faces.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kFaceHalfedge},
-            kInvalidIndex);
-        halfedge.Vector() = faceHalfedge;
-    }
-
 void AddTriangleMeshSource(ECS::Scene::Registry& registry,
                                const ECS::EntityHandle entity)
     {
-        auto& raw = registry.Raw();
-        auto& vertices = raw.emplace<GS::Vertices>(entity);
-        SetPositions(vertices,
-                     {
-                         {0.0f, 0.0f, 0.0f},
-                         {1.0f, 0.0f, 0.0f},
-                         {0.0f, 1.0f, 0.0f},
-                     });
-        SetTexcoords(vertices,
-                     {
-                         {0.0f, 0.0f},
-                         {1.0f, 0.0f},
-                         {0.0f, 1.0f},
-                     });
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        SetEdges(edges, {0u, 1u, 2u}, {1u, 2u, 0u});
-        auto& halfedges = raw.emplace<GS::Halfedges>(entity);
-        SetHalfedges(halfedges,
-                     {1u, 2u, 0u, 0u, 2u, 1u},
-                     {1u, 2u, 0u, 5u, 3u, 4u},
-                     {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
-        auto& faces = raw.emplace<GS::Faces>(entity);
-        SetFaces(faces, {0u});
+        Geometry::HalfedgeMesh::Mesh mesh{};
+        const std::array<Geometry::VertexHandle, 3u> vertices{
+            mesh.AddVertex({0.0f, 0.0f, 0.0f}),
+            mesh.AddVertex({1.0f, 0.0f, 0.0f}),
+            mesh.AddVertex({0.0f, 1.0f, 0.0f}),
+        };
+        (void)mesh.AddFace(vertices);
+        GS::PopulateFromMesh(registry.Raw(), entity, mesh);
+        SetTexcoords(
+            registry.Raw().get<GS::Vertices>(entity),
+            {
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {0.0f, 1.0f},
+            });
     }
 
 void AddGraphSource(
@@ -284,33 +242,19 @@ void AddGraphSource(
         const ECS::EntityHandle entity,
         const std::vector<glm::vec3>& positions)
     {
-        auto& raw = registry.Raw();
-        auto& vertices = raw.emplace<GS::Vertices>(entity);
-        SetPositions(vertices, positions);
-
-        std::vector<std::uint32_t> edgeV0{};
-        std::vector<std::uint32_t> edgeV1{};
-        std::vector<std::uint32_t> halfedgeTo{};
+        Geometry::Graph::Graph graph{};
+        for (const glm::vec3& position : positions)
+            (void)graph.AddVertex(position);
         for (std::uint32_t index = 1u;
              index < static_cast<std::uint32_t>(positions.size());
              ++index)
         {
-            edgeV0.push_back(index - 1u);
-            edgeV1.push_back(index);
-            halfedgeTo.push_back(index);
-            halfedgeTo.push_back(index - 1u);
+            (void)graph.AddEdge(
+                Geometry::VertexHandle{index - 1u},
+                Geometry::VertexHandle{index});
         }
-
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        SetEdges(edges, edgeV0, edgeV1);
-        auto& halfedges = raw.emplace<GS::Halfedges>(entity);
-        SetHalfedges(
-            halfedges,
-            halfedgeTo,
-            std::vector<std::uint32_t>(halfedgeTo.size(), kInvalidIndex),
-            std::vector<std::uint32_t>(halfedgeTo.size(), kInvalidIndex));
-        raw.emplace<GS::HasGraphTopology>(entity);
-        raw.emplace<G::RenderEdges>(entity);
+        GS::PopulateFromGraph(registry.Raw(), entity, graph);
+        registry.Raw().emplace<G::RenderEdges>(entity);
     }
 
 void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
@@ -512,10 +456,12 @@ TEST(SandboxEditorUi,
             .get<GS::Edges>(mesh)
             .Properties.Get<std::uint32_t>(PN::kEdgeV0)
             .Vector();
-    const std::vector<std::uint32_t> graphHalfedgeTo =
+    const std::vector<Geometry::Graph::HalfedgeConnectivity>
+        graphHalfedgeConnectivity =
         registry.Raw()
             .get<GS::Halfedges>(graph)
-            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Properties.Get<Geometry::Graph::HalfedgeConnectivity>(
+                PN::kHalfedgeConnectivity)
             .Vector();
 
     const Runtime::EditorProgressivePoissonConfig config{
@@ -641,12 +587,15 @@ TEST(SandboxEditorUi,
     EXPECT_TRUE(registry.Raw().all_of<GS::HasGraphTopology>(graph));
     EXPECT_TRUE((registry.Raw().all_of<GS::Edges, GS::Halfedges>(graph)));
     EXPECT_TRUE(registry.Raw().all_of<G::RenderEdges>(graph));
-    EXPECT_EQ(
+    const auto graphConnectivity =
         registry.Raw()
             .get<GS::Halfedges>(graph)
-            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
-            .Vector(),
-        graphHalfedgeTo);
+            .Properties.Get<Geometry::Graph::HalfedgeConnectivity>(
+                PN::kHalfedgeConnectivity);
+    ASSERT_TRUE(graphConnectivity);
+    ExpectSameHalfedgeConnectivity(
+        graphConnectivity.Vector(),
+        graphHalfedgeConnectivity);
 }
 TEST(SandboxEditorUi,
      ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState)
@@ -1109,6 +1058,74 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBefo
                      .get<GS::Vertices>(cloud)
                      .Properties.Get<float>("v:poisson_level"));
 }
+TEST(SandboxEditorUi,
+     ProgressivePoissonGraphCpuJobRejectsStaleProductionConnectivity)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.ProgressivePoisson =
+        [&completedSinkCalled](Runtime::EditorProgressivePoissonResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle graph =
+        MakeSelectable(registry, "PoissonGraphStaleConnectivity");
+    AddGraphSource(
+        registry,
+        graph,
+        {
+            {0.0f, 0.0f, 0.0f},
+            {0.25f, 0.0f, 0.0f},
+            {0.75f, 0.25f, 0.0f},
+            {1.0f, 1.0f, 0.0f},
+        });
+
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
+            context,
+            Runtime::EditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(graph),
+                .Config = Runtime::EditorProgressivePoissonConfig{
+                    .Dimension = 2u,
+                    .GridWidth = 3u,
+                    .MaxLevels = 5u,
+                    .HashLoadFactor = 0.75f,
+                    .RadiusAlpha = 0.4f,
+                    .RandomizeGridOrigin = false,
+                    .ShuffleWithinLevels = false,
+                },
+            });
+    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+
+    auto connectivity =
+        registry.Raw()
+            .get<GS::Halfedges>(graph)
+            .Properties.Get<Geometry::Graph::HalfedgeConnectivity>(
+                PN::kHalfedgeConnectivity);
+    ASSERT_TRUE(connectivity);
+    ASSERT_FALSE(connectivity.Vector().empty());
+    const Geometry::HalfedgeHandle changedNext{
+        connectivity[0].Next.Index == 0u ? 1u : 0u};
+    connectivity[0].Next = changedNext;
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_EQ(connectivity[0].Next, changedNext);
+    EXPECT_FALSE(
+        registry.Raw()
+            .get<GS::Vertices>(graph)
+            .Properties.Exists("v:poisson_level"));
+}
 TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply)
 {
     ECS::Scene::Registry registry;
@@ -1207,6 +1224,66 @@ TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublish
             .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
             .Vector(),
         sourceHalfedgeTo);
+}
+TEST(SandboxEditorUi,
+     ProgressivePoissonMeshCpuJobRejectsStaleProductionConnectivity)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    bool completedSinkCalled = false;
+    context.MethodResultSinks.ProgressivePoisson =
+        [&completedSinkCalled](Runtime::EditorProgressivePoissonResult)
+        {
+            completedSinkCalled = true;
+        };
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "PoissonMeshStaleConnectivity");
+    AddTriangleMeshSource(registry, mesh);
+
+    const Runtime::EditorProgressivePoissonResult result =
+        Runtime::ApplyEditorProgressivePoissonCommand(
+            context,
+            Runtime::EditorProgressivePoissonCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Config = Runtime::EditorProgressivePoissonConfig{
+                    .Dimension = 2u,
+                    .GridWidth = 3u,
+                    .MaxLevels = 5u,
+                    .HashLoadFactor = 0.75f,
+                    .RadiusAlpha = 0.4f,
+                    .RandomizeGridOrigin = false,
+                    .ShuffleWithinLevels = false,
+                },
+            });
+    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+
+    auto connectivity =
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Get<Geometry::Graph::VertexConnectivity>(
+                PN::kVertexConnectivity);
+    ASSERT_TRUE(connectivity);
+    ASSERT_FALSE(connectivity.Vector().empty());
+    const Geometry::HalfedgeHandle changedHalfedge{
+        connectivity[0].Halfedge.Index == 0u ? 1u : 0u};
+    connectivity[0].Halfedge = changedHalfedge;
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_EQ(connectivity[0].Halfedge, changedHalfedge);
+    EXPECT_FALSE(
+        registry.Raw()
+            .get<GS::Vertices>(mesh)
+            .Properties.Exists("v:poisson_level"));
 }
 TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
 {
@@ -1823,10 +1900,12 @@ TEST(SandboxEditorUi,
             .get<GS::Edges>(graph)
             .Properties.Get<std::uint32_t>(PN::kEdgeV0)
             .Vector();
-    const std::vector<std::uint32_t> priorHalfedgeTo =
+    const std::vector<Geometry::Graph::HalfedgeConnectivity>
+        priorHalfedgeConnectivity =
         registry.Raw()
             .get<GS::Halfedges>(graph)
-            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
+            .Properties.Get<Geometry::Graph::HalfedgeConnectivity>(
+                PN::kHalfedgeConnectivity)
             .Vector();
 
     const Runtime::EditorProgressivePoissonResult result =
@@ -1879,12 +1958,15 @@ TEST(SandboxEditorUi,
                 .Properties.Get<std::uint32_t>(PN::kEdgeV0)
                 .Vector(),
             priorEdgeV0);
-        EXPECT_EQ(
+        const auto connectivity =
             registry.Raw()
                 .get<GS::Halfedges>(graph)
-                .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
-                .Vector(),
-            priorHalfedgeTo);
+                .Properties.Get<Geometry::Graph::HalfedgeConnectivity>(
+                    PN::kHalfedgeConnectivity);
+        ASSERT_TRUE(connectivity);
+        ExpectSameHalfedgeConnectivity(
+            connectivity.Vector(),
+            priorHalfedgeConnectivity);
     };
 
     assertGraphState();
@@ -1913,6 +1995,21 @@ TEST(SandboxEditorUi,
         registry.Raw()
             .get<GS::Vertices>(graph)
             .Properties.Exists("v:poisson_rank"));
+
+    auto connectivity =
+        registry.Raw()
+            .get<GS::Halfedges>(graph)
+            .Properties.Get<Geometry::Graph::HalfedgeConnectivity>(
+                PN::kHalfedgeConnectivity);
+    ASSERT_TRUE(connectivity);
+    ASSERT_FALSE(connectivity.Vector().empty());
+    const Geometry::HalfedgeHandle changedNext{
+        connectivity[0].Next.Index == 0u ? 1u : 0u};
+    connectivity[0].Next = changedNext;
+    EXPECT_EQ(
+        history.Undo().Status,
+        Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(connectivity[0].Next, changedNext);
 }
 TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo)
 {

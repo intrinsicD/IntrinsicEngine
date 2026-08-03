@@ -1553,7 +1553,7 @@ observations:
     promoted_to: "logic/claims.md:C18"
     crystallized_via: artifact-commitment
     stale: false
-  - id: O101
+  - id: O102
     timestamp: "2026-08-03T02:10+02:00"
     provenance: ai-executed
     content: >
@@ -1570,8 +1570,8 @@ observations:
       owns operational GPU compute/parity, and UI-038 still owns Graph-panel
       registration, so neither is claimed here.
     potential_type: claim
-    bound_to: [N330, N331, N332]
+    bound_to: [N330, N336, N337, N338]
     promoted: true
-    promoted_to: "logic/claims.md:C19"
+    promoted_to: "logic/claims.md:C20"
     crystallized_via: artifact-commitment
     stale: false

@@ -23,13 +23,14 @@ maturity_target: Operational
   accepted-level, splat-radius, and prefix-visibility attributes without
   sampling or replacing the source domain. Mesh/graph topology, ordering,
   provenance, presentation, and non-target properties survive apply/undo/redo.
-  Focused method/runtime/UI coverage passed 44/44; the default CPU selector
-  passed 4,002/4,002 with its policy-defined GLFW/LSan skip; grouped ASan and
-  UBSan each passed 2,654/2,654. Strict method-manifest, layering, task/docs,
-  inventory, ARA, clean-workshop, and independent fixed-surface review evidence
-  close the public-contract correction. No Vulkan compute-parity or performance
-  claim is made; `METHOD-014` retains compute parity and `UI-038` owns the
-  matching Graph panel.
+  Focused method/runtime/UI coverage passed 46/46. The default CPU selector
+  selected 4,004 tests, passed 4,003, and skipped its policy-defined GLFW/LSan
+  case; grouped ASan passed 2,656/2,656, while grouped UBSan selected 2,656,
+  passed 2,655, and skipped the LSan-only case. Strict method-manifest,
+  layering, task/docs, inventory, ARA, clean-workshop, and independent
+  fixed-surface review evidence close the public-contract correction. No
+  Vulkan compute-parity or performance claim is made; `METHOD-014` retains
+  compute parity and `UI-038` owns the matching Graph panel.
 - Commit: the implementation/evidence commits and accepted revision-bound
   review under `tasks/evidence/RUNTIME-208/` provide the exact source binding.
 
@@ -98,6 +99,8 @@ maturity_target: Operational
       cloud and compare method result buffers plus published properties.
 - [x] Prove graph/mesh topology, vertex ordering, non-target properties, and
       provenance survive apply/undo/redo.
+- [x] Prove queued publication and history fail closed on same-cardinality
+      edits to the production typed mesh/graph connectivity properties.
 - [x] Prove no mesh surface sampling or domain replacement occurs through Run,
       auto-run, config/agent, queued CPU, requested GPU, or fallback paths.
 - [x] Cover config migration/removal diagnostics and all channel sentinel

@@ -80,6 +80,7 @@ import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.Curvature;
 import Geometry.CatmullClark;
+import Geometry.HalfedgeMesh.Fwd;
 import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 import Geometry.HalfedgeMesh.SubdivisionSqrt3;
 import Geometry.HalfedgeMesh.Vertices.Normals;
@@ -727,6 +728,44 @@ namespace Extrinsic::Runtime
                    SameProgressivePoissonValue(lhs.w, rhs.w);
         }
 
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<
+            Geometry::Graph::VertexConnectivity>(
+            const Geometry::Graph::VertexConnectivity& lhs,
+            const Geometry::Graph::VertexConnectivity& rhs) noexcept
+        {
+            return lhs.Halfedge == rhs.Halfedge;
+        }
+
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<
+            Geometry::Graph::HalfedgeConnectivity>(
+            const Geometry::Graph::HalfedgeConnectivity& lhs,
+            const Geometry::Graph::HalfedgeConnectivity& rhs) noexcept
+        {
+            return lhs.Vertex == rhs.Vertex &&
+                   lhs.Next == rhs.Next &&
+                   lhs.Prev == rhs.Prev;
+        }
+
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<
+            Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>(
+            const Geometry::HalfedgeMesh::HalfedgeFaceConnectivity& lhs,
+            const Geometry::HalfedgeMesh::HalfedgeFaceConnectivity& rhs) noexcept
+        {
+            return lhs.Face == rhs.Face;
+        }
+
+        template <>
+        [[nodiscard]] bool SameProgressivePoissonValue<
+            Geometry::HalfedgeMesh::FaceConnectivity>(
+            const Geometry::HalfedgeMesh::FaceConnectivity& lhs,
+            const Geometry::HalfedgeMesh::FaceConnectivity& rhs) noexcept
+        {
+            return lhs.Halfedge == rhs.Halfedge;
+        }
+
         template <typename T>
         [[nodiscard]] bool SameProgressivePoissonProperty(
             const Geometry::ConstPropertySet& current,
@@ -753,6 +792,54 @@ namespace Extrinsic::Runtime
                 }
             }
             return true;
+        }
+
+        [[nodiscard]] bool SameProgressivePoissonUnknownProperty(
+            const Geometry::ConstPropertySet& current,
+            const Geometry::ConstPropertySet& expected,
+            const Geometry::PropertyDescriptor& descriptor) noexcept
+        {
+            const Geometry::Internal::TypeID type = descriptor.Type;
+            if (type == Geometry::Internal::TypeInfo<
+                            Geometry::Graph::VertexConnectivity>::ID())
+            {
+                return SameProgressivePoissonProperty<
+                    Geometry::Graph::VertexConnectivity>(
+                    current,
+                    expected,
+                    descriptor.Name);
+            }
+            if (type == Geometry::Internal::TypeInfo<
+                            Geometry::Graph::HalfedgeConnectivity>::ID())
+            {
+                return SameProgressivePoissonProperty<
+                    Geometry::Graph::HalfedgeConnectivity>(
+                    current,
+                    expected,
+                    descriptor.Name);
+            }
+            if (type == Geometry::Internal::TypeInfo<
+                            Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>::ID())
+            {
+                return SameProgressivePoissonProperty<
+                    Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>(
+                    current,
+                    expected,
+                    descriptor.Name);
+            }
+            if (type == Geometry::Internal::TypeInfo<
+                            Geometry::HalfedgeMesh::FaceConnectivity>::ID())
+            {
+                return SameProgressivePoissonProperty<
+                    Geometry::HalfedgeMesh::FaceConnectivity>(
+                    current,
+                    expected,
+                    descriptor.Name);
+            }
+            // An erased value that cannot be compared must fail closed. A
+            // queued publication may be retried, but it must never overwrite
+            // an unverified property snapshot.
+            return false;
         }
 
         [[nodiscard]] bool SameProgressivePoissonPropertySet(
@@ -845,10 +932,10 @@ namespace Extrinsic::Runtime
                         rhs.Name);
                     break;
                 case Geometry::PropertyValueKind::Unknown:
-                    // Geometry containers carry private connectivity
-                    // properties whose erased values are intentionally not
-                    // exposed. Their descriptor metadata is checked here;
-                    // promoted topology/value properties are checked above.
+                    same = SameProgressivePoissonUnknownProperty(
+                        currentView,
+                        expectedView,
+                        rhs);
                     break;
                 }
                 if (!same)

@@ -1,0 +1,71 @@
+session:
+  id: "2026-08-03_002"
+  date: "2026-08-03"
+  started: "2026-08-03T02:59+02:00"
+  last_turn: "2026-08-03T02:59+02:00"
+  turn_count: 1
+  summary: "Implemented and verified RUNTIME-208 canonical-vertex Progressive Poisson publication, then closed the independent review's production-connectivity stale-state finding."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N336"
+    routing: direct
+    provenance: ai-executed
+    summary: "Selected RUNTIME-208 as the next dependency-ready geometry task and preserved the no-converter canonical-source contract."
+  - turn: 1
+    type: dead_end
+    id: "N337"
+    routing: direct
+    provenance: ai-executed
+    summary: "Independent review rejected descriptor-only comparison for erased production mesh/graph connectivity."
+  - turn: 1
+    type: experiment
+    id: "N338"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and verified one Progressive Poisson vertex publication path with typed connectivity stale rejection."
+  - turn: 1
+    type: observation
+    id: "O102"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized canonical-source Progressive Poisson CPU publication to C20 through artifact commitment."
+
+ai_actions:
+  - turn: 1
+    action: "Reviewed the original in-house Progressive Poisson formulation plus Brandt et al., Yuksel, HAPD, and progressive multi-jittered extensions; implemented runtime/config/existing-UI publication; added real mesh/graph stale-connectivity regressions; and ran focused, complete CPU, ASan, UBSan, and structural gates."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.GeometryProcessingOperations.cpp"
+      - "src/runtime/Runtime.ProgressivePoissonConfig.cppm"
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp"
+      - "tests/integration/runtime/Test.SandboxEditorPresentation.cpp"
+      - "methods/geometry/progressive_poisson/paper.md"
+      - "methods/geometry/progressive_poisson/README.md"
+      - "docs/architecture/runtime.md"
+      - "tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md"
+      - "tasks/evidence/RUNTIME-208/"
+      - "ara/logic/claims.md"
+      - "ara/staging/observations.yaml"
+
+claims_touched:
+  - id: C20
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "Mesh, graph, and point-cloud entities already expose their canonical element domains; method integration must consume those sources without conversion."
+  - turn: 1
+    excerpt: "The finite Progressive Poisson input is an existing point span; continuous mesh-surface candidate generation is a separate upstream concern in adjacent literature."
+  - turn: 1
+    excerpt: "Unknown erased geometry properties fail closed, while production typed connectivity is value-compared before publication and history transitions."
+
+open_threads:
+  - "Obtain accepted independent fixed-surface review for the corrected RUNTIME-208 revision."
+  - "METHOD-014 retains operational Progressive Poisson Vulkan compute/parity work."
+  - "UI-038 retains Progressive Poisson Graph-panel registration."
+
+ai_suggestions_pending: []

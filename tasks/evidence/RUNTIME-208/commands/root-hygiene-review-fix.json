@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_root_hygiene.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/repo/check_root_hygiene.py --root .",
+  "cwd": ".",
+  "duration_ms": 28,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T01:02:57Z",
+  "label": "root-hygiene-review-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T01:02:57Z",
+  "stderr_path": "tasks/evidence/RUNTIME-208/commands/root-hygiene-review-fix.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-208/commands/root-hygiene-review-fix.stdout.log",
+  "stdout_sha256": "de3f30e2fc0ccded839655b85768a375b1cce83a84f8b56ced7641304237c9cb",
+  "task_id": "RUNTIME-208"
+}

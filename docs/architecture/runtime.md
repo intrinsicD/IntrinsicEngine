@@ -235,6 +235,9 @@ and point-cloud entities; it preserves topology, element order, provenance,
 non-target properties, and existing surface/edge presentation. Both immediate
 and queued lanes reject intervening source, output, topology, or owned
 presentation changes before publication and before every history transition.
+The snapshot comparison includes the production typed mesh/graph connectivity
+records; an erased property type it cannot compare rejects the transition
+rather than accepting descriptor equality.
 Geometry-presentation slot edits additionally validate and monotonically
 advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The

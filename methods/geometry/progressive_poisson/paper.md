@@ -97,7 +97,7 @@ The repository method is an unpublished in-house formulation. The following
 published methods are adjacent references, not provenance for its exact
 phase-parallel hashing algorithm:
 
-- Brandt et al., *Visibility-Aware Farthest Point Sampling on the GPU* (CGF
+- Brandt et al., *Visibility-Aware Progressive Farthest Point Sampling on the GPU* (CGF
   2019, DOI `10.1111/cgf.13848`) builds a visibility-aware progressive ordering
   with a GPU farthest-point strategy. Its rasterized multi-view surface-candidate
   construction is a separate pipeline stage; it does not justify hiding surface
