@@ -7,6 +7,7 @@ module Extrinsic.Sandbox.ConfigSections;
 
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 
@@ -28,7 +29,10 @@ namespace Extrinsic::Sandbox
             !registry.Register(
                 Runtime::
                     MakePointCloudConsolidationConfigSectionRegistration(
-                        std::move(callbacks.PointCloudConsolidation))))
+                        std::move(callbacks.PointCloudConsolidation))) ||
+            !registry.Register(
+                Runtime::MakePhysicsModuleConfigSectionRegistration(
+                    std::move(callbacks.Physics))))
         {
             std::terminate();
         }

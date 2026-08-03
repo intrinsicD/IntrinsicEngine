@@ -37,6 +37,11 @@ namespace Extrinsic::Runtime
         UiEndCapture,
         BeforeExtraction,
         Maintenance,
+        // App-composed simulation modules run after the promoted ECS fixed-step
+        // bundle and before post-simulation event delivery. Appended to keep the
+        // existing phase values stable while placing execution explicitly in
+        // Engine::RunFrame rather than relying on enum order.
+        Simulation,
     };
 
     export struct RuntimeShutdownAnnounced

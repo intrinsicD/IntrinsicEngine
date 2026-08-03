@@ -36,6 +36,7 @@ namespace Runtime = Extrinsic::Runtime;
 namespace RHI = Extrinsic::RHI;
 
 static_assert(static_cast<std::uint8_t>(Runtime::FramePhase::Maintenance) == 4u);
+static_assert(static_cast<std::uint8_t>(Runtime::FramePhase::Simulation) == 5u);
 
 template <typename T>
 concept HasPhaseMember = requires(T value)

@@ -2,9 +2,9 @@ session:
   id: "2026-08-03_001"
   date: "2026-08-03"
   started: "2026-08-03T01:51+02:00"
-  last_turn: "2026-08-03T19:35+02:00"
-  turn_count: 5
-  summary: "Taskized the verification redesign, reconciled every local branch, and retired BUG-128 plus GEOM-064 with accepted high-risk evidence and a green 4,074-case merged CPU gate."
+  last_turn: "2026-08-03T22:58+02:00"
+  turn_count: 6
+  summary: "Taskized verification redesign, reconciled every local branch, retired BUG-128 plus GEOM-064, and implemented PHYSICS-004's Operational CPU/Null runtime path pending independent review."
 
 events_logged:
   - turn: 1
@@ -157,6 +157,24 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized the bounded GEOM-064 deterministic CPU contract to C26 through artifact commitment."
+  - turn: 6
+    type: dead_end
+    id: "N353"
+    routing: direct
+    provenance: ai-executed
+    summary: "Removed exact PhysicsModule self-publication after final review found no production discovery consumer."
+  - turn: 6
+    type: experiment
+    id: "N354"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented PHYSICS-004 and passed 43 focused, 4,075 CPU, 2,669 ASan, 2,669 UBSan, executable, and structural checks."
+  - turn: 6
+    type: observation
+    id: "O113"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the bounded Operational CPU/Null runtime-physics capability to C27 through artifact commitment."
 
 ai_actions:
   - turn: 1
@@ -245,6 +263,29 @@ ai_actions:
       - "ara/trace/sessions/2026-08-03_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 6
+    action: "Claimed and promoted PHYSICS-004; replaced the test-only PhysicsBridge with a default-disabled app-composed PhysicsModule, wired validated Sandbox config and a generic Simulation hook, added real Null-engine and lifecycle tests, synchronized architecture/task docs, and passed complete CPU, ASan, UBSan, executable, and structural verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.PhysicsModule.cppm"
+      - "src/runtime/Runtime.PhysicsModule.cpp"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/app/Sandbox/main.cpp"
+      - "src/app/Sandbox/Sandbox.ConfigSections.cppm"
+      - "src/app/Sandbox/Sandbox.ConfigSections.cpp"
+      - "tests/integration/runtime/Test.PhysicsModule.cpp"
+      - "tests/integration/runtime/Test.SandboxConfigSections.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "docs/architecture/physics.md"
+      - "docs/architecture/runtime.md"
+      - "tasks/active/PHYSICS-004-operational-runtime-physics-module.md"
+      - "tasks/evidence/PHYSICS-004/"
+      - "ara/logic/claims.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-08-03_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
 claims_touched:
   - id: C19
@@ -253,6 +294,9 @@ claims_touched:
   - id: C26
     action: crystallized
     turn: 5
+  - id: C27
+    action: crystallized
+    turn: 6
 
 key_context:
   - turn: 1
@@ -283,10 +327,17 @@ key_context:
     excerpt: "Independent review rejected three successive GEOM-064 surfaces before revision 4 closed public-record indexing, extreme-scale root, SO(2)/SVD provenance, and near-threshold sign-validation defects."
   - turn: 5
     excerpt: "Main f29018d2 contains all fifteen local branches; 69/69 focused and 4,074/4,074 CPU registrations passed with only their policy-defined opt-in/environment skips."
+  - turn: 6
+    excerpt: "PHYSICS-004 replaces the public test-only bridge with one optional app-owned module whose physics worlds and StableId sidecars remain private per runtime world."
+  - turn: 6
+    excerpt: "The final source passed 43/43 focused tests, 4,075/4,075 canonical CPU tests, and 2,669/2,669 tests in each isolated sanitizer cohort."
+  - turn: 6
+    excerpt: "Technical acceptance is complete, but the high-risk workflow keeps PHYSICS-004 active until an independent reviewer accepts the final revision/content digest."
 
 open_threads:
   - "Implement CI-012 first; every other redesign task is dependency-gated on the compiled evidence-graph foundation or its descendants."
   - "Each task that lands a reusable verification contract must add canonical prose, a catalog entry, executable proof, and updated task contracts in the same reviewed change."
   - "C19 remains untested until BUILD-006, CI-017, CI-018, and CI-020 produce claim-grade matched evidence."
+  - "PHYSICS-004 requires an independent high-risk fixed-surface review before retirement."
 
 ai_suggestions_pending: []

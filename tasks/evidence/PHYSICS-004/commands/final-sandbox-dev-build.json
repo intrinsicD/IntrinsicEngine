@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "dev",
+    "--target",
+    "ExtrinsicSandbox",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset dev --target ExtrinsicSandbox -j 4",
+  "cwd": ".",
+  "duration_ms": 29013,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:47:31Z",
+  "label": "final-sandbox-dev-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:47:02Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/final-sandbox-dev-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/final-sandbox-dev-build.stdout.log",
+  "stdout_sha256": "8f5c8ff18ee7e3cd5bcf18ea8695b53b804887a5d219f055e2280b00e6acb9a2",
+  "task_id": "PHYSICS-004"
+}

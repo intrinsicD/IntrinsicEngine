@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 268598,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:53:46Z",
+  "label": "final-ci-asan-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:49:18Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/final-ci-asan-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/final-ci-asan-tests.stdout.log",
+  "stdout_sha256": "b515076a725bc7ceaf41cfddb119c7624513768b5a38f549ed039f46fd63c8e8",
+  "task_id": "PHYSICS-004"
+}

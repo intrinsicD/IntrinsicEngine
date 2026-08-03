@@ -1,0 +1,31 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-R",
+    "^(PhysicsModule|RuntimeEngineLayering|PointCloudConsolidationModule|RuntimeGeometryAvailability|SandboxConfigSections)",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -R '^(PhysicsModule|RuntimeEngineLayering|PointCloudConsolidationModule|RuntimeGeometryAvailability|SandboxConfigSections)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 6123,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T22:58:30Z",
+  "label": "merged-asan-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T22:58:24Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/merged-asan-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/merged-asan-focused.stdout.log",
+  "stdout_sha256": "cd455f7e448d56edf77b1d9526a3997f97861e0a8832308ca83917767937c6fd",
+  "task_id": "PHYSICS-004"
+}

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tools/repo/check_layering.py --root src --strict"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tools/repo/check_layering.py --root src --strict'",
+  "cwd": ".",
+  "duration_ms": 300,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:57:04Z",
+  "label": "final-layering",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:57:04Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/final-layering.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/final-layering.stdout.log",
+  "stdout_sha256": "57d56f5e5caf4ff9fa9ab8bfeeba335a4daad3cb07f416500c5afbedfa682576",
+  "task_id": "PHYSICS-004"
+}

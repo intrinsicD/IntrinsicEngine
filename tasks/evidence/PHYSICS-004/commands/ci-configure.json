@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 4124,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:38:58Z",
+  "label": "ci-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:38:54Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/ci-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/ci-configure.stdout.log",
+  "stdout_sha256": "edd7c1e5e8f020d862d487df0316664191c80f88bdc0fda6a3eab117c34de835",
+  "task_id": "PHYSICS-004"
+}

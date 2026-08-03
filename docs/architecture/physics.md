@@ -152,22 +152,39 @@ The ECS descriptor surface is present in
 as `Extrinsic.ECS.Component.Collider` and
 `Extrinsic.ECS.Component.RigidBody`. It is a CPU authoring contract only; live
 physics-world state is stored in `Extrinsic.Physics.World`, and runtime
-synchronization is stored in runtime-owned bridge sidecars.
+synchronization is stored in runtime-owned module sidecars.
 
 ECS must not store physics-world handles, broadphase proxies, contacts, islands,
 solver indices, runtime sidecars, graphics handles, or RHI handles.
 
-Runtime owns the bridge:
+Runtime owns the optional composition module:
 
-- maps stable ECS identity to physics handles in runtime sidecars through
-  `Extrinsic.Runtime.PhysicsBridge`;
-- syncs ECS authoring descriptors into physics state before fixed-step stepping;
-- steps physics with deterministic fixed `dt` through an accumulator;
-- writes simulated dynamic-body transforms back to ECS and stamps transform
-  dirty markers;
-- skips static and kinematic writeback with diagnostics;
-- routes future contacts/collision events to runtime/editor/app command
-  surfaces once `PHYSICS-002` exposes contact data.
+- Sandbox explicitly composes `Extrinsic.Runtime.PhysicsModule`; generic
+  `Runtime.Engine` exposes only the domain-free `FramePhase::Simulation` hook
+  and never imports the concrete module.
+- Each encountered `WorldHandle` owns one private `Extrinsic.Physics.World`, a
+  `StableId -> BodyHandle` sidecar, and a bounded fixed-step accumulator.
+  Destroying a runtime world, disabling the module, or shutting down removes
+  the corresponding live state.
+- The module synchronizes ECS authoring before stepping with
+  `Physics::World::SolveStep`, then writes only dynamic poses back to ECS and
+  stamps `Transform::IsDirtyTag` plus `Transform::WorldUpdatedTag`. Static and
+  kinematic writeback is deliberately skipped and diagnosed.
+- A deterministic authoring fingerprint updates a body only when its ECS
+  descriptor changes. Physics-owned velocity and pose evolution therefore are
+  not reset by the next unchanged authoring sync.
+- `sandbox.physics` is the one config lane for enablement, fixed delta,
+  accumulation bound, step budget, and gravity. It defaults disabled, and a
+  disabled module owns no physics worlds. File, editor-source, agent/CLI, and
+  programmatic candidates use the same preview/validate/commit path.
+- The public module surface exposes only validated config apply and copied
+  config/diagnostic snapshots. It exposes no `Physics::World`, `BodyHandle`, or
+  parallel `PhysicsService`, and does not publish itself through
+  `ServiceRegistry` without a production discovery consumer.
+
+Contact records are summarized in copied solver diagnostics. Publishing
+contact events to editor/app command surfaces is not part of the current
+module contract.
 
 ## First-Phase Collider Policy
 
@@ -214,5 +231,6 @@ and contact/event counts where applicable.
 - [`PHYSICS-001`](../../tasks/archive/PHYSICS-001-physics-world-state-and-runtime-sync.md) defines the first physics world/state module and runtime bridge at `CPUContracted` maturity.
 - [`PHYSICS-002`](../../tasks/archive/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
 - [`PHYSICS-003`](../../tasks/archive/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) added constraints, islands, sleep, and solver diagnostics at `CPUContracted`.
+- [`PHYSICS-004`](../../tasks/active/PHYSICS-004-operational-runtime-physics-module.md) composes the optional runtime module, real Null-engine fixed-step/writeback path, and retirement of the test-only public bridge surface.
 - [`ARCH-002`](../../tasks/archive/ARCH-002-physics-phenomena-roadmap.md) records the non-rigid and multi-phenomena roadmap decisions.
 - [`METHOD-009`](../../tasks/archive/METHOD-009-particle-spring-reference-backend.md), [`METHOD-010`](../../tasks/archive/METHOD-010-xpbd-cloth-shell-reference-backend.md), and [`METHOD-011`](../../tasks/archive/METHOD-011-sph-fluid-reference-backend.md) are the first non-rigid physics method-package follow-ups (all three are done). They remain CPU-reference-first and open no GPU backend.

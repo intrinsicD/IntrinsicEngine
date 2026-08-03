@@ -64,10 +64,11 @@ override. Applying an empty path clears the active override and returns to the
 derived default frame recipe.
 
 `Extrinsic.Runtime.ClusteringConfig`,
-`Extrinsic.Runtime.ProgressivePoissonConfig`, and
-`Extrinsic.Runtime.ParameterizationConfig`, and
-`Extrinsic.Runtime.PointCloudConsolidationConfig` own the typed codecs for the current
-four Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
+`Extrinsic.Runtime.ProgressivePoissonConfig`,
+`Extrinsic.Runtime.ParameterizationConfig`,
+`Extrinsic.Runtime.PointCloudConsolidationConfig`, and
+`Extrinsic.Runtime.PhysicsModule` own the typed codecs for the current five
+Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
 registrations in the application before config boot. The
 `sandbox.progressive_poisson` payload carries the interactive playground's
 reference-sampler knobs, prefix/color-channel selection, backend request, and
@@ -100,6 +101,15 @@ stale world/entity/source at main-thread completion, and commits a current
 result through one undoable geometry mutation. The pointer-free result reports
 the stable `cpu_reference` implementation identity and convergence diagnostics;
 there is no speculative backend selector.
+
+The `sandbox.physics` payload carries only enablement, fixed delta,
+accumulation bound, per-frame step budget, and gravity. It defaults disabled.
+Sandbox wires its registered post-commit callback to the exact app-composed
+`PhysicsModule::ApplyConfig`; module resolution reads the already committed
+boot value from the same `EngineConfigControl`. Invalid direct applies reject
+without changing live state, and disabling clears all private per-world
+physics state. The callback cannot expose a mutable physics world or body
+handle.
 
 `render.enable_gpu_profiling` defaults to `false`. A changed value commits
 synchronously with the rest of the hot subset; it does not construct, destroy,
@@ -157,6 +167,11 @@ after feature preparation resolves `EngineConfigControl` from
   that surface and reports its pointer-free completion diagnostics; file,
   editor-operation, agent/CLI, and programmatic callers share validation and
   execution semantics.
+- Physics currently has no dedicated Sandbox window. Any future editor control
+  must edit `sandbox.physics` through this same preview/hot-apply lane. The
+  generic `Editor`, `AgentCli`, and `Programmatic` source variants already
+  produce the same canonical validated section state; none is a private module
+  mutation path.
 - The existing `view.frame_graph` panel reads
   `render.enable_gpu_profiling` from the control state and routes its toggle
   through `PreviewEngineConfigControlDocument` followed by

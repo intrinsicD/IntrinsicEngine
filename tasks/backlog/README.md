@@ -122,10 +122,11 @@ Theme C's CPU reference foundation is complete: the rigid-body foundation
 (ADR-0019, METHOD-001, PHYSICS-001..003) and all three non-rigid reference
 method packages from the phenomena roadmap (METHOD-009 particles/springs,
 METHOD-010 XPBD cloth, METHOD-011 SPH fluid) are retired at
-`CPUContracted`. Open `PHYSICS-004` now owns the first real app-composed
-runtime physics module and retirement of the otherwise test-only public
-`PhysicsBridge`; optimized/GPU backends still open separately only through the
-roadmap's evidence gates.
+`CPUContracted`. Active
+[`PHYSICS-004`](../active/PHYSICS-004-operational-runtime-physics-module.md)
+owns the first real app-composed runtime physics module and retirement of the
+otherwise test-only public `PhysicsBridge`; optimized/GPU backends still open
+separately only through the roadmap's evidence gates.
 
 ### Theme D — ECS hardening parity (P0, bounded contract convergence)
 
@@ -375,7 +376,7 @@ Open members (kernel-seam priority set first):
 - The dependency-ordered
   [`RUNTIME-192..205` runtime consolidation set](runtime/README.md), whose
   remaining leaves are RUNTIME-139, RUNTIME-203, and RUNTIME-205.
-- [`physics/PHYSICS-004-operational-runtime-physics-module.md`](physics/PHYSICS-004-operational-runtime-physics-module.md).
+- [`PHYSICS-004-operational-runtime-physics-module.md`](../active/PHYSICS-004-operational-runtime-physics-module.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).

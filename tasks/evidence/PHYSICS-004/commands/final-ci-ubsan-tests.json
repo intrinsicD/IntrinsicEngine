@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 119544,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:51:17Z",
+  "label": "final-ci-ubsan-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:49:18Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-tests.stdout.log",
+  "stdout_sha256": "bde81c0de4f0d63357640fa7a243e0c9797d81ac774d350e0e0fbd991f8cfc51",
+  "task_id": "PHYSICS-004"
+}

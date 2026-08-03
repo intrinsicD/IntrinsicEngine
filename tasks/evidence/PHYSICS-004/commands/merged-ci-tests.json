@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 56186,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T22:47:46Z",
+  "label": "merged-ci-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T22:46:50Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/merged-ci-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/merged-ci-tests.stdout.log",
+  "stdout_sha256": "ab3bbc3948b45f967d15bea7bb5d302786ffcd2f1620883d39dd5392ae3ab5e6",
+  "task_id": "PHYSICS-004"
+}

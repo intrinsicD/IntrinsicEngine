@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "PhysicsModule|RuntimePhysics|PhysicsBridge|SandboxConfigSections|RuntimeEngineLayering",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'PhysicsModule|RuntimePhysics|PhysicsBridge|SandboxConfigSections|RuntimeEngineLayering' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 689,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:40:43Z",
+  "label": "focused-physics-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:40:42Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/focused-physics-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/focused-physics-tests.stdout.log",
+  "stdout_sha256": "6986ca7a57e88112cc115046b5cfb351193b6100e76405a469dc326209bbed7e",
+  "task_id": "PHYSICS-004"
+}

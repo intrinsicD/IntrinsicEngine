@@ -48,7 +48,7 @@ target_sources(${target_name}
         Runtime.WorldHandle.cppm
         Runtime.WorldRegistry.cppm
         Runtime.GeometryAvailability.cppm
-        Runtime.PhysicsBridge.cppm
+        Runtime.PhysicsModule.cppm
         Scene/Runtime.SceneDocumentModule.cppm
         Scene/Runtime.SceneInteractionModule.cppm
         Runtime.SceneSerialization.cppm
@@ -149,7 +149,7 @@ target_sources(${target_name}
         Runtime.ServiceRegistry.cpp
         Runtime.WorldRegistry.cpp
         Runtime.GeometryAvailability.cpp
-        Runtime.PhysicsBridge.cpp
+        Runtime.PhysicsModule.cpp
         Scene/Runtime.SceneDocumentModule.cpp
         Scene/Runtime.SceneInteractionModule.cpp
         Runtime.SceneSerialization.cpp

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `PHYSICS-004` — Operational runtime physics module and bridge privatization (tasks/active/PHYSICS-004-operational-runtime-physics-module.md)
 
 ## Theme B — Rendering modernization
 
@@ -20,10 +20,6 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
-
-## Theme C — Physics readiness
-
-- unblocked: `PHYSICS-004` — Operational runtime physics module and bridge privatization (tasks/backlog/physics/PHYSICS-004-operational-runtime-physics-module.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 

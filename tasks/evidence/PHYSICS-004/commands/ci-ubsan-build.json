@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-ubsan",
+    "--target",
+    "IntrinsicCpuTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci-ubsan --target IntrinsicCpuTests -j 4",
+  "cwd": ".",
+  "duration_ms": 1130835,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T20:36:37Z",
+  "label": "ci-ubsan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T20:17:46Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/ci-ubsan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/ci-ubsan-build.stdout.log",
+  "stdout_sha256": "20730fca7b26958a413e16f8bfb20718f1b41252c9bd5b8a71fb4a69ef5ace73",
+  "task_id": "PHYSICS-004"
+}
