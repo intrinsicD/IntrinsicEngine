@@ -3,20 +3,20 @@ task_id: RUNTIME-208
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-03T00:18:11Z'
+generated_at: '2026-08-03T00:21:35Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 614a59bf25cefd97bee9659f4a1b6782358e47b6
-  head_revision: 919b4fc01e45c227fa981321a0828b759133f285
+  head_revision: c2a9e6bc37832d1a340d076485ba7e973a6b2024
   branch: runtime/runtime-208-element-domain-publication
   worktree: /tmp/intrinsic-runtime208.qxtdIf
   dirty: false
   surface:
   - path: ara/logic/claims.md
-    sha256: 652c4b9532132249d5451a38d9433561793fcc11c8174d3646b18d26b654b99a
+    sha256: 0fca1b977ad53ce23048ea2990aeb55379eae14e8588089c0655837fd2be83ee
   - path: ara/staging/observations.yaml
-    sha256: 08aa55a5c790420b974ba6846d880ea51f4e1c1546ce166e97672b2e34d14b88
+    sha256: b77bd1de608a982603d58dd0fa4240f8b0a4ecbb119b9baf092424f7b9c6bd1c
   - path: docs/architecture/engine-config.md
     sha256: 283a6267cfcb2543ede8de03d3e86beefd640a9dcd290ca2d4f7d40be28ee1b3
   - path: docs/architecture/runtime-config-control.md
@@ -69,7 +69,7 @@ source:
     sha256: 7318753147976e426c695d3ce28ab6218980b1ad8becaa2c203b8ed38aea0b52
   - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
     sha256: 55867670f5793723f6e77f951645de4bb2d02011e3ceace399fb8db42d10ed94
-  content_digest: dde96f297de30e243043d2bfcbba7ad4ad76788291d9789053c53fc1d738e311
+  content_digest: aa418dc01540870274d09b8ca5d6e4066d41b43361013e3bfd19b1611543ee3b
 touched:
   paths:
   - ara/logic/claims.md
@@ -135,6 +135,7 @@ commands:
 - receipt: tasks/evidence/RUNTIME-208/commands/ara-claims-final.json
 - receipt: tasks/evidence/RUNTIME-208/commands/ara-claims-seal.json
 - receipt: tasks/evidence/RUNTIME-208/commands/ara-claims.json
+- receipt: tasks/evidence/RUNTIME-208/commands/ara-id-collision-fix.json
 - receipt: tasks/evidence/RUNTIME-208/commands/asan-build.json
 - receipt: tasks/evidence/RUNTIME-208/commands/asan-configure.json
 - receipt: tasks/evidence/RUNTIME-208/commands/asan-tests.json
@@ -143,6 +144,7 @@ commands:
 - receipt: tasks/evidence/RUNTIME-208/commands/clean-workshop.json
 - receipt: tasks/evidence/RUNTIME-208/commands/cpu-tests.json
 - receipt: tasks/evidence/RUNTIME-208/commands/diff-check-final.json
+- receipt: tasks/evidence/RUNTIME-208/commands/diff-check-id-collision-fix.json
 - receipt: tasks/evidence/RUNTIME-208/commands/diff-check-report-fix.json
 - receipt: tasks/evidence/RUNTIME-208/commands/diff-check-seal.json
 - receipt: tasks/evidence/RUNTIME-208/commands/diff-check.json
@@ -154,6 +156,7 @@ commands:
 - receipt: tasks/evidence/RUNTIME-208/commands/module-inventory.json
 - receipt: tasks/evidence/RUNTIME-208/commands/root-hygiene.json
 - receipt: tasks/evidence/RUNTIME-208/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-208/commands/task-policy-id-collision-fix.json
 - receipt: tasks/evidence/RUNTIME-208/commands/task-policy-report-fix.json
 - receipt: tasks/evidence/RUNTIME-208/commands/task-policy-seal.json
 - receipt: tasks/evidence/RUNTIME-208/commands/task-policy.json
