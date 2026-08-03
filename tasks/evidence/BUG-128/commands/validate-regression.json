@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.ValidateTasks.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.ValidateTasks.py",
+  "cwd": ".",
+  "duration_ms": 8140,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T15:35:56Z",
+  "label": "validate-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T15:35:47Z",
+  "stderr_path": "tasks/evidence/BUG-128/commands/validate-regression.stderr.log",
+  "stderr_sha256": "eba64c5db0bbe8919edf104517b86929c7047fcdd6a092b4f893a13f1057d272",
+  "stdout_path": "tasks/evidence/BUG-128/commands/validate-regression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-128"
+}

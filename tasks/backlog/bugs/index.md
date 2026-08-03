@@ -5,12 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-128` — Parallel pre-policy retired task baselines](BUG-128-parallel-prepolicy-retired-task-baselines.md):
-  the prospective contract inventory currently has one main-line baseline, so
-  merging byte-identical task records retired and scientifically sealed on a
-  parallel pre-policy branch either forces post-run edits or fails strict task
-  validation; bind only those exact retired paths to an immutable parallel
-  revision while preserving prospective enrollment for every later change.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
@@ -64,6 +58,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-03: [`BUG-128` — Parallel pre-policy retired task
+  baselines](../../done/BUG-128-parallel-prepolicy-retired-task-baselines.md).
+  Exact `done/` or `archive/` snapshots may now bind one immutable parallel
+  pre-policy revision and SHA-256 digest under a named high-risk policy task;
+  open records and every later byte change remain prospectively enrolled.
 
 - Closed 2026-08-01: [`BUG-123` — Retired queued scene save intermittently
   loses its terminal event](../../done/BUG-123-retired-scene-save-terminal-event-race.md).

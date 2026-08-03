@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-128`](BUG-128-parallel-prepolicy-retired-task-baselines.md) — parallel
+pre-policy retired-task baselines completed on 2026-08-03 at `Operational`.
+The prospective contract validator now accepts only explicitly listed
+`done/` or `archive/` task bytes whose SHA-256 digest matches one exact 40-hex
+parallel-history revision, with `BUG-128` retaining high-risk policy ownership.
+The primary effective date and open-task consumption/replay rules are
+unchanged; edited, promoted, open, unverified, or symbolically addressed
+records still require prospective enrollment. Eleven imported retired task
+files remain byte-identical to the revision that sealed their scientific
+custody. The 23-case validator regression suite and strict task, workflow,
+documentation, and skill-mirror gates pass without rewriting any task,
+experiment, bundle, or audit provenance.
+
 [`UI-038`](UI-038-progressive-poisson-multi-domain-panel.md) — Progressive
 Poisson multi-domain panel completed on 2026-08-03 at `Operational`. The
 Sandbox now exposes one shared panel state under Mesh, Graph, and PointCloud

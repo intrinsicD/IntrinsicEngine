@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 694,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T15:37:57Z",
+  "label": "task-policy-retired",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T15:37:57Z",
+  "stderr_path": "tasks/evidence/BUG-128/commands/task-policy-retired.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-128/commands/task-policy-retired.stdout.log",
+  "stdout_sha256": "d3d8089016161940094607be66015a6196d94e505971c9906b5d686444e86c69",
+  "task_id": "BUG-128"
+}

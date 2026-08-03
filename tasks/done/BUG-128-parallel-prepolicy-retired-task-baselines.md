@@ -8,20 +8,18 @@ evidence: required
 owner: "Codex-LocalMerge"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-03T12:07:20Z"
+claimed_at: "2026-08-03T15:36:52Z"
 contract_schema: 1
 contracts: [repo.task-contract-discovery]
 ---
 # BUG-128 — Parallel pre-policy retired task baselines
 
 ## Status
-- Implementation and regression coverage are complete on 2026-08-03. Strict
-  task-policy and workflow-custody validation pass while the eleven imported
-  retired task files remain byte-identical to their pre-policy feature
-  revision.
-- The task remains active because its `high-risk` profile still requires a
-  durable handoff and an independent fixed-surface accepted review before
-  retirement; no self-review is being represented as that acceptance.
+- Completed on 2026-08-03 at `Operational`. Strict task-policy and
+  workflow-custody validation accept the eleven exact retired snapshots while
+  rejecting later byte changes, and the imported sealed task records remain
+  byte-identical to their pre-policy feature revision.
+- Commit: pending final evidence binding.
 
 ## Goal
 - Let the prospective task-contract validator preserve byte-identical retired
