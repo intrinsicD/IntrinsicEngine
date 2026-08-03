@@ -1,0 +1,17 @@
+Internal ctest changing into directory: /tmp/intrinsic-ui038.h8R1Tp/build/ci
+Test project /tmp/intrinsic-ui038.h8R1Tp/build/ci
+    Start 1033: SandboxEditorProgressivePoisson.CopiedReadinessExplainsInvalidVertexPositions
+1/3 Test #1033: SandboxEditorProgressivePoisson.CopiedReadinessExplainsInvalidVertexPositions ..................   Passed    0.01 sec
+    Start 1192: SandboxEditorProgressivePoisson.RegistersAndDrawsAllVertexDomainWindows
+2/3 Test #1192: SandboxEditorProgressivePoisson.RegistersAndDrawsAllVertexDomainWindows ........................   Passed    0.04 sec
+    Start 1193: SandboxEditorProgressivePoisson.ProgressivePoissonPanelUsesOneNonDestructiveConfigAndRunPath
+3/3 Test #1193: SandboxEditorProgressivePoisson.ProgressivePoissonPanelUsesOneNonDestructiveConfigAndRunPath ...   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 3
+
+Label Time Summary:
+contract       =   0.01 sec*proc (1 test)
+integration    =   0.05 sec*proc (2 tests)
+runtime        =   0.05 sec*proc (3 tests)
+
+Total Test time (real) =   0.82 sec

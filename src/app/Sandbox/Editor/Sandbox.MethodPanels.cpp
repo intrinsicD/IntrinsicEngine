@@ -225,6 +225,20 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::SetTooltip("%s", text);
         }
 
+        void DrawProgressivePoissonDisabledRun(
+            const std::string_view disabledReason)
+        {
+            ImGui::BeginDisabled();
+            (void)ImGui::Button(
+                "Run Progressive Poisson##ProgressivePoisson");
+            ImGui::EndDisabled();
+            DrawDisabledReasonTooltip(disabledReason);
+            if (!disabledReason.empty())
+                ImGui::TextDisabled("%.*s",
+                                    static_cast<int>(disabledReason.size()),
+                                    disabledReason.data());
+        }
+
         [[nodiscard]] std::string FormatLevelCounts(
             const std::vector<std::uint32_t>& counts)
         {
@@ -620,6 +634,11 @@ namespace Extrinsic::Sandbox::Editor
                 {"PointCloud", "Processing"},
                 "PointCloud / Processing / Progressive Poisson");
             RegisterProgressivePoissonWindow(
+                Runtime::EditorDomainWindowKind::Graph,
+                "graph.processing.progressive_poisson",
+                {"Graph", "Processing"},
+                "Graph / Processing / Progressive Poisson");
+            RegisterProgressivePoissonWindow(
                 Runtime::EditorDomainWindowKind::Mesh,
                 "mesh.processing.progressive_poisson",
                 {"Mesh", "Processing"},
@@ -762,8 +781,12 @@ namespace Extrinsic::Sandbox::Editor
                 if (!DomainWindowReady(model) ||
                     !model.Processing.HasSelectedEntity)
                 {
-                    ImGui::TextDisabled(
-                        "Select a matching domain entity to inspect processing affordances.");
+                    const std::string_view disabledReason =
+                        model.Diagnostics.empty()
+                            ? "Select a matching domain entity with finite vertex positions."
+                            : std::string_view{
+                                  model.Diagnostics.front().Message};
+                    DrawProgressivePoissonDisabledRun(disabledReason);
                 }
                 else
                 {
@@ -1103,11 +1126,18 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::EditorGeometryProcessingModel& processing =
                 model.Processing;
             ImGui::SeparatorText("Progressive Poisson");
+            ImGui::TextWrapped(
+                "Orders the selected entity's existing finite Vertices; "
+                "source topology and cardinality are preserved.");
             const bool available = processing.ProgressivePoissonAvailable;
             if (!available)
             {
-                ImGui::TextDisabled(
-                    "Progressive Poisson is unavailable for this selection.");
+                const std::string_view disabledReason =
+                    processing.ProgressivePoissonDisabledReason.empty()
+                        ? "Progressive Poisson is unavailable for this selection."
+                        : std::string_view{
+                              processing.ProgressivePoissonDisabledReason};
+                DrawProgressivePoissonDisabledRun(disabledReason);
                 return;
             }
 
@@ -1119,7 +1149,7 @@ namespace Extrinsic::Sandbox::Editor
                 context.GeometryConfigCommandsAvailable;
             if (!configControlAvailable)
             {
-                ImGui::TextDisabled(
+                DrawProgressivePoissonDisabledRun(
                     "Progressive Poisson requires engine config-control.");
                 return;
             }
@@ -1159,7 +1189,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
             DrawProgressivePoissonTooltip(
-                "Input dimensionality used by the reference sampler.");
+                "Interpret the existing vertex positions in 2D (XY) or 3D.");
 
             ProgressivePoisson.GridWidth =
                 std::clamp(ProgressivePoisson.GridWidth, 1, 4096);
@@ -1213,7 +1243,7 @@ namespace Extrinsic::Sandbox::Editor
                 1,
                 32);
             DrawProgressivePoissonTooltip(
-                "Maximum progressive hierarchy levels to emit.");
+                "Maximum hierarchy depth for ordering the existing finite input set.");
             configChanged |= ImGui::DragFloat(
                 "Hash load##ProgressivePoisson",
                 &ProgressivePoisson.HashLoadFactor,
@@ -1263,7 +1293,7 @@ namespace Extrinsic::Sandbox::Editor
                 0,
                 10'000'000);
             DrawProgressivePoissonTooltip(
-                "Visible prefix count; zero shows all accepted points.");
+                "Leading accepted input vertices to display; zero displays every accepted vertex.");
             configChanged |= ImGui::Checkbox(
                 "Auto run on edit##ProgressivePoisson",
                 &ProgressivePoisson.AutoRunOnEdit);
@@ -1307,7 +1337,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
             DrawProgressivePoissonTooltip(
-                "Scalar property used for point color visualization.");
+                "Published source-cardinality level, rank, introduction-radius, or prefix-visibility scalar; rejected inputs retain documented sentinels.");
 
             const Runtime::EditorProgressivePoissonBackend backend =
                 ProgressivePoissonBackendFromIndex(
@@ -1338,7 +1368,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
             DrawProgressivePoissonTooltip(
-                "Requested method backend; the result reports the actual backend and any CPU fallback.");
+                "Request CPU reference or Vulkan compute; result status reports the actual backend and any CPU fallback reason.");
 
             const auto applyConfig = [&]()
             {

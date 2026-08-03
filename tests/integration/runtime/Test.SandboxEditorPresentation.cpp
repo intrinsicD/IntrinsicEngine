@@ -327,7 +327,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 35u);
+    ASSERT_EQ(menu.size(), 36u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -345,7 +345,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 25> expected{{
+    const std::array<ExpectedWindow, 26> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -360,6 +360,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"graph.processing.kmeans", {"Graph", "Processing"}},
         {"mesh.processing.kmeans", {"Mesh", "Processing"}},
         {"pointcloud.processing.progressive_poisson", {"PointCloud", "Processing"}},
+        {"graph.processing.progressive_poisson", {"Graph", "Processing"}},
         {"mesh.processing.progressive_poisson", {"Mesh", "Processing"}},
         {"mesh.processing.parameterize_uv", {"Mesh", "Processing"}},
         {"mesh.processing.denoise", {"Mesh", "Processing"}},
@@ -396,6 +397,60 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
     }
     domainPanels.Unregister();
     meshProcessingPanels.Unregister();
+    methodPanels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorProgressivePoisson,
+     RegistersAndDrawsAllVertexDomainWindows)
+{
+    struct ExpectedWindow
+    {
+        std::string_view Id;
+        std::vector<std::string> MenuPath;
+        std::string_view WindowTitle;
+    };
+    const std::array<ExpectedWindow, 3u> expected{{
+        {"pointcloud.processing.progressive_poisson",
+         {"PointCloud", "Processing"},
+         "PointCloud / Processing / Progressive Poisson"},
+        {"graph.processing.progressive_poisson",
+         {"Graph", "Processing"},
+         "Graph / Processing / Progressive Poisson"},
+        {"mesh.processing.progressive_poisson",
+         {"Mesh", "Processing"},
+         "Mesh / Processing / Progressive Poisson"},
+    }};
+
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MethodPanels methodPanels;
+    methodPanels.Register(shell);
+
+    const auto menu = shell.BuildEditorWindowMenuModel();
+    for (const ExpectedWindow& expectedWindow : expected)
+    {
+        const Runtime::EditorWindowMenuEntry* entry =
+            FindWindow(menu, expectedWindow.Id);
+        ASSERT_NE(entry, nullptr) << expectedWindow.Id;
+        EXPECT_EQ(entry->MenuPath, expectedWindow.MenuPath)
+            << expectedWindow.Id;
+        EXPECT_EQ(entry->Title, "Progressive Poisson")
+            << expectedWindow.Id;
+        ASSERT_TRUE(shell.SetEditorWindowOpen(expectedWindow.Id, true));
+    }
+
+    engine.Run();
+
+    for (const ExpectedWindow& expectedWindow : expected)
+        EXPECT_TRUE(ImGuiWindowExists(expectedWindow.WindowTitle))
+            << expectedWindow.Id;
+
     methodPanels.Unregister();
     shell.Detach();
     engine.Shutdown();
@@ -470,7 +525,7 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
     EXPECT_NE(source.find("Shell = nullptr"), std::string::npos);
 }
 
-TEST(SandboxEditorPresentation,
+TEST(SandboxEditorProgressivePoisson,
      ProgressivePoissonPanelUsesOneNonDestructiveConfigAndRunPath)
 {
     const std::string source = ReadRepositoryTextFile(
@@ -479,10 +534,18 @@ TEST(SandboxEditorPresentation,
 
     for (const std::string_view required :
          {"processing.ProgressivePoissonAvailable",
+          "processing.ProgressivePoissonDisabledReason",
+          "DrawDisabledReasonTooltip(disabledReason)",
           "EditorProgressivePoissonChannel::Rank",
+          "EditorProgressivePoissonChannel::Level",
+          "EditorProgressivePoissonChannel::SplatRadius",
+          "EditorProgressivePoissonChannel::PrefixVisible",
           "const auto runSampler = [&]()",
           "ApplyEditorProgressivePoissonConfigCommand",
-          "ApplyEditorProgressivePoissonCommand"})
+          "ApplyEditorProgressivePoissonCommand",
+          "source topology and cardinality are preserved",
+          "Published source-cardinality level, rank",
+          "result.BackendFallbackReason"})
     {
         EXPECT_NE(source.find(required), std::string::npos) << required;
     }
