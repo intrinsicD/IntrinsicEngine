@@ -1,0 +1,123 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-asan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-asan
+      Start  527: RuntimeGeometryAvailability.MeshResolvesIndependentSurfaceEdgeAndPointLanes
+ 1/55 Test  #527: RuntimeGeometryAvailability.MeshResolvesIndependentSurfaceEdgeAndPointLanes ..................   Passed    0.05 sec
+      Start  528: RuntimeGeometryAvailability.GraphSupportsUnifiedVertexHalfedgeAndEdgeSources
+ 2/55 Test  #528: RuntimeGeometryAvailability.GraphSupportsUnifiedVertexHalfedgeAndEdgeSources .................   Passed    0.05 sec
+      Start  529: RuntimeGeometryAvailability.SharedSourceMatrixDoesNotReplaceGraphProvenance
+ 3/55 Test  #529: RuntimeGeometryAvailability.SharedSourceMatrixDoesNotReplaceGraphProvenance ..................   Passed    0.05 sec
+      Start  530: RuntimeGeometryAvailability.GraphMarkerKeepsProvenanceForMixedSourceMatrix
+ 4/55 Test  #530: RuntimeGeometryAvailability.GraphMarkerKeepsProvenanceForMixedSourceMatrix ...................   Passed    0.05 sec
+      Start  531: RuntimeGeometryAvailability.PointCloudSupportsPointsAndRejectsSurfaceAndEdges
+ 5/55 Test  #531: RuntimeGeometryAvailability.PointCloudSupportsPointsAndRejectsSurfaceAndEdges ................   Passed    0.05 sec
+      Start  532: RuntimeGeometryAvailability.MeshEdgeLaneCanDeriveFromSurfaceTopologyWithoutEdges
+ 6/55 Test  #532: RuntimeGeometryAvailability.MeshEdgeLaneCanDeriveFromSurfaceTopologyWithoutEdges .............   Passed    0.05 sec
+      Start  533: RuntimeGeometryAvailability.PartialMeshCanSupportPointsWhileSurfaceReportsMissingHalfedges
+ 7/55 Test  #533: RuntimeGeometryAvailability.PartialMeshCanSupportPointsWhileSurfaceReportsMissingHalfedges ...   Passed    0.05 sec
+      Start  683: RuntimeEngineLayering.RunFrameDoesNotUseGpuResourceOrPassLevelDetails
+ 8/55 Test  #683: RuntimeEngineLayering.RunFrameDoesNotUseGpuResourceOrPassLevelDetails ........................   Passed    0.05 sec
+      Start  684: RuntimeEngineLayering.ProductionSourceHasNoApplicationCallbackLifecycle
+ 9/55 Test  #684: RuntimeEngineLayering.ProductionSourceHasNoApplicationCallbackLifecycle ......................   Passed    0.15 sec
+      Start  685: RuntimeEngineLayering.RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder
+10/55 Test  #685: RuntimeEngineLayering.RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder ........   Passed    0.05 sec
+      Start  686: RuntimeEngineLayering.PhysicsModuleIsAppComposedAndThePublicBridgeSurfaceIsRetired
+11/55 Test  #686: RuntimeEngineLayering.PhysicsModuleIsAppComposedAndThePublicBridgeSurfaceIsRetired ...........   Passed    0.22 sec
+      Start  687: RuntimeEngineLayering.RunFrameAppliesJobCompletionsWithBoundedBudget
+12/55 Test  #687: RuntimeEngineLayering.RunFrameAppliesJobCompletionsWithBoundedBudget .........................   Passed    0.05 sec
+      Start  688: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRendererContract
+13/55 Test  #688: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRendererContract ..................   Passed    0.05 sec
+      Start  689: RuntimeEngineLayering.EnginePrivatelyOwnsGpuQueueHookLifecycle
+14/55 Test  #689: RuntimeEngineLayering.EnginePrivatelyOwnsGpuQueueHookLifecycle ...............................   Passed    0.05 sec
+      Start  690: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition
+15/55 Test  #690: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition .................   Passed    0.05 sec
+      Start  691: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsGizmoFrameState
+16/55 Test  #691: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsGizmoFrameState ...........................   Passed    0.05 sec
+      Start  692: RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface
+17/55 Test  #692: RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface .............   Passed    0.09 sec
+      Start  693: RuntimeEngineLayering.RunFrameCarriesDataOnlyFrameContext
+18/55 Test  #693: RuntimeEngineLayering.RunFrameCarriesDataOnlyFrameContext ....................................   Passed    0.05 sec
+      Start  694: RuntimeEngineLayering.GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction
+19/55 Test  #694: RuntimeEngineLayering.GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction ..........   Passed    0.05 sec
+      Start  695: RuntimeEngineLayering.PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder
+20/55 Test  #695: RuntimeEngineLayering.PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder ..........   Passed    0.05 sec
+      Start  696: RuntimeEngineLayering.RunFrameRegistersPromotedEcsSystemsBeforeCompile
+21/55 Test  #696: RuntimeEngineLayering.RunFrameRegistersPromotedEcsSystemsBeforeCompile .......................   Passed    0.05 sec
+      Start  697: RuntimeEngineLayering.SupersededWorkSurfacesAreRetiredFromBuild
+22/55 Test  #697: RuntimeEngineLayering.SupersededWorkSurfacesAreRetiredFromBuild ..............................   Passed    0.05 sec
+      Start  698: RuntimeEngineLayering.SupersededGpuResultReadbackSurfacesAreRetiredFromBuild
+23/55 Test  #698: RuntimeEngineLayering.SupersededGpuResultReadbackSurfacesAreRetiredFromBuild .................   Passed    0.09 sec
+      Start  699: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService
+24/55 Test  #699: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService ...........................   Passed    0.05 sec
+      Start  700: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine
+25/55 Test  #700: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine ..................   Passed    0.05 sec
+      Start  701: RuntimeEngineLayering.MaintenanceHasNoOptionalStreamingFacade
+26/55 Test  #701: RuntimeEngineLayering.MaintenanceHasNoOptionalStreamingFacade ................................   Passed    0.05 sec
+      Start  702: RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope
+27/55 Test  #702: RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope ........................   Passed    0.06 sec
+      Start  703: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface
+28/55 Test  #703: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface ............................   Passed    0.05 sec
+      Start  704: RuntimeEngineLayering.FrameLoopContractDoesNotBecomeCompositionRoot
+29/55 Test  #704: RuntimeEngineLayering.FrameLoopContractDoesNotBecomeCompositionRoot ..........................   Passed    0.05 sec
+      Start  705: RuntimeEngineLayering.DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine
+30/55 Test  #705: RuntimeEngineLayering.DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine ................   Passed    0.05 sec
+      Start  706: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted
+31/55 Test  #706: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted ............................   Passed    0.05 sec
+      Start  707: RuntimeEngineLayering.CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine
+32/55 Test  #707: RuntimeEngineLayering.CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine ...............   Passed    0.05 sec
+      Start  708: RuntimeEngineLayering.InputActionsKeepRegistryAndDispatchOutOfEngine
+33/55 Test  #708: RuntimeEngineLayering.InputActionsKeepRegistryAndDispatchOutOfEngine .........................   Passed    0.05 sec
+      Start  709: RuntimeEngineLayering.RetiredEngineCompositionHelperBmisAreAbsent
+34/55 Test  #709: RuntimeEngineLayering.RetiredEngineCompositionHelperBmisAreAbsent ............................   Passed    0.05 sec
+      Start  710: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsPickCorrelationState
+35/55 Test  #710: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsPickCorrelationState ......................   Passed    0.05 sec
+      Start  711: RuntimeEngineLayering.EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics
+36/55 Test  #711: RuntimeEngineLayering.EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics ..............   Passed    0.05 sec
+      Start  712: RuntimeEngineLayering.AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence
+37/55 Test  #712: RuntimeEngineLayering.AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence .................   Passed    0.05 sec
+      Start  713: RuntimeEngineLayering.RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers
+38/55 Test  #713: RuntimeEngineLayering.RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers ...................   Passed    0.05 sec
+      Start  714: RuntimeEngineLayering.RetiredSpatialDebugRegistryHasNoProductionSurface
+39/55 Test  #714: RuntimeEngineLayering.RetiredSpatialDebugRegistryHasNoProductionSurface ......................   Passed    0.05 sec
+      Start  715: RuntimeEngineLayering.RetiredProgressivePresentationModulesAndSymbolsStayDeleted
+40/55 Test  #715: RuntimeEngineLayering.RetiredProgressivePresentationModulesAndSymbolsStayDeleted .............   Passed    0.16 sec
+      Start  716: RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains
+41/55 Test  #716: RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains ...........................   Passed    0.05 sec
+      Start  717: RuntimeEngineLayering.RetiredGeometryPackerAndLifecycleSurfacesStayDeleted
+42/55 Test  #717: RuntimeEngineLayering.RetiredGeometryPackerAndLifecycleSurfacesStayDeleted ...................   Passed    0.09 sec
+      Start  762: PointCloudConsolidationModule.AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain
+43/55 Test  #762: PointCloudConsolidationModule.AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain .......   Passed    0.06 sec
+      Start  763: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo
+44/55 Test  #763: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo ...................   Passed    0.17 sec
+      Start  764: PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion
+45/55 Test  #764: PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion ....   Passed    0.19 sec
+      Start  765: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+46/55 Test  #765: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback .............................   Passed    0.96 sec
+      Start  766: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput
+47/55 Test  #766: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput ...........   Passed    0.16 sec
+      Start 1175: SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
+48/55 Test #1175: SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun ...................   Passed    0.19 sec
+      Start 1176: SandboxConfigSections.PhysicsSourcesProduceIdenticalValidatedState
+49/55 Test #1176: SandboxConfigSections.PhysicsSourcesProduceIdenticalValidatedState ...........................   Passed    0.38 sec
+      Start 1177: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState
+50/55 Test #1177: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState ...........   Passed    0.38 sec
+      Start 1216: PhysicsModule.DisabledOwnsNoWorldAndStepBudgetIsBounded
+51/55 Test #1216: PhysicsModule.DisabledOwnsNoWorldAndStepBudgetIsBounded ......................................   Passed    0.01 sec
+      Start 1217: PhysicsModule.AuthoringFingerprintReusesBodiesAndTracksUpdatesAndRemoval
+52/55 Test #1217: PhysicsModule.AuthoringFingerprintReusesBodiesAndTracksUpdatesAndRemoval .....................   Passed    0.01 sec
+      Start 1218: PhysicsModule.SolverWritesBackOnlyDynamicBodiesWithoutResettingAuthoring
+53/55 Test #1218: PhysicsModule.SolverWritesBackOnlyDynamicBodiesWithoutResettingAuthoring .....................   Passed    0.01 sec
+      Start 1219: PhysicsModule.PerWorldStateIsRemovedOnDestroyAndShutdown
+54/55 Test #1219: PhysicsModule.PerWorldStateIsRemovedOnDestroyAndShutdown .....................................   Passed    0.01 sec
+      Start 1220: PhysicsModule.NullEngineRunAdvancesDynamicAndPreservesStaticKinematicEcsPose
+55/55 Test #1220: PhysicsModule.NullEngineRunAdvancesDynamicAndPreservesStaticKinematicEcsPose .................   Passed    0.14 sec
+
+100% tests passed, 0 tests failed out of 55
+
+Label Time Summary:
+contract       =   4.10 sec*proc (47 tests)
+ecs            =   0.18 sec*proc (5 tests)
+integration    =   1.13 sec*proc (8 tests)
+physics        =   0.18 sec*proc (5 tests)
+runtime        =   5.23 sec*proc (55 tests)
+
+Total Test time (real) =   6.12 sec

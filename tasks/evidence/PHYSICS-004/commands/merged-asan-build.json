@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicCpuTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci-asan --target IntrinsicCpuTests -j 4",
+  "cwd": ".",
+  "duration_ms": 578687,
+  "exit_code": 0,
+  "finished_at": "2026-08-03T22:58:19Z",
+  "label": "merged-asan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-03T22:48:40Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/merged-asan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/merged-asan-build.stdout.log",
+  "stdout_sha256": "c19fdd08883070fa6b28ed0a6823a72a66063a1c92c1b735e6b0a488c242a134",
+  "task_id": "PHYSICS-004"
+}
