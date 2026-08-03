@@ -44,7 +44,8 @@ maturity_target: Operational
 
 - No sampling-kernel or CPU/GPU parity change, new surface sampler, or generic
   geometry converter.
-- No UI implementation; the re-scoped `UI-038` consumes this runtime surface.
+- No new Graph-panel registration; the re-scoped `UI-038` consumes this runtime
+  surface while this task keeps the existing Mesh/PointCloud controls aligned.
 - No deletion/reordering of topology-bearing vertex storage.
 
 ## Context
@@ -109,8 +110,7 @@ maturity_target: Operational
 
 ## Acceptance criteria
 
-- [x] Progressive Poisson is runnable from every `Vertices` source with no
-      converter and with source-cardinality publication.
+- [x] Progressive Poisson is runnable from every `Vertices` source with no converter and with source-cardinality publication.
 - [x] Mesh and graph topology/cardinality are unchanged on every backend path.
 - [x] Obsolete surface-generation controls cannot trigger hidden conversion.
 
