@@ -231,6 +231,6 @@ and contact/event counts where applicable.
 - [`PHYSICS-001`](../../tasks/archive/PHYSICS-001-physics-world-state-and-runtime-sync.md) defines the first physics world/state module and runtime bridge at `CPUContracted` maturity.
 - [`PHYSICS-002`](../../tasks/archive/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
 - [`PHYSICS-003`](../../tasks/archive/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) added constraints, islands, sleep, and solver diagnostics at `CPUContracted`.
-- [`PHYSICS-004`](../../tasks/active/PHYSICS-004-operational-runtime-physics-module.md) composes the optional runtime module, real Null-engine fixed-step/writeback path, and retirement of the test-only public bridge surface.
+- [`PHYSICS-004`](../../tasks/done/PHYSICS-004-operational-runtime-physics-module.md) composes the optional runtime module, real Null-engine fixed-step/writeback path, and retirement of the test-only public bridge surface.
 - [`ARCH-002`](../../tasks/archive/ARCH-002-physics-phenomena-roadmap.md) records the non-rigid and multi-phenomena roadmap decisions.
 - [`METHOD-009`](../../tasks/archive/METHOD-009-particle-spring-reference-backend.md), [`METHOD-010`](../../tasks/archive/METHOD-010-xpbd-cloth-shell-reference-backend.md), and [`METHOD-011`](../../tasks/archive/METHOD-011-sph-fluid-reference-backend.md) are the first non-rigid physics method-package follow-ups (all three are done). They remain CPU-reference-first and open no GPU backend.

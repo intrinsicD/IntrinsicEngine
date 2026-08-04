@@ -808,7 +808,7 @@
   disable, world destruction, or shutdown retains owned state; the generic
   Engine imports the concrete module; or the public module exposes live
   physics handles/state or an unconsumed service publication.
-- **Proof**: [tasks/active/PHYSICS-004-operational-runtime-physics-module.md,
+- **Proof**: [tasks/done/PHYSICS-004-operational-runtime-physics-module.md,
   src/runtime/Runtime.PhysicsModule.cppm,
   src/runtime/Runtime.PhysicsModule.cpp,
   src/runtime/Runtime.Engine.cpp,

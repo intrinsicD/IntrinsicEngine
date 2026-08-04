@@ -15,6 +15,16 @@ contracts: [repo.task-contract-discovery]
 ---
 # PHYSICS-004 — Operational runtime physics module and bridge privatization
 
+## Status
+
+- Completed on 2026-08-04 at `Operational`. The optional app-composed runtime
+  module owns isolated per-world physics state and ECS sidecars, advances the
+  existing CPU solver through the real Null-window engine loop, writes back
+  dynamic transforms only, and retires the public test-only bridge surface.
+- Commit: implementation `ba395d1e`, merged verification `ea5c87da`; the
+  retirement and accepted fixed-surface review seal are recorded by repository
+  history and `tasks/evidence/PHYSICS-004/`.
+
 ## Goal
 
 - Compose the existing physics world/synchronization contract as an optional
@@ -159,6 +169,6 @@ Executed evidence is recorded under `tasks/evidence/PHYSICS-004/commands/`:
 
 - Reached: `Operational` through the real CPU/Null engine loop, with the public
   test-only bridge surface retired.
-- Workflow status: technical acceptance and driver self-review are complete;
-  the task remains active until an independent high-risk review is accepted
-  against the final revision/content digest.
+- Workflow status: technical acceptance, driver self-review, durable handoff,
+  and independent high-risk fixed-surface review are recorded under
+  `tasks/evidence/PHYSICS-004/`.

@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PHYSICS-004`](PHYSICS-004-operational-runtime-physics-module.md) — operational
+runtime physics composition completed on 2026-08-04 at `Operational`. The
+Sandbox now composes one optional `PhysicsModule` through the existing runtime
+module lifecycle and validated `sandbox.physics` config lane. Runtime owns
+isolated per-world physics state and StableId sidecars, performs bounded
+fixed-step authoring synchronization, advances the physics-owned CPU solver,
+and writes back dynamic transforms with the existing dirty/generation
+contract; disabled configuration and teardown retain no live state. The public
+test-only `Runtime.PhysicsBridge` surface is deleted, while ECS remains free of
+physics handles and the lower physics layer remains independent of ECS,
+runtime, graphics, platform, and app. On the merged source, 55 focused
+physics/config/runtime cases and all 4,077 CPU-supported cases passed; the
+complete isolated ASan and UBSan cohorts and strict layering, clean-workshop,
+task, documentation, inventory, test-layout, root-hygiene, ARA, durable
+handoff, and independent fixed-surface review gates also passed. GPU/Vulkan
+physics, contact-event publication, persistence, a dedicated physics UI, and
+performance claims remain outside this task.
+
 [`RUNTIME-206`](RUNTIME-206-lop-element-domain-source-integration.md) — LOP
 family element-domain source integration completed on 2026-08-03 at
 `Operational`. The runtime now resolves named finite `vec3` input/output
