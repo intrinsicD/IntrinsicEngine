@@ -471,7 +471,7 @@
   tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md,
   tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md,
   tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
-  tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md,
+  tasks/done/UI-039-lop-multi-domain-discovery.md,
   tasks/backlog/ui/UI-040-icp-compatible-source-selection.md,
   tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md,
   tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md,
@@ -834,8 +834,8 @@
   cardinality.
 - **Status**: supported — Clang 23 exact module 5/5, complete CPU/Null 4,075
   pass plus one policy skip, ASan 2,670/2,670, and UBSan 2,669 pass plus one
-  policy skip; property-aware Sandbox discovery remains with `UI-039`, and no
-  GPU/Vulkan, optimized-backend, or performance claim is made
+  policy skip; property-aware Sandbox discovery is separately closed by C29,
+  and no GPU/Vulkan, optimized-backend, or performance claim is made
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Any compatible element-domain property is
@@ -857,3 +857,41 @@
 - **Tags**: runtime, geometry, point set, property domains, LOP, WLOP, CLOP,
   EAR, CPU, undo, stale writeback
 - **From staging**: O115
+
+## C29: The Sandbox binds LOP-family slots across geometry property domains
+- **Statement**: The single semantic PointCloud consolidation panel builds its
+  Position, optional Normal, and output slots from the selected entity's
+  canonical property catalog rather than its container provenance. Compatible
+  finite float `vec3` properties on mesh vertex, edge, halfedge, and face;
+  graph node, edge, and halfedge; and point-cloud point domains enter the same
+  runtime availability, validated config, submit, result, and history path.
+  Publication remains on the originating entity/domain, and runtime readiness
+  prevents topology-bearing cardinality changes. Canonical published mesh
+  area-vector, centroid, and scalar-gradient properties use float `glm::vec3`
+  storage while their direct calculations remain double precision.
+- **Status**: supported — fresh Clang 23 focused UI/runtime/geometry 50/50 and
+  complete CPU/Null 4,078 pass plus one policy-defined GLFW/LSan skip, with
+  strict task, documentation, method-manifest, inventory, layering,
+  test-layout, root-hygiene, and clean-workshop gates; no sanitizer,
+  GPU/Vulkan, optimized-backend, or performance claim is made
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A compatible float `vec3` property is hidden or
+  rejected because of its name, handle wrapper, element domain, or mesh/graph
+  provenance; the panel bypasses the runtime availability/config/submit path;
+  it permits a topology-bearing count change; publication targets another
+  entity/domain or mutates geometry directly; or a canonical published mesh
+  vector quantity is stored as a public double-vector property.
+- **Proof**: [tasks/done/UI-039-lop-multi-domain-discovery.md,
+  src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
+  src/runtime/Runtime.EditorWorkspaceSnapshots.cppm,
+  src/runtime/Runtime.GeometryProcessingOperations.cppm,
+  src/geometry/Geometry.HalfedgeMesh.Utils.cppm,
+  tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp,
+  tests/unit/geometry/Test_MeshQuantities.cpp,
+  tasks/evidence/UI-039/commands/focused-tests.json,
+  tasks/evidence/UI-039/commands/ci-tests.json]
+- **Dependencies**: [C18, C28]
+- **Tags**: app, runtime, geometry, point set, property domains, LOP, WLOP,
+  CLOP, EAR, UI, CPU, float properties
+- **From staging**: O116

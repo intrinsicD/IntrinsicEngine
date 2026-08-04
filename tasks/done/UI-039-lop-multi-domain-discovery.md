@@ -15,6 +15,17 @@ maturity_target: Operational
 ---
 # UI-039 — Semantic point-set slot binding and LOP discovery
 
+## Status
+
+- Completed on 2026-08-04 at `Operational`. The single semantic PointCloud
+  consolidation panel now binds canonical typed Position, optional Normal,
+  and output slots from the selected mesh, graph, or point-cloud property
+  catalog, while runtime remains the source of publication readiness and exact
+  disabled diagnostics.
+- Commit: implementation `c80abcef`, fresh CPU verification `cf342268`; the
+  retirement and accepted fixed-surface review seal are recorded by repository
+  history and `tasks/evidence/UI-039/`.
+
 ## Goal
 
 - Establish the typed method-slot binding pattern for point-set UI and make the
@@ -102,8 +113,6 @@ maturity_target: Operational
 - [x] UI cannot request topology-destructive publication.
 - [x] No point-set method requires its Position slot to be named
       `v:position`, and public geometry vector properties use float storage.
-- [ ] Complete the durable handoff and accepted independent fixed-surface
-      review required by the `high-risk` workflow profile before retirement.
 
 ## Verification
 
@@ -115,8 +124,26 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/sync_skills.py --check
 ```
 
+Recorded results: the focused semantic-slot, consolidation, and mesh-quantity
+selector passed `50/50`; the complete CPU-supported selector selected `4,079`,
+passed `4,078`, failed zero, and skipped its policy-defined GLFW/LSan case.
+Strict task, documentation, skill-mirror, method-manifest, module-inventory,
+layering, test-layout, root-hygiene, clean-workshop, ARA, and workflow-evidence
+checks close the task. Sanitizer and GPU/Vulkan execution are not claimed:
+UI-039 changes no ownership/allocator/backend lifetime, and `METHOD-020` owns
+the LOP-family Vulkan backend and parity work.
+
 ## Forbidden changes
 
 - No PointCloud-provenance gate, `VertexProperty` filter, property-name alias,
   converter, app-owned readiness/config, direct property mutation, dynamic
   universal method schema, or separate panel implementation per domain.
+
+## Maturity
+
+- Reached: `Operational` for CPU/Null semantic property discovery, validated
+  runtime routing, same-domain publication readiness, and float public vector
+  property storage.
+- Workflow status: technical acceptance, driver self-review, durable handoff,
+  and independent high-risk fixed-surface review are recorded under
+  `tasks/evidence/UI-039/`.

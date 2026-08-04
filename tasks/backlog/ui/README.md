@@ -49,6 +49,11 @@ retired under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
 
+- UI-039 is retired at `Operational`. The LOP/WLOP/CLOP/EAR panel now
+  discovers finite float `vec3` Position and optional Normal properties across
+  every compatible mesh, graph, and point-cloud element domain, submits full
+  typed property references through the shared runtime path, and prevents
+  topology-bearing count changes with runtime-owned readiness diagnostics.
 - UI-038 is retired at `Operational`. Progressive Poisson is discoverable
   under Mesh, Graph, and PointCloud Processing through one shared app state,
   copied runtime readiness/config/run path, and the source-cardinality result
@@ -189,6 +194,11 @@ retired under the runtime backlog as `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [UI-039 — Semantic point-set slot binding and LOP discovery](../../done/UI-039-lop-multi-domain-discovery.md)
+  (done, 2026-08-04, `Operational`): one catalog-backed panel binds semantic
+  Position, optional Normal, and output slots across all compatible property
+  domains and reuses runtime readiness/config/submit/history without conversion
+  or direct geometry mutation.
 - [UI-038 — Progressive Poisson multi-domain panel](../../done/UI-038-progressive-poisson-multi-domain-panel.md)
   (done, 2026-08-03, `Operational`): exposes one non-destructive Progressive
   Poisson operation under Mesh, Graph, and PointCloud with copied finite-source

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `UI-039` — Semantic point-set slot binding and LOP discovery (tasks/active/UI-039-lop-multi-domain-discovery.md)
+- none
 
 ## Theme B — Rendering modernization
 
