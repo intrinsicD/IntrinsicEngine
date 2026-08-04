@@ -5,10 +5,10 @@ depends_on: [RUNTIME-206, UI-035]
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner: "codex-slot-binding"
-branch: "main"
+owner: "codex-root"
+branch: "feature/ui-039-lop-multi-domain-discovery"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-04T11:38:28Z"
+claimed_at: "2026-08-04T18:59:59Z"
 contract_schema: 1
 contracts: [repo.task-contract-discovery, geometry.element-domain-sources, method.engine-integration]
 maturity_target: Operational

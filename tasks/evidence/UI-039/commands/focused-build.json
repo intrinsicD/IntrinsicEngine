@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicSandboxEditorIntegrationTests",
+    "IntrinsicGeometryTests",
+    "IntrinsicRuntimeContractTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests IntrinsicGeometryTests IntrinsicRuntimeContractTests",
+  "cwd": ".",
+  "duration_ms": 599100,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T19:10:27Z",
+  "label": "focused-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:00:28Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/focused-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-039/commands/focused-build.stdout.log",
+  "stdout_sha256": "b19b45dcae05bc2894fda30eb36364a671ada45e11dc9aab408329e66bbf717f",
+  "task_id": "UI-039"
+}
