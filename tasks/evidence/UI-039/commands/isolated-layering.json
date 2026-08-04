@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_layering.py",
+    "--root",
+    "src",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_layering.py --root src --strict",
+  "cwd": ".",
+  "duration_ms": 193,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T19:24:51Z",
+  "label": "isolated-layering",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:24:50Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/isolated-layering.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-039/commands/isolated-layering.stdout.log",
+  "stdout_sha256": "d0edba50762be054713791e18ff6ac5234207b82c8740cdabb98a156c45e2166",
+  "task_id": "UI-039"
+}
