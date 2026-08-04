@@ -3,12 +3,12 @@ task_id: UI-039
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-04T19:25:25Z'
+generated_at: '2026-08-04T19:28:03Z'
 claim_eligible: false
 source:
   base_ref: 19a6551f
   base_revision: 19a6551f9378ba9633dde48f6f410046766f39f1
-  head_revision: 8e8e4a5cd3cb99f5eac4c619ab1a1bdf76a91806
+  head_revision: e4133e1f5fdc009aaf64ac4e296c30eeabfc0072
   branch: feature/ui-039-lop-multi-domain-discovery
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
@@ -20,7 +20,7 @@ source:
   - path: ara/staging/observations.yaml
     sha256: a79a8d75c9464f11bb7901ee4f633300cbda1e511818fe10146016288b9e0029
   - path: ara/trace/exploration_tree.yaml
-    sha256: 49da6fb42a626fad62c00f3a126c5f7686d26b90bbf8d15909c2c213fcf54ac2
+    sha256: f77133408a5241526df598781afb5eee4821d05b21d23ae7f4ba966555a0eb96
   - path: docs/agent/method-workflow.md
     sha256: 7d184847bd5830cc58015765d20c1d1fe35271c9d82a1d23cdf99ba0636b83f4
   - path: docs/architecture/geometry-api-style.md
@@ -77,7 +77,7 @@ source:
     sha256: d4a22b774ee513c4c22f0add046cbc2959a0b2af609a1d1a93f5baddb9540e31
   - path: tools/agents/skills/intrinsicengine-method/references/method-workflow.md
     sha256: 71d646aa54b0cd6897fb1f63e7a83be07ab45550ba05775e7ab6c12390f18f9f
-  content_digest: 234d9ef3f5b1d15cbf4f3efc00470dd8fe3066f57cdadd7b5c7ee0ab6a836f78
+  content_digest: 2affa57eb08e6b83567314d85bccf6da43fc76632a53323d4634b2988f434b8e
 touched:
   paths:
   - AGENTS.md
@@ -190,6 +190,9 @@ commands:
 - receipt: tasks/evidence/UI-039/commands/retirement-test-layout.json
 - receipt: tasks/evidence/UI-039/commands/retirement-validate-tasks.json
 - receipt: tasks/evidence/UI-039/commands/root-hygiene.json
+- receipt: tasks/evidence/UI-039/commands/scope-final-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/scope-final-ara-yaml.json
+- receipt: tasks/evidence/UI-039/commands/scope-final-diff-check.json
 - receipt: tasks/evidence/UI-039/commands/session-brief.json
 - receipt: tasks/evidence/UI-039/commands/task-policy.json
 - receipt: tasks/evidence/UI-039/commands/task-state-links.json
