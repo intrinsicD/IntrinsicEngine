@@ -1,0 +1,6 @@
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 850
+[check_task_state_links] Mode: strict
+[check_task_state_links] Findings:
+  - tasks/backlog/README.md:126: state-only index links retired task PHYSICS-004-operational-runtime-physics-module.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+[check_task_state_links] STRICT MODE: failing.
