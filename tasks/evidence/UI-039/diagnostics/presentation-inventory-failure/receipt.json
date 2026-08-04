@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 53697,
+  "exit_code": 8,
+  "finished_at": "2026-08-04T19:45:49Z",
+  "label": "review-repair-cpu-tests-before-presentation-inventory-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:44:55Z",
+  "stderr_path": "tasks/evidence/UI-039/diagnostics/presentation-inventory-failure/stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/UI-039/diagnostics/presentation-inventory-failure/stdout.log",
+  "stdout_sha256": "c48fc9e4d4379f2eddb98cd1925d975d485434c528b30b20420d4d92cc53692a",
+  "task_id": "UI-039"
+}

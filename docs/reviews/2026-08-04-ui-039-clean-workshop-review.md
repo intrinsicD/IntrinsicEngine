@@ -29,7 +29,8 @@
 
 No finding requires a follow-up task. The change reuses the existing
 `GeometryPropertyRef`, runtime availability/config/submit path, inspector
-property catalog, and one app-owned panel state. The three small public
+property catalog, and one app-owned panel state shared by three stable menu
+registrations. The three small public
 functions have present production callers at the runtime-to-app boundary; no
 converter, universal schema, duplicated per-domain panel, factory, or service
 was introduced.

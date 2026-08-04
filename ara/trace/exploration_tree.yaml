@@ -8507,14 +8507,16 @@ tree:
       - "c80abcef: UI-039 semantic property-slot implementation"
       - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
       - "src/geometry/Geometry.HalfedgeMesh.Utils.cpp"
-      - "tasks/evidence/UI-039/commands/focused-tests.json: 50/50 passed"
-      - "tasks/evidence/UI-039/commands/ci-tests.json: 4,079 selected, 4,078 passed, zero failed, one policy GLFW/LSan skip"
+      - "tasks/evidence/UI-039/commands/review-repair-focused-tests.json: 50/50 passed"
+      - "tasks/evidence/UI-039/commands/review-repair-presentation-tests.json: 3/3 passed"
+      - "tasks/evidence/UI-039/commands/review-repair-cpu-tests-r2.json: 4,079 selected, 4,078 passed, zero failed, one policy GLFW/LSan skip"
       - "tasks/evidence/UI-039/commands/clean-workshop.json: strict automated scorecard passed"
     result: >
-      One catalog-backed Sandbox panel now discovers and binds compatible
-      float vec3 properties from every mesh, graph, and point-cloud element
-      domain, delegates exact readiness and count-change rejection to the
-      runtime path, and keeps output on the originating entity/domain. Public
+      Stable Mesh, Graph, and PointCloud Processing entries now render one
+      shared catalog-backed Sandbox panel/state. It discovers and binds
+      compatible float vec3 properties from every mesh, graph, and point-cloud
+      element domain, delegates exact readiness and count-change rejection to
+      the runtime path, and keeps output on the originating entity/domain. Public
       mesh vector quantities publish float properties while direct kernels
       retain double precision. Focused and complete CPU/Null gates passed;
       sanitizer, GPU/Vulkan, optimized-backend, and performance evidence remain

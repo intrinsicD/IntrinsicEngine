@@ -1,0 +1,16 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 1184: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+1/3 Test #1184: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ...............................   Passed    0.04 sec
+    Start 1185: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+2/3 Test #1185: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...................   Passed    0.04 sec
+    Start 1210: SandboxPointCloudConsolidationPanel.ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath
+3/3 Test #1210: SandboxPointCloudConsolidationPanel.ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath ...   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 3
+
+Label Time Summary:
+integration    =   0.12 sec*proc (3 tests)
+runtime        =   0.12 sec*proc (3 tests)
+
+Total Test time (real) =   0.26 sec

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 1746,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T19:44:33Z",
+  "label": "review-repair-clean-workshop",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:44:32Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/review-repair-clean-workshop.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-039/commands/review-repair-clean-workshop.stdout.log",
+  "stdout_sha256": "d1144d514967811c4c73783f719abb530534cf0ec1057a02e6ff94eed96e53fe",
+  "task_id": "UI-039"
+}

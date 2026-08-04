@@ -9,9 +9,10 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 [`UI-039`](UI-039-lop-multi-domain-discovery.md) — semantic LOP-family slot
-binding completed on 2026-08-04 at `Operational`. The single PointCloud /
-Processing consolidation panel now builds Position, optional Normal, and output
-selectors from the selected entity's canonical property catalog, so compatible
+binding completed on 2026-08-04 at `Operational`. Stable Mesh, Graph, and
+PointCloud Processing entries open one shared consolidation panel/state, which
+builds Position, optional Normal, and output selectors from the selected
+entity's canonical property catalog, so compatible
 float `vec3` properties on mesh vertices, edges, halfedges, and faces; graph
 nodes, edges, and halfedges; and point-cloud points enter one typed runtime
 readiness/config/submit/result/history path without conversion or app-owned
@@ -19,8 +20,9 @@ geometry mutation. Topology-bearing cardinality changes remain disabled by the
 runtime's exact shared diagnostic, and same-count output stays on the
 originating entity/domain. Canonical published mesh area-vector, centroid, and
 scalar-gradient properties now use float storage while their direct kernels
-retain double precision. The focused selector passed 50/50; the complete CPU
-selector selected 4,079, passed 4,078, failed zero, and skipped its
+retain double precision. The focused selector passed 50/50 and the repaired
+three-menu presentation selector passed 3/3; the complete CPU selector
+selected 4,079, passed 4,078, failed zero, and skipped its
 policy-defined GLFW/LSan case. Strict task, docs, skill-mirror,
 method-manifest, inventory, layering, test-layout, root-hygiene, ARA,
 clean-workshop, durable-handoff, and independent fixed-surface review gates

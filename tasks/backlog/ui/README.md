@@ -49,7 +49,8 @@ retired under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
 
-- UI-039 is retired at `Operational`. The LOP/WLOP/CLOP/EAR panel now
+- UI-039 is retired at `Operational`. Stable Mesh, Graph, and PointCloud
+  Processing entries open one shared LOP/WLOP/CLOP/EAR panel/state, which
   discovers finite float `vec3` Position and optional Normal properties across
   every compatible mesh, graph, and point-cloud element domain, submits full
   typed property references through the shared runtime path, and prevents

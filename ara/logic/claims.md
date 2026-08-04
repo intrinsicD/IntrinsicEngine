@@ -859,9 +859,10 @@
 - **From staging**: O115
 
 ## C29: The Sandbox binds LOP-family slots across geometry property domains
-- **Statement**: The single semantic PointCloud consolidation panel builds its
-  Position, optional Normal, and output slots from the selected entity's
-  canonical property catalog rather than its container provenance. Compatible
+- **Statement**: Stable Mesh, Graph, and PointCloud Processing registrations
+  open one shared consolidation panel/state, which builds its Position,
+  optional Normal, and output slots from the selected entity's canonical
+  property catalog rather than its container provenance. Compatible
   finite float `vec3` properties on mesh vertex, edge, halfedge, and face;
   graph node, edge, and halfedge; and point-cloud point domains enter the same
   runtime availability, validated config, submit, result, and history path.
@@ -869,16 +870,19 @@
   prevents topology-bearing cardinality changes. Canonical published mesh
   area-vector, centroid, and scalar-gradient properties use float `glm::vec3`
   storage while their direct calculations remain double precision.
-- **Status**: supported — fresh Clang 23 focused UI/runtime/geometry 50/50 and
-  complete CPU/Null 4,078 pass plus one policy-defined GLFW/LSan skip, with
+- **Status**: supported — fresh Clang 23 focused UI/runtime/geometry 50/50,
+  three-menu headless presentation 3/3, and complete CPU/Null 4,078 pass plus
+  one policy-defined GLFW/LSan skip, with
   strict task, documentation, method-manifest, inventory, layering,
   test-layout, root-hygiene, and clean-workshop gates; no sanitizer,
   GPU/Vulkan, optimized-backend, or performance claim is made
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Falsification criteria**: A compatible float `vec3` property is hidden or
-  rejected because of its name, handle wrapper, element domain, or mesh/graph
-  provenance; the panel bypasses the runtime availability/config/submit path;
+- **Falsification criteria**: Any Mesh, Graph, or PointCloud Processing entry
+  is missing or does not open the shared panel path; a compatible float `vec3`
+  property is hidden or rejected because of its name, handle wrapper, element
+  domain, or mesh/graph provenance; the panel bypasses the runtime
+  availability/config/submit path;
   it permits a topology-bearing count change; publication targets another
   entity/domain or mutates geometry directly; or a canonical published mesh
   vector quantity is stored as a public double-vector property.
@@ -888,9 +892,11 @@
   src/runtime/Runtime.GeometryProcessingOperations.cppm,
   src/geometry/Geometry.HalfedgeMesh.Utils.cppm,
   tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp,
+  tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
   tests/unit/geometry/Test_MeshQuantities.cpp,
-  tasks/evidence/UI-039/commands/focused-tests.json,
-  tasks/evidence/UI-039/commands/ci-tests.json]
+  tasks/evidence/UI-039/commands/review-repair-focused-tests.json,
+  tasks/evidence/UI-039/commands/review-repair-presentation-tests.json,
+  tasks/evidence/UI-039/commands/review-repair-cpu-tests-r2.json]
 - **Dependencies**: [C18, C28]
 - **Tags**: app, runtime, geometry, point set, property domains, LOP, WLOP,
   CLOP, EAR, UI, CPU, float properties

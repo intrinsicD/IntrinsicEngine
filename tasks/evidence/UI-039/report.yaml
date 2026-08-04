@@ -3,12 +3,12 @@ task_id: UI-039
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-04T19:28:03Z'
+generated_at: '2026-08-04T19:32:47Z'
 claim_eligible: false
 source:
   base_ref: 19a6551f
   base_revision: 19a6551f9378ba9633dde48f6f410046766f39f1
-  head_revision: e4133e1f5fdc009aaf64ac4e296c30eeabfc0072
+  head_revision: ced7ef08c814915705304ce1688d663a45dfb5a6
   branch: feature/ui-039-lop-multi-domain-discovery
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
@@ -70,14 +70,14 @@ source:
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: f984dc2044994283a053a220769103be6648560e5fc0e6f7921160511ce7c1d3
   - path: tasks/done/UI-039-lop-multi-domain-discovery.md
-    sha256: a91b4dcdb36c8121941fd980049f85cc49413df41617c4747c01a07c1c714722
+    sha256: c76237e5ae742a7e3920622f132ae436b2f43ca5498581b4ff499ba2205d6d36
   - path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
     sha256: ee4746731554a11023da8d5df682e627689cce583081212a0bfaf746b59faa15
   - path: tests/unit/geometry/Test_MeshQuantities.cpp
     sha256: d4a22b774ee513c4c22f0add046cbc2959a0b2af609a1d1a93f5baddb9540e31
   - path: tools/agents/skills/intrinsicengine-method/references/method-workflow.md
     sha256: 71d646aa54b0cd6897fb1f63e7a83be07ab45550ba05775e7ab6c12390f18f9f
-  content_digest: 2affa57eb08e6b83567314d85bccf6da43fc76632a53323d4634b2988f434b8e
+  content_digest: bef87e5ba0770818299b1005841ee1706d1de8564cb88bfa9f8ff52b78740562
 touched:
   paths:
   - AGENTS.md
@@ -173,6 +173,11 @@ commands:
 - receipt: tasks/evidence/UI-039/commands/isolated-test-layout.json
 - receipt: tasks/evidence/UI-039/commands/isolated-validate-tasks.json
 - receipt: tasks/evidence/UI-039/commands/layering.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-diff-check.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-task-policy.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-task-state-links.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-validate-tasks.json
 - receipt: tasks/evidence/UI-039/commands/method-manifests.json
 - receipt: tasks/evidence/UI-039/commands/module-inventory.json
 - receipt: tasks/evidence/UI-039/commands/pre-retirement-ara-claims.json
@@ -231,7 +236,7 @@ skipped_checks:
     headless integration tests are the durable UI evidence
 artifacts:
 - path: tasks/done/UI-039-lop-multi-domain-discovery.md
-  sha256: a91b4dcdb36c8121941fd980049f85cc49413df41617c4747c01a07c1c714722
+  sha256: c76237e5ae742a7e3920622f132ae436b2f43ca5498581b4ff499ba2205d6d36
   kind: file
 - path: docs/reviews/2026-08-04-ui-039-clean-workshop-review.md
   sha256: e8cbc4c5eeac38e5b3bb1d64171d070d39c281ddd267c715a0e25f40fae7f7a1

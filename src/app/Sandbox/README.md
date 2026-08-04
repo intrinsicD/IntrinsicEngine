@@ -198,14 +198,14 @@ surfaces, and the sandbox app
 still does not own selection, ECS mutation, method jobs, rendering, or asset
 state.
 
-`PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` exposes exactly
-the four promoted CPU-reference strategies. The `PointCloud` menu location
-names their least-structured point-set contract; it does not require a selected
-point-cloud entity. A Position slot accepts any finite `vec3` property in the
-selected entity's canonical property catalog, including mesh `v:position` or
-`f:centroid`, and an optional Normal slot accepts a count-matched `vec3` on the
-same element domain. Named Position/Normal outputs publish on that domain
-without a property alias or converted entity. Shared controls cover support
+`Mesh`, `Graph`, and `PointCloud` each expose a stable `Processing >
+Consolidate (LOP/WLOP/CLOP/EAR)` entry. All three open the same panel path and
+shared state; the menu location is only a discovery surface and does not gate
+the selected entity's provenance. A Position slot accepts any finite `vec3`
+property in the selected entity's canonical property catalog, including mesh
+`v:position` or `f:centroid`, and an optional Normal slot accepts a
+count-matched `vec3` on the same element domain. Named Position/Normal outputs
+publish on that domain without a property alias or converted entity. Shared controls cover support
 radius, repulsion, stopping criteria, target count, and seed; strategy-specific
 controls cover WLOP anisotropy, CLOP mixture fitting, and EAR normal policy,
 refinement, and edge sensitivity. The window keeps a panel-local draft and

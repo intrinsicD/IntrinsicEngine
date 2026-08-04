@@ -1944,17 +1944,19 @@ observations:
     timestamp: "2026-08-04T21:19+02:00"
     provenance: ai-executed
     content: >
-      The single Sandbox LOP-family panel binds typed Position, optional Normal,
-      and output properties across compatible mesh, graph, and point-cloud
-      element domains through the same runtime readiness/config/submit path;
+      Stable Mesh, Graph, and PointCloud Processing registrations open one
+      shared Sandbox LOP-family panel/state, which binds typed Position,
+      optional Normal, and output properties across compatible element domains
+      through the same runtime readiness/config/submit path;
       canonical published mesh vector quantities use float storage while their
       direct computations retain double precision.
     context: >
-      UI-039 removed the PointCloud-provenance gate, reused the canonical
-      property catalog and RUNTIME-206 publication preflight, passed 50 focused
-      UI/runtime/geometry cases and the complete CPU/Null selector with zero
-      failures, and added no converter, direct app mutation, GPU backend, or
-      performance claim.
+      UI-039 removed provenance gating, reused the canonical property catalog
+      and RUNTIME-206 publication preflight, rendered all three registered
+      windows in the headless ImGui path, passed 50 focused
+      UI/runtime/geometry cases, the 3-case menu presentation selector, and the
+      complete CPU/Null selector with zero failures, and added no converter,
+      direct app mutation, GPU backend, or performance claim.
     potential_type: claim
     bound_to: [N355, N356, N359]
     promoted: true
