@@ -2,9 +2,9 @@ session:
   id: "2026-08-04_001"
   date: "2026-08-04"
   started: "2026-08-04T01:10+02:00"
-  last_turn: "2026-08-04T23:06+02:00"
-  turn_count: 4
-  summary: "Retired the final active tasks, converged every branch history, and diagnosed child.obj's absent LOP render response as long-running serial CPU work before publication."
+  last_turn: "2026-08-04T23:21+02:00"
+  turn_count: 5
+  summary: "Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication, and opened a property-specific neighborhood-scale design for automatic radii."
 
 events_logged:
   - turn: 1
@@ -79,6 +79,30 @@ events_logged:
     routing: staged
     provenance: ai-suggested
     summary: "Staged workload guard, in-flight deduplication, cancellation, and combined render-proof requirements."
+  - turn: 5
+    type: question
+    id: "N367"
+    routing: direct
+    provenance: user
+    summary: "Asked for one fast default-radius recommendation path shared by radius-using methods and whether it should be entity component state."
+  - turn: 5
+    type: claim
+    id: "C30"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized explicit post-publication LOP render invalidation after the researcher pivoted from the resolved diagnosis to automatic radius selection."
+  - turn: 5
+    type: observation
+    id: "O119"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged bounded robust k-distance profiling plus method-specific neighbor policies as the shared automatic-radius architecture."
+  - turn: 5
+    type: observation
+    id: "O120"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged config-owned auto/manual intent and a property-revision-keyed runtime cache instead of one entity scalar."
 
 ai_actions:
   - turn: 1
@@ -121,6 +145,16 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-08-04_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 5
+    action: "Audited existing point-cloud statistics, radius consumers, KD-tree reuse, canonical property-domain resolution, mutable PropertySet revision support, and the original WLOP default-radius guidance; recorded the unresolved architecture alternatives."
+    provenance: ai-executed
+    files_changed:
+      - "ara/logic/claims.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-08-04_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched:
   - id: C27
@@ -132,6 +166,9 @@ claims_touched:
   - id: C29
     action: confirmed
     turn: 2
+  - id: C30
+    action: crystallized
+    turn: 5
 
 key_context:
   - turn: 1
@@ -150,11 +187,18 @@ key_context:
     excerpt: "GPU invalidation is explicit and post-publication; the active child.obj jobs are still Queued, so no property mutation or dirty upload has occurred."
   - turn: 4
     excerpt: "The live Sandbox has five CPU-bound worker threads executing the serial reference on 50,002 samples with a radius that spans most of the model."
+  - turn: 5
+    excerpt: "The user requires a general fast recommendation consumed by every applicable support-radius method and asked whether the recommendation should be queryable entity state."
+  - turn: 5
+    excerpt: "One entity-wide radius is ambiguous because the selected property domain and each method's desired neighborhood cardinality determine the useful scale."
 
 open_threads:
   - "The three merged local feature branches may be deleted after explicit authorization; remote refs, eleven clean temporary worktrees, and two redundant stashes require separately scoped cleanup."
   - "Decide whether to add LOP in-flight deduplication/cancellation, a practical workload guard, and a combined canonical-publication-to-render-residency regression."
+  - "Choose and task the shared bounded k-distance profile, per-method policies, auto/manual config schema, and source-revision/cache ownership for support-radius recommendations."
 
 ai_suggestions_pending:
   - "For a bounded child.obj check, restart to cancel the five jobs, use canonical v:position, a much smaller local support radius, and one iteration."
   - "Track and implement the LOP queued-work UX and combined render regression as a scoped follow-up."
+  - "Use deterministic sampled k-neighbor distance quantiles as shared geometry facts, then map them to support radii through explicit method policies; retain bounds only for diagnostics and fallback."
+  - "Persist Auto versus Manual intent in config and keep any reusable profile in a property-revision-keyed runtime sidecar rather than an authored entity scalar."

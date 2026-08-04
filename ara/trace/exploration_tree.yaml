@@ -8674,3 +8674,15 @@ tree:
       reads canonical v:position. No existing test combines direct OBJ import,
       LOP completion, and a render-residency fingerprint assertion.
     status: resolved
+  - id: N367
+    type: question
+    title: "Choose a general fast support-radius recommendation contract"
+    provenance: user
+    timestamp: "2026-08-04T23:21+02:00"
+    also_depends_on: [N366]
+    description: >
+      Decide whether geometry methods should derive default support radii from
+      a bounding-volume fraction or sampled spatial distances, how every
+      radius-using method should consume the recommendation, and whether the
+      result belongs in an entity component that callers can query.
+    status: open

@@ -1980,9 +1980,9 @@ observations:
       symptom from asset residency and the GPU upload implementation.
     potential_type: claim
     bound_to: [N364, N365, N366]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/claims.md:C30"
+    crystallized_via: empirical-resolution
     stale: false
   - id: O118
     timestamp: "2026-08-04T23:06+02:00"
@@ -2000,6 +2000,50 @@ observations:
       and render invalidation only as separate halves.
     potential_type: constraint
     bound_to: [N366]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O119
+    timestamp: "2026-08-04T23:21+02:00"
+    provenance: ai-suggested
+    content: >
+      Automatic geometry-neighborhood radii should resolve in two stages: a
+      geometry-owned, entity-agnostic profile computes robust quantiles of
+      distinct k-nearest-neighbor distances from a bounded deterministic
+      sample of the selected finite vec3 property, then each method chooses
+      its own target neighbor count and coverage quantile. Bounding-box scale
+      is diagnostic and fallback data rather than the primary radius.
+    context: >
+      The existing point-cloud statistics already build a spatial index and
+      sample nearest-neighbor spacing, while the WLOP literature combines
+      bounds with sample count. A fixed diagonal percentage is density-blind,
+      and one global multiplier cannot express the neighborhood semantics of
+      consolidation, outlier removal, local fitting, and physics kernels.
+    potential_type: architecture
+    bound_to: [N367]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O120
+    timestamp: "2026-08-04T23:21+02:00"
+    provenance: ai-suggested
+    content: >
+      A computed radius recommendation should not be one authored ECS scalar.
+      Automatic/manual intent belongs in serializable method config; any
+      reusable computed profile belongs in a runtime-derived cache keyed by
+      entity, full GeometryPropertyRef, source-data revision, and estimator
+      version. Until property mutation has a reliable revision contract, the
+      execution path should recompute the bounded profile rather than trust a
+      stale cache.
+    context: >
+      One entity can expose differently spaced vertex, edge, halfedge, face,
+      graph, and point-cloud properties, geometry and method layers cannot
+      query live ECS ownership, and PropertySet currently exposes mutable
+      handles without a tracked value revision.
+    potential_type: architecture
+    bound_to: [N367]
     promoted: false
     promoted_to: null
     crystallized_via: null

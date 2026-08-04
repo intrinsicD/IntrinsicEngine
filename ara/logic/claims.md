@@ -901,3 +901,31 @@
 - **Tags**: app, runtime, geometry, point set, property domains, LOP, WLOP,
   CLOP, EAR, UI, CPU, float properties
 - **From staging**: O116
+
+## C30: Canonical LOP publication explicitly invalidates render residency
+- **Statement**: An asynchronous LOP-family request changes rendered mesh
+  positions only after successful runtime publication. Publishing canonical
+  mesh `v:position` explicitly stamps GPU and vertex-position dirty state, and
+  render extraction then repacks that channel; queued or still-running work
+  has not mutated the property, and publication to another property name does
+  not change the canonical rendered position channel.
+- **Status**: supported — source-path tracing and focused direct-OBJ,
+  LOP-publication, and dirty-position reupload contracts; no completed
+  child.obj end-to-end render fingerprint or GPU/Vulkan performance claim
+- **Provenance**: ai-suggested
+- **Crystallized via**: empirical-resolution
+- **Falsification criteria**: A successfully published canonical mesh
+  position result omits the required dirty state or is not repacked by render
+  extraction; a queued/running request mutates the source before publication;
+  or publishing only a non-canonical output property changes the packed
+  canonical position channel.
+- **Proof**: [src/runtime/Runtime.PointCloudConsolidationModule.cpp,
+  src/runtime/Runtime.RenderExtraction.cpp,
+  src/runtime/Runtime.GeometryPlanBuilders.Mesh.cpp,
+  tests/contract/runtime/Test.PointCloudConsolidationModule.cpp,
+  tests/contract/runtime/Test.AssetImportFormatCoverage.cpp,
+  tests/integration/runtime/Test.RuntimeRenderExtraction.cpp]
+- **Dependencies**: [C28, C29]
+- **Tags**: runtime, geometry, LOP, publication, dirty state, render residency,
+  CPU
+- **From staging**: O117
