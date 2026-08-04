@@ -8685,4 +8685,34 @@ tree:
       a bounding-volume fraction or sampled spatial distances, how every
       radius-using method should consume the recommendation, and whether the
       result belongs in an entity component that callers can query.
-    status: open
+    status: resolved
+  - id: N368
+    type: decision
+    title: "Adopt property-specific automatic radius resolution"
+    provenance: user-revised
+    timestamp: "2026-08-04T23:30+02:00"
+    also_depends_on: [N367]
+    choice: >
+      Adopt bounded k-neighbor distance profiles plus method-specific radius
+      policies, persist automatic/manual intent in config, and avoid one
+      authored entity-wide support-radius component.
+    alternatives:
+      - "Use a fixed percentage of the entity bounding-box diagonal."
+      - "Persist one computed support-radius scalar on each entity."
+      - "Let every method invent an unrelated default-radius estimator."
+    evidence:
+      - "User affirmation: ok yes."
+      - "O119: bounded robust k-distance profile architecture"
+      - "O120: config and derived-cache ownership architecture"
+    status: resolved
+  - id: N369
+    type: question
+    title: "Specify support-neighborhood spatial query mechanics"
+    provenance: user
+    timestamp: "2026-08-04T23:30+02:00"
+    also_depends_on: [N367, N368]
+    description: >
+      Clarify whether an arbitrary resolved support radius is evaluated through
+      an octree or KD-tree sphere query and how broad-phase candidates become
+      exact support members.
+    status: resolved

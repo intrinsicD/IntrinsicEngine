@@ -2,9 +2,9 @@ session:
   id: "2026-08-04_001"
   date: "2026-08-04"
   started: "2026-08-04T01:10+02:00"
-  last_turn: "2026-08-04T23:21+02:00"
-  turn_count: 5
-  summary: "Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication, and opened a property-specific neighborhood-scale design for automatic radii."
+  last_turn: "2026-08-04T23:30+02:00"
+  turn_count: 6
+  summary: "Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication, and adopted property-specific k-distance profiles with KD-tree radius execution."
 
 events_logged:
   - turn: 1
@@ -103,6 +103,30 @@ events_logged:
     routing: staged
     provenance: ai-suggested
     summary: "Staged config-owned auto/manual intent and a property-revision-keyed runtime cache instead of one entity scalar."
+  - turn: 6
+    type: decision
+    id: "N368"
+    routing: direct
+    provenance: user-revised
+    summary: "Adopted property-specific bounded k-distance profiles, method policies, config-owned intent, and no entity-wide radius scalar."
+  - turn: 6
+    type: question
+    id: "N369"
+    routing: direct
+    provenance: user
+    summary: "Asked whether arbitrary support radii use octree or KD-tree sphere queries and how exact membership is decided."
+  - turn: 6
+    type: architecture
+    id: "A30"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized k-neighbor recommendation plus KD-tree radius execution through verbal affirmation of O119."
+  - turn: 6
+    type: architecture
+    id: "A31"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized auto/manual config and derived revision-keyed runtime profile ownership through verbal affirmation of O120."
 
 ai_actions:
   - turn: 1
@@ -155,6 +179,16 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-08-04_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 6
+    action: "Confirmed the exact LOP query path: KD-tree radius traversal prunes node AABBs by squared sphere distance, tests point leaves exactly, and the consolidation kernel reapplies its double-precision support cutoff after an outward-rounded float broad phase."
+    provenance: ai-executed
+    files_changed:
+      - "ara/logic/solution/architecture.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-08-04_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched:
   - id: C27
@@ -191,14 +225,16 @@ key_context:
     excerpt: "The user requires a general fast recommendation consumed by every applicable support-radius method and asked whether the recommendation should be queryable entity state."
   - turn: 5
     excerpt: "One entity-wide radius is ambiguous because the selected property domain and each method's desired neighborhood cardinality determine the useful scale."
+  - turn: 6
+    excerpt: "The user affirmed the property-specific automatic-radius architecture and requested the exact octree-versus-KD-tree support lookup mechanics."
+  - turn: 6
+    excerpt: "Recommendation uses sampled KNN distances; method execution uses KDTree::QueryRadius as an exact Euclidean sphere query over point AABBs."
 
 open_threads:
   - "The three merged local feature branches may be deleted after explicit authorization; remote refs, eleven clean temporary worktrees, and two redundant stashes require separately scoped cleanup."
   - "Decide whether to add LOP in-flight deduplication/cancellation, a practical workload guard, and a combined canonical-publication-to-render-residency regression."
-  - "Choose and task the shared bounded k-distance profile, per-method policies, auto/manual config schema, and source-revision/cache ownership for support-radius recommendations."
+  - "Task and implement the adopted bounded k-distance profile, per-method policies, auto/manual config schema, and source-revision/cache ownership for support-radius recommendations."
 
 ai_suggestions_pending:
   - "For a bounded child.obj check, restart to cancel the five jobs, use canonical v:position, a much smaller local support radius, and one iteration."
   - "Track and implement the LOP queued-work UX and combined render regression as a scoped follow-up."
-  - "Use deterministic sampled k-neighbor distance quantiles as shared geometry facts, then map them to support radii through explicit method policies; retain bounds only for diagnostics and fallback."
-  - "Persist Auto versus Manual intent in config and keep any reusable profile in a property-revision-keyed runtime sidecar rather than an authored entity scalar."

@@ -1401,3 +1401,10 @@ entries:
       - "Staged O120 separately because config/cache/component ownership can be accepted independently of the numerical estimator."
       - "Did not crystallize O118: automatic radius selection addresses workload risk but does not adopt cancellation, duplicate suppression, progress reporting, or the combined render regression."
       - "Recorded no timing, quality, GPU/Vulkan, or universal-radius capability claim; existing source inspection establishes available seams, not estimator performance."
+  - turn: "2026-08-04_001#6"
+    notes:
+      - "Routed the user's explicit yes as adoption decision N368 and the follow-up spatial-query question as resolved N369."
+      - "Crystallized O119 and O120 to A30 and A31 through verbal affirmation, upgrading their provenance from ai-suggested to user-revised."
+      - "Recorded recommendation-time KNN and execution-time KD-tree radius lookup in A30; the current exact source path supports the clarification without creating a new performance claim."
+      - "Kept O118 staged because accepting automatic radii does not accept cancellation, duplicate suppression, progress reporting, or an end-to-end render regression."
+      - "Left implementation as an open thread: adoption fixes architecture, but no task, module, config schema, benchmark, or engine behavior changed this turn."

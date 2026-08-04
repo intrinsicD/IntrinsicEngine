@@ -246,8 +246,8 @@ sessions:
     open_threads: 2
   - id: "2026-08-04_001"
     date: "2026-08-04"
-    summary: "Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication, and opened a property-specific neighborhood-scale design for automatic radii."
-    turn_count: 5
-    events_count: 16
+    summary: "Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication, and adopted property-specific k-distance profiles with KD-tree radius execution."
+    turn_count: 6
+    events_count: 20
     claims_touched: [C27, C28, C29, C30]
     open_threads: 3

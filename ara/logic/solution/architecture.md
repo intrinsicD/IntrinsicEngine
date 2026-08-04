@@ -447,3 +447,40 @@
   docs/architecture/method-api-contract.md,
   docs/architecture/contract-catalog.yaml]
 - **From staging**: O114
+
+## A30: Automatic Radii Derive from Property-Specific Neighborhood Profiles
+- **Decision**: A geometry-owned, entity-independent profile computes robust
+  quantiles of distinct k-nearest-neighbor distances over a bounded,
+  deterministic sample of the selected finite `vec3` property. Each method
+  maps that shared profile through its own target-neighbor and coverage policy;
+  bounding-box scale remains diagnostic/fallback data rather than the primary
+  radius. Recommendation uses k-nearest queries, while execution enumerates
+  support with the existing KD-tree radius query and applies the method
+  kernel's exact cutoff.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N367, N368, N369,
+  src/geometry/Geometry.KDTree.cppm,
+  src/geometry/Geometry.KDTree.cpp,
+  src/geometry/Geometry.PointCloud.Utils.cpp,
+  src/geometry/Geometry.PointCloud.Consolidation.cpp]
+- **From staging**: O119
+
+## A31: Automatic Radius Intent Is Config; Profiles Are Derived Runtime State
+- **Decision**: Radius-using operations persist validated `Auto` versus
+  `Manual` intent in serializable method config and pass an explicit resolved
+  world-unit radius to lower-layer kernels. A computed recommendation is not
+  one authored ECS scalar because it is specific to the full property domain
+  and method policy. If reuse warrants caching, runtime owns a derived profile
+  keyed by stable entity identity, full `GeometryPropertyRef`, source-data
+  revision, and estimator version; until mutation has a reliable revision
+  contract, execution recomputes the bounded profile rather than trusting
+  cached state.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N367, N368,
+  AGENTS.md,
+  src/geometry/Geometry.Properties.cppm,
+  src/runtime/Runtime.GeometryAvailability.cppm,
+  src/runtime/Runtime.PointCloudConsolidationConfig.cppm]
+- **From staging**: O120

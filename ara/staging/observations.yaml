@@ -2006,7 +2006,7 @@ observations:
     stale: false
   - id: O119
     timestamp: "2026-08-04T23:21+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       Automatic geometry-neighborhood radii should resolve in two stages: a
       geometry-owned, entity-agnostic profile computes robust quantiles of
@@ -2022,13 +2022,13 @@ observations:
       consolidation, outlier removal, local fitting, and physics kernels.
     potential_type: architecture
     bound_to: [N367]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A30"
+    crystallized_via: verbal-affirmation
     stale: false
   - id: O120
     timestamp: "2026-08-04T23:21+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       A computed radius recommendation should not be one authored ECS scalar.
       Automatic/manual intent belongs in serializable method config; any
@@ -2044,7 +2044,7 @@ observations:
       handles without a tracked value revision.
     potential_type: architecture
     bound_to: [N367]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A31"
+    crystallized_via: verbal-affirmation
     stale: false
