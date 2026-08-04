@@ -1408,3 +1408,11 @@ entries:
       - "Recorded recommendation-time KNN and execution-time KD-tree radius lookup in A30; the current exact source path supports the clarification without creating a new performance claim."
       - "Kept O118 staged because accepting automatic radii does not accept cancellation, duplicate suppression, progress reporting, or an end-to-end render regression."
       - "Left implementation as an open thread: adoption fixes architecture, but no task, module, config schema, benchmark, or engine behavior changed this turn."
+  - turn: "2026-08-04_001#7"
+    notes:
+      - "Routed the user's full-family acceleration request as open question N370; no backend or data-structure proposal is adopted yet."
+      - "Staged O121 as architecture: it selects the existing Vulkan seam and one fixed-radius cell-grid implementation without adding CUDA, LBVH, or a public neighbor-index framework."
+      - "Staged O122 as a heuristic because work bounding, static precomputation, fused traversal, and explicit CLOP selection describe how to retain effective scaling rather than a new capability claim."
+      - "Staged O123 as a constraint after the scientist pass found METHOD-019 and current ci-vulkan evidence too narrowly scoped for the proposed production performance decision; its historical negative result remains valid within its frozen Debug smoke."
+      - "Did not crystallize O118 or O121-O123: the user asked for a recommendation but has not affirmed one, and no new benchmark empirically resolves the alternatives."
+      - "Recorded the local GPU and source/preset audit as an AI action, not a performance experiment; no speedup, parity, Vulkan execution, or CUDA capability claim was added."

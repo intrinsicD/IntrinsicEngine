@@ -2,9 +2,9 @@ session:
   id: "2026-08-04_001"
   date: "2026-08-04"
   started: "2026-08-04T01:10+02:00"
-  last_turn: "2026-08-04T23:30+02:00"
-  turn_count: 6
-  summary: "Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication, and adopted property-specific k-distance profiles with KD-tree radius execution."
+  last_turn: "2026-08-04T23:45+02:00"
+  turn_count: 7
+  summary: "Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication, adopted property-specific radius profiles, and evaluated a Vulkan grid acceleration path."
 
 events_logged:
   - turn: 1
@@ -127,6 +127,30 @@ events_logged:
     routing: crystallized
     provenance: user-revised
     summary: "Crystallized auto/manual config and derived revision-keyed runtime profile ownership through verbal affirmation of O120."
+  - turn: 7
+    type: question
+    id: "N370"
+    routing: direct
+    provenance: user
+    summary: "Asked for the effective CPU, CUDA/Vulkan, data-structure, and algorithmic acceleration strategy for radius determination and the full LOP family."
+  - turn: 7
+    type: observation
+    id: "O121"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged Vulkan compute with a fixed-radius count-scan-scatter cell grid as the first production GPU architecture."
+  - turn: 7
+    type: observation
+    id: "O122"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged work bounding, fused neighbor accumulation, static precomputation, and revision-keyed CLOP mixture reuse before backend acceleration."
+  - turn: 7
+    type: observation
+    id: "O123"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged successful scale-corpus and unsanitized Release Vulkan evidence as prerequisites for backend performance claims."
 
 ai_actions:
   - turn: 1
@@ -189,6 +213,15 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-08-04_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 7
+    action: "Audited the frozen METHOD-019 comparison, unblocked METHOD-020 Vulkan plan, current consolidation phase structure, CPU/GPU presets, compute primitives, CUDA surface, local RTX 3050 CUDA/Vulkan capabilities, and primary GPU grid/BVH/CLOP sources; produced a bounded acceleration recommendation without running a performance benchmark."
+    provenance: ai-executed
+    files_changed:
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-08-04_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched:
   - id: C27
@@ -229,12 +262,20 @@ key_context:
     excerpt: "The user affirmed the property-specific automatic-radius architecture and requested the exact octree-versus-KD-tree support lookup mechanics."
   - turn: 6
     excerpt: "Recommendation uses sampled KNN distances; method execution uses KDTree::QueryRadius as an exact Euclidean sphere query over point AABBs."
+  - turn: 7
+    excerpt: "The user requested one recommendation spanning default-radius cost, LOP-family data structures, CPU versus CUDA/Vulkan backends, and alternative formulations."
+  - turn: 7
+    excerpt: "The proposed ordering is work bounding first, CPU KNN recommendation, Vulkan fixed-radius grid execution, then evidence-triggered LBVH/CUDA or method variants."
 
 open_threads:
   - "The three merged local feature branches may be deleted after explicit authorization; remote refs, eleven clean temporary worktrees, and two redundant stashes require separately scoped cleanup."
   - "Decide whether to add LOP in-flight deduplication/cancellation, a practical workload guard, and a combined canonical-publication-to-render-residency regression."
   - "Task and implement the adopted bounded k-distance profile, per-method policies, auto/manual config schema, and source-revision/cache ownership for support-radius recommendations."
+  - "Decide whether to adopt and task the proposed Vulkan fixed-grid backend, Release GPU benchmark identity, and explicit CLOP large-source/caching policy before revising METHOD-020."
 
 ai_suggestions_pending:
   - "For a bounded child.obj check, restart to cancel the five jobs, use canonical v:position, a much smaller local support radius, and one iteration."
   - "Track and implement the LOP queued-work UX and combined render regression as a scoped follow-up."
+  - "Keep default-radius profiling on a bounded CPU KD-tree sample; use its resolved h to size a Vulkan count-scan-scatter cell grid for LOP-family execution."
+  - "Do not add CUDA or LBVH first; promote either only after a Release scale corpus falsifies the Vulkan cell-grid path on a named workload."
+  - "Separate ci-vulkan parity from an unsanitized Release Vulkan performance preset and record phase, workload, memory, and quality deltas."

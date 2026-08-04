@@ -8716,3 +8716,15 @@ tree:
       an octree or KD-tree sphere query and how broad-phase candidates become
       exact support members.
     status: resolved
+  - id: N370
+    type: question
+    title: "Choose an effective LOP-family acceleration strategy"
+    provenance: user
+    timestamp: "2026-08-04T23:45+02:00"
+    also_depends_on: [N366, N367, N368, N369]
+    description: >
+      Decide whether default-radius estimation and the LOP/WLOP/CLOP/EAR
+      implementations should use CUDA, Vulkan compute, a different spatial
+      index, CPU parallelism, or a method-level reformulation, and define the
+      evidence sequence for an efficient production path.
+    status: open

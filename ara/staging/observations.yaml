@@ -2048,3 +2048,74 @@ observations:
     promoted_to: "logic/solution/architecture.md:A31"
     crystallized_via: verbal-affirmation
     stale: false
+  - id: O121
+    timestamp: "2026-08-04T23:45+02:00"
+    provenance: ai-suggested
+    content: >
+      The first production LOP-family GPU backend should remain the planned
+      Vulkan-compute path, using the CPU k-distance profile to choose h and a
+      GPU fixed-radius cell grid of width h for repeated support queries. Build
+      the source grid once; rebuild the moving projected grid each iteration
+      with count, prefix-scan, and scatter passes; stream exact neighbor
+      accumulation without materializing a global pair list; keep convergence
+      and iterations on-device and read back once. CUDA and GPU LBVH remain
+      measured follow-ups rather than parallel first implementations.
+    context: >
+      IntrinsicEngine already has an unblocked METHOD-020 Vulkan task, RHI
+      compute, scan/compaction, JobService, and batch readback seams, while
+      CUDA is only an opt-in build flag. Fixed h makes a cell list natural;
+      automatic h bounds occupancy, and the local RTX 3050 supports both CUDA
+      and operational Vulkan so hardware does not force a vendor-only path.
+    potential_type: architecture
+    bound_to: [N370]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O122
+    timestamp: "2026-08-04T23:45+02:00"
+    provenance: ai-suggested
+    content: >
+      LOP acceleration must reduce and measure work before asserting backend
+      speed: automatic h and a P50/P95/max neighbor-work guard precede GPU
+      dispatch; source indices and density weights are computed once; CLOP
+      mixtures are reusable only under an exact source-revision/parameter key;
+      per-iteration kernels fuse traversal and accumulation. CLOP is an
+      explicit large-source method choice, not a silent WLOP backend switch.
+    context: >
+      A radius spanning most of child.obj produced near-global neighborhoods,
+      which no processor can make asymptotically local. The CLOP paper reduces
+      discrete source attraction to a compact Gaussian mixture, while the
+      current engine refits that mixture per request and already keeps separate
+      method semantics.
+    potential_type: heuristic
+    bound_to: [N370]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O123
+    timestamp: "2026-08-04T23:45+02:00"
+    provenance: ai-suggested
+    content: >
+      Backend selection requires a successful, release-mode scale corpus and
+      phase accounting. The existing METHOD-019 result rejects only its exact
+      single-thread Debug micro-optimization candidates on 112-1024 point
+      smoke fixtures; it does not adjudicate parallel CPU, fixed grids,
+      child-scale workloads, or GPU execution. Vulkan parity should remain on
+      ci-vulkan, while performance evidence requires a separate unsanitized
+      Release Vulkan preset with CPU-reference quality deltas, device timing,
+      end-to-end timing, memory, grid-build, neighbor-count, contribution, and
+      convergence metrics.
+    context: >
+      METHOD-019 reported exact-parity ratios of about 0.96-1.04 under its
+      frozen scope, CMake identifies ci and ci-vulkan as Debug, and the current
+      METHOD-020 task asks its GPU benchmark to run under ci-vulkan. The repo
+      already has ci-release for CPU performance but no promoted-Vulkan Release
+      counterpart.
+    potential_type: constraint
+    bound_to: [N370]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
