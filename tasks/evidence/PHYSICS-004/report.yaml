@@ -3,15 +3,15 @@ task_id: PHYSICS-004
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-04T18:54:45Z'
+generated_at: '2026-08-04T18:55:15Z'
 claim_eligible: false
 source:
   base_ref: f3933a37
   base_revision: f3933a37e59ed1289e6281a9314014bf026e0574
-  head_revision: 55da43673a2b4e5c12bc3b070b918d662acca7aa
+  head_revision: 7f0c310067b49c3f5b451c2dd033df042a477c0c
   branch: feature/physics-004-runtime-module
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: ara/logic/claims.md
     sha256: 9c65e3a3633651fdb8edf2a94034ba999e8b3f810af94e2a351048bb9203902e
