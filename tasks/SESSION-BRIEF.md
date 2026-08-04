@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `PHYSICS-004` — Operational runtime physics module and bridge privatization (tasks/active/PHYSICS-004-operational-runtime-physics-module.md)
-- `UI-039` — Semantic point-set slot binding and LOP discovery (tasks/active/UI-039-lop-multi-domain-discovery.md)
 
 ## Theme B — Rendering modernization
 

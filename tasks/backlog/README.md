@@ -368,6 +368,8 @@ extension without rewriting that history. See the
 split and the
 [audit](../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md)
 for the revised scoped inventory.
+The LOP property-domain pair `RUNTIME-206`/`UI-039` is now fully retired;
+remaining rows keep their named runtime/UI owners.
 
 Open members (kernel-seam priority set first):
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
