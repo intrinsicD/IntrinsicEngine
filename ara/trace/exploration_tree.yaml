@@ -8617,3 +8617,60 @@ tree:
       were forensically matched to changes already committed or superseded on
       main; none was applied, dropped, or deleted.
     status: resolved
+  - id: N364
+    type: question
+    title: "Explain absent LOP render response on imported child mesh"
+    provenance: user
+    timestamp: "2026-08-04T23:06+02:00"
+    also_depends_on: [N356, N359]
+    description: >
+      Determine whether LOP-family publication on the imported child.obj mesh
+      should trigger a GPU vertex-buffer update and why the visible surface
+      does not respond after submitting LOP, WLOP, CLOP, or EAR.
+    status: resolved
+  - id: N365
+    type: dead_end
+    title: "Reject asset-source priority as the child.obj update blocker"
+    provenance: ai-executed
+    timestamp: "2026-08-04T23:06+02:00"
+    also_depends_on: [N364]
+    hypothesis: >
+      Direct OBJ import leaves AssetInstance::Source attached alongside mutable
+      GeometrySources, causing render extraction to prefer immutable asset
+      residency and ignore LOP-authored vertex properties.
+    failure_mode: >
+      The direct OBJ route materializes canonical GeometrySources and does not
+      attach AssetInstance::Source. Its focused import contract passed, so the
+      asset-residency exclusion branch does not explain this entity.
+    lesson: >
+      Standalone OBJ entities render from their mutable GeometrySources. Check
+      async publication state and reference-method workload before diagnosing
+      a dual-authority asset/GPU-residency defect.
+    evidence:
+      - "src/runtime/Runtime.AssetWorkflowImportExecutor.cpp: direct mesh materialization populates GeometrySources without AssetInstance::Source"
+      - "src/runtime/Runtime.RenderExtraction.cpp: GeometrySources residency is excluded only when a procedural or asset source is attached"
+      - "RuntimeAssetImportFormatCoverage.DirectObjImportPreservesVertexNormalsInGeometrySources: passed"
+    status: resolved
+  - id: N366
+    type: experiment
+    title: "Trace child.obj LOP publication through render invalidation"
+    provenance: ai-executed
+    timestamp: "2026-08-04T23:06+02:00"
+    also_depends_on: [N356, N359, N364, N365]
+    evidence:
+      - "assets/models/child.obj: 50,002 vertices, 100,000 faces, approximately unit-sized bounds"
+      - "src/runtime/Runtime.PointCloudConsolidationModule.cpp: runtime invokes cpu_reference and stamps GpuDirty plus canonical DirtyVertexPositions only after successful publication"
+      - "src/runtime/Runtime.RenderExtraction.cpp and Runtime.GeometryPlanBuilders.Mesh.cpp: dirty extraction repacks canonical v:position"
+      - "Focused contracts: direct OBJ import, LOP publication/dirty tags, and DirtyVertexPositions reupload all passed (3/3)"
+      - "Live build/dev/bin/ExtrinsicSandbox process 3463261: about 33 minutes elapsed at 468% aggregate CPU; five non-main runnable threads had each accumulated about 24-26 CPU minutes"
+    result: >
+      The CPU-to-render invalidation halves are operational, but the live runs
+      have not reached publication. child.obj's 50,002 samples are executing
+      through the serial cpu_reference with default support radius 1.0, which
+      spans most of the unit-sized model; repeated submissions occupy five
+      worker threads. Until one job completes and commits, v:position is
+      unchanged and no GPU dirty tag exists to consume. A separately named
+      output property would also remain visually inert because mesh packing
+      reads canonical v:position. No existing test combines direct OBJ import,
+      LOP completion, and a render-residency fingerprint assertion.
+    status: resolved

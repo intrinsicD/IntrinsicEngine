@@ -2,9 +2,9 @@ session:
   id: "2026-08-04_001"
   date: "2026-08-04"
   started: "2026-08-04T01:10+02:00"
-  last_turn: "2026-08-04T22:38+02:00"
-  turn_count: 3
-  summary: "Retired the final active tasks, preserved accepted three-domain LOP discovery, and converged every local and fetched branch history on a fully verified local main."
+  last_turn: "2026-08-04T23:06+02:00"
+  turn_count: 4
+  summary: "Retired the final active tasks, converged every branch history, and diagnosed child.obj's absent LOP render response as long-running serial CPU work before publication."
 
 events_logged:
   - turn: 1
@@ -49,6 +49,36 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Audited branches, detached worktrees, and stashes; connected the one superseded branch without changing the tree and passed the 4,079-case CPU plus strict structural gates."
+  - turn: 4
+    type: question
+    id: "N364"
+    routing: direct
+    provenance: user
+    summary: "Asked whether LOP property publication should update the GPU buffer and why child.obj remained visually unchanged."
+  - turn: 4
+    type: dead_end
+    id: "N365"
+    routing: direct
+    provenance: ai-executed
+    summary: "Ruled out AssetInstance source priority because direct OBJ import renders from mutable GeometrySources."
+  - turn: 4
+    type: experiment
+    id: "N366"
+    routing: direct
+    provenance: ai-executed
+    summary: "Confirmed the dirty-upload halves and found five long-running serial child.obj jobs had not reached publication."
+  - turn: 4
+    type: observation
+    id: "O117"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the distinction between explicit post-publication dirty tags and generic property observation."
+  - turn: 4
+    type: observation
+    id: "O118"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged workload guard, in-flight deduplication, cancellation, and combined render-proof requirements."
 
 ai_actions:
   - turn: 1
@@ -82,6 +112,15 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-08-04_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 4
+    action: "Traced LOP publication, direct OBJ materialization, dirty-tag extraction, and canonical mesh packing; ran three focused contracts; measured child.obj cardinality/bounds; and sampled the active Sandbox process and worker threads."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-08-04_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched:
   - id: C27
@@ -107,8 +146,15 @@ key_context:
     excerpt: "The only non-ancestor branch contained superseded UI-039 retirement wording, so its lineage was connected without replacing the accepted main tree."
   - turn: 3
     excerpt: "All local and fetched remote branches are now merged; branch, worktree, and stash deletion was not performed without explicit cleanup authorization."
+  - turn: 4
+    excerpt: "GPU invalidation is explicit and post-publication; the active child.obj jobs are still Queued, so no property mutation or dirty upload has occurred."
+  - turn: 4
+    excerpt: "The live Sandbox has five CPU-bound worker threads executing the serial reference on 50,002 samples with a radius that spans most of the model."
 
 open_threads:
   - "The three merged local feature branches may be deleted after explicit authorization; remote refs, eleven clean temporary worktrees, and two redundant stashes require separately scoped cleanup."
+  - "Decide whether to add LOP in-flight deduplication/cancellation, a practical workload guard, and a combined canonical-publication-to-render-residency regression."
 
-ai_suggestions_pending: []
+ai_suggestions_pending:
+  - "For a bounded child.obj check, restart to cancel the five jobs, use canonical v:position, a much smaller local support radius, and one iteration."
+  - "Track and implement the LOP queued-work UX and combined render regression as a scoped follow-up."

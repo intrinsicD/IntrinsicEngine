@@ -1963,3 +1963,44 @@ observations:
     promoted_to: "logic/claims.md:C29"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O117
+    timestamp: "2026-08-04T23:06+02:00"
+    provenance: ai-suggested
+    content: >
+      LOP-family property writes do not notify GPU residency generically. A
+      successful runtime publication explicitly stamps dirty tags; canonical
+      mesh v:position then causes render extraction to repack and upload the
+      position channel. The observed child.obj run remains visually unchanged
+      because its serial CPU jobs have not completed or published, while a
+      custom output name would not drive the canonical render position even
+      after publication.
+    context: >
+      Source tracing, three focused passing contracts, child.obj cardinality
+      and bounds inspection, and live process/thread sampling isolated the
+      symptom from asset residency and the GPU upload implementation.
+    potential_type: claim
+    bound_to: [N364, N365, N366]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O118
+    timestamp: "2026-08-04T23:06+02:00"
+    provenance: ai-suggested
+    content: >
+      An interactive serial-reference method lane should expose in-flight work,
+      prevent duplicate same-entity submissions, provide cancellation, and
+      warn or fail closed on neighborhood-work estimates that make a selected
+      support radius and sample count impractical. Its integration proof should
+      cover successful canonical publication through render-residency change.
+    context: >
+      The Sandbox panel accepts repeated submissions while the prior result is
+      Queued. Five long-running child.obj jobs saturated worker threads without
+      any progress/cancel affordance, and current contracts cover publication
+      and render invalidation only as separate halves.
+    potential_type: constraint
+    bound_to: [N366]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
