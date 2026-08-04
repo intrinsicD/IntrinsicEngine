@@ -8482,16 +8482,15 @@ tree:
     evidence:
       - "tasks/evidence/PHYSICS-004/commands/merged-ci-build.json: combined IntrinsicTests build passed"
       - "tasks/evidence/PHYSICS-004/commands/merged-focused-tests.json: 55/55 passed"
-      - "tasks/evidence/PHYSICS-004/commands/merged-ci-tests.json: 4,077 selected, 4,076 passed, zero failed, one policy GLFW/LSan skip"
+      - "tasks/evidence/PHYSICS-004/commands/merged-ci-tests.json: 4,077/4,077 passed with one policy GLFW/LSan skip"
       - "tasks/evidence/PHYSICS-004/commands/merged-asan-focused.json: 55/55 passed"
       - "tasks/evidence/PHYSICS-004/commands/merged-ubsan-focused.json: 55/55 passed"
       - "tasks/evidence/PHYSICS-004/commands/merged-structural.json: strict structural bundle passed"
       - "tasks/evidence/PHYSICS-004/report.yaml: clean revision ea5c87da and content digest 72f344b4"
     result: >
       The exact combined source built with the canonical Clang 23 ci preset,
-      passed the 55-case physics/runtime/domain integration selector, selected
-      4,077 CPU-supported cases with 4,076 passed and one policy skip, passed
-      the same 55 cases under ASan and
+      passed the 55-case physics/runtime/domain integration selector, passed
+      all 4,077 CPU-supported tests, passed the same 55 cases under ASan and
       UBSan, and passed strict task, layering, documentation, layout, hygiene,
       ARA, skill-mirror, clean-workshop, and diff checks. Local main now
       contains RUNTIME-206 and PHYSICS-004 at 9702c88f. PHYSICS-004 remains
