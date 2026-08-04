@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- `UI-039` — Semantic point-set slot binding and LOP discovery
-  (`in-progress`; owner: `codex-slot-binding`; branch: `main`). Implementation
-  and CPU verification are complete; next action is the required independent
-  high-risk review against the final evidence revision/content digest.
+- None.
 
 ## History
 

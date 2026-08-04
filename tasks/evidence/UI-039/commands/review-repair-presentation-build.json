@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicSandboxEditorIntegrationTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests",
+  "cwd": ".",
+  "duration_ms": 19667,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T19:46:41Z",
+  "label": "review-repair-presentation-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:46:21Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/review-repair-presentation-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-039/commands/review-repair-presentation-build.stdout.log",
+  "stdout_sha256": "d937a9e55a49ebb9cdc7b1ee09a61e2668839fb3dc9772fa6f3257bece4991a9",
+  "task_id": "UI-039"
+}

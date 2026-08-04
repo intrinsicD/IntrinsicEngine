@@ -1,0 +1,113 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  761: PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField
+ 1/50 Test  #761: PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField ....................................   Passed    0.01 sec
+      Start  762: PointCloudConsolidationModule.AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain
+ 2/50 Test  #762: PointCloudConsolidationModule.AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain ..........   Passed    0.00 sec
+      Start  763: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo
+ 3/50 Test  #763: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo ......................   Passed    0.04 sec
+      Start  764: PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion
+ 4/50 Test  #764: PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion .......   Passed    0.04 sec
+      Start  765: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+ 5/50 Test  #765: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ................................   Passed    0.25 sec
+      Start  766: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput
+ 6/50 Test  #766: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput ..............   Passed    0.04 sec
+      Start 1177: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState
+ 7/50 Test #1177: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState ..............   Passed    0.10 sec
+      Start 1210: SandboxPointCloudConsolidationPanel.ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath
+ 8/50 Test #1210: SandboxPointCloudConsolidationPanel.ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath ...   Passed    0.04 sec
+      Start 1211: SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed
+ 9/50 Test #1211: SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed ..............   Passed    0.00 sec
+      Start 1212: SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure
+10/50 Test #1212: SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure ..........   Passed    0.00 sec
+      Start 1213: SandboxPointCloudConsolidationPanel.MeshVertexAndFaceSlotsUseTheSameEditorPreflight
+11/50 Test #1213: SandboxPointCloudConsolidationPanel.MeshVertexAndFaceSlotsUseTheSameEditorPreflight .............   Passed    0.04 sec
+      Start 1214: SandboxPointCloudConsolidationPanel.GraphAndPointCloudPositionsUseTheSemanticEditorPreflight
+12/50 Test #1214: SandboxPointCloudConsolidationPanel.GraphAndPointCloudPositionsUseTheSemanticEditorPreflight ....   Passed    0.04 sec
+      Start 1215: SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace
+13/50 Test #1215: SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace ...   Passed    0.04 sec
+      Start 1357: GeometryMeshQuantities.SingleTriangleAreaVectorCentroid
+14/50 Test #1357: GeometryMeshQuantities.SingleTriangleAreaVectorCentroid .........................................   Passed    0.00 sec
+      Start 1358: GeometryMeshQuantities.BarycentricAreasSumToSurfaceArea
+15/50 Test #1358: GeometryMeshQuantities.BarycentricAreasSumToSurfaceArea .........................................   Passed    0.00 sec
+      Start 1359: GeometryMeshQuantities.EquilateralTriangleAreaIsAnalytic
+16/50 Test #1359: GeometryMeshQuantities.EquilateralTriangleAreaIsAnalytic ........................................   Passed    0.00 sec
+      Start 1360: GeometryMeshQuantities.ClosedMeshAreaVectorsSumToZero
+17/50 Test #1360: GeometryMeshQuantities.ClosedMeshAreaVectorsSumToZero ...........................................   Passed    0.00 sec
+      Start 1361: GeometryMeshQuantities.PublishCanonicalQuantityProperties
+18/50 Test #1361: GeometryMeshQuantities.PublishCanonicalQuantityProperties .......................................   Passed    0.00 sec
+      Start 1362: GeometryMeshQuantities.FaceCentroidIsCornerAverageNotOneRing
+19/50 Test #1362: GeometryMeshQuantities.FaceCentroidIsCornerAverageNotOneRing ....................................   Passed    0.00 sec
+      Start 1363: GeometryMeshQuantities.FailClosedOnInvalidFace
+20/50 Test #1363: GeometryMeshQuantities.FailClosedOnInvalidFace ..................................................   Passed    0.00 sec
+      Start 1364: GeometryMeshQuantities.FaceScalarGradientMatchesLinearField
+21/50 Test #1364: GeometryMeshQuantities.FaceScalarGradientMatchesLinearField .....................................   Passed    0.00 sec
+      Start 1365: GeometryMeshQuantities.FaceScalarGradientFailsClosed
+22/50 Test #1365: GeometryMeshQuantities.FaceScalarGradientFailsClosed ............................................   Passed    0.00 sec
+      Start 1366: GeometryMeshQuantities.ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices
+23/50 Test #1366: GeometryMeshQuantities.ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices ...............   Passed    0.00 sec
+      Start 1367: GeometryMeshQuantities.VertexOneRingPcaAlignsWithSphereNormal
+24/50 Test #1367: GeometryMeshQuantities.VertexOneRingPcaAlignsWithSphereNormal ...................................   Passed    0.00 sec
+      Start 1368: GeometryMeshQuantities.VertexOneRingPcaFailsClosedWhenUnderdetermined
+25/50 Test #1368: GeometryMeshQuantities.VertexOneRingPcaFailsClosedWhenUnderdetermined ...........................   Passed    0.00 sec
+      Start 1369: GeometryMeshQuantities.NonPlanarQuadAreaUsesTriangleFan
+26/50 Test #1369: GeometryMeshQuantities.NonPlanarQuadAreaUsesTriangleFan .........................................   Passed    0.00 sec
+      Start 1370: GeometryMeshQuantities.PlanarConcavePolygonUsesShoelaceArea
+27/50 Test #1370: GeometryMeshQuantities.PlanarConcavePolygonUsesShoelaceArea .....................................   Passed    0.00 sec
+      Start 1371: GeometryMeshQuantities.FailClosedOnNonFiniteCorner
+28/50 Test #1371: GeometryMeshQuantities.FailClosedOnNonFiniteCorner ..............................................   Passed    0.00 sec
+      Start 2368: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic
+29/50 Test #2368: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic ....................   Passed    0.02 sec
+      Start 2369: PointCloudConsolidation.OptimizedCandidateFailureMatchesReference
+30/50 Test #2369: PointCloudConsolidation.OptimizedCandidateFailureMatchesReference ...............................   Passed    0.00 sec
+      Start 2370: PointCloudConsolidation.WlopDenoisesPlaneAndSphere
+31/50 Test #2370: PointCloudConsolidation.WlopDenoisesPlaneAndSphere ..............................................   Passed    0.01 sec
+      Start 2371: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast
+32/50 Test #2371: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast ................................   Passed    0.01 sec
+      Start 2372: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature
+33/50 Test #2372: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature .......................................   Passed    0.01 sec
+      Start 2373: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable
+34/50 Test #2373: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable ...........................   Passed    0.01 sec
+      Start 2374: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload
+35/50 Test #2374: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload ...............................   Passed    0.00 sec
+      Start 2375: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing
+36/50 Test #2375: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing ......................................   Passed    0.01 sec
+      Start 2376: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle
+37/50 Test #2376: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle ....................................   Passed    0.00 sec
+      Start 2377: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop
+38/50 Test #2377: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop ................................   Passed    0.01 sec
+      Start 2378: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch
+39/50 Test #2378: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch .......................   Passed    0.01 sec
+      Start 2379: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation
+40/50 Test #2379: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation ...............................   Passed    0.00 sec
+      Start 2380: PointCloudConsolidation.ClopDenoisesPlaneAndSphere
+41/50 Test #2380: PointCloudConsolidation.ClopDenoisesPlaneAndSphere ..............................................   Passed    0.02 sec
+      Start 2381: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop
+42/50 Test #2381: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop ..................................   Passed    0.02 sec
+      Start 2382: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded
+43/50 Test #2382: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded ..................................   Passed    0.01 sec
+      Start 2383: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed
+44/50 Test #2383: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed .......................................   Passed    0.01 sec
+      Start 2384: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic
+45/50 Test #2384: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic ..................................   Passed    0.05 sec
+      Start 2385: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic
+46/50 Test #2385: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic ................................   Passed    0.01 sec
+      Start 2386: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic
+47/50 Test #2386: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic ............................   Passed    0.01 sec
+      Start 2387: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions
+48/50 Test #2387: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions ...........................   Passed    0.00 sec
+      Start 2388: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite
+49/50 Test #2388: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite ...............................   Passed    0.01 sec
+      Start 2389: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots
+50/50 Test #2389: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots ........................................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 50
+
+Label Time Summary:
+contract       =   0.38 sec*proc (6 tests)
+geometry       =   0.30 sec*proc (37 tests)
+integration    =   0.26 sec*proc (7 tests)
+runtime        =   0.64 sec*proc (13 tests)
+unit           =   0.30 sec*proc (37 tests)
+
+Total Test time (real) =   1.08 sec

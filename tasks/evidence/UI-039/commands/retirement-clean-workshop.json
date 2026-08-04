@@ -1,0 +1,21 @@
+{
+  "command": [
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 1852,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T19:21:37Z",
+  "label": "retirement-clean-workshop",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:21:35Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/retirement-clean-workshop.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-039/commands/retirement-clean-workshop.stdout.log",
+  "stdout_sha256": "ddd2d89c0a2d3c924c795bcdaee8975467432e4f87032a0a4a5cb9c0606fa4da",
+  "task_id": "UI-039"
+}

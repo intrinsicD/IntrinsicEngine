@@ -923,7 +923,18 @@ namespace Extrinsic::Sandbox::Editor
                 "mesh.processing.progressive_poisson",
                 {"Mesh", "Processing"},
                 "Mesh / Processing / Progressive Poisson");
-            RegisterPointCloudConsolidationWindow();
+            RegisterPointSetConsolidationWindow(
+                "pointcloud.processing.consolidation",
+                {"PointCloud", "Processing"},
+                "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)");
+            RegisterPointSetConsolidationWindow(
+                "graph.processing.consolidation",
+                {"Graph", "Processing"},
+                "Graph / Processing / Consolidate (LOP/WLOP/CLOP/EAR)");
+            RegisterPointSetConsolidationWindow(
+                "mesh.processing.consolidation",
+                {"Mesh", "Processing"},
+                "Mesh / Processing / Consolidate (LOP/WLOP/CLOP/EAR)");
             RegisterParameterizationWindow();
         }
 
@@ -1069,20 +1080,27 @@ namespace Extrinsic::Sandbox::Editor
                 }));
         }
 
-        void RegisterPointCloudConsolidationWindow()
+        void RegisterPointSetConsolidationWindow(
+            std::string id,
+            std::vector<std::string> menuPath,
+            std::string windowTitle)
         {
+            const std::string callbackTitle = windowTitle;
             Handles.push_back(Shell->RegisterEditorWindow(
                 EditorWindowDescriptor{
-                    .Id = "pointcloud.processing.consolidation",
-                    .MenuPath = {"PointCloud", "Processing"},
+                    .Id = std::move(id),
+                    .MenuPath = std::move(menuPath),
                     .Title = "Consolidate (LOP/WLOP/CLOP/EAR)",
                     .OpenByDefault = false,
                     .Draw =
-                        [this](
+                        [this, windowTitle = callbackTitle](
                             bool& open,
                             const SandboxEditorContext& context)
                         {
-                            DrawPointCloudConsolidationWindow(open, context);
+                            DrawPointCloudConsolidationWindow(
+                                open,
+                                context,
+                                windowTitle);
                         },
                 }));
         }
@@ -1600,13 +1618,14 @@ namespace Extrinsic::Sandbox::Editor
 
         void DrawPointCloudConsolidationWindow(
             bool& open,
-            const SandboxEditorContext& context)
+            const SandboxEditorContext& context,
+            const std::string& windowTitle)
         {
             ImGui::SetNextWindowSize(
                 ImVec2(440.0f, 660.0f),
                 ImGuiCond_FirstUseEver);
             if (ImGui::Begin(
-                    "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)",
+                    windowTitle.c_str(),
                     &open))
             {
                 const Runtime::EditorInspectorModel& inspector =

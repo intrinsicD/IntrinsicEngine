@@ -1,0 +1,297 @@
+schema_version: 1
+task_id: UI-039
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-04T19:52:10Z'
+claim_eligible: false
+source:
+  base_ref: 19a6551f
+  base_revision: 19a6551f9378ba9633dde48f6f410046766f39f1
+  head_revision: 694b651b74771dbe993718968263ead2ac0426de
+  branch: feature/ui-039-lop-multi-domain-discovery
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: AGENTS.md
+    sha256: 8bf555b329a2d5165f91982cb90ba6d70e7db8e0d8048d6098269aa05deea3a9
+  - path: ara/logic/claims.md
+    sha256: 43e8d443d7b3b254a90277381fa891fd9c42c60820f29f3683d8a8cd08c4778f
+  - path: ara/staging/observations.yaml
+    sha256: 242ee81051f99019839545fdb0549a167bdb712eb13b473f9a8f696e11328682
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 82c789d83b8a311bf3fbe862bd18dbac983ab35155984442a0506d6a7f83790d
+  - path: docs/agent/method-workflow.md
+    sha256: 7d184847bd5830cc58015765d20c1d1fe35271c9d82a1d23cdf99ba0636b83f4
+  - path: docs/architecture/geometry-api-style.md
+    sha256: 86cdb065d5d124379b3fc5e2db0d7a598286e626b61b8d3ccda44f48a28c5255
+  - path: docs/architecture/geometry.md
+    sha256: b5c4779914d7bea672f0154515432316c6c108bcb8846137cbc6a6a2a6a761f9
+  - path: docs/architecture/method-api-contract.md
+    sha256: 87ee520e690a8084c235a115d2155e27a9866e9cb5d0cf96f4710fd73a73bc68
+  - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+    sha256: cf4cfa18240b6568fbf84f67a43add2cc1cffa19b31397663c6dbea0506c981d
+  - path: docs/reviews/2026-08-04-ui-039-clean-workshop-review.md
+    sha256: 37fad02ae01130750a5a15cd4a4e99021bb4cf3521061c857e953bccfc1525bd
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 5e0a2fb25cb05ecfff970e4c28317665758eb9e4b49dcbf5fcf98cefabf94121
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: 28858cffc614be27d0f69c051fff73cade05a98815ef9be1563cf7cba1ff4881
+  - path: src/app/Sandbox/README.md
+    sha256: 533de38cac2ac5d7d7500337d3f9c20db14f7d3435a65ff30396f76d7eeabaae
+  - path: src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+    sha256: 9267f7203787fb8ac1f31c4f79c4824524d2e1528d959f1425ffcf02ed6b7785
+  - path: src/geometry/Geometry.HalfedgeMesh.Utils.cppm
+    sha256: c7615c793f9d71e6d4a7d183e7f77c931dae3eb4c062ad256637be39f483491d
+  - path: src/runtime/README.md
+    sha256: 5a009941f79843b28f4f6eda16ce9250e623cf1db83a88aa5930d43c4a8b5310
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 9e3dd1576aefcc07382cd7c85cde013d62d1a7504ca7bd1f981cf79cf5f4cc2d
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.Public.cpp
+    sha256: 82f3f92bb7b3c999e72c54115c71b580a61761590f65e0c9c002d9a9eca83e64
+  - path: src/runtime/Runtime.EditorWorkspaceSnapshots.cppm
+    sha256: f04019160f72dcabc439e62e35db9445cd6b608e0857c6d700f71bd667e13ca0
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: b3f1c9a5b44c97136938726208e1ce62f82c9b7f75e288a9e32701313157738b
+  - path: src/runtime/Runtime.GeometryProcessingOperations.cppm
+    sha256: aa5e762180a915d64feda0b632ce383ce8fd8d33006100a700dc1e69e42cdc42
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
+    sha256: c71fe329dc383fe5ad0a79a9e224f1a63867da65bc2b6339df79fe692b48f9e2
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
+    sha256: 8cb7226e980d88420feccc0d51b7bcaf58542d9858542cdc394258827aaab766
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 424911297c1c8c31c2f65bf1058328cbb2fe1fa3dd21b501e6bb1a08389a7284
+  - path: tasks/backlog/README.md
+    sha256: b244cb98e703b255a71caa2abeff21fccf80365d9e34dab8a1bb731a5ab01a6a
+  - path: tasks/backlog/ui/README.md
+    sha256: 55c7225890a17c440134ceed51a174aa0e1d591e58ec6625bd7c34723c750fe3
+  - path: tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 62ca26ad45ea4768afc52d0c16b3f30cfb8811ce066b438a69ebe0ea99ee23d7
+  - path: tasks/done/UI-039-lop-multi-domain-discovery.md
+    sha256: fa366f0057c3dbc35f0bd7c674aa895901042e12aa8fed3e6a8fc2e7dc07502c
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 358183312a2daf9d849433b192762ec20143da9280cf5a92b2a7bc370942a25b
+  - path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+    sha256: 0e185f984453467fecdb75c654f3ce7f9fdc32a122922aa0be737f69cad3f709
+  - path: tests/unit/geometry/Test_MeshQuantities.cpp
+    sha256: d4a22b774ee513c4c22f0add046cbc2959a0b2af609a1d1a93f5baddb9540e31
+  - path: tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+    sha256: 71d646aa54b0cd6897fb1f63e7a83be07ab45550ba05775e7ab6c12390f18f9f
+  content_digest: b7de52c97a82f194646dbf676e977f640115a267ef8389f956b95d7a9b1b9eff
+touched:
+  paths:
+  - AGENTS.md
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - docs/agent/method-workflow.md
+  - docs/architecture/geometry-api-style.md
+  - docs/architecture/geometry.md
+  - docs/architecture/method-api-contract.md
+  - docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  - docs/reviews/2026-08-04-ui-039-clean-workshop-review.md
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/README.md
+  - src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Utils.cppm
+  - src/runtime/README.md
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.Public.cpp
+  - src/runtime/Runtime.EditorWorkspaceSnapshots.cppm
+  - src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Runtime.PointCloudConsolidationModule.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/README.md
+  - tasks/backlog/ui/README.md
+  - tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/UI-039-lop-multi-domain-discovery.md
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+  - tests/unit/geometry/Test_MeshQuantities.cpp
+  - tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+  layers:
+  - app
+  - geometry
+  - runtime
+  - tests
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Runtime.PointCloudConsolidationModule
+  - Extrinsic.Sandbox.Editor.MethodPanels
+  - Geometry.HalfedgeMesh.Utils
+extension_seam: Existing canonical EditorPropertyCatalogModel plus typed GeometryPropertyRef availability/config/submit
+  path from RUNTIME-206, exposed through three stable registrations sharing one panel state
+future_change_plan: Apply the same typed-slot pattern to the already named RUNTIME/UI 207 and 209 through
+  213 task pairs; add no universal schema or converter
+acceptance:
+- criterion: Loading a mesh, graph, or point cloud exposes a matching stable
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every domain drives the same runtime config and typed operation.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: UI cannot request topology-destructive publication.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No point-set method requires its Position slot to be named
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/UI-039/commands/ci-build.json
+- receipt: tasks/evidence/UI-039/commands/ci-configure.json
+- receipt: tasks/evidence/UI-039/commands/ci-tests.json
+- receipt: tasks/evidence/UI-039/commands/clean-workshop.json
+- receipt: tasks/evidence/UI-039/commands/doc-links.json
+- receipt: tasks/evidence/UI-039/commands/docs-sync.json
+- receipt: tasks/evidence/UI-039/commands/focused-build.json
+- receipt: tasks/evidence/UI-039/commands/focused-tests.json
+- receipt: tasks/evidence/UI-039/commands/isolated-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/isolated-ara-yaml-parse.json
+- receipt: tasks/evidence/UI-039/commands/isolated-clean-workshop.json
+- receipt: tasks/evidence/UI-039/commands/isolated-diff-check.json
+- receipt: tasks/evidence/UI-039/commands/isolated-doc-links.json
+- receipt: tasks/evidence/UI-039/commands/isolated-docs-sync.json
+- receipt: tasks/evidence/UI-039/commands/isolated-layering.json
+- receipt: tasks/evidence/UI-039/commands/isolated-method-manifests.json
+- receipt: tasks/evidence/UI-039/commands/isolated-module-inventory.json
+- receipt: tasks/evidence/UI-039/commands/isolated-root-hygiene.json
+- receipt: tasks/evidence/UI-039/commands/isolated-session-brief.json
+- receipt: tasks/evidence/UI-039/commands/isolated-task-policy.json
+- receipt: tasks/evidence/UI-039/commands/isolated-task-state-links.json
+- receipt: tasks/evidence/UI-039/commands/isolated-test-layout.json
+- receipt: tasks/evidence/UI-039/commands/isolated-validate-tasks.json
+- receipt: tasks/evidence/UI-039/commands/layering.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-diff-check.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-task-policy.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-task-state-links.json
+- receipt: tasks/evidence/UI-039/commands/lineage-final-validate-tasks.json
+- receipt: tasks/evidence/UI-039/commands/method-manifests.json
+- receipt: tasks/evidence/UI-039/commands/module-inventory.json
+- receipt: tasks/evidence/UI-039/commands/pre-retirement-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/retirement-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/retirement-ara-yaml-parse.json
+- receipt: tasks/evidence/UI-039/commands/retirement-clean-workshop.json
+- receipt: tasks/evidence/UI-039/commands/retirement-diff-check.json
+- receipt: tasks/evidence/UI-039/commands/retirement-doc-links.json
+- receipt: tasks/evidence/UI-039/commands/retirement-docs-sync.json
+- receipt: tasks/evidence/UI-039/commands/retirement-layering.json
+- receipt: tasks/evidence/UI-039/commands/retirement-root-hygiene.json
+- receipt: tasks/evidence/UI-039/commands/retirement-session-brief.json
+- receipt: tasks/evidence/UI-039/commands/retirement-task-policy.json
+- receipt: tasks/evidence/UI-039/commands/retirement-task-state-links.json
+- receipt: tasks/evidence/UI-039/commands/retirement-test-layout.json
+- receipt: tasks/evidence/UI-039/commands/retirement-validate-tasks.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-ara-yaml.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-clean-workshop.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-cpu-tests-r2.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-doc-links.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-final-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-final-ara-yaml.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-final-doc-links.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-final-validate-tasks.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-focused-build.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-focused-tests.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-layering.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-method-manifests.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-module-inventory.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-presentation-build.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-presentation-tests.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-root-hygiene.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-seal-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-seal-diff-check.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-seal-validate-tasks.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-session-brief.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-skill-mirror.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-task-policy.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-task-state-links.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-test-layout.json
+- receipt: tasks/evidence/UI-039/commands/review-repair-validate-tasks.json
+- receipt: tasks/evidence/UI-039/commands/root-hygiene.json
+- receipt: tasks/evidence/UI-039/commands/scope-final-ara-claims.json
+- receipt: tasks/evidence/UI-039/commands/scope-final-ara-yaml.json
+- receipt: tasks/evidence/UI-039/commands/scope-final-diff-check.json
+- receipt: tasks/evidence/UI-039/commands/session-brief.json
+- receipt: tasks/evidence/UI-039/commands/task-policy.json
+- receipt: tasks/evidence/UI-039/commands/task-state-links.json
+- receipt: tasks/evidence/UI-039/commands/test-layout.json
+- receipt: tasks/evidence/UI-039/commands/validate-tasks.json
+changed_public_contracts:
+- Mesh, Graph, and PointCloud Processing expose stable consolidation registrations backed by one shared
+  panel/state/runtime path
+- Semantic Position, optional Normal, and output slots bind full GeometryPropertyRef values without property-name,
+  handle-wrapper, or container-provenance eligibility filters
+- Public and persisted geometry vector properties use float glm::vec storage; precision-sensitive kernels
+  may retain double internally and convert at publication
+diagnostics_and_previews:
+- The panel displays runtime-owned availability, topology/cardinality, stale-source, configuration, convergence,
+  backend, result, and history diagnostics
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/UI-039-lop-multi-domain-discovery.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Sanitizer execution was not repeated because UI-039 changes no ownership, allocator, asynchronous lifetime,
+  or backend lifetime; complete CPU and focused integration execution cover the changed behavior
+- Interactive pointer-driven desktop rendering is not a claim; durable UI proof opens all three real ImGui
+  windows in the headless integration path
+skipped_checks:
+- check: sanitizers
+  reason: No ownership, allocator, asynchronous lifetime, or backend lifetime changed; the full CPU selector
+    and focused runtime/editor integration suite are the strongest relevant checks
+- check: gpu-vulkan
+  reason: UI-039 changes CPU/Null discovery and runtime routing only; METHOD-020 owns LOP-family Vulkan
+    backend and parity evidence
+- check: benchmark
+  reason: No performance claim is made
+- check: sandbox-screenshot
+  reason: The repository has no checked-in Sandbox screenshot corpus; source-backed panel contracts and
+    headless integration tests are the durable UI evidence
+artifacts:
+- path: tasks/done/UI-039-lop-multi-domain-discovery.md
+  sha256: fa366f0057c3dbc35f0bd7c674aa895901042e12aa8fed3e6a8fc2e7dc07502c
+  kind: file
+- path: docs/reviews/2026-08-04-ui-039-clean-workshop-review.md
+  sha256: 37fad02ae01130750a5a15cd4a4e99021bb4cf3521061c857e953bccfc1525bd
+  kind: file
+- path: ara/logic/claims.md
+  sha256: 43e8d443d7b3b254a90277381fa891fd9c42c60820f29f3683d8a8cd08c4778f
+  kind: file
+- path: tasks/evidence/UI-039/diagnostics/ara-yaml-invalid-command/receipt.json
+  sha256: 12d056343b222fff87d8e12756c748237d6f8fd64d4618db2123d019a8796db9
+  kind: file
+- path: tasks/evidence/UI-039/diagnostics/presentation-inventory-failure/receipt.json
+  sha256: 0cc7cc355e25aca286b5ecaee5ce1c4c7448326cb4f9d7b6012eb4b710ccce44
+  kind: file
+- path: tasks/evidence/UI-039/commands/review-repair-presentation-tests.json
+  sha256: 6bc76a6422086d752c0d44b0addee8453279d80db242cf8de9ef935eea1ca1e1
+  kind: file
+- path: tasks/evidence/UI-039/commands/review-repair-cpu-tests-r2.json
+  sha256: c2bd64e21f624c4858fd45ed61a4c5eb7c73f787d5270ae26363fc59b45603fa
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/UI-039/handoff.jsonl
+review: tasks/evidence/UI-039/reviews.jsonl

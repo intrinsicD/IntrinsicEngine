@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "PointCloudConsolidation|MethodPanel|MeshQuantities",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'PointCloudConsolidation|MethodPanel|MeshQuantities' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 1089,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T19:43:30Z",
+  "label": "review-repair-focused-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:43:29Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/review-repair-focused-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-039/commands/review-repair-focused-tests.stdout.log",
+  "stdout_sha256": "fa037211047830a3019c174fde6d055fe5985b84fbc38548e4219fd5e34153ed",
+  "task_id": "UI-039"
+}

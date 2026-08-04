@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "SandboxEditorPresentation\\.(DefaultDrawStartsWithOnlyMenuBarVisible|DomainMenusUseAppearanceAndFocusedProcessingWindows)|SandboxPointCloudConsolidationPanel\\.ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorPresentation\\.(DefaultDrawStartsWithOnlyMenuBarVisible|DomainMenusUseAppearanceAndFocusedProcessingWindows)|SandboxPointCloudConsolidationPanel\\.ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 270,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T19:46:55Z",
+  "label": "review-repair-presentation-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:46:55Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/review-repair-presentation-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-039/commands/review-repair-presentation-tests.stdout.log",
+  "stdout_sha256": "46158b1ae7ecdf8237e54eaa960636e4c5fbec7df7b25a024ed5a8dca3603715",
+  "task_id": "UI-039"
+}

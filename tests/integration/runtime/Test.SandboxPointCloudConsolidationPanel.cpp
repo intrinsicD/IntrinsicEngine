@@ -12,6 +12,8 @@
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+#include <imgui.h>
+#include <imgui_internal.h>
 
 #include "RuntimeTestModule.hpp"
 
@@ -209,39 +211,72 @@ namespace
 }
 
 TEST(SandboxPointCloudConsolidationPanel,
-     RegistrationIsStableAndIdempotent)
+     ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath)
 {
+    struct ExpectedWindow
+    {
+        std::string_view Id;
+        std::vector<std::string> MenuPath;
+        std::string_view WindowTitle;
+    };
+    const std::array<ExpectedWindow, 3u> expected{{
+        {"pointcloud.processing.consolidation",
+         {"PointCloud", "Processing"},
+         "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
+        {"graph.processing.consolidation",
+         {"Graph", "Processing"},
+         "Graph / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
+        {"mesh.processing.consolidation",
+         {"Mesh", "Processing"},
+         "Mesh / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
+    }};
+
     EditorUiShellHarness harness{};
     Editor::MethodPanels panels{};
     panels.Register(harness.Shell);
     panels.Register(harness.Shell);
 
     auto menu = harness.Shell.BuildEditorWindowMenuModel();
-    const Runtime::EditorWindowMenuEntry* entry = FindWindow(
-        menu,
-        "pointcloud.processing.consolidation");
-    ASSERT_NE(entry, nullptr);
-    EXPECT_EQ(
-        entry->MenuPath,
-        (std::vector<std::string>{"PointCloud", "Processing"}));
-    EXPECT_EQ(entry->Title, "Consolidate (LOP/WLOP/CLOP/EAR)");
-    EXPECT_FALSE(entry->Open);
-    EXPECT_EQ(
-        std::count_if(
-            menu.begin(),
-            menu.end(),
-            [](const Runtime::EditorWindowMenuEntry& candidate)
-            {
-                return candidate.Id ==
-                    "pointcloud.processing.consolidation";
-            }),
-        1);
+    for (const ExpectedWindow& expectedWindow : expected)
+    {
+        const Runtime::EditorWindowMenuEntry* entry =
+            FindWindow(menu, expectedWindow.Id);
+        ASSERT_NE(entry, nullptr) << expectedWindow.Id;
+        EXPECT_EQ(entry->MenuPath, expectedWindow.MenuPath)
+            << expectedWindow.Id;
+        EXPECT_EQ(entry->Title, "Consolidate (LOP/WLOP/CLOP/EAR)")
+            << expectedWindow.Id;
+        EXPECT_FALSE(entry->Open) << expectedWindow.Id;
+        EXPECT_EQ(
+            std::count_if(
+                menu.begin(),
+                menu.end(),
+                [&expectedWindow](
+                    const Runtime::EditorWindowMenuEntry& candidate)
+                {
+                    return candidate.Id == expectedWindow.Id;
+                }),
+            1)
+            << expectedWindow.Id;
+        ASSERT_TRUE(
+            harness.Shell.SetEditorWindowOpen(expectedWindow.Id, true))
+            << expectedWindow.Id;
+    }
+
+    harness.Kernel.Run();
+
+    for (const ExpectedWindow& expectedWindow : expected)
+    {
+        EXPECT_NE(
+            ImGui::FindWindowByName(expectedWindow.WindowTitle.data()),
+            nullptr)
+            << expectedWindow.Id;
+    }
 
     panels.Unregister();
     menu = harness.Shell.BuildEditorWindowMenuModel();
-    EXPECT_EQ(
-        FindWindow(menu, "pointcloud.processing.consolidation"),
-        nullptr);
+    for (const ExpectedWindow& expectedWindow : expected)
+        EXPECT_EQ(FindWindow(menu, expectedWindow.Id), nullptr);
 }
 
 TEST(SandboxPointCloudConsolidationPanel,

@@ -8482,18 +8482,44 @@ tree:
     evidence:
       - "tasks/evidence/PHYSICS-004/commands/merged-ci-build.json: combined IntrinsicTests build passed"
       - "tasks/evidence/PHYSICS-004/commands/merged-focused-tests.json: 55/55 passed"
-      - "tasks/evidence/PHYSICS-004/commands/merged-ci-tests.json: 4,077/4,077 passed with one policy GLFW/LSan skip"
+      - "tasks/evidence/PHYSICS-004/commands/merged-ci-tests.json: 4,077 selected, 4,076 passed, zero failed, one policy GLFW/LSan skip"
       - "tasks/evidence/PHYSICS-004/commands/merged-asan-focused.json: 55/55 passed"
       - "tasks/evidence/PHYSICS-004/commands/merged-ubsan-focused.json: 55/55 passed"
       - "tasks/evidence/PHYSICS-004/commands/merged-structural.json: strict structural bundle passed"
       - "tasks/evidence/PHYSICS-004/report.yaml: clean revision ea5c87da and content digest 72f344b4"
     result: >
       The exact combined source built with the canonical Clang 23 ci preset,
-      passed the 55-case physics/runtime/domain integration selector, passed
-      all 4,077 CPU-supported tests, passed the same 55 cases under ASan and
-      UBSan, and passed strict task, layering, documentation, layout, hygiene,
+      passed the 55-case physics/runtime/domain integration selector, selected
+      4,077 CPU-supported cases and passed 4,076 with zero failures plus one
+      policy GLFW/LSan skip, passed the same 55 cases under ASan and UBSan, and
+      passed strict task, layering, documentation, layout, hygiene,
       ARA, skill-mirror, clean-workshop, and diff checks. Local main now
       contains RUNTIME-206 and PHYSICS-004 at 9702c88f. PHYSICS-004 remains
       active pending its required independent high-risk fixed-surface review;
       no remote push was performed.
+    status: resolved
+  - id: N359
+    type: experiment
+    title: "Verify UI-039 semantic LOP slot discovery and float publication"
+    provenance: ai-executed
+    timestamp: "2026-08-04T21:19+02:00"
+    also_depends_on: [N355, N356]
+    evidence:
+      - "c80abcef: UI-039 semantic property-slot implementation"
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.Utils.cpp"
+      - "tasks/evidence/UI-039/commands/review-repair-focused-tests.json: 50/50 passed"
+      - "tasks/evidence/UI-039/commands/review-repair-presentation-tests.json: 3/3 passed"
+      - "tasks/evidence/UI-039/commands/review-repair-cpu-tests-r2.json: 4,079 selected, 4,078 passed, zero failed, one policy GLFW/LSan skip"
+      - "tasks/evidence/UI-039/commands/clean-workshop.json: strict automated scorecard passed"
+    result: >
+      Stable Mesh, Graph, and PointCloud Processing entries now render one
+      shared catalog-backed Sandbox panel/state. It discovers and binds
+      compatible float vec3 properties from every mesh, graph, and point-cloud
+      element domain, delegates exact readiness and count-change rejection to
+      the runtime path, and keeps output on the originating entity/domain. Public
+      mesh vector quantities publish float properties while direct kernels
+      retain double precision. Focused and complete CPU/Null gates passed;
+      sanitizer, GPU/Vulkan, optimized-backend, and performance evidence remain
+      outside UI-039.
     status: resolved

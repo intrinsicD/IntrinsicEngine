@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py",
+    "--root",
+    "tasks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py --root tasks --strict",
+  "cwd": ".",
+  "duration_ms": 634,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T19:21:25Z",
+  "label": "retirement-validate-tasks",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:21:25Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/retirement-validate-tasks.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/UI-039/commands/retirement-validate-tasks.stdout.log",
+  "stdout_sha256": "907e4af83e517b3c4f99e29d3fafeeb6cd7277f51d687a2815469b6c83ab565c",
+  "task_id": "UI-039"
+}

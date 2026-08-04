@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_ara_claims.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_ara_claims.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 25,
+  "exit_code": 1,
+  "finished_at": "2026-08-04T19:15:19Z",
+  "label": "pre-retirement-ara-claims",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-08-04T19:15:19Z",
+  "stderr_path": "tasks/evidence/UI-039/commands/pre-retirement-ara-claims.stderr.log",
+  "stderr_sha256": "facd25a687da4729eea32e603ff94161950d3ba2b46a78f8f06e0542a4d489ff",
+  "stdout_path": "tasks/evidence/UI-039/commands/pre-retirement-ara-claims.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "UI-039"
+}

@@ -1,0 +1,2 @@
+check_ara_claims: 1 error(s):
+  - claim C17 cites proof path 'tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md' which does not exist
