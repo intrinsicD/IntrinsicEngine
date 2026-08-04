@@ -2,9 +2,9 @@ session:
   id: "2026-08-04_001"
   date: "2026-08-04"
   started: "2026-08-04T01:10+02:00"
-  last_turn: "2026-08-04T01:10+02:00"
-  turn_count: 1
-  summary: "Preserved the accepted RUNTIME-206 history, verified its combined surface with PHYSICS-004, and merged PHYSICS-004 into local main pending independent review."
+  last_turn: "2026-08-04T22:06+02:00"
+  turn_count: 2
+  summary: "Preserved RUNTIME-206, retired PHYSICS-004 and UI-039 after independent fixed-surface acceptance, restored three-domain LOP discovery, and left the active queue empty."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,24 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Verified the combined source with 4,077 CPU tests plus 55 focused CI, ASan, and UBSan cases."
+  - turn: 2
+    type: experiment
+    id: "N359"
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified shared semantic LOP binding across stable Mesh, Graph, and PointCloud registrations with focused, presentation, and complete CPU gates."
+  - turn: 2
+    type: dead_end
+    id: "N360"
+    routing: direct
+    provenance: ai-executed
+    summary: "Recorded and repaired the independently rejected assumption that property-based eligibility permitted collapsing three provenance discovery entries into one menu."
+  - turn: 2
+    type: decision
+    id: "N361"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired PHYSICS-004 and UI-039 after independent fixed-surface acceptance and integrated both histories into local main."
 
 ai_actions:
   - turn: 1
@@ -31,6 +49,19 @@ ai_actions:
       - "ara/trace/sessions/2026-08-04_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/staging/observations.yaml"
+  - turn: 2
+    action: "Completed independent PHYSICS-004 review and retirement, repaired UI-039 after independent review rejected its narrowed menu surface, re-ran focused/presentation/full-CPU and structural gates, obtained exact fixed-surface acceptance, merged UI-039, and regenerated the empty active-task view."
+    provenance: ai-executed
+    files_changed:
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
+      - "tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorPresentation.cpp"
+      - "tasks/done/PHYSICS-004-operational-runtime-physics-module.md"
+      - "tasks/done/UI-039-lop-multi-domain-discovery.md"
+      - "tasks/evidence/PHYSICS-004/"
+      - "tasks/evidence/UI-039/"
+      - "tasks/SESSION-BRIEF.md"
+      - "ara/"
 
 claims_touched:
   - id: C27
@@ -39,14 +70,20 @@ claims_touched:
   - id: C28
     action: confirmed
     turn: 1
+  - id: C29
+    action: confirmed
+    turn: 2
 
 key_context:
   - turn: 1
     excerpt: "RUNTIME-206 was already accepted and merged on origin/main, so its history and evidence were preserved instead of duplicated."
   - turn: 1
     excerpt: "PHYSICS-004 is merged locally but remains active until an independent reviewer accepts its exact fixed surface."
+  - turn: 2
+    excerpt: "Independent review rejected UI-039's one-menu interpretation; stable provenance discovery and property-based semantic eligibility are separate contract axes."
+  - turn: 2
+    excerpt: "Both remaining tasks now have accepted exact fixed-surface reviews, and the generated active-task view is empty."
 
-open_threads:
-  - "An independent reviewer must accept or request revisions on PHYSICS-004 revision ea5c87da/content digest 72f344b4 before retirement."
+open_threads: []
 
 ai_suggestions_pending: []

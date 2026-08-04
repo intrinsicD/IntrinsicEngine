@@ -8523,3 +8523,54 @@ tree:
       sanitizer, GPU/Vulkan, optimized-backend, and performance evidence remain
       outside UI-039.
     status: resolved
+  - id: N360
+    type: dead_end
+    title: "Reject one-menu provenance discovery for UI-039"
+    provenance: ai-executed
+    timestamp: "2026-08-04T22:06+02:00"
+    also_depends_on: [N355, N356]
+    hypothesis: >
+      Because LOP eligibility is property-based rather than provenance-based,
+      one PointCloud Processing registration could replace the task's stable
+      Mesh, Graph, and PointCloud discovery entries while still reaching the
+      shared semantic operation.
+    failure_mode: >
+      Independent fixed-surface review found that this collapsed semantic
+      eligibility into UI discovery and contradicted both the base task and the
+      canonical method.engine-integration contract. The candidate also lacked
+      a headless proof that every required provenance entry opened and rendered
+      the real shared panel.
+    lesson: >
+      Discovery location and operation eligibility are separate axes. Stable
+      provenance menus may share one panel state, config/apply path, and runtime
+      implementation without turning provenance into an eligibility filter.
+    evidence:
+      - "ced7ef08: rejected single-PointCloud-menu candidate"
+      - "tasks/evidence/UI-039/reviews.jsonl: sequence 4 revision-requested"
+      - "694b651b: repaired three-registration implementation"
+      - "tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorPresentation.cpp"
+    status: resolved
+  - id: N361
+    type: decision
+    title: "Retire the final active PHYSICS-004 and UI-039 tasks"
+    provenance: ai-executed
+    timestamp: "2026-08-04T22:06+02:00"
+    also_depends_on: [N358, N359, N360]
+    choice: >
+      Retire PHYSICS-004 and the repaired UI-039 only after their exact
+      fixed-surface reports received independent acceptance, merge both task
+      histories into local main, and leave the generated active-task view
+      empty.
+    alternatives:
+      - "Retire either high-risk task before independent fixed-surface acceptance."
+      - "Keep UI-039's independently rejected single-menu scope."
+      - "Leave accepted, fully evidenced tasks active without a remaining defect or gate."
+    evidence:
+      - "tasks/evidence/PHYSICS-004/reviews.jsonl: sequence 4 accepted"
+      - "tasks/evidence/UI-039/reviews.jsonl: sequence 6 accepted"
+      - "tasks/done/PHYSICS-004-operational-runtime-physics-module.md"
+      - "tasks/done/UI-039-lop-multi-domain-discovery.md"
+      - "tasks/SESSION-BRIEF.md: no active tasks"
+      - "39ecde6e: UI-039 retirement merge on local main"
+    status: resolved

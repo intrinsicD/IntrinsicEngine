@@ -246,8 +246,8 @@ sessions:
     open_threads: 2
   - id: "2026-08-04_001"
     date: "2026-08-04"
-    summary: "Preserved the accepted RUNTIME-206 history, verified its combined surface with PHYSICS-004, and merged PHYSICS-004 into local main pending independent review."
-    turn_count: 1
-    events_count: 2
-    claims_touched: [C27, C28]
-    open_threads: 1
+    summary: "Preserved RUNTIME-206, retired PHYSICS-004 and UI-039 after independent fixed-surface acceptance, restored three-domain LOP discovery, and left the active queue empty."
+    turn_count: 2
+    events_count: 5
+    claims_touched: [C27, C28, C29]
+    open_threads: 0

@@ -1369,3 +1369,11 @@ entries:
       - "Marked O87, O89, and O90 stale after three later session-days without promotion, reference, or an open-thread match; left O93 active because fewer than three later session-days have elapsed."
       - "Recorded the 4,077-case CPU result and 55-case ASan/UBSan selectors as merge evidence only; no GPU/Vulkan or performance interpretation was added."
       - "Recorded local main integration at 9702c88f and explicitly noted that no remote push was requested or performed."
+  - turn: "2026-08-04_001#2"
+    notes:
+      - "Routed UI-039's verified final surface as experiment N359, the independently rejected one-menu assumption as dead end N360, and both accepted task retirements as decision N361."
+      - "Added no observation or claim: C27 and C29 already bind the bounded PHYSICS-004 and UI-039 capabilities, so this turn confirms their evidence and task closure without duplicating them."
+      - "Preserved the failed UI candidate as useful negative evidence: property-based method eligibility does not erase provenance-specific discovery obligations, while all registrations may still share one state and runtime path."
+      - "Recorded 52/52 final combined UI cases and 4,079 selected, 4,078 passed, zero failed, one policy-skip CPU evidence; sanitizer, GPU/Vulkan, pointer-driven screenshot, and performance claims remain outside UI-039."
+      - "Closed the PHYSICS-004 independent-review thread after terminal acceptance, left no active task thread, and did not revisit unrelated staged observation O93."
+      - "Recorded local-main integration at 39ecde6e and explicitly noted that no remote push was requested or performed."
