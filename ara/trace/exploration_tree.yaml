@@ -8574,3 +8574,46 @@ tree:
       - "tasks/SESSION-BRIEF.md: no active tasks"
       - "39ecde6e: UI-039 retirement merge on local main"
     status: resolved
+  - id: N362
+    type: decision
+    title: "Converge every retained branch history on local main"
+    provenance: user
+    timestamp: "2026-08-04T22:38+02:00"
+    also_depends_on: [N361]
+    choice: >
+      Commit and merge all remaining changes and branch histories into local
+      main before deciding whether the now-merged branches should be removed.
+    alternatives:
+      - "Leave superseded branch histories disconnected from main."
+      - "Delete branch references before proving their changes are represented."
+      - "Overwrite the accepted main tree with stale branch content."
+    evidence:
+      - "User direction: commit and merge all changes and branches into main."
+      - "git branch --no-merged main identified only feature/ui-039-integrated-checkpoint before reconciliation."
+      - "2fbd0fa5: ancestry-only merge of the superseded UI-039 checkpoint lineage"
+    status: resolved
+  - id: N363
+    type: experiment
+    title: "Audit and verify complete local branch convergence"
+    provenance: ai-executed
+    timestamp: "2026-08-04T22:38+02:00"
+    also_depends_on: [N360, N362]
+    evidence:
+      - "cf342268 and ea6fd3c4 have identical stable patch IDs for UI-039 verification evidence"
+      - "0a6be2fb and main ancestor b4df01b0 have identical stable patch IDs for RUNTIME-139 evidence"
+      - "5dc957ab is a main ancestor containing the tracked BUG-032 stash implementation"
+      - "git diff HEAD^ HEAD: empty; merge commit 2fbd0fa5 preserved tree 244305de"
+      - "cmake --preset ci and cmake --build --preset ci --target IntrinsicTests: passed with Clang 23"
+      - "default CPU selector: 4,079 selected, 4,078 passed, zero failed, one policy GLFW/LSan skip"
+      - "strict task, state-link, docs, skill-mirror, inventory, layering, test-layout, root-hygiene, ARA, method-manifest, and workflow-evidence checks passed"
+    result: >
+      All three local feature branches and every fetched origin branch are
+      ancestors of local main. The sole disconnected branch was an obsolete
+      UI-039 checkpoint: its verification patch was already duplicated in the
+      accepted lineage, and its one-menu retirement text was superseded by the
+      independently accepted three-menu repair, so an ours-strategy merge
+      recorded ancestry without changing files. Eleven detached temporary
+      worktrees are clean. Two retained stashes and one detached unique commit
+      were forensically matched to changes already committed or superseded on
+      main; none was applied, dropped, or deleted.
+    status: resolved

@@ -246,8 +246,8 @@ sessions:
     open_threads: 2
   - id: "2026-08-04_001"
     date: "2026-08-04"
-    summary: "Preserved RUNTIME-206, retired PHYSICS-004 and UI-039 after independent fixed-surface acceptance, restored three-domain LOP discovery, and left the active queue empty."
-    turn_count: 2
-    events_count: 5
+    summary: "Retired the final active tasks, preserved accepted three-domain LOP discovery, and converged every local and fetched branch history on a fully verified local main."
+    turn_count: 3
+    events_count: 7
     claims_touched: [C27, C28, C29]
-    open_threads: 0
+    open_threads: 1

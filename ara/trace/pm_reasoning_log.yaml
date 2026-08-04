@@ -1377,3 +1377,11 @@ entries:
       - "Recorded 52/52 final combined UI cases and 4,079 selected, 4,078 passed, zero failed, one policy-skip CPU evidence; sanitizer, GPU/Vulkan, pointer-driven screenshot, and performance claims remain outside UI-039."
       - "Closed the PHYSICS-004 independent-review thread after terminal acceptance, left no active task thread, and did not revisit unrelated staged observation O93."
       - "Recorded local-main integration at 39ecde6e and explicitly noted that no remote push was requested or performed."
+  - turn: "2026-08-04_001#3"
+    notes:
+      - "Routed the user's all-branches convergence direction as decision N362 and the ancestry/content/verification audit as experiment N363."
+      - "Used an ours-strategy merge only for the superseded UI-039 checkpoint: its verification patch is exact-equivalent to the accepted lineage, while its retired one-menu wording is refuted by N360 and must not replace main."
+      - "Treated detached-worktree and stash inspection as part of the experiment and session AI action; all were clean or matched to existing main commits, and none was applied or deleted."
+      - "Added no observation or claim because branch convergence and verification are journey facts and do not change C27-C29's capability statements."
+      - "Recorded the canonical Clang 23 build and CPU result as 4,079 selected, 4,078 passed, zero failed, and one policy GLFW/LSan skip; no new GPU/Vulkan or performance claim is made."
+      - "Left cleanup open because the user's question establishes eligibility, not unambiguous authorization to delete local/remote refs, worktrees, or stashes."

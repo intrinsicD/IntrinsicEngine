@@ -2,9 +2,9 @@ session:
   id: "2026-08-04_001"
   date: "2026-08-04"
   started: "2026-08-04T01:10+02:00"
-  last_turn: "2026-08-04T22:06+02:00"
-  turn_count: 2
-  summary: "Preserved RUNTIME-206, retired PHYSICS-004 and UI-039 after independent fixed-surface acceptance, restored three-domain LOP discovery, and left the active queue empty."
+  last_turn: "2026-08-04T22:38+02:00"
+  turn_count: 3
+  summary: "Retired the final active tasks, preserved accepted three-domain LOP discovery, and converged every local and fetched branch history on a fully verified local main."
 
 events_logged:
   - turn: 1
@@ -37,6 +37,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Retired PHYSICS-004 and UI-039 after independent fixed-surface acceptance and integrated both histories into local main."
+  - turn: 3
+    type: decision
+    id: "N362"
+    routing: direct
+    provenance: user
+    summary: "Directed every remaining change and branch history to be committed and merged into local main before cleanup."
+  - turn: 3
+    type: experiment
+    id: "N363"
+    routing: direct
+    provenance: ai-executed
+    summary: "Audited branches, detached worktrees, and stashes; connected the one superseded branch without changing the tree and passed the 4,079-case CPU plus strict structural gates."
 
 ai_actions:
   - turn: 1
@@ -62,6 +74,14 @@ ai_actions:
       - "tasks/evidence/UI-039/"
       - "tasks/SESSION-BRIEF.md"
       - "ara/"
+  - turn: 3
+    action: "Fetched and audited every local/remote branch, clean detached worktree, and stash; matched redundant changes to accepted main commits, ancestry-merged the superseded UI-039 checkpoint without changing the tree, and ran the canonical build, complete CPU selector, and strict repository validators."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-08-04_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched:
   - id: C27
@@ -83,7 +103,12 @@ key_context:
     excerpt: "Independent review rejected UI-039's one-menu interpretation; stable provenance discovery and property-based semantic eligibility are separate contract axes."
   - turn: 2
     excerpt: "Both remaining tasks now have accepted exact fixed-surface reviews, and the generated active-task view is empty."
+  - turn: 3
+    excerpt: "The only non-ancestor branch contained superseded UI-039 retirement wording, so its lineage was connected without replacing the accepted main tree."
+  - turn: 3
+    excerpt: "All local and fetched remote branches are now merged; branch, worktree, and stash deletion was not performed without explicit cleanup authorization."
 
-open_threads: []
+open_threads:
+  - "The three merged local feature branches may be deleted after explicit authorization; remote refs, eleven clean temporary worktrees, and two redundant stashes require separately scoped cleanup."
 
 ai_suggestions_pending: []
