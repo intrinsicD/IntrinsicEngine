@@ -22,7 +22,7 @@ maturity_target: Operational
   and output slots from the selected mesh, graph, or point-cloud property
   catalog, while runtime remains the source of publication readiness and exact
   disabled diagnostics.
-- Commit: implementation `c80abcef`, fresh CPU verification `cf342268`; the
+- Commit: implementation `c80abcef`, fresh CPU verification `ea6fd3c4`; the
   retirement and accepted fixed-surface review seal are recorded by repository
   history and `tasks/evidence/UI-039/`.
 
