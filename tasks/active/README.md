@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- None.
+- [`GEOM-075`](GEOM-075-property-support-radius-profile.md) — property-specific
+  support-radius profile and automatic LOP-family policy (`in-progress`, owner:
+  `Codex-LOPVulkan`, branch: `main`). Next verification: strict task/schema
+  validation after the public geometry/config contract is added.
 
 ## History
 

@@ -1,7 +1,16 @@
 ---
 id: METHOD-020
 theme: I
-depends_on: [METHOD-019, RUNTIME-175, RUNTIME-194, RUNTIME-195]
+depends_on: [METHOD-019, RUNTIME-175, RUNTIME-194, RUNTIME-195, GEOM-075]
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [geometry.element-domain-sources, method.engine-integration]
 maturity_target: ParityProven
 ---
 # METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity
@@ -15,6 +24,7 @@ maturity_target: ParityProven
 
 ## Non-goals
 - No algorithm/variant changes; the GPU path reproduces the reference numerics, it does not redefine them.
+- No CUDA backend, CUDA build dependency, or CUDA/Vulkan interoperability path.
 - No second config lane or editor panel. Extend the delivered
   `RUNTIME-175`/`UI-035` surfaces only after the GPU path passes parity.
 - No synchronous device-wide readback or work on the platform poll thread;
@@ -30,6 +40,12 @@ maturity_target: ParityProven
   K-Means backend/queue family is explicitly not a template; `RUNTIME-196`
   retires it.
 - The projection iteration (neighbor-weighted attraction + repulsion, or the CLOP continuous per-component term) maps to a compute dispatch over the projected set; the shared weight math from `Geometry.PointCloud.Kernels` is reproduced in the shader with the same closed forms the CPU path uses.
+- `GEOM-075` resolves Auto/Manual intent to one positive world-unit support
+  radius and rejects unsafe predicted work before backend selection. Vulkan
+  uses that fixed radius with an `h`-sized count/scan/scatter cell grid: source
+  cells are built once, projected cells are rebuilt per iteration, 27 adjacent
+  cells are exact-distance filtered, and neighbor contributions are streamed
+  without a global pair list.
 - Verification requires the `ci-vulkan` preset and a Vulkan-capable host; on non-operational devices the path must fall back to the CPU reference with honest telemetry, and the parity test asserts that fallback.
 - `METHOD-019` is an evidence-ordering gate, not a promise that every
   `cpu_optimized` strategy survived. Compare every GPU strategy against
@@ -44,6 +60,17 @@ maturity_target: ParityProven
 
 ## Backends
 - Backend axis: adds `gpu_vulkan_compute`; `cpu_reference` stays the parity oracle and the fallback target.
+
+## Engine integration
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | A finite contiguous `vec3` position property/span, plus an optional count-matched finite `vec3` normal property for anisotropic WLOP/EAR. |
+| Compatible entity sources | Every resolved point-cloud, graph, or mesh vertex/halfedge/edge/face property domain satisfying the existing consolidation preflight; topology provenance is not an eligibility filter. |
+| `RuntimeModule` | Extend the existing private execution state in `Extrinsic.Runtime.PointCloudConsolidationModule`; CPU remains the reference/fallback and Vulkan records through operational RHI only. |
+| Config/agent | Add `gpu_vulkan_compute` to the existing schema-versioned config and typed operation only after an implementation exists; use the same preview/validate/apply path as UI. |
+| UI | Extend the existing property-aware panel backend selector for every compatible domain; unsupported strategy/backend pairs fail preview. |
+| Publication | Reuse the existing undoable same-domain property publication and topology-free point-cloud replacement rules; GPU results never bypass canonical writeback. |
+| End-to-end tests | Null-device fallback/control-source parity in the CPU gate plus operational `gpu;vulkan` CPU-reference parity for each exposed strategy and compatible source fixture. |
 
 ## Slice plan
 - **Slice A — private backend/fallback.** Extend the existing typed operation
@@ -72,6 +99,10 @@ maturity_target: ParityProven
       submit through the real frame context and publish completed results
       through the delivered `RUNTIME-175` mutation/writeback path.
 - [ ] Add the compute shader assets for the attraction/repulsion (and CLOP continuous-term) passes under `assets/shaders/`, recorded through the RHI compute path.
+- [ ] Build bounded dense cell ranges with count, shared prefix scan, and scatter
+      passes; guard cell count/occupancy/memory, build the source grid once,
+      rebuild the projected grid per iteration, and exact-filter the 27-cell
+      candidate set without materializing a global neighbor-pair list.
 - [ ] Reproduce the `Geometry.PointCloud.Kernels` weight/repulsion closed forms in-shader; document any float-precision divergence and bound it in the parity tolerance.
 - [ ] Keep every projection iteration and convergence reduction on-device;
       drain the final result once through the `RUNTIME-195` readback operation. No
@@ -107,6 +138,9 @@ maturity_target: ParityProven
 - [ ] Add `IntrinsicLopFamilyGpuBenchmarkSmoke`, emitting schema-valid result
       JSON only from actual Vulkan execution with backend/device, strategy,
       CPU-reference parity, fallback, timing source, and iteration diagnostics.
+- [ ] Add an unsanitized optimized promoted-Vulkan benchmark preset separate
+      from `ci-vulkan`; parity remains sanitizer-backed while performance
+      evidence records release device and end-to-end phase timing.
 - [ ] Update each package README backend-status table (`gpu_vulkan_compute` → `METHOD-020`), the parity tolerance, and the shader/precision limitations.
 - [ ] Note the GPU backend and its host requirement in the `docs/architecture/algorithm-variant-dispatch.md` current-exemplar section if the family becomes a cited exemplar.
 
@@ -133,6 +167,8 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicTests IntrinsicLopFamilyGpuBenchmarkSmoke
 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Consolidation|IntrinsicLopFamilyGpuBenchmarkSmoke' --timeout 180
+cmake --preset ci-vulkan-release
+cmake --build --preset ci-vulkan-release --target IntrinsicLopFamilyGpuBenchmarkSmoke
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
 python3 tools/benchmark/validate_benchmark_results.py --root build/ci-vulkan/benchmark-ctest/IntrinsicLopFamilyGpuBenchmarkSmoke --strict

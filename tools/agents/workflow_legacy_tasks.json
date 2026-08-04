@@ -49,7 +49,6 @@
     "backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md": "0f7a6d3efc64873d75952f861eafc8b8148d27f3e7d4a3fc6b53d7f51fe72e1d",
     "backlog/methods/METHOD-018-edge-aware-resampling-anisotropic-lop-reference-backend.md": "029ef982367c0803ab5e93869bd746ef02d6a1983d5b2aa0a316dc155c672484",
     "backlog/methods/METHOD-019-lop-family-optimized-cpu-backend.md": "480b74f8a7cd406d66381714215edfae95cd2e0ab74fd3f8dc65b6be66230094",
-    "backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md": "a88457ccfb16c762b15a51b922483a397f23a2062253dfbda4bc4e90851d1cc3",
     "backlog/methods/METHOD-021-arap-parameterization-reference-backend.md": "3a18ffab1713fed759f4ec5b38fbe8312d1ef169beeda7554a82ec0a7d775745",
     "backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md": "3157953cc5c98bf1ce281cb374990b0be1970ffaa84474232f8de8f2e42fb2a0",
     "backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md": "a978840c1e5410969bf9fe7b86cc1ab306a79b61e364fe66920f3907371619f5",
