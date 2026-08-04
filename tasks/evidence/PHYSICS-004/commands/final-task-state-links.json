@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_state_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/check_task_state_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 468,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T18:53:15Z",
+  "label": "final-task-state-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T18:53:14Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/final-task-state-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/final-task-state-links.stdout.log",
+  "stdout_sha256": "a30b97161e2addb6f5d84c5a569d9075dc0f92086edd18934a67a881ddd385f2",
+  "task_id": "PHYSICS-004"
+}

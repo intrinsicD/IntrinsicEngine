@@ -5,17 +5,14 @@ phenomena roadmap. `src/physics` is approved by
 [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md)
 as a promoted layer with `physics -> core, geometry` dependencies. `PHYSICS-001`
 added the first CPU-only world/state source and historical runtime bridge;
-`PHYSICS-004` is replacing that test-only surface with the app-composed module.
+`PHYSICS-004` replaced that test-only surface with the app-composed module.
 
 See [`tasks/backlog/README.md`](../README.md) for the cross-domain convergence
 map.
 
 ## Tasks
 
-- [`PHYSICS-004` — Operational runtime physics module and bridge privatization](../../active/PHYSICS-004-operational-runtime-physics-module.md)
-  composes the retired CPU physics contracts in the real runtime lifecycle,
-  proves ECS authoring/fixed-step/writeback through `Engine::Run()`, and then
-  removes the test-only public `PhysicsBridge` surface.
+- No open physics tasks.
 
 ## Convergence
 
@@ -32,9 +29,9 @@ map.
   diagnostics.
 - `PHYSICS-003` is retired; it owns constraint, island, sleep, and solver
   diagnostics on top of retired `PHYSICS-001`/`002`.
-- `PHYSICS-004` is the active operational runtime-integration leaf: physics remains
-  the simulation owner, runtime owns per-world composition/writeback, and no
-  live physics handles enter ECS.
+- `PHYSICS-004` is retired at `Operational`: physics remains the simulation
+  owner, runtime owns per-world composition/writeback, and no live physics
+  handles enter ECS.
 - ARCH-002 must not bless GPU/optimized backend tasks for any phenomenon before
   its CPU reference path exists. It retired with first non-rigid physics method
   follow-ups:
@@ -56,3 +53,4 @@ split; narratives live in the retirement log.
 - [PHYSICS-001 - Physics world state and runtime fixed-step sync](../../archive/PHYSICS-001-physics-world-state-and-runtime-sync.md) (done 2026-06-05).
 - [PHYSICS-002 - Collision broadphase/narrowphase contract](../../archive/PHYSICS-002-collision-broadphase-narrowphase-contract.md) (done 2026-06-06).
 - [PHYSICS-003 - Constraints, islands, sleep, and solver diagnostics](../../archive/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) (done 2026-06-10).
+- [PHYSICS-004 - Operational runtime physics module and bridge privatization](../../done/PHYSICS-004-operational-runtime-physics-module.md) (done 2026-08-04).

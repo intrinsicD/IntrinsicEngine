@@ -1,0 +1,21 @@
+{
+  "command": [
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 1944,
+  "exit_code": 0,
+  "finished_at": "2026-08-04T18:45:47Z",
+  "label": "retirement-clean-workshop",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-04T18:45:45Z",
+  "stderr_path": "tasks/evidence/PHYSICS-004/commands/retirement-clean-workshop.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PHYSICS-004/commands/retirement-clean-workshop.stdout.log",
+  "stdout_sha256": "a1eb8261c3782e2b126a839464e793ca4e24878149ab84b3cf9a2de73f24a03f",
+  "task_id": "PHYSICS-004"
+}
