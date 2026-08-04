@@ -101,11 +101,25 @@ graph method additionally names the adjacency/connectivity sources it needs and
 therefore also accepts a mesh satisfying those sources. Requiring mesh
 provenance is correct only when faces or surface topology are semantic inputs.
 
+Runtime/config/UI adapters bind typed method records by semantic slot. Each
+slot stores a full `GeometryPropertyRef` (element domain, original property
+name, and value kind); the slot label is not a required property name. Thus a
+point-set `Position` slot can bind a mesh-face `f:centroid` property directly,
+without manufacturing `v:position` or a temporary PointCloud entity. Typed
+method-specific records remain preferred over a dynamic universal slot schema:
+they make paired-count, optional-input, mutability, topology, and publication
+requirements explicit and compile-time reviewable.
+
 Input eligibility and result publication are separate decisions. A
 same-cardinality result publishes only named output properties on the
 originating element domain and preserves all unrelated properties/topology. A
 topology or cardinality change requires an explicit owning operation and must
 not silently discard richer source domains.
+
+Public/persisted geometry vector properties use float `glm::vec*` storage.
+Method implementations may promote to double precision internally and convert
+once when publishing. Public `glm::dvec*` property storage is an explicit API
+exception, not an incidental consequence of an internal calculation.
 
 Method-only scientific slices may defer runtime/config/UI/publication work, but
 each deferred matrix row names the task that owns it. A package is not described

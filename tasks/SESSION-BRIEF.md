@@ -9,6 +9,7 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `PHYSICS-004` — Operational runtime physics module and bridge privatization (tasks/active/PHYSICS-004-operational-runtime-physics-module.md)
+- `UI-039` — Semantic point-set slot binding and LOP discovery (tasks/active/UI-039-lop-multi-domain-discovery.md)
 
 ## Theme B — Rendering modernization
 
@@ -102,7 +103,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
 - unblocked: `RUNTIME-213` — Point-set normal property-domain integration (tasks/backlog/runtime/RUNTIME-213-point-normal-property-domain-integration.md)
-- unblocked: `UI-039` — LOP family multi-domain discovery (tasks/backlog/ui/UI-039-lop-multi-domain-discovery.md)
 - blocked by `RUNTIME-207`: `UI-040` — ICP compatible-source selection and discovery (tasks/backlog/ui/UI-040-icp-compatible-source-selection.md)
 - blocked by `RUNTIME-209`: `UI-041` — Point-set outlier multi-domain panel (tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md)
 - blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)

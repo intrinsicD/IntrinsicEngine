@@ -73,6 +73,9 @@ export namespace Extrinsic::Runtime
         std::string positionPropertyName,
         std::optional<std::string> normalPropertyName = std::nullopt);
 
+    [[nodiscard]] bool IsValidPointCloudConsolidationPropertyRefs(
+        const PointCloudConsolidationPropertyRefs& properties) noexcept;
+
     struct PointCloudConsolidationAvailability
     {
         bool Available{false};

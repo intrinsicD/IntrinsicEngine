@@ -967,6 +967,10 @@ export namespace Extrinsic::Runtime
     SubmitEditorPointCloudConsolidation(
         const EditorGeometryProcessingContext& context,
         PointCloudConsolidationRequest request);
+    [[nodiscard]] PointCloudConsolidationAvailability
+    ResolveEditorPointCloudConsolidationAvailability(
+        const EditorGeometryProcessingContext& context,
+        const PointCloudConsolidationRequest& request);
 
     [[nodiscard]] Geometry::ConstPropertySet
     ResolveEditorSelectedMeshVertexProperties(const EditorGeometryProcessingContext& context);
@@ -1210,6 +1214,10 @@ export namespace Extrinsic::Runtime
     SubmitEditorPointCloudConsolidation(
         const EditorGeometryProcessingCommands& commands,
         PointCloudConsolidationRequest request);
+    [[nodiscard]] PointCloudConsolidationAvailability
+    ResolveEditorPointCloudConsolidationAvailability(
+        const EditorGeometryProcessingCommands& commands,
+        const PointCloudConsolidationRequest& request);
     [[nodiscard]] Geometry::ConstPropertySet
     ResolveEditorSelectedMeshVertexProperties(
         const EditorGeometryProcessingCommands& commands);

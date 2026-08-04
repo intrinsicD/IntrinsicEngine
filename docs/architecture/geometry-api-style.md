@@ -119,6 +119,15 @@ preserved. Topology or cardinality changes are separate, explicit owning
 operations with diagnostics and history semantics; they must not silently
 replace a topology-rich entity merely because a kernel consumed point samples.
 
+Method records name semantic input/output slots, while `GeometryPropertyRef`
+names the physical property bound to each slot. The two names are deliberately
+independent: a `Position` slot may bind `f:centroid` on `MeshFace`, and the
+runtime passes that typed property/span directly. Do not copy or alias the
+property into `v:position`, and do not create a PointCloud entity merely to
+satisfy method vocabulary. Compatibility is determined from value kind,
+component shape, element count/correspondence, mutability, finite-value policy,
+and any topology the method explicitly requires—not from the property prefix.
+
 ## Property API contract
 
 Geometry properties expose names as `std::string_view` borrowed from the owning
@@ -191,11 +200,14 @@ randomness, or dependence on traversal order unless that order is specified.
 
 ## Numeric policy
 
-- Keep `glm::vec*` and `float`-oriented storage for public geometry positions,
-  directions, and renderer-facing data unless a task explicitly defines another
-  representation.
-- Use `double` internally for numerical kernels where conditioning, accumulation,
-  residuals, or predicate stability matters.
+- Use float `glm::vec*` storage for public and persisted geometry vector
+  properties, including positions, centroids, directions, normals, colors, and
+  renderer/method-facing data. Convert at publication rather than exposing an
+  internal `glm::dvec*` representation. A deliberate public double-vector
+  property requires a scoped API decision plus typed catalog/serialization/UI
+  support; it is never the incidental default.
+- Use `double`/`glm::dvec*` internally for numerical kernels where conditioning,
+  accumulation, residuals, or predicate stability matters.
 - Expose tolerances as named parameters or policy records when callers may need to
   reproduce results across datasets or scales.
 - Choose tolerances from documented scale assumptions. Prefer scale-normalized

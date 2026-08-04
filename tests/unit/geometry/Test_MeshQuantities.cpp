@@ -129,8 +129,20 @@ TEST(GeometryMeshQuantities, PublishCanonicalQuantityProperties)
     EXPECT_TRUE(mesh.VertexProperties().Exists(MU::kBarycentricVertexAreaPropertyName));
 
     EXPECT_NEAR(areas[FaceHandle{0}], MU::FaceArea(mesh, FaceHandle{0}), 1.0e-9);
-    ExpectVecNear(areaVectors[FaceHandle{0}], MU::FaceAreaVector(mesh, FaceHandle{0}));
-    ExpectVecNear(centroids[FaceHandle{0}], MU::FaceCentroid(mesh, FaceHandle{0}));
+    ExpectVecNear(
+        glm::dvec3(areaVectors[FaceHandle{0}]),
+        MU::FaceAreaVector(mesh, FaceHandle{0}),
+        1.0e-6);
+    ExpectVecNear(
+        glm::dvec3(centroids[FaceHandle{0}]),
+        MU::FaceCentroid(mesh, FaceHandle{0}),
+        1.0e-6);
+    EXPECT_TRUE(mesh.FaceProperties()
+                    .Get<glm::vec3>(MU::kFaceAreaVectorPropertyName)
+                    .IsValid());
+    EXPECT_TRUE(mesh.FaceProperties()
+                    .Get<glm::vec3>(MU::kFaceCentroidPropertyName)
+                    .IsValid());
 
     const double barySum = std::accumulate(
         barycentricAreas.Vector().begin(), barycentricAreas.Vector().end(), 0.0);
@@ -167,6 +179,17 @@ TEST(GeometryMeshQuantities, FaceScalarGradientMatchesLinearField)
     const glm::dvec3 gradient = MU::FaceScalarGradient(mesh, FaceHandle{0}, u);
     ExpectVecNear(gradient, glm::dvec3{2.0, 3.0, 0.0}, 1.0e-7);
 
+    constexpr double fineDelta = 1.0e-10;
+    const std::vector<double> fineValues{
+        1.0,
+        1.0 + fineDelta,
+        1.0 + 2.0 * fineDelta,
+    };
+    ExpectVecNear(
+        MU::FaceScalarGradient(mesh, FaceHandle{0}, fineValues),
+        glm::dvec3{fineDelta, 2.0 * fineDelta, 0.0},
+        1.0e-14);
+
     const auto gradients = MU::ComputeFaceScalarGradients(mesh, u);
     ASSERT_EQ(gradients.size(), mesh.FacesSize());
     ExpectVecNear(gradients[0], gradient, 1.0e-12);
@@ -174,7 +197,10 @@ TEST(GeometryMeshQuantities, FaceScalarGradientMatchesLinearField)
     auto mutableMesh = mesh;
     const auto published = MU::PublishFaceScalarGradients(mutableMesh, u);
     ASSERT_TRUE(published.IsValid());
-    ExpectVecNear(published[FaceHandle{0}], gradient, 1.0e-12);
+    ExpectVecNear(glm::dvec3(published[FaceHandle{0}]), gradient, 1.0e-6);
+    EXPECT_TRUE(mutableMesh.FaceProperties()
+                    .Get<glm::vec3>(MU::kFaceScalarGradientPropertyName)
+                    .IsValid());
 }
 
 TEST(GeometryMeshQuantities, FaceScalarGradientFailsClosed)

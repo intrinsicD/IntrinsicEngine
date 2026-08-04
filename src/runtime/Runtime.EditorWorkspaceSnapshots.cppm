@@ -266,6 +266,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
         const EditorWorkspaceSnapshotContext& context,
         const EditorWorkspaceSnapshotRequest& request);
+    [[nodiscard]] EditorInspectorModel BuildEditorInspectorModel(
+        const EditorWorkspaceSnapshotContext& context);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotContext& context,
         EditorDomainWindowKind kind);
@@ -274,6 +276,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
         const EditorWorkspaceSnapshotQueries& queries,
         const EditorWorkspaceSnapshotRequest& request);
+    [[nodiscard]] EditorInspectorModel BuildEditorInspectorModel(
+        const EditorWorkspaceSnapshotQueries& queries,
+        EditorWorkspaceSnapshotStats* modelBuildStats = nullptr);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotQueries& queries,
         EditorDomainWindowKind kind,

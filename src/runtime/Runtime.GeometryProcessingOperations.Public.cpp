@@ -204,6 +204,41 @@ PointCloudConsolidationResult SubmitEditorPointCloudConsolidation(
   return result;
 }
 
+PointCloudConsolidationAvailability
+ResolveEditorPointCloudConsolidationAvailability(
+    const EditorGeometryProcessingContext &context,
+    const PointCloudConsolidationRequest &request) {
+  if (!IsEditorPointCloudConsolidationAvailable(context)) {
+    return PointCloudConsolidationAvailability{
+        .Available = false,
+        .Error = Core::ErrorCode::InvalidState,
+        .Message = "Point-set consolidation service is unavailable.",
+    };
+  }
+  if (context.Scene == nullptr) {
+    return PointCloudConsolidationAvailability{
+        .Available = false,
+        .Error = Core::ErrorCode::ResourceNotFound,
+        .Message = "Scene registry is unavailable.",
+    };
+  }
+
+  const entt::registry &raw = context.Scene->Raw();
+  const ECS::EntityHandle entity =
+      SelectionController::ToEntityHandle(request.StableEntityId);
+  if (entity == ECS::InvalidEntityHandle || !raw.valid(entity)) {
+    return PointCloudConsolidationAvailability{
+        .Available = false,
+        .Error = Core::ErrorCode::ResourceNotFound,
+        .Message = "The selected geometry entity is stale or unavailable.",
+    };
+  }
+
+  return ResolvePointCloudConsolidationAvailability(
+      BuildGeometryAvailability(raw, entity), request.Properties,
+      request.Config);
+}
+
 Geometry::ConstPropertySet ResolveEditorSelectedMeshVertexProperties(
     const EditorGeometryProcessingContext &context) {
   if (context.Scene == nullptr || context.Selection == nullptr)
@@ -247,6 +282,14 @@ PointCloudConsolidationResult SubmitEditorPointCloudConsolidation(
     PointCloudConsolidationRequest request) {
   return SubmitEditorPointCloudConsolidation(ContextOrEmpty(commands),
                                              std::move(request));
+}
+
+PointCloudConsolidationAvailability
+ResolveEditorPointCloudConsolidationAvailability(
+    const EditorGeometryProcessingCommands &commands,
+    const PointCloudConsolidationRequest &request) {
+  return ResolveEditorPointCloudConsolidationAvailability(
+      ContextOrEmpty(commands), request);
 }
 
 Geometry::ConstPropertySet ResolveEditorSelectedMeshVertexProperties(

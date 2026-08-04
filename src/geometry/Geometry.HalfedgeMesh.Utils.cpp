@@ -40,6 +40,19 @@ namespace Geometry::MeshUtils
             return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
         }
 
+        [[nodiscard]] glm::vec3 ToPublicVec3(const glm::dvec3& value) noexcept
+        {
+            if (!IsFinite(value))
+            {
+                return glm::vec3(0.0f);
+            }
+            const glm::vec3 published(value);
+            return std::isfinite(published.x) && std::isfinite(published.y) &&
+                           std::isfinite(published.z)
+                       ? published
+                       : glm::vec3(0.0f);
+        }
+
         struct QuantizedPositionKey
         {
             std::int64_t X{0};
@@ -482,10 +495,10 @@ namespace Geometry::MeshUtils
         return accum * 0.5;
     }
 
-    FaceProperty<glm::dvec3> PublishFaceAreaVectors(HalfedgeMesh::Mesh& mesh)
+    FaceProperty<glm::vec3> PublishFaceAreaVectors(HalfedgeMesh::Mesh& mesh)
     {
-        FaceProperty<glm::dvec3> property(
-            mesh.FaceProperties().GetOrAdd<glm::dvec3>(kFaceAreaVectorPropertyName, glm::dvec3(0.0)));
+        FaceProperty<glm::vec3> property(
+            mesh.FaceProperties().GetOrAdd<glm::vec3>(kFaceAreaVectorPropertyName, glm::vec3(0.0f)));
         if (!property.IsValid())
         {
             return property;
@@ -494,7 +507,7 @@ namespace Geometry::MeshUtils
         for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
         {
             const FaceHandle f{static_cast<PropertyIndex>(fi)};
-            property[f] = FaceAreaVector(mesh, f);
+            property[f] = ToPublicVec3(FaceAreaVector(mesh, f));
         }
         return property;
     }
@@ -611,10 +624,10 @@ namespace Geometry::MeshUtils
         return sum / static_cast<double>(count);
     }
 
-    FaceProperty<glm::dvec3> PublishFaceCentroids(HalfedgeMesh::Mesh& mesh)
+    FaceProperty<glm::vec3> PublishFaceCentroids(HalfedgeMesh::Mesh& mesh)
     {
-        FaceProperty<glm::dvec3> property(
-            mesh.FaceProperties().GetOrAdd<glm::dvec3>(kFaceCentroidPropertyName, glm::dvec3(0.0)));
+        FaceProperty<glm::vec3> property(
+            mesh.FaceProperties().GetOrAdd<glm::vec3>(kFaceCentroidPropertyName, glm::vec3(0.0f)));
         if (!property.IsValid())
         {
             return property;
@@ -623,7 +636,7 @@ namespace Geometry::MeshUtils
         for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
         {
             const FaceHandle f{static_cast<PropertyIndex>(fi)};
-            property[f] = FaceCentroid(mesh, f);
+            property[f] = ToPublicVec3(FaceCentroid(mesh, f));
         }
         return property;
     }
@@ -713,27 +726,30 @@ namespace Geometry::MeshUtils
             return glm::dvec3(0.0);
         }
 
-        glm::vec3 normal = glm::cross(tri.P1 - tri.P0, tri.P2 - tri.P0);
-        const float areaTimesTwo = glm::length(normal);
-        if (!(std::isfinite(areaTimesTwo)) || areaTimesTwo < 1.0e-10f)
+        const glm::dvec3 p0(tri.P0);
+        const glm::dvec3 p1(tri.P1);
+        const glm::dvec3 p2(tri.P2);
+        glm::dvec3 normal = glm::cross(p1 - p0, p2 - p0);
+        const double areaTimesTwo = glm::length(normal);
+        if (!(std::isfinite(areaTimesTwo)) || areaTimesTwo < 1.0e-10)
         {
             return glm::dvec3(0.0);
         }
 
         normal /= areaTimesTwo;
-        const glm::vec3 ea = tri.P2 - tri.P1;
-        const glm::vec3 eb = tri.P0 - tri.P2;
-        const glm::vec3 ec = tri.P1 - tri.P0;
-        const float invTwoA = 1.0f / areaTimesTwo;
-        const glm::vec3 gradient = invTwoA * (
-            static_cast<float>(ua) * glm::cross(normal, ea) +
-            static_cast<float>(ub) * glm::cross(normal, eb) +
-            static_cast<float>(uc) * glm::cross(normal, ec));
-        if (!IsFinite(glm::dvec3(gradient)))
+        const glm::dvec3 ea = p2 - p1;
+        const glm::dvec3 eb = p0 - p2;
+        const glm::dvec3 ec = p1 - p0;
+        const double invTwoA = 1.0 / areaTimesTwo;
+        const glm::dvec3 gradient = invTwoA * (
+            ua * glm::cross(normal, ea) +
+            ub * glm::cross(normal, eb) +
+            uc * glm::cross(normal, ec));
+        if (!IsFinite(gradient))
         {
             return glm::dvec3(0.0);
         }
-        return glm::dvec3(gradient);
+        return gradient;
     }
 
     std::vector<glm::dvec3> ComputeFaceScalarGradients(
@@ -748,18 +764,18 @@ namespace Geometry::MeshUtils
         return gradients;
     }
 
-    FaceProperty<glm::dvec3> PublishFaceScalarGradients(
+    FaceProperty<glm::vec3> PublishFaceScalarGradients(
         HalfedgeMesh::Mesh& mesh,
         std::span<const double> vertexValues,
         std::string_view outputPropertyName)
     {
         if (outputPropertyName.empty())
         {
-            return FaceProperty<glm::dvec3>{};
+            return FaceProperty<glm::vec3>{};
         }
 
-        FaceProperty<glm::dvec3> property(
-            mesh.FaceProperties().GetOrAdd<glm::dvec3>(std::string(outputPropertyName), glm::dvec3(0.0)));
+        FaceProperty<glm::vec3> property(
+            mesh.FaceProperties().GetOrAdd<glm::vec3>(std::string(outputPropertyName), glm::vec3(0.0f)));
         if (!property.IsValid())
         {
             return property;
@@ -768,7 +784,7 @@ namespace Geometry::MeshUtils
         for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
         {
             const FaceHandle f{static_cast<PropertyIndex>(fi)};
-            property[f] = FaceScalarGradient(mesh, f, vertexValues);
+            property[f] = ToPublicVec3(FaceScalarGradient(mesh, f, vertexValues));
         }
         return property;
     }

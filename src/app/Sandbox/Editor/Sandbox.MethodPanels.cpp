@@ -35,6 +35,7 @@ import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -122,6 +123,132 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TextDisabled("Selected: none");
             }
             DrawDiagnostics(model.Diagnostics);
+        }
+
+        [[nodiscard]] bool IsPointSetVec3Property(
+            const Runtime::EditorPropertyCatalogRow& row) noexcept
+        {
+            return row.Bindable && row.ElementCount != 0u &&
+                   row.Descriptor.Domain !=
+                       Runtime::GeometryElementDomain::Unknown &&
+                   row.ValueKind == Geometry::PropertyValueKind::Vec3;
+        }
+
+        [[nodiscard]] int PointSetPositionPreference(
+            const Runtime::EditorPropertyCatalogRow& row) noexcept
+        {
+            if (row.Name == "v:position" || row.Name == "v:point" ||
+                row.Name == "p:position")
+            {
+                return 0;
+            }
+            if (row.Name.find("position") != std::string::npos)
+                return 1;
+            if (row.Name == "f:centroid" ||
+                row.Name.find("centroid") != std::string::npos ||
+                row.Name.find("center") != std::string::npos)
+            {
+                return 2;
+            }
+            if (row.Name.find("normal") == std::string::npos)
+                return 3;
+            return 4;
+        }
+
+        [[nodiscard]] const Runtime::EditorPropertyCatalogRow*
+        FindPreferredPointSetPosition(
+            const Runtime::EditorPropertyCatalogModel& catalog)
+        {
+            const Runtime::EditorPropertyCatalogRow* preferred = nullptr;
+            int preferredRank = std::numeric_limits<int>::max();
+            for (const Runtime::EditorPropertyCatalogRow& row : catalog.Rows)
+            {
+                if (!IsPointSetVec3Property(row))
+                    continue;
+                const int rank = PointSetPositionPreference(row);
+                if (preferred == nullptr || rank < preferredRank)
+                {
+                    preferred = &row;
+                    preferredRank = rank;
+                }
+            }
+            return preferred;
+        }
+
+        [[nodiscard]] const Runtime::EditorPropertyCatalogRow*
+        FindPointSetProperty(
+            const Runtime::EditorPropertyCatalogModel& catalog,
+            const Runtime::GeometryPropertyRef& property)
+        {
+            const auto found = std::find_if(
+                catalog.Rows.begin(),
+                catalog.Rows.end(),
+                [&property](const Runtime::EditorPropertyCatalogRow& row)
+                {
+                    return IsPointSetVec3Property(row) &&
+                           row.Descriptor == property;
+                });
+            return found != catalog.Rows.end() ? &*found : nullptr;
+        }
+
+        [[nodiscard]] bool IsCompatiblePointSetNormal(
+            const Runtime::EditorPropertyCatalogRow& row,
+            const Runtime::EditorPropertyCatalogRow& positions) noexcept
+        {
+            return IsPointSetVec3Property(row) &&
+                   row.Descriptor.Domain == positions.Descriptor.Domain &&
+                   row.ElementCount == positions.ElementCount &&
+                   row.Name != positions.Name;
+        }
+
+        [[nodiscard]] const Runtime::EditorPropertyCatalogRow*
+        FindPreferredPointSetNormal(
+            const Runtime::EditorPropertyCatalogModel& catalog,
+            const Runtime::EditorPropertyCatalogRow& positions)
+        {
+            for (const Runtime::EditorPropertyCatalogRow& row : catalog.Rows)
+            {
+                if (!IsCompatiblePointSetNormal(row, positions))
+                    continue;
+                if (row.Name == "v:normal" || row.Name == "p:normal" ||
+                    row.Name == "f:normal" ||
+                    row.Name.find("normal") != std::string::npos)
+                {
+                    return &row;
+                }
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] std::string PointSetPropertyLabel(
+            const Runtime::EditorPropertyCatalogRow& row)
+        {
+            std::string label =
+                Runtime::DebugNameForEditorPropertyCatalogDomain(row.Domain);
+            label += " / ";
+            label += row.Name;
+            label += " (";
+            label += std::to_string(row.ElementCount);
+            label += ")";
+            return label;
+        }
+
+        template <std::size_t Size>
+        void SetPropertyNameBuffer(
+            std::array<char, Size>& buffer,
+            const std::string_view name)
+        {
+            buffer.fill('\0');
+            const std::size_t count =
+                std::min(name.size(), buffer.size() - 1u);
+            std::copy_n(name.data(), count, buffer.data());
+        }
+
+        [[nodiscard]] bool IsConsolidationHistoryLabel(
+            const std::string_view label) noexcept
+        {
+            return label == "Consolidate point set" ||
+                   label == "Consolidate point cloud";
         }
 
         [[nodiscard]] bool ContainsKMeansDomain(
@@ -431,9 +558,11 @@ namespace Extrinsic::Sandbox::Editor
     std::optional<SandboxPointCloudConsolidationPanelApplyRequest>
     BuildSandboxPointCloudConsolidationPanelApplyRequest(
         const std::uint32_t stableEntityId,
+        const Runtime::PointCloudConsolidationPropertyRefs& properties,
         const SandboxPointCloudConsolidationPanelConfig& config)
     {
         if (stableEntityId == 0u ||
+            !Runtime::IsValidPointCloudConsolidationPropertyRefs(properties) ||
             !IsSupportedPointCloudConsolidationStrategy(config.Strategy) ||
             Runtime::StableToken(config.Strategy).empty())
         {
@@ -447,6 +576,7 @@ namespace Extrinsic::Sandbox::Editor
             .Config = config,
             .Execute = Runtime::PointCloudConsolidationRequest{
                 .StableEntityId = stableEntityId,
+                .Properties = properties,
                 .Config = config,
             },
         };
@@ -456,6 +586,7 @@ namespace Extrinsic::Sandbox::Editor
     ApplySandboxPointCloudConsolidationPanelAction(
         const SandboxEditorContext& context,
         const std::uint32_t stableEntityId,
+        const Runtime::PointCloudConsolidationPropertyRefs& properties,
         const SandboxPointCloudConsolidationPanelConfig& config)
     {
         SandboxPointCloudConsolidationPanelActionResult result{};
@@ -464,7 +595,7 @@ namespace Extrinsic::Sandbox::Editor
         result.Config.Source = Runtime::RuntimeConfigControlSource::Editor;
         const auto request =
             BuildSandboxPointCloudConsolidationPanelApplyRequest(
-                stableEntityId, config);
+                stableEntityId, properties, config);
         if (!request.has_value())
             return result;
 
@@ -713,6 +844,12 @@ namespace Extrinsic::Sandbox::Editor
         struct PointCloudConsolidationState
         {
             SandboxPointCloudConsolidationPanelConfig Draft{};
+            Runtime::PointCloudConsolidationPropertyRefs Properties{};
+            std::array<char, 128u> OutputPositionName{};
+            std::array<char, 128u> OutputNormalName{};
+            std::uint32_t BoundStableEntityId{0u};
+            bool BindingsInitialized{false};
+            bool PublishNormals{false};
             bool Initialized{false};
             bool Dirty{false};
             std::optional<Runtime::RuntimeEngineConfigApplyResult>
@@ -745,6 +882,7 @@ namespace Extrinsic::Sandbox::Editor
             std::optional<Runtime::EditorDomainWindowModel>,
             3u>
             CachedDomainModels{};
+        std::optional<Runtime::EditorInspectorModel> CachedInspectorModel{};
         KMeansState KMeans{};
         ProgressivePoissonState ProgressivePoisson{};
         PointCloudConsolidationState PointCloudConsolidation{};
@@ -801,6 +939,7 @@ namespace Extrinsic::Sandbox::Editor
             CachedModelFrame = -1;
             for (auto& model : CachedDomainModels)
                 model.reset();
+            CachedInspectorModel.reset();
             KMeans = KMeansState{};
             ProgressivePoisson.LastResult.reset();
             ProgressivePoisson.LastConfigResult.reset();
@@ -823,6 +962,7 @@ namespace Extrinsic::Sandbox::Editor
                 CachedModelFrame = frame;
                 for (auto& model : CachedDomainModels)
                     model.reset();
+                CachedInspectorModel.reset();
             }
 
             auto& model = CachedDomainModels[static_cast<std::size_t>(kind)];
@@ -838,6 +978,27 @@ namespace Extrinsic::Sandbox::Editor
                 ++context.ModelBuildStats->DomainWindowModelCacheHits;
             }
             return *model;
+        }
+
+        [[nodiscard]] const Runtime::EditorInspectorModel& GetInspectorModel(
+            const SandboxEditorContext& context)
+        {
+            const int frame = ImGui::GetFrameCount();
+            if (CachedModelFrame != frame)
+            {
+                CachedModelFrame = frame;
+                for (auto& model : CachedDomainModels)
+                    model.reset();
+                CachedInspectorModel.reset();
+            }
+
+            if (!CachedInspectorModel.has_value())
+            {
+                CachedInspectorModel = Runtime::BuildEditorInspectorModel(
+                    context.SnapshotQueries,
+                    context.ModelBuildStats);
+            }
+            return *CachedInspectorModel;
         }
 
         void RegisterKMeansWindow(
@@ -1171,6 +1332,272 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TextWrapped("%s", summary.Message.c_str());
         }
 
+        static void ClearPointCloudConsolidationBindings(
+            PointCloudConsolidationState& state,
+            const std::uint32_t stableEntityId)
+        {
+            state.Properties.InputPositions = {};
+            state.Properties.InputNormals.reset();
+            state.Properties.OutputPositions = {};
+            state.Properties.OutputNormals.reset();
+            state.OutputPositionName.fill('\0');
+            state.OutputNormalName.fill('\0');
+            state.BoundStableEntityId = stableEntityId;
+            state.BindingsInitialized = true;
+            state.PublishNormals = false;
+        }
+
+        static void BindPointCloudConsolidationPosition(
+            PointCloudConsolidationState& state,
+            const Runtime::EditorPropertyCatalogModel& catalog,
+            const Runtime::EditorPropertyCatalogRow& positions)
+        {
+            state.Properties.InputPositions = positions.Descriptor;
+            state.Properties.OutputPositions = positions.Descriptor;
+            SetPropertyNameBuffer(
+                state.OutputPositionName,
+                positions.Descriptor.Name);
+
+            const Runtime::EditorPropertyCatalogRow* normals =
+                FindPreferredPointSetNormal(catalog, positions);
+            if (normals != nullptr)
+            {
+                state.Properties.InputNormals = normals->Descriptor;
+                state.Properties.OutputNormals = normals->Descriptor;
+                SetPropertyNameBuffer(
+                    state.OutputNormalName,
+                    normals->Descriptor.Name);
+                state.PublishNormals = true;
+            }
+            else
+            {
+                state.Properties.InputNormals.reset();
+                state.Properties.OutputNormals.reset();
+                state.OutputNormalName.fill('\0');
+                state.PublishNormals = false;
+            }
+        }
+
+        static void EnsurePointCloudConsolidationBindings(
+            PointCloudConsolidationState& state,
+            const Runtime::EditorInspectorModel& inspector)
+        {
+            const std::uint32_t stableEntityId = inspector.HasEntity
+                ? inspector.Entity.StableEntityId
+                : 0u;
+            if (stableEntityId == 0u)
+            {
+                if (!state.BindingsInitialized ||
+                    state.BoundStableEntityId != 0u)
+                {
+                    ClearPointCloudConsolidationBindings(state, 0u);
+                }
+                return;
+            }
+
+            const Runtime::EditorPropertyCatalogModel& catalog =
+                inspector.PropertyCatalog;
+            const Runtime::EditorPropertyCatalogRow* positions =
+                FindPointSetProperty(
+                    catalog,
+                    state.Properties.InputPositions);
+            if (!state.BindingsInitialized ||
+                state.BoundStableEntityId != stableEntityId ||
+                positions == nullptr)
+            {
+                ClearPointCloudConsolidationBindings(state, stableEntityId);
+                positions = FindPreferredPointSetPosition(catalog);
+                if (positions != nullptr)
+                {
+                    BindPointCloudConsolidationPosition(
+                        state,
+                        catalog,
+                        *positions);
+                }
+                return;
+            }
+
+            state.Properties.OutputPositions.Domain =
+                positions->Descriptor.Domain;
+            state.Properties.OutputPositions.ValueKind =
+                Geometry::PropertyValueKind::Vec3;
+            if (state.Properties.InputNormals.has_value())
+            {
+                const Runtime::EditorPropertyCatalogRow* normals =
+                    FindPointSetProperty(
+                        catalog,
+                        *state.Properties.InputNormals);
+                if (normals == nullptr ||
+                    !IsCompatiblePointSetNormal(*normals, *positions))
+                {
+                    state.Properties.InputNormals.reset();
+                }
+            }
+        }
+
+        static void DrawPointCloudConsolidationSourceHeader(
+            const Runtime::EditorInspectorModel& inspector)
+        {
+            ImGui::TextDisabled(
+                "Minimum contract: one finite vec3 Position property "
+                "on any element domain.");
+            if (inspector.HasEntity)
+            {
+                ImGui::Text(
+                    "Selected: %s (%u)",
+                    inspector.Entity.Name.c_str(),
+                    inspector.Entity.StableEntityId);
+                ImGui::Text(
+                    "Geometry provenance: %s",
+                    Runtime::DebugNameForEditorGeometryDomain(
+                        inspector.Geometry.Domain));
+            }
+            else
+            {
+                ImGui::TextDisabled("Selected: none");
+            }
+            DrawDiagnostics(inspector.Diagnostics);
+            DrawDiagnostics(inspector.PropertyCatalog.Diagnostics);
+        }
+
+        static void DrawPointCloudConsolidationPropertySlots(
+            PointCloudConsolidationState& state,
+            const Runtime::EditorPropertyCatalogModel& catalog)
+        {
+            ImGui::SeparatorText("Property slots");
+            const Runtime::EditorPropertyCatalogRow* positions =
+                FindPointSetProperty(
+                    catalog,
+                    state.Properties.InputPositions);
+            const std::string positionPreview = positions != nullptr
+                ? PointSetPropertyLabel(*positions)
+                : std::string{"Unbound"};
+            if (ImGui::BeginCombo(
+                    "Position##PointCloudConsolidation",
+                    positionPreview.c_str()))
+            {
+                for (const Runtime::EditorPropertyCatalogRow& row :
+                     catalog.Rows)
+                {
+                    if (!IsPointSetVec3Property(row))
+                        continue;
+                    const bool selected = positions == &row;
+                    const std::string label = PointSetPropertyLabel(row);
+                    if (ImGui::Selectable(label.c_str(), selected))
+                    {
+                        BindPointCloudConsolidationPosition(
+                            state,
+                            catalog,
+                            row);
+                        positions = &row;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            if (positions == nullptr)
+            {
+                ImGui::TextDisabled(
+                    "The selected entity exposes no bindable vec3 property.");
+                return;
+            }
+
+            const Runtime::EditorPropertyCatalogRow* normals = nullptr;
+            if (state.Properties.InputNormals.has_value())
+            {
+                normals = FindPointSetProperty(
+                    catalog,
+                    *state.Properties.InputNormals);
+                if (normals != nullptr &&
+                    !IsCompatiblePointSetNormal(*normals, *positions))
+                {
+                    normals = nullptr;
+                }
+            }
+            const std::string normalPreview = normals != nullptr
+                ? PointSetPropertyLabel(*normals)
+                : std::string{"None (estimate when needed)"};
+            if (ImGui::BeginCombo(
+                    "Normal (optional)##PointCloudConsolidation",
+                    normalPreview.c_str()))
+            {
+                if (ImGui::Selectable(
+                        "None (estimate when needed)",
+                        normals == nullptr))
+                {
+                    state.Properties.InputNormals.reset();
+                    normals = nullptr;
+                }
+                for (const Runtime::EditorPropertyCatalogRow& row :
+                     catalog.Rows)
+                {
+                    if (!IsCompatiblePointSetNormal(row, *positions))
+                        continue;
+                    const bool selected = normals == &row;
+                    const std::string label = PointSetPropertyLabel(row);
+                    if (ImGui::Selectable(label.c_str(), selected))
+                    {
+                        state.Properties.InputNormals = row.Descriptor;
+                        normals = &row;
+                        if (state.OutputNormalName.front() == '\0')
+                        {
+                            SetPropertyNameBuffer(
+                                state.OutputNormalName,
+                                row.Descriptor.Name);
+                        }
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::TextDisabled(
+                "Outputs stay on %s; topology-bearing domains require "
+                "a count-preserving target.",
+                Runtime::ToString(positions->Descriptor.Domain).data());
+            (void)ImGui::InputText(
+                "Output Position##PointCloudConsolidation",
+                state.OutputPositionName.data(),
+                state.OutputPositionName.size());
+            state.Properties.OutputPositions = Runtime::GeometryPropertyRef{
+                .Domain = positions->Descriptor.Domain,
+                .Name = std::string{state.OutputPositionName.data()},
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            };
+
+            if (ImGui::Checkbox(
+                    "Publish normals##PointCloudConsolidation",
+                    &state.PublishNormals) &&
+                state.PublishNormals &&
+                state.OutputNormalName.front() == '\0')
+            {
+                SetPropertyNameBuffer(
+                    state.OutputNormalName,
+                    normals != nullptr
+                        ? std::string_view{normals->Name}
+                        : std::string_view{"lop:normal"});
+            }
+            if (state.PublishNormals)
+            {
+                (void)ImGui::InputText(
+                    "Output Normal##PointCloudConsolidation",
+                    state.OutputNormalName.data(),
+                    state.OutputNormalName.size());
+                state.Properties.OutputNormals = Runtime::GeometryPropertyRef{
+                    .Domain = positions->Descriptor.Domain,
+                    .Name = std::string{state.OutputNormalName.data()},
+                    .ValueKind = Geometry::PropertyValueKind::Vec3,
+                };
+            }
+            else
+            {
+                state.Properties.OutputNormals.reset();
+            }
+        }
+
         void DrawPointCloudConsolidationWindow(
             bool& open,
             const SandboxEditorContext& context)
@@ -1182,12 +1609,15 @@ namespace Extrinsic::Sandbox::Editor
                     "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)",
                     &open))
             {
-                const Runtime::EditorDomainWindowModel& model =
-                    GetDomainWindowModel(
-                        context,
-                        Runtime::EditorDomainWindowKind::PointCloud);
-                DrawDomainWindowHeader(model);
-                DrawDiagnostics(model.Processing.Diagnostics);
+                const Runtime::EditorInspectorModel& inspector =
+                    GetInspectorModel(context);
+                DrawPointCloudConsolidationSourceHeader(inspector);
+                EnsurePointCloudConsolidationBindings(
+                    PointCloudConsolidation,
+                    inspector);
+                DrawPointCloudConsolidationPropertySlots(
+                    PointCloudConsolidation,
+                    inspector.PropertyCatalog);
 
                 if (!PointCloudConsolidation.Initialized ||
                     !PointCloudConsolidation.Dirty)
@@ -1212,16 +1642,34 @@ namespace Extrinsic::Sandbox::Editor
                 PointCloudConsolidation.Dirty |=
                     DrawPointCloudConsolidationControls(
                         PointCloudConsolidation.Draft);
-                const std::uint32_t stableEntityId =
-                    DomainWindowReady(model)
-                    ? model.SelectedStableId
+                const std::uint32_t stableEntityId = inspector.HasEntity
+                    ? inspector.Entity.StableEntityId
                     : 0u;
-                const bool draftValid =
+                const bool configValid =
+                    IsSupportedPointCloudConsolidationStrategy(
+                        PointCloudConsolidation.Draft.Strategy) &&
+                    Runtime::IsValidEditorPointCloudConsolidationConfig(
+                        PointCloudConsolidation.Draft);
+                const auto request =
                     BuildSandboxPointCloudConsolidationPanelApplyRequest(
-                        stableEntityId == 0u ? 1u : stableEntityId,
-                        PointCloudConsolidation.Draft)
-                        .has_value();
-                if (!draftValid)
+                        stableEntityId,
+                        PointCloudConsolidation.Properties,
+                        PointCloudConsolidation.Draft);
+                Runtime::PointCloudConsolidationAvailability availability{};
+                if (request.has_value())
+                {
+                    availability =
+                        Runtime::ResolveEditorPointCloudConsolidationAvailability(
+                            context.GeometryCommands,
+                            request->Execute);
+                }
+                else
+                {
+                    availability.Message = stableEntityId == 0u
+                        ? "Select a geometry entity to bind point-set properties."
+                        : "Bind valid Position/output slots on one element domain.";
+                }
+                if (!configValid)
                     ImGui::TextDisabled(
                         "Draft contains an unsupported or out-of-range value.");
                 else if (PointCloudConsolidation.Dirty)
@@ -1229,7 +1677,7 @@ namespace Extrinsic::Sandbox::Editor
 
                 const bool configAvailable =
                     context.GeometryConfigCommandsAvailable;
-                ImGui::BeginDisabled(!configAvailable || !draftValid);
+                ImGui::BeginDisabled(!configAvailable || !configValid);
                 if (ImGui::Button(
                         "Apply configuration##PointCloudConsolidation"))
                 {
@@ -1252,17 +1700,17 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 ImGui::EndDisabled();
 
-                const bool canRun = configAvailable && draftValid &&
-                    stableEntityId != 0u &&
-                    context.PointCloudConsolidationAvailable;
+                const bool canRun = configAvailable && request.has_value() &&
+                    availability.Available;
                 ImGui::BeginDisabled(!canRun);
                 if (ImGui::Button(
-                        "Consolidate selected point cloud##PointCloudConsolidation"))
+                        "Consolidate selected property set##PointCloudConsolidation"))
                 {
                     SandboxPointCloudConsolidationPanelActionResult action =
                         ApplySandboxPointCloudConsolidationPanelAction(
                             context,
                             stableEntityId,
+                            PointCloudConsolidation.Properties,
                             PointCloudConsolidation.Draft);
                     PointCloudConsolidation.LastConfigApply =
                         std::move(action.Config);
@@ -1275,18 +1723,15 @@ namespace Extrinsic::Sandbox::Editor
                         PointCloudConsolidation.Dirty = false;
                 }
                 ImGui::EndDisabled();
-                if (!context.PointCloudConsolidationAvailable)
-                {
-                    ImGui::TextDisabled(
-                        "Point-cloud consolidation service is unavailable.");
-                }
                 if (!configAvailable)
                 {
                     ImGui::TextDisabled(
                         "Point-cloud consolidation config control is unavailable.");
                 }
-                if (stableEntityId == 0u)
-                    ImGui::TextDisabled("Select a point-cloud entity to run.");
+                if (!availability.Available && !availability.Message.empty())
+                {
+                    ImGui::TextDisabled("%s", availability.Message.c_str());
+                }
 
                 const Runtime::EditorDocumentModel history =
                     context.Document != nullptr
@@ -1295,9 +1740,9 @@ namespace Extrinsic::Sandbox::Editor
                 const bool historyAvailable =
                     context.DocumentCommands.Available();
                 const bool canUndo = history.CanUndo &&
-                    history.UndoLabel == "Consolidate point cloud";
+                    IsConsolidationHistoryLabel(history.UndoLabel);
                 const bool canRedo = history.CanRedo &&
-                    history.RedoLabel == "Consolidate point cloud";
+                    IsConsolidationHistoryLabel(history.RedoLabel);
                 ImGui::BeginDisabled(!canUndo || !historyAvailable);
                 if (ImGui::Button(
                         "Undo consolidation##PointCloudConsolidation"))

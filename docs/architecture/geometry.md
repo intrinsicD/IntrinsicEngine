@@ -479,17 +479,19 @@ canonical property names:
 - `FaceArea` / `PublishFaceAreas` write `f:area`; polygon faces use Newell
   area for planar loops, including concave loops, and fall back to triangle-fan
   surface area for genuinely folded non-planar loops.
-- `FaceAreaVector` / `PublishFaceAreaVectors` write `f:area_vector`, the
-  oriented Newell vector area.
-- `FaceCentroid` / `PublishFaceCentroids` write `f:centroid`, the average of a
-  face's own corner positions. This is distinct from `ComputeOneRingCentroid`,
-  which averages a vertex neighborhood.
+- `FaceAreaVector` computes the oriented Newell vector area in double
+  precision; `PublishFaceAreaVectors` writes float `f:area_vector` storage.
+- `FaceCentroid` computes the average of a face's own corner positions in
+  double precision; `PublishFaceCentroids` writes float `f:centroid` storage.
+  This is distinct from `ComputeOneRingCentroid`, which averages a vertex
+  neighborhood.
 - `ComputeBarycentricVertexAreas` / `PublishBarycentricVertexAreas` write
   `v:barycentric_area`, the lumped incident face-area partition.
-- `FaceScalarGradient`, `ComputeFaceScalarGradients`, and
-  `PublishFaceScalarGradients` expose the unnormalized triangle-face gradient
-  of a vertex scalar field and default to `f:scalar_gradient`. The heat method
-  continues to normalize and negate the returned gradient locally.
+- `FaceScalarGradient` and `ComputeFaceScalarGradients` compute the
+  unnormalized triangle-face gradient of a vertex scalar field in double
+  precision; `PublishFaceScalarGradients` writes float vector storage and
+  defaults to `f:scalar_gradient`. The heat method continues to normalize and
+  negate the returned gradient locally.
 - `VertexOneRingPCA` / `PublishVertexOneRingPCA` write `v:pca` with
   `Geometry::PCAResult`, using finite 1-ring neighbor positions and failing
   closed for deleted, isolated, non-finite, or underdetermined neighborhoods.

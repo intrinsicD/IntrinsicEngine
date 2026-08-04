@@ -93,6 +93,7 @@ export namespace Extrinsic::Sandbox::Editor
     std::optional<SandboxPointCloudConsolidationPanelApplyRequest>
     BuildSandboxPointCloudConsolidationPanelApplyRequest(
         std::uint32_t stableEntityId,
+        const Runtime::PointCloudConsolidationPropertyRefs& properties,
         const SandboxPointCloudConsolidationPanelConfig& config);
 
     struct SandboxPointCloudConsolidationPanelActionResult
@@ -112,6 +113,7 @@ export namespace Extrinsic::Sandbox::Editor
     ApplySandboxPointCloudConsolidationPanelAction(
         const SandboxEditorContext& context,
         std::uint32_t stableEntityId,
+        const Runtime::PointCloudConsolidationPropertyRefs& properties,
         const SandboxPointCloudConsolidationPanelConfig& config);
 
     struct SandboxPointCloudConsolidationResultSummary

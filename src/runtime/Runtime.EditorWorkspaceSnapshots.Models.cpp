@@ -4243,6 +4243,12 @@ namespace {
 
 } // namespace
 
+    EditorInspectorModel BuildEditorInspectorModelFromBindings(
+        const EditorFeatureBindings& context)
+    {
+        return BuildInspectorModel(context);
+    }
+
     EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshotFromBindings(
         const EditorFeatureBindings& context,
         const EditorWorkspaceSnapshotRequest& request);
@@ -4498,6 +4504,13 @@ namespace Extrinsic::Runtime
     {
         return EditorFeatureDetail::BuildEditorWorkspaceSnapshotFromBindings(
             EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), request);
+    }
+
+    EditorInspectorModel BuildEditorInspectorModel(
+        const EditorWorkspaceSnapshotContext& context)
+    {
+        return EditorFeatureDetail::BuildEditorInspectorModelFromBindings(
+            EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
     }
 
     EditorDomainWindowModel BuildEditorDomainWindowModel(

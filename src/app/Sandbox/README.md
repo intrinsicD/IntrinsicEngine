@@ -119,7 +119,11 @@ registrations share one copied readiness model, validated config/apply path,
 run action, result readout, and source-cardinality visualization-channel state.
 The panel orders the selected entity's existing finite `Vertices`; it has no
 surface-sampling, conversion, or topology-replacement path. The app continues
-to import the same runtime module surface. `Sandbox.Editor.MeshProcessingPanels`
+to import the same runtime module surface. The single consolidation entry is a
+semantic point-set window rather than a provenance window: its Position and
+optional Normal slots enumerate compatible typed properties from every
+resolved mesh, graph, and point-cloud element domain, and its output slots keep
+the chosen originating domain. `Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
 registers those nine windows under their existing menu paths, owns their ImGui
@@ -195,20 +199,30 @@ still does not own selection, ECS mutation, method jobs, rendering, or asset
 state.
 
 `PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` exposes exactly
-the four promoted CPU-reference strategies. Shared controls cover support
+the four promoted CPU-reference strategies. The `PointCloud` menu location
+names their least-structured point-set contract; it does not require a selected
+point-cloud entity. A Position slot accepts any finite `vec3` property in the
+selected entity's canonical property catalog, including mesh `v:position` or
+`f:centroid`, and an optional Normal slot accepts a count-matched `vec3` on the
+same element domain. Named Position/Normal outputs publish on that domain
+without a property alias or converted entity. Shared controls cover support
 radius, repulsion, stopping criteria, target count, and seed; strategy-specific
 controls cover WLOP anisotropy, CLOP mixture fitting, and EAR normal policy,
 refinement, and edge sensitivity. The window keeps a panel-local draft and
 validates it through `Runtime.GeometryProcessingOperations` before applying the
 registered `sandbox.point_cloud_consolidation` section with the `Editor`
-source. Running submits that same typed value to
+source. Running submits those full property references and that same typed
+config to
 `PointCloudConsolidationService`; completion reports the actual
 `cpu_reference` identity, strategy, convergence/displacement, normal, and
 insertion diagnostics. The runtime then performs the single `GeometrySources`
-mutation, so the viewport observes the consolidated cloud and the window's
-undo/redo affordances use the shared document history. If config control, the
-service, a selected point cloud, or a valid strategy is unavailable, controls
-fail closed rather than using a panel-private path.
+mutation, so the viewport observes the originating entity and the window's
+undo/redo affordances use the shared document history. The Run button uses the
+runtime's canonical property/publication preflight: same-cardinality mesh and
+graph requests are accepted, while topology-bearing count changes are disabled
+with the exact runtime diagnostic. If config control, the service, a selected
+compatible property, or a valid strategy is unavailable, controls fail closed
+rather than using a panel-private path.
 
 `Mesh > Processing > Parameterize (UV)` exposes exactly the four CPU strategies
 implemented by `Runtime.GeometryProcessingOperations`: LSCM, harmonic cotangent, uniform Tutte, and

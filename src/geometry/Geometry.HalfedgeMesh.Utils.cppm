@@ -113,8 +113,9 @@ export namespace Geometry::MeshUtils
     /// face or one with a non-finite corner position.
     glm::dvec3 FaceAreaVector(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
 
-    /// Populate the canonical `f:area_vector` property from FaceAreaVector().
-    [[nodiscard]] FaceProperty<glm::dvec3> PublishFaceAreaVectors(HalfedgeMesh::Mesh& mesh);
+    /// Populate the canonical float `f:area_vector` property from the
+    /// double-precision FaceAreaVector() computation.
+    [[nodiscard]] FaceProperty<glm::vec3> PublishFaceAreaVectors(HalfedgeMesh::Mesh& mesh);
 
     /// Scalar surface area of a (possibly polygonal) face. Planar faces —
     /// including concave polygons — use the exact Newell/shoelace area
@@ -132,8 +133,9 @@ export namespace Geometry::MeshUtils
     /// Returns (0,0,0) for a deleted/invalid/empty face.
     glm::dvec3 FaceCentroid(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
 
-    /// Populate the canonical `f:centroid` property from FaceCentroid().
-    [[nodiscard]] FaceProperty<glm::dvec3> PublishFaceCentroids(HalfedgeMesh::Mesh& mesh);
+    /// Populate the canonical float `f:centroid` property from the
+    /// double-precision FaceCentroid() computation.
+    [[nodiscard]] FaceProperty<glm::vec3> PublishFaceCentroids(HalfedgeMesh::Mesh& mesh);
 
     /// Lumped ("barycentric") vertex areas: each vertex receives FaceArea/degree
     /// from every incident face (= Σ incident FaceArea / 3 for a triangle mesh).
@@ -159,8 +161,9 @@ export namespace Geometry::MeshUtils
         const HalfedgeMesh::Mesh& mesh,
         std::span<const double> vertexValues);
 
-    /// Populate a face vector property with unnormalized scalar gradients.
-    [[nodiscard]] FaceProperty<glm::dvec3> PublishFaceScalarGradients(
+    /// Populate a float face vector property with unnormalized scalar
+    /// gradients computed in double precision.
+    [[nodiscard]] FaceProperty<glm::vec3> PublishFaceScalarGradients(
         HalfedgeMesh::Mesh& mesh,
         std::span<const double> vertexValues,
         std::string_view outputPropertyName = kFaceScalarGradientPropertyName);

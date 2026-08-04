@@ -62,6 +62,15 @@ EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
   return BuildEditorWorkspaceSnapshot(ContextOrEmpty(queries), request);
 }
 
+EditorInspectorModel BuildEditorInspectorModel(
+    const EditorWorkspaceSnapshotQueries &queries,
+    EditorWorkspaceSnapshotStats *modelBuildStats) {
+  EditorWorkspaceSnapshotContext context = ContextOrEmpty(queries);
+  if (modelBuildStats != nullptr)
+    context.Visualization.ModelBuildStats = modelBuildStats;
+  return BuildEditorInspectorModel(context);
+}
+
 EditorDomainWindowModel BuildEditorDomainWindowModel(
     const EditorWorkspaceSnapshotQueries &queries,
     EditorDomainWindowKind kind,

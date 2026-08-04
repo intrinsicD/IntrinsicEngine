@@ -1749,6 +1749,12 @@ namespace Extrinsic::Runtime
         return refs;
     }
 
+    bool IsValidPointCloudConsolidationPropertyRefs(
+        const PointCloudConsolidationPropertyRefs& properties) noexcept
+    {
+        return HasValidPropertyRefs(properties);
+    }
+
     PointCloudConsolidationAvailability
     ResolvePointCloudConsolidationAvailability(
         const GeometryEntityAvailability& availability,

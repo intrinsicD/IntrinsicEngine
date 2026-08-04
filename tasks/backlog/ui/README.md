@@ -28,9 +28,6 @@ map.
 - [UI-040 — ICP compatible-source selection and discovery](UI-040-icp-compatible-source-selection.md)
   (all mixed Mesh/Graph/PointCloud property-source pairs through one shared
   runtime config/readiness window after `RUNTIME-207`).
-- [UI-039 — LOP family multi-domain discovery](UI-039-lop-multi-domain-discovery.md)
-  (extends the `UI-035` panel across every compatible element-domain property
-  through topology-safe `RUNTIME-206` publication).
 - [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)
   (one shared readiness value reused by each feature-owned typed operation for
   mesh, UV, bake, point-cloud, registration, and parameterization actions;

@@ -47,6 +47,23 @@ also accepts meshes satisfying them. Same-cardinality results publish named
 properties back to the originating domain; topology/cardinality edits remain
 explicit owning operations.
 
+Engine bindings express each method input and output as a semantic slot backed
+by a full canonical property reference: element domain, original property name,
+and value kind. Slot semantics never prescribe a storage name. A `Position`
+slot may therefore bind `f:centroid`, `e:sample`, or another compatible property
+without copying or aliasing it to `v:position`; the runtime resolver validates
+the property and passes its typed property/span to the kernel. Paired slots add
+their actual count/domain/correspondence requirements, and topology-aware slots
+add only the adjacency sources the method really consumes.
+
+Public and persisted geometry vector properties use float `glm::vec*` storage.
+Precision-sensitive kernels may promote values to `double`/`glm::dvec*` for
+internal computation, then convert at the result-publication boundary. Do not
+publish `glm::dvec*` properties by default or add silent persistent float/double
+alias properties. A method that genuinely requires a public double-vector
+contract must declare that exception, add typed catalog support, and test every
+control surface explicitly.
+
 ## Backend policy summary
 
 - Reference backend is the canonical truth for correctness.

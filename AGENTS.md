@@ -210,6 +210,11 @@ Method/paper work must follow this order:
 Geometry method binding follows the canonical property-domain substitutability
 contract in `docs/architecture/geometry-api-style.md`:
 
+- Method inputs and outputs are semantic slots bound by full canonical property
+  references (element domain + property name + value kind). A slot named
+  `Position` does not require a property named `v:position`; for example it may
+  bind `f:centroid` on mesh faces when that property satisfies the typed
+  contract. Do not create compatibility aliases merely to satisfy a slot name.
 - A point-set method consumes the compatible typed `Property<T>` /
   `ConstProperty<T>` (or span) it names on any resolved element domain. It must
   not require point-cloud provenance, a `Vertices` component, or a
@@ -228,6 +233,12 @@ contract in `docs/architecture/geometry-api-style.md`:
   property/topology preflight. Every appropriate provenance menu must expose
   compatible property domains; handle-specific property aliases are
   conveniences, not discovery filters.
+- Public, persisted geometry vector properties use float `glm::vec*` storage.
+  Kernels may use `double`/`glm::dvec*` for conditioning, accumulation,
+  predicates, and other precision-sensitive internal work, but convert at the
+  publication boundary instead of exposing double-vector properties by
+  default. A deliberate public double-vector contract requires its own scoped
+  API decision and typed catalog support.
 
 Every new or materially changed geometry-method task must declare
 `geometry.element-domain-sources` and `method.engine-integration` when
