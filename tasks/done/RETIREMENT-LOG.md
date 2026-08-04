@@ -19,8 +19,9 @@ contract; disabled configuration and teardown retain no live state. The public
 test-only `Runtime.PhysicsBridge` surface is deleted, while ECS remains free of
 physics handles and the lower physics layer remains independent of ECS,
 runtime, graphics, platform, and app. On the merged source, 55 focused
-physics/config/runtime cases and all 4,077 CPU-supported cases passed; the
-complete isolated ASan and UBSan cohorts and strict layering, clean-workshop,
+physics/config/runtime cases passed; the full CPU selector selected 4,077,
+passed 4,076, and skipped its policy-defined GLFW/LSan case. The complete
+isolated ASan and UBSan cohorts and strict layering, clean-workshop,
 task, documentation, inventory, test-layout, root-hygiene, ARA, durable
 handoff, and independent fixed-surface review gates also passed. GPU/Vulkan
 physics, contact-event publication, persistence, a dedicated physics UI, and

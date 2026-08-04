@@ -795,8 +795,8 @@
   and shutdown. Its public surface exposes config and copied diagnostics but no
   physics world, body handle, parallel service, or exact self-publication.
 - **Status**: supported — Clang 23 focused and complete CPU/Null contracts,
-  complete ASan and UBSan CPU cohorts, and a linked Sandbox executable; the
-  task's independent high-risk acceptance remains pending, and no GPU/Vulkan
+  complete ASan and UBSan CPU cohorts, a linked Sandbox executable, and an
+  accepted independent fixed-surface implementation review; no GPU/Vulkan
   physics, persistence, contact-event, dedicated-UI, or performance claim is
   made
 - **Provenance**: ai-executed
