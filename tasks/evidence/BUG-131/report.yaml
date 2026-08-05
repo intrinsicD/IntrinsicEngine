@@ -1,0 +1,241 @@
+schema_version: 1
+task_id: BUG-131
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-05T08:46:55Z'
+claim_eligible: false
+source:
+  base_ref: 976d34e0
+  base_revision: 976d34e024f95b984413dbc8aa6f4a6046c5570f
+  head_revision: 060e91093ccc033fabedb8b4fca571d76d1a7e88
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: be54a59f76fa252c575af418882f89e52f3032aa59450fea33f613299a8eeb74
+  - path: ara/staging/observations.yaml
+    sha256: 328f6f08653f65cdb961825cc708ddaaa149d58436f401d88693acc0004aae30
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 215591684064fce712bdee7613538b54764eb61e2301e236ea9330af7a5d03c7
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: ba26140d884e77bc2a83c0e41a59347e3e02b672e55d2054d9c5ffbcfaf346a9
+  - path: ara/trace/sessions/2026-08-05_001.yaml
+    sha256: 9471d773d8834f6a5792ac19d79c00555b1b1a41b51d8dbe33fb029e341d3092
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: 9ad1abaf444048ea9cd593f9be904627c198fbfde80baa79ad7bbfc6024b36a8
+  - path: assets/shaders/lop_density.comp
+    sha256: 06ce26d63bc6bb34a407c97d48d95f8fc5001a9ffdfd1de9594ac75c23c5fdc3
+  - path: assets/shaders/lop_gpu_common.glslinc
+    sha256: 56c1a6f7712967b0da164e1c4c4a913fef0e4686fa98cd13567e309226730cf6
+  - path: assets/shaders/lop_initialize.comp
+    sha256: d10c36a420fb53b122dfc4cb4aea3cc182cdd2510559d173bf9fa79b4eb87438
+  - path: assets/shaders/lop_project.comp
+    sha256: db9f07ef49d1ef434d75c72e14b4edd2cdc190b164778784a5c621e07aaa8a0b
+  - path: docs/architecture/geometry.md
+    sha256: b5a17be1607355c16e46617060a4568cdaae6dd83d983fd753a74af2da46bc9c
+  - path: docs/architecture/runtime-config-control.md
+    sha256: b3ee0f215ecfbad9c6f2f6056a2b312353e40933ad06b887102e95e9c5d32322
+  - path: docs/architecture/support-radius-policy.md
+    sha256: cb05e00501f20e08c7564d0d170ead03e23c46d9448f52d6442255c1353e437f
+  - path: methods/geometry/locally_optimal_projection/README.md
+    sha256: bf9c8720c106d3d1ffa833ad002897dcf16838bd7a66c28c46710c43642d06a8
+  - path: methods/geometry/locally_optimal_projection/paper.md
+    sha256: e305258171bf782ce482972943b85e7785ee7e553c410157177df074de9b72e2
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 89753c665b7dce47b98320573c17810c8bb10b8b673247a761a3cd67bbf29b59
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: 918de5c28c532f11eedeb533ef5425f93ae4953db4e4b79d38434879d6fea73c
+  - path: src/app/Sandbox/README.md
+    sha256: 7f26df37b71bb982e109bcece93c7b99c0429d5873ccae7dc85f71fc14923e31
+  - path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+    sha256: 2b5e6c6a3f80e35df6dd2b936273509b9e0f24fc1667c380b1999f858701da49
+  - path: src/geometry/Geometry.PointCloud.Kernels.cpp
+    sha256: ec7c3ff70f1aa6a022cbdcb7f2e272bc0342fc165c92f22eb5180e60b76f9ebe
+  - path: src/geometry/Geometry.PointCloud.Kernels.cppm
+    sha256: d9c3e8b0b8230e60db8442dddff67416576c40f8913b7137365d7edb4d6aa39c
+  - path: src/geometry/Geometry.SupportRadius.cpp
+    sha256: 01f7c9c2e475fbd8d737305ddeeecc5b81d251c2af36bfbf73007daff43285a3
+  - path: src/geometry/Geometry.SupportRadius.cppm
+    sha256: 2021d1124fc708df6665fb0e8d727bf015b398a9c2d9590548a5a91ba178444f
+  - path: src/runtime/README.md
+    sha256: d682e0e5b5325d6be906456595082d07b074caf1f40e3af2d845bbef6f3bb981
+  - path: src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: 523f70a60d274588ca9c7926073051611e7877739598c1b687070cd3bf26a468
+  - path: src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+    sha256: ce2d0c8594db99615fac74da2f622f7a0b7f5e494e4df4e4bb2d7917e33e74cd
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
+    sha256: 35355a04f934d9077db0f059264f5cf34faa45d98d56aaef171e000f78db76f2
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
+    sha256: 94b2063346b713dcc2c6a2303dedc5a84add8efa396172cbbb2fcc56847e15ae
+  - path: tasks/active/README.md
+    sha256: 5e7ab45c9632da4378cfeca117e20a312cfa8c7418020bb7bc15be263e95c564
+  - path: tasks/done/BUG-131-lop-auto-radius-visible-application.md
+    sha256: 86bdb06cd3687a957db78b200962c6864430e41bc9af17c3e0d318f39aaef2af
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 7ec134354495423450619d99f7861c5c0c7d7bbfed011dcd8b08fd8fbac0d645
+  - path: tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+    sha256: 0b5fb3b4d289f78c6b4267e1fd2c1a3838a73a19903a0cc1d495c088570899d0
+  - path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+    sha256: 9c17cc96061e69402628963f0da8a7573d9dc5d3d2e37ba33164fba47ebaeedd
+  - path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: 0e5acc25f39513183e75e2c60725ea0666955bb0ad5a8b2995e7d8f2af256f99
+  - path: tests/unit/geometry/Test.PointCloudKernels.cpp
+    sha256: a99abdf41a733bea036ee0e61c95587574f513575a1bcae6f5ba5576a439ad69
+  - path: tests/unit/geometry/Test.SupportRadius.cpp
+    sha256: 8c243f38fe0f3fe62391a623c0d8e7a4a9143e4e27ec1a466a9ce8d596ead4ea
+  content_digest: 33236580cdd7af2d42b7591e35e0310ee47ab493c3aacb8cb04c0f96e6bb0b68
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-05_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - assets/shaders/lop_density.comp
+  - assets/shaders/lop_gpu_common.glslinc
+  - assets/shaders/lop_initialize.comp
+  - assets/shaders/lop_project.comp
+  - docs/architecture/geometry.md
+  - docs/architecture/runtime-config-control.md
+  - docs/architecture/support-radius-policy.md
+  - methods/geometry/locally_optimal_projection/README.md
+  - methods/geometry/locally_optimal_projection/paper.md
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/README.md
+  - src/geometry/Geometry.PointCloud.Consolidation.cpp
+  - src/geometry/Geometry.PointCloud.Kernels.cpp
+  - src/geometry/Geometry.PointCloud.Kernels.cppm
+  - src/geometry/Geometry.SupportRadius.cpp
+  - src/geometry/Geometry.SupportRadius.cppm
+  - src/runtime/README.md
+  - src/runtime/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cppm
+  - tasks/active/README.md
+  - tasks/done/BUG-131-lop-auto-radius-visible-application.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+  - tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+  - tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  - tests/unit/geometry/Test.PointCloudKernels.cpp
+  - tests/unit/geometry/Test.SupportRadius.cpp
+  layers:
+  - app
+  - geometry
+  - methods
+  - runtime
+  modules:
+  - Extrinsic.Geometry.PointCloud.Kernels
+  - Extrinsic.Geometry.SupportRadius
+  - Extrinsic.Runtime.PointCloudConsolidationModule
+extension_seam: The existing geometry-owned support-radius profile feeds the existing runtime consolidation
+  operation, private Vulkan participant, canonical property publisher, and Sandbox result view without
+  adding a public spatial-index or backend abstraction.
+future_change_plan: Extend additional LOP-family Vulkan strategies only through the same validated operation,
+  explicit capability matrix, bounded radius analysis, CPU-reference parity, and canonical publication
+  path.
+acceptance:
+- criterion: The reported Auto workflow no longer ends at `UnsafeSupportRadius` when
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Unsafe shared work still fails before execution with sampled-neighbor or
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A successful default canonical-position run reports actual Vulkan,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: UI, config, and agent/CLI use one validated execution/result path.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No layering, property-domain, topology/cardinality, or method-parity
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-131/commands/ara-claims-retired.json
+- receipt: tasks/evidence/BUG-131/commands/ara-claims.json
+- receipt: tasks/evidence/BUG-131/commands/asan-build.json
+- receipt: tasks/evidence/BUG-131/commands/asan-configure.json
+- receipt: tasks/evidence/BUG-131/commands/asan-tests.json
+- receipt: tasks/evidence/BUG-131/commands/clean-workshop.json
+- receipt: tasks/evidence/BUG-131/commands/diff-check-retired.json
+- receipt: tasks/evidence/BUG-131/commands/doc-links-retired.json
+- receipt: tasks/evidence/BUG-131/commands/focused-cpu.json
+- receipt: tasks/evidence/BUG-131/commands/full-cpu-build.json
+- receipt: tasks/evidence/BUG-131/commands/full-cpu-tests.json
+- receipt: tasks/evidence/BUG-131/commands/method-manifests.json
+- receipt: tasks/evidence/BUG-131/commands/root-hygiene.json
+- receipt: tasks/evidence/BUG-131/commands/session-brief-retired.json
+- receipt: tasks/evidence/BUG-131/commands/task-policy-retired.json
+- receipt: tasks/evidence/BUG-131/commands/task-state-links-retired.json
+- receipt: tasks/evidence/BUG-131/commands/task-validation-active.json
+- receipt: tasks/evidence/BUG-131/commands/task-validation-retired.json
+- receipt: tasks/evidence/BUG-131/commands/test-layout.json
+- receipt: tasks/evidence/BUG-131/commands/ubsan-build.json
+- receipt: tasks/evidence/BUG-131/commands/ubsan-configure.json
+- receipt: tasks/evidence/BUG-131/commands/ubsan-tests.json
+- receipt: tasks/evidence/BUG-131/commands/vulkan-build-final.json
+- receipt: tasks/evidence/BUG-131/commands/vulkan-build-postreview.json
+- receipt: tasks/evidence/BUG-131/commands/vulkan-parity-visible-final.json
+- receipt: tasks/evidence/BUG-131/commands/vulkan-parity-visible.json
+- receipt: tasks/evidence/BUG-131/commands/vulkan-postreview.json
+changed_public_contracts:
+- Auto support radius reports requested and selected neighbor rank and deterministically chooses the largest
+  policy-valid rank within the unchanged work budget; Manual radius remains exact and fail-closed.
+- WLOP direct and reciprocal density weights use the paper-defined 1 + sum base value, including isolated-density
+  samples, on CPU reference, optimized CPU, and Vulkan.
+- Successful same-cardinality publication updates the selected originating property; canonical mesh positions
+  enter the existing render-dirty upload path.
+diagnostics_and_previews:
+- Queued and running UI state names radius analysis, backend execution, and publication; terminal state
+  reports Auto rank backoff, actual backend/fallback, and displacement.
+- Unsafe work and concrete Vulkan grid/resource plans remain fail-closed with named analysis categories.
+benchmark_or_parity_evidence:
+- The opt-in gpu;vulkan selector passed both parity and real child.obj publication cases on this host;
+  this is operational/parity evidence only and supports no speedup or cross-device claim.
+docs_sync:
+  task_file: tasks/done/BUG-131-lop-auto-radius-visible-application.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- The visible-publication proof is bounded to assets/models/child.obj and this operational Vulkan host;
+  visual quality, convergence quality, performance, memory efficiency, and cross-device behavior are unclaimed.
+- Anisotropic WLOP, CLOP, and EAR remain explicit CPU-only/Vulkan capability-negative pairs.
+skipped_checks: []
+artifacts:
+- path: tasks/done/BUG-131-lop-auto-radius-visible-application.md
+  sha256: 86bdb06cd3687a957db78b200962c6864430e41bc9af17c3e0d318f39aaef2af
+  kind: file
+- path: tests/unit/geometry/Test.SupportRadius.cpp
+  sha256: 8c243f38fe0f3fe62391a623c0d8e7a4a9143e4e27ec1a466a9ce8d596ead4ea
+  kind: file
+- path: tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+  sha256: 0b5fb3b4d289f78c6b4267e1fd2c1a3838a73a19903a0cc1d495c088570899d0
+  kind: file
+- path: docs/architecture/support-radius-policy.md
+  sha256: cb05e00501f20e08c7564d0d170ead03e23c46d9448f52d6442255c1353e437f
+  kind: file
+- path: assets/shaders/lop_density.comp
+  sha256: 06ce26d63bc6bb34a407c97d48d95f8fc5001a9ffdfd1de9594ac75c23c5fdc3
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
