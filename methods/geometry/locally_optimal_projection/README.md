@@ -13,6 +13,7 @@ kept out of the method backend.
 | --- | --- | --- | --- |
 | `cpu_reference` | LOP, WLOP | implemented | METHOD-016 |
 | optimized CPU candidate | LOP, WLOP | parity passed; ratios 0.961824 / 0.966845 missed the 0.80 gate; not selectable | METHOD-019 |
+| `gpu_vulkan_compute` | ordinary LOP, isotropic WLOP | implemented behind the METHOD-020 opt-in v3 parity and benchmark gates | METHOD-020 |
 
 WLOP is the default strategy. Plain LOP follows the same update but uses unit
 source/projected density weights.
@@ -40,8 +41,12 @@ source/projected density weights.
   anisotropic samples. METHOD-018 owns the normal-aware EAR strategy.
 - WLOP density correction improves non-uniform sampling but does not infer
   connectivity or reconstruct a surface.
-- The reference is serial and correctness-oriented. Optimized CPU and GPU
-  backends are separate parity tasks.
+- The reference is serial and correctness-oriented. The private Vulkan path
+  uses float shader arithmetic, one bounded `h`-cell grid, and a single
+  in-flight operation; unavailable, busy, or transport-invalid GPU work falls
+  back to the CPU reference with explicit requested/actual backend telemetry.
+- Anisotropic WLOP remains CPU-only. Its normal preparation and directional
+  kernel are not aliases for the isotropic Vulkan shader.
 - METHOD-019 retained its exact execution candidates as benchmark-only
   negative evidence. They do not add a backend token, config value, or UI
   choice.
@@ -53,6 +58,11 @@ source/projected density weights.
 - Paired candidate comparison:
   `benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml`; see
   `reports/METHOD-019-result.md`
+- Vulkan confirmation:
+  `tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp` and
+  `benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml`. The v1
+  and v2 WLOP fixtures are preserved as rejected CPU-oracle protocols in the
+  METHOD-020 screening reports rather than retuned.
 
 ## Runtime integration
 
@@ -65,4 +75,8 @@ container conversion is required. Same-cardinality output updates named
 properties on the originating domain with undo/redo. Mesh/graph count changes
 are rejected before scheduling; canonical point-cloud replacement remains the
 explicit count-changing path. Support profiling runs from the captured property
-on the same job worker before the method; rejected work publishes no geometry.
+on the same job worker before backend selection. `gpu_vulkan_compute` records
+ordinary LOP and isotropic WLOP through the private runtime Vulkan participant,
+while all callers rejoin the same stale-result, undo, property-publication, and
+render dirty-state path. A finite iteration-limit result publishes as an
+explicit `NotConverged` preview; hard failures publish no geometry.

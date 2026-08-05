@@ -29,6 +29,7 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
     using Runtime::ParameterizationUvConfig;
     using Runtime::ParameterizationUvRenderMode;
     using Runtime::PointCloudConsolidationConfig;
+    using Runtime::PointCloudConsolidationBackend;
     using Runtime::PointCloudConsolidationNormalSource;
     using Runtime::PointCloudConsolidationStrategy;
     using Runtime::ProgressivePoissonPlaygroundBackend;

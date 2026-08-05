@@ -32,6 +32,21 @@ property/service-operation diagnostics, and parity for the same deterministic
 fixture without claiming a speedup. The timing is intentionally not described
 as raw shader or device time.
 
+METHOD-020 adds the same bounded exception for the LOP family in
+[`Bench_LopFamilyGpuVulkanSmoke.cpp`](Bench_LopFamilyGpuVulkanSmoke.cpp).
+`IntrinsicLopFamilyGpuBenchmarkSmoke` composes the production
+`PointCloudConsolidationService`, requires actual Vulkan identity with no
+fallback, and compares ordinary LOP plus isotropic WLOP against their frozen
+CPU-reference fixtures after one warmup and three measured runs. It reports
+host service-command-to-applied-event time as the explicitly named timing
+source, device identity, per-strategy RMS/L-infinity and repeat deltas, and no
+speedup claim. Use `ci-vulkan-release` for unsanitized optimized descriptive
+timing; sanitizer-backed parity remains under `ci-vulkan`.
+The executable contract is
+[`lop_family_gpu_vulkan_smoke_v3.yaml`](manifests/lop_family_gpu_vulkan_smoke_v3.yaml);
+v1 and v2 remain immutable rejected preregistrations whose WLOP CPU oracles
+produced no positions.
+
 ## Manifest schema
 
 Manifests follow the canonical schema documented in

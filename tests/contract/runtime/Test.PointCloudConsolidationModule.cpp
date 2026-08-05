@@ -33,6 +33,7 @@ import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
+import Geometry.PointCloud.Consolidation;
 import Geometry.Properties;
 
 namespace CoreConfig = Extrinsic::Core::Config;
@@ -385,6 +386,15 @@ namespace
         : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        explicit ConsolidationSuccessApp(
+            const Runtime::PointCloudConsolidationBackend backend =
+                Runtime::PointCloudConsolidationBackend::CpuReference,
+            const double convergenceTolerance = 1.0)
+            : Backend(backend)
+            , ConvergenceTolerance(convergenceTolerance)
+        {
+        }
+
         void Resolve() override
         {
             auto& engine = Kernel();
@@ -407,6 +417,8 @@ namespace
             MainThread = std::this_thread::get_id();
             Runtime::PointCloudConsolidationRequest request =
                 MakeRequest(Entity);
+            request.Config.Backend = Backend;
+            request.Config.ConvergenceTolerance = ConvergenceTolerance;
             request.Config.SupportRadiusMode = Runtime::
                 PointCloudConsolidationSupportRadiusMode::Manual;
             Correlation = Service->Run(std::move(request));
@@ -446,6 +458,9 @@ namespace
         std::uint32_t Ticks{0u};
         bool MissingService{false};
         bool TimedOut{false};
+        Runtime::PointCloudConsolidationBackend Backend{
+            Runtime::PointCloudConsolidationBackend::CpuReference};
+        double ConvergenceTolerance{1.0};
     };
 
     class ConsolidationStaleSourceApp final
@@ -973,6 +988,45 @@ TEST(PointCloudConsolidationModule,
     EXPECT_EQ(clopAvailability.InputPointCount, NoisyPlane().size());
     EXPECT_NE(clopAvailability.Message.find("mixture component count"),
               std::string::npos);
+
+    Runtime::PointCloudConsolidationConfig vulkan =
+        SameCardinalityConfig();
+    vulkan.Backend =
+        Runtime::PointCloudConsolidationBackend::VulkanCompute;
+    const Runtime::PointCloudConsolidationAvailability vulkanWlop =
+        Runtime::ResolvePointCloudConsolidationAvailability(
+            Runtime::BuildGeometryAvailability(
+                scene.Raw(), sources.PointCloud),
+            pointProperties,
+            vulkan);
+    EXPECT_TRUE(vulkanWlop.Available) << vulkanWlop.Message;
+
+    for (const Runtime::PointCloudConsolidationStrategy strategy : {
+             Runtime::PointCloudConsolidationStrategy::Clop,
+             Runtime::PointCloudConsolidationStrategy::Ear})
+    {
+        vulkan.Strategy = strategy;
+        const Runtime::PointCloudConsolidationAvailability unsupported =
+            Runtime::ResolvePointCloudConsolidationAvailability(
+                Runtime::BuildGeometryAvailability(
+                    scene.Raw(), sources.PointCloud),
+                pointProperties,
+                vulkan);
+        EXPECT_FALSE(unsupported.Available);
+        EXPECT_NE(unsupported.Message.find("ordinary LOP and isotropic WLOP"),
+                  std::string::npos);
+    }
+    vulkan.Strategy = Runtime::PointCloudConsolidationStrategy::Wlop;
+    vulkan.WlopAnisotropic = true;
+    const Runtime::PointCloudConsolidationAvailability anisotropicVulkan =
+        Runtime::ResolvePointCloudConsolidationAvailability(
+            Runtime::BuildGeometryAvailability(
+                scene.Raw(), sources.PointCloud),
+            pointProperties,
+            vulkan);
+    EXPECT_FALSE(anisotropicVulkan.Available);
+    EXPECT_NE(anisotropicVulkan.Message.find("ordinary LOP and isotropic WLOP"),
+              std::string::npos);
 }
 
 TEST(PointCloudConsolidationModule,
@@ -1222,6 +1276,65 @@ TEST(PointCloudConsolidationModule,
               appPtr->MeshFaceTopologyBefore);
     EXPECT_EQ(meshFaces.Get<OpaqueDomainValue>("f:opaque").Vector(),
               appPtr->MeshOpaqueBefore);
+
+    engine.Shutdown();
+}
+
+TEST(PointCloudConsolidationModule,
+     VulkanRequestFallsBackHonestlyWhenNoOperationalGpuStateExists)
+{
+    auto app = std::make_unique<ConsolidationSuccessApp>(
+        Runtime::PointCloudConsolidationBackend::VulkanCompute);
+    ConsolidationSuccessApp* appPtr = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine{
+        HeadlessConfig(), std::move(app)};
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_FALSE(appPtr->MissingService);
+    EXPECT_FALSE(appPtr->TimedOut);
+    ASSERT_TRUE(appPtr->Completion.has_value());
+    ASSERT_TRUE(appPtr->Completion->Succeeded())
+        << appPtr->Completion->Message;
+    EXPECT_EQ(appPtr->Completion->RequestedBackend,
+              Runtime::PointCloudConsolidationBackend::VulkanCompute);
+    EXPECT_EQ(appPtr->Completion->ActualBackend,
+              Runtime::PointCloudConsolidationBackend::CpuReference);
+    EXPECT_TRUE(appPtr->Completion->FellBackToCpu);
+    EXPECT_EQ(appPtr->Completion->ImplementationId, "cpu_reference");
+    EXPECT_FALSE(appPtr->Completion->BackendDiagnostic.empty());
+    EXPECT_EQ(appPtr->Stats.GpuRequestsAccepted, 0u);
+    EXPECT_EQ(appPtr->Stats.GpuFallbacks, 1u);
+    EXPECT_EQ(appPtr->Stats.GpuCompletions, 0u);
+    EXPECT_EQ(appPtr->Stats.JobsSubmitted, 2u);
+    EXPECT_EQ(appPtr->Stats.ResultsCommitted, 1u);
+
+    engine.Shutdown();
+}
+
+TEST(PointCloudConsolidationModule,
+     NonConvergedFiniteIteratePublishesAsAnExplicitPreview)
+{
+    auto app = std::make_unique<ConsolidationSuccessApp>(
+        Runtime::PointCloudConsolidationBackend::CpuReference,
+        0.0);
+    ConsolidationSuccessApp* appPtr = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine{
+        HeadlessConfig(), std::move(app)};
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_FALSE(appPtr->TimedOut);
+    ASSERT_TRUE(appPtr->Completion.has_value());
+    EXPECT_TRUE(appPtr->Completion->Succeeded())
+        << appPtr->Completion->Message;
+    EXPECT_EQ(appPtr->Completion->GeometryStatus,
+              Geometry::PointCloud::Consolidation::Status::NotConverged);
+    EXPECT_FALSE(appPtr->Completion->Converged);
+    EXPECT_EQ(appPtr->Completion->Iterations, 1u);
+    EXPECT_EQ(appPtr->Completion->OutputPointCount, 16u);
 
     engine.Shutdown();
 }

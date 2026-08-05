@@ -258,6 +258,17 @@ production-shaped output buffers and proves only the real transfer queue plus
 typed parser; METHOD-014 still owns compute execution and public CPU/GPU parity.
 Do not promote transport evidence into an algorithm-parity claim.
 
+`PointCloudConsolidationService` is the second production exemplar. Its one
+private runtime Vulkan state implements ordinary LOP and isotropic WLOP with a
+bounded `h`-sized count/scan/scatter grid, the shared prefix-scan primitive,
+on-device fixed-iteration/convergence state, and one final multi-range result
+batch. The CPU reference remains the oracle and fallback. Requested/actual
+backend telemetry distinguishes fallback from actual GPU evidence, while
+anisotropic WLOP, CLOP, and EAR are explicit capability-negative pairs that
+fail the canonical availability preview. METHOD-020's opt-in Vulkan parity and
+benchmark fixtures are the algorithm evidence; the shared scan/readback seams
+alone are not.
+
 ## Config And Agent Lane
 
 For a family with a justified backend seam, the backend field on the algorithm

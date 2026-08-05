@@ -1,0 +1,41 @@
+#version 460
+
+#include "lop_gpu_common.glslinc"
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+    if (pc.StateBDA == uint64_t(0)) return;
+    LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
+    const uint index = gl_GlobalInvocationID.x;
+    const bool source = pc.PassMode == LOP_GPU_MODE_SOURCE;
+    const uint count = source ? pc.SourceCount : pc.TargetCount;
+    if (index >= count) return;
+    if (!source && LopGpuDiagnosticsRef(state.DiagnosticsBDA).Active == 0u)
+        return;
+
+    const uint64_t positionsBDA = source
+        ? state.SourcePositionsBDA
+        : LopCurrentProjectedBDA(state, pc.Iteration);
+    const uint64_t countsBDA = source
+        ? state.SourceCountsBDA
+        : state.ProjectedCountsBDA;
+    if (positionsBDA == uint64_t(0) || countsBDA == uint64_t(0))
+    {
+        LopFail(state, LOP_GPU_ERROR_GRID);
+        return;
+    }
+
+    ivec3 coordinate;
+    uint cell;
+    if (!LopCellForPoint(
+            LopVec4ArrayRO(positionsBDA).Values[index].xyz,
+            coordinate,
+            cell))
+    {
+        LopFail(state, LOP_GPU_ERROR_GRID);
+        return;
+    }
+    atomicAdd(LopUIntArray(countsBDA).Values[cell], 1u);
+}

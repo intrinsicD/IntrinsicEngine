@@ -29,6 +29,13 @@ export namespace Extrinsic::Runtime
         Ear,
     };
 
+    enum class PointCloudConsolidationBackend : std::uint32_t
+    {
+        None = 0u,
+        CpuReference,
+        VulkanCompute,
+    };
+
     enum class PointCloudConsolidationNormalSource : std::uint32_t
     {
         AuthoredOrEstimate = 0u,
@@ -43,6 +50,8 @@ export namespace Extrinsic::Runtime
 
     struct PointCloudConsolidationConfig
     {
+        PointCloudConsolidationBackend Backend{
+            PointCloudConsolidationBackend::CpuReference};
         PointCloudConsolidationStrategy Strategy{
             PointCloudConsolidationStrategy::Wlop};
         PointCloudConsolidationSupportRadiusMode SupportRadiusMode{
@@ -72,6 +81,8 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] std::string_view StableToken(
         PointCloudConsolidationStrategy strategy) noexcept;
+    [[nodiscard]] std::string_view StableToken(
+        PointCloudConsolidationBackend backend) noexcept;
     [[nodiscard]] std::string_view StableToken(
         PointCloudConsolidationNormalSource source) noexcept;
     [[nodiscard]] std::string_view StableToken(

@@ -112,6 +112,26 @@ if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLAT
             IntrinsicGeometry
     )
     intrinsic_add_glsl_shaders(IntrinsicKMeansGpuBenchmarkSmoke)
+
+    add_executable(IntrinsicLopFamilyGpuBenchmarkSmoke
+        geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+    )
+    set_target_properties(IntrinsicLopFamilyGpuBenchmarkSmoke PROPERTIES CXX_SCAN_FOR_MODULES ON)
+    target_compile_features(IntrinsicLopFamilyGpuBenchmarkSmoke PRIVATE cxx_std_23)
+    target_compile_options(IntrinsicLopFamilyGpuBenchmarkSmoke PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+    target_link_options(IntrinsicLopFamilyGpuBenchmarkSmoke PRIVATE ${INTRINSIC_LINK_FLAGS})
+    target_link_libraries(IntrinsicLopFamilyGpuBenchmarkSmoke
+        PRIVATE
+            IntrinsicConfig
+            ExtrinsicRuntime
+            ExtrinsicGraphics
+            ExtrinsicBackendsVulkan
+            ExtrinsicPlatform
+            ExtrinsicRHI
+            ExtrinsicCore
+            IntrinsicGeometry
+    )
+    intrinsic_add_glsl_shaders(IntrinsicLopFamilyGpuBenchmarkSmoke)
 endif()
 
 # Keep the monolithic smoke runner available as an opt-in CTest fixture. The
@@ -197,6 +217,49 @@ if(BUILD_TESTING)
                 LABELS "benchmark;geometry;runtime;gpu;vulkan"
                 TIMEOUT 30
                 FIXTURES_REQUIRED IntrinsicKMeansGpuBenchmarkSmoke
+            )
+        endif()
+    endif()
+
+    if(TARGET IntrinsicLopFamilyGpuBenchmarkSmoke)
+        intrinsic_register_test_executable(
+            TARGET IntrinsicLopFamilyGpuBenchmarkSmoke
+            LABELS benchmark geometry runtime gpu vulkan
+        )
+
+        set(_intrinsic_lop_gpu_bench_dir
+            "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicLopFamilyGpuBenchmarkSmoke")
+
+        add_test(
+            NAME IntrinsicLopFamilyGpuBenchmarkSmoke.Run
+            COMMAND ${Python3_EXECUTABLE}
+                "${CMAKE_SOURCE_DIR}/tools/benchmark/run_and_seal.py"
+                --executable $<TARGET_FILE:IntrinsicLopFamilyGpuBenchmarkSmoke>
+                --output "${_intrinsic_lop_gpu_bench_dir}"
+                --manifests-root "${CMAKE_SOURCE_DIR}/benchmarks"
+                --run-id "ctest-lop-gpu-smoke"
+                --attempt-id "attempt-001"
+        )
+        set_tests_properties(IntrinsicLopFamilyGpuBenchmarkSmoke.Run PROPERTIES
+            ENVIRONMENT "${_intrinsic_benchmark_test_env}"
+            LABELS "benchmark;geometry;runtime;gpu;vulkan"
+            TIMEOUT 180
+            FIXTURES_SETUP IntrinsicLopFamilyGpuBenchmarkSmoke
+        )
+
+        if(Python3_Interpreter_FOUND)
+            add_test(
+                NAME IntrinsicLopFamilyGpuBenchmarkSmoke.Validate
+                COMMAND ${Python3_EXECUTABLE}
+                    "${CMAKE_SOURCE_DIR}/tools/benchmark/validate_benchmark_results.py"
+                    --root "${_intrinsic_lop_gpu_bench_dir}"
+                    --strict
+            )
+            set_tests_properties(IntrinsicLopFamilyGpuBenchmarkSmoke.Validate PROPERTIES
+                ENVIRONMENT "${_intrinsic_benchmark_test_env}"
+                LABELS "benchmark;geometry;runtime;gpu;vulkan"
+                TIMEOUT 30
+                FIXTURES_REQUIRED IntrinsicLopFamilyGpuBenchmarkSmoke
             )
         endif()
     endif()

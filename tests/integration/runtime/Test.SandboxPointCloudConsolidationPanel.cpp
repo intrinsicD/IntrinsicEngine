@@ -305,6 +305,7 @@ TEST(SandboxPointCloudConsolidationPanel,
     }
 
     Runtime::PointCloudConsolidationConfig config{};
+    config.Backend = Runtime::PointCloudConsolidationBackend::VulkanCompute;
     config.Strategy = Strategy::Ear;
     config.SupportRadius = 0.375;
     config.SupportRadiusMode = Runtime::
@@ -355,6 +356,7 @@ TEST(SandboxPointCloudConsolidationPanel,
         request->Execute.Properties.OutputPositions.Name,
         "lop:centroid");
     EXPECT_EQ(request->Execute.Config.Strategy, config.Strategy);
+    EXPECT_EQ(request->Execute.Config.Backend, config.Backend);
     EXPECT_DOUBLE_EQ(
         request->Execute.Config.SupportRadius,
         config.SupportRadius);
@@ -402,6 +404,12 @@ TEST(SandboxPointCloudConsolidationPanel,
 {
     const Runtime::PointCloudConsolidationResult applied{
         .Status = Runtime::PointCloudConsolidationRunStatus::Applied,
+        .RequestedBackend =
+            Runtime::PointCloudConsolidationBackend::VulkanCompute,
+        .ActualBackend =
+            Runtime::PointCloudConsolidationBackend::CpuReference,
+        .FellBackToCpu = true,
+        .BackendDiagnostic = "Vulkan unavailable; CPU completed.",
         .ImplementationId = "cpu_reference",
         .StrategyToken = "ear",
         .SupportRadiusAnalysisStatus = "success",
@@ -436,6 +444,11 @@ TEST(SandboxPointCloudConsolidationPanel,
     EXPECT_EQ(summary.Status, "Applied");
     EXPECT_EQ(summary.ImplementationId, "cpu_reference");
     EXPECT_EQ(summary.StrategyToken, "ear");
+    EXPECT_EQ(summary.RequestedBackend, "gpu_vulkan_compute");
+    EXPECT_EQ(summary.ActualBackend, "cpu_reference");
+    EXPECT_TRUE(summary.FellBackToCpu);
+    EXPECT_EQ(summary.BackendDiagnostic,
+              "Vulkan unavailable; CPU completed.");
     EXPECT_EQ(summary.SupportRadiusAnalysisStatus, "success");
     EXPECT_EQ(summary.SupportRadiusSource, "recommended");
     EXPECT_DOUBLE_EQ(summary.ResolvedSupportRadius, 0.25);
@@ -716,6 +729,8 @@ TEST(SandboxPointCloudConsolidationPanel,
         prepared.PointCloudConsolidationAvailable;
 
     Runtime::PointCloudConsolidationConfig requested{};
+    requested.Backend =
+        Runtime::PointCloudConsolidationBackend::VulkanCompute;
     requested.Strategy = Runtime::PointCloudConsolidationStrategy::Wlop;
     requested.SupportRadius = 0.65;
     requested.RepulsionWeight = 0.0;
@@ -752,6 +767,11 @@ TEST(SandboxPointCloudConsolidationPanel,
     ASSERT_TRUE(appPtr->Completion->Succeeded())
         << appPtr->Completion->Message;
     EXPECT_EQ(appPtr->Completion->OutputPointCount, 16u);
+    EXPECT_EQ(appPtr->Completion->RequestedBackend,
+              Runtime::PointCloudConsolidationBackend::VulkanCompute);
+    EXPECT_EQ(appPtr->Completion->ActualBackend,
+              Runtime::PointCloudConsolidationBackend::CpuReference);
+    EXPECT_TRUE(appPtr->Completion->FellBackToCpu);
     EXPECT_EQ(appPtr->Completion->SupportRadiusSource, "recommended");
     EXPECT_EQ(appPtr->Completion->SupportRadiusAnalysisStatus, "success");
     EXPECT_GT(appPtr->Completion->ResolvedSupportRadius, 0.0);

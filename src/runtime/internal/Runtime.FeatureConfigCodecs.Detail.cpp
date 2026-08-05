@@ -530,6 +530,17 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<PointCloudConsolidationBackend>
+        ParsePointCloudConsolidationBackend(
+            const std::string_view value) noexcept
+        {
+            if (value == "cpu_reference")
+                return PointCloudConsolidationBackend::CpuReference;
+            if (value == "gpu_vulkan_compute")
+                return PointCloudConsolidationBackend::VulkanCompute;
+            return std::nullopt;
+        }
+
         [[nodiscard]] std::optional<PointCloudConsolidationNormalSource>
         ParsePointCloudConsolidationNormalSource(
             const std::string_view value) noexcept
@@ -677,6 +688,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
 
         [[nodiscard]] std::string_view ToConfigString(
             const PointCloudConsolidationStrategy value) noexcept
+        {
+            return StableToken(value);
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const PointCloudConsolidationBackend value) noexcept
         {
             return StableToken(value);
         }
@@ -865,7 +882,8 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             AddUnknownFieldDiagnostics(
                 context,
                 *object,
-                {"strategy",
+                {"backend",
+                 "strategy",
                  "support_radius_mode",
                  "support_radius",
                  "max_support_neighbors",
@@ -884,6 +902,16 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                  "clop_mixture_relative_tolerance",
                  "clop_covariance_floor",
                  "ear_edge_sensitivity"});
+
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "backend",
+                    ParsePointCloudConsolidationBackend,
+                    config.Backend))
+            {
+                CountParsed(context);
+            }
 
             if (ReadEnum(
                     context,
@@ -1745,6 +1773,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         const PointCloudConsolidationConfig& config)
     {
         return json::object({
+            {"backend", std::string{ToConfigString(config.Backend)}},
             {"strategy", std::string{ToConfigString(config.Strategy)}},
             {"support_radius_mode",
              std::string{ToConfigString(config.SupportRadiusMode)}},

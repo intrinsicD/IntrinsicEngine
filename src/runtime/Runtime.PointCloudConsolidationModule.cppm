@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -10,6 +11,7 @@ module;
 export module Extrinsic.Runtime.PointCloudConsolidationModule;
 
 import Extrinsic.Core.Error;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 export import Extrinsic.Runtime.GeometryAvailability;
@@ -23,6 +25,8 @@ import Geometry.PointCloud.Consolidation;
 
 export namespace Extrinsic::Runtime
 {
+    class PointCloudConsolidationGpuState;
+
     enum class PointCloudConsolidationRunStatus : std::uint8_t
     {
         Queued = 0u,
@@ -108,6 +112,12 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         PointCloudConsolidationPropertyRefs Properties{};
         PointCloudConsolidationConfig Config{};
+        PointCloudConsolidationBackend RequestedBackend{
+            PointCloudConsolidationBackend::CpuReference};
+        PointCloudConsolidationBackend ActualBackend{
+            PointCloudConsolidationBackend::None};
+        bool FellBackToCpu{false};
+        std::string BackendDiagnostic{};
         std::string ImplementationId{"cpu_reference"};
         std::string StrategyToken{"wlop"};
         std::string SupportRadiusAnalysisStatus{"not_run"};
@@ -150,6 +160,9 @@ export namespace Extrinsic::Runtime
         std::uint64_t CommandsHandled{0u};
         std::uint64_t JobsSubmitted{0u};
         std::uint64_t JobSubmissionFailures{0u};
+        std::uint64_t GpuRequestsAccepted{0u};
+        std::uint64_t GpuFallbacks{0u};
+        std::uint64_t GpuCompletions{0u};
         std::uint64_t CompletionEvents{0u};
         std::uint64_t ResultsCommitted{0u};
         std::uint64_t CommitsDropped{0u};
@@ -188,6 +201,9 @@ export namespace Extrinsic::Runtime
     class PointCloudConsolidationModule final : public IRuntimeModule
     {
     public:
+        PointCloudConsolidationModule();
+        ~PointCloudConsolidationModule() override;
+
         [[nodiscard]] std::string_view Name() const noexcept override;
         [[nodiscard]] Core::Result OnRegister(EngineSetup& setup) override;
         [[nodiscard]] Core::Result OnResolve(EngineSetup& setup) override;
@@ -206,6 +222,9 @@ export namespace Extrinsic::Runtime
         JobService* m_Jobs{};
         WorldRegistry* m_Worlds{};
         EditorCommandHistory* m_History{};
+        RHI::IDevice* m_Device{};
+        std::unique_ptr<PointCloudConsolidationGpuState> m_GpuState{};
+        GpuQueueParticipantHandle m_GpuParticipant{};
         PointCloudConsolidationModuleStats m_Stats{};
     };
 }

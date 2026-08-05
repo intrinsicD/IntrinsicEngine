@@ -36,3 +36,4 @@ known_limitations:
   - "The deterministic CPU reference implements original EAR, not later L0, graph/intrinsic, or learned resampling objectives."
   - "The serial CPU reference is correctness-oriented and makes no performance claim."
   - "METHOD-019's exact optimized EAR candidate preserved parity but missed the frozen useful-acceleration gate; no optimized backend is selectable."
+  - "METHOD-020 records anisotropic WLOP and EAR as capability-negative for gpu_vulkan_compute; runtime preview rejects them rather than dropping normal weighting, refinement, or insertion semantics."

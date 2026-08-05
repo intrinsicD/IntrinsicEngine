@@ -1,0 +1,81 @@
+#version 460
+
+#include "lop_gpu_common.glslinc"
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+    if (pc.StateBDA == uint64_t(0)) return;
+    LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
+    const uint index = gl_GlobalInvocationID.x;
+    if (index >= pc.TargetCount) return;
+    LopGpuDiagnosticsRef diagnostics =
+        LopGpuDiagnosticsRef(state.DiagnosticsBDA);
+    if (diagnostics.Active == 0u) return;
+
+    const vec3 query =
+        LopVec4ArrayRO(state.ProjectedBBDA).Values[index].xyz;
+    ivec3 center;
+    uint ignoredCell;
+    if (!LopCellForPoint(query, center, ignoredCell))
+    {
+        LopFail(state, LOP_GPU_ERROR_GRID);
+        return;
+    }
+
+    vec3 weightedSum = vec3(0.0);
+    float weightSum = 0.0;
+    uint contributions = 0u;
+    const float h2 = pc.SupportRadius * pc.SupportRadius;
+    for (int z = -1; z <= 1; ++z)
+    for (int y = -1; y <= 1; ++y)
+    for (int x = -1; x <= 1; ++x)
+    {
+        const ivec3 coordinate = center + ivec3(x, y, z);
+        if (!LopValidNeighborCell(coordinate)) continue;
+        const uint cell = LopLinearCell(coordinate);
+        const uint begin =
+            LopUIntArrayRO(state.SourceOffsetsBDA).Values[cell];
+        const uint count =
+            LopUIntArrayRO(state.SourceCountsBDA).Values[cell];
+        for (uint local = 0u; local < count; ++local)
+        {
+            const uint neighbor =
+                LopUIntArrayRO(state.SourceIndicesBDA).Values[begin + local];
+            if (neighbor >= pc.SourceCount) continue;
+            const vec3 source =
+                LopVec4ArrayRO(state.SourcePositionsBDA).Values[neighbor].xyz;
+            const vec3 delta = query - source;
+            const float distanceSquared = dot(delta, delta);
+            if (!(distanceSquared < h2)) continue;
+            const float weight = LopTheta(distanceSquared) *
+                LopFloatArrayRO(state.SourceWeightsBDA).Values[neighbor];
+            if (!(weight > 0.0)) continue;
+            weightedSum += source * weight;
+            weightSum += weight;
+            ++contributions;
+            if (contributions > pc.MaxNeighbors)
+            {
+                LopFail(state, LOP_GPU_ERROR_NEIGHBOR_LIMIT);
+                return;
+            }
+        }
+    }
+    if (!(weightSum > 0.0) || !LopFinite(weightedSum))
+    {
+        atomicAdd(diagnostics.EmptyNeighborhoodCount, 1u);
+        LopFail(state, LOP_GPU_ERROR_EMPTY_ATTRACTION);
+        return;
+    }
+    const vec3 initialized = weightedSum / weightSum;
+    if (!LopFinite(initialized))
+    {
+        LopFail(state, LOP_GPU_ERROR_NON_FINITE);
+        return;
+    }
+    LopVec4Array(state.ProjectedABDA).Values[index] =
+        vec4(initialized, 1.0);
+    atomicAdd(diagnostics.AttractionContributionCount, contributions);
+    if (index == 0u) diagnostics.SourceGridBuilt = 1u;
+}

@@ -148,6 +148,22 @@
         "INTRINSIC_SANITIZER_MODE": "address,undefined",
         "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "ON"
       }
+    },
+    {
+      "name": "ci-vulkan-release",
+      "displayName": "Release benchmarks + promoted Vulkan (CUDA off)",
+      "inherits": "ci-vulkan",
+      "description": "Unsanitized optimized Vulkan configuration for descriptive GPU benchmark evidence. CUDA remains disabled and promoted Vulkan execution remains opt-in.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "INTRINSIC_BUILD_SANDBOX": "OFF",
+        "INTRINSIC_BUILD_BENCHMARKS": "ON",
+        "INTRINSIC_ENABLE_CUDA": "OFF",
+        "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+        "INTRINSIC_SANITIZER_MODE": "none",
+        "INTRINSIC_ENABLE_SOURCE_COVERAGE": "OFF",
+        "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -186,6 +202,10 @@
     {
       "name": "ci-vulkan",
       "configurePreset": "ci-vulkan"
+    },
+    {
+      "name": "ci-vulkan-release",
+      "configurePreset": "ci-vulkan-release"
     }
   ]
 }

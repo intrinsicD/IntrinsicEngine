@@ -16,6 +16,7 @@ outputs:
   - "Consolidation diagnostics with strategy, convergence, displacement, and neighborhood contribution counts"
 backends:
   - cpu_reference
+  - gpu_vulkan_compute
 metrics:
   - "mean_distance_to_reference_surface"
   - "uniformity_min_pairwise_distance"
@@ -23,11 +24,15 @@ metrics:
   - "runtime_ms"
 correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
+  - "../../../tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
 benchmarks:
   - "../../../benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml"
 known_limitations:
   - "Compact support h must connect every projected sample to at least one source sample; isolated neighborhoods fail closed."
   - "Thin structures and strongly anisotropic sampling can merge across sheets when h is too large."
   - "METHOD-019's exact optimized candidates preserved parity but missed the frozen useful-acceleration gate for both LOP and WLOP; no optimized backend is selectable."
+  - "gpu_vulkan_compute supports ordinary LOP and isotropic WLOP only; anisotropic WLOP fails runtime preview and remains on cpu_reference."
+  - "The Vulkan backend uses float shader arithmetic, bounded dense h-cell grids, and one in-flight operation; device, planning, busy, or transport unavailability falls back honestly to cpu_reference."
   - "Inverse-distance terms use a scale-relative distance floor of 0.01 h for coincident samples."

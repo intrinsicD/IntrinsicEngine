@@ -2180,3 +2180,24 @@ observations:
     promoted_to: "logic/claims.md:C33"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O127
+    timestamp: "2026-08-05T05:22+02:00"
+    provenance: ai-suggested
+    content: >
+      METHOD-020 now has a bounded implementation candidate for ordinary LOP
+      and isotropic WLOP through private Vulkan compute, while anisotropic
+      WLOP, CLOP, and EAR remain explicit capability-negative pairs. The v3
+      confirmation requires actual Vulkan execution, CPU-reference parity,
+      and same-host repeatability before promotion.
+    context: >
+      Dirty-worktree real-device parity and benchmark smoke runs passed, but
+      claim-grade policy requires a clean exact-revision run, portable bundle,
+      accepted experiment audit, and independent fixed-surface review. The
+      observation therefore records only the candidate and frozen decision
+      boundary, not a confirmed Vulkan capability or performance result.
+    potential_type: claim
+    bound_to: [N370]
+    promoted: true
+    promoted_to: "logic/claims.md:C34"
+    crystallized_via: artifact-commitment
+    stale: false

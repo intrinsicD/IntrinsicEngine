@@ -1,0 +1,17 @@
+#version 460
+
+#include "lop_gpu_common.glslinc"
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+    if (pc.StateBDA == uint64_t(0) || pc.TargetCount == 0u) return;
+    LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
+    LopGpuDiagnosticsRef diagnostics =
+        LopGpuDiagnosticsRef(state.DiagnosticsBDA);
+    float sum = 0.0;
+    for (uint index = 0u; index < pc.TargetCount; ++index)
+        sum += LopFloatArrayRO(state.DisplacementsBDA).Values[index];
+    diagnostics.AverageDisplacement = sum / float(pc.TargetCount);
+}

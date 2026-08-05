@@ -124,6 +124,7 @@ imports the application DTO or field vocabulary.
         "schema": "intrinsic.runtime.sandbox.point-cloud-consolidation",
         "version": 1,
         "payload": {
+          "backend": "cpu_reference",
           "strategy": "wlop",
           "support_radius_mode": "auto",
           "support_radius": 1.0,
@@ -217,7 +218,8 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `physics` | `max_accumulated_seconds` | Finite number in `[fixed_delta_seconds, 10]` seconds |
 | `physics` | `max_steps_per_frame` | Integer in `[1, 1024]` |
 | `physics` | `gravity` | Array of exactly three finite numbers, each in `[-100000, 100000]` |
-| `consolidation` | `strategy` | `lop`, `wlop`, `clop`, `ear`; all select the promoted CPU-reference implementation |
+| `consolidation` | `backend` | `cpu_reference`, `gpu_vulkan_compute`; Vulkan is implemented for LOP and isotropic WLOP, falls back honestly when the device/transport is unavailable, and fails preview for anisotropic WLOP, CLOP, or EAR |
+| `consolidation` | `strategy` | `lop`, `wlop`, `clop`, `ear`; backend/strategy compatibility is checked by the same runtime preflight used by config, editor, and agent callers |
 | `consolidation` | `support_radius_mode` | `auto` profiles the selected position property; `manual` preserves `support_radius` exactly |
 | `consolidation` | `support_radius` | Finite number in `[1e-12, 1e12]`, in input world units; stored as the Manual value even while Auto is selected |
 | `consolidation` | `max_support_neighbors` | Integer in `[1, 1000000]`; sampled support-occupancy limit |

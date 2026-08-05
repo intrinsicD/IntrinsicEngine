@@ -34,3 +34,4 @@ known_limitations:
   - "The 2024 incomplete-gamma CLOP kernel is recorded as a more accurate extension but is not substituted into this original-paper oracle."
   - "The serial CPU reference is correctness-oriented and makes no performance claim."
   - "METHOD-019's exact optimized CLOP candidate preserved parity but missed the frozen useful-acceleration gate; no optimized backend is selectable."
+  - "METHOD-020 records CLOP as capability-negative for gpu_vulkan_compute because its fitted Gaussian-mixture continuous attraction is a distinct kernel; runtime preview rejects the pair rather than substituting LOP/WLOP."

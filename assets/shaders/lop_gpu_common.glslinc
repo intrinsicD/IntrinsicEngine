@@ -1,0 +1,183 @@
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+const uint LOP_GPU_ERROR_NONE = 0u;
+const uint LOP_GPU_ERROR_GRID = 1u;
+const uint LOP_GPU_ERROR_EMPTY_DENSITY = 2u;
+const uint LOP_GPU_ERROR_EMPTY_ATTRACTION = 3u;
+const uint LOP_GPU_ERROR_NON_FINITE = 4u;
+const uint LOP_GPU_ERROR_NEIGHBOR_LIMIT = 5u;
+const uint LOP_GPU_ERROR_NOT_CONVERGED = 6u;
+
+const uint LOP_GPU_STRATEGY_LOP = 0u;
+const uint LOP_GPU_STRATEGY_WLOP = 1u;
+const uint LOP_GPU_MODE_SOURCE = 0u;
+const uint LOP_GPU_MODE_PROJECTED = 1u;
+
+layout(buffer_reference, scalar) readonly buffer LopVec4ArrayRO
+{
+    vec4 Values[];
+};
+layout(buffer_reference, scalar) buffer LopVec4Array
+{
+    vec4 Values[];
+};
+layout(buffer_reference, scalar) readonly buffer LopFloatArrayRO
+{
+    float Values[];
+};
+layout(buffer_reference, scalar) buffer LopFloatArray
+{
+    float Values[];
+};
+layout(buffer_reference, scalar) readonly buffer LopUIntArrayRO
+{
+    uint Values[];
+};
+layout(buffer_reference, scalar) buffer LopUIntArray
+{
+    uint Values[];
+};
+
+layout(buffer_reference, scalar) buffer LopGpuDiagnosticsRef
+{
+    uint ErrorCode;
+    uint Iterations;
+    uint Converged;
+    uint Active;
+    uint MaxDisplacementBits;
+    uint DensityContributionCount;
+    uint AttractionContributionCount;
+    uint RepulsionContributionCount;
+    uint EmptyNeighborhoodCount;
+    uint SourceGridBuilt;
+    uint ProjectedGridBuilds;
+    uint Reserved0;
+    float AverageDisplacement;
+    float Reserved1;
+    float Reserved2;
+    float Reserved3;
+};
+
+layout(buffer_reference, scalar) readonly buffer LopGpuStateRef
+{
+    uint64_t SourcePositionsBDA;
+    uint64_t SourceWeightsBDA;
+    uint64_t ProjectedABDA;
+    uint64_t ProjectedBBDA;
+    uint64_t ProjectedWeightsBDA;
+    uint64_t DisplacementsBDA;
+    uint64_t SourceCountsBDA;
+    uint64_t SourceOffsetsBDA;
+    uint64_t SourceCursorsBDA;
+    uint64_t SourceIndicesBDA;
+    uint64_t ProjectedCountsBDA;
+    uint64_t ProjectedOffsetsBDA;
+    uint64_t ProjectedCursorsBDA;
+    uint64_t ProjectedIndicesBDA;
+    uint64_t DiagnosticsBDA;
+};
+
+layout(push_constant, scalar) uniform LopGpuPush
+{
+    uint64_t StateBDA;
+    uint SourceCount;
+    uint TargetCount;
+    uint CellCount;
+    uint DimX;
+    uint DimY;
+    uint DimZ;
+    uint Iteration;
+    uint MaxIterations;
+    uint Strategy;
+    uint PassMode;
+    uint MaxNeighbors;
+    uint Reserved0;
+    float OriginX;
+    float OriginY;
+    float OriginZ;
+    float SupportRadius;
+    float RepulsionWeight;
+    float ConvergenceTolerance;
+} pc;
+
+bool LopFinite(const vec3 value)
+{
+    return !any(isnan(value)) && !any(isinf(value));
+}
+
+uint64_t LopCurrentProjectedBDA(
+    const LopGpuStateRef state,
+    const uint iteration)
+{
+    return (iteration & 1u) == 0u
+        ? state.ProjectedABDA
+        : state.ProjectedBBDA;
+}
+
+uint64_t LopNextProjectedBDA(
+    const LopGpuStateRef state,
+    const uint iteration)
+{
+    return (iteration & 1u) == 0u
+        ? state.ProjectedBBDA
+        : state.ProjectedABDA;
+}
+
+bool LopCellForPoint(
+    const vec3 point,
+    out ivec3 coordinate,
+    out uint cell)
+{
+    if (!LopFinite(point) || !(pc.SupportRadius > 0.0))
+    {
+        return false;
+    }
+    const vec3 relative =
+        (point - vec3(pc.OriginX, pc.OriginY, pc.OriginZ)) /
+        pc.SupportRadius;
+    coordinate = ivec3(floor(relative));
+    if (any(lessThan(coordinate, ivec3(0))) ||
+        coordinate.x >= int(pc.DimX) ||
+        coordinate.y >= int(pc.DimY) ||
+        coordinate.z >= int(pc.DimZ))
+    {
+        return false;
+    }
+    cell = uint(coordinate.x) +
+        pc.DimX * (uint(coordinate.y) + pc.DimY * uint(coordinate.z));
+    return cell < pc.CellCount;
+}
+
+uint LopLinearCell(const ivec3 coordinate)
+{
+    return uint(coordinate.x) +
+        pc.DimX * (uint(coordinate.y) + pc.DimY * uint(coordinate.z));
+}
+
+bool LopValidNeighborCell(const ivec3 coordinate)
+{
+    return all(greaterThanEqual(coordinate, ivec3(0))) &&
+        coordinate.x < int(pc.DimX) &&
+        coordinate.y < int(pc.DimY) &&
+        coordinate.z < int(pc.DimZ);
+}
+
+float LopTheta(const float distanceSquared)
+{
+    const float h2 = pc.SupportRadius * pc.SupportRadius;
+    return exp(-16.0 * distanceSquared / h2);
+}
+
+void LopFail(const LopGpuStateRef state, const uint errorCode)
+{
+    if (state.DiagnosticsBDA == uint64_t(0))
+    {
+        return;
+    }
+    LopGpuDiagnosticsRef diagnostics =
+        LopGpuDiagnosticsRef(state.DiagnosticsBDA);
+    atomicCompSwap(diagnostics.ErrorCode, LOP_GPU_ERROR_NONE, errorCode);
+    atomicExchange(diagnostics.Active, 0u);
+}

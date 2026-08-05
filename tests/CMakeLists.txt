@@ -744,6 +744,24 @@ if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLAT
     )
 endif()
 
+# METHOD-020 — opt-in actual-Vulkan LOP/isotropic-WLOP parity against the
+# frozen CPU-reference fixtures. Kept separate so backend evidence cannot be
+# confused with the CPU fallback contracts in RuntimeContractTestObjs.
+if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    set(_runtime_point_cloud_consolidation_gpu_parity_test_files
+        Test.PointCloudConsolidationGpuParity.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_point_cloud_consolidation_gpu_parity_test_sources
+        SEARCH_DIRS integration/runtime
+        FILES ${_runtime_point_cloud_consolidation_gpu_parity_test_files}
+    )
+    intrinsic_test_object_lib(RuntimePointCloudConsolidationGpuParityTestObjs
+        SOURCES
+            ${_runtime_point_cloud_consolidation_gpu_parity_test_sources}
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry glm::glm
+    )
+endif()
+
 # RUNTIME-195 Slice B2 — opt-in actual-Vulkan transport of a
 # CPU-reference-shaped Progressive Poisson result. METHOD-014 retains compute
 # execution/public parity; this target proves the shared three-range batch and
@@ -1299,6 +1317,15 @@ if(TARGET RuntimeClusteringServiceGpuSmokeTestObjs)
         LABELS gpu vulkan integration runtime geometry
     )
     intrinsic_add_glsl_shaders(IntrinsicRuntimeClusteringServiceGpuSmokeTests)
+endif()
+
+if(TARGET RuntimePointCloudConsolidationGpuParityTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimePointCloudConsolidationGpuParityTests
+        OBJECTS RuntimePointCloudConsolidationGpuParityTestObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry
+        LABELS gpu vulkan integration runtime geometry
+    )
+    intrinsic_add_glsl_shaders(IntrinsicRuntimePointCloudConsolidationGpuParityTests)
 endif()
 
 if(TARGET RuntimeProgressivePoissonResultGpuSmokeTestObjs)

@@ -1,0 +1,132 @@
+#version 460
+
+#include "lop_gpu_common.glslinc"
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+    if (pc.StateBDA == uint64_t(0)) return;
+    LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
+    const uint index = gl_GlobalInvocationID.x;
+    if (index >= pc.TargetCount) return;
+    LopGpuDiagnosticsRef diagnostics =
+        LopGpuDiagnosticsRef(state.DiagnosticsBDA);
+    const uint64_t currentBDA =
+        LopCurrentProjectedBDA(state, pc.Iteration);
+    const uint64_t nextBDA = LopNextProjectedBDA(state, pc.Iteration);
+    const vec3 query = LopVec4ArrayRO(currentBDA).Values[index].xyz;
+    if (diagnostics.Active == 0u)
+    {
+        LopVec4Array(nextBDA).Values[index] = vec4(query, 1.0);
+        return;
+    }
+
+    ivec3 center;
+    uint ignoredCell;
+    if (!LopCellForPoint(query, center, ignoredCell))
+    {
+        LopFail(state, LOP_GPU_ERROR_GRID);
+        return;
+    }
+
+    vec3 attraction = vec3(0.0);
+    float attractionWeight = 0.0;
+    uint attractionCount = 0u;
+    vec3 repulsion = vec3(0.0);
+    float repulsionWeight = 0.0;
+    uint repulsionCount = 0u;
+    const float h2 = pc.SupportRadius * pc.SupportRadius;
+    const float distanceFloor = max(pc.SupportRadius * 0.01, 1.17549435e-38);
+
+    for (int z = -1; z <= 1; ++z)
+    for (int y = -1; y <= 1; ++y)
+    for (int x = -1; x <= 1; ++x)
+    {
+        const ivec3 coordinate = center + ivec3(x, y, z);
+        if (!LopValidNeighborCell(coordinate)) continue;
+        const uint cell = LopLinearCell(coordinate);
+
+        const uint sourceBegin =
+            LopUIntArrayRO(state.SourceOffsetsBDA).Values[cell];
+        const uint sourceCount =
+            LopUIntArrayRO(state.SourceCountsBDA).Values[cell];
+        for (uint local = 0u; local < sourceCount; ++local)
+        {
+            const uint neighbor = LopUIntArrayRO(
+                state.SourceIndicesBDA).Values[sourceBegin + local];
+            if (neighbor >= pc.SourceCount) continue;
+            const vec3 source = LopVec4ArrayRO(
+                state.SourcePositionsBDA).Values[neighbor].xyz;
+            const vec3 delta = query - source;
+            const float distanceSquared = dot(delta, delta);
+            if (!(distanceSquared < h2)) continue;
+            const float distance = sqrt(max(distanceSquared, 0.0));
+            const float weight = LopTheta(distanceSquared) *
+                LopFloatArrayRO(state.SourceWeightsBDA).Values[neighbor] /
+                max(distance, distanceFloor);
+            if (!(weight > 0.0)) continue;
+            attraction += source * weight;
+            attractionWeight += weight;
+            ++attractionCount;
+            if (attractionCount > pc.MaxNeighbors)
+            {
+                LopFail(state, LOP_GPU_ERROR_NEIGHBOR_LIMIT);
+                return;
+            }
+        }
+
+        const uint projectedBegin =
+            LopUIntArrayRO(state.ProjectedOffsetsBDA).Values[cell];
+        const uint projectedCount =
+            LopUIntArrayRO(state.ProjectedCountsBDA).Values[cell];
+        for (uint local = 0u; local < projectedCount; ++local)
+        {
+            const uint neighbor = LopUIntArrayRO(
+                state.ProjectedIndicesBDA).Values[projectedBegin + local];
+            if (neighbor >= pc.TargetCount || neighbor == index) continue;
+            const vec3 neighborPoint =
+                LopVec4ArrayRO(currentBDA).Values[neighbor].xyz;
+            const vec3 delta = query - neighborPoint;
+            const float distanceSquared = dot(delta, delta);
+            if (!(distanceSquared < h2)) continue;
+            const float distance = sqrt(max(distanceSquared, 0.0));
+            const float weight = LopTheta(distanceSquared) *
+                (1.0 / pc.SupportRadius) *
+                LopFloatArrayRO(state.ProjectedWeightsBDA).Values[neighbor] /
+                max(distance, distanceFloor);
+            if (!(weight > 0.0)) continue;
+            repulsion += delta * weight;
+            repulsionWeight += weight;
+            ++repulsionCount;
+            if (repulsionCount > pc.MaxNeighbors)
+            {
+                LopFail(state, LOP_GPU_ERROR_NEIGHBOR_LIMIT);
+                return;
+            }
+        }
+    }
+
+    if (!(attractionWeight > 0.0))
+    {
+        atomicAdd(diagnostics.EmptyNeighborhoodCount, 1u);
+        LopFail(state, LOP_GPU_ERROR_EMPTY_ATTRACTION);
+        return;
+    }
+    vec3 updated = attraction / attractionWeight;
+    if (pc.RepulsionWeight > 0.0 && repulsionWeight > 0.0)
+        updated += pc.RepulsionWeight * repulsion / repulsionWeight;
+    if (!LopFinite(updated))
+    {
+        LopFail(state, LOP_GPU_ERROR_NON_FINITE);
+        return;
+    }
+
+    const float displacement = length(updated - query);
+    LopVec4Array(nextBDA).Values[index] = vec4(updated, 1.0);
+    LopFloatArray(state.DisplacementsBDA).Values[index] = displacement;
+    atomicMax(diagnostics.MaxDisplacementBits,
+              floatBitsToUint(displacement));
+    atomicAdd(diagnostics.AttractionContributionCount, attractionCount);
+    atomicAdd(diagnostics.RepulsionContributionCount, repulsionCount);
+}

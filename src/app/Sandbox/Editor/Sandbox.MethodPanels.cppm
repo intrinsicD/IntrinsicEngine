@@ -123,6 +123,10 @@ export namespace Extrinsic::Sandbox::Editor
         std::string Status{};
         std::string ImplementationId{};
         std::string StrategyToken{};
+        std::string RequestedBackend{};
+        std::string ActualBackend{};
+        bool FellBackToCpu{false};
+        std::string BackendDiagnostic{};
         std::string SupportRadiusAnalysisStatus{};
         std::string SupportRadiusSource{};
         std::string SupportRadiusQuantile{};

@@ -624,6 +624,12 @@ namespace Extrinsic::Sandbox::Editor
             .Status = std::string{Runtime::ToString(result.Status)},
             .ImplementationId = result.ImplementationId,
             .StrategyToken = result.StrategyToken,
+            .RequestedBackend = std::string{
+                Runtime::StableToken(result.RequestedBackend)},
+            .ActualBackend = std::string{
+                Runtime::StableToken(result.ActualBackend)},
+            .FellBackToCpu = result.FellBackToCpu,
+            .BackendDiagnostic = result.BackendDiagnostic,
             .SupportRadiusAnalysisStatus =
                 result.SupportRadiusAnalysisStatus,
             .SupportRadiusSource = result.SupportRadiusSource,
@@ -1227,7 +1233,36 @@ namespace Extrinsic::Sandbox::Editor
         static bool DrawPointCloudConsolidationControls(
             SandboxPointCloudConsolidationPanelConfig& config)
         {
-            bool changed = DrawPointCloudConsolidationStrategy(config);
+            bool changed = false;
+            const bool vulkan = config.Backend == Runtime::
+                PointCloudConsolidationBackend::VulkanCompute;
+            if (ImGui::BeginCombo(
+                    "Backend##PointCloudConsolidation",
+                    vulkan ? "Vulkan compute" : "CPU reference"))
+            {
+                if (ImGui::Selectable(
+                        "CPU reference##PointCloudConsolidation",
+                        !vulkan))
+                {
+                    config.Backend = Runtime::
+                        PointCloudConsolidationBackend::CpuReference;
+                    changed = true;
+                }
+                if (!vulkan)
+                    ImGui::SetItemDefaultFocus();
+                if (ImGui::Selectable(
+                        "Vulkan compute##PointCloudConsolidation",
+                        vulkan))
+                {
+                    config.Backend = Runtime::
+                        PointCloudConsolidationBackend::VulkanCompute;
+                    changed = true;
+                }
+                if (vulkan)
+                    ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
+            }
+            changed |= DrawPointCloudConsolidationStrategy(config);
             ImGui::SeparatorText("Shared parameters");
             const bool manualRadius = config.SupportRadiusMode ==
                 Runtime::PointCloudConsolidationSupportRadiusMode::Manual;
@@ -1375,6 +1410,18 @@ namespace Extrinsic::Sandbox::Editor
                 "Strategy: %s  implementation: %s",
                 summary.StrategyToken.c_str(),
                 summary.ImplementationId.c_str());
+            ImGui::Text(
+                "Backend: requested %s  actual %s",
+                summary.RequestedBackend.c_str(),
+                summary.ActualBackend.c_str());
+            if (!summary.BackendDiagnostic.empty())
+            {
+                ImGui::TextWrapped(
+                    summary.FellBackToCpu
+                        ? "Backend fallback: %s"
+                        : "Backend diagnostic: %s",
+                    summary.BackendDiagnostic.c_str());
+            }
             if (summary.SupportRadiusAnalysisStatus != "not_run" &&
                 !summary.SupportRadiusAnalysisStatus.empty())
             {

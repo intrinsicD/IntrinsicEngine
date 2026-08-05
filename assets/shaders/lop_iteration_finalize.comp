@@ -1,0 +1,33 @@
+#version 460
+
+#include "lop_gpu_common.glslinc"
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+    if (pc.StateBDA == uint64_t(0)) return;
+    LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
+    LopGpuDiagnosticsRef diagnostics =
+        LopGpuDiagnosticsRef(state.DiagnosticsBDA);
+    if (diagnostics.ErrorCode != LOP_GPU_ERROR_NONE ||
+        diagnostics.Active == 0u)
+    {
+        return;
+    }
+
+    diagnostics.Iterations = pc.Iteration + 1u;
+    diagnostics.ProjectedGridBuilds += 1u;
+    const float maximum =
+        uintBitsToFloat(diagnostics.MaxDisplacementBits);
+    if (maximum <= pc.ConvergenceTolerance)
+    {
+        diagnostics.Converged = 1u;
+        diagnostics.Active = 0u;
+    }
+    else if (pc.Iteration + 1u == pc.MaxIterations)
+    {
+        diagnostics.Active = 0u;
+        diagnostics.ErrorCode = LOP_GPU_ERROR_NOT_CONVERGED;
+    }
+}

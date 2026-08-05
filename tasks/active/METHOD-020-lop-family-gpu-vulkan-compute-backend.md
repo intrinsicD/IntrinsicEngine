@@ -16,8 +16,11 @@ maturity_target: ParityProven
 # METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity
 
 ## Status
-- `in-progress` — protocol and benchmark intent will be frozen before implementation.
-- Next verification: validate the frozen preregistration and benchmark manifest, then build the first operational Vulkan LOP parity slice.
+- `in-progress` — implementation and dirty-worktree operational screening pass;
+  clean exact-revision confirmation, custody, and independent review remain.
+- Next verification: commit the implementation candidate, initialize the
+  frozen claim-grade v3 run against that exact revision, then run the complete
+  CPU/sanitizer/Vulkan/structural closure bundle.
 
 ## Goal
 - Evaluate an explicit command-recording `gpu_vulkan_compute` path for every
@@ -95,58 +98,61 @@ maturity_target: ParityProven
   queue, service, or synchronous device-wide readback path.
 
 ## Required changes
-- [ ] Implement GPU projection as private state/implementation of the
+- [x] Implement GPU projection as private state/implementation of the
       `RUNTIME-175` typed consolidation operation, taking `RHI::IDevice&`,
       gating on `IsOperational()`, and reusing persistent buffers across
       iterations without exporting `Runtime.ConsolidationGpuBackend`.
-- [ ] Register the consolidation participant privately with `JobService`;
+- [x] Register the consolidation participant privately with `JobService`;
       submit through the real frame context and publish completed results
       through the delivered `RUNTIME-175` mutation/writeback path.
-- [ ] Add the compute shader assets for the attraction/repulsion (and CLOP continuous-term) passes under `assets/shaders/`, recorded through the RHI compute path.
-- [ ] Build bounded dense cell ranges with count, shared prefix scan, and scatter
+- [x] Add the compute shader assets for the adopted ordinary-LOP/isotropic-WLOP
+      attraction, repulsion, density, convergence, and reduction passes under
+      `assets/shaders/`, recorded through the RHI compute path. CLOP remains an
+      explicit capability-negative pair rather than receiving a partial kernel.
+- [x] Build bounded dense cell ranges with count, shared prefix scan, and scatter
       passes; guard cell count/occupancy/memory, build the source grid once,
       rebuild the projected grid per iteration, and exact-filter the 27-cell
       candidate set without materializing a global neighbor-pair list.
-- [ ] Reproduce the `Geometry.PointCloud.Kernels` weight/repulsion closed forms in-shader; document any float-precision divergence and bound it in the parity tolerance.
-- [ ] Keep every projection iteration and convergence reduction on-device;
+- [x] Reproduce the `Geometry.PointCloud.Kernels` weight/repulsion closed forms in-shader; document any float-precision divergence and bound it in the parity tolerance.
+- [x] Keep every projection iteration and convergence reduction on-device;
       drain the final result once through the `RUNTIME-195` readback operation. No
       per-iteration CPU readback may steer convergence.
-- [ ] Honest fallback + telemetry: a `Backend::GPU` request on a null/non-operational device runs the CPU reference and reports `FellBackToCPU`.
-- [ ] Extend the delivered `RUNTIME-175` config/operation and `UI-035` panel with
+- [x] Honest fallback + telemetry: a `Backend::GPU` request on a null/non-operational device runs the CPU reference and reports `FellBackToCPU`.
+- [x] Extend the delivered `RUNTIME-175` config/operation and `UI-035` panel with
       `gpu_vulkan_compute` only after the implementation exists; all UI,
       config-file, and agent requests use the same preview/validate/apply path.
-- [ ] Update a package `method.yaml` to list `gpu_vulkan_compute` only if at
+- [x] Update a package `method.yaml` to list `gpu_vulkan_compute` only if at
       least one strategy it contains passes parity; add the GPU benchmark
       manifest under `benchmarks` for the evaluated family. Record the exact
       per-strategy capability matrix in package docs and result diagnostics.
 
 ## Tests
-- [ ] `tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp`
+- [x] `tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp`
       labeled `gpu;vulkan` (opt-in), asserting the typed operation's private GPU
       path matches the CPU reference within frozen per-strategy tolerances.
-- [ ] Fallback telemetry: `Backend::GPU` requested on a non-operational/null device reports `ActualBackend == cpu_reference` and `FellBackToCPU == true`, verified in the default CPU gate (no GPU required).
-- [ ] Config/control-surface parity: Editor, AgentCli, and Programmatic requests
+- [x] Fallback telemetry: `Backend::GPU` requested on a non-operational/null device reports `ActualBackend == cpu_reference` and `FellBackToCPU == true`, verified in the default CPU gate (no GPU required).
+- [x] Config/control-surface parity: Editor, AgentCli, and Programmatic requests
       produce the same validated backend request; the panel never schedules
       GPU work from the poll thread. Unsupported strategy/backend pairs fail
       preview rather than silently running a different strategy.
-- [ ] Determinism within the documented tolerance across two GPU runs on the same host.
+- [x] Determinism within the documented tolerance across two GPU runs on the same host.
 
 ## Docs
-- [ ] GPU benchmark manifest
-      `benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke.yaml` with
-      stable ID `geometry.lop_family.gpu_vulkan.smoke`, a stable built-in
+- [x] GPU benchmark manifest
+      `benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml` with
+      stable ID `geometry.lop_family.gpu_vulkan.v3.smoke`, a stable built-in
       dataset, `params.intent: gpu`, explicit warmup/measured counts,
       `baseline_comparison: cpu_reference_same_fixture`, and metrics
       `runtime_ms`/`gpu_time_ms`/`quality_error_l2`; exclude it from the
       default CPU smoke runner.
-- [ ] Add `IntrinsicLopFamilyGpuBenchmarkSmoke`, emitting schema-valid result
+- [x] Add `IntrinsicLopFamilyGpuBenchmarkSmoke`, emitting schema-valid result
       JSON only from actual Vulkan execution with backend/device, strategy,
       CPU-reference parity, fallback, timing source, and iteration diagnostics.
-- [ ] Add an unsanitized optimized promoted-Vulkan benchmark preset separate
+- [x] Add an unsanitized optimized promoted-Vulkan benchmark preset separate
       from `ci-vulkan`; parity remains sanitizer-backed while performance
       evidence records release device and end-to-end phase timing.
-- [ ] Update each package README backend-status table (`gpu_vulkan_compute` → `METHOD-020`), the parity tolerance, and the shader/precision limitations.
-- [ ] Note the GPU backend and its host requirement in the `docs/architecture/algorithm-variant-dispatch.md` current-exemplar section if the family becomes a cited exemplar.
+- [x] Update each package README backend-status table (`gpu_vulkan_compute` → `METHOD-020`), the parity tolerance, and the shader/precision limitations.
+- [x] Note the GPU backend and its host requirement in the `docs/architecture/algorithm-variant-dispatch.md` current-exemplar section if the family becomes a cited exemplar.
 
 ## Acceptance criteria
 - [ ] Every strategy is evaluated. Each exposed GPU strategy passes the

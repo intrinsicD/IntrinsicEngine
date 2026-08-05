@@ -14,6 +14,20 @@ import Extrinsic.Runtime.Private.FeatureConfigCodecs;
 namespace Extrinsic::Runtime
 {
     std::string_view StableToken(
+        const PointCloudConsolidationBackend backend) noexcept
+    {
+        switch (backend)
+        {
+        case PointCloudConsolidationBackend::None: return "none";
+        case PointCloudConsolidationBackend::CpuReference:
+            return "cpu_reference";
+        case PointCloudConsolidationBackend::VulkanCompute:
+            return "gpu_vulkan_compute";
+        }
+        return {};
+    }
+
+    std::string_view StableToken(
         const PointCloudConsolidationStrategy strategy) noexcept
     {
         switch (strategy)

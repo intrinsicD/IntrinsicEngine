@@ -12,7 +12,7 @@ method module or backend registry.
 | --- | --- | --- |
 | `cpu_reference` | implemented | METHOD-017 |
 | optimized CPU candidate | parity passed; ratio 0.998818 missed the 0.80 gate; not selectable | METHOD-019 |
-| Vulkan compute | planned | METHOD-020 |
+| `gpu_vulkan_compute` | capability-negative: CLOP's fitted Gaussian-mixture attraction is not the discrete LOP/WLOP kernel | METHOD-020 |
 
 ## Selection guidance
 
@@ -38,6 +38,10 @@ mixture/component work is included in the same contribution guard; see the
 - METHOD-019's exact factor-cache/underflow-only candidate remains a
   benchmark validation seam; it does not add a method-manifest backend,
   runtime config token, or UI choice.
+- METHOD-020 does not expose CLOP through `gpu_vulkan_compute`; the canonical
+  runtime preview rejects that pair instead of substituting ordinary LOP or
+  isotropic WLOP. CLOP remains `cpu_reference` until its mixture fit and
+  continuous attraction receive an independently preregistered Vulkan path.
 
 ## Verification targets
 

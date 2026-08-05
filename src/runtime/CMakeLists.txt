@@ -114,6 +114,7 @@ target_sources(${target_name}
         Runtime.ParameterizationConfig.cpp
         Runtime.PointCloudConsolidationConfig.cpp
         Runtime.PointCloudConsolidationModule.cpp
+        Runtime.PointCloudConsolidationGpu.cpp
         internal/Runtime.FeatureConfigCodecs.Detail.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.EditorCommon.Public.cpp

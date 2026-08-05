@@ -1,0 +1,96 @@
+#version 460
+
+#include "lop_gpu_common.glslinc"
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+    if (pc.StateBDA == uint64_t(0)) return;
+    LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
+    const bool source = pc.PassMode == LOP_GPU_MODE_SOURCE;
+    const uint index = gl_GlobalInvocationID.x;
+    const uint pointCount = source ? pc.SourceCount : pc.TargetCount;
+    if (index >= pointCount) return;
+    LopGpuDiagnosticsRef diagnostics =
+        LopGpuDiagnosticsRef(state.DiagnosticsBDA);
+    if (diagnostics.Active == 0u) return;
+
+    const uint64_t positionsBDA = source
+        ? state.SourcePositionsBDA
+        : LopCurrentProjectedBDA(state, pc.Iteration);
+    const uint64_t countsBDA = source
+        ? state.SourceCountsBDA
+        : state.ProjectedCountsBDA;
+    const uint64_t offsetsBDA = source
+        ? state.SourceOffsetsBDA
+        : state.ProjectedOffsetsBDA;
+    const uint64_t indicesBDA = source
+        ? state.SourceIndicesBDA
+        : state.ProjectedIndicesBDA;
+    const uint64_t weightsBDA = source
+        ? state.SourceWeightsBDA
+        : state.ProjectedWeightsBDA;
+    if (positionsBDA == uint64_t(0) || countsBDA == uint64_t(0) ||
+        offsetsBDA == uint64_t(0) || indicesBDA == uint64_t(0) ||
+        weightsBDA == uint64_t(0))
+    {
+        LopFail(state, LOP_GPU_ERROR_GRID);
+        return;
+    }
+
+    const vec3 query = LopVec4ArrayRO(positionsBDA).Values[index].xyz;
+    ivec3 center;
+    uint ignoredCell;
+    if (!LopCellForPoint(query, center, ignoredCell))
+    {
+        LopFail(state, LOP_GPU_ERROR_GRID);
+        return;
+    }
+
+    float density = 1.0;
+    uint contributions = 0u;
+    const float h2 = pc.SupportRadius * pc.SupportRadius;
+    for (int z = -1; z <= 1; ++z)
+    for (int y = -1; y <= 1; ++y)
+    for (int x = -1; x <= 1; ++x)
+    {
+        const ivec3 coordinate = center + ivec3(x, y, z);
+        if (!LopValidNeighborCell(coordinate)) continue;
+        const uint cell = LopLinearCell(coordinate);
+        const uint begin = LopUIntArrayRO(offsetsBDA).Values[cell];
+        const uint count = LopUIntArrayRO(countsBDA).Values[cell];
+        for (uint local = 0u; local < count; ++local)
+        {
+            const uint neighbor =
+                LopUIntArrayRO(indicesBDA).Values[begin + local];
+            if (neighbor >= pointCount || neighbor == index) continue;
+            const vec3 delta = query -
+                LopVec4ArrayRO(positionsBDA).Values[neighbor].xyz;
+            const float distanceSquared = dot(delta, delta);
+            if (!(distanceSquared < h2)) continue;
+            density += LopTheta(distanceSquared);
+            ++contributions;
+            if (contributions > pc.MaxNeighbors)
+            {
+                LopFail(state, LOP_GPU_ERROR_NEIGHBOR_LIMIT);
+                return;
+            }
+        }
+    }
+    if (contributions == 0u)
+    {
+        atomicAdd(diagnostics.EmptyNeighborhoodCount, 1u);
+        LopFail(state, LOP_GPU_ERROR_EMPTY_DENSITY);
+        return;
+    }
+    if (isnan(density) || isinf(density) || !(density > 0.0))
+    {
+        LopFail(state, LOP_GPU_ERROR_NON_FINITE);
+        return;
+    }
+    LopFloatArray(weightsBDA).Values[index] = source
+        ? 1.0 / density
+        : density;
+    atomicAdd(diagnostics.DensityContributionCount, contributions);
+}

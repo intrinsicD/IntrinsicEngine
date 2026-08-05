@@ -12,7 +12,7 @@ it does not create a method-owned engine module, registry, or normal service.
 | --- | --- | --- |
 | `cpu_reference` | implemented | METHOD-018 |
 | optimized CPU candidate | parity passed; ratio 1.037145 missed the 0.80 gate; not selectable | METHOD-019 |
-| Vulkan compute | planned | METHOD-020 |
+| `gpu_vulkan_compute` | capability-negative: anisotropic WLOP normal kernels and EAR refinement/insertion are not implemented | METHOD-020 |
 
 ## Selection guidance
 
@@ -43,6 +43,9 @@ a method-local copy and never overwrites the source property.
 - METHOD-019's exact local-scan candidate remains a benchmark validation seam;
   it does not add a method-manifest backend, runtime config token, or UI
   choice.
+- METHOD-020 keeps anisotropic WLOP and EAR CPU-only. The canonical Vulkan
+  preview rejects both pairs instead of dropping normal weighting or silently
+  changing EAR's progressive-insertion/cardinality semantics.
 
 Runtime defaults anisotropic WLOP and EAR to the directional Auto support
 policy (rank 24, P75, multiplier 1.25); Manual keeps the configured world-unit
