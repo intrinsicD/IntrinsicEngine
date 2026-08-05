@@ -1,0 +1,54 @@
+# METHOD-020 — frozen v2 LOP-family Vulkan parity and descriptive benchmark.
+benchmark_id: geometry.lop_family.gpu_vulkan.v2.smoke
+method: geometry.lop_family.gpu_vulkan
+dataset: builtin.lop_family.gpu_vulkan.v2
+params:
+  intent: gpu
+  fixture_version: 2
+  execution_route: point_cloud_consolidation_service
+  measurement_scope: service_command_to_applied_event
+  actual_backend_required: gpu_vulkan_compute
+  fallback_allowed: false
+  baseline_comparison: cpu_reference_same_fixture
+  adopted_candidates:
+    - lop
+    - wlop_isotropic
+  capability_negative_pairs:
+    - wlop_anisotropic
+    - clop
+    - ear
+  fixtures:
+    lop:
+      id: method_019_noisy_plane_32x32
+      input_points: 1024
+      target_points: 256
+      support_radius: 0.18
+      repulsion_weight: 0.35
+      projection_iterations: 8
+      convergence_tolerance: 0.0
+      seed: 1901
+    wlop_isotropic:
+      id: method_019_density_plane_40x24
+      input_points: 960
+      target_points: 240
+      density_warp_exponent: 1.7
+      support_radius: 0.20
+      repulsion_weight: 0.35
+      projection_iterations: 8
+      convergence_tolerance: 0.0
+      seed: 1902
+  warmup_iterations: 1
+  measured_iterations: 3
+  timing_interpretation: descriptive_no_speedup_claim
+  position_rms_delta_max: 0.0005
+  position_linf_delta_max: 0.002
+  same_host_repeat_rms_delta_max: 0.0005
+  same_host_repeat_linf_delta_max: 0.002
+metrics:
+  - runtime_ms
+  - gpu_time_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 30000
+  gpu_time_ms_max: 30000
+  quality_error_l2_max: 0.0005

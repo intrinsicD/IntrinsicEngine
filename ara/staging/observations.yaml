@@ -2119,3 +2119,23 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O124
+    timestamp: "2026-08-05T04:46+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-020's frozen v1 isotropic-WLOP confirmation fixture cannot
+      adjudicate Vulkan parity: its CPU-reference oracle returns
+      empty_neighborhood after one projection iteration with one empty
+      projected-density neighborhood, before any Vulkan request is submitted.
+    context: >
+      The exact ci-vulkan parity executable was run with the frozen 28x16,
+      h=0.26, target=112, seed=2202 fixture. The v1 parameters and tolerances
+      remain unchanged; the replacement suite is preregistered under a new v2
+      dataset and benchmark identity using already CPU-confirmed METHOD-019
+      fixtures.
+    potential_type: claim
+    bound_to: [N370]
+    promoted: true
+    promoted_to: "logic/claims.md:C31"
+    crystallized_via: artifact-commitment
+    stale: false

@@ -929,3 +929,24 @@
 - **Tags**: runtime, geometry, LOP, publication, dirty state, render residency,
   CPU
 - **From staging**: O117
+
+## C31: METHOD-020 v1 WLOP fixture cannot adjudicate Vulkan parity
+- **Statement**: The frozen `builtin.lop_family.gpu_vulkan.v1` isotropic-WLOP
+  fixture is rejected as a GPU confirmation fixture because its CPU-reference
+  oracle returns `empty_neighborhood` after one projection iteration with one
+  empty projected-density neighborhood, before any Vulkan request is
+  submitted. This result says nothing about Vulkan WLOP parity; replacement
+  confirmation uses a new v2 dataset and benchmark identity.
+- **Status**: refuted — the hypothesis that the v1 suite can evaluate both
+  adopted candidates failed its CPU-oracle prerequisite
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Repeating the exact v1 WLOP float fixture and
+  parameters with the frozen CPU reference returns `success` or a finite
+  `not_converged` result without an empty projected-density neighborhood.
+- **Proof**: [methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol.md,
+  methods/geometry/locally_optimal_projection/reports/METHOD-020-v1-screening.md,
+  benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke.yaml]
+- **Dependencies**: []
+- **Tags**: geometry, LOP, WLOP, CPU reference, Vulkan protocol, refuted
+- **From staging**: O124
