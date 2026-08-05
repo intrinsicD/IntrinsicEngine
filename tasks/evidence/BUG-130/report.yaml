@@ -1,0 +1,112 @@
+schema_version: 1
+task_id: BUG-130
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-05T04:45:33Z'
+claim_eligible: false
+source:
+  base_ref: 70d38d38
+  base_revision: 70d38d38b7f64c37c19d2fc2f2082b5d41fd97d0
+  head_revision: 14a91429727c60528b827f3882d226e79ebd8011
+  branch: bug/BUG-130-rejected-run-task-seal
+  worktree: /tmp/intrinsic-bug130.8PDH4l/worktree
+  dirty: false
+  surface:
+  - path: docs/agent/workflow-evidence.md
+    sha256: 03e106e6aee756f1a68bec7f04d8219624ba88b7667281e9c8c9b8ae688fdc52
+  - path: tasks/backlog/bugs/index.md
+    sha256: 4d626503e5b6060f4dc313bb65aadc9897bd88b410a1f8c4fe6b3fb5a17fcc08
+  - path: tasks/done/BUG-130-rejected-run-historical-task-seal.md
+    sha256: 9e434978e0506f644a0402b41381424059849f407631bd6f57506483601b2202
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 6298d14c636bfed85af42c448d13e83e84bc17175ea3e6db843e6535af9e43ac
+  - path: tests/regression/tooling/Test.ExperimentCustody.py
+    sha256: ebccf0f31bd72d60de6794dbb7de5b745061fde12a064b8f72e4550d38198e3a
+  - path: tools/agents/experiment_custody.py
+    sha256: d4adb943ee66b384ee4fefbd9e36bc864f538927ba866a84c4a571a220ddb2ed
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 03e106e6aee756f1a68bec7f04d8219624ba88b7667281e9c8c9b8ae688fdc52
+  content_digest: 05c3e790a659b9883e21adccba6ee705ece7698bc7cca67817f555cf0fd344ec
+touched:
+  paths:
+  - docs/agent/workflow-evidence.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-130-rejected-run-historical-task-seal.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/regression/tooling/Test.ExperimentCustody.py
+  - tools/agents/experiment_custody.py
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  layers:
+  - agent-workflow
+  modules:
+  - experiment-custody
+extension_seam: Rejected claim-grade evidence may bind only the exact historical task blob after its independent
+  audit recomputes.
+future_change_plan: Extend task-seal disposition rules only with paired positive and adversarial custody
+  regressions.
+acceptance:
+- criterion: METHOD-020 run-001 remains structurally valid rejected evidence after the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Accepted evidence cannot use a historical task seal.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Fixed-surface independent review finds no blocker.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-130/commands/custody-regression.json
+- receipt: tasks/evidence/BUG-130/commands/doc-links.json
+- receipt: tasks/evidence/BUG-130/commands/global-custody.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-doc-links.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-session-brief.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-skill-mirrors.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-task-policy.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-task-validation.json
+- receipt: tasks/evidence/BUG-130/commands/skill-mirror-check.json
+- receipt: tasks/evidence/BUG-130/commands/task-policy.json
+- receipt: tasks/evidence/BUG-130/commands/task-validation.json
+changed_public_contracts:
+- Accepted experiment evidence remains bound to current task bytes; only clean-source independently rejected
+  evidence may use the exact same-ID, same-profile historical task blob.
+diagnostics_and_previews:
+- METHOD-020 run-001 recomputes one genuine positive-audit error and validates globally after the task
+  advances.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-130-rejected-run-historical-task-seal.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Independent identity uses cooperative labels rather than cryptographic signatures; the existing custody
+  model is unchanged.
+skipped_checks:
+- check: full-cpu
+  reason: Python workflow tooling, policy prose, and Python regressions changed no C++ or runtime surface;
+    the complete 35-case custody suite is the strongest relevant behavioral gate.
+artifacts:
+- path: tools/agents/experiment_custody.py
+  sha256: d4adb943ee66b384ee4fefbd9e36bc864f538927ba866a84c4a571a220ddb2ed
+  kind: file
+- path: tests/regression/tooling/Test.ExperimentCustody.py
+  sha256: ebccf0f31bd72d60de6794dbb7de5b745061fde12a064b8f72e4550d38198e3a
+  kind: file
+- path: docs/agent/workflow-evidence.md
+  sha256: 03e106e6aee756f1a68bec7f04d8219624ba88b7667281e9c8c9b8ae688fdc52
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-130/handoff.jsonl
+review: tasks/evidence/BUG-130/reviews.jsonl
