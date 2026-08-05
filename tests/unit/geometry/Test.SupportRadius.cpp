@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <limits>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -9,6 +10,7 @@
 #include <glm/glm.hpp>
 
 import Geometry.SupportRadius;
+import Geometry.HalfedgeMesh.IO;
 
 namespace
 {
@@ -187,6 +189,121 @@ TEST(SupportRadius, WorkloadLimitsRetainDiagnosticsAndFailClosed)
     EXPECT_GT(result.PredictedContributionCount, 100u);
 }
 
+TEST(SupportRadius, AutomaticModeSelectsTheLargestSafeRank)
+{
+    const std::vector<glm::vec3> points = Line(65u);
+    const Radius::Analysis result = Radius::Analyze(
+        points,
+        std::nullopt,
+        Radius::RecommendationPolicy{
+            .NeighborRank = 8u,
+            .Quantile = Radius::CoverageQuantile::P75,
+            .RadiusMultiplier = 1.25,
+            .MinimumNeighborRank = 2u,
+        },
+        Radius::WorkloadBudget{
+            .PredictedQueryCount = 1'000u,
+            .MaxPredictedContributions = 8'000u,
+        },
+        Radius::ProfileParams{
+            .MaxSamples = points.size(),
+            .MaxNeighborRank = 8u,
+        });
+
+    ASSERT_TRUE(result.Succeeded()) << Radius::DebugName(result.State);
+    EXPECT_EQ(result.RequestedNeighborRank, 8u);
+    EXPECT_TRUE(result.WorkloadAdjusted);
+    EXPECT_GE(result.SelectedNeighborRank, 2u);
+    EXPECT_LT(result.SelectedNeighborRank, 8u);
+    EXPECT_LE(result.PredictedContributionCount, 8'000u);
+
+    const Radius::Analysis nextRank = Radius::Analyze(
+        points,
+        std::nullopt,
+        Radius::RecommendationPolicy{
+            .NeighborRank = result.SelectedNeighborRank + 1u,
+            .Quantile = Radius::CoverageQuantile::P75,
+            .RadiusMultiplier = 1.25,
+            .MinimumNeighborRank = result.SelectedNeighborRank + 1u,
+        },
+        Radius::WorkloadBudget{
+            .PredictedQueryCount = 1'000u,
+            .MaxPredictedContributions = 8'000u,
+        },
+        Radius::ProfileParams{
+            .MaxSamples = points.size(),
+            .MaxNeighborRank = 8u,
+        });
+    EXPECT_EQ(nextRank.State, Radius::Status::WorkloadLimitExceeded);
+}
+
+TEST(SupportRadius, AutomaticMinimumAndManualOverrideRemainFailClosed)
+{
+    const std::vector<glm::vec3> points = Line(65u);
+    const Radius::WorkloadBudget budget{
+        .PredictedQueryCount = 1'000u,
+        .MaxNeighborsPerSample = 1u,
+        .MaxPredictedContributions = 1'000u,
+    };
+    const Radius::Analysis automatic = Radius::Analyze(
+        points, std::nullopt, {}, budget);
+    const Radius::Analysis manual = Radius::Analyze(
+        points, 16.0, {}, budget);
+
+    EXPECT_EQ(
+        automatic.State, Radius::Status::WorkloadLimitExceeded);
+    EXPECT_TRUE(automatic.WorkloadAdjusted);
+    EXPECT_EQ(automatic.SelectedNeighborRank, 4u);
+    EXPECT_TRUE(automatic.NeighborLimitExceeded);
+    EXPECT_EQ(manual.State, Radius::Status::WorkloadLimitExceeded);
+    EXPECT_FALSE(manual.WorkloadAdjusted);
+    EXPECT_EQ(manual.SelectedNeighborRank, 0u);
+    EXPECT_DOUBLE_EQ(manual.Radius, 16.0);
+}
+
+TEST(SupportRadius, ChildObjAutoSelectsTheLargestSafeNeighborhood)
+{
+    const std::string path =
+        std::string{ENGINE_ROOT_DIR} + "/assets/models/child.obj";
+    const auto mesh = Geometry::MeshIO::LoadOBJ(path);
+    ASSERT_TRUE(mesh.has_value());
+    const auto positions = mesh->Vertices.Get<glm::vec3>("v:point");
+    ASSERT_TRUE(positions.IsValid());
+    ASSERT_EQ(positions.Vector().size(), 50'002u);
+
+    constexpr std::uint64_t pointCount = 50'002u;
+    constexpr std::uint64_t maxIterations = 20u;
+    constexpr std::uint64_t predictedWlopQueries =
+        pointCount + pointCount + 3u * pointCount * maxIterations;
+    const Radius::Analysis result = Radius::Analyze(
+        positions.Vector(),
+        std::nullopt,
+        Radius::RecommendationPolicy{
+            .NeighborRank = 16u,
+            .Quantile = Radius::CoverageQuantile::P75,
+            .RadiusMultiplier = 1.25,
+        },
+        Radius::WorkloadBudget{
+            .PredictedQueryCount = predictedWlopQueries,
+            .FixedContributionCount = 0u,
+            .MaxNeighborsPerSample = 4'096u,
+            .MaxPredictedContributions = 100'000'000u,
+        });
+
+    EXPECT_EQ(result.State, Radius::Status::Success)
+        << Radius::DebugName(result.State)
+        << "; contributions=" << result.PredictedContributionCount;
+    EXPECT_FALSE(result.NeighborLimitExceeded);
+    EXPECT_FALSE(result.ContributionLimitExceeded);
+    EXPECT_TRUE(result.WorkloadAdjusted);
+    EXPECT_EQ(result.RequestedNeighborRank, 16u);
+    EXPECT_EQ(result.SelectedNeighborRank, 5u);
+    EXPECT_DOUBLE_EQ(result.SupportNeighborsP95, 30.0);
+    EXPECT_EQ(result.SupportNeighborsMax, 45u);
+    EXPECT_EQ(result.PredictedQueryCount, 3'100'124u);
+    EXPECT_EQ(result.PredictedContributionCount, 93'003'720u);
+}
+
 TEST(SupportRadius, DegenerateAndInvalidInputsHaveExplicitStatuses)
 {
     EXPECT_EQ(
@@ -224,6 +341,16 @@ TEST(SupportRadius, DegenerateAndInvalidInputsHaveExplicitStatuses)
     EXPECT_EQ(
         Radius::Analyze(
             Line(8u), std::nullopt, invalidQuantile).State,
+        Radius::Status::InvalidParameters);
+    const Radius::RecommendationPolicy invalidMinimum{
+        .NeighborRank = 4u,
+        .Quantile = Radius::CoverageQuantile::P75,
+        .RadiusMultiplier = 1.0,
+        .MinimumNeighborRank = 5u,
+    };
+    EXPECT_EQ(
+        Radius::Analyze(
+            Line(8u), std::nullopt, invalidMinimum).State,
         Radius::Status::InvalidParameters);
     EXPECT_EQ(
         Radius::Analyze(Line(8u), 0.0).State,

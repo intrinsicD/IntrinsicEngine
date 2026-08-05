@@ -66,6 +66,19 @@ The retired Sandbox facade export ledger and current owner map are recorded in
 | `Extrinsic.Runtime.RenderRecipeEditingOperations` | Typed render-graph, recipe draft/apply, profiling, and artifact publication snapshots/operations. |
 | `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor transform-gizmo interaction (`RUNTIME-084`, history convergence in `RUNTIME-201`). It performs screen-space handle hit testing and axis-constrained translate/rotate/scale preview edits, stamps transform dirtiness, and coalesces every moved entity from one drag into one generation-validated `EditorCommandHistory` transaction. Undo/redo revalidates the exact expected batch before restoring it atomically; the retired `GizmoUndoStack` has no replacement stack. In production `SceneInteractionModule` directly owns the interaction plus its packet builder and reusable selected-entity scratch, and graphics receives only frozen copied `TransformGizmoRenderPacket` values in the interaction render snapshot. |
 
+### Point-cloud consolidation progress and radius admission
+
+Automatic support-radius analysis first evaluates the method's requested
+neighbor rank, then reports and selects the largest rank down to the policy
+minimum that satisfies the configured sampled-neighbor and predicted-work
+limits. Manual mode keeps its exact radius and remains fail-closed. The queued
+editor result names the remaining analysis, backend-execution, readback, and
+publication path; the terminal result exposes requested/selected ranks,
+work-budget backoff, actual backend/fallback, and displacement. Vulkan also
+validates its concrete grid, buffers, dispatch, and device state. Its
+saturating diagnostic counters are telemetry and do not impose a hypothetical
+`query_count * max_neighbors` plan rejection.
+
 ### Asset Import Apply Scheduling
 
 Runtime import materialization may synchronously complete the specific

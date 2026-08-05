@@ -106,8 +106,8 @@ export namespace Geometry::PointCloud::Kernels
 
     // Compute 1 + sum_{j!=i} kernel(||p_i-p_j||^2,h), or its reciprocal,
     // in point-index order. Accumulation is double precision and output is
-    // float. An isolated point makes the whole operation fail closed with
-    // EmptyNeighborhood and no published weights.
+    // float. Huang et al.'s leading 1 makes an isolated point's valid direct
+    // and reciprocal density weights both equal to 1.
     [[nodiscard]] DensityWeightResult ComputeDensityWeights(
         std::span<const glm::vec3> points,
         double supportRadius,

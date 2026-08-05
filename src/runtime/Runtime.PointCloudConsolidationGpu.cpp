@@ -137,7 +137,6 @@ namespace Extrinsic::Runtime
             glm::vec3 Origin{0.0f};
             float SupportRadius{0.0f};
             bool DensityWeighted{false};
-            std::uint64_t MaximumContributionCount{0u};
             Graphics::ParallelPrimitiveDispatchPlan ScanPlan{};
             std::uint64_t TotalBufferBytes{0u};
 
@@ -351,25 +350,6 @@ namespace Extrinsic::Runtime
             const std::uint64_t sourceCount = snapshot.Positions.size();
             const std::uint64_t targetCount =
                 snapshot.GpuInitialPositions.size();
-            const std::uint64_t perIterationQueries =
-                (wlop != nullptr ? 3u : 2u) * targetCount;
-            const std::uint64_t totalQueries =
-                (wlop != nullptr ? sourceCount : 0u) + targetCount +
-                static_cast<std::uint64_t>(snapshot.Params.MaxIterations) *
-                    perIterationQueries;
-            const std::uint64_t maximumContributions =
-                totalQueries >
-                    std::numeric_limits<std::uint64_t>::max() /
-                        snapshot.Request.Config.MaxSupportNeighbors
-                ? std::numeric_limits<std::uint64_t>::max()
-                : totalQueries *
-                      snapshot.Request.Config.MaxSupportNeighbors;
-            if (maximumContributions >
-                std::numeric_limits<std::uint32_t>::max())
-            {
-                return std::nullopt;
-            }
-
             LopGpuPlan plan{
                 .SourceCount = static_cast<std::uint32_t>(sourceCount),
                 .TargetCount = static_cast<std::uint32_t>(targetCount),
@@ -380,7 +360,6 @@ namespace Extrinsic::Runtime
                 .Origin = origin,
                 .SupportRadius = support,
                 .DensityWeighted = wlop != nullptr,
-                .MaximumContributionCount = maximumContributions,
                 .ScanPlan = Graphics::ComputePrefixScanDispatchPlan(
                     static_cast<std::uint32_t>(cellCount64),
                     Graphics::PrefixScanMode::Exclusive),

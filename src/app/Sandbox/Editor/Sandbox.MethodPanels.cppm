@@ -133,7 +133,9 @@ export namespace Extrinsic::Sandbox::Editor
         std::string Message{};
         std::uint32_t SupportRadiusEstimatorVersion{0u};
         std::uint32_t SupportRadiusProfileSampleCount{0u};
+        std::uint32_t SupportRadiusRequestedNeighborRank{0u};
         std::uint32_t SupportRadiusNeighborRank{0u};
+        bool SupportRadiusWorkloadAdjusted{false};
         double SupportRadiusNeighborDistance{0.0};
         double ResolvedSupportRadius{0.0};
         double SupportRadiusBoundingBoxDiagonal{0.0};

@@ -127,6 +127,8 @@ void main()
     LopFloatArray(state.DisplacementsBDA).Values[index] = displacement;
     atomicMax(diagnostics.MaxDisplacementBits,
               floatBitsToUint(displacement));
-    atomicAdd(diagnostics.AttractionContributionCount, attractionCount);
-    atomicAdd(diagnostics.RepulsionContributionCount, repulsionCount);
+    LopSaturatingAtomicAdd(
+        diagnostics, LOP_GPU_COUNTER_ATTRACTION, attractionCount);
+    LopSaturatingAtomicAdd(
+        diagnostics, LOP_GPU_COUNTER_REPULSION, repulsionCount);
 }

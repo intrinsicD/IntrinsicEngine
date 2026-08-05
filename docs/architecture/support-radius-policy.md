@@ -35,18 +35,23 @@ Automatic analysis performs the following steps:
    policy factor. The axis-aligned bounding-box diagonal is reported only as a
    scale diagnostic; it is not the recommendation when valid neighbor
    distances exist.
-6. Query the recommended sphere for the same bounded sample and report support
-   occupancy P50, P95, and maximum. The float KD-tree radius is rounded outward
-   for broad-phase completeness, followed by the method-compatible double
+6. Query that sphere for the same bounded sample and report support occupancy
+   P50, P95, and maximum. The float KD-tree radius is rounded outward for
+   broad-phase completeness, followed by the method-compatible double
    precision cutoff `distance_squared < radius_squared`.
+7. If the requested automatic rank exceeds the declared neighborhood or
+   contribution budget, search the already-built rank profile for the largest
+   safe rank, never below the policy's minimum rank. This is deterministic
+   work-budget backoff: it changes the selected automatic recommendation and
+   is reported explicitly; it does not relax a limit.
 
 The current LOP-family policies are deliberately small, deterministic
 heuristics rather than quality claims:
 
-| Strategies | Neighbor rank | Distance quantile | Multiplier |
-| --- | ---: | ---: | ---: |
-| LOP, isotropic WLOP, CLOP | 16 | P75 | 1.25 |
-| anisotropic WLOP, EAR | 24 | P75 | 1.25 |
+| Strategies | Requested rank | Minimum automatic rank | Distance quantile | Multiplier |
+| --- | ---: | ---: | ---: | ---: |
+| LOP, isotropic WLOP, CLOP | 16 | 4 | P75 | 1.25 |
+| anisotropic WLOP, EAR | 24 | 4 | P75 | 1.25 |
 
 The factor puts the selected neighbor inside the compact-support cutoff rather
 than exactly on its zero-weight boundary. These defaults are operational
@@ -54,8 +59,9 @@ starting points; benchmark-backed method-specific tuning can revise a row only
 through a scoped method task with correctness evidence.
 
 Manual mode preserves the positive finite world-unit radius exactly. It skips
-the k-distance recommendation but still runs the same sampled occupancy and
-workload checks, so a manual value is an override, not a safety bypass.
+the k-distance recommendation and automatic backoff but still runs the same
+sampled occupancy and workload checks, so a manual value is an override, not a
+safety bypass.
 
 ## Workload preview and failure
 
@@ -84,22 +90,30 @@ Configuration supplies two non-zero bounds:
 
 The preview is a deterministic guard against obviously unsafe work, not a
 runtime or performance guarantee: projected samples can become denser than the
-source sample. An over-budget, degenerate, build, or query status returns
-`UnsafeSupportRadius` before the LOP-family method executes and publishes no
-geometry result. Completion telemetry retains estimator version, source,
-status, sample count, selected rank/quantile/distance, resolved radius,
-bounding-box diagonal, occupancy, predicted query count, and predicted
-contributions.
+source sample. Auto first tries the method's requested rank and, when needed,
+backs off to the largest safe rank at or above the policy minimum. It returns
+`UnsafeSupportRadius` only when even that minimum is over budget or when the
+analysis is degenerate or cannot build/query its index. Manual mode remains
+fail-closed at the exact requested radius. No rejected request executes or
+publishes geometry. Completion telemetry retains estimator version, source,
+status, sample count, requested and selected ranks, whether work-budget backoff
+occurred, quantile/distance, resolved radius, bounding-box diagonal, occupancy,
+predicted query count, and predicted contributions.
 
 ## Complexity and backend use
 
 For `N` input points, `S <= 2,048` samples, and bounded rank `K <= 64`, profile
-construction is `O(N log N + S(log N + K))` plus `S` exact radius queries and
-`O(N)` index storage. It runs on the existing job worker rather than the frame
-thread. The CPU reference and Vulkan backend consume the same resolved positive
-radius and workload decision. Backends may use different acceleration
-structures for their iterative queries, but they do not independently infer a
-different default radius.
+construction is `O(N log N + S(log N + K))` plus `S` exact radius queries for
+the requested radius and, only after an over-budget result, at most a bounded
+binary search over the rank interval. The analysis stores `O(N)` index data and
+runs on the existing job worker rather than the frame thread. The CPU reference
+and Vulkan backend consume the same resolved positive radius and workload
+decision. Backends may use different acceleration structures for their
+iterative queries, but they do not independently infer a different default
+radius. Vulkan additionally validates its concrete cell-grid, buffer, dispatch,
+and device limits. Its 32-bit diagnostic contribution counters saturate for
+telemetry; their representable sum is not treated as a hypothetical
+`query_count * max_neighbors` execution limit.
 
 `Geometry.ImplicitPlaneField` keeps its hierarchy-local radius factor, and SPH
 keeps its physical smoothing length. Those parameters have different semantics

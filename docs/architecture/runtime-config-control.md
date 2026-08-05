@@ -102,7 +102,10 @@ limits. Applying it mutates only the canonical generic section record.
 `PointCloudConsolidationService` snapshots the selected entity's
 `GeometrySources`, profiles that selected position property on `JobService`,
 and either passes the explicit resolved radius to the chosen strategy or
-rejects unsafe work before method execution. It rejects a stale
+rejects unsafe work before method execution. Auto may select the largest
+policy-allowed lower neighbor rank that satisfies those unchanged limits and
+reports requested rank, selected rank, and backoff; Manual never changes the
+authored radius. It rejects a stale
 world/entity/source at main-thread completion and commits a current result
 through one undoable geometry mutation. The pointer-free result reports
 requested/actual backend identity, explicit CPU fallback and backend
@@ -179,7 +182,9 @@ after feature preparation resolves `EngineConfigControl` from
   editor-operation, agent/CLI, and programmatic callers share validation and
   execution semantics. Its backend selector edits that same typed section;
   completion presentation keeps requested and actual backend identities plus
-  fallback diagnostics distinct.
+  fallback diagnostics distinct. The queued presentation names the remaining
+  analysis/backend/publication pipeline, and the terminal result shows any
+  Auto work-budget backoff plus measured displacement.
 - Physics currently has no dedicated Sandbox window. Any future editor control
   must edit `sandbox.physics` through this same preview/hot-apply lane. The
   generic `Editor`, `AgentCli`, and `Programmatic` source variants already

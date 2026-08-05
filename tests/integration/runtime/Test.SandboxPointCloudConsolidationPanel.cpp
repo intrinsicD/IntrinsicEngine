@@ -415,9 +415,11 @@ TEST(SandboxPointCloudConsolidationPanel,
         .SupportRadiusAnalysisStatus = "success",
         .SupportRadiusSource = "recommended",
         .SupportRadiusQuantile = "p75",
-        .SupportRadiusEstimatorVersion = 1u,
+        .SupportRadiusEstimatorVersion = 2u,
         .SupportRadiusProfileSampleCount = 40u,
-        .SupportRadiusNeighborRank = 16u,
+        .SupportRadiusRequestedNeighborRank = 16u,
+        .SupportRadiusNeighborRank = 8u,
+        .SupportRadiusWorkloadAdjusted = true,
         .SupportRadiusNeighborDistance = 0.2,
         .ResolvedSupportRadius = 0.25,
         .SupportRadiusBoundingBoxDiagonal = 3.0,
@@ -451,6 +453,9 @@ TEST(SandboxPointCloudConsolidationPanel,
               "Vulkan unavailable; CPU completed.");
     EXPECT_EQ(summary.SupportRadiusAnalysisStatus, "success");
     EXPECT_EQ(summary.SupportRadiusSource, "recommended");
+    EXPECT_EQ(summary.SupportRadiusRequestedNeighborRank, 16u);
+    EXPECT_EQ(summary.SupportRadiusNeighborRank, 8u);
+    EXPECT_TRUE(summary.SupportRadiusWorkloadAdjusted);
     EXPECT_DOUBLE_EQ(summary.ResolvedSupportRadius, 0.25);
     EXPECT_DOUBLE_EQ(summary.SupportNeighborsP95, 18.0);
     EXPECT_EQ(summary.PredictedContributionCount, 36'000u);
@@ -755,6 +760,12 @@ TEST(SandboxPointCloudConsolidationPanel,
     EXPECT_EQ(
         action.Submission->Status,
         Runtime::PointCloudConsolidationRunStatus::Queued);
+    EXPECT_NE(
+        action.Submission->Message.find("support-radius profiling"),
+        std::string::npos);
+    EXPECT_NE(
+        action.Submission->Message.find("Vulkan"),
+        std::string::npos);
     EXPECT_EQ(
         action.Config.Source,
         Runtime::RuntimeConfigControlSource::Editor);

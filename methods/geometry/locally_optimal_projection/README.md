@@ -22,9 +22,11 @@ source/projected density weights.
 
 - `SupportRadius` (`h`) is in input world units. Runtime defaults to Auto: the
   selected position property is deterministically k-distance profiled and the
-  LOP/isotropic-WLOP policy uses rank 16, P75, and a 1.25 multiplier. Manual
-  preserves the configured value exactly. Both modes retain sampled occupancy
-  and contribution limits. See the canonical
+  LOP/isotropic-WLOP policy requests rank 16, P75, and a 1.25 multiplier. If
+  that automatic recommendation exceeds the declared work limits, the
+  estimator reports and selects the largest safe rank down to rank 4. Manual
+  preserves the configured value exactly and never backs off. Both modes retain
+  sampled occupancy and contribution limits. See the canonical
   [support-radius policy](../../../docs/architecture/support-radius-policy.md).
 - `RepulsionWeight` (`mu`) is constrained to `[0, 0.5)`. Values near `0` favor
   denoising; values around `0.4`–`0.45` improve spacing.
@@ -40,7 +42,9 @@ source/projected density weights.
 - A single isotropic radius cannot preserve all thin features or strongly
   anisotropic samples. METHOD-018 owns the normal-aware EAR strategy.
 - WLOP density correction improves non-uniform sampling but does not infer
-  connectivity or reconstruct a surface.
+  connectivity or reconstruct a surface. Its paper-defined density is
+  `1 + sum`; a sample with no non-self neighbor inside compact support therefore
+  has valid direct and reciprocal density weights of one.
 - The reference is serial and correctness-oriented. The private Vulkan path
   uses float shader arithmetic, one bounded `h`-cell grid, and a single
   in-flight operation; unavailable, busy, or transport-invalid GPU work falls
@@ -78,5 +82,8 @@ explicit count-changing path. Support profiling runs from the captured property
 on the same job worker before backend selection. `gpu_vulkan_compute` records
 ordinary LOP and isotropic WLOP through the private runtime Vulkan participant,
 while all callers rejoin the same stale-result, undo, property-publication, and
-render dirty-state path. A finite iteration-limit result publishes as an
-explicit `NotConverged` preview; hard failures publish no geometry.
+render dirty-state path. The Sandbox keeps the request visibly queued while
+analysis/backend execution/readback/publication are in progress, then reports
+the selected Auto rank, actual backend, displacement, and terminal status. A
+finite iteration-limit result publishes as an explicit `NotConverged` preview;
+hard failures publish no geometry.

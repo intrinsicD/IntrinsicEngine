@@ -639,8 +639,12 @@ namespace Extrinsic::Sandbox::Editor
                 result.SupportRadiusEstimatorVersion,
             .SupportRadiusProfileSampleCount =
                 result.SupportRadiusProfileSampleCount,
+            .SupportRadiusRequestedNeighborRank =
+                result.SupportRadiusRequestedNeighborRank,
             .SupportRadiusNeighborRank =
                 result.SupportRadiusNeighborRank,
+            .SupportRadiusWorkloadAdjusted =
+                result.SupportRadiusWorkloadAdjusted,
             .SupportRadiusNeighborDistance =
                 result.SupportRadiusNeighborDistance,
             .ResolvedSupportRadius = result.ResolvedSupportRadius,
@@ -1432,14 +1436,32 @@ namespace Extrinsic::Sandbox::Editor
                     summary.SupportRadiusAnalysisStatus.c_str());
                 if (summary.SupportRadiusSource == "recommended")
                 {
-                    ImGui::Text(
-                        "Profile v%u: %u samples  rank %u %s distance %.6g  bbox %.6g",
-                        summary.SupportRadiusEstimatorVersion,
-                        summary.SupportRadiusProfileSampleCount,
-                        summary.SupportRadiusNeighborRank,
-                        summary.SupportRadiusQuantile.c_str(),
-                        summary.SupportRadiusNeighborDistance,
-                        summary.SupportRadiusBoundingBoxDiagonal);
+                    if (summary.SupportRadiusWorkloadAdjusted)
+                    {
+                        ImGui::Text(
+                            "Profile v%u: %u samples  requested rank %u -> selected %u (%s)",
+                            summary.SupportRadiusEstimatorVersion,
+                            summary.SupportRadiusProfileSampleCount,
+                            summary.SupportRadiusRequestedNeighborRank,
+                            summary.SupportRadiusNeighborRank,
+                            "work-budget backoff");
+                        ImGui::Text(
+                            "%s distance %.6g  bbox %.6g",
+                            summary.SupportRadiusQuantile.c_str(),
+                            summary.SupportRadiusNeighborDistance,
+                            summary.SupportRadiusBoundingBoxDiagonal);
+                    }
+                    else
+                    {
+                        ImGui::Text(
+                            "Profile v%u: %u samples  rank %u %s distance %.6g  bbox %.6g",
+                            summary.SupportRadiusEstimatorVersion,
+                            summary.SupportRadiusProfileSampleCount,
+                            summary.SupportRadiusNeighborRank,
+                            summary.SupportRadiusQuantile.c_str(),
+                            summary.SupportRadiusNeighborDistance,
+                            summary.SupportRadiusBoundingBoxDiagonal);
+                    }
                 }
                 else
                 {
@@ -1496,6 +1518,11 @@ namespace Extrinsic::Sandbox::Editor
                         "Inserted points: %u",
                         summary.InsertedPointCount);
                 }
+            }
+            else
+            {
+                ImGui::TextDisabled(
+                    "In progress: radius analysis -> backend execution -> publication");
             }
             if (!summary.Message.empty())
                 ImGui::TextWrapped("%s", summary.Message.c_str());

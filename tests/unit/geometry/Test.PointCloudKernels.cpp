@@ -366,13 +366,31 @@ TEST(PointCloudKernels, DensityFailuresPublishNoWeights)
     };
     const auto isolatedResult =
         Kernels::ComputeDensityWeights(isolated, 1.0);
-    EXPECT_EQ(
-        isolatedResult.Status,
-        Kernels::DensityWeightStatus::EmptyNeighborhood);
-    EXPECT_TRUE(isolatedResult.Weights.empty());
+    ASSERT_TRUE(isolatedResult.Succeeded());
+    ASSERT_EQ(isolatedResult.Weights.size(), isolated.size());
+    EXPECT_FLOAT_EQ(isolatedResult.Weights[0], 1.0f);
+    EXPECT_FLOAT_EQ(isolatedResult.Weights[1], 1.0f);
     EXPECT_EQ(
         isolatedResult.Diagnostics.EmptyNeighborhoodCount,
-        1u);
+        0u);
+    EXPECT_EQ(
+        isolatedResult.Diagnostics.NeighborContributionCount,
+        0u);
+    const auto isolatedReciprocal = Kernels::ComputeDensityWeights(
+        isolated,
+        1.0,
+        Kernels::KernelType::ThetaLop,
+        Kernels::DensityWeightMode::Reciprocal);
+    ASSERT_TRUE(isolatedReciprocal.Succeeded());
+    ASSERT_EQ(isolatedReciprocal.Weights.size(), isolated.size());
+    EXPECT_FLOAT_EQ(isolatedReciprocal.Weights[0], 1.0f);
+    EXPECT_FLOAT_EQ(isolatedReciprocal.Weights[1], 1.0f);
+    EXPECT_EQ(
+        isolatedReciprocal.Diagnostics.EmptyNeighborhoodCount,
+        0u);
+    EXPECT_EQ(
+        isolatedReciprocal.Diagnostics.NeighborContributionCount,
+        0u);
 
     Geometry::KDTree wrongIndex{};
     ASSERT_TRUE(wrongIndex.BuildFromPoints(connected).has_value());

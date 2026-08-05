@@ -76,6 +76,7 @@ void main()
     }
     LopVec4Array(state.ProjectedABDA).Values[index] =
         vec4(initialized, 1.0);
-    atomicAdd(diagnostics.AttractionContributionCount, contributions);
+    LopSaturatingAtomicAdd(
+        diagnostics, LOP_GPU_COUNTER_ATTRACTION, contributions);
     if (index == 0u) diagnostics.SourceGridBuilt = 1u;
 }

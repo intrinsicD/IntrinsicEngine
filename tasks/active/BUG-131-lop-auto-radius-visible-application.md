@@ -11,10 +11,28 @@ worktree: "/home/alex/Documents/IntrinsicEngine"
 claimed_at: "2026-08-05T06:52:29Z"
 contract_schema: 1
 contracts: [geometry.element-domain-sources, geometry.support-radius-policy, method.engine-integration]
-contract_review: "BUG-131 repairs backend-aware automatic-radius admission and the existing property-aware runtime/UI publication path without narrowing compatible domains or changing method equations/cardinality."
+contract_review: "BUG-131 repairs backend-aware automatic-radius admission, restores WLOP's paper-defined 1+sum density base case consistently on CPU/Vulkan, and preserves the existing property-aware publication path without narrowing compatible domains or changing cardinality."
 maturity_target: Operational
 ---
 # BUG-131 — LOP Auto radius rejects visible imported-mesh execution
+
+## Status
+
+- Completed on 2026-08-05 at `Operational` for ordinary LOP and isotropic
+  WLOP on the repository `child.obj` asset and this Vulkan-capable host. The
+  final opt-in run selected actual `gpu_vulkan_compute` with zero fallback,
+  non-zero canonical displacement, and a changed resident position
+  fingerprint/content revision. This is no speedup, convergence,
+  visual-quality, or cross-device claim.
+- Clean-workshop manual scorecard: row 3 pass (new public fields expose only
+  owning-layer scalar data); rows 4–6 not applicable (no renderer subsystem,
+  frame-graph pass, or recipe edge was added); no follow-up findings.
+- Commit: pending final evidence binding.
+
+## Maturity
+
+- Reached: `Operational` on a Vulkan-capable host, with `CPUContracted`
+  behavior retained by the default, ASan, and UBSan gates.
 
 ## Goal
 - Make a default Auto-radius LOP or isotropic-WLOP request on the imported
@@ -41,10 +59,16 @@ maturity_target: Operational
   the rendered position fingerprint.
 - Impact: the newly delivered Auto/Vulkan path is technically present but its
   default large-mesh UI workflow appears inert to the researcher.
-- Ranked diagnosis: the current fixed `100,000,000` contribution budget uses a
-  CPU-reference pass-count estimate before backend dispatch; output binding is
-  already canonical by default; stale-build and Vulkan availability remain
-  secondary checks.
+- Ranked diagnosis: the rank-16 default exceeds the current `100,000,000`
+  contribution budget on this asset even though smaller policy-valid ranks are
+  safe; Vulkan plan construction also treated a hypothetical
+  `query_count * max_neighbors` diagnostic-counter sum as a hard execution
+  limit. Output binding is already canonical by default; stale-build and
+  Vulkan availability remain secondary checks.
+- Real-device diagnosis: workload backoff can produce projected particles with
+  no other particle inside compact support. Huang et al. define both WLOP
+  densities as `1 + sum`, so their density remains exactly one; the current CPU
+  and Vulkan paths instead reject that valid base case as `EmptyNeighborhood`.
 - Owners/layers: geometry retains the backend-independent radius/occupancy
   analysis; runtime owns backend-aware admission, execution, publication, and
   telemetry; app owns presentation only.
@@ -57,9 +81,10 @@ maturity_target: Operational
 - Agent/CLI: consume the same validated config and runtime result fields as UI.
 
 ## Backends
-- Backend axis: CPU reference keeps its conservative work guard; Vulkan uses
-  the concrete bounded cell-grid/resource plan and remains fail-closed when the
-  device or plan is unavailable.
+- Backend axis: both backends retain the shared conservative work guard and
+  consume one explicit resolved radius. Vulkan additionally validates its
+  concrete bounded cell-grid/resource plan and remains fail-closed when the
+  device or plan is unavailable; saturating diagnostics are not plan limits.
 
 ## Engine integration
 | Field | Disposition |
@@ -73,45 +98,52 @@ maturity_target: Operational
 | End-to-end tests | Reproduce 50k-scale Auto admission and prove actual Vulkan completion plus canonical position/render-residency change. |
 
 ## Required changes
-- [ ] Add a deterministic 50k-scale `child.obj`-equivalent feedback loop that
+- [x] Add a deterministic 50k-scale `child.obj`-equivalent feedback loop that
       records the exact Auto analysis status, radius, occupancy, predicted CPU
       work, and Vulkan plan disposition.
-- [ ] Separate backend-independent radius validity/occupancy from
-      backend-specific execution admission so a safe concrete Vulkan grid is
-      not rejected solely by the CPU-reference pass estimate.
-- [ ] Preserve fail-closed CPU limits and actionable Vulkan plan/device
+- [x] Make Auto choose and report the largest policy-valid neighbor rank that
+      satisfies the unchanged work budget, and stop rejecting a concrete safe
+      Vulkan plan solely because hypothetical diagnostic-counter totals exceed
+      32 bits.
+- [x] Restore the paper-defined WLOP singleton density value of one in the CPU
+      reference, optimized CPU, and Vulkan paths; retain fail-closed behavior
+      for an actually empty attraction denominator.
+- [x] Preserve fail-closed CPU limits and actionable Vulkan plan/device
       rejection; do not turn configured limits into ignored UI fields.
-- [ ] Make Sandbox progress and terminal diagnostics distinguish analysis,
-      backend admission, queued GPU work, applied output, and rejection.
-- [ ] Prove canonical position publication enters the existing dirty-upload
+- [x] Make Sandbox queued and terminal diagnostics name the analysis/backend/
+      publication pipeline, Auto backoff, applied output, and rejection.
+- [x] Prove canonical position publication enters the existing dirty-upload
       path and produces a non-zero before/after position/render fingerprint.
 
 ## Tests
-- [ ] Add a failing regression for the reported default Auto large-mesh
+- [x] Add a failing regression for the reported default Auto large-mesh
       request before applying the fix.
-- [ ] Cover CPU-reference over-budget rejection and Vulkan concrete-plan
+- [x] Cover CPU-reference over-budget rejection and Vulkan concrete-plan
       admission without changing property-domain/cardinality contracts.
-- [ ] Add or extend an opt-in `gpu;vulkan` integration/readback proof that
+- [x] Cover isolated direct/reciprocal density weights and CPU/Vulkan parity so
+      a zero non-self density contribution count is not reported as failure.
+- [x] Add or extend an opt-in `gpu;vulkan` integration/readback proof that
       records actual Vulkan execution, zero fallback, applied displacement,
       and changed visible residency.
-- [ ] Run focused config, panel, runtime, support-radius, and Vulkan selectors.
+- [x] Run focused config, panel, runtime, support-radius, and Vulkan selectors.
 
 ## Docs
-- [ ] Update support-radius/runtime/UI current-state docs with backend-aware
+- [x] Update support-radius/runtime/UI current-state docs with backend-aware
       admission and actionable diagnostics.
-- [ ] Update task indexes/session brief and append the retirement narrative on
+- [x] Update task indexes/session brief and append the retirement narrative on
       closure; refresh generated artifacts required by touched surfaces.
 
 ## Acceptance criteria
-- [ ] The reported Auto workflow no longer ends at `UnsafeSupportRadius` when
+- [x] The reported Auto workflow no longer ends at `UnsafeSupportRadius` when
       the resolved radius and concrete Vulkan plan are safe.
-- [ ] Unsafe CPU or Vulkan work still fails before execution with the exact
-      exceeded resource/limit named.
-- [ ] A successful default canonical-position run reports actual Vulkan,
+- [x] Unsafe shared work still fails before execution with sampled-neighbor or
+      predicted-contribution diagnostics, and an unsafe Vulkan plan remains
+      fail-closed with its bounded grid/resource category named.
+- [x] A successful default canonical-position run reports actual Vulkan,
       zero fallback, non-zero displacement, applied publication, and a changed
       render-residency fingerprint.
-- [ ] UI, config, and agent/CLI use one validated execution/result path.
-- [ ] No layering, property-domain, topology/cardinality, or method-parity
+- [x] UI, config, and agent/CLI use one validated execution/result path.
+- [x] No layering, property-domain, topology/cardinality, or method-parity
       regression is introduced.
 
 ## Verification

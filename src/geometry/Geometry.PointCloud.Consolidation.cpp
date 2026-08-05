@@ -455,13 +455,6 @@ namespace Geometry::PointCloud::Consolidation
                     density += *weight;
                     ++contributionCount;
                 }
-                if (contributionCount == 0u)
-                {
-                    ++diagnostics.EmptyNeighborhoodCount;
-                    failure = Status::EmptyNeighborhood;
-                    weights.clear();
-                    return false;
-                }
                 if (!std::isfinite(density) ||
                     density > static_cast<double>(
                         std::numeric_limits<float>::max()))

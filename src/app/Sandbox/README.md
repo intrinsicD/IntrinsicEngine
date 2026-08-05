@@ -123,7 +123,11 @@ to import the same runtime module surface. The single consolidation entry is a
 semantic point-set window rather than a provenance window: its Position and
 optional Normal slots enumerate compatible typed properties from every
 resolved mesh, graph, and point-cloud element domain, and its output slots keep
-the chosen originating domain. `Sandbox.Editor.MeshProcessingPanels`
+the chosen originating domain. While a consolidation request is queued, the
+panel names the analysis, backend execution, and publication pipeline. The
+terminal readout shows requested/selected Auto ranks, any work-budget backoff,
+actual backend/fallback, and measured average/maximum displacement.
+`Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
 registers those nine windows under their existing menu paths, owns their ImGui

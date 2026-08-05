@@ -13,7 +13,7 @@ export module Geometry.SupportRadius;
 
 export namespace Geometry::SupportRadius
 {
-    inline constexpr std::uint32_t kEstimatorVersion = 1u;
+    inline constexpr std::uint32_t kEstimatorVersion = 2u;
     inline constexpr std::size_t kMaximumProfileSamples = 2'048u;
     inline constexpr std::uint32_t kMaximumNeighborRank = 64u;
 
@@ -57,6 +57,9 @@ export namespace Geometry::SupportRadius
         std::uint32_t NeighborRank{16u};
         CoverageQuantile Quantile{CoverageQuantile::P75};
         double RadiusMultiplier{1.0};
+        // Automatic mode may reduce NeighborRank no lower than this value
+        // when the requested neighborhood exceeds the workload budget.
+        std::uint32_t MinimumNeighborRank{4u};
     };
 
     struct WorkloadBudget
@@ -98,6 +101,7 @@ export namespace Geometry::SupportRadius
         std::size_t RadiusDistanceEvaluations{0u};
         double BoundingBoxDiagonal{0.0};
         std::vector<RankProfile> Ranks{};
+        std::uint32_t RequestedNeighborRank{0u};
         std::uint32_t SelectedNeighborRank{0u};
         CoverageQuantile SelectedQuantile{CoverageQuantile::P75};
         double SelectedNeighborDistance{0.0};
@@ -109,6 +113,7 @@ export namespace Geometry::SupportRadius
         std::uint64_t PredictedContributionCount{0u};
         bool NeighborLimitExceeded{false};
         bool ContributionLimitExceeded{false};
+        bool WorkloadAdjusted{false};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {

@@ -208,14 +208,6 @@ namespace Geometry::PointCloud::Kernels
                     density += *weight;
                     ++contributionCount;
                 }
-                if (contributionCount == 0u)
-                {
-                    ++result.Diagnostics.EmptyNeighborhoodCount;
-                    result.Status =
-                        DensityWeightStatus::EmptyNeighborhood;
-                    result.Weights.clear();
-                    return result;
-                }
                 result.Diagnostics.NeighborContributionCount +=
                     contributionCount;
                 const double output =

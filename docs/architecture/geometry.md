@@ -19,7 +19,10 @@
   profiles a deterministic sample of at most 2,048 positions, and returns
   k-distance quantiles plus exact sampled sphere occupancy and bounded-work
   diagnostics. It accepts values rather than a point-cloud container, so every
-  compatible element-domain property is substitutable.
+  compatible element-domain property is substitutable. Automatic analysis may
+  select the largest policy-allowed lower rank that satisfies the supplied
+  workload budget and reports requested/selected ranks plus that adjustment;
+  manual radii never change.
 - Runtime selects the method policy and Auto/Manual intent. The geometry module
   does not own an ECS component or cache; see the canonical
   [support-radius policy](support-radius-policy.md).

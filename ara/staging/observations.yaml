@@ -2201,3 +2201,28 @@ observations:
     promoted_to: "logic/claims.md:C34"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O128
+    timestamp: "2026-08-05T10:05+02:00"
+    provenance: ai-executed
+    content: >
+      The exact 50,002-vertex child.obj integration run no longer stops at
+      UnsafeSupportRadius: Auto selected rank 5 from requested rank 16 under
+      the unchanged 100,000,000-contribution limit, actual Vulkan execution
+      completed with zero fallback and non-zero displacement, canonical mesh
+      positions were published, and render residency advanced to a different
+      position fingerprint and content revision.
+    context: >
+      Diagnosis found two independent blockers: Auto had no policy-bounded
+      work-budget backoff and the Vulkan plan treated a hypothetical 32-bit
+      diagnostic-counter total as an execution limit. The first real run then
+      exposed a CPU/Vulkan WLOP bug: Huang et al.'s density is 1 + sum, so an
+      isolated density sample is valid with weight one rather than an empty
+      neighborhood failure. Focused CPU tests and both Vulkan parity/asset
+      integration tests passed; the result supports no performance,
+      visual-quality, convergence, or cross-device claim.
+    potential_type: claim
+    bound_to: [N377]
+    promoted: true
+    promoted_to: "logic/claims.md:C35"
+    crystallized_via: empirical-resolution
+    stale: false

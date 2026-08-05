@@ -78,12 +78,6 @@ void main()
             }
         }
     }
-    if (contributions == 0u)
-    {
-        atomicAdd(diagnostics.EmptyNeighborhoodCount, 1u);
-        LopFail(state, LOP_GPU_ERROR_EMPTY_DENSITY);
-        return;
-    }
     if (isnan(density) || isinf(density) || !(density > 0.0))
     {
         LopFail(state, LOP_GPU_ERROR_NON_FINITE);
@@ -92,5 +86,6 @@ void main()
     LopFloatArray(weightsBDA).Values[index] = source
         ? 1.0 / density
         : density;
-    atomicAdd(diagnostics.DensityContributionCount, contributions);
+    LopSaturatingAtomicAdd(
+        diagnostics, LOP_GPU_COUNTER_DENSITY, contributions);
 }

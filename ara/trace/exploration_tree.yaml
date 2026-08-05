@@ -8859,3 +8859,24 @@ tree:
       - "git branch --list: main is the only local branch"
       - "commit d798fc9b: accepted METHOD-020 completion evidence"
     status: resolved
+  - id: N377
+    type: experiment
+    title: "Make Auto WLOP visibly update child.obj through Vulkan"
+    provenance: ai-executed
+    timestamp: "2026-08-05T10:05+02:00"
+    also_depends_on: [N375, N376]
+    evidence:
+      - "tests/unit/geometry/Test.SupportRadius.cpp"
+      - "tests/unit/geometry/Test.PointCloudKernels.cpp"
+      - "tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
+      - "docs/architecture/support-radius-policy.md"
+    result: >
+      Auto now deterministically backs the requested neighborhood down only as
+      far as the policy minimum to fit unchanged work limits, while Manual
+      stays exact. WLOP density uses its paper-defined 1 + sum base case on CPU
+      and Vulkan, and Vulkan diagnostic counters saturate instead of imposing
+      a false plan limit. The exact child.obj smoke selected rank 5, completed
+      on Vulkan with zero fallback and non-zero position displacement, and
+      observed a changed resident position fingerprint/content revision. This
+      is bounded operational evidence, not a performance or quality claim.
+    status: resolved

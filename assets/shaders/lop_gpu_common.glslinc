@@ -14,6 +14,9 @@ const uint LOP_GPU_STRATEGY_LOP = 0u;
 const uint LOP_GPU_STRATEGY_WLOP = 1u;
 const uint LOP_GPU_MODE_SOURCE = 0u;
 const uint LOP_GPU_MODE_PROJECTED = 1u;
+const uint LOP_GPU_COUNTER_DENSITY = 0u;
+const uint LOP_GPU_COUNTER_ATTRACTION = 1u;
+const uint LOP_GPU_COUNTER_REPULSION = 2u;
 
 layout(buffer_reference, scalar) readonly buffer LopVec4ArrayRO
 {
@@ -168,6 +171,41 @@ float LopTheta(const float distanceSquared)
 {
     const float h2 = pc.SupportRadius * pc.SupportRadius;
     return exp(-16.0 * distanceSquared / h2);
+}
+
+void LopSaturatingAtomicAdd(
+    LopGpuDiagnosticsRef diagnostics,
+    const uint counter,
+    const uint increment)
+{
+    if (increment == 0u)
+        return;
+    uint observed = counter == LOP_GPU_COUNTER_DENSITY
+        ? atomicAdd(diagnostics.DensityContributionCount, 0u)
+        : counter == LOP_GPU_COUNTER_ATTRACTION
+            ? atomicAdd(diagnostics.AttractionContributionCount, 0u)
+            : atomicAdd(diagnostics.RepulsionContributionCount, 0u);
+    while (observed != 0xffffffffu)
+    {
+        const uint desired = increment > 0xffffffffu - observed
+            ? 0xffffffffu
+            : observed + increment;
+        const uint previous = counter == LOP_GPU_COUNTER_DENSITY
+            ? atomicCompSwap(
+                  diagnostics.DensityContributionCount, observed, desired)
+            : counter == LOP_GPU_COUNTER_ATTRACTION
+                ? atomicCompSwap(
+                      diagnostics.AttractionContributionCount,
+                      observed,
+                      desired)
+                : atomicCompSwap(
+                      diagnostics.RepulsionContributionCount,
+                      observed,
+                      desired);
+        if (previous == observed)
+            return;
+        observed = previous;
+    }
 }
 
 void LopFail(const LopGpuStateRef state, const uint errorCode)

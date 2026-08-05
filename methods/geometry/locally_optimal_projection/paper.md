@@ -32,7 +32,10 @@ from `Geometry.PointCloud.Kernels`.
 
 Plain LOP sets `v_j = w_i = 1`. WLOP uses reciprocal source density for `v_j`
 and direct projected density for `w_i`, both evaluated with the same compact
-kernel. Initial projected samples come from the engine's seeded random
+kernel. In the paper's notation both densities include their leading base term,
+`1 + sum`; an isolated sample therefore has direct density `1` and reciprocal
+density `1`, rather than an empty-neighborhood failure. Initial projected
+samples come from the engine's seeded random
 subsample, followed by the paper's theta-weighted L2 initializer. Fixed input,
 parameters, and seed therefore produce a bitwise-identical serial result.
 
@@ -56,9 +59,12 @@ interpretation, inverse-distance terms clamp distance to `epsilon = 0.01 h`.
 
 Empty/one-point clouds, invalid or garbage cloud storage, non-finite positions,
 invalid controls, requests above the caller's input-count resource guard,
-failed spatial indexing/querying, empty compact-support neighborhoods, density
-failures, and non-finite arithmetic return explicit statuses. Coincident
-samples remain finite. The routine never mutates input.
+failed spatial indexing/querying, empty compact-support attraction
+neighborhoods, density failures, and non-finite arithmetic return explicit
+statuses. A missing attraction denominator remains an `EmptyNeighborhood`
+failure, while zero non-self contributions to a WLOP density is the valid
+paper-defined base case. Coincident samples remain finite. The routine never
+mutates input.
 
 ## Provenance and translation notes
 

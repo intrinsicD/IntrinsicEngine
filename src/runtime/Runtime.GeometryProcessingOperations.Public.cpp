@@ -200,7 +200,12 @@ PointCloudConsolidationResult SubmitEditorPointCloudConsolidation(
   }
   result.Status = PointCloudConsolidationRunStatus::Queued;
   result.Error = Core::ErrorCode::Success;
-  result.Message = "Point-cloud consolidation runtime job queued.";
+  result.Message = result.Config.Backend ==
+                           PointCloudConsolidationBackend::VulkanCompute
+      ? "Queued: support-radius profiling runs first; accepted Vulkan work "
+        "then records, executes, reads back, and publishes positions."
+      : "Queued: support-radius profiling runs first; CPU execution and "
+        "position publication follow.";
   return result;
 }
 

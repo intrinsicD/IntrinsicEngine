@@ -149,6 +149,8 @@ namespace Geometry::SupportRadius
             }();
             return policy.NeighborRank > 0u &&
                    policy.NeighborRank <= params.MaxNeighborRank &&
+                   policy.MinimumNeighborRank > 0u &&
+                   policy.MinimumNeighborRank <= policy.NeighborRank &&
                    validQuantile &&
                    std::isfinite(policy.RadiusMultiplier) &&
                    policy.RadiusMultiplier > 0.0;
@@ -167,6 +169,9 @@ namespace Geometry::SupportRadius
                 ? RadiusSource::Manual
                 : RadiusSource::Recommended,
             .InputPointCount = points.size(),
+            .RequestedNeighborRank = manualRadius.has_value()
+                ? 0u
+                : policy.NeighborRank,
             .SelectedNeighborRank = manualRadius.has_value()
                 ? 0u
                 : policy.NeighborRank,
@@ -298,99 +303,231 @@ namespace Geometry::SupportRadius
                 result.Ranks.push_back(profile);
             }
 
-            const RankProfile& selected =
-                result.Ranks[result.SelectedNeighborRank - 1u];
-            if (selected.ValidSampleCount == 0u)
-            {
-                result.State = Status::MissingNeighborhoodScale;
-                return result;
-            }
-            result.SelectedNeighborDistance =
-                SelectQuantile(selected.Distance, policy.Quantile);
-            result.Radius = result.SelectedNeighborDistance *
-                policy.RadiusMultiplier;
-            if (!std::isfinite(result.Radius) || !(result.Radius > 0.0))
-            {
-                result.State = Status::DegenerateNeighborhood;
-                return result;
-            }
-        }
-        else
-        {
-            result.Radius = *manualRadius;
         }
 
-        const std::optional<float> broadPhaseRadius =
-            BroadPhaseRadius(result.Radius);
-        if (!broadPhaseRadius.has_value())
+        struct RadiusEvaluation
         {
-            result.State = Status::InvalidRadius;
-            return result;
-        }
+            Status State{Status::InvalidRadius};
+            double Radius{0.0};
+            double SupportNeighborsP50{0.0};
+            double SupportNeighborsP95{0.0};
+            std::uint32_t SupportNeighborsMax{0u};
+            std::uint64_t PredictedQueryCount{0u};
+            std::uint64_t PredictedContributionCount{0u};
+            bool NeighborLimitExceeded{false};
+            bool ContributionLimitExceeded{false};
+            std::size_t DistanceEvaluations{0u};
+        };
 
         std::vector<double> supportCounts{};
         supportCounts.reserve(result.ProfileSampleCount);
         std::vector<KDTree::ElementIndex> neighbors{};
         KDTree::RadiusQueryScratch scratch{};
-        const double radiusSquared = result.Radius * result.Radius;
-        for (const std::size_t sampleIndex : sampleIndices)
+        const auto evaluateRadius = [&](const double radius)
         {
-            const auto query = index.QueryRadius(
-                points[sampleIndex], *broadPhaseRadius, neighbors, scratch);
-            if (!query.has_value())
+            RadiusEvaluation evaluation{.Radius = radius};
+            const std::optional<float> broadPhaseRadius =
+                BroadPhaseRadius(radius);
+            if (!broadPhaseRadius.has_value())
             {
-                result.State = Status::QueryFailed;
-                return result;
+                return evaluation;
             }
-            result.RadiusDistanceEvaluations +=
-                query->DistanceEvaluations;
 
-            std::uint32_t exactCount = 0u;
-            for (const KDTree::ElementIndex neighbor : neighbors)
+            supportCounts.clear();
+            const double radiusSquared = radius * radius;
+            for (const std::size_t sampleIndex : sampleIndices)
             {
-                if (SquaredDistance(
-                        points[sampleIndex], points[neighbor]) <
-                    radiusSquared)
+                const auto query = index.QueryRadius(
+                    points[sampleIndex],
+                    *broadPhaseRadius,
+                    neighbors,
+                    scratch);
+                if (!query.has_value())
                 {
-                    ++exactCount;
+                    evaluation.State = Status::QueryFailed;
+                    return evaluation;
                 }
-            }
-            supportCounts.push_back(static_cast<double>(exactCount));
-            result.SupportNeighborsMax = std::max(
-                result.SupportNeighborsMax, exactCount);
-        }
+                evaluation.DistanceEvaluations +=
+                    query->DistanceEvaluations;
 
-        const auto supportP50 = Statistics::Quantile(
-            std::span<const double>{supportCounts}, 0.50);
-        const auto supportP95 = Statistics::Quantile(
-            std::span<const double>{supportCounts}, 0.95);
-        if (!supportP50.has_value() || !supportP95.has_value())
+                std::uint32_t exactCount = 0u;
+                for (const KDTree::ElementIndex neighbor : neighbors)
+                {
+                    if (SquaredDistance(
+                            points[sampleIndex], points[neighbor]) <
+                        radiusSquared)
+                    {
+                        ++exactCount;
+                    }
+                }
+                supportCounts.push_back(static_cast<double>(exactCount));
+                evaluation.SupportNeighborsMax = std::max(
+                    evaluation.SupportNeighborsMax, exactCount);
+            }
+
+            const auto supportP50 = Statistics::Quantile(
+                std::span<const double>{supportCounts}, 0.50);
+            const auto supportP95 = Statistics::Quantile(
+                std::span<const double>{supportCounts}, 0.95);
+            if (!supportP50.has_value() || !supportP95.has_value())
+            {
+                evaluation.State = Status::QueryFailed;
+                return evaluation;
+            }
+            evaluation.SupportNeighborsP50 = *supportP50;
+            evaluation.SupportNeighborsP95 = *supportP95;
+            evaluation.PredictedQueryCount =
+                budget.PredictedQueryCount == 0u
+                ? static_cast<std::uint64_t>(points.size())
+                : budget.PredictedQueryCount;
+            const std::uint64_t p95Neighbors =
+                static_cast<std::uint64_t>(
+                    std::ceil(evaluation.SupportNeighborsP95));
+            evaluation.PredictedContributionCount = SaturatingAdd(
+                budget.FixedContributionCount,
+                SaturatingMultiply(
+                    evaluation.PredictedQueryCount, p95Neighbors));
+            evaluation.NeighborLimitExceeded =
+                budget.MaxNeighborsPerSample != 0u &&
+                evaluation.SupportNeighborsMax >
+                    budget.MaxNeighborsPerSample;
+            evaluation.ContributionLimitExceeded =
+                budget.MaxPredictedContributions != 0u &&
+                evaluation.PredictedContributionCount >
+                    budget.MaxPredictedContributions;
+            evaluation.State = evaluation.NeighborLimitExceeded ||
+                    evaluation.ContributionLimitExceeded
+                ? Status::WorkloadLimitExceeded
+                : Status::Success;
+            return evaluation;
+        };
+
+        std::size_t totalRadiusDistanceEvaluations = 0u;
+        const auto accumulateEvaluations =
+            [&totalRadiusDistanceEvaluations](
+                const std::size_t evaluations) noexcept
         {
-            result.State = Status::QueryFailed;
+            if (evaluations >
+                std::numeric_limits<std::size_t>::max() -
+                    totalRadiusDistanceEvaluations)
+            {
+                totalRadiusDistanceEvaluations =
+                    std::numeric_limits<std::size_t>::max();
+                return;
+            }
+            totalRadiusDistanceEvaluations += evaluations;
+        };
+        const auto applyEvaluation = [&](const RadiusEvaluation& evaluation)
+        {
+            result.State = evaluation.State;
+            result.Radius = evaluation.Radius;
+            result.SupportNeighborsP50 = evaluation.SupportNeighborsP50;
+            result.SupportNeighborsP95 = evaluation.SupportNeighborsP95;
+            result.SupportNeighborsMax = evaluation.SupportNeighborsMax;
+            result.PredictedQueryCount = evaluation.PredictedQueryCount;
+            result.PredictedContributionCount =
+                evaluation.PredictedContributionCount;
+            result.NeighborLimitExceeded =
+                evaluation.NeighborLimitExceeded;
+            result.ContributionLimitExceeded =
+                evaluation.ContributionLimitExceeded;
+            result.RadiusDistanceEvaluations =
+                totalRadiusDistanceEvaluations;
+        };
+
+        if (manualRadius.has_value())
+        {
+            const RadiusEvaluation evaluation =
+                evaluateRadius(*manualRadius);
+            accumulateEvaluations(evaluation.DistanceEvaluations);
+            applyEvaluation(evaluation);
             return result;
         }
-        result.SupportNeighborsP50 = *supportP50;
-        result.SupportNeighborsP95 = *supportP95;
-        result.PredictedQueryCount = budget.PredictedQueryCount == 0u
-            ? static_cast<std::uint64_t>(points.size())
-            : budget.PredictedQueryCount;
-        const std::uint64_t p95Neighbors = static_cast<std::uint64_t>(
-            std::ceil(result.SupportNeighborsP95));
-        result.PredictedContributionCount = SaturatingAdd(
-            budget.FixedContributionCount,
-            SaturatingMultiply(
-                result.PredictedQueryCount, p95Neighbors));
-        result.NeighborLimitExceeded =
-            budget.MaxNeighborsPerSample != 0u &&
-            result.SupportNeighborsMax > budget.MaxNeighborsPerSample;
-        result.ContributionLimitExceeded =
-            budget.MaxPredictedContributions != 0u &&
-            result.PredictedContributionCount >
-                budget.MaxPredictedContributions;
-        result.State = result.NeighborLimitExceeded ||
-                result.ContributionLimitExceeded
-            ? Status::WorkloadLimitExceeded
-            : Status::Success;
+
+        const auto radiusForRank = [&](const std::uint32_t rank)
+            -> std::optional<double>
+        {
+            const RankProfile& selected = result.Ranks[rank - 1u];
+            if (selected.ValidSampleCount == 0u)
+                return std::nullopt;
+            const double distance =
+                SelectQuantile(selected.Distance, policy.Quantile);
+            const double radius = distance * policy.RadiusMultiplier;
+            if (!std::isfinite(radius) || !(radius > 0.0))
+                return std::nullopt;
+            return radius;
+        };
+        const auto evaluateRank = [&](const std::uint32_t rank)
+        {
+            result.SelectedNeighborRank = rank;
+            const std::optional<double> radius = radiusForRank(rank);
+            if (!radius.has_value())
+                return RadiusEvaluation{.State =
+                    Status::DegenerateNeighborhood};
+            result.SelectedNeighborDistance =
+                SelectQuantile(
+                    result.Ranks[rank - 1u].Distance,
+                    policy.Quantile);
+            RadiusEvaluation evaluation = evaluateRadius(*radius);
+            accumulateEvaluations(evaluation.DistanceEvaluations);
+            return evaluation;
+        };
+
+        const std::uint32_t requestedRank = result.SelectedNeighborRank;
+        RadiusEvaluation requested = evaluateRank(requestedRank);
+        applyEvaluation(requested);
+        if (requested.State != Status::WorkloadLimitExceeded)
+            return result;
+
+        const std::uint32_t policyMinimumRank = std::min(
+            policy.MinimumNeighborRank, requestedRank);
+        std::optional<std::uint32_t> minimumUsableRank{};
+        for (std::uint32_t rank = policyMinimumRank;
+             rank < requestedRank;
+             ++rank)
+        {
+            if (radiusForRank(rank).has_value())
+            {
+                minimumUsableRank = rank;
+                break;
+            }
+        }
+        if (!minimumUsableRank.has_value())
+            return result;
+
+        RadiusEvaluation best = evaluateRank(*minimumUsableRank);
+        result.WorkloadAdjusted = true;
+        applyEvaluation(best);
+        if (best.State != Status::Success)
+            return result;
+
+        std::uint32_t safeRank = *minimumUsableRank;
+        std::uint32_t unsafeRank = requestedRank;
+        while (safeRank + 1u < unsafeRank)
+        {
+            const std::uint32_t candidateRank =
+                safeRank + (unsafeRank - safeRank) / 2u;
+            RadiusEvaluation candidate = evaluateRank(candidateRank);
+            if (candidate.State == Status::Success)
+            {
+                safeRank = candidateRank;
+                best = candidate;
+            }
+            else if (candidate.State == Status::WorkloadLimitExceeded)
+            {
+                unsafeRank = candidateRank;
+            }
+            else
+            {
+                applyEvaluation(candidate);
+                return result;
+            }
+        }
+
+        result.SelectedNeighborRank = safeRank;
+        result.SelectedNeighborDistance = SelectQuantile(
+            result.Ranks[safeRank - 1u].Distance, policy.Quantile);
+        applyEvaluation(best);
         return result;
     }
 

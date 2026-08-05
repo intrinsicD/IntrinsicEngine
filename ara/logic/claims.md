@@ -910,8 +910,9 @@
   has not mutated the property, and publication to another property name does
   not change the canonical rendered position channel.
 - **Status**: supported — source-path tracing and focused direct-OBJ,
-  LOP-publication, and dirty-position reupload contracts; no completed
-  child.obj end-to-end render fingerprint or GPU/Vulkan performance claim
+  LOP-publication, and dirty-position reupload contracts; the bounded
+  `child.obj` Vulkan end-to-end proof is recorded separately by C35, with no
+  GPU/Vulkan performance claim
 - **Provenance**: ai-suggested
 - **Crystallized via**: empirical-resolution
 - **Falsification criteria**: A successfully published canonical mesh
@@ -1025,3 +1026,30 @@
 - **Dependencies**: [C22, C23, C24, C33]
 - **Tags**: geometry, LOP, WLOP, Vulkan, GPU, parity, bounded result
 - **From staging**: O127
+
+## C35: Auto WLOP visibly updates the imported child mesh through Vulkan
+- **Statement**: On the repository `assets/models/child.obj` fixture with
+  50,002 mesh vertices, an explicit Vulkan request using the otherwise-default
+  isotropic-WLOP controls and Auto support radius selects rank 5 from the
+  requested rank 16 under the unchanged 100,000,000-contribution limit,
+  executes as `gpu_vulkan_compute` with zero CPU fallback, publishes non-zero
+  canonical mesh-position displacement, and advances the renderer's resident
+  position fingerprint and content revision after dirty upload.
+- **Status**: supported — one repository asset and this Vulkan-capable host;
+  no visual-quality, convergence, speedup, device-time, memory-efficiency, or
+  cross-device claim
+- **Provenance**: ai-executed
+- **Crystallized via**: empirical-resolution
+- **Falsification criteria**: Repeating the labeled integration test on an
+  operational Vulkan host reports `UnsafeSupportRadius`, selects a rank other
+  than 5 under the frozen defaults, falls back to CPU, publishes zero
+  displacement, fails to update canonical mesh positions, or leaves the
+  renderer position fingerprint/content revision unchanged.
+- **Proof**: [src/geometry/Geometry.SupportRadius.cpp,
+  src/runtime/Runtime.PointCloudConsolidationGpu.cpp,
+  tests/unit/geometry/Test.SupportRadius.cpp,
+  tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp]
+- **Dependencies**: [C30, C34]
+- **Tags**: geometry, runtime, LOP, WLOP, Auto radius, Vulkan, GPU, mesh,
+  render residency, bounded result
+- **From staging**: O128

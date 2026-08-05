@@ -397,7 +397,7 @@ TEST(PointCloudConsolidation, OptimizedCandidatesMatchReferenceAndAreDeterminist
     }
 }
 
-TEST(PointCloudConsolidation, OptimizedCandidateFailureMatchesReference)
+TEST(PointCloudConsolidation, IsolatedWlopDensityMatchesReference)
 {
     const std::vector<glm::vec3> sparse{
         {0.0f, 0.0f, 0.0f},
@@ -409,10 +409,15 @@ TEST(PointCloudConsolidation, OptimizedCandidateFailureMatchesReference)
     const auto candidate =
         Consolidation::Validation::ConsolidateCpuOptimizedCandidate(
             sparse, params);
-    EXPECT_EQ(reference.State, Consolidation::Status::EmptyNeighborhood);
+    ASSERT_TRUE(reference.Succeeded())
+        << Consolidation::DebugName(reference.State);
     EXPECT_EQ(candidate.State, reference.State);
-    EXPECT_TRUE(reference.Positions.empty());
-    EXPECT_TRUE(candidate.Positions.empty());
+    EXPECT_EQ(reference.Positions.size(), sparse.size());
+    EXPECT_EQ(candidate.Positions, reference.Positions);
+    EXPECT_EQ(reference.Diagnostics.DensityContributionCount, 0u);
+    EXPECT_EQ(candidate.Diagnostics.DensityContributionCount, 0u);
+    EXPECT_EQ(reference.Diagnostics.EmptyNeighborhoodCount, 0u);
+    EXPECT_EQ(candidate.Diagnostics.EmptyNeighborhoodCount, 0u);
     EXPECT_EQ(candidate.Diagnostics.Implementation,
               Consolidation::Validation::kOptimizedCandidateImplementation);
 }
@@ -1207,10 +1212,6 @@ TEST(PointCloudConsolidation, InvalidRequestsFailWithoutPublishingPositions)
     expectFailure(Consolidation::Consolidate(nonFinite, ReferenceParams()),
                   Consolidation::Status::NonFiniteInput);
 
-    params = ReferenceParams();
-    params.SupportRadius = 0.25;
-    expectFailure(Consolidation::Consolidate(points, params),
-                  Consolidation::Status::EmptyNeighborhood);
 }
 
 TEST(PointCloudConsolidation, DegenerateAndNonConvergedStatesStayFinite)

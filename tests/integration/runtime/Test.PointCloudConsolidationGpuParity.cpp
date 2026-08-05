@@ -17,24 +17,36 @@
 #include "RuntimeTestModule.hpp"
 
 import Extrinsic.Backends.Vulkan;
+import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Platform.Backend.Glfw;
+import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.PointCloud.Consolidation;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.IO;
+import Geometry.Mesh.Conversion;
+import Geometry.MeshSoup;
 import Geometry.Properties;
 
 namespace
 {
     namespace ECS = Extrinsic::ECS;
+    namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
     namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    namespace Graphics = Extrinsic::Graphics;
     namespace Runtime = Extrinsic::Runtime;
     namespace Consolidation = Geometry::PointCloud::Consolidation;
 
@@ -292,6 +304,168 @@ namespace
         bool InFlight{false};
         bool TimedOut{false};
     };
+
+    class PointCloudConsolidationGpuAutoMeshApp final
+        : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        explicit PointCloudConsolidationGpuAutoMeshApp(
+            Geometry::HalfedgeMesh::Mesh mesh,
+            std::vector<glm::vec3> positions)
+            : Mesh(std::move(mesh)), Input(std::move(positions))
+        {
+        }
+
+        void Resolve() override
+        {
+            auto& engine = Kernel();
+            Service = engine.Services().Find<
+                Runtime::PointCloudConsolidationService>();
+            Extraction = engine.Services().Find<
+                Runtime::RenderExtractionCache>();
+            Scene = engine.Worlds().Get(engine.ActiveWorld());
+            if (Service == nullptr || !Service->Available() ||
+                Extraction == nullptr || Scene == nullptr)
+            {
+                MissingService = true;
+                engine.RequestExit();
+                return;
+            }
+
+            Entity = Scene->Create();
+            GS::PopulateFromMesh(Scene->Raw(), Entity, Mesh);
+            Scene->Raw().emplace<
+                Extrinsic::ECS::Components::Transform::WorldMatrix>(Entity);
+            Scene->Raw().emplace<Graphics::Components::RenderSurface>(Entity);
+            CompletionSubscription = Service->SubscribeCompleted(
+                [this](
+                    const Runtime::PointCloudConsolidationResult& result)
+                {
+                    Completion = result;
+                    if (result.Succeeded())
+                    {
+                        const auto positions = Scene->Raw()
+                            .get<GS::Vertices>(Entity)
+                            .Properties.Get<glm::vec3>(
+                                GS::PropertyNames::kPosition);
+                        if (positions)
+                            Output = positions.Vector();
+                        TaggedGpuDirty = Scene->Raw().all_of<Dirty::GpuDirty>(
+                            Entity);
+                        TaggedPositionDirty = Scene->Raw().all_of<
+                            Dirty::DirtyVertexPositions>(Entity);
+                    }
+                });
+        }
+
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++Frames;
+            if (!InitialResidencyCaptured &&
+                engine.GetDevice().IsOperational())
+            {
+                const auto sidecar = Extraction->FindRenderableSidecarForTest(
+                    Runtime::SelectionController::ToStableEntityId(Entity));
+                Graphics::GpuGeometryResidencyView residency{};
+                if (sidecar.has_value() && sidecar->HasMeshResidency &&
+                    engine.GetRenderer().GetGpuWorld().
+                        TryGetGeometryResidencyView(
+                            sidecar->MeshGeometry, residency))
+                {
+                    InitialResidencyCaptured = true;
+                    InitialPositionFingerprint =
+                        residency.PositionFingerprint;
+                    InitialContentRevision = residency.ContentRevision;
+                }
+            }
+
+            if (InitialResidencyCaptured && !Submitted)
+            {
+                Submitted = true;
+                Runtime::PointCloudConsolidationConfig config{};
+                config.Backend =
+                    Runtime::PointCloudConsolidationBackend::VulkanCompute;
+                Correlation = Service->Run(
+                    Runtime::PointCloudConsolidationRequest{
+                        .StableEntityId = Runtime::SelectionController::
+                            ToStableEntityId(Entity),
+                        .Properties = Runtime::
+                            MakePointCloudConsolidationPropertyRefs(
+                                Runtime::GeometryElementDomain::MeshVertex,
+                                std::string{GS::PropertyNames::kPosition},
+                                std::nullopt),
+                        .Config = config,
+                    });
+            }
+
+            if (Completion.has_value() && Completion->Succeeded())
+            {
+                const auto sidecar = Extraction->FindRenderableSidecarForTest(
+                    Runtime::SelectionController::ToStableEntityId(Entity));
+                Graphics::GpuGeometryResidencyView residency{};
+                if (sidecar.has_value() && sidecar->HasMeshResidency &&
+                    engine.GetRenderer().GetGpuWorld().
+                        TryGetGeometryResidencyView(
+                            sidecar->MeshGeometry, residency) &&
+                    residency.ContentRevision > InitialContentRevision &&
+                    residency.PositionFingerprint !=
+                        InitialPositionFingerprint)
+                {
+                    UpdatedResidencyObserved = true;
+                    UpdatedPositionFingerprint =
+                        residency.PositionFingerprint;
+                    UpdatedContentRevision = residency.ContentRevision;
+                    DirtyTagsConsumed = !Scene->Raw().any_of<
+                        Dirty::GpuDirty,
+                        Dirty::DirtyVertexPositions>(Entity);
+                    Stats = Service->Stats();
+                    engine.RequestExit();
+                }
+            }
+            else if (Completion.has_value())
+            {
+                Stats = Service->Stats();
+                engine.RequestExit();
+            }
+            else if (Frames > 4'000u)
+            {
+                TimedOut = true;
+                engine.RequestExit();
+            }
+        }
+
+        void Shutdown() override
+        {
+            if (Service != nullptr)
+                Service->Unsubscribe(CompletionSubscription);
+        }
+
+        Geometry::HalfedgeMesh::Mesh Mesh{};
+        std::vector<glm::vec3> Input{};
+        std::vector<glm::vec3> Output{};
+        Runtime::PointCloudConsolidationService* Service{};
+        Runtime::RenderExtractionCache* Extraction{};
+        ECS::Scene::Registry* Scene{};
+        ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        Runtime::KernelEventSubscription CompletionSubscription{};
+        Runtime::CommandCorrelationId Correlation{};
+        std::optional<Runtime::PointCloudConsolidationResult> Completion{};
+        Runtime::PointCloudConsolidationModuleStats Stats{};
+        std::uint32_t Frames{0u};
+        bool Submitted{false};
+        bool MissingService{false};
+        bool TimedOut{false};
+        bool TaggedGpuDirty{false};
+        bool TaggedPositionDirty{false};
+        bool InitialResidencyCaptured{false};
+        bool UpdatedResidencyObserved{false};
+        bool DirtyTagsConsumed{false};
+        std::uint64_t InitialPositionFingerprint{0u};
+        std::uint64_t UpdatedPositionFingerprint{0u};
+        std::uint64_t InitialContentRevision{0u};
+        std::uint64_t UpdatedContentRevision{0u};
+    };
 }
 
 TEST(PointCloudConsolidationGpuParity,
@@ -411,6 +585,162 @@ TEST(PointCloudConsolidationGpuParity,
     EXPECT_EQ(appPtr->Stats.GpuFallbacks, 0u);
     EXPECT_EQ(appPtr->Stats.GpuCompletions, 4u);
     EXPECT_EQ(appPtr->Stats.ResultsCommitted, 4u);
+
+    engine.Shutdown();
+}
+
+TEST(PointCloudConsolidationGpuParity,
+     VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+    {
+        GTEST_SKIP()
+            << "GLFW could not initialize; gpu;vulkan LOP smoke is opt-in.";
+    }
+
+    const std::string path =
+        std::string{ENGINE_ROOT_DIR} + "/assets/models/child.obj";
+    const auto mesh = Geometry::MeshIO::LoadOBJ(path);
+    ASSERT_TRUE(mesh.has_value());
+    const auto meshPositions = mesh->Vertices.Get<glm::vec3>("v:point");
+    ASSERT_TRUE(meshPositions.IsValid());
+    ASSERT_EQ(meshPositions.Vector().size(), 50'002u);
+    const auto meshFaces = mesh->Faces.Get<std::vector<std::uint32_t>>(
+        "f:vertices");
+    ASSERT_TRUE(meshFaces.IsValid());
+    Geometry::MeshSoup::IndexedMesh indexedMesh{};
+    for (const glm::vec3 position : meshPositions.Vector())
+        static_cast<void>(indexedMesh.AddVertex(position));
+    for (const std::vector<std::uint32_t>& face : meshFaces.Vector())
+        static_cast<void>(indexedMesh.AddFace(face));
+    auto runtimeMesh = Geometry::Mesh::Conversion::ToHalfedgeMesh(indexedMesh);
+    ASSERT_TRUE(runtimeMesh.Succeeded());
+    ASSERT_EQ(runtimeMesh.Mesh.VerticesSize(), 50'002u);
+
+    auto config = Runtime::CreateReferenceEngineConfig();
+    config.Window.Title = "Intrinsic child.obj LOP Vulkan Auto smoke";
+    config.Window.Width = 64;
+    config.Window.Height = 64;
+    config.Window.Resizable = false;
+    config.Render.EnableValidation = false;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+
+    std::vector<glm::vec3> input = meshPositions.Vector();
+    auto app = std::make_unique<PointCloudConsolidationGpuAutoMeshApp>(
+        std::move(runtimeMesh.Mesh), input);
+    PointCloudConsolidationGpuAutoMeshApp* appPtr = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.Initialize();
+
+    const auto operationalInputs =
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(
+            &engine.GetDevice());
+    if (!operationalInputs.LogicalDeviceReady ||
+        !operationalInputs.SwapchainReady ||
+        !operationalInputs.CommandSyncReady)
+    {
+        engine.Shutdown();
+        GTEST_SKIP()
+            << "Promoted Vulkan did not reach device/swapchain/command readiness.";
+    }
+
+    engine.Run();
+
+    EXPECT_FALSE(appPtr->MissingService);
+    EXPECT_FALSE(appPtr->TimedOut);
+    ASSERT_TRUE(appPtr->Correlation.IsValid());
+    ASSERT_TRUE(appPtr->Completion.has_value());
+    const Runtime::PointCloudConsolidationResult& result =
+        *appPtr->Completion;
+    ASSERT_TRUE(result.Succeeded())
+        << result.Message
+        << "; actual_backend=" << Runtime::StableToken(result.ActualBackend)
+        << "; radius=" << result.ResolvedSupportRadius
+        << "; requested_rank="
+        << result.SupportRadiusRequestedNeighborRank
+        << "; selected_rank=" << result.SupportRadiusNeighborRank
+        << "; support_p95=" << result.SupportNeighborsP95
+        << "; support_max=" << result.SupportNeighborsMax
+        << "; backend_diagnostic=" << result.BackendDiagnostic;
+    EXPECT_EQ(result.RequestedBackend,
+              Runtime::PointCloudConsolidationBackend::VulkanCompute);
+    EXPECT_EQ(result.ActualBackend,
+              Runtime::PointCloudConsolidationBackend::VulkanCompute);
+    EXPECT_FALSE(result.FellBackToCpu) << result.BackendDiagnostic;
+    EXPECT_EQ(result.ImplementationId, "gpu_vulkan_compute");
+    EXPECT_EQ(result.SupportRadiusAnalysisStatus, "success");
+    EXPECT_EQ(result.SupportRadiusRequestedNeighborRank, 16u);
+    EXPECT_TRUE(result.SupportRadiusWorkloadAdjusted);
+    EXPECT_EQ(result.SupportRadiusNeighborRank, 5u);
+    EXPECT_DOUBLE_EQ(result.SupportNeighborsP95, 30.0);
+    EXPECT_EQ(result.SupportNeighborsMax, 45u);
+    EXPECT_EQ(result.PredictedSupportQueryCount, 3'100'124u);
+    EXPECT_EQ(result.PredictedContributionCount, 93'003'720u);
+    EXPECT_EQ(result.OutputPointCount, 50'002u);
+    EXPECT_GT(result.Iterations, 0u);
+    EXPECT_GT(result.AverageDisplacement, 0.0);
+    EXPECT_GT(result.MaxDisplacement, 0.0);
+    ASSERT_EQ(appPtr->Output.size(), appPtr->Input.size());
+    const PositionError displacement = MeasurePositionError(
+        appPtr->Output, appPtr->Input);
+    EXPECT_GT(displacement.Rms, 0.0);
+    EXPECT_GT(displacement.Linf, 0.0);
+    EXPECT_TRUE(appPtr->TaggedGpuDirty);
+    EXPECT_TRUE(appPtr->TaggedPositionDirty);
+    EXPECT_TRUE(appPtr->InitialResidencyCaptured);
+    EXPECT_TRUE(appPtr->UpdatedResidencyObserved);
+    EXPECT_TRUE(appPtr->DirtyTagsConsumed);
+    EXPECT_NE(appPtr->InitialPositionFingerprint, 0u);
+    EXPECT_NE(appPtr->UpdatedPositionFingerprint,
+              appPtr->InitialPositionFingerprint);
+    EXPECT_GT(appPtr->UpdatedContentRevision,
+              appPtr->InitialContentRevision);
+    EXPECT_EQ(appPtr->Stats.GpuRequestsAccepted, 1u);
+    EXPECT_EQ(appPtr->Stats.GpuFallbacks, 0u);
+    EXPECT_EQ(appPtr->Stats.GpuCompletions, 1u);
+    EXPECT_EQ(appPtr->Stats.ResultsCommitted, 1u);
+
+    RecordProperty(
+        "ResolvedSupportRadius",
+        std::to_string(result.ResolvedSupportRadius));
+    RecordProperty(
+        "RequestedNeighborRank",
+        std::to_string(result.SupportRadiusRequestedNeighborRank));
+    RecordProperty(
+        "SelectedNeighborRank",
+        std::to_string(result.SupportRadiusNeighborRank));
+    RecordProperty(
+        "SupportNeighborsP95",
+        std::to_string(result.SupportNeighborsP95));
+    RecordProperty(
+        "SupportNeighborsMax",
+        std::to_string(result.SupportNeighborsMax));
+    RecordProperty(
+        "PredictedSupportQueries",
+        std::to_string(result.PredictedSupportQueryCount));
+    RecordProperty(
+        "PredictedContributions",
+        std::to_string(result.PredictedContributionCount));
+    RecordProperty(
+        "AverageDisplacement",
+        std::to_string(result.AverageDisplacement));
+    RecordProperty(
+        "MaximumDisplacement",
+        std::to_string(result.MaxDisplacement));
+    RecordProperty(
+        "InitialPositionFingerprint",
+        std::to_string(appPtr->InitialPositionFingerprint));
+    RecordProperty(
+        "UpdatedPositionFingerprint",
+        std::to_string(appPtr->UpdatedPositionFingerprint));
+    RecordProperty(
+        "InitialContentRevision",
+        std::to_string(appPtr->InitialContentRevision));
+    RecordProperty(
+        "UpdatedContentRevision",
+        std::to_string(appPtr->UpdatedContentRevision));
 
     engine.Shutdown();
 }

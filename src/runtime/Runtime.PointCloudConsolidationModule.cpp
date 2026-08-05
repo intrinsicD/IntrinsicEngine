@@ -672,8 +672,12 @@ namespace Extrinsic::Runtime
                 analysis.EstimatorVersion;
             completion.SupportRadiusProfileSampleCount =
                 static_cast<std::uint32_t>(analysis.ProfileSampleCount);
+            completion.SupportRadiusRequestedNeighborRank =
+                analysis.RequestedNeighborRank;
             completion.SupportRadiusNeighborRank =
                 analysis.SelectedNeighborRank;
+            completion.SupportRadiusWorkloadAdjusted =
+                analysis.WorkloadAdjusted;
             completion.SupportRadiusNeighborDistance =
                 analysis.SelectedNeighborDistance;
             completion.ResolvedSupportRadius = analysis.Radius;
