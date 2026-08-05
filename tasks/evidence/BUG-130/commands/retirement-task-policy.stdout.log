@@ -1,0 +1,5 @@
+Validated 217 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /tmp/intrinsic-bug130.8PDH4l/worktree
+[check_task_maturity_followups] Open task files scanned: 90
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.

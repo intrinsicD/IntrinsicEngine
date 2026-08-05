@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-130`](BUG-130-rejected-run-historical-task-seal.md) — rejected-run
+historical task-seal custody completed on 2026-08-05. A clean-source run with
+an independently rejected canonical audit may retain its recorded task digest
+against the exact same-ID, same-profile task blob at the frozen source revision
+after its task advances to a corrected run. Accepted, unaudited, dirty-source,
+forged, malformed, stale-bundle, and substituted non-task evidence remains
+strictly current-task-bound. METHOD-020 run-001 now validates as retained
+negative evidence without blocking its later accepted run. All 35 custody
+regressions, six-protocol/five-run global validation, strict task/docs/skill
+checks, and independent source review of `0a54b2f7` pass; no C++, Vulkan, or
+performance behavior changed.
+
 [`GEOM-075`](GEOM-075-property-support-radius-profile.md) — property-specific
 support-radius analysis completed on 2026-08-05 at `Operational`.
 `Geometry.SupportRadius` now builds one exact KD-tree, deterministically samples
