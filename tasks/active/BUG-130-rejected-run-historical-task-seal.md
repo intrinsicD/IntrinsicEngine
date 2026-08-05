@@ -15,8 +15,9 @@ contracts: [repo.task-contract-discovery]
 # BUG-130 — Rejected experiment runs require their historical task seal
 
 ## Status
-- In progress on 2026-08-05. Reproduced against the independently rejected
-  METHOD-020 run-001 after the task advanced to its corrected run-002 surface.
+- Implementation complete on 2026-08-05; retirement is pending fixed-surface
+  independent review. METHOD-020 run-001 now validates as retained negative
+  evidence after the task advanced to its corrected run-002 surface.
 
 ## Goal
 - Preserve immutable, independently rejected claim-grade runs when their task
@@ -39,25 +40,25 @@ contracts: [repo.task-contract-discovery]
   METHOD-020 run-002 from satisfying otherwise valid completion custody.
 
 ## Required changes
-- [ ] Add a bounded historical task-seal fallback for independently rejected,
+- [x] Add a bounded historical task-seal fallback for independently rejected,
       clean-source runs only.
-- [ ] Keep accepted, unaudited, dirty-source, and malformed rejected runs
+- [x] Keep accepted, unaudited, dirty-source, and malformed rejected runs
       fail-closed against current task drift.
 
 ## Tests
-- [ ] Add regressions for a valid historical rejected run, accepted-run drift,
+- [x] Add regressions for a valid historical rejected run, accepted-run drift,
       and forged or incomplete rejection evidence.
-- [ ] Run the complete experiment-custody regression suite and global custody.
+- [x] Run the complete experiment-custody regression suite and global custody.
 
 ## Docs
-- [ ] Document the negative-run historical task-seal rule in the canonical
+- [x] Document the negative-run historical task-seal rule in the canonical
       workflow evidence policy and regenerate its skill mirror.
 - [ ] Update the bug index, session brief, and retirement log on closure.
 
 ## Acceptance criteria
-- [ ] METHOD-020 run-001 remains structurally valid rejected evidence after the
+- [x] METHOD-020 run-001 remains structurally valid rejected evidence after the
       task advances, and a later accepted run may satisfy completion.
-- [ ] Accepted evidence cannot use a historical task seal.
+- [x] Accepted evidence cannot use a historical task seal.
 - [ ] Fixed-surface independent review finds no blocker.
 
 ## Verification

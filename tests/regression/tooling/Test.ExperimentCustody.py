@@ -756,6 +756,140 @@ class ExperimentCustodyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("task changed", result.stdout)
 
+    def test_rejected_clean_claim_run_keeps_historical_task_seal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            self.assertEqual(fixture.freeze(commit=True).returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(
+                fixture.cell("failed", error="first attempt rejected").returncode,
+                0,
+            )
+            self.assertEqual(fixture.bundle().returncode, 0)
+            self.assertEqual(fixture.audit().returncode, 1)
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "retain rejected evidence")
+
+            fixture.task.write_text(
+                fixture.task.read_text(encoding="utf-8")
+                + "\n## Corrected run\n- Advance the task without rewriting run-001.\n",
+                encoding="utf-8",
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "advance task for corrected run")
+
+            self.assertEqual(
+                fixture.init("run-002", "attempt-002").returncode,
+                0,
+            )
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(fixture.cell("completed").returncode, 0)
+            self.assertEqual(fixture.bundle().returncode, 0)
+            self.assertEqual(fixture.audit().returncode, 0)
+            validation = invoke(
+                fixture.repo, "validate", "--root", str(fixture.repo)
+            )
+            completion = fixture.completion()
+        self.assertEqual(validation.returncode, 0, validation.stdout)
+        self.assertEqual(completion.returncode, 0, completion.stdout)
+
+    def test_accepted_clean_claim_run_cannot_use_historical_task_seal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            self.assertEqual(fixture.freeze(commit=True).returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(fixture.cell("completed").returncode, 0)
+            self.assertEqual(fixture.bundle().returncode, 0)
+            self.assertEqual(fixture.audit().returncode, 0)
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "seal accepted evidence")
+
+            fixture.task.write_text(
+                fixture.task.read_text(encoding="utf-8") + "\nchanged\n",
+                encoding="utf-8",
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "change accepted task")
+            result = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("task changed after official run initialization", result.stdout)
+
+    def test_forged_rejected_audit_cannot_unlock_historical_task_seal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            self.assertEqual(fixture.freeze(commit=True).returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(fixture.cell("completed").returncode, 0)
+            self.assertEqual(fixture.bundle().returncode, 0)
+            self.assertEqual(fixture.audit().returncode, 0)
+
+            audit_path = fixture.run_root / "audit.json"
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            audit["disposition"] = "rejected"
+            audit["errors"] = ["forged rejection"]
+            audit_path.write_text(
+                json.dumps(audit, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            fixture.task.write_text(
+                fixture.task.read_text(encoding="utf-8") + "\nchanged\n",
+                encoding="utf-8",
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "forge rejected audit")
+            result = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("task changed after official run initialization", result.stdout)
+        self.assertIn("audit disposition differs", result.stdout)
+
+    def test_rejected_run_cannot_substitute_non_task_historical_blob(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            self.assertEqual(fixture.freeze(commit=True).returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(
+                fixture.cell("failed", error="negative evidence").returncode,
+                0,
+            )
+            self.assertEqual(fixture.bundle().returncode, 0)
+            self.assertEqual(fixture.audit().returncode, 1)
+
+            run_path = fixture.run_root / "run.yaml"
+            run = yaml.safe_load(run_path.read_text(encoding="utf-8"))
+            run["task_path"] = fixture.implementation.relative_to(
+                fixture.repo
+            ).as_posix()
+            run["task_sha256"] = sha(fixture.implementation)
+            run_path.write_text(
+                yaml.safe_dump(run, sort_keys=False), encoding="utf-8"
+            )
+            bundle_path = fixture.run_root / "bundle.yaml"
+            bundle = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
+            bundle["provenance"]["task_sha256"] = run["task_sha256"]
+            bundle_path.write_text(
+                yaml.safe_dump(bundle, sort_keys=False), encoding="utf-8"
+            )
+            audit_path = fixture.run_root / "audit.json"
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            audit["bundle_sha256"] = sha(bundle_path)
+            audit_path.write_text(
+                json.dumps(audit, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            fixture.task.write_text(
+                fixture.task.read_text(encoding="utf-8") + "\nchanged\n",
+                encoding="utf-8",
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "substitute historical blob")
+            result = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("task changed after official run initialization", result.stdout)
+
     def test_changed_protocol_and_retuned_gate_are_detected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ExperimentFixture(Path(tmp))

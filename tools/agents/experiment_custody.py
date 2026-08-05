@@ -22,6 +22,7 @@ from workflow_evidence import (  # noqa: E402
     SCHEMA_VERSION,
     _append_jsonl,
     _atomic_write,
+    blob_at_revision,
     find_task,
     git,
     load_jsonl,
@@ -34,6 +35,7 @@ from workflow_evidence import (  # noqa: E402
     sha256_file,
     strict_json_load,
     strict_yaml_load,
+    strict_yaml_load_text,
     utc_now,
     yaml_dump,
 )
@@ -185,6 +187,62 @@ def _claim_source_revision(record: dict[str, Any]) -> str | None:
     if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
         return None
     return revision
+
+
+def _has_valid_historical_rejected_task_seal(
+    repo_root: Path,
+    run_root: Path,
+    run: dict[str, Any],
+    protocol: dict[str, Any],
+    source_revision: str | None,
+) -> bool:
+    """Allow only audited negative evidence to retain its frozen task bytes."""
+    if source_revision is None:
+        return False
+    task_path = run.get("task_path")
+    task_sha256 = run.get("task_sha256")
+    if not isinstance(task_path, str) or not isinstance(task_sha256, str):
+        return False
+    try:
+        if Path(task_path).parts[:1] != ("tasks",):
+            return False
+        task_blob = blob_at_revision(repo_root, source_revision, task_path)
+        if task_blob is None or sha256_bytes(task_blob) != task_sha256:
+            return False
+        task_text = task_blob.decode("utf-8")
+        if not task_text.startswith("---\n"):
+            return False
+        front_matter_end = task_text.find("\n---\n", 4)
+        if front_matter_end < 0:
+            return False
+        historical_metadata = strict_yaml_load_text(
+            task_text[4:front_matter_end],
+            f"{source_revision}:{task_path}",
+        )
+        if historical_metadata.get("id") != run.get("task_id"):
+            return False
+        if historical_metadata.get("workflow_profile") != protocol.get("profile"):
+            return False
+        bundle_path = run_root / "bundle.yaml"
+        audit_path = run_root / "audit.json"
+        if not bundle_path.is_file() or not audit_path.is_file():
+            return False
+        bundle = strict_yaml_load(bundle_path)
+        audit = strict_json_load(audit_path)
+        expected_errors, _, _ = _validate_bundle(repo_root, run_root, run, bundle)
+        expected_errors.extend(_positive_audit_errors(repo_root, run_root, run, bundle))
+        if not expected_errors or audit.get("disposition") != "rejected":
+            return False
+        return not _validate_audit_record(
+            repo_root,
+            run_root,
+            run,
+            audit,
+            expected_errors=expected_errors,
+            require_accepted=False,
+        )
+    except (CustodyError, OSError, ValueError):
+        return False
 
 
 def _validate_sealed_file(
@@ -624,7 +682,12 @@ def _validate_run_bindings(
         protocol = {}
     try:
         task_path = find_task(repo_root, str(run.get("task_id")))
-        if sha256_file(task_path) != run.get("task_sha256"):
+        if (
+            sha256_file(task_path) != run.get("task_sha256")
+            and not _has_valid_historical_rejected_task_seal(
+                repo_root, run_root, run, protocol, source_revision
+            )
+        ):
             errors.append("task changed after official run initialization")
     except ValueError as exc:
         errors.append(str(exc))
