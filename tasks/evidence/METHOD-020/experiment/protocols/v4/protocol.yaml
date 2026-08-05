@@ -1,0 +1,172 @@
+schema_version: 2
+task_id: METHOD-020
+protocol_id: lop-family-vulkan-parity-v4-fail-closed-runner
+profile: claim-grade
+state: frozen
+question: 'Do the production ordinary-LOP and isotropic-WLOP Vulkan paths preserve the frozen v3 CPU-reference
+  result and same-host repeatability contracts without falling back from actual Vulkan execution?
+
+  '
+hypothesis: 'Both adopted Vulkan paths complete all eight measured GPU requests with no fallback, match
+  CPU-reference status, cardinality, iteration count, and convergence state, and keep worst positional
+  RMS and L-infinity error across CPU parity and same-host repeats at or below 0.0005 and 0.002 respectively.
+
+  '
+claim_boundary: 'The two checked-in analytic v3 fixtures on the recorded local Vulkan device and exact
+  source revision only. This protocol makes no scanner-corpus, cross-device, asymptotic, memory-efficiency,
+  device-time, or speedup claim; anisotropic WLOP, CLOP, and EAR remain capability-negative backend pairs.
+
+  '
+evidence_phase: confirmation
+claim_eligible: true
+datasets:
+- id: lop-family-v3-cpu-radius-screening
+  path: methods/geometry/locally_optimal_projection/reports/METHOD-020-v3-screening.md
+  sha256: 46b24b8cc098c6f80037ac8cc1678a5385bf87be4e8718b38e95ea4dd99b33e1
+  split: screening
+- id: lop-family-v3-vulkan-confirmation
+  path: benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+  sha256: 533f1695af7003fb2f47b6cb0eaad7d41103b60731df0353155cec79153c973f
+  split: confirmation
+disjoint_splits:
+- left: screening
+  right: confirmation
+  method: 'Screening contains CPU-only support-radius feasibility observations and no Vulkan output. Confirmation
+    consumes the preregistered h=0.32 choice and records previously unobserved actual-Vulkan parity/repeat
+    outputs. The analytic WLOP coordinates are intentionally shared because the claim is implementation
+    parity on that frozen fixture, not sample generalization; evidence channels and backend outcomes are
+    disjoint.
+
+    '
+seeds:
+- 1901
+- 1902
+input_policy: 'Use only the committed v3 analytic fixtures, parameters, seeds, one warmup, three measured
+  runs, and frozen tolerances. Earlier v1/v2 CPU-oracle failures and the v3/run-001 harness rejection
+  remain visible negative evidence. Do not retune radius, fixture, iteration budget, tolerance, backend
+  identity, or fallback policy after observing Vulkan results.
+
+  '
+comparators:
+- id: cpu-reference
+  budget: matched-fixture-params-seed-and-eight-iterations
+- id: gpu-vulkan-compute
+  budget: matched-fixture-params-seed-and-eight-iterations-no-fallback
+primary_metrics:
+- name: maximum_combined_rms_error
+  direction: minimize
+  unit: world-units
+  statistical_unit: confirmation-suite
+- name: maximum_combined_linf_error
+  direction: minimize
+  unit: world-units
+  statistical_unit: confirmation-suite
+statistical_tests:
+- name: deterministic-bounded-parity-and-repeat
+  alpha: null
+summaries:
+- name: maximum_combined_rms_error
+  column: quality_error_l2
+  statistic: max
+- name: maximum_combined_linf_error
+  column: quality_error_linf
+  statistic: max
+killing_gates:
+- metric: maximum_combined_rms_error
+  operator: <=
+  threshold: 0.0005
+- metric: maximum_combined_linf_error
+  operator: <=
+  threshold: 0.002
+screening_confirmation_policy: 'V1 and v2 were frozen and rejected when their CPU WLOP oracles produced
+  no positions. V3/run-001 completed actual Vulkan parity but its independent audit rejected the runner
+  because unavailable execution could exit zero and assert a false actual-backend identity. BUG-129 fixed
+  the runner and general custody before this v4 source revision without changing fixtures, parameters,
+  seeds, or tolerances. The benchmark now exits nonzero unless every run reports actual gpu_vulkan_compute,
+  no fallback, matched status/cardinality/iterations/convergence, bounded CPU parity, and bounded same-host
+  repeatability. Custody independently rejects non-passed results or incomplete cells. A miss remains
+  negative evidence and prevents backend promotion for that strategy.
+
+  '
+resources:
+  cpu_threads: 1
+  gpu: true
+  graphics_api: Vulkan
+  benchmark_build_type: Release
+  sanitizer_parity_build: ci-vulkan
+command:
+- env
+- GIT_COMMIT=04ec3d256696cce3584721065cd1f6ca651d3d28
+- build/ci-vulkan-release/bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+- tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json
+expected_artifacts:
+- tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json
+- tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml
+- tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json
+blockers: []
+source:
+  revision: 04ec3d256696cce3584721065cd1f6ca651d3d28
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml
+  sha256: d8f0302774bfac890821ddb9cd2653a0f2879048e1733bed60da019c40f6e6e4
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+implementation:
+- path: methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol-v3.md
+  sha256: 361625c483553051fd421f43221dba20fa5503ad7c4373b10df8faec141f09fd
+- path: src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+  sha256: 77b3b05f903bb9143bfe330a6c7515fe7994cf4b5a87eccecedffb886f7d006e
+- path: src/runtime/internal/Runtime.PointCloudConsolidationGpu.Internal.hpp
+  sha256: c6cb36cb5a747885cca98d27019569fb442934a8ac712cf795684ca08c6425b5
+- path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
+  sha256: f2c682f2f507d4fd917314f17a5a41e9cffb10db9c80f353f8d588f4399b51da
+- path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
+  sha256: 96f1c673dc58205f69b7ea55da0532dba4b2f733adaa9a37ea422959cd678591
+- path: src/runtime/Runtime.PointCloudConsolidationConfig.cpp
+  sha256: 00fad1b176b2bfb0d72f2eada1f1deb5f64b318f005eb2679b4b0bc97f56fc13
+- path: src/runtime/Runtime.PointCloudConsolidationConfig.cppm
+  sha256: 793ef6a1e6d7300765ab8a59846fab8f55d29c88ebf8bd12db2ce1149710e225
+- path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  sha256: 6b34d73a84855fa571531da951ca67dfabf974d2d0dc5ce1327786499d69588e
+- path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+  sha256: 19daf8941f49a5d561d8f8fa1c9231c83d74843fd497af1a50dce5f444082b9d
+- path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  sha256: 08fbab7803967fc5d6d2800c6fab90f5f2ef1ed69b73dde9aefea7724c13480a
+- path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  sha256: 33f6b63bc8053673a5fdeef9686aa764e695fc34cad40332b4131a86f083ad32
+- path: benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+  sha256: 533f1695af7003fb2f47b6cb0eaad7d41103b60731df0353155cec79153c973f
+- path: tools/agents/experiment_custody.py
+  sha256: f04e1bd0724d67d65eedb09a050deedb68554019ce79cc5d55d4e20b3f681e7a
+- path: tests/regression/tooling/Test.LopFamilyGpuBenchmarkUnavailable.py
+  sha256: 83f7170083a982ec74c8d54a5a373240c465889de579ef3e82b36f53f29ee212
+- path: tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+  sha256: 388bc7a55056aa0d25fa228a83e575c50cb3a3d41e3c23a2554961cdfb909513
+- path: src/runtime/CMakeLists.txt
+  sha256: 5732d425dba4dc3e3b1e1960bab1e2c896ddf0e2784089d5a922af6bfbf30393
+- path: benchmarks/CMakeLists.txt
+  sha256: f7a05d04af2f7791974764c4687ee2418d3cea7aa79b42411450f9758c0ac181
+- path: tests/CMakeLists.txt
+  sha256: b50b37ddb85533fb1591eeda3e771d568e5ef4d35c0c38adccd341e8d6509a2d
+- path: assets/shaders/lop_gpu_common.glslinc
+  sha256: 5634e0290daadf23670068c8e05bba469daf8b7ebb8d7e1a33ed3dd06da42d1a
+- path: assets/shaders/lop_grid_count.comp
+  sha256: 04bc16018c3b968df5334ff729982090b023cae58baa1676c84500b5c6ec3bac
+- path: assets/shaders/lop_grid_scatter.comp
+  sha256: 71c757c1b2e0845820a6bba7172510a6fd00f953be54ac5b1ede966be45db841
+- path: assets/shaders/lop_density.comp
+  sha256: 7d784d329c491216cfac341f1f8e40bdbe543fc0cdd7c62a3b48c6045f893d47
+- path: assets/shaders/lop_initialize.comp
+  sha256: 8185685cffae76676e932d0eb12cc22ce51b40c790a93cf3b8ee0c39d3546e98
+- path: assets/shaders/lop_iteration_reset.comp
+  sha256: ccb41ea63b13857d51f848108d7696cd35ecfaebd80845f137b8649d4a857841
+- path: assets/shaders/lop_project.comp
+  sha256: 2f0f97d1e3aa4e4edab174d69b899b5218a9e5c07b0248cc52475702006f959e
+- path: assets/shaders/lop_iteration_finalize.comp
+  sha256: 354e580e1d5516398feb1cbd1fff3203cfbbf3c409290cf09093b10b5bc93d23
+- path: assets/shaders/lop_final_reduce.comp
+  sha256: 871e9f4cade9be2f85c53013d88d7ce51daee83e74b91243eeb76e3439f325c0
+frozen_at: '2026-08-05T04:20:37Z'
+protocol_digest: 7774197b1d262b64214a9c255cd91104febe0ff48a23ed1db90e0b72cf4ee8b5
