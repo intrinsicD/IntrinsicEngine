@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 2276,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T01:30:02Z",
+  "label": "revision4-ci-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T01:30:00Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/revision4-ci-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/revision4-ci-configure.stdout.log",
+  "stdout_sha256": "d7b1e8aa4f2f5fab9a4241cbd431f79a95824ff86a148a8a7b5be3fd785b8f3d",
+  "task_id": "GEOM-075"
+}

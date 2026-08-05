@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 224711,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T01:35:52Z",
+  "label": "revision4-ci-asan-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T01:32:07Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/revision4-ci-asan-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/revision4-ci-asan-tests.stdout.log",
+  "stdout_sha256": "4f60a9f3bfc691e487bbc9eaa86c681c45216e15c413376e831ef5a181d925f6",
+  "task_id": "GEOM-075"
+}

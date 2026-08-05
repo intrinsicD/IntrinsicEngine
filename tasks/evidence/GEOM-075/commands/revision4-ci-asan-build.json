@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicCpuTests"
+  ],
+  "command_display": "cmake --build --preset ci-asan --target IntrinsicCpuTests",
+  "cwd": ".",
+  "duration_ms": 18669,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T01:32:02Z",
+  "label": "revision4-ci-asan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T01:31:44Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/revision4-ci-asan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/revision4-ci-asan-build.stdout.log",
+  "stdout_sha256": "cdaec89a781228fa5c26e4510bce5a4efbed51c91f47aad619f4c88a9bca9f84",
+  "task_id": "GEOM-075"
+}
