@@ -27,6 +27,10 @@ This document defines how to create and review benchmark work.
 - Avoid requiring external large datasets for smoke checks.
 - Native producers use `tools/benchmark/run_and_seal.py`; raw output is not a
   publishable result.
+- Native runners return zero only for `passed`; `skipped`, `failed`, and
+  `error` retain raw diagnostics but return nonzero. GPU runners report the
+  requested backend separately from the actual backend and use an explicit
+  non-execution state when no request reached that backend.
 - Local or unverified source defaults to non-claim-eligible.
 
 ## Reporting requirements
@@ -41,6 +45,10 @@ This document defines how to create and review benchmark work.
 - Claim-grade results additionally use the frozen protocol, portable bundle,
   independent audit, and ARA ledger; a passing result alone authorizes no
   claim.
+- Benchmark-backed positive bundle audit requires both canonical
+  `execution_status` and recomputed `status` to be `passed`. Non-passed results
+  may remain in a portable bundle as negative evidence, but its audit is
+  rejected and it cannot satisfy workflow completion.
 
 ## Canonical commands
 

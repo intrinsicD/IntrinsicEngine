@@ -262,7 +262,12 @@ true
             git(self.repo, "commit", "-qm", "freeze protocol")
         return result
 
-    def init(self) -> subprocess.CompletedProcess[str]:
+    def init(
+        self,
+        run_id: str = "run-001",
+        attempt_id: str = "attempt-001",
+    ) -> subprocess.CompletedProcess[str]:
+        self.run_root = self.experiment / "runs" / run_id
         return invoke(
             self.repo,
             "init-run",
@@ -273,9 +278,9 @@ true
             "--run-parent",
             (self.experiment / "runs").relative_to(self.repo).as_posix(),
             "--run-id",
-            "run-001",
+            run_id,
             "--attempt-id",
-            "attempt-001",
+            attempt_id,
         )
 
     def cell(self, state: str, **kwargs: str) -> subprocess.CompletedProcess[str]:
@@ -300,6 +305,80 @@ true
         receipt = self.run_root / "smoke.json"
         receipt.write_text('{"exit_code":0}\n', encoding="utf-8")
         return raw, receipt
+
+    def configure_example_benchmark(self, execution_status: str = "passed") -> Path:
+        manifest_source = (
+            REPO_ROOT / "benchmarks/datasets/manifests/geometry_example_small.yaml"
+        )
+        result_source = (
+            REPO_ROOT / "benchmarks/reports/examples/example_smoke_result.json"
+        )
+        manifest = self.repo / manifest_source.relative_to(REPO_ROOT)
+        result = self.repo / "benchmarks/results/example_smoke_result.json"
+        manifest.parent.mkdir(parents=True)
+        result.parent.mkdir(parents=True)
+        manifest.write_bytes(manifest_source.read_bytes())
+        result_data = json.loads(result_source.read_text(encoding="utf-8"))
+        result_data["execution_status"] = execution_status
+        result_data["status"] = execution_status
+        result.write_text(
+            json.dumps(result_data, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+        protocol = yaml.safe_load(self.protocol.read_text(encoding="utf-8"))
+        protocol["question"] = "Does the existing example smoke stay bounded?"
+        protocol["hypothesis"] = "Runtime remains within its smoke guardrail."
+        protocol["claim_boundary"] = "Workflow migration rehearsal only."
+        protocol["primary_metrics"] = [
+            {
+                "name": "runtime_ms",
+                "direction": "minimize",
+                "unit": "milliseconds",
+                "statistical_unit": "benchmark attempt",
+            }
+        ]
+        protocol["summaries"] = [
+            {
+                "name": "runtime_ms",
+                "column": "runtime_ms",
+                "statistic": "mean",
+            }
+        ]
+        protocol["killing_gates"] = [
+            {"metric": "runtime_ms", "operator": "<=", "threshold": 200.0}
+        ]
+        self.protocol.write_text(
+            yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+        )
+        return result
+
+    def benchmark_bundle(self, result: Path) -> subprocess.CompletedProcess[str]:
+        _, receipt = self.raw_and_receipt()
+        return invoke(
+            self.repo,
+            "create-bundle",
+            "--root",
+            str(self.repo),
+            "--run-root",
+            self.run_root.relative_to(self.repo).as_posix(),
+            "--benchmark-result",
+            result.relative_to(self.repo).as_posix(),
+            "--benchmark-manifests-root",
+            "benchmarks",
+            "--summary",
+            "runtime_ms:runtime_ms:mean",
+            "--replay-command",
+            "python3",
+            "--replay-command",
+            "tools/benchmark/run_and_seal.py",
+            "--view-command",
+            "python3",
+            "--view-command",
+            "tools/benchmark/validate_benchmark_results.py",
+            "--smoke-receipt",
+            receipt.relative_to(self.repo).as_posix(),
+        )
 
     def bundle(
         self,
@@ -494,77 +573,13 @@ class ExperimentCustodyTests(unittest.TestCase):
             fixture = ExperimentFixture(
                 Path(tmp), profile="claim-grade", claim_eligible=False
             )
-            manifest_source = (
-                REPO_ROOT / "benchmarks/datasets/manifests/geometry_example_small.yaml"
-            )
-            result_source = (
-                REPO_ROOT / "benchmarks/reports/examples/example_smoke_result.json"
-            )
-            manifest = (
-                fixture.repo
-                / "benchmarks/datasets/manifests/geometry_example_small.yaml"
-            )
-            result = fixture.repo / "benchmarks/results/example_smoke_result.json"
-            manifest.parent.mkdir(parents=True)
-            result.parent.mkdir(parents=True)
-            manifest.write_bytes(manifest_source.read_bytes())
-            result.write_bytes(result_source.read_bytes())
-
-            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
-            protocol["question"] = "Does the existing example smoke stay bounded?"
-            protocol["hypothesis"] = "Runtime remains within its smoke guardrail."
-            protocol["claim_boundary"] = "Workflow migration rehearsal only."
-            protocol["primary_metrics"] = [
-                {
-                    "name": "runtime_ms",
-                    "direction": "minimize",
-                    "unit": "milliseconds",
-                    "statistical_unit": "benchmark attempt",
-                }
-            ]
-            protocol["summaries"] = [
-                {
-                    "name": "runtime_ms",
-                    "column": "runtime_ms",
-                    "statistic": "mean",
-                }
-            ]
-            protocol["killing_gates"] = [
-                {"metric": "runtime_ms", "operator": "<=", "threshold": 200.0}
-            ]
-            fixture.protocol.write_text(
-                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
-            )
+            result = fixture.configure_example_benchmark()
 
             self.assertEqual(fixture.freeze().returncode, 0)
             self.assertEqual(fixture.init().returncode, 0)
             self.assertEqual(fixture.cell("started").returncode, 0)
             self.assertEqual(fixture.cell("completed").returncode, 0)
-            _, receipt = fixture.raw_and_receipt()
-            bundle = invoke(
-                fixture.repo,
-                "create-bundle",
-                "--root",
-                str(fixture.repo),
-                "--run-root",
-                fixture.run_root.relative_to(fixture.repo).as_posix(),
-                "--benchmark-result",
-                result.relative_to(fixture.repo).as_posix(),
-                "--benchmark-manifests-root",
-                "benchmarks",
-                "--summary",
-                "runtime_ms:runtime_ms:mean",
-                "--replay-command",
-                "python3",
-                "--replay-command",
-                "tools/benchmark/run_and_seal.py",
-                "--view-command",
-                "python3",
-                "--view-command",
-                "tools/benchmark/validate_benchmark_results.py",
-                "--smoke-receipt",
-                receipt.relative_to(fixture.repo).as_posix(),
-            )
+            bundle = fixture.benchmark_bundle(result)
             audit = fixture.audit()
             bundle_data = yaml.safe_load(
                 (fixture.run_root / "bundle.yaml").read_text(encoding="utf-8")
@@ -576,6 +591,101 @@ class ExperimentCustodyTests(unittest.TestCase):
             "geometry.example.small",
         )
         self.assertFalse(bundle_data["benchmark_result"]["claim_eligible"])
+
+    def test_nonpassed_benchmark_bundle_is_retained_but_audit_rejects_it(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(
+                Path(tmp), profile="claim-grade", claim_eligible=False
+            )
+            result = fixture.configure_example_benchmark("skipped")
+            self.assertEqual(fixture.freeze().returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(fixture.cell("completed").returncode, 0)
+            bundle = fixture.benchmark_bundle(result)
+            audit = fixture.audit()
+            validation = invoke(
+                fixture.repo, "validate", "--root", str(fixture.repo)
+            )
+            completion = fixture.completion()
+            audit_data = json.loads(
+                (fixture.run_root / "audit.json").read_text(encoding="utf-8")
+            )
+        self.assertEqual(bundle.returncode, 0, bundle.stdout)
+        self.assertEqual(audit.returncode, 1, audit.stdout)
+        self.assertEqual(validation.returncode, 0, validation.stdout)
+        self.assertNotEqual(completion.returncode, 0, completion.stdout)
+        self.assertEqual(audit_data["disposition"], "rejected")
+        self.assertTrue(
+            any(
+                "positive benchmark bundle requires execution_status and status"
+                in error
+                for error in audit_data["errors"]
+            ),
+            audit_data,
+        )
+
+    def test_failed_cell_rejects_audit_but_remains_valid_negative_evidence(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), profile="claim-grade")
+            self.assertEqual(fixture.freeze().returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(
+                fixture.cell("failed", error="independent review rejected").returncode,
+                0,
+            )
+            self.assertEqual(fixture.bundle().returncode, 0)
+            audit = fixture.audit()
+            validation = invoke(
+                fixture.repo, "validate", "--root", str(fixture.repo)
+            )
+            completion = fixture.completion()
+            audit_data = json.loads(
+                (fixture.run_root / "audit.json").read_text(encoding="utf-8")
+            )
+        self.assertEqual(audit.returncode, 1, audit.stdout)
+        self.assertEqual(validation.returncode, 0, validation.stdout)
+        self.assertEqual(completion.returncode, 1, completion.stdout)
+        self.assertEqual(audit_data["disposition"], "rejected")
+        self.assertTrue(
+            any(
+                "positive audit requires every journal cell to be completed"
+                in error
+                for error in audit_data["errors"]
+            ),
+            audit_data,
+        )
+
+    def test_rejected_run_does_not_block_later_accepted_run_completion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), profile="claim-grade")
+            self.assertEqual(fixture.freeze().returncode, 0)
+
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(
+                fixture.cell("failed", error="first attempt rejected").returncode,
+                0,
+            )
+            self.assertEqual(fixture.bundle().returncode, 0)
+            self.assertEqual(fixture.audit().returncode, 1)
+
+            self.assertEqual(fixture.init("run-002", "attempt-002").returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(fixture.cell("completed").returncode, 0)
+            self.assertEqual(fixture.bundle().returncode, 0)
+            self.assertEqual(fixture.audit().returncode, 0)
+            validation = invoke(
+                fixture.repo, "validate", "--root", str(fixture.repo)
+            )
+            completion = fixture.completion()
+        self.assertEqual(validation.returncode, 0, validation.stdout)
+        self.assertEqual(completion.returncode, 0, completion.stdout)
 
     def test_dirty_official_source_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

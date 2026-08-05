@@ -241,8 +241,12 @@ The bundle command invokes the strict schema-v2 benchmark validator, derives a
 single tidy row from the bound metric payload, and records the result hash plus
 stable benchmark/run/attempt identities. The audit repeats strict validation
 and rejects a stale result binding or raw rows that no longer derive exactly
-from those metrics. The checked-in `geometry.example.small` payload is the
-non-claim-eligible regression fixture for this bridge.
+from those metrics. A bundle may retain a canonical `skipped`, `failed`, or
+`error` result as inspectable negative evidence, but positive audit requires
+both `execution_status: passed` and recomputed `status: passed`; otherwise the
+audit is rejected and cannot satisfy completion. The checked-in
+`geometry.example.small` payload is the non-claim-eligible regression fixture
+for this bridge.
 
 ## Protected attempts
 

@@ -14,6 +14,11 @@ contracts: [repo.task-contract-discovery]
 ---
 # BUG-129 — Claim custody accepts skipped benchmarks as positive evidence
 
+## Status
+- Implementation and verification are complete. The original METHOD-020
+  run-001 now carries a structurally valid rejected audit; final fixed-surface
+  independent review is pending.
+
 ## Goal
 - Make Vulkan benchmark runners and claim-grade benchmark custody fail closed
   when the requested backend did not execute successfully.
@@ -36,32 +41,32 @@ contracts: [repo.task-contract-discovery]
   positive-claim path with zero executions and zero-valued metrics.
 
 ## Required changes
-- [ ] Make the METHOD-020 benchmark runner return nonzero for skipped, failed,
+- [x] Make the METHOD-020 benchmark runner return nonzero for skipped, failed,
       and error outcomes and report truthful actual-backend/fallback state.
-- [ ] Make benchmark-backed bundle audit reject every canonical result whose
+- [x] Make benchmark-backed bundle audit reject every canonical result whose
       execution or recomputed status is not `passed`, while retaining the
       failed result as inspectable negative evidence.
-- [ ] Preserve historical passed bundle bindings without a schema rewrite.
+- [x] Preserve historical passed bundle bindings without a schema rewrite.
 
 ## Tests
-- [ ] Add a tooling regression proving skipped benchmark output cannot receive
+- [x] Add a tooling regression proving skipped benchmark output cannot receive
       an accepted experiment audit.
-- [ ] Add an executable regression proving the runner's unavailable-windowing
+- [x] Add an executable regression proving the runner's unavailable-windowing
       path returns nonzero and does not claim actual Vulkan execution.
-- [ ] Run the complete benchmark-result and experiment-custody regression suites.
+- [x] Run the complete benchmark-result and experiment-custody regression suites.
 
 ## Docs
-- [ ] Document the positive bundle audit rule and requested-versus-actual
+- [x] Document the positive bundle audit rule and requested-versus-actual
       backend diagnostics in the canonical benchmark/workflow policy.
 - [ ] Update the bug index, session brief, and retirement log on closure; sync
       generated skill mirrors for changed `docs/agent/*` policy.
 
 ## Acceptance criteria
-- [ ] The original headless repro exits nonzero, reports `status: skipped`, and
+- [x] The original headless repro exits nonzero, reports `status: skipped`, and
       reports no actual Vulkan backend or observed fallback.
-- [ ] Custody creation may retain a non-passed result, but independent audit and
+- [x] Custody creation may retain a non-passed result, but independent audit and
       completion cannot accept it as positive evidence.
-- [ ] Existing passed experiment bundles and strict repository validators remain green.
+- [x] Existing passed experiment bundles and strict repository validators remain green.
 - [ ] Fixed-surface independent review finds no blocker.
 
 ## Verification

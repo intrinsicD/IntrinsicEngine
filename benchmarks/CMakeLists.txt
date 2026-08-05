@@ -249,6 +249,20 @@ if(BUILD_TESTING)
 
         if(Python3_Interpreter_FOUND)
             add_test(
+                NAME IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed
+                COMMAND ${Python3_EXECUTABLE}
+                    "${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.LopFamilyGpuBenchmarkUnavailable.py"
+                    --executable $<TARGET_FILE:IntrinsicLopFamilyGpuBenchmarkSmoke>
+                    --output "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicLopFamilyGpuBenchmarkSmokeUnavailable/raw.json"
+            )
+            set_tests_properties(
+                IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed
+                PROPERTIES
+                    LABELS "benchmark;geometry;runtime;gpu;vulkan"
+                    TIMEOUT 60
+            )
+
+            add_test(
                 NAME IntrinsicLopFamilyGpuBenchmarkSmoke.Validate
                 COMMAND ${Python3_EXECUTABLE}
                     "${CMAKE_SOURCE_DIR}/tools/benchmark/validate_benchmark_results.py"

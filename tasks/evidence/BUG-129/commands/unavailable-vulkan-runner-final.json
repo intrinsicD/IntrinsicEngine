@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "LopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R LopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed --timeout 60",
+  "cwd": ".",
+  "duration_ms": 3242,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T03:58:56Z",
+  "label": "unavailable-vulkan-runner-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T03:58:53Z",
+  "stderr_path": "tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.stdout.log",
+  "stdout_sha256": "678631933cd02c35dbc74d733f5b218549685f2ff7fb24333cf3e73177678be5",
+  "task_id": "BUG-129"
+}

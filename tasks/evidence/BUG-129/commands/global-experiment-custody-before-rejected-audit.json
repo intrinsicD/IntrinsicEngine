@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/experiment_custody.py",
+    "validate",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/experiment_custody.py validate --root .",
+  "cwd": ".",
+  "duration_ms": 552,
+  "exit_code": 1,
+  "finished_at": "2026-08-05T03:59:25Z",
+  "label": "global-experiment-custody-before-rejected-audit",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-08-05T03:59:25Z",
+  "stderr_path": "tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.stdout.log",
+  "stdout_sha256": "710370a0ec6bc571ea338f8e80e04afebfb4946585b351469405928dda73f834",
+  "task_id": "BUG-129"
+}

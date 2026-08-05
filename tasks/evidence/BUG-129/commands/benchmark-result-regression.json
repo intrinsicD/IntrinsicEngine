@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test_BenchmarkResultValidator.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test_BenchmarkResultValidator.py",
+  "cwd": ".",
+  "duration_ms": 1128,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T03:53:27Z",
+  "label": "benchmark-result-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T03:53:26Z",
+  "stderr_path": "tasks/evidence/BUG-129/commands/benchmark-result-regression.stderr.log",
+  "stderr_sha256": "9d759badbf96827da64fe08347a37d4a98e8c11cb7697a867ad9b3145dcd6ed6",
+  "stdout_path": "tasks/evidence/BUG-129/commands/benchmark-result-regression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-129"
+}

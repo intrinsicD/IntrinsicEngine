@@ -822,6 +822,8 @@ def _benchmark_bundle_input(
     repo_root: Path,
     result_value: str,
     manifests_value: str,
+    *,
+    require_passed_execution: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     result_path = resolve_repo_path(repo_root, result_value)
     manifests_root = resolve_repo_path(repo_root, manifests_value)
@@ -843,6 +845,15 @@ def _benchmark_bundle_input(
         raise CustodyError("invalid benchmark result: " + "; ".join(errors))
     if identity is None:
         raise CustodyError("benchmark result has no valid run/attempt identity")
+    if require_passed_execution and (
+        result.get("execution_status") != "passed"
+        or result.get("status") != "passed"
+    ):
+        raise CustodyError(
+            "positive benchmark bundle requires execution_status and status "
+            f"to both be 'passed' (got execution_status="
+            f"{result.get('execution_status')!r}, status={result.get('status')!r})"
+        )
     row: dict[str, Any] = {
         "benchmark_id": identity[0],
         "run_id": identity[1],
@@ -1238,6 +1249,52 @@ def _validate_bundle(
     return errors, recomputed, recomputed_gates
 
 
+def _positive_audit_errors(
+    repo_root: Path,
+    run_root: Path,
+    run: dict[str, Any],
+    bundle: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    try:
+        journal_path = resolve_repo_path(repo_root, run.get("cell_journal"))
+        if journal_path.parent != run_root:
+            errors.append("positive audit cell journal is outside canonical run root")
+        cells = load_jsonl(journal_path) if journal_path.is_file() else []
+        if not cells:
+            errors.append("positive audit requires a non-empty cell journal")
+        latest_states: dict[str, str] = {}
+        for cell in cells:
+            key = cell.get("cell_key")
+            if isinstance(key, str):
+                latest_states[key] = cell.get("state")
+        noncompleted = sorted(
+            f"{key}={state}"
+            for key, state in latest_states.items()
+            if state != "completed"
+        )
+        if noncompleted:
+            errors.append(
+                "positive audit requires every journal cell to be completed "
+                f"(got {', '.join(noncompleted)})"
+            )
+    except ValueError as exc:
+        errors.append(str(exc))
+
+    benchmark = bundle.get("benchmark_result")
+    if isinstance(benchmark, dict):
+        try:
+            _benchmark_bundle_input(
+                repo_root,
+                benchmark.get("path"),
+                benchmark.get("manifests_root"),
+                require_passed_execution=True,
+            )
+        except (CustodyError, ValueError) as exc:
+            errors.append(f"benchmark_result: {exc}")
+    return errors
+
+
 def audit_bundle(args: argparse.Namespace) -> int:
     repo_root = repo_root_from(args.root)
     run_root, run = _load_run(repo_root, args.run_root)
@@ -1249,6 +1306,7 @@ def audit_bundle(args: argparse.Namespace) -> int:
     bundle_path = run_root / "bundle.yaml"
     bundle = strict_yaml_load(bundle_path)
     errors, summaries, gates = _validate_bundle(repo_root, run_root, run, bundle)
+    errors.extend(_positive_audit_errors(repo_root, run_root, run, bundle))
     disposition = "accepted" if not errors else "rejected"
     receipt = {
         "schema_version": SCHEMA_VERSION,
@@ -1489,6 +1547,9 @@ def _validate_audit_record(
     run_root: Path,
     run: dict[str, Any],
     audit: dict[str, Any],
+    *,
+    expected_errors: list[str],
+    require_accepted: bool,
 ) -> list[str]:
     errors: list[str] = []
     if audit.get("schema_version") != SCHEMA_VERSION:
@@ -1509,9 +1570,14 @@ def _validate_audit_record(
         errors.append("audit bundle path does not match canonical run bundle")
     if bundle_path.is_file() and audit.get("bundle_sha256") != sha256_file(bundle_path):
         errors.append("audit binds stale bundle")
-    if audit.get("disposition") != "accepted":
+    expected_disposition = "accepted" if not expected_errors else "rejected"
+    if audit.get("disposition") != expected_disposition:
+        errors.append("independent audit disposition differs from recomputation")
+    if audit.get("errors") != expected_errors:
+        errors.append("independent audit errors differ from recomputation")
+    if require_accepted and audit.get("disposition") != "accepted":
         errors.append("independent audit is not accepted")
-    if audit.get("errors") != []:
+    if require_accepted and audit.get("errors") != []:
         errors.append("independent audit retains errors")
     if audit.get("claim_authorized") is not False:
         errors.append("audit must not silently authorize claim")
@@ -1608,6 +1674,7 @@ def validate_completion_records(
             errors.append(str(exc))
 
     completed_runs = 0
+    incomplete_runs: list[str] = []
     for run_path in run_paths:
         run_root = run_path.parent
         try:
@@ -1630,19 +1697,33 @@ def validate_completion_records(
             if not bundle_path.exists() and not audit_path.exists():
                 continue
             candidate_errors: list[str] = []
+            bundle_errors: list[str] = []
+            positive_errors: list[str] = []
             if not bundle_path.is_file():
                 candidate_errors.append("portable bundle is missing")
             else:
                 bundle = strict_yaml_load(bundle_path)
                 bundle_errors, _, _ = _validate_bundle(repo_root, run_root, run, bundle)
-                candidate_errors.extend(bundle_errors)
+                errors.extend(f"{run_path}: {error}" for error in bundle_errors)
+                positive_errors = _positive_audit_errors(
+                    repo_root, run_root, run, bundle
+                )
+                candidate_errors.extend(positive_errors)
             if not audit_path.is_file():
                 candidate_errors.append("independent audit is missing")
             else:
                 audit = strict_json_load(audit_path)
-                candidate_errors.extend(
-                    _validate_audit_record(repo_root, run_root, run, audit)
+                audit_errors = _validate_audit_record(
+                    repo_root,
+                    run_root,
+                    run,
+                    audit,
+                    expected_errors=bundle_errors + positive_errors,
+                    require_accepted=False,
                 )
+                errors.extend(f"{run_path}: {error}" for error in audit_errors)
+                if audit.get("disposition") != "accepted":
+                    candidate_errors.append("independent audit is not accepted")
 
             journal_path = resolve_repo_path(repo_root, run.get("cell_journal"))
             if not journal_path.is_file():
@@ -1651,13 +1732,23 @@ def validate_completion_records(
                 cells = load_jsonl(journal_path)
                 if not cells:
                     candidate_errors.append("completion cell journal is empty")
-                _validate_cells(cells, candidate_errors)
+                cell_errors: list[str] = []
+                _validate_cells(cells, cell_errors)
+                errors.extend(f"{run_path}: {error}" for error in cell_errors)
                 latest_states: dict[str, str] = {}
                 for cell in cells:
                     if isinstance(cell.get("cell_key"), str):
                         latest_states[cell["cell_key"]] = cell.get("state")
-                if any(state == "started" for state in latest_states.values()):
-                    candidate_errors.append("completion cell journal has started cells")
+                noncompleted = sorted(
+                    f"{key}={state}"
+                    for key, state in latest_states.items()
+                    if state != "completed"
+                )
+                if noncompleted:
+                    candidate_errors.append(
+                        "completion requires every journal cell to be completed "
+                        f"(got {', '.join(noncompleted)})"
+                    )
 
             if profile == "protected":
                 attempt_path = run_root / "attempts" / f"{run.get('attempt_id')}.json"
@@ -1671,12 +1762,15 @@ def validate_completion_records(
                         )
                     )
             if candidate_errors:
-                errors.extend(f"{run_path}: {error}" for error in candidate_errors)
-            elif not run_errors:
+                incomplete_runs.extend(
+                    f"{run_path}: {error}" for error in candidate_errors
+                )
+            elif not run_errors and not bundle_errors:
                 completed_runs += 1
         except (ValueError, CustodyError) as exc:
             errors.append(str(exc))
     if run_paths and completed_runs == 0:
+        errors.extend(incomplete_runs)
         errors.append(
             "completion requires a valid run with terminal cells, portable bundle, "
             "and accepted independent audit"
@@ -1749,6 +1843,9 @@ def validate_tree(args: argparse.Namespace) -> int:
                         repo_root, run_root, run, bundle
                     )
                     errors.extend(f"{bundle_path}: {error}" for error in bundle_errors)
+                    positive_errors = _positive_audit_errors(
+                        repo_root, run_root, run, bundle
+                    )
                     audit_path = run_root / "audit.json"
                     if not audit_path.is_file():
                         errors.append(
@@ -1759,7 +1856,12 @@ def validate_tree(args: argparse.Namespace) -> int:
                         errors.extend(
                             f"{audit_path}: {error}"
                             for error in _validate_audit_record(
-                                repo_root, run_root, run, audit
+                                repo_root,
+                                run_root,
+                                run,
+                                audit,
+                                expected_errors=bundle_errors + positive_errors,
+                                require_accepted=False,
                             )
                         )
                 for attempt_path in sorted((run_root / "attempts").glob("*.json")):

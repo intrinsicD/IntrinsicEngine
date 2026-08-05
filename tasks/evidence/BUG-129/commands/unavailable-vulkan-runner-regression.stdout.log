@@ -1,0 +1,15 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed
+1/1 Test #6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed ...   Passed    3.10 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+benchmark    =   3.10 sec*proc (1 test)
+geometry     =   3.10 sec*proc (1 test)
+gpu          =   3.10 sec*proc (1 test)
+runtime      =   3.10 sec*proc (1 test)
+vulkan       =   3.10 sec*proc (1 test)
+
+Total Test time (real) =   3.22 sec

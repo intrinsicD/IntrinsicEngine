@@ -92,6 +92,19 @@ copies its limit, records the observed metric, and computes `passed`.
 
 The validator recomputes the complete disposition and status.
 
+Native runners return zero only for raw `passed`. A skipped or failed attempt
+still writes its raw diagnostic payload, but returns nonzero so generic command
+receipts cannot mistake non-execution for success. GPU diagnostics distinguish
+the requested backend from the actual backend; when no backend request was
+accepted, `actual_backend` uses an explicit non-execution token and
+`fallback_observed` remains unknown rather than manufacturing successful GPU
+identity from zero counters.
+
+`claim_eligible` describes source custody, not whether an attempt passed, so a
+non-passed canonical result may be retained. Claim-grade positive bundle audit
+separately requires both `execution_status` and recomputed `status` to be
+`passed`.
+
 ## Commands
 
 Seal raw producer output:

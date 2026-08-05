@@ -1,0 +1,48 @@
+{
+  "attempt_id": "attempt-001",
+  "audited_at": "2026-08-05T04:03:12Z",
+  "audited_revision": "f5f69ea70a8ae9af7716861f4462fdbb6162f0f1",
+  "auditor_label": "Codex-METHOD020-ClaimAudit",
+  "bundle_path": "tasks/evidence/METHOD-020/experiment/runs/run-001/bundle.yaml",
+  "bundle_sha256": "47588f96235c7b607fa7777b6bf9733dc47f88c37df88dc39713c94f4556281e",
+  "claim_authorized": false,
+  "disposition": "rejected",
+  "driver_label": "Codex-LOPVulkan",
+  "errors": [
+    "positive audit requires every journal cell to be completed (got independent-audit=failed)"
+  ],
+  "identity_assurance": "cooperative-label-only",
+  "recomputed_gates": [
+    {
+      "metric": "maximum_combined_rms_error",
+      "observed": 2.2518e-05,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.0005
+    },
+    {
+      "metric": "maximum_combined_linf_error",
+      "observed": 0.000217834,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.002
+    }
+  ],
+  "recomputed_summaries": [
+    {
+      "column": "quality_error_l2",
+      "name": "maximum_combined_rms_error",
+      "statistic": "max",
+      "value": 2.2518e-05
+    },
+    {
+      "column": "quality_error_linf",
+      "name": "maximum_combined_linf_error",
+      "statistic": "max",
+      "value": 0.000217834
+    }
+  ],
+  "run_id": "run-001",
+  "schema_version": 1,
+  "task_id": "METHOD-020"
+}

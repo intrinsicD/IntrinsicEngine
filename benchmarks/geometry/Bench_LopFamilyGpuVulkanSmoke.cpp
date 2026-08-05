@@ -369,7 +369,7 @@ namespace
         {
             return GpuBenchmarkResult{
                 .Fixtures = Results,
-                .Stats = Stats,
+                .Stats = Service != nullptr ? Service->Stats() : Stats,
                 .Diagnostic = Diagnostic,
                 .Succeeded = Succeeded,
             };
@@ -681,6 +681,11 @@ int main(const int argc, char** argv)
     const bool passed = !skipped && cpu[0].Succeeded && cpu[1].Succeeded &&
         gpu.Succeeded && gpu.Fixtures[0].Succeeded &&
         gpu.Fixtures[1].Succeeded;
+    const bool gpuExecutionObserved = gpu.Stats.GpuRequestsAccepted != 0u ||
+        gpu.Stats.GpuCompletions != 0u || gpu.Stats.GpuFallbacks != 0u;
+    const std::string_view actualBackend = gpu.Stats.GpuFallbacks != 0u
+        ? "cpu_reference"
+        : gpuExecutionObserved ? "gpu_vulkan_compute" : "none";
     const std::string_view status = skipped
         ? "skipped"
         : passed ? "passed" : "failed";
@@ -723,13 +728,19 @@ int main(const int argc, char** argv)
            << "    \"runner\": \"IntrinsicLopFamilyGpuBenchmarkSmoke\",\n"
            << "    \"mode\": \"gpu_smoke\",\n"
            << "    \"execution_route\": \"PointCloudConsolidationService\",\n"
+           << "    \"requested_backend\": \"gpu_vulkan_compute\",\n"
            << "    \"warmup_iterations\": " << kWarmupIterations << ",\n"
            << "    \"measured_iterations\": " << kMeasuredIterations
            << ",\n"
-           << "    \"actual_backend\": \"gpu_vulkan_compute\",\n"
+           << "    \"actual_backend\": \"" << actualBackend << "\",\n"
+           << "    \"execution_observed\": "
+           << (gpuExecutionObserved ? "true" : "false") << ",\n"
            << "    \"fallback_allowed\": false,\n"
            << "    \"fallback_observed\": "
-           << (gpu.Stats.GpuFallbacks == 0u ? "false" : "true") << ",\n"
+           << (!gpuExecutionObserved
+                   ? "null"
+                   : gpu.Stats.GpuFallbacks == 0u ? "false" : "true")
+           << ",\n"
            << "    \"baseline_comparison\": \"cpu_reference_same_fixture\",\n"
            << "    \"speedup_claimed\": false,\n"
            << "    \"gpu_time_source\": \"host_service_command_to_applied_event\",\n"
@@ -773,5 +784,5 @@ int main(const int argc, char** argv)
 
     if (!WriteFile(outputPath, output.str()))
         return 1;
-    return status == "failed" ? 2 : 0;
+    return passed ? 0 : 2;
 }

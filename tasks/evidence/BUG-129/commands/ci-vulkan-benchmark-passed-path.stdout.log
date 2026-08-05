@@ -1,0 +1,17 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run
+1/2 Test #5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run ........   Passed   10.92 sec
+    Start 7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate
+2/2 Test #7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate ...   Passed    0.07 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+benchmark    =  10.99 sec*proc (2 tests)
+geometry     =  10.99 sec*proc (2 tests)
+gpu          =  10.99 sec*proc (2 tests)
+runtime      =  10.99 sec*proc (2 tests)
+vulkan       =  10.99 sec*proc (2 tests)
+
+Total Test time (real) =  11.11 sec

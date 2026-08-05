@@ -40,7 +40,10 @@ fallback, and compares ordinary LOP plus isotropic WLOP against their frozen
 CPU-reference fixtures after one warmup and three measured runs. It reports
 host service-command-to-applied-event time as the explicitly named timing
 source, device identity, per-strategy RMS/L-infinity and repeat deltas, and no
-speedup claim. Use `ci-vulkan-release` for unsanitized optimized descriptive
+speedup claim. The raw runner exits zero only after passed Vulkan execution;
+window/device unavailability retains a skipped diagnostic with requested
+Vulkan versus actual `none` identity and an unknown fallback observation. Use
+`ci-vulkan-release` for unsanitized optimized descriptive
 timing; sanitizer-backed parity remains under `ci-vulkan`.
 The executable contract is
 [`lop_family_gpu_vulkan_smoke_v3.yaml`](manifests/lop_family_gpu_vulkan_smoke_v3.yaml);
