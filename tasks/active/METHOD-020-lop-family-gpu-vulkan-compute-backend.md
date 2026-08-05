@@ -143,7 +143,9 @@ maturity_target: ParityProven
       stable ID `geometry.lop_family.gpu_vulkan.v3.smoke`, a stable built-in
       dataset, `params.intent: gpu`, explicit warmup/measured counts,
       `baseline_comparison: cpu_reference_same_fixture`, and metrics
-      `runtime_ms`/`gpu_time_ms`/`quality_error_l2`; exclude it from the
+      `runtime_ms`/`gpu_time_ms` plus worst-of-parity-and-repeat
+      `quality_error_l2`/`quality_error_linf`; backend identity and fallback
+      remain fail-closed execution-status diagnostics. Exclude it from the
       default CPU smoke runner.
 - [x] Add `IntrinsicLopFamilyGpuBenchmarkSmoke`, emitting schema-valid result
       JSON only from actual Vulkan execution with backend/device, strategy,

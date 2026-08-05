@@ -688,9 +688,18 @@ int main(const int argc, char** argv)
         (gpu.Fixtures[0].RuntimeMilliseconds +
          gpu.Fixtures[1].RuntimeMilliseconds) /
         2.0;
-    const double qualityError = std::max(
+    const double qualityError = std::max({
         gpu.Fixtures[0].MaxParityRms,
-        gpu.Fixtures[1].MaxParityRms);
+        gpu.Fixtures[1].MaxParityRms,
+        gpu.Fixtures[0].MaxRepeatRms,
+        gpu.Fixtures[1].MaxRepeatRms,
+    });
+    const double qualityErrorLinf = std::max({
+        gpu.Fixtures[0].MaxParityLinf,
+        gpu.Fixtures[1].MaxParityLinf,
+        gpu.Fixtures[0].MaxRepeatLinf,
+        gpu.Fixtures[1].MaxRepeatLinf,
+    });
 
     std::ostringstream output{};
     output.setf(std::ios::fixed);
@@ -706,7 +715,9 @@ int main(const int argc, char** argv)
            << "  \"metrics\": {\n"
            << "    \"runtime_ms\": " << runtimeMilliseconds << ",\n"
            << "    \"gpu_time_ms\": " << runtimeMilliseconds << ",\n"
-           << "    \"quality_error_l2\": " << qualityError << "\n"
+           << "    \"quality_error_l2\": " << qualityError << ",\n"
+           << "    \"quality_error_linf\": " << qualityErrorLinf
+           << "\n"
            << "  },\n"
            << "  \"diagnostics\": {\n"
            << "    \"runner\": \"IntrinsicLopFamilyGpuBenchmarkSmoke\",\n"
