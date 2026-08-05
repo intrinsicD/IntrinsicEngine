@@ -1,0 +1,800 @@
+schema_version: 1
+task_id: METHOD-020
+workflow_profile: claim-grade
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-05T05:18:15Z'
+claim_eligible: true
+source:
+  base_ref: f4fd84e6
+  base_revision: f4fd84e6f851fb1773ef40c24aaefefccf53c32d
+  head_revision: fd52b8c2d8c93c9506ec15a8921d519a18a1c610
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: CMakePresets.json
+    sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+  - path: ara/logic/claims.md
+    sha256: 4afbe541bb4eb0eae6a21386de79abd69c034a65509df4cb101e178cb375fd35
+  - path: ara/staging/observations.yaml
+    sha256: 0ca2ef42a2f0780c7e06242dbbe6a7bf7197d797461810591f183737c82e046f
+  - path: assets/shaders/lop_density.comp
+    sha256: 7d784d329c491216cfac341f1f8e40bdbe543fc0cdd7c62a3b48c6045f893d47
+  - path: assets/shaders/lop_final_reduce.comp
+    sha256: 871e9f4cade9be2f85c53013d88d7ce51daee83e74b91243eeb76e3439f325c0
+  - path: assets/shaders/lop_gpu_common.glslinc
+    sha256: 5634e0290daadf23670068c8e05bba469daf8b7ebb8d7e1a33ed3dd06da42d1a
+  - path: assets/shaders/lop_grid_count.comp
+    sha256: 04bc16018c3b968df5334ff729982090b023cae58baa1676c84500b5c6ec3bac
+  - path: assets/shaders/lop_grid_scatter.comp
+    sha256: 71c757c1b2e0845820a6bba7172510a6fd00f953be54ac5b1ede966be45db841
+  - path: assets/shaders/lop_initialize.comp
+    sha256: 8185685cffae76676e932d0eb12cc22ce51b40c790a93cf3b8ee0c39d3546e98
+  - path: assets/shaders/lop_iteration_finalize.comp
+    sha256: 354e580e1d5516398feb1cbd1fff3203cfbbf3c409290cf09093b10b5bc93d23
+  - path: assets/shaders/lop_iteration_reset.comp
+    sha256: ccb41ea63b13857d51f848108d7696cd35ecfaebd80845f137b8649d4a857841
+  - path: assets/shaders/lop_project.comp
+    sha256: 2f0f97d1e3aa4e4edab174d69b899b5218a9e5c07b0248cc52475702006f959e
+  - path: benchmarks/CMakeLists.txt
+    sha256: f7a05d04af2f7791974764c4687ee2418d3cea7aa79b42411450f9758c0ac181
+  - path: benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+    sha256: 533f1695af7003fb2f47b6cb0eaad7d41103b60731df0353155cec79153c973f
+  - path: benchmarks/geometry/README.md
+    sha256: 90ffe5acf0267f594a729c269a6c8f8cc5bc351510d0281897a6999546e127d2
+  - path: benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke.yaml
+    sha256: 56a48f5e6f75c255e1c863e79d1a2210287e88a81702533395806eeb9303e6e2
+  - path: benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v2.yaml
+    sha256: 41bf318d18ccb06cdb5c51ad2aa9d5fbc679ce183f2c58268895e78a31906b62
+  - path: benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml
+    sha256: d8f0302774bfac890821ddb9cd2653a0f2879048e1733bed60da019c40f6e6e4
+  - path: docs/agent/benchmark-workflow.md
+    sha256: 77f014fb5a8af419df3241d534901f46e32041c874f75251566318b1b9ff448d
+  - path: docs/agent/workflow-evidence.md
+    sha256: 69ba66d421e9bc59b1163a85b8df6f66f242868f78bc99141fd6483cced94e5d
+  - path: docs/architecture/algorithm-variant-dispatch.md
+    sha256: 0c91fff3db4fe84b4821966f8ff9ef6a4f7a393a5fe4a4bedf7896c2aa7db61f
+  - path: docs/architecture/engine-config.md
+    sha256: 812b368576432b6a4257da5ddc50a3e8d661b85074d76ee4467c3e1ff9881465
+  - path: docs/architecture/runtime-config-control.md
+    sha256: e8a0f884e621991e150c7e12e8c69f3ed6f69dee69183dff8c973aa0b5713a0f
+  - path: docs/benchmarking/result-json-schema.md
+    sha256: dc8ec40ed7d18410507179f0da03f970b84bb3ac2e02f7b19ecb41f0e5a8665a
+  - path: methods/geometry/continuous_lop/README.md
+    sha256: 8a2d51380d55a8a929fa3169e4b9725965e09fa971a968d0e5b9f0b192f16e89
+  - path: methods/geometry/continuous_lop/method.yaml
+    sha256: 8ab91947ca768310f38f1a0670a6bffa6e1bafcd74722c5e274af967691aa108
+  - path: methods/geometry/edge_aware_resampling/README.md
+    sha256: 8e9a6b5df4af762e8c3b75105fb3e884b82b7e326482103b5281bff4746802f0
+  - path: methods/geometry/edge_aware_resampling/method.yaml
+    sha256: 4bb3745024a9e3736eca4afe30fa9cee05a11464b0fd62904f5bd069d684de9d
+  - path: methods/geometry/locally_optimal_projection/README.md
+    sha256: 983ab158218629d823ef9e8a3af53bfdea731ce43310a26f8287befd680eaa0f
+  - path: methods/geometry/locally_optimal_projection/method.yaml
+    sha256: 65b1350058e29dc16ab20e6a78a8b8497332eebdc13f5978673d715931bf0eda
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol-v2.md
+    sha256: e17b1122388cf4ca9936d315005375a8f52161ffa2d20f49a259353dcd5d409f
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol-v3.md
+    sha256: 361625c483553051fd421f43221dba20fa5503ad7c4373b10df8faec141f09fd
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol.md
+    sha256: 32a9cd3616913389851a0348a07232d365a7ca990d0ee6f90dfc136b16285ce9
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md
+    sha256: 60aba78c3eede5354480af81035f43ad913998fa7005ead9aa854d91df8cd512
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-020-v1-screening.md
+    sha256: d1bf10b12e6709214807649268bb812252c8126ba1192adc76bebb9cb65225c1
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-020-v2-screening.md
+    sha256: e568329c8dbadcbfb3d44542b7e9224ba8d3662a176cbcca3b1219da448246ac
+  - path: methods/geometry/locally_optimal_projection/reports/METHOD-020-v3-screening.md
+    sha256: 46b24b8cc098c6f80037ac8cc1678a5385bf87be4e8718b38e95ea4dd99b33e1
+  - path: methods/geometry/locally_optimal_projection/reports/README.md
+    sha256: 1653de446ad4f3ff369d31ff275f8c9d049ce01bb6dbe5519dc72eb55783c76d
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 08fbab7803967fc5d6d2800c6fab90f5f2ef1ed69b73dde9aefea7724c13480a
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: 33f6b63bc8053673a5fdeef9686aa764e695fc34cad40332b4131a86f083ad32
+  - path: src/app/Sandbox/README.md
+    sha256: fe9ac4176cde444d2346bde2b4741378cd4e69e193c5f8bb6d761784f865403b
+  - path: src/runtime/CMakeLists.txt
+    sha256: 5732d425dba4dc3e3b1e1960bab1e2c896ddf0e2784089d5a922af6bfbf30393
+  - path: src/runtime/README.md
+    sha256: efc6e45fc599686437f4bbb2791feeecd96de03a6430c5243c5cc4708e1a1ff2
+  - path: src/runtime/Runtime.PointCloudConsolidationConfig.cpp
+    sha256: 00fad1b176b2bfb0d72f2eada1f1deb5f64b318f005eb2679b4b0bc97f56fc13
+  - path: src/runtime/Runtime.PointCloudConsolidationConfig.cppm
+    sha256: 793ef6a1e6d7300765ab8a59846fab8f55d29c88ebf8bd12db2ce1149710e225
+  - path: src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+    sha256: 77b3b05f903bb9143bfe330a6c7515fe7994cf4b5a87eccecedffb886f7d006e
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
+    sha256: f2c682f2f507d4fd917314f17a5a41e9cffb10db9c80f353f8d588f4399b51da
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
+    sha256: 96f1c673dc58205f69b7ea55da0532dba4b2f733adaa9a37ea422959cd678591
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: 6b34d73a84855fa571531da951ca67dfabf974d2d0dc5ce1327786499d69588e
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+    sha256: 19daf8941f49a5d561d8f8fa1c9231c83d74843fd497af1a50dce5f444082b9d
+  - path: src/runtime/internal/Runtime.PointCloudConsolidationGpu.Internal.hpp
+    sha256: c6cb36cb5a747885cca98d27019569fb442934a8ac712cf795684ca08c6425b5
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 9b3ab4aba0cb18ed5ba1aeeec85b5fa1830932e55591e62156ed8d5d85bab804
+  - path: tasks/active/README.md
+    sha256: 718a88bb350493fac52ee1b091876ea6d20db493e8da85653c9ad1a1018436d5
+  - path: tasks/backlog/bugs/index.md
+    sha256: e678d49ef0e8e68ca3386d9c0425810f3f4a19f1ce057f9b13d4707c2e5aa379
+  - path: tasks/backlog/methods/README.md
+    sha256: 19e0e6440caa25e73929f5433f0fb3bf5bbea6c7ffb46c8af56bf79a76c0dee6
+  - path: tasks/done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md
+    sha256: cebb1ac1406419b1ec138024a4d2f23b8075768e904394cfe64ad5dd6e614b06
+  - path: tasks/done/BUG-130-rejected-run-historical-task-seal.md
+    sha256: d4cbf1dc6fe1f9cf3e96f56d2137c4d39d50914a275b5d7fd5fded69e43810db
+  - path: tasks/done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md
+    sha256: be0c0a21282cf30d5f36c762fc2dcc53d402fb9271c3748959ec6ae236b6a62b
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 3aadc5318de117f2492f6825b5cce7c8c4bc3c5613c944bd77c284cce0594184
+  - path: tasks/evidence/BUG-129/commands/benchmark-result-regression-final.json
+    sha256: ded252002865351e9a64184c72ff28266a17f2fde9ec4f65b9fe4871d3cfc318
+  - path: tasks/evidence/BUG-129/commands/benchmark-result-regression-final.stderr.log
+    sha256: 8dab4d06da9abf173dd7634d9e8f3adb3e87ed49d99c1650337d859cb05ca98d
+  - path: tasks/evidence/BUG-129/commands/benchmark-result-regression-final.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/benchmark-result-regression.json
+    sha256: 3a455310a826e75fde5503f350b2651fa69313f2d9c000d316ecce9bef77fc3e
+  - path: tasks/evidence/BUG-129/commands/benchmark-result-regression.stderr.log
+    sha256: 9d759badbf96827da64fe08347a37d4a98e8c11cb7697a867ad9b3145dcd6ed6
+  - path: tasks/evidence/BUG-129/commands/benchmark-result-regression.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-benchmark-passed-path.json
+    sha256: 4cb2c630a86cdaefdc2db43799d64ec4ab98edf364b68a9ff1401acb6a0f6ef0
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-benchmark-passed-path.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-benchmark-passed-path.stdout.log
+    sha256: 77f69561b5f982f074182514633a546b681c7fc884fa328dcb3260b067e43da7
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-runner-build.json
+    sha256: cd96a88b9fa00b2595109503c03dcb07842b149fa67b5dbb5650e8982c59d0a2
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-runner-build.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-runner-build.stdout.log
+    sha256: 7fbe82449697c2788c35afe48614eca1b327188db0cd732741714df0ce3cdddc
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-runner-rebuild.json
+    sha256: 5daf472d473f13bc0d90dee89466e03ec0b5695489dd28274835b1d9772f13a8
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-runner-rebuild.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/ci-vulkan-runner-rebuild.stdout.log
+    sha256: c4b434691e935bad900ebcd78ad6f29ec80382679fe5d21f3e71c75bd14f4472
+  - path: tasks/evidence/BUG-129/commands/doc-links-retired.json
+    sha256: 62dd27f0199dd57b7a82163f4f00490201f55794a7e372cfbbd9abf656ae31d7
+  - path: tasks/evidence/BUG-129/commands/doc-links-retired.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/doc-links-retired.stdout.log
+    sha256: b583f7df12a9a0a5273a799fdcc0db2c01325238bca5d79ae303efbec626808d
+  - path: tasks/evidence/BUG-129/commands/doc-links.json
+    sha256: 9209a200287d4737d9e495aae0c6e9313169cf4c4642bfd7a208f040371c4ad1
+  - path: tasks/evidence/BUG-129/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/doc-links.stdout.log
+    sha256: 64c3a02063e9ed6edfce8de37f2b72bfa1a02ce841884188bfe26df0e2a50b37
+  - path: tasks/evidence/BUG-129/commands/experiment-custody-regression-final.json
+    sha256: 4d486f4d3fa9b85cd90fda5bdad80ec7243168ecf026f630b813098e81ae3bb1
+  - path: tasks/evidence/BUG-129/commands/experiment-custody-regression-final.stderr.log
+    sha256: 1c058b5b8db37abd102ce38e647130b0a45421f28b77f127e7d2093a2b9c5ced
+  - path: tasks/evidence/BUG-129/commands/experiment-custody-regression-final.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/experiment-custody-regression.json
+    sha256: 71136fe1c1de46c541262ceaac31131bbd1239134e3a7333236d87d8e29c32f5
+  - path: tasks/evidence/BUG-129/commands/experiment-custody-regression.stderr.log
+    sha256: f8ac727f5798e64ba05d08197f5260ca51dac4551db2526da0ca5145a75cea69
+  - path: tasks/evidence/BUG-129/commands/experiment-custody-regression.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/global-custody-final.json
+    sha256: 803cf2ed04c4d3f10b2a848d7b9655203fdd6f58816179682473ea6cfe2267f7
+  - path: tasks/evidence/BUG-129/commands/global-custody-final.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/global-custody-final.stdout.log
+    sha256: 902f940c9c81b9c1c5d15f7ecd1ce073fd0e48b6493ea457c669c6f2050cff27
+  - path: tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.json
+    sha256: 1036778ee5c50a68f4a0db6cb2160038d4d49d86d97428a5d10a50fccf95a778
+  - path: tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.stdout.log
+    sha256: 710370a0ec6bc571ea338f8e80e04afebfb4946585b351469405928dda73f834
+  - path: tasks/evidence/BUG-129/commands/global-experiment-custody.json
+    sha256: 56328e9f80f52e37017ad46d89029f6709646372b5bc7cf98050e246fb7bb930
+  - path: tasks/evidence/BUG-129/commands/global-experiment-custody.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/global-experiment-custody.stdout.log
+    sha256: 902f940c9c81b9c1c5d15f7ecd1ce073fd0e48b6493ea457c669c6f2050cff27
+  - path: tasks/evidence/BUG-129/commands/method020-result-validation.json
+    sha256: 26fb8053f4dfd1304d4a1f9dbe9241dfb4681833a922c523e4f6a870b38fd750
+  - path: tasks/evidence/BUG-129/commands/method020-result-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/method020-result-validation.stdout.log
+    sha256: a806b163d505e492f471c36ffc20357118b68a9e796734da3bfcc9b8cb6740fe
+  - path: tasks/evidence/BUG-129/commands/session-brief.json
+    sha256: 56064eabf5d6a4554ac4069ffa7367c4d18cc75c419380ef41200631fbf941ba
+  - path: tasks/evidence/BUG-129/commands/session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/BUG-129/commands/skill-mirror-check.json
+    sha256: 9ac41e96be0d15a1fc557505a6a003a58d5b8823904c3ebf6eddf85d98f5c2b1
+  - path: tasks/evidence/BUG-129/commands/skill-mirror-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/skill-mirror-check.stdout.log
+    sha256: c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58
+  - path: tasks/evidence/BUG-129/commands/skill-mirrors-retired.json
+    sha256: 3f35db1c96e560356fe49c1a1dd15dbc498ab18c21ad5c5fe03445955c3cadf3
+  - path: tasks/evidence/BUG-129/commands/skill-mirrors-retired.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/skill-mirrors-retired.stdout.log
+    sha256: c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58
+  - path: tasks/evidence/BUG-129/commands/task-policy-retired-before-commit-reference.json
+    sha256: cd1a726968d8fc15e6e62150e39da50ab9ee561d18bc462640865bcb41b5fe25
+  - path: tasks/evidence/BUG-129/commands/task-policy-retired-before-commit-reference.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/task-policy-retired-before-commit-reference.stdout.log
+    sha256: 3eb5062576f76fdd8ab4be3071ef5a107e041e927463a9a8dc6a739384e9d5f7
+  - path: tasks/evidence/BUG-129/commands/task-policy-retired.json
+    sha256: c6b43908fe8b3f47016f9e29e24be4aa1ede7a162bab54c6bbf4a3a5bf1fe9f2
+  - path: tasks/evidence/BUG-129/commands/task-policy-retired.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/task-policy-retired.stdout.log
+    sha256: 7d1853beaf3450aee91ccf6f2cd4fdc806f050422f8843fa8c7d03b3b3564f90
+  - path: tasks/evidence/BUG-129/commands/task-policy.json
+    sha256: 985fc1b241edc50ab32380c714cd146fc33e747f39d902621f82314e16e500d6
+  - path: tasks/evidence/BUG-129/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/task-policy.stdout.log
+    sha256: 913bc8de47b038c6151d41b6a841484d2d82a2f2133e652f0a441f4671a98df5
+  - path: tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.json
+    sha256: 8078d76f2478eb1d76e8e1b5393a0b38474bc91b9a12668dbaa4d83c32f17da5
+  - path: tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.stdout.log
+    sha256: ea8b0205a5613758549ac213634bda13d0eb5e826ec94f4e3cf58cbd6ef814c6
+  - path: tasks/evidence/BUG-129/commands/task-validation-retired.json
+    sha256: acf2586d56a69cf2de42a812b3065366e7cb04bb220a1476d9cffb6fb5f81982
+  - path: tasks/evidence/BUG-129/commands/task-validation-retired.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/task-validation-retired.stdout.log
+    sha256: b584d149e7be91ec2e9164bbf6592b742fc49a70940950721f96f0e8b85936e9
+  - path: tasks/evidence/BUG-129/commands/task-validation.json
+    sha256: 372333aa2df4b60899b157681c4607b620a9290e4546d44e452806b39dea57e4
+  - path: tasks/evidence/BUG-129/commands/task-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/task-validation.stdout.log
+    sha256: b584d149e7be91ec2e9164bbf6592b742fc49a70940950721f96f0e8b85936e9
+  - path: tasks/evidence/BUG-129/commands/test-layout.json
+    sha256: d27946cefc785955f1a0caa042d06a257c94e65e972fb1f1955cedf6f929c9fa
+  - path: tasks/evidence/BUG-129/commands/test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.json
+    sha256: 06d0b18d6451dff162ea7959a1d7f91ec528100d2c0fa03fbfbab3d5f6188fa7
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.stdout.log
+    sha256: 678631933cd02c35dbc74d733f5b218549685f2ff7fb24333cf3e73177678be5
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-initial-timeout.json
+    sha256: 0d56c0124375f9c6592345cb933b40d0ff1ec76b4eae2da0427a179bb1806d23
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-initial-timeout.stderr.log
+    sha256: 18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-initial-timeout.stdout.log
+    sha256: c60422e7c2d2ffdfe24dd0649e58283360701703730a6d9b3077a00fc3101842
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-regression.json
+    sha256: 51d11bfab778287dab8fb633974d27eb43bd862e8fdb766af32e6b9162fcada7
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-regression.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-regression.stdout.log
+    sha256: 8ead3d80931d9070e03b7776b1dbd7990a43a01fa78eec5112b44482d9f1cf1f
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-requested-actual.json
+    sha256: b8473933eeb7ad5c369e6fd385927a3c0ff9f45d8182693097fe88e9b497071f
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-requested-actual.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-requested-actual.stdout.log
+    sha256: 8ead3d80931d9070e03b7776b1dbd7990a43a01fa78eec5112b44482d9f1cf1f
+  - path: tasks/evidence/BUG-129/handoff.jsonl
+    sha256: 20e32d786e787d68ff8701d803f5c195c7c53330351e294e4163b4dcaf0a91db
+  - path: tasks/evidence/BUG-129/report.yaml
+    sha256: 512b7029cbec27b6fb991a59656df2af1284039b81982f1e18caf9e0f125ce30
+  - path: tasks/evidence/BUG-129/reviews.jsonl
+    sha256: 9d735d970548509c3edcca2dbcfae0ef6b8001fa21236919e44a20525d39fb25
+  - path: tasks/evidence/BUG-130/commands/custody-regression-r2.json
+    sha256: b9ff2fcab99579b301662aa2c3e3da0fcd2eacc0fa859e354ab6f213faf294d8
+  - path: tasks/evidence/BUG-130/commands/custody-regression-r2.stderr.log
+    sha256: 272c0f3bb533f2e7f9ac780078a69057790a7bdc350245e28fd48cd15a043d85
+  - path: tasks/evidence/BUG-130/commands/custody-regression-r2.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/custody-regression.json
+    sha256: 95701a2982da4904af243b57ee5ea306fd657d37329efd04d227ebbc0850c417
+  - path: tasks/evidence/BUG-130/commands/custody-regression.stderr.log
+    sha256: 734431e65800dcdf42d252e89de9a21010f72fade409bfcb45c4e15b0961f707
+  - path: tasks/evidence/BUG-130/commands/custody-regression.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/doc-links.json
+    sha256: 8a0d75788a8749c9b49b6c96af779a5a66dc3edfbc3718a04dcbd4485d8b8385
+  - path: tasks/evidence/BUG-130/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/doc-links.stdout.log
+    sha256: bec7179bd2af16d83e7d65274e21b25e0b1e609250304fb6bf2f07c722f20a6e
+  - path: tasks/evidence/BUG-130/commands/global-custody-r2.json
+    sha256: 6aac16445c27fa2f51cb80bc130a5067d518078c4a32ea2caadb82b665d2d23e
+  - path: tasks/evidence/BUG-130/commands/global-custody-r2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/global-custody-r2.stdout.log
+    sha256: 53eb82f4b8d0c715999413a99d88ea36441fd326fbba671f6dd38e9cf8844fec
+  - path: tasks/evidence/BUG-130/commands/global-custody.json
+    sha256: 71fa19330169a97bb8e3463b441f03547a3100b4c92c2d72fe39dd3dd3e16675
+  - path: tasks/evidence/BUG-130/commands/global-custody.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/global-custody.stdout.log
+    sha256: 53eb82f4b8d0c715999413a99d88ea36441fd326fbba671f6dd38e9cf8844fec
+  - path: tasks/evidence/BUG-130/commands/retirement-doc-links-r2.json
+    sha256: edc3ff8a213afd7dd19a640dbf2b2aca5f3b5fd3762dc14c916e713df0eee772
+  - path: tasks/evidence/BUG-130/commands/retirement-doc-links-r2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-doc-links-r2.stdout.log
+    sha256: c6f5bdab0981c23da3cd47b11355d4b8713efa3aef010110fcbdcf39b351bba6
+  - path: tasks/evidence/BUG-130/commands/retirement-doc-links.json
+    sha256: d090a42933a2c890897f0a158c5333e427ae3011291a27b71cc1531a37310b8a
+  - path: tasks/evidence/BUG-130/commands/retirement-doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-doc-links.stdout.log
+    sha256: bec7179bd2af16d83e7d65274e21b25e0b1e609250304fb6bf2f07c722f20a6e
+  - path: tasks/evidence/BUG-130/commands/retirement-session-brief-r2.json
+    sha256: 818c5e2e648ca19e027c68a5eaf0a58c6788f2b8c72ba9faba7731696a44dc42
+  - path: tasks/evidence/BUG-130/commands/retirement-session-brief-r2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-session-brief-r2.stdout.log
+    sha256: 033aa66b4254012cbe47bcc950cab67ace08daca3aec2ecd43c41082489b3939
+  - path: tasks/evidence/BUG-130/commands/retirement-session-brief.json
+    sha256: 1d0796a840ae446513af5d9fff845113f9acced58395e1f88f2cd4fb254485cd
+  - path: tasks/evidence/BUG-130/commands/retirement-session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-session-brief.stdout.log
+    sha256: 033aa66b4254012cbe47bcc950cab67ace08daca3aec2ecd43c41082489b3939
+  - path: tasks/evidence/BUG-130/commands/retirement-skill-mirrors-r2.json
+    sha256: 2c94aeb9aba2ece4190666b6ad77e5ea86f5b8e4ab044ca62af3bce2b80d6a4e
+  - path: tasks/evidence/BUG-130/commands/retirement-skill-mirrors-r2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-skill-mirrors-r2.stdout.log
+    sha256: c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58
+  - path: tasks/evidence/BUG-130/commands/retirement-skill-mirrors.json
+    sha256: 694600531ad5c986a0e11cf58479ea925a9d669d71e0ab73374a02dd195a57c7
+  - path: tasks/evidence/BUG-130/commands/retirement-skill-mirrors.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-skill-mirrors.stdout.log
+    sha256: c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58
+  - path: tasks/evidence/BUG-130/commands/retirement-task-policy-r2.json
+    sha256: f9c46703ecf7730a1202893c71c3af1e75effb809254b19a56ed92e54ad6410b
+  - path: tasks/evidence/BUG-130/commands/retirement-task-policy-r2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-task-policy-r2.stdout.log
+    sha256: 91bd03ab674b3e79cc99b130203c76530486a09d42d95fd68dd77b4b955b5b91
+  - path: tasks/evidence/BUG-130/commands/retirement-task-policy.json
+    sha256: 2620dfd943f9493a72b19b6e530f41ab3a7991ea47d5f328b85ef17ab42b990e
+  - path: tasks/evidence/BUG-130/commands/retirement-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-task-policy.stdout.log
+    sha256: 91bd03ab674b3e79cc99b130203c76530486a09d42d95fd68dd77b4b955b5b91
+  - path: tasks/evidence/BUG-130/commands/retirement-task-validation-r2.json
+    sha256: 3be3fbe1ffb56fdde31cbc67b52cbdfda165702e4fa4eda7fb27e69d552e1cfd
+  - path: tasks/evidence/BUG-130/commands/retirement-task-validation-r2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-task-validation-r2.stdout.log
+    sha256: e1a1374487457005dd007104f8da96c28edd9dcc85afc49267d900de468cdef2
+  - path: tasks/evidence/BUG-130/commands/retirement-task-validation.json
+    sha256: 30400db9f24871de4cb79d6505d264884a5659420515262c2a7075fb8786f200
+  - path: tasks/evidence/BUG-130/commands/retirement-task-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/retirement-task-validation.stdout.log
+    sha256: e1a1374487457005dd007104f8da96c28edd9dcc85afc49267d900de468cdef2
+  - path: tasks/evidence/BUG-130/commands/skill-mirror-check-r2.json
+    sha256: cf28aa3a2b9c00244c93e4d5d4bfba18867c56a0ae1e0be1e303fb24889fd675
+  - path: tasks/evidence/BUG-130/commands/skill-mirror-check-r2.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/skill-mirror-check-r2.stdout.log
+    sha256: c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58
+  - path: tasks/evidence/BUG-130/commands/skill-mirror-check.json
+    sha256: 47214901afc31d6c19d325b1ae3650faabb479fd41522a0c81a6a820708baa70
+  - path: tasks/evidence/BUG-130/commands/skill-mirror-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/skill-mirror-check.stdout.log
+    sha256: c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58
+  - path: tasks/evidence/BUG-130/commands/task-policy.json
+    sha256: 9534ae7e75009063b17dddafb2ea805a8cb5a73b5ac6a3fd93ec969f56f50672
+  - path: tasks/evidence/BUG-130/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/task-policy.stdout.log
+    sha256: 38582eb5715f65f2d94e7002c55712c1cf4c077c37f3ba2b3fe862dee5c4e6f1
+  - path: tasks/evidence/BUG-130/commands/task-validation.json
+    sha256: 8b193b472b531499455b792bffaa4360295d3c77849fd4c759c37acb22eb7809
+  - path: tasks/evidence/BUG-130/commands/task-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-130/commands/task-validation.stdout.log
+    sha256: e1a1374487457005dd007104f8da96c28edd9dcc85afc49267d900de468cdef2
+  - path: tasks/evidence/BUG-130/handoff.jsonl
+    sha256: 4cd3d2663a56505927e448f8039b5564c6a8e50413a70b6af8352b350cb674a9
+  - path: tasks/evidence/BUG-130/report.yaml
+    sha256: 77302f3dd3172142db2138a1a1a0870aef9f4612293bf4a32ecf5e04289493ae
+  - path: tasks/evidence/BUG-130/reviews.jsonl
+    sha256: f5b4dd9da441380556b9b278489c2fa4784fda1ef5ae6ccf009a535f03e997c1
+  - path: tests/CMakeLists.txt
+    sha256: b50b37ddb85533fb1591eeda3e771d568e5ef4d35c0c38adccd341e8d6509a2d
+  - path: tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+    sha256: 6dbe72234ae140d1e6db753300145214bc303232a363c0bf21b078bd040de992
+  - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+    sha256: 78945f02d00291a4faca506e08b662f10758a5f28c2619448da44cdb82c100b0
+  - path: tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+    sha256: 388bc7a55056aa0d25fa228a83e575c50cb3a3d41e3c23a2554961cdfb909513
+  - path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+    sha256: 999d595963203aa3cbf64d2db44480319b71b3e46db9d989ba177c469c8197ef
+  - path: tests/regression/tooling/Test.ExperimentCustody.py
+    sha256: 29f708747d6d4c7e7fe3859e647f182b10b30772bc7ac742f971e783f72907a0
+  - path: tests/regression/tooling/Test.LopFamilyGpuBenchmarkUnavailable.py
+    sha256: 83f7170083a982ec74c8d54a5a373240c465889de579ef3e82b36f53f29ee212
+  - path: tools/agents/experiment_custody.py
+    sha256: 746cb8b1ae53e5f6ad079eebcd589f62d589bad0d925087994f987705bf249e9
+  - path: tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
+    sha256: ce1a206ed1cd4659fffda5b68cb9619d780a94a6465df87837188f7e171b7fc7
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 69ba66d421e9bc59b1163a85b8df6f66f242868f78bc99141fd6483cced94e5d
+  content_digest: 8266707144e6d723d743c0e669d0e49ccd76acc5b8c10a5c793855c6ae226a62
+touched:
+  paths:
+  - CMakePresets.json
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - assets/shaders/lop_density.comp
+  - assets/shaders/lop_final_reduce.comp
+  - assets/shaders/lop_gpu_common.glslinc
+  - assets/shaders/lop_grid_count.comp
+  - assets/shaders/lop_grid_scatter.comp
+  - assets/shaders/lop_initialize.comp
+  - assets/shaders/lop_iteration_finalize.comp
+  - assets/shaders/lop_iteration_reset.comp
+  - assets/shaders/lop_project.comp
+  - benchmarks/CMakeLists.txt
+  - benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+  - benchmarks/geometry/README.md
+  - benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke.yaml
+  - benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v2.yaml
+  - benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml
+  - docs/agent/benchmark-workflow.md
+  - docs/agent/workflow-evidence.md
+  - docs/architecture/algorithm-variant-dispatch.md
+  - docs/architecture/engine-config.md
+  - docs/architecture/runtime-config-control.md
+  - docs/benchmarking/result-json-schema.md
+  - methods/geometry/continuous_lop/README.md
+  - methods/geometry/continuous_lop/method.yaml
+  - methods/geometry/edge_aware_resampling/README.md
+  - methods/geometry/edge_aware_resampling/method.yaml
+  - methods/geometry/locally_optimal_projection/README.md
+  - methods/geometry/locally_optimal_projection/method.yaml
+  - methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol-v2.md
+  - methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol-v3.md
+  - methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol.md
+  - methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md
+  - methods/geometry/locally_optimal_projection/reports/METHOD-020-v1-screening.md
+  - methods/geometry/locally_optimal_projection/reports/METHOD-020-v2-screening.md
+  - methods/geometry/locally_optimal_projection/reports/METHOD-020-v3-screening.md
+  - methods/geometry/locally_optimal_projection/reports/README.md
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/README.md
+  - src/runtime/CMakeLists.txt
+  - src/runtime/README.md
+  - src/runtime/Runtime.PointCloudConsolidationConfig.cpp
+  - src/runtime/Runtime.PointCloudConsolidationConfig.cppm
+  - src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cppm
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+  - src/runtime/internal/Runtime.PointCloudConsolidationGpu.Internal.hpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/methods/README.md
+  - tasks/done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md
+  - tasks/done/BUG-130-rejected-run-historical-task-seal.md
+  - tasks/done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/BUG-129/commands/benchmark-result-regression-final.json
+  - tasks/evidence/BUG-129/commands/benchmark-result-regression-final.stderr.log
+  - tasks/evidence/BUG-129/commands/benchmark-result-regression-final.stdout.log
+  - tasks/evidence/BUG-129/commands/benchmark-result-regression.json
+  - tasks/evidence/BUG-129/commands/benchmark-result-regression.stderr.log
+  - tasks/evidence/BUG-129/commands/benchmark-result-regression.stdout.log
+  - tasks/evidence/BUG-129/commands/ci-vulkan-benchmark-passed-path.json
+  - tasks/evidence/BUG-129/commands/ci-vulkan-benchmark-passed-path.stderr.log
+  - tasks/evidence/BUG-129/commands/ci-vulkan-benchmark-passed-path.stdout.log
+  - tasks/evidence/BUG-129/commands/ci-vulkan-runner-build.json
+  - tasks/evidence/BUG-129/commands/ci-vulkan-runner-build.stderr.log
+  - tasks/evidence/BUG-129/commands/ci-vulkan-runner-build.stdout.log
+  - tasks/evidence/BUG-129/commands/ci-vulkan-runner-rebuild.json
+  - tasks/evidence/BUG-129/commands/ci-vulkan-runner-rebuild.stderr.log
+  - tasks/evidence/BUG-129/commands/ci-vulkan-runner-rebuild.stdout.log
+  - tasks/evidence/BUG-129/commands/doc-links-retired.json
+  - tasks/evidence/BUG-129/commands/doc-links-retired.stderr.log
+  - tasks/evidence/BUG-129/commands/doc-links-retired.stdout.log
+  - tasks/evidence/BUG-129/commands/doc-links.json
+  - tasks/evidence/BUG-129/commands/doc-links.stderr.log
+  - tasks/evidence/BUG-129/commands/doc-links.stdout.log
+  - tasks/evidence/BUG-129/commands/experiment-custody-regression-final.json
+  - tasks/evidence/BUG-129/commands/experiment-custody-regression-final.stderr.log
+  - tasks/evidence/BUG-129/commands/experiment-custody-regression-final.stdout.log
+  - tasks/evidence/BUG-129/commands/experiment-custody-regression.json
+  - tasks/evidence/BUG-129/commands/experiment-custody-regression.stderr.log
+  - tasks/evidence/BUG-129/commands/experiment-custody-regression.stdout.log
+  - tasks/evidence/BUG-129/commands/global-custody-final.json
+  - tasks/evidence/BUG-129/commands/global-custody-final.stderr.log
+  - tasks/evidence/BUG-129/commands/global-custody-final.stdout.log
+  - tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.json
+  - tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.stderr.log
+  - tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.stdout.log
+  - tasks/evidence/BUG-129/commands/global-experiment-custody.json
+  - tasks/evidence/BUG-129/commands/global-experiment-custody.stderr.log
+  - tasks/evidence/BUG-129/commands/global-experiment-custody.stdout.log
+  - tasks/evidence/BUG-129/commands/method020-result-validation.json
+  - tasks/evidence/BUG-129/commands/method020-result-validation.stderr.log
+  - tasks/evidence/BUG-129/commands/method020-result-validation.stdout.log
+  - tasks/evidence/BUG-129/commands/session-brief.json
+  - tasks/evidence/BUG-129/commands/session-brief.stderr.log
+  - tasks/evidence/BUG-129/commands/session-brief.stdout.log
+  - tasks/evidence/BUG-129/commands/skill-mirror-check.json
+  - tasks/evidence/BUG-129/commands/skill-mirror-check.stderr.log
+  - tasks/evidence/BUG-129/commands/skill-mirror-check.stdout.log
+  - tasks/evidence/BUG-129/commands/skill-mirrors-retired.json
+  - tasks/evidence/BUG-129/commands/skill-mirrors-retired.stderr.log
+  - tasks/evidence/BUG-129/commands/skill-mirrors-retired.stdout.log
+  - tasks/evidence/BUG-129/commands/task-policy-retired-before-commit-reference.json
+  - tasks/evidence/BUG-129/commands/task-policy-retired-before-commit-reference.stderr.log
+  - tasks/evidence/BUG-129/commands/task-policy-retired-before-commit-reference.stdout.log
+  - tasks/evidence/BUG-129/commands/task-policy-retired.json
+  - tasks/evidence/BUG-129/commands/task-policy-retired.stderr.log
+  - tasks/evidence/BUG-129/commands/task-policy-retired.stdout.log
+  - tasks/evidence/BUG-129/commands/task-policy.json
+  - tasks/evidence/BUG-129/commands/task-policy.stderr.log
+  - tasks/evidence/BUG-129/commands/task-policy.stdout.log
+  - tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.json
+  - tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.stderr.log
+  - tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.stdout.log
+  - tasks/evidence/BUG-129/commands/task-validation-retired.json
+  - tasks/evidence/BUG-129/commands/task-validation-retired.stderr.log
+  - tasks/evidence/BUG-129/commands/task-validation-retired.stdout.log
+  - tasks/evidence/BUG-129/commands/task-validation.json
+  - tasks/evidence/BUG-129/commands/task-validation.stderr.log
+  - tasks/evidence/BUG-129/commands/task-validation.stdout.log
+  - tasks/evidence/BUG-129/commands/test-layout.json
+  - tasks/evidence/BUG-129/commands/test-layout.stderr.log
+  - tasks/evidence/BUG-129/commands/test-layout.stdout.log
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.json
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.stderr.log
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.stdout.log
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-initial-timeout.json
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-initial-timeout.stderr.log
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-initial-timeout.stdout.log
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-regression.json
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-regression.stderr.log
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-regression.stdout.log
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-requested-actual.json
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-requested-actual.stderr.log
+  - tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-requested-actual.stdout.log
+  - tasks/evidence/BUG-129/handoff.jsonl
+  - tasks/evidence/BUG-129/report.yaml
+  - tasks/evidence/BUG-129/reviews.jsonl
+  - tasks/evidence/BUG-130/commands/custody-regression-r2.json
+  - tasks/evidence/BUG-130/commands/custody-regression-r2.stderr.log
+  - tasks/evidence/BUG-130/commands/custody-regression-r2.stdout.log
+  - tasks/evidence/BUG-130/commands/custody-regression.json
+  - tasks/evidence/BUG-130/commands/custody-regression.stderr.log
+  - tasks/evidence/BUG-130/commands/custody-regression.stdout.log
+  - tasks/evidence/BUG-130/commands/doc-links.json
+  - tasks/evidence/BUG-130/commands/doc-links.stderr.log
+  - tasks/evidence/BUG-130/commands/doc-links.stdout.log
+  - tasks/evidence/BUG-130/commands/global-custody-r2.json
+  - tasks/evidence/BUG-130/commands/global-custody-r2.stderr.log
+  - tasks/evidence/BUG-130/commands/global-custody-r2.stdout.log
+  - tasks/evidence/BUG-130/commands/global-custody.json
+  - tasks/evidence/BUG-130/commands/global-custody.stderr.log
+  - tasks/evidence/BUG-130/commands/global-custody.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-doc-links-r2.json
+  - tasks/evidence/BUG-130/commands/retirement-doc-links-r2.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-doc-links-r2.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-doc-links.json
+  - tasks/evidence/BUG-130/commands/retirement-doc-links.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-doc-links.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-session-brief-r2.json
+  - tasks/evidence/BUG-130/commands/retirement-session-brief-r2.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-session-brief-r2.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-session-brief.json
+  - tasks/evidence/BUG-130/commands/retirement-session-brief.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-session-brief.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-skill-mirrors-r2.json
+  - tasks/evidence/BUG-130/commands/retirement-skill-mirrors-r2.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-skill-mirrors-r2.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-skill-mirrors.json
+  - tasks/evidence/BUG-130/commands/retirement-skill-mirrors.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-skill-mirrors.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-task-policy-r2.json
+  - tasks/evidence/BUG-130/commands/retirement-task-policy-r2.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-task-policy-r2.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-task-policy.json
+  - tasks/evidence/BUG-130/commands/retirement-task-policy.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-task-policy.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-task-validation-r2.json
+  - tasks/evidence/BUG-130/commands/retirement-task-validation-r2.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-task-validation-r2.stdout.log
+  - tasks/evidence/BUG-130/commands/retirement-task-validation.json
+  - tasks/evidence/BUG-130/commands/retirement-task-validation.stderr.log
+  - tasks/evidence/BUG-130/commands/retirement-task-validation.stdout.log
+  - tasks/evidence/BUG-130/commands/skill-mirror-check-r2.json
+  - tasks/evidence/BUG-130/commands/skill-mirror-check-r2.stderr.log
+  - tasks/evidence/BUG-130/commands/skill-mirror-check-r2.stdout.log
+  - tasks/evidence/BUG-130/commands/skill-mirror-check.json
+  - tasks/evidence/BUG-130/commands/skill-mirror-check.stderr.log
+  - tasks/evidence/BUG-130/commands/skill-mirror-check.stdout.log
+  - tasks/evidence/BUG-130/commands/task-policy.json
+  - tasks/evidence/BUG-130/commands/task-policy.stderr.log
+  - tasks/evidence/BUG-130/commands/task-policy.stdout.log
+  - tasks/evidence/BUG-130/commands/task-validation.json
+  - tasks/evidence/BUG-130/commands/task-validation.stderr.log
+  - tasks/evidence/BUG-130/commands/task-validation.stdout.log
+  - tasks/evidence/BUG-130/handoff.jsonl
+  - tasks/evidence/BUG-130/report.yaml
+  - tasks/evidence/BUG-130/reviews.jsonl
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+  - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+  - tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+  - tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+  - tests/regression/tooling/Test.ExperimentCustody.py
+  - tests/regression/tooling/Test.LopFamilyGpuBenchmarkUnavailable.py
+  - tools/agents/experiment_custody.py
+  - tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  layers:
+  - app
+  - benchmarks
+  - graphics-rhi
+  - methods
+  - runtime
+  - tests
+  modules:
+  - experiment-custody
+  - lop-family-vulkan
+  - point-cloud-consolidation
+extension_seam: The existing validated consolidation backend axis selects one private runtime Vulkan participant;
+  geometry remains the CPU oracle and no Vk type or public recorder seam escapes RHI.
+future_change_plan: Expose another strategy/device path only through a new frozen protocol, CPU-reference
+  parity, capability preview, actual-backend/fallback evidence, and the existing config/runtime/UI publication
+  path.
+acceptance:
+- criterion: Every strategy is evaluated. Each exposed GPU strategy passes the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Fallback telemetry is asserted in the default CPU gate.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The GPU benchmark validates and reports a CPU-reference baseline (no bare speedup claim).
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Where METHOD-019 exposed `cpu_optimized`, report it as an additional
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The actual-GPU result validates; skipped/fallback execution is reported
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No `Vk*` types cross the public seam.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/METHOD-020/commands/ara-final.json
+- receipt: tasks/evidence/METHOD-020/commands/benchmark-manifests-final.json
+- receipt: tasks/evidence/METHOD-020/commands/benchmark-results-final.json
+- receipt: tasks/evidence/METHOD-020/commands/ci-asan-build.json
+- receipt: tasks/evidence/METHOD-020/commands/ci-asan-configure.json
+- receipt: tasks/evidence/METHOD-020/commands/ci-asan-tests.json
+- receipt: tasks/evidence/METHOD-020/commands/ci-build.json
+- receipt: tasks/evidence/METHOD-020/commands/ci-tests.json
+- receipt: tasks/evidence/METHOD-020/commands/ci-ubsan-build.json
+- receipt: tasks/evidence/METHOD-020/commands/ci-ubsan-configure.json
+- receipt: tasks/evidence/METHOD-020/commands/ci-ubsan-tests.json
+- receipt: tasks/evidence/METHOD-020/commands/claim-confirmation.json
+- receipt: tasks/evidence/METHOD-020/commands/claim-result-validate.json
+- receipt: tasks/evidence/METHOD-020/commands/claim-seal.json
+- receipt: tasks/evidence/METHOD-020/commands/doc-links-final.json
+- receipt: tasks/evidence/METHOD-020/commands/experiment-completion-final.json
+- receipt: tasks/evidence/METHOD-020/commands/experiment-custody-final.json
+- receipt: tasks/evidence/METHOD-020/commands/layering-final.json
+- receipt: tasks/evidence/METHOD-020/commands/method-manifests-final.json
+- receipt: tasks/evidence/METHOD-020/commands/retirement-ara.json
+- receipt: tasks/evidence/METHOD-020/commands/retirement-completion.json
+- receipt: tasks/evidence/METHOD-020/commands/retirement-custody.json
+- receipt: tasks/evidence/METHOD-020/commands/retirement-doc-links.json
+- receipt: tasks/evidence/METHOD-020/commands/retirement-session-brief.json
+- receipt: tasks/evidence/METHOD-020/commands/retirement-skill-mirrors.json
+- receipt: tasks/evidence/METHOD-020/commands/retirement-task-policy.json
+- receipt: tasks/evidence/METHOD-020/commands/retirement-task-validation.json
+- receipt: tasks/evidence/METHOD-020/commands/root-hygiene-final.json
+- receipt: tasks/evidence/METHOD-020/commands/skill-mirror-final.json
+- receipt: tasks/evidence/METHOD-020/commands/task-policy-final.json
+- receipt: tasks/evidence/METHOD-020/commands/task-validation-final.json
+- receipt: tasks/evidence/METHOD-020/commands/test-layout-final.json
+- receipt: tasks/evidence/METHOD-020/commands/v4-ci-vulkan-build.json
+- receipt: tasks/evidence/METHOD-020/commands/v4-ci-vulkan-tests.json
+- receipt: tasks/evidence/METHOD-020/commands/v4-claim-confirmation.json
+- receipt: tasks/evidence/METHOD-020/commands/v4-claim-result-validate.json
+- receipt: tasks/evidence/METHOD-020/commands/v4-claim-seal.json
+- receipt: tasks/evidence/METHOD-020/commands/v4-release-benchmark-build.json
+changed_public_contracts:
+- A gpu_vulkan_compute request executes actual Vulkan only on an operational device; otherwise it reports
+  cpu_reference plus FellBackToCPU without claiming GPU execution.
+- Ordinary LOP and isotropic WLOP are the only adopted Vulkan pairs; anisotropic WLOP, CLOP, and EAR fail
+  shared preview as capability-negative.
+- GPU completion publishes through the same generation/staleness, undo, property/topology, and render-dirty
+  path as CPU consolidation.
+diagnostics_and_previews:
+- Claim-grade v4/run-002 completed eight Vulkan requests on the recorded RTX 3050 with zero fallback;
+  worst RMS 1.6746e-5 and L-infinity 1.31344e-4 passed frozen bounds.
+- V3/run-001 remains independently rejected because its pre-BUG-129 unavailable runner could exit zero;
+  corrected run-002 is separately accepted.
+benchmark_or_parity_evidence:
+- geometry.lop_family.gpu_vulkan.v3.smoke binds the same-fixture CPU reference, actual device/backend
+  identity, one warmup plus three measured iterations, and explicitly sets speedup_claimed=false.
+docs_sync:
+  task_file: tasks/done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Operational parity covers two analytic fixtures and one NVIDIA RTX 3050/driver, not scanner corpora
+  or a cross-vendor/device matrix.
+- Timing is host service-command-to-applied-event and supports no device-time, asymptotic, memory-efficiency,
+  or speedup claim.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json
+  sha256: 1b4a87dbcb6fdfa6b5b946dc59aa8b8e0cff846a2dd69d9d9e7043ec5dfba599
+  kind: file
+- path: tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml
+  sha256: 5c953e452f7cff84351f8672df3a24e270c9739a9deecceafadc5453685964d9
+  kind: file
+- path: tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json
+  sha256: 4367f67dce04ed18c115fe694c6f744b226ff6444efbb2775f9083eb545e10a3
+  kind: file
+- path: methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md
+  sha256: 60aba78c3eede5354480af81035f43ad913998fa7005ead9aa854d91df8cd512
+  kind: file
+- path: src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+  sha256: 77b3b05f903bb9143bfe330a6c7515fe7994cf4b5a87eccecedffb886f7d006e
+  kind: file
+- path: tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+  sha256: 388bc7a55056aa0d25fa228a83e575c50cb3a3d41e3c23a2554961cdfb909513
+  kind: file
+- path: tasks/done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md
+  sha256: be0c0a21282cf30d5f36c762fc2dcc53d402fb9271c3748959ec6ae236b6a62b
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/METHOD-020/handoff.jsonl
+review: tasks/evidence/METHOD-020/reviews.jsonl
+experiment_root: tasks/evidence/METHOD-020/experiment
