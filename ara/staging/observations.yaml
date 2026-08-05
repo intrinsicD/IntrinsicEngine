@@ -2139,3 +2139,23 @@ observations:
     promoted_to: "logic/claims.md:C31"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O125
+    timestamp: "2026-08-05T04:52+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-020's frozen v2 isotropic-WLOP fixture also cannot adjudicate
+      Vulkan parity: its CPU oracle returns empty_neighborhood during the first
+      projected-density calculation, before any Vulkan request. METHOD-019 had
+      confirmed exact parity for this intentional failure state, not a usable
+      WLOP position result.
+    context: >
+      The v2 preregistration reused METHOD-019's 40x24, h=0.20, target=240,
+      seed=1902 fixture but incorrectly generalized its parity evidence. The
+      METHOD-019 result report records empty_neighborhood and empty output for
+      both CPU implementations. V2 remains frozen and rejected.
+    potential_type: claim
+    bound_to: [N370]
+    promoted: true
+    promoted_to: "logic/claims.md:C32"
+    crystallized_via: artifact-commitment
+    stale: false
