@@ -3,15 +3,15 @@ task_id: GEOM-075
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-05T01:10:17Z'
+generated_at: '2026-08-05T01:10:48Z'
 claim_eligible: false
 source:
   base_ref: 2c6446cd
   base_revision: 2c6446cd8bca80b7672b6e9dee08cedcf783a6ab
-  head_revision: 4aa5b6d2979c228cbff86455e52bd8866b20143e
+  head_revision: 131fc32569911360fda4955d0f6e39a2958eb690
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: docs/api/generated/module_inventory.md
     sha256: b595f7dc654768ece13c063e02da92f56dceda0e6b05198b13b9b11ac2818bbc

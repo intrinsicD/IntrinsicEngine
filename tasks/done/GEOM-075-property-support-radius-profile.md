@@ -21,9 +21,9 @@ completed_on: 2026-08-05
 - Completed on 2026-08-05 at `Operational`. The geometry-owned estimator,
   automatic/manual runtime policy, workload guard, config/agent/UI controls,
   telemetry, documentation, and property-domain tests are complete. The full
-  CPU gate selected 4,087 cases with zero failures and one policy-defined
-  GLFW/LSan environment skip; isolated ASan selected 2,673 with zero failures,
-  and UBSan selected 2,673 with zero failures plus the same skip. Strict
+  CPU gate selected 4,089 cases with zero failures and one policy-defined
+  GLFW/LSan environment skip; isolated ASan selected 2,674 with zero failures,
+  and UBSan selected 2,674 with zero failures plus the same skip. Strict
   structural checks and the final fixed-surface evidence bundle close this
   revision.
 - Commit: pending final evidence binding.
