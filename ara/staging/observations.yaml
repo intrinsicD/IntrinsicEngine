@@ -2159,3 +2159,24 @@ observations:
     promoted_to: "logic/claims.md:C32"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O126
+    timestamp: "2026-08-05T04:53+02:00"
+    provenance: ai-executed
+    content: >
+      A bounded CPU-reference screening of METHOD-020's prospective v3 WLOP
+      fixture found h=0.22 through 0.28 fail with one empty projected-density
+      neighborhood, while h=0.30 through 0.40 each return a finite 240-point
+      not_converged last iterate after eight iterations with no empty
+      neighborhoods. V3 selects h=0.32 before Vulkan execution.
+    context: >
+      The exact 40x24 density-warped plane, target 240, seed 1902, eight
+      iterations, and zero convergence tolerance were screened through the
+      sanitizer-backed ci-vulkan executable under a CPU-only GTest filter.
+      H=0.32 is one screened step above the observed feasibility boundary;
+      parity tolerances were not changed.
+    potential_type: claim
+    bound_to: [N370]
+    promoted: true
+    promoted_to: "logic/claims.md:C33"
+    crystallized_via: artifact-commitment
+    stale: false

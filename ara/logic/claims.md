@@ -973,3 +973,26 @@
 - **Dependencies**: [C31]
 - **Tags**: geometry, LOP, WLOP, CPU reference, Vulkan protocol, refuted
 - **From staging**: O125
+
+## C33: METHOD-020 v3 has a usable CPU WLOP confirmation oracle
+- **Statement**: On the exact METHOD-020 v3 `40 x 24` density-warped plane,
+  target 240, seed 1902, eight-iteration CPU reference, radii `0.22` through
+  `0.28` fail with one empty projected-density neighborhood, while radii
+  `0.30` through `0.40` return a finite 240-position `not_converged` last
+  iterate with no empty neighborhoods. V3 freezes `h=0.32`, selected before
+  Vulkan execution as one screened step above the observed feasibility
+  boundary.
+- **Status**: supported — sanitizer-backed CPU-reference screening only; no
+  Vulkan parity or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Repeating the exact screened float fixture and
+  parameters changes any listed CPU state, iteration count, empty-neighborhood
+  count, or output cardinality, or the v3 `h=0.32` oracle lacks finite
+  positions.
+- **Proof**: [methods/geometry/locally_optimal_projection/reports/METHOD-020-v3-screening.md,
+  methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol-v3.md,
+  benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml]
+- **Dependencies**: [C31, C32]
+- **Tags**: geometry, LOP, WLOP, CPU reference, Vulkan protocol, screening
+- **From staging**: O126
