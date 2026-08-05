@@ -58,6 +58,7 @@ def main() -> int:
     diagnostics = payload.get("diagnostics", {})
     expected = {
         "status": "skipped",
+        "requested_backend": "gpu_vulkan_compute",
         "actual_backend": "none",
         "execution_observed": False,
         "fallback_observed": None,
@@ -67,6 +68,7 @@ def main() -> int:
     }
     observed = {
         "status": payload.get("status"),
+        "requested_backend": diagnostics.get("requested_backend"),
         "actual_backend": diagnostics.get("actual_backend"),
         "execution_observed": diagnostics.get("execution_observed"),
         "fallback_observed": diagnostics.get("fallback_observed"),
