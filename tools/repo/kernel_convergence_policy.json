@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "engine_interface": "src/runtime/Runtime.Engine.cppm",
+  "engine_interface": "src/runtime/Kernel/Runtime.Engine.cppm",
   "substrate_imports": {
     "prefixes": [
       "Extrinsic.Core.",

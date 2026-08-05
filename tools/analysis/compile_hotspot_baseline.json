@@ -3,7 +3,7 @@
   "targets": [
     {
       "edge_id": "58ec1170b599cb974764ce6459b83c3f8090403d6455d5555f162baf402ac970",
-      "source": "src/runtime/Runtime.Engine.cppm",
+      "source": "src/runtime/Kernel/Runtime.Engine.cppm",
       "edge_kind": "module-interface",
       "outputs": [
         "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.Engine.pcm",
@@ -13,7 +13,7 @@
     },
     {
       "edge_id": "86f41c84f63ce2736408ccd2c99e84fd43fca32ea17d9e65aed6bf40c38c398d",
-      "source": "src/runtime/Runtime.RenderExtraction.cppm",
+      "source": "src/runtime/Rendering/Runtime.RenderExtraction.cppm",
       "edge_kind": "module-interface",
       "outputs": [
         "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.RenderExtraction.pcm",

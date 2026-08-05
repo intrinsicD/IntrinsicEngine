@@ -644,21 +644,21 @@ TEST(SandboxEditorPresentation,
     const std::string appShellContract =
         ReadRepositoryTextFile("src/app/Sandbox/Editor/Sandbox.EditorShell.cppm");
     const std::string detailContract =
-        ReadRepositoryTextFile("src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
+        ReadRepositoryTextFile("src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm");
     const std::string workspaceSession =
-        ReadRepositoryTextFile("src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
+        ReadRepositoryTextFile("src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp");
     const std::string workspaceModels =
-        ReadRepositoryTextFile("src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp");
+        ReadRepositoryTextFile("src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp");
     const std::string sceneActions =
-        ReadRepositoryTextFile("src/runtime/Runtime.SceneEditingOperations.Actions.cpp");
+        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp");
     const std::string geometryOperations =
-        ReadRepositoryTextFile("src/runtime/Runtime.GeometryProcessingOperations.cpp");
+        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp");
     const std::string geometryMeshOperations =
-        ReadRepositoryTextFile("src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp");
+        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp");
     const std::string visualizationActions =
-        ReadRepositoryTextFile("src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp");
+        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp");
     const std::string renderRecipeOperations =
-        ReadRepositoryTextFile("src/runtime/Runtime.RenderRecipeEditingOperations.cpp");
+        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp");
     const std::string runtimeCMake = ReadRepositoryTextFile("src/runtime/CMakeLists.txt");
     ASSERT_FALSE(appShell.empty());
     ASSERT_FALSE(appShellContract.empty());

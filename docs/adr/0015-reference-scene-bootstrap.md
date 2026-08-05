@@ -68,7 +68,7 @@ This ADR captures those answers as the canonical durable home. `docs/architectur
 
 The bootstrap owner is **runtime**:
 
-- A planned module `Extrinsic.Runtime.ReferenceScene` (source `src/runtime/Runtime.ReferenceScene.cppm`) exposes:
+- A planned module `Extrinsic.Runtime.ReferenceScene` (source `src/runtime/Scene/Runtime.ReferenceScene.cppm`) exposes:
   - An `IReferenceSceneProvider` interface.
   - A `ReferenceSceneRegistry` container.
 - `Engine::Initialize()` resolves a single `EngineConfig::ReferenceScene::Selector` value (default `ReferenceSceneSelector::Triangle`) and invokes the matching provider **after** the scene registry is constructed but **before** the first frame.

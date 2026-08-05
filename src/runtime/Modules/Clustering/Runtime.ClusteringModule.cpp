@@ -35,8 +35,8 @@ import Extrinsic.Runtime.WorldRegistry;
 import Geometry.KMeans;
 import Geometry.Properties;
 
-#include "Runtime.ClusteringGpuState.Internal.hpp"
-#include "../../Runtime.EditorMutation.Internal.hpp"
+#include "Modules/Clustering/Runtime.ClusteringGpuState.Internal.hpp"
+#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

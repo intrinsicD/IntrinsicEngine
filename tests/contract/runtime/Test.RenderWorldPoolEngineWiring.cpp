@@ -35,9 +35,9 @@ TEST(RenderWorldPoolEngineWiring, ConfiguresPrivatePoolFromExtractionMode)
 {
     const auto root = RepoRoot();
     const std::string engine =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const std::string service =
-        ReadFile(root / "src/runtime/Runtime.RenderExtractionService.cpp");
+        ReadFile(root / "src/runtime/Rendering/Runtime.RenderExtractionService.cpp");
 
     EXPECT_NE(engine.find(
                   "m_Impl->m_RenderExtractionService.ConfigurePool(\n"
@@ -52,9 +52,9 @@ TEST(RenderWorldPoolEngineWiring, FrameLoopOwnsPoolLifecycleWithoutPublicForward
 {
     const auto root = RepoRoot();
     const std::string engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const std::string engine =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
 
     EXPECT_NE(engine.find("m_Impl->m_RenderExtractionService.Pool(),"),
               std::string::npos);

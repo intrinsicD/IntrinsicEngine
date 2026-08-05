@@ -42,7 +42,7 @@
   record to terminal `Published`, `Dropped`, or `Cancelled` state.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.JobService.cpp,
+- **Evidence**: [src/runtime/Kernel/Runtime.JobService.cpp,
   tests/contract/runtime/Test.RuntimeJobService.cpp,
   src/runtime/README.md,
   tasks/archive/BUG-067-jobservice-completion-state-lost-update-race.md]
@@ -123,7 +123,7 @@
   scene-registry reference.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.Engine.cpp,
+- **Evidence**: [src/runtime/Kernel/Runtime.Engine.cpp,
   tests/contract/runtime/Test.RuntimeWorldRegistry.cpp,
   docs/architecture/runtime.md,
   tasks/archive/BUG-068-asset-scene-handoff-not-rebound-on-active-world-change.md]
@@ -149,9 +149,9 @@
   attachment.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/internal/Runtime.EditorWorkspaceSession.cpp,
-  src/runtime/Runtime.EditorWorkspaceAttachment.cppm,
-  src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp,
+- **Evidence**: [src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp,
+  src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm,
+  src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp,
   tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
@@ -192,7 +192,7 @@
   cache is invalidated synchronously when the command is applied.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.ParameterizationOperations.cpp,
+- **Evidence**: [src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp,
   tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N214, N215]
@@ -205,7 +205,7 @@
   disk that is valid in the source representation.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.ParameterizationOperations.cpp,
+- **Evidence**: [src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp,
   tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N214, N215]
@@ -252,9 +252,9 @@
   matches canonical topology-to-face indices, vertex positions, and UV values.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.GeometryProcessingOperations.Internal.hpp,
-  src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp,
-  src/runtime/Runtime.ParameterizationOperations.cpp,
+- **Evidence**: [src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp,
+  src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp,
   tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/GRAPHICS-122-uv-view-offscreen-render-target.md,
   N221]
@@ -301,7 +301,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp,
-  src/runtime/Runtime.Engine.cppm, commit 982c72ae, N276, N277]
+  src/runtime/Kernel/Runtime.Engine.cppm, commit 982c72ae, N276, N277]
 - **From staging**: O60
 
 ## K24: Workflow Profiles Add Requirements Prospectively and Cumulatively
@@ -421,3 +421,18 @@
   tasks/backlog/bugs/BUG-128-parallel-prepolicy-retired-task-baselines.md,
   872059d5]
 - **From staging**: O111
+
+## K31: Mechanical Runtime Moves Precede Semantic Consolidation
+- **Constraint**: A runtime path reorganization is reviewed as a mechanical
+  slice that preserves module names, public APIs, dependency edges, target
+  membership, and behavior. Deleting or merging file/module seams belongs in a
+  subsequent semantic task with its own consumers, tests, and review surface;
+  neither change may be hidden inside the other.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N383, N385, N386,
+  AGENTS.md,
+  tasks/active/RUNTIME-215-organize-runtime-source-layout.md,
+  tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md,
+  src/runtime/CMakeLists.txt]
+- **From staging**: O58

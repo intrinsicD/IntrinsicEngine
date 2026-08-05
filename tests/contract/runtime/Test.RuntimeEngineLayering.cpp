@@ -68,7 +68,7 @@ namespace
 
 TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 {
-    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cpp");
     const auto runFrame = SliceBetween(content,
                                        "void Engine::RunFrame()",
@@ -121,7 +121,7 @@ TEST(RuntimeEngineLayering, ProductionSourceHasNoApplicationCallbackLifecycle)
 
 TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder)
 {
-    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto runFrame = SliceBetween(content,
                                        "void Engine::RunFrame()",
                                        "bool Engine::IsRunning() const noexcept");
@@ -162,13 +162,13 @@ TEST(RuntimeEngineLayering,
 {
     const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto moduleInterface =
-        ReadFile(root / "src/runtime/Runtime.PhysicsModule.cppm");
+        ReadFile(root / "src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm");
     const auto moduleImpl =
-        ReadFile(root / "src/runtime/Runtime.PhysicsModule.cpp");
+        ReadFile(root / "src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp");
     const auto runtimeCMake =
         ReadFile(root / "src/runtime/CMakeLists.txt");
     const auto sandboxMain =
@@ -238,7 +238,7 @@ TEST(RuntimeEngineLayering,
 TEST(RuntimeEngineLayering, RunFrameAppliesJobCompletionsWithBoundedBudget)
 {
     const auto content =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto runFrame = SliceBetween(
         content,
         "void Engine::RunFrame()",
@@ -257,7 +257,7 @@ TEST(RuntimeEngineLayering, RunFrameAppliesJobCompletionsWithBoundedBudget)
 
 TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContract)
 {
-    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto runFrame = SliceBetween(content,
                                        "void Engine::RunFrame()",
                                        "bool Engine::IsRunning() const noexcept");
@@ -282,8 +282,8 @@ TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContrac
 
 TEST(RuntimeEngineLayering, EnginePrivatelyOwnsGpuQueueHookLifecycle)
 {
-    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
-    const auto publicApi = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
+    const auto publicApi = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto beginShutdown =
         SliceBetween(content, "void Engine::BeginShutdown()", "void Engine::Shutdown()");
     const auto shutdown      = SliceBetween(content, "void Engine::Shutdown()", "// ── Main loop");
@@ -334,25 +334,25 @@ TEST(RuntimeEngineLayering,
      TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition)
 {
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto workflowInterface =
         ReadFile(
             RepoRoot() /
-            "src/runtime/Runtime.AssetWorkflowModule.cppm");
+            "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm");
     const auto workflowImpl =
         ReadFile(
             RepoRoot() /
-            "src/runtime/Runtime.AssetWorkflowModule.cpp");
+            "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp");
     const auto textureBakeInterface =
         ReadFile(
             RepoRoot() /
-            "src/runtime/Runtime.TextureBakeModule.cppm");
+            "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm");
     const auto textureBakeImpl =
         ReadFile(
             RepoRoot() /
-            "src/runtime/Runtime.TextureBakeModule.cpp");
+            "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp");
     const auto runtimeCMake = ReadFile(RepoRoot() / "src/runtime/CMakeLists.txt");
     const auto graphicsCMake =
         ReadFile(RepoRoot() / "src/graphics/renderer/CMakeLists.txt");
@@ -496,13 +496,13 @@ TEST(RuntimeEngineLayering,
 {
     const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto frameLoop =
         ReadFile(
             root /
-            "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+            "src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto interactionInterface =
         ReadFile(
             root /
@@ -659,9 +659,9 @@ TEST(RuntimeEngineLayering,
 {
     const std::filesystem::path root = RepoRoot();
     const auto historyInterface =
-        ReadFile(root / "src/runtime/Runtime.EditorCommandHistory.cppm");
+        ReadFile(root / "src/runtime/Editor/Runtime.EditorCommandHistory.cppm");
     const auto mutationHelper =
-        ReadFile(root / "src/runtime/Runtime.EditorMutation.Internal.hpp");
+        ReadFile(root / "src/runtime/Editor/internal/Runtime.EditorMutation.Internal.hpp");
 
     EXPECT_NE(historyInterface.find("class EditorCommandHistory"),
               std::string::npos);
@@ -735,9 +735,9 @@ TEST(RuntimeEngineLayering,
 
 TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
 {
-    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp");
 
     EXPECT_NE(frameLoop.find("struct RuntimeFrameContext"), std::string::npos);
     EXPECT_NE(frameLoop.find("double FrameDeltaSeconds"), std::string::npos);
@@ -759,7 +759,7 @@ TEST(RuntimeEngineLayering,
      GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction)
 {
     const auto content =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto runFrame = SliceBetween(
         content,
         "void Engine::RunFrame()",
@@ -822,9 +822,9 @@ TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMainten
 TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemsBeforeCompile)
 {
     const auto content =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
 
     const auto transformRegistration = content.find(
         "ECS::Systems::TransformHierarchy::RegisterSystem(");
@@ -950,14 +950,14 @@ TEST(RuntimeEngineLayering,
 TEST(RuntimeEngineLayering, AsyncWorkModulePublishesOnlyKernelJobService)
 {
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
     const auto moduleInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AsyncWorkModule.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.AsyncWorkModule.cppm");
     const auto moduleImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AsyncWorkModule.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.AsyncWorkModule.cpp");
     const auto sandboxMain = ReadFile(RepoRoot() / "src/app/Sandbox/main.cpp");
 
     // The generic Engine composition root may borrow capabilities by service
@@ -997,21 +997,21 @@ TEST(RuntimeEngineLayering,
      EngineConfigControlIsAnAppComposedModuleOutsideEngine)
 {
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto controlInterface =
         ReadFile(
             RepoRoot() /
-            "src/runtime/Runtime.EngineConfigControl.cppm");
+            "src/runtime/Config/Runtime.EngineConfigControl.cppm");
     const auto controlImpl =
         ReadFile(
             RepoRoot() /
-            "src/runtime/Runtime.EngineConfigControl.cpp");
+            "src/runtime/Config/Runtime.EngineConfigControl.cpp");
     const auto activationInterface =
         ReadFile(
             RepoRoot() /
-            "src/runtime/Runtime.RenderRecipeActivation.cppm");
+            "src/runtime/Config/Runtime.RenderRecipeActivation.cppm");
     const auto sandbox =
         ReadFile(RepoRoot() / "src/app/Sandbox/main.cpp");
     const auto runtimeCMake =
@@ -1094,7 +1094,7 @@ TEST(RuntimeEngineLayering,
 TEST(RuntimeEngineLayering, MaintenanceHasNoOptionalStreamingFacade)
 {
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto frameLoop =
         ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cpp");
     const auto runFrame = SliceBetween(
@@ -1123,33 +1123,33 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
 {
     const auto assetImport = ReadFile(
         RepoRoot() /
-        "src/runtime/Runtime.AssetWorkflowImportExecutor.cpp");
+        "src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp");
     const auto sceneDocument =
         ReadFile(
             RepoRoot() /
             "src/runtime/Scene/Runtime.SceneDocumentModule.cpp");
     const auto importPolicies =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp");
+        ReadFile(RepoRoot() / "src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp");
     const auto visualization =
         ReadFile(RepoRoot() /
                  "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp");
     const auto modelHandoff =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModelMaterialization.cpp");
+        ReadFile(RepoRoot() / "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp");
     const auto geometryOperations =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp");
     const auto geometryMeshOperations =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp");
     const auto clusteringModule = ReadFile(
         RepoRoot() /
         "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp");
     const auto workspaceSession =
         ReadFile(RepoRoot() /
-                 "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
+                 "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp");
     const auto editorContextAdapters =
         ReadFile(RepoRoot() /
-                 "src/runtime/internal/Runtime.EditorFeatureContextAdapters.cpp");
+                 "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp");
     const auto assetWorkflow =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModule.cpp");
+        ReadFile(RepoRoot() / "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp");
 
     EXPECT_EQ(CountOccurrences(assetImport, "JobDesc{"), 2u);
     EXPECT_EQ(
@@ -1204,15 +1204,15 @@ TEST(RuntimeEngineLayering, SandboxEditorJobsUseSingleJobServiceSurface)
 {
     const auto editorDetailInterface =
         ReadFile(RepoRoot() /
-                 "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
+                 "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm");
     const auto jobProjectionInterface =
         ReadFile(RepoRoot() /
-                 "src/runtime/Runtime.EditorJobProjection.cppm");
+                 "src/runtime/Editor/Runtime.EditorJobProjection.cppm");
     const auto editorImplementation =
         ReadFile(RepoRoot() /
-                 "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp");
+                 "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp");
     const auto methodImplementation =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp");
 
     EXPECT_EQ(editorDetailInterface.find(
                   "import Extrinsic.Runtime.DerivedJobGraph"),
@@ -1267,15 +1267,15 @@ TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)
 TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine)
 {
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto workflowImpl =
         ReadFile(
             RepoRoot() /
-            "src/runtime/Runtime.AssetWorkflowModule.cpp");
+            "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp");
     const auto bootstrap =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.DeviceBootstrap.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.DeviceBootstrap.cpp");
     const auto workflowRegistration = SliceBetween(
         workflowImpl,
         "Core::Result AssetWorkflowModule::OnRegister(",
@@ -1320,15 +1320,15 @@ TEST(RuntimeEngineLayering, ObsoleteMeshPrimitiveViewControlsAreDeleted)
 {
     const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto extractionInterface =
-        ReadFile(root / "src/runtime/Runtime.RenderExtraction.cppm");
+        ReadFile(root / "src/runtime/Rendering/Runtime.RenderExtraction.cppm");
     const auto extractionInternal =
         ReadFile(
             root /
-            "src/runtime/Runtime.RenderExtraction.Internal.cpp");
+            "src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp");
 
     EXPECT_FALSE(std::filesystem::exists(
         root /
@@ -1362,17 +1362,17 @@ TEST(RuntimeEngineLayering,
 {
     const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto cameraModuleInterface = ReadFile(
         root / "src/runtime/Cameras/Runtime.CameraModule.cppm");
     const auto cameraModuleImpl = ReadFile(
         root / "src/runtime/Cameras/Runtime.CameraModule.cpp");
     const auto referenceInterface =
-        ReadFile(root / "src/runtime/Runtime.ReferenceScene.cppm");
+        ReadFile(root / "src/runtime/Scene/Runtime.ReferenceScene.cppm");
     const auto referenceImpl =
-        ReadFile(root / "src/runtime/Runtime.ReferenceScene.cpp");
+        ReadFile(root / "src/runtime/Scene/Runtime.ReferenceScene.cpp");
     const auto sandbox =
         ReadFile(root / "src/app/Sandbox/Sandbox.cpp");
     const auto sandboxMain  = ReadFile(root / "src/app/Sandbox/main.cpp");
@@ -1486,15 +1486,15 @@ TEST(RuntimeEngineLayering,
 TEST(RuntimeEngineLayering, InputActionsKeepRegistryAndDispatchOutOfEngine)
 {
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto inputInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.InputActions.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.InputActions.cppm");
     const auto inputImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.InputActions.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.InputActions.cpp");
 
     EXPECT_EQ(engineInterface.find("export import Extrinsic.Runtime.InputActions"),
               std::string::npos);
@@ -1544,9 +1544,9 @@ TEST(RuntimeEngineLayering, RetiredEngineCompositionHelperBmisAreAbsent)
 {
     const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto runtimeCMake =
         ReadFile(root / "src/runtime/CMakeLists.txt");
     const auto testsCMake = ReadFile(root / "tests/CMakeLists.txt");
@@ -1617,13 +1617,13 @@ TEST(RuntimeEngineLayering, SceneInteractionPrivatelyOwnsPickCorrelationState)
 {
     const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto frameLoop =
         ReadFile(
             root /
-            "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+            "src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto interactionInterface =
         ReadFile(
             root /
@@ -1754,17 +1754,17 @@ TEST(RuntimeEngineLayering, SceneInteractionPrivatelyOwnsPickCorrelationState)
 TEST(RuntimeEngineLayering, EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics)
 {
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto editorUiModuleInterface =
         ReadFile(RepoRoot() / "src/runtime/Editor/Runtime.EditorUiModule.cppm");
     const auto editorUiModuleImpl =
         ReadFile(RepoRoot() / "src/runtime/Editor/Runtime.EditorUiModule.cpp");
     const auto diagnosticsInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.FramePacingDiagnostics.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.FramePacingDiagnostics.cppm");
     const auto diagnosticsImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.FramePacingDiagnostics.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.FramePacingDiagnostics.cpp");
 
     EXPECT_EQ(engineInterface.find("export import Extrinsic.Runtime.FramePacingDiagnostics"),
               std::string::npos);
@@ -1833,13 +1833,13 @@ TEST(RuntimeEngineLayering,
 {
     const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto workflowImpl =
         ReadFile(
             root /
-            "src/runtime/Runtime.AssetWorkflowModule.cpp");
+            "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp");
     const auto coreFrameLoop =
         ReadFile(root / "src/core/Core.FrameLoop.cpp");
     const auto announcement = SliceBetween(
@@ -2033,12 +2033,12 @@ TEST(RuntimeEngineLayering, RetiredSpatialDebugRegistryHasNoProductionSurface)
     const auto ecsComponentsCMake =
         ReadFile(RepoRoot() / "src/ecs/Components/CMakeLists.txt");
     const auto extractionInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.RenderExtraction.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Rendering/Runtime.RenderExtraction.cppm");
     const auto editorHistoryInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.EditorCommandHistory.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Editor/Runtime.EditorCommandHistory.cppm");
     const auto editorFeatureInterface =
         ReadFile(RepoRoot() /
-                 "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
+                 "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm");
 
     // No retired module is published.
     EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.SpatialDebugAdapters"),
@@ -2121,7 +2121,7 @@ TEST(RuntimeEngineLayering,
               std::string::npos);
 
     const std::string presentation =
-        ReadFile(root / "src/runtime/Runtime.GeometryPresentation.cppm");
+        ReadFile(root / "src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm");
     EXPECT_NE(presentation.find("struct GeometryPresentationRecipe"),
               std::string::npos);
     EXPECT_NE(presentation.find("struct GeometryPresentationRuntimeState"),
@@ -2140,13 +2140,13 @@ TEST(RuntimeEngineLayering,
 TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
 {
     const std::array<std::filesystem::path, 7> sources{
-        RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cppm",
-        RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cpp",
-        RepoRoot() / "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm",
-        RepoRoot() / "src/runtime/internal/Runtime.EditorWorkspaceSession.cpp",
-        RepoRoot() / "src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp",
-        RepoRoot() / "src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp",
-        RepoRoot() / "src/runtime/Runtime.TextureBakeModule.cpp",
+        RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm",
+        RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cpp",
+        RepoRoot() / "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm",
+        RepoRoot() / "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+        RepoRoot() / "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+        RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp",
+        RepoRoot() / "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp",
     };
 
     for (const auto& path : sources)
@@ -2166,7 +2166,7 @@ TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
 
     // The canonical vocabulary and its constraint form live in one place.
     const std::string availability =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryAvailability.cppm");
+        ReadFile(RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm");
     EXPECT_NE(availability.find("struct GeometryPropertyRef"), std::string::npos);
     EXPECT_NE(availability.find("GeometryPropertyCatalogSnapshot"),
               std::string::npos);
@@ -2180,7 +2180,7 @@ TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
     // The persisted wire format keeps its legacy spellings, and they are owned
     // by the serializer rather than derived from the canonical debug names.
     const std::string serialization =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SceneSerialization.cpp");
+        ReadFile(RepoRoot() / "src/runtime/Scene/Runtime.SceneSerialization.cpp");
     EXPECT_NE(serialization.find("\"ScalarFloat\""), std::string::npos);
     EXPECT_NE(serialization.find("\"ScalarDouble\""), std::string::npos);
     EXPECT_NE(serialization.find("\"GraphVertex\""), std::string::npos);
@@ -2270,11 +2270,11 @@ TEST(RuntimeEngineLayering,
               std::string::npos);
 
     const std::string extraction =
-        ReadFile(root / "src/runtime/Runtime.RenderExtraction.cppm");
+        ReadFile(root / "src/runtime/Rendering/Runtime.RenderExtraction.cppm");
     EXPECT_EQ(CountOccurrences(extraction, "void TickGeometryResidency("), 1u);
 
     const std::string channelBindings =
-        ReadFile(root / "src/runtime/Runtime.VertexChannelBindings.cppm");
+        ReadFile(root / "src/runtime/GeometryIntegration/Runtime.VertexChannelBindings.cppm");
     EXPECT_NE(channelBindings.find("GeometryPropertyRef Property"),
               std::string::npos);
     EXPECT_EQ(channelBindings.find("AttributeSourceType SourceType"),

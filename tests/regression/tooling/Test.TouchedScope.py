@@ -158,7 +158,7 @@ class TouchedScopeTests(unittest.TestCase):
 
     def test_runtime_mapping_has_no_retired_selection_target(self) -> None:
         route = touched_scope.analyze_change_records(
-            [record("src/runtime/Runtime.Engine.cpp")]
+            [record("src/runtime/Kernel/Runtime.Engine.cpp")]
         )
         self.assertEqual(route["route"], "focused")
         self.assertIn("IntrinsicRuntimeContractTests", route["anchor_targets"])
@@ -169,7 +169,7 @@ class TouchedScopeTests(unittest.TestCase):
 
     def test_graph_affecting_and_unknown_paths_are_broad(self) -> None:
         paths = (
-            "src/runtime/Runtime.Engine.cppm",
+            "src/runtime/Kernel/Runtime.Engine.cppm",
             "src/runtime/Runtime.Engine.hpp",
             "src/core/Core.Error.cpp",
             "src/graphics/vulkan/Vulkan.Device.cpp",
@@ -566,7 +566,7 @@ class TouchedScopeTests(unittest.TestCase):
             build_dir = Path(tmp)
             write_registry(build_dir, rows)
             route = touched_scope.analyze_change_records(
-                [record("src/runtime/Runtime.Engine.cpp")]
+                [record("src/runtime/Kernel/Runtime.Engine.cpp")]
             )
             finalized = touched_scope.finalize_route(route, build_dir)
             self.assertEqual(
@@ -632,7 +632,7 @@ class TouchedScopeTests(unittest.TestCase):
             ]
             write_registry(build_dir, rows)
             route = touched_scope.analyze_change_records(
-                [record("src/runtime/Runtime.Engine.cpp")]
+                [record("src/runtime/Kernel/Runtime.Engine.cpp")]
             )
             finalized = touched_scope.finalize_route(route, build_dir)
             self.assertEqual(finalized["route"], "broad")

@@ -128,10 +128,10 @@ Confirmed:
 
 - Strong layer contract. `runtime` composes lower layers, and RHI remains
   platform-neutral; runtime fills `RHI::DeviceCreateDesc` from the live window in
-  [src/runtime/Runtime.Engine.cpp](../../src/runtime/Runtime.Engine.cpp#L228).
+  [src/runtime/Kernel/Runtime.Engine.cpp](../../src/runtime/Kernel/Runtime.Engine.cpp#L228).
 - Graphics avoids live ECS mutation. Runtime drains selection picks and documents
   graphics as reporting-only in
-  [src/runtime/Runtime.Engine.cpp](../../src/runtime/Runtime.Engine.cpp#L733).
+  [src/runtime/Kernel/Runtime.Engine.cpp](../../src/runtime/Kernel/Runtime.Engine.cpp#L733).
 - Fail-closed renderer behavior is deliberate. Missing pass routes become
   `SkippedNonOperational` or `SkippedUnavailable`, not silent success, in
   [src/graphics/renderer/Graphics.Renderer.cpp](../../src/graphics/renderer/Graphics.Renderer.cpp#L2254).

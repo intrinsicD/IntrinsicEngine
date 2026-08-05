@@ -253,8 +253,8 @@ sessions:
     open_threads: 4
   - id: "2026-08-05_001"
     date: "2026-08-05"
-    summary: "Implemented support-radius and Vulkan LOP work, then committed universal property revisions, staging-first uploads, and validation-clean publication-to-rendering coherence."
-    turn_count: 4
-    events_count: 21
+    summary: "Implemented support-radius and Vulkan LOP work, committed universal property coherence, and completed a path-only runtime organization while taskizing semantic seam reduction."
+    turn_count: 6
+    events_count: 29
     claims_touched: [C31, C32, C33, C34, C35, C36]
-    open_threads: 3
+    open_threads: 5

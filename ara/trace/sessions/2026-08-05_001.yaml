@@ -2,9 +2,9 @@ session:
   id: "2026-08-05_001"
   date: "2026-08-05"
   started: "2026-08-05T01:17+02:00"
-  last_turn: "2026-08-05T17:23+02:00"
-  turn_count: 4
-  summary: "Implemented support-radius and Vulkan LOP work, then committed universal property revisions, staging-first uploads, and validation-clean publication-to-rendering coherence."
+  last_turn: "2026-08-05T20:57+02:00"
+  turn_count: 6
+  summary: "Implemented support-radius and Vulkan LOP work, committed universal property coherence, and completed a path-only runtime organization while taskizing semantic seam reduction."
 
 events_logged:
   - turn: 1
@@ -133,6 +133,54 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized the exact-revision no-dirty-tag rendering and validation-clean Vulkan publication result from O132."
+  - turn: 5
+    type: decision
+    id: "N383"
+    routing: direct
+    provenance: user
+    summary: "Adopted cohesive runtime folders and reduction of file/module seams that do not carry ownership or locality weight."
+  - turn: 5
+    type: experiment
+    id: "N384"
+    routing: direct
+    provenance: ai-executed
+    summary: "Measured the converged runtime at 170 files, 94,532 C++ lines, and 131 root-level files while auditing module/TU necessity."
+  - turn: 5
+    type: architecture
+    id: "A35"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized cohesive ownership/lifecycle folders rather than a flat root or one folder per source pair."
+  - turn: 5
+    type: architecture
+    id: "O133"
+    routing: staged
+    provenance: user
+    summary: "Staged the runtime-as-composition/integration criterion for deciding which feature-specific and forwarding seams remain."
+  - turn: 6
+    type: decision
+    id: "N385"
+    routing: direct
+    provenance: user-revised
+    summary: "Adopted a path-only runtime move first and a separately reviewed semantic seam-reduction task second."
+  - turn: 6
+    type: experiment
+    id: "N386"
+    routing: direct
+    provenance: ai-executed
+    summary: "Moved 136 files into cohesive runtime folders while preserving 162 target sources/module declarations and passing the 4,103-test CPU gate."
+  - turn: 6
+    type: constraint
+    id: "K31"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the mechanical-before-semantic runtime cleanup boundary from O58."
+  - turn: 6
+    type: architecture
+    id: "A36"
+    routing: crystallized
+    provenance: user
+    summary: "Crystallized the evidence-based criterion for retaining runtime composition and feature seams from O133."
 
 ai_actions:
   - turn: 1
@@ -197,6 +245,26 @@ ai_actions:
       - "tasks/active/RUNTIME-214-universal-geometry-property-coherence.md"
       - "tasks/evidence/RUNTIME-214/"
       - "ara/"
+  - turn: 5
+    action: "Audited the full runtime file/module inventory, ownership docs, right-sizing history, production importer counts, and the clearest remaining shallow seam; made no engine-source edit."
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 6
+    action: "Created and claimed RUNTIME-215; moved runtime sources into twelve cohesive ownership folders; updated all path consumers, documentation, tests, tooling policy, and generated module inventory; opened RUNTIME-216 for semantic deletion; tracked the unrelated task-link defect as BUG-133; and ran fresh Clang 23 build, full CPU, focused regression, structural, and review gates."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/"
+      - "tests/contract/runtime/"
+      - "tests/regression/tooling/"
+      - "docs/api/generated/module_inventory.md"
+      - "docs/architecture/"
+      - "tools/ci/touched_scope.py"
+      - "tools/repo/kernel_convergence_policy.json"
+      - "tasks/active/RUNTIME-215-organize-runtime-source-layout.md"
+      - "tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md"
+      - "tasks/backlog/bugs/BUG-133-method-backlog-retired-link-outside-history.md"
+      - "ara/"
 
 claims_touched:
   - id: C31
@@ -241,11 +309,21 @@ key_context:
     excerpt: "The final architecture keeps Geometry::PropertySet canonical, reuses runtime extraction and GpuWorld residency, stages device-local writes on the graphics queue, and reads GPU method output back only at completion."
   - turn: 4
     excerpt: "The final source passed 4,103 CPU, 2,683 ASan, 2,683 UBSan, and three synchronization-validation Vulkan tests; independent high-risk acceptance remains outstanding."
+  - turn: 5
+    excerpt: "The user confirmed that src/runtime should use cohesive folders and should retain only the general binding abstractions and feature-specific seams that are actually necessary."
+  - turn: 5
+    excerpt: "The converged tree has 170 files and 94,532 C++ lines; 131 files remain flat at the root, while most total files are ordinary module interface/implementation pairs rather than disposable wrappers."
+  - turn: 6
+    excerpt: "The user affirmed the proposed two-boundary cleanup: organize paths mechanically first, then reduce proven-unnecessary seams in a separate semantic review."
+  - turn: 6
+    excerpt: "The runtime root now contains only CMakeLists.txt and README.md; all 162 target sources/module declarations remain represented and the 4,103-test CPU selector has zero failures."
 
 open_threads:
   - "A performance claim still requires device timestamps, memory and phase accounting, scanner-scale inputs, baselines, and cross-device evidence; current host timing is descriptive only."
   - "Anisotropic WLOP, CLOP, and EAR remain explicit Vulkan capability-negative pairs; CLOP caching, LBVH, or CUDA require separately justified work."
   - "RUNTIME-214 remains active until an independent reviewer accepts revision 548e62b5 and its fixed content digest."
+  - "RUNTIME-215 remains active pending its formal evidence/review boundary; the unrelated global METHOD-020 state-link defect is tracked by BUG-133."
+  - "Implement RUNTIME-216 as the first semantic reduction slice by removing the private RenderExtractionService forwarding seam after RUNTIME-215 is reviewed."
 
 ai_suggestions_pending:
   - "Add device timestamp and scanner-scale benchmark evidence before making any speedup or backend-selection claim."

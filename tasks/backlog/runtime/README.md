@@ -41,6 +41,12 @@ The source-complete runtime surface audit re-gated `REVIEW-003`. `RUNTIME-203`
 and `RUNTIME-205` closed the one-consumer helper findings through their concrete
 production owners while preserving public behavior first.
 
+- [RUNTIME-216 — Inline shallow render-extraction Engine glue](RUNTIME-216-inline-render-extraction-engine-glue.md)
+  follows the mechanical `RUNTIME-215` layout move. It deletes the two-file,
+  Engine-private `RenderExtractionService` forwarding layer only after the
+  path-only change is independently reviewable; extraction behavior and the
+  public module surface remain unchanged.
+
 #### Retired prerequisites and completed paths
 
 - [`RUNTIME-206` — LOP family element-domain source integration](../../done/RUNTIME-206-lop-element-domain-source-integration.md)

@@ -26,7 +26,7 @@ import Extrinsic.RHI.Types;
 import :GpuBackend;
 import Geometry.KMeans;
 
-#include "Runtime.ClusteringGpuState.Internal.hpp"
+#include "Modules/Clustering/Runtime.ClusteringGpuState.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

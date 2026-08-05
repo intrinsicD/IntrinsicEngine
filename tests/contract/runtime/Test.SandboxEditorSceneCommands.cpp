@@ -3272,7 +3272,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
 TEST(SandboxEditorUi, ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic)
 {
     const std::string engineSource =
-        ReadRepositoryTextFile("src/runtime/Runtime.Engine.cpp");
+        ReadRepositoryTextFile("src/runtime/Kernel/Runtime.Engine.cpp");
     ASSERT_FALSE(engineSource.empty());
     EXPECT_NE(engineSource.find(
                   "m_Impl->m_Window && m_Impl->m_Window->ShouldClose()"),

@@ -4,6 +4,26 @@
 subsystem instantiation order, frame-phase orchestration, and deterministic
 startup/shutdown.
 
+## Source layout
+
+Physical directories group sources by runtime responsibility; they do not add
+CMake targets, rename modules, or create new dependency layers.
+
+| Directory | Cohort |
+|---|---|
+| `Kernel/` | Engine lifecycle, runtime-module composition, jobs, commands/events, worlds, input actions, and service publication. |
+| `AssetWorkflow/` | Asset import, CPU materialization, GPU-residency handoff, and workflow policy. |
+| `Config/` | Boot/live engine configuration and shared private codecs. |
+| `Editor/` | Editor services, workspace models, UI hosts, and feature operations; shared non-public details live in `Editor/internal/`. |
+| `GeometryIntegration/` | Geometry availability, extraction-plan construction, presentation state, topology, refinement, and vertex-channel binding. |
+| `Rendering/` | ECS-to-render extraction, render-world pooling, artifact publication, and Engine-private render handoff. |
+| `Scene/` | Scene documents/interactions, reference content, serialization, selection, and stable-entity lookup. |
+| `Modules/<feature>/` | Cohesive optional feature owners such as clustering, physics integration, point-cloud consolidation, Progressive Poisson, parameterization, and texture baking. |
+| `Cameras/`, `Gizmos/`, `ImGui/`, `Visualization/` | Focused runtime adapters and presentation recipes. |
+
+Only this `README.md` and the layer `CMakeLists.txt` live directly in the
+runtime root. Public module names remain independent of these paths.
+
 ## Public module surface
 
 The retired Sandbox facade export ledger and current owner map are recorded in

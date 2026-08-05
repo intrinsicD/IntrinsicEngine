@@ -138,7 +138,7 @@ Generator helpers and the optional runtime lookup sidecar land
 when a concrete serializer/selection consumer demands them. The
 selection path is that consumer: `RUNTIME-092` Slice A realised the
 Decision-3 sidecar as `Extrinsic.Runtime.StableEntityLookup`
-(`src/runtime/Runtime.StableEntityLookup.cppm`), a runtime-owned
+(`src/runtime/Scene/Runtime.StableEntityLookup.cppm`), a runtime-owned
 `StableId -> entt::entity` winner-map with deterministic
 smallest-render-id duplicate policy and lazy stale invalidation.
 `RUNTIME-092` Slice B then wired that sidecar into the runtime frame

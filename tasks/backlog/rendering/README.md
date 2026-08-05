@@ -442,7 +442,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   policy. Follow-up implementation remains separate from this docs-only slice.
 - [GRAPHICS-029 — Reference scene bootstrap and minimal renderable extraction](../../archive/GRAPHICS-029-runtime-reference-scene-bootstrap.md):
   retired planning slice that locks down module placement
-  (`Extrinsic.Runtime.ReferenceScene` at `src/runtime/Runtime.ReferenceScene.cppm`),
+  (`Extrinsic.Runtime.ReferenceScene` at `src/runtime/Scene/Runtime.ReferenceScene.cppm`),
   bootstrap-seam shape (`IReferenceSceneProvider` + `ReferenceSceneRegistry`,
   one default `TriangleProvider`), original renderable composition (HARDEN-060
   default components plus `Graphics::Components::RenderSurface`; RUNTIME-097

@@ -6483,7 +6483,7 @@ tree:
       Should the crowded src/runtime root be cleaned up by distributing its
       files into directories, with Runtime.Engine.cppm as the immediate
       architectural reference point?
-    status: open
+    status: resolved
   - id: N274
     type: experiment
     title: "Audit runtime layout and Engine convergence constraints"
@@ -8983,4 +8983,100 @@ tree:
       staging overwrite/readback plus ordinary LOP and isotropic-WLOP terminal
       publication. Revision 548e62b5 and its draft high-risk handoff were pushed
       to main; task retirement remains pending independent fixed-surface review.
+    status: resolved
+  - id: N383
+    type: decision
+    title: "Organize runtime by cohesive ownership and reduce unjustified files"
+    provenance: user
+    timestamp: "2026-08-05T20:12+02:00"
+    also_depends_on: [N273, N274]
+    choice: >
+      Proceed with a runtime cleanup that makes cohesive source folders the
+      navigational structure, keeps runtime focused on composition and
+      integration ownership, and reduces file/module seams where inspection
+      shows they do not carry their weight.
+    alternatives:
+      - "Leave the crowded src/runtime root unchanged."
+      - "Merge files solely to meet a numerical file-count target."
+      - "Treat every existing source pair as an equally permanent architecture boundary."
+    evidence:
+      - "User direction: runtime should primarily contain the right general binding abstractions and should use its existing folder pattern more consistently."
+      - "N274: prior runtime layout and Engine convergence audit"
+      - "O57: cohesive ownership-directory proposal"
+      - "O58: staged mechanical/semantic separation constraint"
+    status: resolved
+  - id: N384
+    type: experiment
+    title: "Re-audit the converged runtime source surface"
+    provenance: ai-executed
+    timestamp: "2026-08-05T20:12+02:00"
+    also_depends_on: [N383]
+    evidence:
+      - "find src/runtime -type f"
+      - "find/wc inventory of runtime files and LOC by directory"
+      - "runtime module declaration and production-import census"
+      - "docs/adr/0026-runtime-module-scope-by-consumer-contract.md"
+      - "docs/adr/0027-right-sized-runtime-composition.md"
+      - "tasks/archive/RUNTIME-096-runtime-module-implementation-splits.md"
+    result: >
+      The current tree has 170 runtime files: 168 C++ sources/interfaces/headers
+      totaling 94,532 lines, with 131 files and 77,069 lines still at the
+      runtime root. It contains 73 module interfaces, 89 implementation units,
+      six headers, and 74 named module declarations; 56 named modules use the
+      normal two-unit interface/implementation shape. Recent convergence work
+      already removed most one-consumer public helpers. The remaining issue is
+      primarily flat physical layout, with a smaller semantic cleanup surface;
+      the Engine-private RenderExtractionService remains the clearest shallow
+      forwarding candidate. No engine source was changed.
+    status: resolved
+  - id: N385
+    type: decision
+    title: "Separate runtime layout from semantic seam deletion"
+    provenance: user-revised
+    timestamp: "2026-08-05T20:57+02:00"
+    also_depends_on: [N383, N384]
+    choice: >
+      Execute the first cleanup boundary as a path-only organization that
+      preserves module names, APIs, dependencies, and behavior; review
+      semantic file/module deletion separately, beginning with the private
+      RenderExtractionService forwarding seam.
+    alternatives:
+      - "Mix physical moves and semantic deletion in one review boundary."
+      - "Stop after the read-only audit and leave the runtime root flat."
+      - "Merge modules until an arbitrary file-count target is reached."
+    evidence:
+      - "User affirmation: yes please."
+      - "O58: staged mechanical-versus-semantic separation constraint"
+      - "O133: runtime composition and seam-necessity criterion"
+      - "tasks/active/RUNTIME-215-organize-runtime-source-layout.md"
+      - "tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md"
+    status: resolved
+  - id: N386
+    type: experiment
+    title: "Verify the path-only runtime source organization"
+    provenance: ai-executed
+    timestamp: "2026-08-05T20:57+02:00"
+    also_depends_on: [N385]
+    evidence:
+      - "src/runtime/CMakeLists.txt"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/active/RUNTIME-215-organize-runtime-source-layout.md"
+      - "cmake --preset ci --fresh"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+    result: >
+      Moved 136 runtime files into cohesive ownership folders, including all
+      131 formerly root-level C++ sources, leaving only CMakeLists.txt and
+      README.md directly under src/runtime. All 162 runtime target-source
+      entries and module declarations were preserved, and an automated diff
+      audit found only path/include spelling changes. A fresh Clang 23
+      configure and IntrinsicTests build completed, all 4,103 selected CPU
+      tests had zero failures with one expected environment-gated skip, and
+      focused kernel-convergence, touched-scope, layering, docs, task, and
+      workshop-review gates passed. The exact lower-layer-like folder names
+      Assets, Geometry, and Physics were replaced by AssetWorkflow,
+      GeometryIntegration, and PhysicsIntegration after the strict ownership
+      checker correctly forced unambiguous runtime-local naming.
     status: resolved

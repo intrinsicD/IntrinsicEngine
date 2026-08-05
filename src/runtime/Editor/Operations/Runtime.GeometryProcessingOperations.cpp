@@ -100,8 +100,8 @@ import Geometry.Subdivision;
 import Geometry.UvAtlas;
 
 
-#include "Runtime.EditorMutation.Internal.hpp"
-#include "Runtime.GeometryProcessingOperations.Internal.hpp"
+#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

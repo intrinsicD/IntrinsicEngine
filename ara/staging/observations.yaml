@@ -742,7 +742,7 @@ observations:
     stale: false
   - id: O57
     timestamp: "2026-07-23T01:31+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       Runtime source directories should correspond to cohesive ownership and
       lifecycle cohorts rather than to individual .cppm/.cpp pairs. Broad
@@ -754,10 +754,10 @@ observations:
       ADR-0027 right-sizing, and the existing mixed flat/subdirectory layout.
     potential_type: architecture
     bound_to: [N273, N274]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
-    stale: true
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A35"
+    crystallized_via: verbal-affirmation
+    stale: false
   - id: O58
     timestamp: "2026-07-23T01:31+02:00"
     provenance: ai-suggested
@@ -772,10 +772,10 @@ observations:
       current shape first would duplicate churn and obscure semantic review.
     potential_type: constraint
     bound_to: [N273, N274]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
-    stale: true
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K31"
+    crystallized_via: verbal-affirmation
+    stale: false
   - id: O59
     timestamp: "2026-07-23T08:31+02:00"
     provenance: ai-executed
@@ -2315,4 +2315,26 @@ observations:
     promoted: true
     promoted_to: "logic/claims.md:C36"
     crystallized_via: artifact-commitment
+    stale: false
+  - id: O133
+    timestamp: "2026-08-05T20:12+02:00"
+    provenance: user
+    content: >
+      Runtime should primarily expose the general abstractions that bind
+      lower layers and own genuine cross-layer lifecycle, commit, and
+      publication behavior. Feature-specific or forwarding file/module seams
+      should remain only when inspection shows that ownership, locality, a
+      volatile boundary, or a present consumer makes them necessary.
+    context: >
+      The user reopened the runtime-layout question after the prior convergence
+      chain and explicitly coupled cohesive folder organization with a request
+      to reduce the necessary file count. The read-only census found that most
+      files are normal C++23 module interface/implementation pairs or deep
+      implementation shards, so the exact semantic deletion set still needs a
+      bounded task audit rather than a numeric target.
+    potential_type: architecture
+    bound_to: [N383, N384]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A36"
+    crystallized_via: verbal-affirmation
     stale: false

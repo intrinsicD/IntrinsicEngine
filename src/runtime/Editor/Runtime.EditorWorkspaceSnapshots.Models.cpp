@@ -93,7 +93,7 @@ import Geometry.Graph;
 import Geometry.Properties;
 import Geometry.UvAtlas;
 
-#include "Runtime.EditorMutation.Internal.hpp"
+#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
 namespace Extrinsic::Runtime::EditorFeatureDetail {
 namespace {

@@ -64,8 +64,8 @@ import Extrinsic.ECS.System.BoundsPropagation;
 import Extrinsic.ECS.System.RenderSync;
 import Extrinsic.ECS.System.TransformHierarchy;
 
-#include "Runtime.Engine.FrameLoop.Internal.hpp"
-#include "Runtime.RenderExtractionService.Internal.hpp"
+#include "Kernel/Runtime.Engine.FrameLoop.Internal.hpp"
+#include "Rendering/Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

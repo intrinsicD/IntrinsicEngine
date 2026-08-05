@@ -52,7 +52,7 @@
 - **Crystallized via**: artifact-commitment
 - **Sensitivity**: medium
 - **Code ref**: [src/core/Core.Config.EngineLoad.cpp,
-  src/runtime/Runtime.EngineConfigControl.cpp,
+  src/runtime/Config/Runtime.EngineConfigControl.cpp,
   tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N214, N215]

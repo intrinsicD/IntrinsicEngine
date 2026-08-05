@@ -35,7 +35,7 @@ import Extrinsic.RHI.Types;
 import Geometry.PointCloud.Consolidation;
 import Geometry.SupportRadius;
 
-#include "internal/Runtime.PointCloudConsolidationGpu.Internal.hpp"
+#include "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

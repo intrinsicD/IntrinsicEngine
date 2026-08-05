@@ -8,176 +8,176 @@ option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-        Runtime.AsyncWorkModule.cppm
-        Runtime.AssetWorkflowModule.cppm
-        Runtime.AssetIngestStateMachine.cppm
-        Runtime.CommandBus.cppm
-        Runtime.DeviceBootstrap.cppm
-        Runtime.JobService.cppm
+        Kernel/Runtime.AsyncWorkModule.cppm
+        AssetWorkflow/Runtime.AssetWorkflowModule.cppm
+        AssetWorkflow/Runtime.AssetIngestStateMachine.cppm
+        Kernel/Runtime.CommandBus.cppm
+        Kernel/Runtime.DeviceBootstrap.cppm
+        Kernel/Runtime.JobService.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
         Modules/Clustering/Runtime.ClusteringGpuBackend.cppm
-        Runtime.GeometryPresentation.cppm
-        Runtime.ProgressivePoissonGpuBackend.cppm
-        Runtime.RenderArtifactPublication.cppm
+        GeometryIntegration/Runtime.GeometryPresentation.cppm
+        Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm
+        Rendering/Runtime.RenderArtifactPublication.cppm
         Modules/Clustering/Runtime.ClusteringConfig.cppm
-        Runtime.ProgressivePoissonConfig.cppm
-        Runtime.ParameterizationConfig.cppm
-        Runtime.PointCloudConsolidationConfig.cppm
-        Runtime.PointCloudConsolidationModule.cppm
-        Runtime.EditorCommandHistory.cppm
-        Runtime.EditorCommon.cppm
-        Runtime.EditorWorkspaceAttachment.cppm
-        Runtime.EditorWorkspaceSnapshots.cppm
-        Runtime.EditorJobProjection.cppm
-        Runtime.SceneEditingOperations.cppm
-        Runtime.GeometryProcessingOperations.cppm
-        Runtime.VisualizationEditingOperations.cppm
-        Runtime.RenderRecipeEditingOperations.cppm
+        Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+        Modules/Parameterization/Runtime.ParameterizationConfig.cppm
+        Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+        Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
+        Editor/Runtime.EditorCommandHistory.cppm
+        Editor/Runtime.EditorCommon.cppm
+        Editor/Runtime.EditorWorkspaceAttachment.cppm
+        Editor/Runtime.EditorWorkspaceSnapshots.cppm
+        Editor/Runtime.EditorJobProjection.cppm
+        Editor/Operations/Runtime.SceneEditingOperations.cppm
+        Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+        Editor/Operations/Runtime.VisualizationEditingOperations.cppm
+        Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm
         Editor/Runtime.EditorPropertyWidgets.cppm
         Editor/Runtime.EditorUiHost.cppm
         Editor/Runtime.EditorUiModule.cppm
         Editor/Runtime.EditorWindowRegistry.cppm
-        Runtime.Engine.cppm
-        Runtime.EngineConfigBoot.cppm
-        Runtime.EngineConfigControl.cppm
-        Runtime.FramePacingDiagnostics.cppm
-        Runtime.InputActions.cppm
-        Runtime.KernelEvents.cppm
-        Runtime.Module.cppm
-        Runtime.ServiceRegistry.cppm
-        Runtime.WorldHandle.cppm
-        Runtime.WorldRegistry.cppm
-        Runtime.GeometryAvailability.cppm
-        Runtime.PhysicsModule.cppm
+        Kernel/Runtime.Engine.cppm
+        Config/Runtime.EngineConfigBoot.cppm
+        Config/Runtime.EngineConfigControl.cppm
+        Kernel/Runtime.FramePacingDiagnostics.cppm
+        Kernel/Runtime.InputActions.cppm
+        Kernel/Runtime.KernelEvents.cppm
+        Kernel/Runtime.Module.cppm
+        Kernel/Runtime.ServiceRegistry.cppm
+        Kernel/Runtime.WorldHandle.cppm
+        Kernel/Runtime.WorldRegistry.cppm
+        GeometryIntegration/Runtime.GeometryAvailability.cppm
+        Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm
         Scene/Runtime.SceneDocumentModule.cppm
         Scene/Runtime.SceneInteractionModule.cppm
-        Runtime.SceneSerialization.cppm
+        Scene/Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraModule.cppm
         Cameras/Runtime.CameraControllers.cppm
         Cameras/Runtime.CameraFocusCommand.cppm
         Gizmos/Runtime.GizmoInteraction.cppm
         ImGui/Runtime.ImGuiAdapter.cppm
-        Runtime.MeshPrimitiveView.cppm
-        Runtime.MeshSurfaceTopology.cppm
-        Runtime.PrimitiveSelectionRefinement.cppm
-        Runtime.ReferenceScene.cppm
-        Runtime.RenderRecipeActivation.cppm
-        Runtime.RenderExtraction.cppm
-        Runtime.RenderWorldPool.cppm
-        Runtime.SelectionController.cppm
-        Runtime.StableEntityLookup.cppm
-        Runtime.TextureBakeModule.cppm
-        Runtime.VertexAttributeBinding.cppm
-        Runtime.VertexChannelBindings.cppm
-        Runtime.VertexChannelStreams.cppm
+        GeometryIntegration/Runtime.MeshPrimitiveView.cppm
+        GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
+        GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm
+        Scene/Runtime.ReferenceScene.cppm
+        Config/Runtime.RenderRecipeActivation.cppm
+        Rendering/Runtime.RenderExtraction.cppm
+        Rendering/Runtime.RenderWorldPool.cppm
+        Scene/Runtime.SelectionController.cppm
+        Scene/Runtime.StableEntityLookup.cppm
+        Modules/TextureBake/Runtime.TextureBakeModule.cppm
+        GeometryIntegration/Runtime.VertexAttributeBinding.cppm
+        GeometryIntegration/Runtime.VertexChannelBindings.cppm
+        GeometryIntegration/Runtime.VertexChannelStreams.cppm
         Visualization/Runtime.VisualizationRecipes.cppm
         PRIVATE
         FILE_SET feature_config_impl TYPE CXX_MODULES FILES
-        internal/Runtime.FeatureConfigCodecs.Detail.cppm
+        Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
         PRIVATE
         FILE_SET editor_feature_impl TYPE CXX_MODULES FILES
-        internal/Runtime.EditorFeatures.Detail.cppm
-        internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
+        Editor/internal/Runtime.EditorFeatures.Detail.cppm
+        Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
         PRIVATE
         FILE_SET asset_workflow_impl TYPE CXX_MODULES FILES
-        Runtime.AssetWorkflowImportExecutor.cppm
-        Runtime.AssetWorkflowGeometryMaterialization.cppm
-        Runtime.AssetWorkflowModelMaterialization.cppm
-        Runtime.AssetWorkflowModelTextureDecode.cppm
-        Runtime.AssetWorkflowRecipePolicies.cppm
-        Runtime.AssetWorkflowTextureResidency.cppm
+        AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm
+        AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm
+        AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+        AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cppm
+        AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cppm
+        AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cppm
         PRIVATE
         FILE_SET render_extraction_impl TYPE CXX_MODULES FILES
-        Runtime.GeometryPlanBuilders.cppm
-        Runtime.RenderExtraction.Internal.cpp
+        GeometryIntegration/Runtime.GeometryPlanBuilders.cppm
+        Rendering/Runtime.RenderExtraction.Internal.cpp
         PRIVATE
-        Runtime.AsyncWorkModule.cpp
-        Runtime.AssetWorkflowModule.cpp
-        Runtime.AssetWorkflowImportExecutor.cpp
-        Runtime.AssetIngestStateMachine.cpp
-        Runtime.AssetWorkflowGeometryMaterialization.cpp
-        Runtime.AssetWorkflowModelMaterialization.cpp
-        Runtime.AssetWorkflowModelTextureDecode.cpp
-        Runtime.AssetWorkflowRecipePolicies.cpp
-        Runtime.AssetWorkflowTextureResidency.cpp
-        Runtime.CommandBus.cpp
-        Runtime.DeviceBootstrap.cpp
-        Runtime.JobService.cpp
+        Kernel/Runtime.AsyncWorkModule.cpp
+        AssetWorkflow/Runtime.AssetWorkflowModule.cpp
+        AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+        AssetWorkflow/Runtime.AssetIngestStateMachine.cpp
+        AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+        AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+        AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cpp
+        AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp
+        AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cpp
+        Kernel/Runtime.CommandBus.cpp
+        Kernel/Runtime.DeviceBootstrap.cpp
+        Kernel/Runtime.JobService.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
         Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
-        Runtime.GeometryPresentation.cpp
-        Runtime.ProgressivePoissonGpuBackend.cpp
-        Runtime.RenderArtifactPublication.cpp
+        GeometryIntegration/Runtime.GeometryPresentation.cpp
+        Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp
+        Rendering/Runtime.RenderArtifactPublication.cpp
         Modules/Clustering/Runtime.ClusteringConfig.cpp
-        Runtime.ProgressivePoissonConfig.cpp
-        Runtime.ParameterizationConfig.cpp
-        Runtime.PointCloudConsolidationConfig.cpp
-        Runtime.PointCloudConsolidationModule.cpp
-        Runtime.PointCloudConsolidationGpu.cpp
-        internal/Runtime.FeatureConfigCodecs.Detail.cpp
-        Runtime.EditorCommandHistory.cpp
-        Runtime.EditorCommon.Public.cpp
-        Runtime.EditorWorkspaceAttachment.cpp
-        Runtime.EditorJobProjection.Public.cpp
-        Runtime.SceneEditingOperations.Public.cpp
-        Runtime.SceneEditingOperations.Actions.cpp
-        Runtime.SceneEditingOperations.Debug.cpp
-        Runtime.GeometryProcessingOperations.Public.cpp
-        Runtime.VisualizationEditingOperations.Public.cpp
-        Runtime.VisualizationEditingOperations.Actions.cpp
-        Runtime.VisualizationEditingOperations.Debug.cpp
-        Runtime.RenderRecipeEditingOperations.Public.cpp
-        Runtime.EditorWorkspaceSnapshots.Public.cpp
-        Runtime.EditorWorkspaceSnapshots.Models.cpp
-        internal/Runtime.EditorFeatureContextAdapters.cpp
-        internal/Runtime.EditorWorkspaceSession.cpp
-        Runtime.GeometryProcessingOperations.cpp
-        Runtime.GeometryProcessingOperations.Mesh.cpp
-        Runtime.ParameterizationOperations.cpp
-        Runtime.RenderRecipeEditingOperations.cpp
-        Runtime.RenderRecipeEditingOperations.Debug.cpp
+        Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
+        Modules/Parameterization/Runtime.ParameterizationConfig.cpp
+        Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+        Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
+        Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
+        Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+        Editor/Runtime.EditorCommandHistory.cpp
+        Editor/Runtime.EditorCommon.Public.cpp
+        Editor/Runtime.EditorWorkspaceAttachment.cpp
+        Editor/Runtime.EditorJobProjection.Public.cpp
+        Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
+        Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+        Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+        Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
+        Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+        Editor/Operations/Runtime.VisualizationEditingOperations.Debug.cpp
+        Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp
+        Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+        Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+        Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+        Editor/internal/Runtime.EditorWorkspaceSession.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+        Editor/Operations/Runtime.ParameterizationOperations.cpp
+        Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
+        Editor/Operations/Runtime.RenderRecipeEditingOperations.Debug.cpp
         Editor/Runtime.EditorPropertyWidgets.cpp
         Editor/Runtime.EditorUiHost.cpp
         Editor/Runtime.EditorUiModule.cpp
         Editor/Runtime.EditorWindowRegistry.cpp
-        Runtime.Engine.cpp
-        Runtime.EngineConfigBoot.cpp
-        Runtime.EngineConfigControl.cpp
-        Runtime.FramePacingDiagnostics.cpp
-        Runtime.InputActions.cpp
-        Runtime.KernelEvents.cpp
-        Runtime.ServiceRegistry.cpp
-        Runtime.WorldRegistry.cpp
-        Runtime.GeometryAvailability.cpp
-        Runtime.PhysicsModule.cpp
+        Kernel/Runtime.Engine.cpp
+        Config/Runtime.EngineConfigBoot.cpp
+        Config/Runtime.EngineConfigControl.cpp
+        Kernel/Runtime.FramePacingDiagnostics.cpp
+        Kernel/Runtime.InputActions.cpp
+        Kernel/Runtime.KernelEvents.cpp
+        Kernel/Runtime.ServiceRegistry.cpp
+        Kernel/Runtime.WorldRegistry.cpp
+        GeometryIntegration/Runtime.GeometryAvailability.cpp
+        Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp
         Scene/Runtime.SceneDocumentModule.cpp
         Scene/Runtime.SceneInteractionModule.cpp
-        Runtime.SceneSerialization.cpp
+        Scene/Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraModule.cpp
         Cameras/Runtime.CameraControllers.cpp
         Cameras/Runtime.CameraFocusCommand.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp
-        Runtime.GeometryPlanBuilders.Graph.cpp
-        Runtime.GeometryPlanBuilders.Mesh.cpp
-        Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp
-        Runtime.GeometryPlanBuilders.PointCloud.cpp
-        Runtime.GeometryPlanBuilders.Procedural.cpp
-        Runtime.MeshSurfaceTopology.cpp
-        Runtime.PrimitiveSelectionRefinement.cpp
-        Runtime.ReferenceScene.cpp
-        Runtime.RenderRecipeActivation.cpp
-        Runtime.RenderExtraction.cpp
-        Runtime.RenderExtraction.Recipes.cpp
-        Runtime.RenderExtraction.Geometry.cpp
-        Runtime.RenderExtractionService.cpp
-        Runtime.RenderWorldPool.cpp
-        Runtime.SelectionController.cpp
-        Runtime.StableEntityLookup.cpp
-        Runtime.TextureBakeModule.cpp
-        Runtime.VertexAttributeBinding.cpp
-        Runtime.VertexChannelStreams.cpp
+        GeometryIntegration/Runtime.GeometryPlanBuilders.Graph.cpp
+        GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp
+        GeometryIntegration/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp
+        GeometryIntegration/Runtime.GeometryPlanBuilders.PointCloud.cpp
+        GeometryIntegration/Runtime.GeometryPlanBuilders.Procedural.cpp
+        GeometryIntegration/Runtime.MeshSurfaceTopology.cpp
+        GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cpp
+        Scene/Runtime.ReferenceScene.cpp
+        Config/Runtime.RenderRecipeActivation.cpp
+        Rendering/Runtime.RenderExtraction.cpp
+        Rendering/Runtime.RenderExtraction.Recipes.cpp
+        Rendering/Runtime.RenderExtraction.Geometry.cpp
+        Rendering/Runtime.RenderExtractionService.cpp
+        Rendering/Runtime.RenderWorldPool.cpp
+        Scene/Runtime.SelectionController.cpp
+        Scene/Runtime.StableEntityLookup.cpp
+        Modules/TextureBake/Runtime.TextureBakeModule.cpp
+        GeometryIntegration/Runtime.VertexAttributeBinding.cpp
+        GeometryIntegration/Runtime.VertexChannelStreams.cpp
         Visualization/Runtime.VisualizationRecipes.cpp
 )
 

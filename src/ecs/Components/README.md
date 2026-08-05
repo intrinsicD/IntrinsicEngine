@@ -124,7 +124,7 @@ call `MarkGpuDirty` explicitly.
 
 Clearing-side ownership stays outside ECS: downstream consumers — runtime
 render extraction today (see
-[`Runtime.RenderExtraction::ExtractAndSubmit`](../../runtime/Runtime.RenderExtraction.cpp))
+[`Runtime.RenderExtraction::ExtractAndSubmit`](../../runtime/Rendering/Runtime.RenderExtraction.cpp))
 and any future GPU residency drain — remove these tags after the
 corresponding upload, mirroring the existing `DirtyTags::DirtyTransform`
 drain that `RenderSync::OnUpdate` produces and `RenderExtraction` consumes

@@ -42,15 +42,15 @@ fix. High-severity findings were verified by direct source reads.
   `m_KMeansGpuJobs`, exposes `SubmitKMeansGpuJob`/`ConsumeCompletedKMeansGpuJob`
   as public API, drains its transfers in maintenance, monopolizes the single
   `IRenderer::SetRuntimeFrameCommandHook` slot
-  (`src/runtime/Runtime.Engine.cpp:2471-2480`), and adds a K-Means-specific
+  (`src/runtime/Kernel/Runtime.Engine.cpp:2471-2480`), and adds a K-Means-specific
   shutdown `WaitIdle`. → `RUNTIME-143`.
 - **R3 (high).** Method/app config lives in core:
   `Core::Config::EngineConfig` embeds `SandboxConfig.ProgressivePoisson`
   (`src/core/Core.Config.Engine.cppm:57-93`) and Engine hot-apply hand-compares
-  its 18 fields (`src/runtime/Runtime.Engine.cpp:3271-3329`). → `CORE-009`.
+  its 18 fields (`src/runtime/Kernel/Runtime.Engine.cpp:3271-3329`). → `CORE-009`.
 - **R4 (medium).** The generic import path hardcodes a method step: every
   direct mesh import queues an object-space normal bake with fixed
-  `"v:normal"`/64×64 options (`src/runtime/Runtime.Engine.cpp:1293-1373`),
+  `"v:normal"`/64×64 options (`src/runtime/Kernel/Runtime.Engine.cpp:1293-1373`),
   plus import-time UX policy (camera focus, auto-select, authoring defaults,
   `Runtime.Engine.cpp:3866-3873`) with no post-import extension point.
   → `RUNTIME-144` (bake re-domaining stays with `RUNTIME-129`).
@@ -70,14 +70,14 @@ fix. High-severity findings were verified by direct source reads.
   features via per-frame resource-name string scans
   (`src/graphics/renderer/Graphics.Renderer.cpp:2590-2663`). → `GRAPHICS-116`.
 - **R8 (low).** The `F`-key focus binding is hardcoded in `RunFrame`
-  (`src/runtime/Runtime.Engine.cpp:2938-2945`); folded into `RUNTIME-144`'s
+  (`src/runtime/Kernel/Runtime.Engine.cpp:2938-2945`); folded into `RUNTIME-144`'s
   seam scope as UX policy.
 
 ## Asynchrony / blocking
 
 - **R9 (high).** `DrainAssetImportEvents` calls the global
   `Core::Tasks::Scheduler::WaitForAll()` mid-frame
-  (`src/runtime/Runtime.Engine.cpp:857-864`), reached from Phase-10 import
+  (`src/runtime/Kernel/Runtime.Engine.cpp:857-864`), reached from Phase-10 import
   applies and editor imports — one import stalls the frame on all unrelated
   background work. → `RUNTIME-140`.
 - **R10 (high).** Editor method commands run heavy compute synchronously
@@ -85,12 +85,12 @@ fix. High-severity findings were verified by direct source reads.
   `src/runtime/Editor/Runtime.SandboxEditorUi.cpp:4286-4308, 4789-4804`);
   the Poisson GPU drain uses `device.ReadBuffer` which performs
   `vkDeviceWaitIdle` per call
-  (`src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp:588-601`).
+  (`src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp:588-601`).
   → `RUNTIME-141` (CPU command lane); the async readback helper is owned by
   `RUNTIME-137`, Poisson GPU parity by `METHOD-014`.
 - **R11 (medium).** Model-scene/texture drops and scene save/load do
   synchronous file IO + decode on the main thread
-  (`src/runtime/Runtime.Engine.cpp:3645-3661, 4526-4561`); geometry drops
+  (`src/runtime/Kernel/Runtime.Engine.cpp:3645-3661, 4526-4561`); geometry drops
   already use the deferred streaming path. → `RUNTIME-142`.
 - **R12 (medium).** `TaskGraph::Execute` blocks the caller with a `yield()`
   spin (`src/core/Core.Dag.TaskGraph.cpp:999-1020`), has no
@@ -120,7 +120,7 @@ fix. High-severity findings were verified by direct source reads.
 - **R16 (high).** Both graphs are rebuilt/recompiled from scratch although
   topology rarely changes: the ECS `FrameGraph` re-registers the same three
   system passes and recompiles per fixed tick
-  (`src/runtime/Runtime.Engine.cpp:546-584`); the renderer does
+  (`src/runtime/Kernel/Runtime.Engine.cpp:546-584`); the renderer does
   `Reset → BuildDefaultFrameRecipe → Compile` every frame
   (`Graphics.Renderer.cpp:2180, 2388, 2406`). → `CORE-008` (CPU DAG plan
   cache + adoption) and `GRAPHICS-117` (render-graph compile cache).
@@ -134,7 +134,7 @@ fix. High-severity findings were verified by direct source reads.
   duplicated format-size table (BC formats overestimated). → `GRAPHICS-120`.
 - **R19 (medium).** Runtime frame-path steady-state waste: full
   `StableEntityLookup::Rebuild` per frame despite incremental APIs
-  (`src/runtime/Runtime.Engine.cpp:3022`), `StreamingExecutor` task records
+  (`src/runtime/Kernel/Runtime.Engine.cpp:3022`), `StreamingExecutor` task records
   never reclaimed with O(all-tasks-ever) ready scans
   (`Runtime.StreamingExecutor.cpp:96-124`), unconditional
   `FlushPreRenderTransformState` re-sweeps, per-frame `liveRenderableKeys`

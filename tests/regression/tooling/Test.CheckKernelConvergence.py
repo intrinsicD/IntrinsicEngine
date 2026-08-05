@@ -46,7 +46,7 @@ def fixture_policy(*, plain_imports: int = 2) -> dict[str, object]:
         exact_plain_imports.append("Extrinsic.Core.FrameClock")
     return {
         "schema_version": 2,
-        "engine_interface": "src/runtime/Runtime.Engine.cppm",
+        "engine_interface": "src/runtime/Kernel/Runtime.Engine.cppm",
         "substrate_imports": {
             "prefixes": ["Extrinsic.Core."],
             "exact": ["Extrinsic.Runtime.CommandBus"],
@@ -102,7 +102,7 @@ def write_fixture(
     source: str = BASE_SOURCE,
     policy: dict[str, object] | None = None,
 ) -> None:
-    engine = root / "src" / "runtime" / "Runtime.Engine.cppm"
+    engine = root / "src" / "runtime" / "Kernel" / "Runtime.Engine.cppm"
     policy_path = root / "tools" / "repo" / "kernel_convergence_policy.json"
     engine.parent.mkdir(parents=True)
     policy_path.parent.mkdir(parents=True)
@@ -324,7 +324,13 @@ class KernelConvergenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_fixture(root)
-            (root / "src" / "runtime" / "Runtime.Engine.cppm").unlink()
+            (
+                root
+                / "src"
+                / "runtime"
+                / "Kernel"
+                / "Runtime.Engine.cppm"
+            ).unlink()
             result = run_checker(root)
         self.assertEqual(result.returncode, 2, result.stdout)
         self.assertIn("cannot read Engine interface", result.stdout)

@@ -32,7 +32,7 @@
 - **Decision**: `Runtime.Engine` keeps asset lifecycle/frame ordering and public asset/GPU-cache compatibility facades, while GPU asset cache construction/listener ownership, fallback bootstrap delegation, model texture/model scene handoff ownership, maintenance ticks, and teardown ordering live in the Engine-private `AssetResidencyService` implementation glue.
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.AssetResidencyService.Internal.hpp], [src/runtime/Runtime.Engine.cpp], [tasks/archive/RUNTIME-164-extract-asset-residency-service.md], [tasks/done/RUNTIME-171-privatize-asset-residency-service-surface.md]
+- **Evidence**: [src/runtime/Runtime.AssetResidencyService.Internal.hpp], [src/runtime/Kernel/Runtime.Engine.cpp], [tasks/archive/RUNTIME-164-extract-asset-residency-service.md], [tasks/done/RUNTIME-171-privatize-asset-residency-service-surface.md]
 - **From staging**: O07
 
 ## A06: App-Owned Sandbox Method Presentation Over Runtime Facades
@@ -45,8 +45,8 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp,
-  src/runtime/Runtime.GeometryProcessingOperations.cpp,
-  src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp,
   tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
   docs/architecture/runtime.md,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md]
@@ -63,8 +63,8 @@
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.EditorShell.cpp,
   src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp,
-  src/runtime/Runtime.EditorWorkspaceAttachment.cppm,
-  src/runtime/Runtime.EditorWorkspaceSnapshots.cppm,
+  src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm,
+  src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm,
   docs/architecture/runtime.md,
   tasks/done/ARCH-006-sandbox-editor-content-out-of-runtime.md,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp]
@@ -94,7 +94,7 @@
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/core/Core.Config.Engine.cppm,
   src/core/Core.Config.EngineLoad.cpp,
-  src/runtime/Runtime.ParameterizationOperations.cpp,
+  src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp,
   tests/contract/runtime/Test.ParameterizationOperations.cpp,
   tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md,
   N213, N215]
@@ -188,8 +188,8 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [N268, N269, commit 74a15419,
-  src/runtime/Runtime.AssetWorkflowModule.cppm,
-  src/runtime/Runtime.AssetWorkflowModule.cpp,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp,
   tests/contract/runtime/Test.AssetWorkflowModule.cpp,
   tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp,
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp]
@@ -206,9 +206,9 @@
   headers.
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.Engine.cppm,
-  src/runtime/Runtime.Engine.cpp,
-  src/runtime/Runtime.RenderExtractionService.Internal.hpp,
+- **Evidence**: [src/runtime/Kernel/Runtime.Engine.cppm,
+  src/runtime/Kernel/Runtime.Engine.cpp,
+  src/runtime/Rendering/Runtime.RenderExtractionService.Internal.hpp,
   tools/repo/kernel_convergence_policy.json,
   tasks/done/RUNTIME-187-finalize-domain-free-engine-surface.md,
   commit 982c72ae, N277]
@@ -258,10 +258,10 @@
   payload and codec ownership.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.AssetWorkflowModule.cppm,
-  src/runtime/Runtime.AssetWorkflowModule.cpp,
-  src/runtime/Runtime.AssetWorkflowImportExecutor.cpp,
-  src/runtime/Runtime.AssetWorkflowRecipePolicies.cpp,
+- **Evidence**: [src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp,
   tests/contract/runtime/Test.AssetWorkflowModule.cpp,
   tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md,
   tasks/evidence/RUNTIME-200/report.yaml, N268, N269, N288]
@@ -296,7 +296,7 @@
 - **Evidence**: [N312, N313, N317, N318,
   tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md,
   tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md,
-  src/runtime/Runtime.ParameterizationConfig.cppm,
+  src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm,
   src/app/Sandbox/Sandbox.ConfigSections.cpp]
 - **From staging**: O84
 
@@ -315,10 +315,10 @@
   tasks/evidence/RUNTIME-203/report.yaml,
   tasks/evidence/RUNTIME-205/report.yaml,
   tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
-  src/runtime/Runtime.Engine.cpp,
+  src/runtime/Kernel/Runtime.Engine.cpp,
   src/runtime/Scene/Runtime.SceneInteractionModule.cpp,
-  src/runtime/Runtime.EngineConfigControl.cpp,
-  src/runtime/Runtime.AssetWorkflowModule.cpp]
+  src/runtime/Config/Runtime.EngineConfigControl.cpp,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp]
 - **From staging**: O86
 
 ## A23: Method Integrations Share Typed Operations, Not Mandatory Modules
@@ -481,8 +481,8 @@
 - **Evidence**: [N367, N368,
   AGENTS.md,
   src/geometry/Geometry.Properties.cppm,
-  src/runtime/Runtime.GeometryAvailability.cppm,
-  src/runtime/Runtime.PointCloudConsolidationConfig.cppm]
+  src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm,
+  src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm]
 - **From staging**: O120
 
 ## A32: LOP Vulkan Acceleration Uses a Private Fixed-Radius Cell Grid
@@ -499,8 +499,8 @@
 - **Provenance**: user-revised
 - **Crystallized via**: verbal-affirmation
 - **Evidence**: [N370, N371,
-  src/runtime/Runtime.PointCloudConsolidationGpu.cpp,
-  src/runtime/internal/Runtime.PointCloudConsolidationGpu.Internal.hpp,
+  src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp,
+  src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp,
   assets/shaders/lop_grid_count.comp,
   assets/shaders/lop_grid_scatter.comp,
   assets/shaders/lop_project.comp,
@@ -521,7 +521,7 @@
 - **Evidence**: [N378, N380,
   docs/architecture/property-coherence.md,
   src/geometry/Geometry.Properties.cppm,
-  src/runtime/Runtime.RenderExtraction.Geometry.cpp,
+  src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp,
   src/runtime/Visualization/Runtime.VisualizationRecipes.cpp]
 - **From staging**: O129
 
@@ -545,3 +545,34 @@
   src/graphics/vulkan/Backends.Vulkan.Transfer.cpp,
   tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp]
 - **From staging**: O131
+
+## A35: Runtime Source Paths Follow Cohesive Ownership Cohorts
+- **Decision**: Organize `src/runtime` into broad, cohesive ownership and
+  lifecycle folders rather than leaving the layer flat or creating one folder
+  per `.cppm`/`.cpp` pair. Paths are navigational locality, not a replacement
+  architecture taxonomy: module names, dependency direction, public contracts,
+  and behavior remain independent of the physical move.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N273, N274, N383, N384,
+  docs/adr/0026-runtime-module-scope-by-consumer-contract.md,
+  docs/adr/0027-right-sized-runtime-composition.md,
+  src/runtime]
+- **From staging**: O57
+
+## A36: Runtime Retains Only Necessary Composition Seams
+- **Decision**: Runtime is the composition boundary that binds lower layers and
+  owns genuine cross-layer lifecycle, commit, synchronization, and publication
+  behavior. Feature-specific or forwarding file/module seams remain only when
+  a present consumer, ownership boundary, implementation locality, volatile
+  dependency, or test-double surface justifies them. Semantic consolidation is
+  selected by consumer and ownership evidence rather than a numerical file
+  target.
+- **Provenance**: user
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N383, N384, N385,
+  docs/adr/0026-runtime-module-scope-by-consumer-contract.md,
+  docs/adr/0027-right-sized-runtime-composition.md,
+  tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md,
+  src/runtime]
+- **From staging**: O133

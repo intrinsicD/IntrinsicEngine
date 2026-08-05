@@ -61,7 +61,7 @@ evidence for the path that led to that retirement.
   `GRAPHICS-072..078` (done).
 - **Operational device path** — the device factory returns an operational Vulkan
   device when `kPromotedVulkanAvailable && config.EnablePromotedVulkanDevice`,
-  else falls back to Null (`src/runtime/Runtime.Engine.cpp`,
+  else falls back to Null (`src/runtime/Kernel/Runtime.Engine.cpp`,
   `GRAPHICS-080` done). Note: `CreateRenderer()` returns a single renderer class
   ("NullRenderer") by design; operational-ness is gated on
   `RHI::IDevice::IsOperational()`, not the renderer class — this is the canonical

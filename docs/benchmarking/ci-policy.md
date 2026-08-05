@@ -1025,8 +1025,8 @@ new comparable hosted refresh replaces the cohort.
 | Rank | Source | Durations, samples 1-5 (ms) | Median (ms) | Max / nearest-rank p95 (ms) | Budget (ms) |
 | ---: | --- | --- | ---: | ---: | ---: |
 | 1 | `src/runtime/Runtime.SandboxEditorFacades.cppm` | 172263, 190304, 226226, 168445, 193698 | 190304 | 226226 | 283000 |
-| 2 | `src/runtime/Runtime.Engine.cppm` | 122826, 129172, 131516, 98530, 126496 | 126496 | 131516 | 165000 |
-| 3 | `src/runtime/Runtime.RenderExtraction.cppm` | 98660, 121353, 133134, 86219, 127875 | 121353 | 133134 | 167000 |
+| 2 | `src/runtime/Kernel/Runtime.Engine.cppm` | 122826, 129172, 131516, 98530, 126496 | 126496 | 131516 | 165000 |
+| 3 | `src/runtime/Rendering/Runtime.RenderExtraction.cppm` | 98660, 121353, 133134, 86219, 127875 | 121353 | 133134 | 167000 |
 | 4 | `src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm` | 102288, 109121, 116740, 83473, 120399 | 109121 | 120399 | 151000 |
 | 5 | `src/app/Sandbox/Editor/Sandbox.EditorShell.cppm` | 111968, 107500, 103727, 86185, 123945 | 107500 | 123945 | 155000 |
 

@@ -104,8 +104,8 @@
   frame path performs an unbounded completion drain, or cancellation/staleness
   permits a result to publish more than once.
 - **Proof**: [tasks/done/RUNTIME-194-consolidate-runtime-work-execution.md,
-  src/runtime/Runtime.AsyncWorkModule.cpp,
-  src/runtime/Runtime.Engine.cpp,
+  src/runtime/Kernel/Runtime.AsyncWorkModule.cpp,
+  src/runtime/Kernel/Runtime.Engine.cpp,
   tests/contract/runtime/Test.RuntimeJobService.cpp,
   tests/contract/runtime/Test.AsyncWorkModule.cpp,
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
@@ -183,8 +183,8 @@
   once, or the actual-Vulkan transport fixture does not reproduce the seeded
   CPU-reference-shaped order, level offsets, and splat radii.
 - **Proof**: [tasks/done/RUNTIME-195-unified-gpu-result-readback.md,
-  src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm,
-  src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp,
+  src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm,
+  src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp,
   tests/contract/runtime/Test.ProgressivePoissonGpuBackend.cpp,
   tests/integration/runtime/Test.ProgressivePoissonGpuResultReadbackGpuSmoke.cpp]
 - **Dependencies**: [C07]
@@ -213,7 +213,7 @@
   src/graphics/renderer/Graphics.GpuTransfer.cppm,
   src/graphics/renderer/Graphics.GpuTransfer.cpp,
   src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp,
-  src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp,
+  src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp,
   tests/contract/runtime/Test.GpuResultReadbackJob.cpp,
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
   tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp,
@@ -243,7 +243,7 @@
   tasks/done/RUNTIME-196-canonical-clustering-service-path.md,
   src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp,
   src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp,
-  src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp,
+  src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp,
   src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
   tests/contract/runtime/Test.ClusteringModule.cpp,
   tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp,
@@ -273,11 +273,11 @@
   symbol returns; or the operational Vulkan fixture fails to reach a frame
   through the recipe/state path.
 - **Proof**: [tasks/done/RUNTIME-193-general-geometry-presentation-recipe.md,
-  src/runtime/Runtime.GeometryPresentation.cppm,
-  src/runtime/Runtime.GeometryPresentation.cpp,
-  src/runtime/Runtime.SceneSerialization.cpp,
-  src/runtime/Runtime.RenderExtraction.cpp,
-  src/runtime/Runtime.AssetWorkflowModule.cpp,
+  src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm,
+  src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cpp,
+  src/runtime/Scene/Runtime.SceneSerialization.cpp,
+  src/runtime/Rendering/Runtime.RenderExtraction.cpp,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp,
   tasks/done/RUNTIME-191-unified-property-texture-bake-pipeline.md,
   tests/contract/runtime/Test.GeometryPresentation.cpp,
   tests/contract/runtime/Test.RuntimeSceneSerialization.cpp,
@@ -312,10 +312,10 @@
 - **Proof**: [tasks/done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md,
   src/graphics/renderer/Graphics.GeometryResidency.cppm,
   src/graphics/renderer/Graphics.GeometryResidency.cpp,
-  src/runtime/Runtime.GeometryPlanBuilders.cppm,
-  src/runtime/Runtime.RenderExtraction.Geometry.cpp,
-  src/runtime/Runtime.MeshSurfaceTopology.cppm,
-  src/runtime/Runtime.MeshPrimitiveView.cppm,
+  src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm,
+  src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp,
+  src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm,
+  src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm,
   tests/contract/graphics/Test.GeometryResidency.cpp,
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
   tests/contract/runtime/Test.MeshGeometryExtraction.cpp,
@@ -354,8 +354,8 @@
 - **Proof**: [tasks/done/RUNTIME-198-data-driven-visualization-recipes.md,
   src/runtime/Visualization/Runtime.VisualizationRecipes.cppm,
   src/runtime/Visualization/Runtime.VisualizationRecipes.cpp,
-  src/runtime/Runtime.RenderExtraction.Recipes.cpp,
-  src/runtime/Runtime.RenderExtraction.cpp,
+  src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp,
+  src/runtime/Rendering/Runtime.RenderExtraction.cpp,
   tests/contract/runtime/Test.VisualizationRecipes.cpp,
   tests/integration/runtime/Test.RuntimeRenderExtraction.cpp,
   tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp,
@@ -385,9 +385,9 @@
   live CPU fallback; a retired module/shader/vocabulary returns; or either
   exact promoted-Vulkan import/reconciliation readback fails.
 - **Proof**: [tasks/done/RUNTIME-191-unified-property-texture-bake-pipeline.md,
-  src/runtime/Runtime.TextureBakeModule.cppm,
-  src/runtime/Runtime.TextureBakeModule.cpp,
-  src/runtime/Runtime.AssetWorkflowModule.cpp,
+  src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm,
+  src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp,
   src/graphics/renderer/Graphics.PropertyTextureBake.cppm,
   src/graphics/renderer/Graphics.PropertyTextureBake.cpp,
   tests/contract/runtime/Test.TextureBakeModule.cpp,
@@ -422,14 +422,14 @@
   second undo stack, CommandBus inverse hook, or mutation-specific history
   builder returns; or import lifecycle starts creating partial undo records.
 - **Proof**: [tasks/done/RUNTIME-201-unified-editor-mutation-history-transaction.md,
-  src/runtime/Runtime.EditorMutation.Internal.hpp,
-  src/runtime/Runtime.EditorCommandHistory.cppm,
-  src/runtime/Runtime.EditorCommandHistory.cpp,
-  src/runtime/Runtime.SceneEditingOperations.Actions.cpp,
-  src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp,
-  src/runtime/Runtime.VisualizationEditingOperations.Actions.cpp,
-  src/runtime/Runtime.GeometryProcessingOperations.cpp,
-  src/runtime/Runtime.ParameterizationOperations.cpp,
+  src/runtime/Editor/internal/Runtime.EditorMutation.Internal.hpp,
+  src/runtime/Editor/Runtime.EditorCommandHistory.cppm,
+  src/runtime/Editor/Runtime.EditorCommandHistory.cpp,
+  src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp,
+  src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp,
+  src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp,
   src/runtime/Gizmos/Runtime.GizmoInteraction.cpp,
   src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp,
   tests/contract/runtime/Test.EditorCommandHistory.cpp,
@@ -510,9 +510,9 @@
   src/ecs/Components/ECS.Component.GeometrySources.cpp,
   src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp,
   src/geometry/Geometry.Graph.cpp,
-  src/runtime/Runtime.GeometryAvailability.cpp,
-  src/runtime/Runtime.GeometryPlanBuilders.Graph.cpp,
-  src/runtime/Runtime.SceneSerialization.cpp,
+  src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cpp,
+  src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Graph.cpp,
+  src/runtime/Scene/Runtime.SceneSerialization.cpp,
   tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp,
   tests/unit/geometry/Test_RuntimeGraph.cpp,
   tests/contract/runtime/Test.GeometryAvailability.cpp,
@@ -582,10 +582,10 @@
 - **Proof**: [tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
   methods/geometry/progressive_poisson/method.yaml,
   methods/geometry/progressive_poisson/paper.md,
-  src/runtime/Runtime.ProgressivePoissonConfig.cppm,
-  src/runtime/Runtime.GeometryProcessingOperations.cppm,
-  src/runtime/Runtime.GeometryProcessingOperations.cpp,
-  src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp,
+  src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp,
+  src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp,
   src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
   tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp,
   tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
@@ -622,8 +622,8 @@
 - **Proof**: [tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
   tasks/evidence/UI-038/report.yaml,
   src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
-  src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp,
-  src/runtime/Runtime.GeometryProcessingOperations.cppm,
+  src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm,
   tests/contract/runtime/Test.SandboxEditorModels.cpp,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
   methods/geometry/progressive_poisson/README.md,
@@ -809,9 +809,9 @@
   Engine imports the concrete module; or the public module exposes live
   physics handles/state or an unconsumed service publication.
 - **Proof**: [tasks/done/PHYSICS-004-operational-runtime-physics-module.md,
-  src/runtime/Runtime.PhysicsModule.cppm,
-  src/runtime/Runtime.PhysicsModule.cpp,
-  src/runtime/Runtime.Engine.cpp,
+  src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm,
+  src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp,
+  src/runtime/Kernel/Runtime.Engine.cpp,
   src/app/Sandbox/main.cpp,
   tests/integration/runtime/Test.PhysicsModule.cpp,
   tests/integration/runtime/Test.SandboxConfigSections.cpp,
@@ -846,8 +846,8 @@
   CLOP mixture reaches the job queue; or a non-canonical point-cloud property
   is resized.
 - **Proof**: [tasks/done/RUNTIME-206-lop-element-domain-source-integration.md,
-  src/runtime/Runtime.PointCloudConsolidationModule.cppm,
-  src/runtime/Runtime.PointCloudConsolidationModule.cpp,
+  src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm,
+  src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp,
   tests/contract/runtime/Test.PointCloudConsolidationModule.cpp,
   tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.json,
   tasks/evidence/RUNTIME-206/commands/cpu-tests-r2.json,
@@ -888,8 +888,8 @@
   vector quantity is stored as a public double-vector property.
 - **Proof**: [tasks/done/UI-039-lop-multi-domain-discovery.md,
   src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
-  src/runtime/Runtime.EditorWorkspaceSnapshots.cppm,
-  src/runtime/Runtime.GeometryProcessingOperations.cppm,
+  src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm,
   src/geometry/Geometry.HalfedgeMesh.Utils.cppm,
   tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
@@ -920,9 +920,9 @@
   extraction; a queued/running request mutates the source before publication;
   or publishing only a non-canonical output property changes the packed
   canonical position channel.
-- **Proof**: [src/runtime/Runtime.PointCloudConsolidationModule.cpp,
-  src/runtime/Runtime.RenderExtraction.cpp,
-  src/runtime/Runtime.GeometryPlanBuilders.Mesh.cpp,
+- **Proof**: [src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp,
+  src/runtime/Rendering/Runtime.RenderExtraction.cpp,
+  src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp,
   tests/contract/runtime/Test.PointCloudConsolidationModule.cpp,
   tests/contract/runtime/Test.AssetImportFormatCoverage.cpp,
   tests/integration/runtime/Test.RuntimeRenderExtraction.cpp]
@@ -1015,7 +1015,7 @@
   a status/cardinality/iteration mismatch, RMS error above `5e-4`, L-infinity
   error above `2e-3`, a same-host repeat delta above either bound, or a declared
   capability-negative pair passes canonical availability preview.
-- **Proof**: [src/runtime/Runtime.PointCloudConsolidationGpu.cpp,
+- **Proof**: [src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp,
   tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp,
   benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml,
   methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md,
@@ -1046,7 +1046,7 @@
   displacement, fails to update canonical mesh positions, or leaves the
   renderer position fingerprint/content revision unchanged.
 - **Proof**: [src/geometry/Geometry.SupportRadius.cpp,
-  src/runtime/Runtime.PointCloudConsolidationGpu.cpp,
+  src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp,
   tests/unit/geometry/Test.SupportRadius.cpp,
   tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp]
 - **Dependencies**: [C30, C34]
@@ -1074,7 +1074,7 @@
   publication, or the final three-test Vulkan command records a validation
   error or functional failure.
 - **Proof**: [src/geometry/Geometry.Properties.cppm,
-  src/runtime/Runtime.RenderExtraction.Geometry.cpp,
+  src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp,
   src/runtime/Visualization/Runtime.VisualizationRecipes.cpp,
   tests/contract/runtime/Test.MeshGeometryExtraction.cpp,
   tests/contract/runtime/Test.GraphGeometryExtraction.cpp,

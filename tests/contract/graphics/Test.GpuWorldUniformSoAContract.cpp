@@ -33,8 +33,8 @@ TEST(GpuWorldUniformSoAContract, DormantAlternateStoragePlanningSurfaceIsAbsent)
         "src/graphics/renderer/Graphics.GpuWorld.cpp",
         "src/graphics/renderer/Graphics.GeometryResidency.cppm",
         "src/graphics/renderer/Graphics.GeometryResidency.cpp",
-        "src/runtime/Runtime.GeometryPlanBuilders.cppm",
-        "src/runtime/Runtime.RenderExtraction.Geometry.cpp",
+        "src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm",
+        "src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp",
     }};
     constexpr std::array<std::string_view, 7> kDormantTokens{{
         "StaticInterleaved" "AoS",

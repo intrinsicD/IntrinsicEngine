@@ -31,7 +31,7 @@ SMOKE_BUDGET = {
 }
 
 KERNEL_CONVERGENCE_TRACKED_PATHS = {
-    "src/runtime/Runtime.Engine.cppm",
+    "src/runtime/Kernel/Runtime.Engine.cppm",
     "tools/repo/check_kernel_convergence.py",
     "tools/repo/kernel_convergence_policy.json",
     "tests/regression/tooling/Test.CheckKernelConvergence.py",

@@ -516,14 +516,14 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
 - `Geometry.Registration.cppm:73` / `:145` — `RegistrationParams`/`AlignICP` to extend.
 - `Geometry.PointCloud.Features.cppm:184` — the coarse-align seam to glue in.
 - `Geometry.KMeans.cppm` + [algorithm-variant-dispatch.md](algorithm-variant-dispatch.md) — the Strategy×Backend telemetry to adopt.
-- `src/runtime/Runtime.GeometryProcessingOperations.cppm` and
-  `src/runtime/Runtime.GeometryProcessingOperations.cpp` — the runtime-owned
+- `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm` and
+  `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp` — the runtime-owned
   algorithm catalog, capability snapshots, and typed operations.
-- `src/runtime/Runtime.GeometryProcessingOperations.cpp` and
-  `src/runtime/Runtime.GeometryProcessingOperations.Mesh.cpp` — typed geometry
+- `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp` and
+  `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp` — typed geometry
   operations, including the ICP observer and mesh-processing executors.
-- `src/runtime/Runtime.EditorWorkspaceSnapshots.Models.cpp` and
-  `src/runtime/internal/Runtime.EditorWorkspaceSession.cpp` — presentation-free
+- `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp` and
+  `src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp` — presentation-free
   workspace model assembly and the bounded attachment/job-result lifecycle.
 - `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp` — the current
   app-owned registration presentation/controller.

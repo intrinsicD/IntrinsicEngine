@@ -41,8 +41,8 @@ import Geometry.PointCloud.Utils;
 import Geometry.Properties;
 import Geometry.SupportRadius;
 
-#include "Runtime.EditorMutation.Internal.hpp"
-#include "internal/Runtime.PointCloudConsolidationGpu.Internal.hpp"
+#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
+#include "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

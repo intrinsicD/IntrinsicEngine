@@ -37,9 +37,9 @@ Result recorded during this session: the target linked successfully. This proves
 
 ### Runtime defaults do not create an operational GPU path
 
-`src/runtime/Runtime.Engine.cpp` still has a null fallback path in device creation. The current code path returns `Backends::Null::CreateNullDevice()` when the promoted Vulkan path is not both compiled and enabled by configuration.
+`src/runtime/Kernel/Runtime.Engine.cpp` still has a null fallback path in device creation. The current code path returns `Backends::Null::CreateNullDevice()` when the promoted Vulkan path is not both compiled and enabled by configuration.
 
-`src/runtime/Runtime.Engine.cppm` sets the reference render backend to Vulkan, but Vulkan execution is still separately gated by promoted-device configuration and build options. A Vulkan backend enum value alone is insufficient to make the runtime use an operational Vulkan device.
+`src/runtime/Kernel/Runtime.Engine.cppm` sets the reference render backend to Vulkan, but Vulkan execution is still separately gated by promoted-device configuration and build options. A Vulkan backend enum value alone is insufficient to make the runtime use an operational Vulkan device.
 
 `src/graphics/vulkan/README.md` documents that the promoted Vulkan backend keeps `IsOperational() == false` until canonical renderer pass command recording, synchronization/barrier validation, queue-family ownership, and service fallback reconciliation are completed.
 
@@ -51,7 +51,7 @@ The null renderer is useful for CPU-testable contracts: frame lifecycle, render 
 
 ### Runtime extraction observes renderable candidates but does not bind geometry
 
-`src/runtime/Runtime.RenderExtraction.cppm` currently identifies renderable entities by requiring:
+`src/runtime/Rendering/Runtime.RenderExtraction.cppm` currently identifies renderable entities by requiring:
 
 - `ECS::Components::Transform::WorldMatrix`; and
 - at least one render hint from `Graphics::Components::RenderSurface`, `RenderEdges`, or `RenderPoints`.

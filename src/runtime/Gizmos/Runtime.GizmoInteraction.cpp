@@ -19,7 +19,7 @@ module Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.Runtime.StableEntityLookup;
 
-#include "../Runtime.EditorMutation.Internal.hpp"
+#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

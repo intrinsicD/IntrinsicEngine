@@ -14,7 +14,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
 
-#include "Runtime.EditorMutation.Internal.hpp"
+#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
 namespace ECS = Extrinsic::ECS;

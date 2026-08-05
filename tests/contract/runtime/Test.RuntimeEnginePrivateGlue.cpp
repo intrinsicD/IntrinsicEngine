@@ -60,14 +60,14 @@ namespace
 TEST(RuntimeEnginePrivateGlue, FrameLoopHelpersArePrivateTextualGlue)
 {
     const auto root = RepoRoot();
-    const auto engineImpl = ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto engineImpl = ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto privateHeader = ReadFile(
-        root / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+        root / "src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto runtimeCMake = ReadFile(root / "src/runtime/CMakeLists.txt");
     const auto moduleInventory = ReadFile(
         root / "docs/api/generated/module_inventory.md");
     constexpr std::string_view includeDirective =
-        "#include \"Runtime.Engine.FrameLoop.Internal.hpp\"";
+        "#include \"Kernel/Runtime.Engine.FrameLoop.Internal.hpp\"";
 
     std::vector<std::filesystem::path> includeOwners;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(
@@ -101,11 +101,11 @@ TEST(RuntimeEnginePrivateGlue,
 {
     const auto root = RepoRoot();
     const std::string engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const std::string privateHeader = ReadFile(
-        root / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+        root / "src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp");
     const std::string moduleInterface =
-        ReadFile(root / "src/runtime/Runtime.Module.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Module.cppm");
     const std::string interactionImpl = ReadFile(
         root /
         "src/runtime/Scene/Runtime.SceneInteractionModule.cpp");
@@ -224,8 +224,8 @@ TEST(RuntimeEnginePrivateGlue,
 TEST(RuntimeEnginePrivateGlue, EditorUiModuleOwnsOptionalEditorUiComposition)
 {
     const auto root = RepoRoot();
-    const auto engineInterface = ReadFile(root / "src/runtime/Runtime.Engine.cppm");
-    const auto engineImpl = ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto engineInterface = ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
+    const auto engineImpl = ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto moduleInterface = ReadFile(
         root / "src/runtime/Editor/Runtime.EditorUiModule.cppm");
     const auto moduleImpl = ReadFile(
@@ -420,17 +420,17 @@ TEST(RuntimeEnginePrivateGlue, EditorUiModuleOwnsOptionalEditorUiComposition)
 TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementation)
 {
     const auto root = RepoRoot();
-    const auto engineInterface = ReadFile(root / "src/runtime/Runtime.Engine.cppm");
-    const auto engineImpl = ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto engineInterface = ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
+    const auto engineImpl = ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto privateHeader = ReadFile(
-        root / "src/runtime/Runtime.RenderExtractionService.Internal.hpp");
+        root / "src/runtime/Rendering/Runtime.RenderExtractionService.Internal.hpp");
     const auto serviceImpl = ReadFile(
-        root / "src/runtime/Runtime.RenderExtractionService.cpp");
+        root / "src/runtime/Rendering/Runtime.RenderExtractionService.cpp");
     const auto runtimeCMake = ReadFile(root / "src/runtime/CMakeLists.txt");
     const auto moduleInventory = ReadFile(
         root / "docs/api/generated/module_inventory.md");
     constexpr std::string_view includeDirective =
-        "#include \"Runtime.RenderExtractionService.Internal.hpp\"";
+        "#include \"Rendering/Runtime.RenderExtractionService.Internal.hpp\"";
 
     std::vector<std::filesystem::path> includeOwners;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(
@@ -447,7 +447,7 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
     }
 
     EXPECT_FALSE(std::filesystem::exists(
-        root / "src/runtime/Runtime.RenderExtractionService.cppm"));
+        root / "src/runtime/Rendering/Runtime.RenderExtractionService.cppm"));
     ASSERT_EQ(includeOwners.size(), 2u);
     EXPECT_NE(engineImpl.find(includeDirective), std::string::npos);
     EXPECT_NE(serviceImpl.find(includeDirective), std::string::npos);
@@ -512,9 +512,9 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
                   "export import Extrinsic.Runtime.RenderWorldPool;"),
               std::string::npos);
     EXPECT_TRUE(std::filesystem::exists(
-        root / "src/runtime/Runtime.RenderExtraction.cppm"));
+        root / "src/runtime/Rendering/Runtime.RenderExtraction.cppm"));
     EXPECT_TRUE(std::filesystem::exists(
-        root / "src/runtime/Runtime.RenderWorldPool.cppm"));
+        root / "src/runtime/Rendering/Runtime.RenderWorldPool.cppm"));
 
     EXPECT_NE(serviceImpl.find("module Extrinsic.Runtime.Engine;"),
               std::string::npos);
@@ -586,11 +586,11 @@ TEST(RuntimeEnginePrivateGlue, EngineInterfaceCarriesOnlyOpaqueImplementationSta
 {
     const auto root = RepoRoot();
     const std::string engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const std::string engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const std::string moduleInterface =
-        ReadFile(root / "src/runtime/Runtime.Module.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Module.cppm");
     const std::string compactInterface = WithoutWhitespace(engineInterface);
 
     EXPECT_NE(compactInterface.find(
@@ -633,19 +633,19 @@ TEST(RuntimeEnginePrivateGlue,
 {
     const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto frameLoop = ReadFile(
-        root / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+        root / "src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto workflowInterface = ReadFile(
-        root / "src/runtime/Runtime.AssetWorkflowModule.cppm");
+        root / "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm");
     const auto workflowImpl = ReadFile(
-        root / "src/runtime/Runtime.AssetWorkflowModule.cpp");
+        root / "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp");
     const auto textureBakeInterface = ReadFile(
-        root / "src/runtime/Runtime.TextureBakeModule.cppm");
+        root / "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm");
     const auto textureBakeImpl = ReadFile(
-        root / "src/runtime/Runtime.TextureBakeModule.cpp");
+        root / "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp");
     const auto runtimeCMake =
         ReadFile(root / "src/runtime/CMakeLists.txt");
 
@@ -677,11 +677,11 @@ TEST(RuntimeEnginePrivateGlue,
         foundInterface |=
             owner ==
             root /
-                "src/runtime/Runtime.AssetWorkflowModule.cppm";
+                "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm";
         foundImplementation |=
             owner ==
             root /
-                "src/runtime/Runtime.AssetWorkflowModule.cpp";
+                "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp";
     }
     EXPECT_TRUE(foundInterface);
     EXPECT_TRUE(foundImplementation);
@@ -756,7 +756,7 @@ TEST(RuntimeEnginePrivateGlue,
             }
             if (entry.path() ==
                 root /
-                    "src/runtime/Runtime.AssetWorkflowModule.cpp")
+                    "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp")
             {
                 continue;
             }
@@ -876,11 +876,11 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
 {
     const auto root = RepoRoot();
     const auto facadeInterface = ReadFile(
-        root / "src/runtime/internal/Runtime.EditorFeatures.Detail.cppm");
+        root / "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm");
     const auto panelImpl = ReadFile(
         root / "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
     const auto operationImpl = ReadFile(
-        root / "src/runtime/Runtime.GeometryProcessingOperations.Public.cpp");
+        root / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp");
     const auto moduleInterface = ReadFile(
         root / "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm");
     const auto gpuPartition = ReadFile(

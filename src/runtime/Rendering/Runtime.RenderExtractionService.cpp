@@ -9,7 +9,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderWorldPool;
 
-#include "Runtime.RenderExtractionService.Internal.hpp"
+#include "Rendering/Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
