@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "tools/benchmark/validate_benchmark_results.py",
+    "--root",
+    "tasks/evidence/METHOD-020/experiment/inputs",
+    "--manifests-root",
+    "benchmarks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-020/experiment/inputs --manifests-root benchmarks --strict",
+  "cwd": ".",
+  "duration_ms": 66,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T05:15:54Z",
+  "label": "benchmark-results-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T05:15:54Z",
+  "stderr_path": "tasks/evidence/METHOD-020/commands/benchmark-results-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-020/commands/benchmark-results-final.stdout.log",
+  "stdout_sha256": "d9c76871f6c040a9c9ed83d07b9632d493f15f21b3e3a9cdfc4590c8b275782d",
+  "task_id": "METHOD-020"
+}
