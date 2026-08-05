@@ -1,0 +1,147 @@
+schema_version: 1
+task_id: BUG-132
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-05T12:30:43Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 95b115aa1cb73b09e4b284a1a5850901f4e132fd
+  head_revision: 9de8ef80954a2a4acc21786d8b4aef73bbba555a
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm
+    sha256: 25018ab6a1b20c21ab22853a3095173a1274325b6f87d03e99203f61c78256da
+  - path: src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp
+    sha256: 2d7164e56a2da901892805de58fe15fa5a61fd0209ca529736cfc9e6410f277c
+  - path: src/graphics/framegraph/README.md
+    sha256: 5d1babcb609677495858961110647b79dc9ea9c787081de458b6a9ce225731f8
+  - path: src/graphics/renderer/Graphics.FrameRecipe.cpp
+    sha256: 40b2ed5bfb9a0cad41c868be846b81e96ac749319e7b06b584c8828bfb7c44c4
+  - path: src/graphics/renderer/Graphics.GpuTransfer.cpp
+    sha256: 39f29463bf688d1a1fc07334fe54f2c280ea121040818ecd69e0766aa7a30c02
+  - path: src/graphics/renderer/Graphics.GpuTransfer.cppm
+    sha256: e3db5ed214f50cb95ced6b2027802b453e8787f578cb333887ab3c3bf7430b97
+  - path: src/graphics/renderer/Graphics.Renderer.cpp
+    sha256: 07f411cda9de9417c8942a44030d8a5c129ef4888b4083cb2b7eb6c24a95ca82
+  - path: src/graphics/renderer/README.md
+    sha256: 15f6f1e38cdc88edf0552c5623d8cad1d31db76a6e897d453f6764ff8a67b59f
+  - path: src/graphics/rhi/README.md
+    sha256: 9d3af4e3015d9150bad57fedb6188bbe9d7623b0035cccc1e9d0660329249e14
+  - path: src/graphics/rhi/RHI.TransferQueue.cppm
+    sha256: f89706a70427dd26d3db08b41aa372b35378b186b4d6ec67c8b585aea190dd27
+  - path: src/graphics/vulkan/Backends.Vulkan.Device.cpp
+    sha256: fffac5d210e69aae98e95adc14f3660897d8f7ae851b173cc75713756a9f1d38
+  - path: src/graphics/vulkan/Backends.Vulkan.Transfer.cpp
+    sha256: 05a96c7328b40521c8648740a65be476e8a46f774d1f6c4e479d16708e9d12c4
+  - path: src/graphics/vulkan/Backends.Vulkan.Transfer.cppm
+    sha256: 9c834890e45ba8709747c1a3cb886a3c27c374f52d5b7d4459ae31d9113cc7fc
+  - path: src/graphics/vulkan/README.md
+    sha256: d00beeed5215ea7f2bd2b4be14d6e90c4923868c9e76900ce37ddcd6176e3a63
+  - path: src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+    sha256: c128e95b6300d7a2df09d0c6b384f84719401dab6089e6ef6e940d7c930d9fad
+  - path: tasks/backlog/bugs/index.md
+    sha256: 730d1b6c114fc6f7bbda02af89c5c19dd49f5a9be873c7b3a9cc542c954e9614
+  - path: tasks/done/BUG-132-vulkan-method-render-synchronization.md
+    sha256: a164d0e41ae60b7e63570f5ca839f9b7c6845d1b31e285933a768ee0d5ed7be4
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 27d3c548b85bb9cfb8b748051d2f93c7b923b1f4b8826716a3a1929bff87bfe9
+  - path: tests/contract/graphics/Test.FrameRecipeContract.cpp
+    sha256: 5e0909ac434ef2098637f5ab2e6b21058f62336a8f463b5908bdf13510bf038e
+  - path: tests/contract/graphics/Test.GpuTransferFacade.cpp
+    sha256: f23d108b1646897a91aa6cdd0730a40b9db424e3736d8b1eda904369d718cb58
+  - path: tests/contract/graphics/Test.RenderGraphValidation.cpp
+    sha256: dfdedd736d3171d79115ac6b0f89d9d733787293139afc2c4a3b2a26b7baa527
+  - path: tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+    sha256: cd7781e3e7c8c63de1b4e7287c0d3b7815d83923e063bb92afc80670056afbc3
+  content_digest: 7f811a84aebd7a3d0099708a402feeb7a2dd3e07b123f724acab38785c17594b
+touched:
+  paths:
+  - src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm
+  - src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp
+  - src/graphics/framegraph/README.md
+  - src/graphics/renderer/Graphics.FrameRecipe.cpp
+  - src/graphics/renderer/Graphics.GpuTransfer.cpp
+  - src/graphics/renderer/Graphics.GpuTransfer.cppm
+  - src/graphics/renderer/Graphics.Renderer.cpp
+  - src/graphics/renderer/README.md
+  - src/graphics/rhi/README.md
+  - src/graphics/rhi/RHI.TransferQueue.cppm
+  - src/graphics/vulkan/Backends.Vulkan.Device.cpp
+  - src/graphics/vulkan/Backends.Vulkan.Transfer.cpp
+  - src/graphics/vulkan/Backends.Vulkan.Transfer.cppm
+  - src/graphics/vulkan/README.md
+  - src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-132-vulkan-method-render-synchronization.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/graphics/Test.FrameRecipeContract.cpp
+  - tests/contract/graphics/Test.GpuTransferFacade.cpp
+  - tests/contract/graphics/Test.RenderGraphValidation.cpp
+  - tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+  layers:
+  - graphics
+  - methods
+  modules:
+  - Graphics.FrameGraph
+  - Graphics.RHI
+  - Graphics.Vulkan
+  - Methods.PointCloudConsolidation
+extension_seam: Backend-neutral texture barrier states and the shared GPU transfer interface carry synchronization
+  policy; Vulkan remains the backend-local lowering.
+future_change_plan: Represent producer completion tokens before enabling a dedicated transfer queue; retain
+  terminal method readback and validation-fatal GPU regression coverage.
+acceptance:
+- criterion: The original LOP reproduction completes with zero Vulkan validation errors.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A pass with `LoadOp::Load` and color output declares/executes a read-write attachment dependency.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No buffer is destroyed while referenced by a submitted transfer or compute command.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Null/headless behavior and existing CPU transfer contracts remain green.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-132/commands/cpu-build.json
+- receipt: tasks/evidence/BUG-132/commands/cpu-focused.json
+- receipt: tasks/evidence/BUG-132/commands/layering.json
+- receipt: tasks/evidence/BUG-132/commands/task-policy.json
+- receipt: tasks/evidence/BUG-132/commands/vulkan-sync-validation.json
+changed_public_contracts:
+- TextureBarrierState now represents color-attachment read/write access without exposing Vulkan types.
+diagnostics_and_previews:
+- The representative Vulkan Auto LOP regression enables validation and asserts the validation-error counter
+  does not grow.
+benchmark_or_parity_evidence:
+- CPU frame-graph/transfer contract cohorts and the Vulkan imported-child-mesh parity regression passed;
+  command receipts are hash-bound.
+docs_sync:
+  task_file: tasks/done/BUG-132-vulkan-method-render-synchronization.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- Graphics.GpuTransfer intentionally uses the graphics queue until cross-queue producer completion is
+  represented explicitly.
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
