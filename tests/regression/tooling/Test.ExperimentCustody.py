@@ -890,6 +890,61 @@ class ExperimentCustodyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("task changed after official run initialization", result.stdout)
 
+    def test_rejected_run_cannot_substitute_task_decoy_outside_lifecycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            decoy = fixture.repo / "tasks/evidence/decoy-task.md"
+            decoy.parent.mkdir(parents=True, exist_ok=True)
+            decoy.write_bytes(fixture.task.read_bytes())
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "add task-shaped decoy")
+            fixture.source_revision = git(fixture.repo, "rev-parse", "HEAD")
+            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
+            protocol["source"]["revision"] = fixture.source_revision
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+
+            self.assertEqual(fixture.freeze(commit=True).returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            self.assertEqual(fixture.cell("started").returncode, 0)
+            self.assertEqual(
+                fixture.cell("failed", error="negative evidence").returncode,
+                0,
+            )
+            self.assertEqual(fixture.bundle().returncode, 0)
+            self.assertEqual(fixture.audit().returncode, 1)
+
+            run_path = fixture.run_root / "run.yaml"
+            run = yaml.safe_load(run_path.read_text(encoding="utf-8"))
+            run["task_path"] = decoy.relative_to(fixture.repo).as_posix()
+            run["task_sha256"] = sha(decoy)
+            run_path.write_text(
+                yaml.safe_dump(run, sort_keys=False), encoding="utf-8"
+            )
+            bundle_path = fixture.run_root / "bundle.yaml"
+            bundle = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
+            bundle["provenance"]["task_sha256"] = run["task_sha256"]
+            bundle_path.write_text(
+                yaml.safe_dump(bundle, sort_keys=False), encoding="utf-8"
+            )
+            audit_path = fixture.run_root / "audit.json"
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            audit["bundle_sha256"] = sha(bundle_path)
+            audit_path.write_text(
+                json.dumps(audit, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            fixture.task.write_text(
+                fixture.task.read_text(encoding="utf-8") + "\nchanged\n",
+                encoding="utf-8",
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "substitute task-shaped decoy")
+            result = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("task changed after official run initialization", result.stdout)
+
     def test_changed_protocol_and_retuned_gate_are_detected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ExperimentFixture(Path(tmp))

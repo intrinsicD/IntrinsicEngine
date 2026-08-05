@@ -15,10 +15,11 @@ contracts: [repo.task-contract-discovery]
 # BUG-130 — Rejected experiment runs require their historical task seal
 
 ## Status
-- Completed on 2026-08-05. METHOD-020 run-001 validates as retained negative
-  evidence after the task advanced to its corrected run-002 surface, and
-  independent source review accepted revision `0a54b2f7` with no findings.
-- Commit: `0a54b2f7`.
+- Corrected on 2026-08-05 after final fixed-surface review found that a
+  task-shaped decoy below non-lifecycle `tasks/` storage could substitute for
+  the historical task path. The fallback now accepts only canonical lifecycle
+  roots, and the exact adversarial regression passes. Revision `14a91429`
+  remains rejected; renewed source review is pending.
 
 ## Goal
 - Preserve immutable, independently rejected claim-grade runs when their task
@@ -54,13 +55,13 @@ contracts: [repo.task-contract-discovery]
 ## Docs
 - [x] Document the negative-run historical task-seal rule in the canonical
       workflow evidence policy and regenerate its skill mirror.
-- [x] Update the bug index, session brief, and retirement log on closure.
+- [ ] Update the bug index, session brief, and retirement log on closure.
 
 ## Acceptance criteria
 - [x] METHOD-020 run-001 remains structurally valid rejected evidence after the
       task advances, and a later accepted run may satisfy completion.
 - [x] Accepted evidence cannot use a historical task seal.
-- [x] Fixed-surface independent review finds no blocker.
+- [ ] Fixed-surface independent review finds no blocker.
 
 ## Verification
 ```bash

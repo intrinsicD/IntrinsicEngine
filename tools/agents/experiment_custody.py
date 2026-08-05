@@ -204,7 +204,12 @@ def _has_valid_historical_rejected_task_seal(
     if not isinstance(task_path, str) or not isinstance(task_sha256, str):
         return False
     try:
-        if Path(task_path).parts[:1] != ("tasks",):
+        task_parts = Path(task_path).parts
+        if (
+            len(task_parts) < 3
+            or task_parts[0] != "tasks"
+            or task_parts[1] not in {"active", "backlog", "done", "archive"}
+        ):
             return False
         task_blob = blob_at_revision(repo_root, source_revision, task_path)
         if task_blob is None or sha256_bytes(task_blob) != task_sha256:

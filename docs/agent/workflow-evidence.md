@@ -204,8 +204,10 @@ config, environment, dataset seals, implementation digest, and exact command
 with the frozen protocol; merely pointing each field at an existing hash-valid
 file is insufficient. Substituting one valid seal for another therefore fails.
 An independently audited rejected run with a clean exact source may retain its
-recorded task digest against the task blob at that frozen source revision after
-the task advances to a corrected run. This is a negative-evidence exception:
+recorded task digest against the task blob under the canonical
+`tasks/active|backlog|done|archive` lifecycle roots at that frozen source
+revision after the task advances to a corrected run. This is a
+negative-evidence exception:
 the canonical bundle and audit must still recompute to the recorded rejection,
 and accepted, unaudited, dirty-source, or malformed runs remain bound to the
 current task bytes with no historical fallback.

@@ -8,6 +8,12 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+`BUG-130` retirement correction — the 2026-08-05 fixed-surface review of
+revision `14a91429` found that its broad `tasks/` path check admitted a
+same-ID/profile decoy below non-lifecycle storage. The task was immediately
+reopened; the rejected report, handoff, and review remain append-only evidence,
+and the earlier retirement narrative below does not claim final acceptance.
+
 [`BUG-130`](BUG-130-rejected-run-historical-task-seal.md) — rejected-run
 historical task-seal custody completed on 2026-08-05. A clean-source run with
 an independently rejected canonical audit may retain its recorded task digest

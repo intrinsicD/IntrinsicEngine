@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-130` — Rejected experiment runs require their historical task seal (tasks/active/BUG-130-rejected-run-historical-task-seal.md)
 - `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
 
 ## Theme B — Rendering modernization
