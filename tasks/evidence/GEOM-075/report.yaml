@@ -3,12 +3,12 @@ task_id: GEOM-075
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-05T01:21:13Z'
+generated_at: '2026-08-05T01:38:46Z'
 claim_eligible: false
 source:
   base_ref: 2c6446cd
   base_revision: 2c6446cd8bca80b7672b6e9dee08cedcf783a6ab
-  head_revision: df68939fa6ce7b8683a73029e0d0bc68a5ccc3c2
+  head_revision: 991d12a5ff12d494bf60ed35e0db28a0002641bf
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
@@ -26,7 +26,7 @@ source:
   - path: docs/architecture/runtime-config-control.md
     sha256: dd19bf652389263cfce4768be14bd0b8342990d8452aa48500881a1919c4f61a
   - path: docs/architecture/support-radius-policy.md
-    sha256: b727e253645cb44c0463801e54f4d3a988a01690fd07c8dea0083855b33e67c8
+    sha256: 0512f9a552018add892abdab3efb7b1f6cb4f2004d4276883150b623312822bf
   - path: methods/geometry/continuous_lop/README.md
     sha256: aa0855c2d6ff92a948151f2215d3ddf10ef34476a5305e124291d1124c34c2a9
   - path: methods/geometry/edge_aware_resampling/README.md
@@ -52,7 +52,7 @@ source:
   - path: src/runtime/Runtime.PointCloudConsolidationConfig.cppm
     sha256: 77e6a587a7893ab3a71c1c25ae8dc9ea8ed94a5d2ff6d268ec703603509b01db
   - path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
-    sha256: 5773d052862acf4fcf7c9b39f2651c6ce15c9e0e30520f3e1918619902e0c557
+    sha256: 90c4af35bf36d3ab7c73a5d33424eb3332b1e8eda5af3dcaa65fbcb8db6171bf
   - path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
     sha256: e6405b0ff3183b378db693d513d7fcd6391292eae62ae09b49715762caf061cf
   - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
@@ -72,14 +72,14 @@ source:
   - path: tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
     sha256: b782cacc7fbffbdbbb5333b992283cc41ecb4da0aacd2eaac69c24427b2185a3
   - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
-    sha256: 30a806341b60499c4769c2fcd4e1b2c7d780fbf2532bfc56c3e146531745c99c
+    sha256: 4ffe06df3050dd8edf47a3cee716a2ef4ff4008be07c3b87b95fa163ae7a83f4
   - path: tests/integration/runtime/Test.SandboxConfigSections.cpp
     sha256: f1318a3e957fdc19fd10bd8be3635e0b8718faee4b23cc40faadedab6420843c
   - path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
     sha256: 8512386f9048a66064ef8a34311d9caf38aa77abe2fe3d93516baad4d506776f
   - path: tests/unit/geometry/Test.SupportRadius.cpp
     sha256: ac675815f8e5fa2cbe3363c2a2de276a17cca49dab32feed106c5ef258c8be11
-  content_digest: ef480de9130eee5b02f9ac3374f7315270d96836203a394790a31110c0a016d3
+  content_digest: 184aeb0ab850793b8e53b9fca56b0df9ad0ff13da0ad40eea109f85282027343
 touched:
   paths:
   - docs/api/generated/module_inventory.md
@@ -190,6 +190,21 @@ commands:
 - receipt: tasks/evidence/GEOM-075/commands/revision2-task-policy.json
 - receipt: tasks/evidence/GEOM-075/commands/revision2-test-layout.json
 - receipt: tasks/evidence/GEOM-075/commands/revision2-validate-tasks.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-asan-build.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-asan-configure.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-asan-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-build.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-configure.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-ubsan-build.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-ubsan-configure.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-ci-ubsan-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-doc-links.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-focused-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-layering.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-task-policy.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-test-layout.json
+- receipt: tasks/evidence/GEOM-075/commands/revision4-validate-tasks.json
 - receipt: tasks/evidence/GEOM-075/commands/root-hygiene.json
 - receipt: tasks/evidence/GEOM-075/commands/session-brief.json
 - receipt: tasks/evidence/GEOM-075/commands/task-policy.json
@@ -226,7 +241,7 @@ skipped_checks:
     and parity.
 artifacts:
 - path: docs/architecture/support-radius-policy.md
-  sha256: b727e253645cb44c0463801e54f4d3a988a01690fd07c8dea0083855b33e67c8
+  sha256: 0512f9a552018add892abdab3efb7b1f6cb4f2004d4276883150b623312822bf
   kind: file
 - path: tasks/done/GEOM-075-property-support-radius-profile.md
   sha256: 7ae70bcadedafb03cc5921f218cd40f92af5efd5057f1f90c8c221d15da953d2
