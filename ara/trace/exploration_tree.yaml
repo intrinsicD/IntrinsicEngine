@@ -8892,7 +8892,7 @@ tree:
       changed CPU data, let Vulkan methods operate directly on resident data,
       and restore CPU coherence once at the method boundary without stalls or
       stale visual output.
-    status: open
+    status: resolved
   - id: N379
     type: experiment
     title: "Reproduce child.obj LOP with Vulkan validation enabled"
@@ -8914,4 +8914,73 @@ tree:
       validation-coverage gap plus separate renderer barrier and LOP readback
       lifetime defects; the prior numerical/publication result was not a
       validation-clean Vulkan result.
+    status: resolved
+  - id: N380
+    type: decision
+    title: "Adopt one canonical property coherence contract for all methods"
+    provenance: user-revised
+    timestamp: "2026-08-05T17:23+02:00"
+    also_depends_on: [N378, N379]
+    choice: >
+      Apply the same canonical CPU-property boundary to every method: CPU
+      methods publish directly to CPU properties, Vulkan compute methods stage
+      inputs and remain GPU-local until one terminal CPU publication, and
+      rendering observes those property mutations automatically.
+    alternatives:
+      - "Keep method-specific renderer dirty/upload calls."
+      - "Treat rendering and GPU compute as unrelated property-coherence systems."
+      - "Introduce a second canonical property or residency owner in graphics."
+    evidence:
+      - "User affirmation: yes, but this should work for all methods."
+      - "O129: user-authored universal property coherence architecture"
+      - "tasks/active/RUNTIME-214-universal-geometry-property-coherence.md"
+      - "docs/architecture/property-coherence.md"
+    status: resolved
+  - id: N381
+    type: dead_end
+    title: "Reject queue order and an invalid smoke frame as synchronization proof"
+    provenance: ai-executed
+    timestamp: "2026-08-05T17:23+02:00"
+    also_depends_on: [N379, N380]
+    hypothesis: >
+      Repeated staged copies to one live destination are safe from queue order
+      alone, and their consumer barrier can be tested on a transfer-only frame
+      that presents an untouched swapchain image.
+    failure_mode: >
+      The first validation run reported write-after-write hazards on repeated
+      GpuWorld destination ranges. After adding the destination pre-copy
+      barrier, the new smoke itself still emitted an invalid compute-shader
+      destination stage on a transfer-only queue and presented an Undefined
+      swapchain image.
+    lesson: >
+      A repeated overwrite needs an explicit range-scoped producer dependency;
+      a ShaderRead consumer barrier belongs on a shader-capable queue; and even
+      a transfer-focused smoke must submit a presentation-valid frame. Preserve
+      both red receipts as causal evidence and require the final validation run.
+    evidence:
+      - "tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests.json"
+      - "tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-after-upload-barrier.json"
+      - "src/graphics/vulkan/Backends.Vulkan.Transfer.cpp"
+      - "tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp"
+    status: resolved
+  - id: N382
+    type: experiment
+    title: "Verify universal property coherence on CPU and Vulkan"
+    provenance: ai-executed
+    timestamp: "2026-08-05T17:23+02:00"
+    also_depends_on: [N380, N381]
+    evidence:
+      - "commit 548e62b5"
+      - "tasks/evidence/RUNTIME-214/commands/ci-final-cpu-tests.json"
+      - "tasks/evidence/RUNTIME-214/commands/ci-asan-tests.json"
+      - "tasks/evidence/RUNTIME-214/commands/ci-ubsan-tests.json"
+      - "tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.json"
+      - "tasks/evidence/RUNTIME-214/report.yaml"
+    result: >
+      The final source passed 4,103 CPU tests with one policy skip, all 2,683
+      grouped ASan tests, all selected 2,683 grouped UBSan tests with one policy
+      skip, and three synchronization-validation Vulkan tests covering repeated
+      staging overwrite/readback plus ordinary LOP and isotropic-WLOP terminal
+      publication. Revision 548e62b5 and its draft high-risk handoff were pushed
+      to main; task retirement remains pending independent fixed-surface review.
     status: resolved

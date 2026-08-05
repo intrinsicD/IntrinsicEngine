@@ -507,3 +507,41 @@
   tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp,
   tasks/done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md]
 - **From staging**: O121
+
+## A33: Canonical Geometry Properties Define Every Method Coherence Boundary
+- **Decision**: `Geometry::PropertySet` is the canonical CPU authority outside
+  an in-flight GPU method. CPU methods publish through its mutable API; GPU
+  methods stage resolved inputs once, keep iterations GPU-local, and publish one
+  terminal readback before reporting `Applied`. Rendering and CPU-backed
+  visualization observe the same process-monotonic property revisions, so no
+  method calls a renderer-specific upload path and explicit ECS dirty tags are
+  precision/compatibility hints rather than the correctness signal.
+- **Provenance**: user
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N378, N380,
+  docs/architecture/property-coherence.md,
+  src/geometry/Geometry.Properties.cppm,
+  src/runtime/Runtime.RenderExtraction.Geometry.cpp,
+  src/runtime/Visualization/Runtime.VisualizationRecipes.cpp]
+- **From staging**: O129
+
+## A34: Reuse Existing Residency with Graphics-Queue Staging
+- **Decision**: Property coherence adds content revisions and per-consumer
+  observations but no second residency service. Runtime merges exact consumed
+  revision deltas into existing copied upload plans; `GpuWorld` remains the
+  packed rendering owner; and current device-local render/method inputs use one
+  persistent staging-belt boundary. The promoted service submits on the
+  graphics queue, records a range-scoped prior-access-to-transfer-write barrier,
+  and leaves the transfer-write-to-consumer barrier with the caller. Universal
+  destination renaming is unnecessary under this serialization domain. A
+  dedicated transfer queue is admissible only with explicit semaphore and
+  queue-family ownership proof.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N381, N382,
+  docs/architecture/property-coherence.md,
+  src/graphics/renderer/Graphics.GpuTransfer.cpp,
+  src/graphics/renderer/Graphics.GpuWorld.cpp,
+  src/graphics/vulkan/Backends.Vulkan.Transfer.cpp,
+  tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp]
+- **From staging**: O131

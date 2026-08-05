@@ -253,8 +253,8 @@ sessions:
     open_threads: 4
   - id: "2026-08-05_001"
     date: "2026-08-05"
-    summary: "Implemented support-radius and Vulkan LOP work, repaired Auto publication, then exposed validation and property-residency synchronization gaps."
-    turn_count: 3
-    events_count: 15
-    claims_touched: [C31, C32, C33, C34, C35]
+    summary: "Implemented support-radius and Vulkan LOP work, then committed universal property revisions, staging-first uploads, and validation-clean publication-to-rendering coherence."
+    turn_count: 4
+    events_count: 21
+    claims_touched: [C31, C32, C33, C34, C35, C36]
     open_threads: 3

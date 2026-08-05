@@ -2,9 +2,9 @@ session:
   id: "2026-08-05_001"
   date: "2026-08-05"
   started: "2026-08-05T01:17+02:00"
-  last_turn: "2026-08-05T12:10+02:00"
-  turn_count: 3
-  summary: "Implemented property-specific support radii and private Vulkan LOP, repaired Auto publication, then exposed validation and property-residency synchronization gaps in the interactive path."
+  last_turn: "2026-08-05T17:23+02:00"
+  turn_count: 4
+  summary: "Implemented support-radius and Vulkan LOP work, then committed universal property revisions, staging-first uploads, and validation-clean publication-to-rendering coherence."
 
 events_logged:
   - turn: 1
@@ -97,6 +97,42 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Forced validation on the child.obj Auto Vulkan path and reproduced render-attachment synchronization hazards plus two in-use buffer destructions."
+  - turn: 4
+    type: decision
+    id: "N380"
+    routing: direct
+    provenance: user-revised
+    summary: "Adopted one canonical CPU/GPU property-coherence boundary for every CPU method, Vulkan compute method, and render consumer."
+  - turn: 4
+    type: architecture
+    id: "A33"
+    routing: crystallized
+    provenance: user
+    summary: "Crystallized canonical CPU authority, GPU-local iteration, terminal publication, and automatic rendering observation from O129."
+  - turn: 4
+    type: dead_end
+    id: "N381"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected queue order alone and an invalid transfer-only smoke frame as Vulkan synchronization proof."
+  - turn: 4
+    type: experiment
+    id: "N382"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed full CPU, ASan, UBSan, and three validation-enabled Vulkan coherence tests on revision 548e62b5."
+  - turn: 4
+    type: architecture
+    id: "A34"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the right-sized existing-residency plus graphics-queue staging architecture from O131."
+  - turn: 4
+    type: claim
+    id: "C36"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the exact-revision no-dirty-tag rendering and validation-clean Vulkan publication result from O132."
 
 ai_actions:
   - turn: 1
@@ -140,6 +176,27 @@ ai_actions:
     provenance: ai-executed
     files_changed:
       - "ara/"
+  - turn: 4
+    action: "Implemented RUNTIME-214's process-monotonic canonical property revisions, exact per-render-lane observations, CPU-backed visualization invalidation, shared staging-first GpuWorld and Vulkan-method uploads, and destination overwrite ordering; added CPU and validation-enabled Vulkan proofs; passed full CPU, ASan, UBSan, and focused Vulkan gates; committed and pushed main; deleted every verified-merged remote branch; and released the task claim for independent review."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.Properties.cppm"
+      - "src/geometry/Geometry.Properties.cpp"
+      - "src/runtime/Runtime.RenderExtraction.Geometry.cpp"
+      - "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cpp"
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Transfer.cpp"
+      - "tests/unit/geometry/Test.GeometryProperties.cpp"
+      - "tests/contract/runtime/Test.MeshGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.GraphGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp"
+      - "tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp"
+      - "tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
+      - "docs/architecture/property-coherence.md"
+      - "tasks/active/RUNTIME-214-universal-geometry-property-coherence.md"
+      - "tasks/evidence/RUNTIME-214/"
+      - "ara/"
 
 claims_touched:
   - id: C31
@@ -157,6 +214,9 @@ claims_touched:
   - id: C35
     action: crystallized
     turn: 2
+  - id: C36
+    action: crystallized
+    turn: 4
 
 key_context:
   - turn: 1
@@ -175,13 +235,18 @@ key_context:
     excerpt: "The desired contract is property-level CPU/GPU coherence: CPU mutations upload bound data, Vulkan methods consume resident data, and terminal outputs read back once."
   - turn: 3
     excerpt: "With synchronization validation forced, the child.obj case emitted color-attachment WAW/RAW hazards and two in-use buffer-destruction VUIDs despite the GTest reporting success."
+  - turn: 4
+    excerpt: "The user confirmed that the same contract must cover all methods: GPU for compute and rendering, CPU for CPU methods and canonical publication."
+  - turn: 4
+    excerpt: "The final architecture keeps Geometry::PropertySet canonical, reuses runtime extraction and GpuWorld residency, stages device-local writes on the graphics queue, and reads GPU method output back only at completion."
+  - turn: 4
+    excerpt: "The final source passed 4,103 CPU, 2,683 ASan, 2,683 UBSan, and three synchronization-validation Vulkan tests; independent high-risk acceptance remains outstanding."
 
 open_threads:
   - "A performance claim still requires device timestamps, memory and phase accounting, scanner-scale inputs, baselines, and cross-device evidence; current host timing is descriptive only."
   - "Anisotropic WLOP, CLOP, and EAR remain explicit Vulkan capability-negative pairs; CLOP caching, LBVH, or CUDA require separately justified work."
-  - "The render-attachment synchronization and LOP buffer-lifetime VUIDs must become validation-failing regressions before a unified versioned property-residency path can be treated as operational."
+  - "RUNTIME-214 remains active until an independent reviewer accepts revision 548e62b5 and its fixed content digest."
 
 ai_suggestions_pending:
-  - "Repair validation and lifetime ordering before relying on ordinary LOP or isotropic WLOP for interactive visual evidence."
   - "Add device timestamp and scanner-scale benchmark evidence before making any speedup or backend-selection claim."
-  - "Introduce one versioned property-residency sidecar shared by rendering and GPU methods rather than adding another private upload path."
+  - "Obtain an independent fixed-surface review before retiring RUNTIME-214; do not self-accept the high-risk evidence record."

@@ -2242,9 +2242,9 @@ observations:
       and Vulkan validation errors from a smaller LOP input.
     potential_type: architecture
     bound_to: [N378]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A33"
+    crystallized_via: verbal-affirmation
     stale: false
   - id: O130
     timestamp: "2026-08-05T12:10+02:00"
@@ -2269,4 +2269,50 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
+    stale: false
+  - id: O131
+    timestamp: "2026-08-05T17:23+02:00"
+    provenance: ai-executed
+    content: >
+      The committed coherence implementation needs no second property-residency
+      service or universal destination double buffering under the current
+      Vulkan queue model. Process-monotonic property revisions feed exact
+      runtime render-lane snapshots; existing GpuWorld residency receives
+      partial/full plans; a persistent staging belt submits on the graphics
+      queue with a destination-range producer barrier and caller-owned consumer
+      barrier. A future dedicated transfer queue requires explicit semaphore
+      and ownership handoff before this assumption changes.
+    context: >
+      RUNTIME-214 reused the existing geometry, extraction, GpuWorld, and
+      ITransferQueue owners. Synchronization validation first exposed missing
+      staged-overwrite ordering, then verified the corrected staging smoke and
+      representative LOP workflows. Revision 548e62b5 was committed and pushed
+      to main; independent high-risk acceptance remains pending.
+    potential_type: architecture
+    bound_to: [N378, N379, N380, N381, N382]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A34"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O132
+    timestamp: "2026-08-05T17:23+02:00"
+    provenance: ai-executed
+    content: >
+      On revision 548e62b5, direct canonical position mutations without ECS
+      dirty tags advance resident rendering for mesh, graph, and point-cloud
+      sources; CPU-backed visualization dirty stamps follow property revisions;
+      and validation-enabled Vulkan staging plus ordinary LOP/isotropic-WLOP
+      terminal publication tests pass. Full CPU, ASan, and UBSan selectors also
+      pass. This is exact-revision contract evidence, not a performance,
+      visual-quality, or cross-device claim.
+    context: >
+      The final required receipts record 4,103 CPU tests, 2,683 ASan tests,
+      2,683 UBSan tests, and three synchronization-validation Vulkan tests.
+      The RUNTIME-214 report remains draft solely because an independent
+      high-risk fixed-surface review has not yet been appended.
+    potential_type: claim
+    bound_to: [N382]
+    promoted: true
+    promoted_to: "logic/claims.md:C36"
+    crystallized_via: artifact-commitment
     stale: false

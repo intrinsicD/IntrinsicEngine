@@ -1053,3 +1053,40 @@
 - **Tags**: geometry, runtime, LOP, WLOP, Auto radius, Vulkan, GPU, mesh,
   render residency, bounded result
 - **From staging**: O128
+
+## C36: Canonical property mutations drive rendering and Vulkan method publication
+- **Statement**: On exact revision `548e62b5`, direct canonical position
+  mutations without ECS dirty tags advance resident rendering data for mesh,
+  graph, and point-cloud sources; CPU-backed visualization packets derive dirty
+  stamps from the same property revisions; and the validation-enabled promoted
+  Vulkan suite passes a repeated staged-overwrite readback plus ordinary LOP
+  and isotropic-WLOP terminal publication-to-rendering workflows with zero
+  validation errors.
+- **Status**: supported — exact revision and tested CPU/Vulkan host surface;
+  independent RUNTIME-214 high-risk acceptance remains pending, and no
+  performance, visual-quality, or cross-device claim is made
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: On revision `548e62b5`, any labeled direct-mutation
+  extraction test leaves the corresponding resident fingerprint unchanged,
+  unchanged sources reupload every frame, CPU-backed visualization retains a
+  stale dirty stamp, either LOP workflow reports `Applied` before canonical CPU
+  publication, or the final three-test Vulkan command records a validation
+  error or functional failure.
+- **Proof**: [src/geometry/Geometry.Properties.cppm,
+  src/runtime/Runtime.RenderExtraction.Geometry.cpp,
+  src/runtime/Visualization/Runtime.VisualizationRecipes.cpp,
+  tests/contract/runtime/Test.MeshGeometryExtraction.cpp,
+  tests/contract/runtime/Test.GraphGeometryExtraction.cpp,
+  tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp,
+  tests/contract/runtime/Test.VisualizationRecipes.cpp,
+  tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp,
+  tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp,
+  tasks/evidence/RUNTIME-214/commands/ci-final-cpu-tests.json,
+  tasks/evidence/RUNTIME-214/commands/ci-asan-tests.json,
+  tasks/evidence/RUNTIME-214/commands/ci-ubsan-tests.json,
+  tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.json]
+- **Dependencies**: [C30, C34, C35]
+- **Tags**: geometry, runtime, rendering, property revisions, Vulkan, staging,
+  LOP, coherence, bounded result
+- **From staging**: O132
