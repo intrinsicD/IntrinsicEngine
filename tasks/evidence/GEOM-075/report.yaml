@@ -1,0 +1,241 @@
+schema_version: 1
+task_id: GEOM-075
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-05T01:10:17Z'
+claim_eligible: false
+source:
+  base_ref: 2c6446cd
+  base_revision: 2c6446cd8bca80b7672b6e9dee08cedcf783a6ab
+  head_revision: 4aa5b6d2979c228cbff86455e52bd8866b20143e
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: b595f7dc654768ece13c063e02da92f56dceda0e6b05198b13b9b11ac2818bbc
+  - path: docs/architecture/contract-catalog.yaml
+    sha256: bd9b1ace97599865f3d9e340c4997bbbcacddad25f837a3c7e8a77c2864096ba
+  - path: docs/architecture/engine-config.md
+    sha256: 111be40e41d01eaffde2ccdfbad36bb3c7311229c4c99f950d7a6f9c16ab6eec
+  - path: docs/architecture/geometry.md
+    sha256: 90e338d7dfbdda03d520b7866ea0d8b3bc2a4c2d90a06e38947ea57a718596a9
+  - path: docs/architecture/index.md
+    sha256: 7557db7a749da0af28b1b21977ba7c053532c6b7bf4d705335bd5ab212f81faa
+  - path: docs/architecture/runtime-config-control.md
+    sha256: dd19bf652389263cfce4768be14bd0b8342990d8452aa48500881a1919c4f61a
+  - path: docs/architecture/support-radius-policy.md
+    sha256: b727e253645cb44c0463801e54f4d3a988a01690fd07c8dea0083855b33e67c8
+  - path: methods/geometry/continuous_lop/README.md
+    sha256: aa0855c2d6ff92a948151f2215d3ddf10ef34476a5305e124291d1124c34c2a9
+  - path: methods/geometry/edge_aware_resampling/README.md
+    sha256: 69ae30e319bfad9c975e246fe72a8cac899d409f4c4f4c3a579f44e8d200362d
+  - path: methods/geometry/locally_optimal_projection/README.md
+    sha256: cf9fae05695c7416f113b4788dfcb97eddad5fb16def358a9b5fab2dd5bc8bbc
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: eefdae1a0bbf653da18b4fa0645dd0beae0a78ae55977614079b452c4a8b0144
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: 1afba2b541460d0d511cc664bacc92377d8606d6541f94598669c3f47d34fc02
+  - path: src/app/Sandbox/README.md
+    sha256: 7f7dbdbccdb9e4c608f20582c5176c6d5f3c47f8ad293219d1c65a4c061b2a6d
+  - path: src/geometry/CMakeLists.txt
+    sha256: 8326c9fe667da0cdcaf432f3bb0186218925f66bd0a98b6613e596c1b21f5e80
+  - path: src/geometry/Geometry.SupportRadius.cpp
+    sha256: 7186d375c3b1a7ae3aee9ce020c15835e6bc429a6a1cb104a77b6e5e97e5db84
+  - path: src/geometry/Geometry.SupportRadius.cppm
+    sha256: 2caa93ff8979fd5123f5f0ae4f8c482e3f10ded853d09fab972a44279a1dce5b
+  - path: src/runtime/README.md
+    sha256: 6b2e778772ad2f7ce65e1d3833eefaccbc093c90ca18a62d1269cba93f6aa122
+  - path: src/runtime/Runtime.PointCloudConsolidationConfig.cpp
+    sha256: 173d0aec7761a2e289446f72dcf656e3936830a9bfa80c4b8c8837b320c754fb
+  - path: src/runtime/Runtime.PointCloudConsolidationConfig.cppm
+    sha256: 77e6a587a7893ab3a71c1c25ae8dc9ea8ed94a5d2ff6d268ec703603509b01db
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cpp
+    sha256: 5773d052862acf4fcf7c9b39f2651c6ce15c9e0e30520f3e1918619902e0c557
+  - path: src/runtime/Runtime.PointCloudConsolidationModule.cppm
+    sha256: e6405b0ff3183b378db693d513d7fcd6391292eae62ae09b49715762caf061cf
+  - path: src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: 60bca4ef2dce5bb8f3544769dccf86b8b0556c4dd7dff117989f85401348c4d2
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 41112279abe63d438cbdfe2bad419248cad08d9060b5e7eb48dc1f3372b20f21
+  - path: tasks/active/README.md
+    sha256: 21086954992e59188d218ea0846e82b5f40f61219e116e842695ba98b0b82a5b
+  - path: tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md
+    sha256: 54c1308c34b0bc4f5316e665134a87e76b5473bdb9823811fd54af7e42c6a835
+  - path: tasks/done/GEOM-075-property-support-radius-profile.md
+    sha256: e8d1236d4626d26005a487161f3e639bcd184aa12f7379c6355b7fc978e80e16
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: ed949c8c19e0da1840640e471efbe409b6004b30a43eec361c574b5330bbf6e0
+  - path: tests/CMakeLists.txt
+    sha256: 5f85a7844c17d7f426fabf69988710ec9ecb6bc05b25795262321879e9ba5906
+  - path: tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+    sha256: b782cacc7fbffbdbbb5333b992283cc41ecb4da0aacd2eaac69c24427b2185a3
+  - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+    sha256: 30a806341b60499c4769c2fcd4e1b2c7d780fbf2532bfc56c3e146531745c99c
+  - path: tests/integration/runtime/Test.SandboxConfigSections.cpp
+    sha256: f1318a3e957fdc19fd10bd8be3635e0b8718faee4b23cc40faadedab6420843c
+  - path: tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+    sha256: 8512386f9048a66064ef8a34311d9caf38aa77abe2fe3d93516baad4d506776f
+  - path: tests/unit/geometry/Test.SupportRadius.cpp
+    sha256: ac675815f8e5fa2cbe3363c2a2de276a17cca49dab32feed106c5ef258c8be11
+  content_digest: e2cbd1a404ee20001572c9c98ff0656f957e7fa5bfb581a32e5138b358a150c8
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/contract-catalog.yaml
+  - docs/architecture/engine-config.md
+  - docs/architecture/geometry.md
+  - docs/architecture/index.md
+  - docs/architecture/runtime-config-control.md
+  - docs/architecture/support-radius-policy.md
+  - methods/geometry/continuous_lop/README.md
+  - methods/geometry/edge_aware_resampling/README.md
+  - methods/geometry/locally_optimal_projection/README.md
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/README.md
+  - src/geometry/CMakeLists.txt
+  - src/geometry/Geometry.SupportRadius.cpp
+  - src/geometry/Geometry.SupportRadius.cppm
+  - src/runtime/README.md
+  - src/runtime/Runtime.PointCloudConsolidationConfig.cpp
+  - src/runtime/Runtime.PointCloudConsolidationConfig.cppm
+  - src/runtime/Runtime.PointCloudConsolidationModule.cpp
+  - src/runtime/Runtime.PointCloudConsolidationModule.cppm
+  - src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md
+  - tasks/done/GEOM-075-property-support-radius-profile.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+  - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+  - tests/integration/runtime/Test.SandboxConfigSections.cpp
+  - tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp
+  - tests/unit/geometry/Test.SupportRadius.cpp
+  layers:
+  - app
+  - geometry
+  - runtime
+  - tests
+  modules:
+  - Extrinsic.Runtime.PointCloudConsolidationConfig
+  - Extrinsic.Runtime.PointCloudConsolidationModule
+  - Geometry.SupportRadius
+extension_seam: Plain profile, recommendation, budget, and analysis records feed the existing property-aware
+  consolidation job; no service, cache, component, or backend interface was added.
+future_change_plan: METHOD-020 consumes the resolved positive radius and workload decision unchanged;
+  add caching only after geometry properties expose a trustworthy data revision.
+acceptance:
+- criterion: Every current runtime LOP-family strategy defaults to Auto and receives a
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Manual mode passes the authored world-unit radius unchanged through all
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The bounded profile samples no more than 2,048 points, reports exact
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Workload preview reports sampled P50/P95/max occupancy and rejects the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Property-domain substitutability and existing publication/cardinality,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Default CPU gates, strict structure/docs checks, and independent
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GEOM-075/commands/ara-claims.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-asan-build.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-asan-configure.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-asan-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-build.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-configure.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-ubsan-build.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-ubsan-configure.json
+- receipt: tasks/evidence/GEOM-075/commands/ci-ubsan-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/clean-workshop.json
+- receipt: tasks/evidence/GEOM-075/commands/diff-check.json
+- receipt: tasks/evidence/GEOM-075/commands/doc-links.json
+- receipt: tasks/evidence/GEOM-075/commands/docs-sync.json
+- receipt: tasks/evidence/GEOM-075/commands/focused-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/layering.json
+- receipt: tasks/evidence/GEOM-075/commands/method-manifests.json
+- receipt: tasks/evidence/GEOM-075/commands/module-inventory.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-ci-asan-build.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-ci-asan-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-ci-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-ci-ubsan-build.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-ci-ubsan-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-doc-links.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-docs-sync.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-focused-tests.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-layering.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-task-policy.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-test-layout.json
+- receipt: tasks/evidence/GEOM-075/commands/revision2-validate-tasks.json
+- receipt: tasks/evidence/GEOM-075/commands/root-hygiene.json
+- receipt: tasks/evidence/GEOM-075/commands/session-brief.json
+- receipt: tasks/evidence/GEOM-075/commands/task-policy.json
+- receipt: tasks/evidence/GEOM-075/commands/task-state-links.json
+- receipt: tasks/evidence/GEOM-075/commands/test-layout.json
+- receipt: tasks/evidence/GEOM-075/commands/validate-tasks.json
+changed_public_contracts:
+- 'geometry.support-radius-policy: deterministic bounded self-excluding k-distance profiling, exact support
+  cutoff, explicit Auto/Manual intent, and fail-closed workload limits.'
+- 'geometry.element-domain-sources and method.engine-integration: any compatible finite vec3 property
+  remains eligible through the existing canonical preflight and same-domain publication path.'
+diagnostics_and_previews:
+- Completion telemetry exposes estimator version/status/source, sample count, selected rank/quantile/distance,
+  resolved radius, AABB diagonal, sampled occupancy, predicted query count, and predicted contributions.
+- UnsafeSupportRadius rejects degenerate, invalid, query/build, or over-budget analysis before geometry
+  execution and publishes no result property.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GEOM-075-property-support-radius-profile.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- The initial rank/quantile/multiplier rows are deterministic operational heuristics, not benchmark-backed
+  quality optima; highly nonuniform evolving projected sets can exceed sampled source occupancy.
+- Dense manual radii still require a full KD-tree neighbor collection for each bounded profile sample
+  before the configured neighbor limit can reject the request.
+skipped_checks:
+- check: benchmark
+  reason: GEOM-075 makes no quality or performance claim for the default policy; METHOD-020 owns backend
+    benchmarks and method-specific tuning requires a separate declared baseline.
+- check: gpu-vulkan
+  reason: This task resolves backend-independent world-unit policy only; METHOD-020 owns Vulkan execution
+    and parity.
+artifacts:
+- path: docs/architecture/support-radius-policy.md
+  sha256: b727e253645cb44c0463801e54f4d3a988a01690fd07c8dea0083855b33e67c8
+  kind: file
+- path: tasks/done/GEOM-075-property-support-radius-profile.md
+  sha256: e8d1236d4626d26005a487161f3e639bcd184aa12f7379c6355b7fc978e80e16
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GEOM-075/handoff.jsonl
+review: tasks/evidence/GEOM-075/reviews.jsonl
