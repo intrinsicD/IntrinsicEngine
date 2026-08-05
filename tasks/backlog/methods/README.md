@@ -65,10 +65,6 @@ end.
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
   (rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
-- [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
-  (adds a private `gpu_vulkan_compute` implementation to the `RUNTIME-175`
-  typed operation with `gpu;vulkan` parity; uses `RUNTIME-194`/`195` and adds
-  no public adapter or feature queue).
 - [METHOD-021 — ARAP (local/global) parameterization reference backend](METHOD-021-arap-parameterization-reference-backend.md)
   (adds its concrete ARAP params alternative to the retired `GEOM-063` typed
   `Geometry.Parameterization` strategy surface; gated on `geometry/GEOM-064`
@@ -178,6 +174,8 @@ end.
   CPU-reference-first in the dependency order encoded in each task's
   `depends_on`; do not open optimized/GPU/engine slices before the reference
   variant they extend is implemented, tested, and benchmark-manifested.
+  `METHOD-020` is now active under
+  [`tasks/active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md`](../../active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md).
 - **Parameterization family (METHOD-021..026).** The state-of-the-art mesh
   parameterization variants — ARAP (`METHOD-021`), SLIM (`METHOD-022`), BFF
   (`METHOD-023`), and SCP (`METHOD-024`) — each add a concrete params

@@ -5,15 +5,19 @@ depends_on: [METHOD-019, RUNTIME-175, RUNTIME-194, RUNTIME-195, GEOM-075]
 workflow_schema: 1
 workflow_profile: claim-grade
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-LOPVulkan"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-05T01:49:18Z"
 contract_schema: 1
 contracts: [geometry.element-domain-sources, geometry.support-radius-policy, method.engine-integration]
 maturity_target: ParityProven
 ---
 # METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity
+
+## Status
+- `in-progress` — protocol and benchmark intent will be frozen before implementation.
+- Next verification: validate the frozen preregistration and benchmark manifest, then build the first operational Vulkan LOP parity slice.
 
 ## Goal
 - Evaluate an explicit command-recording `gpu_vulkan_compute` path for every

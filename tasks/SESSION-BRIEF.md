@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
 
 ## Theme B — Rendering modernization
 
@@ -80,7 +80,6 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - unblocked: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
-- unblocked: `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
 - unblocked: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
 - blocked by `METHOD-021`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
