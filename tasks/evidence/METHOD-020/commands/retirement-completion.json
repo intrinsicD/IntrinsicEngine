@@ -1,0 +1,29 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/experiment_custody.py",
+    "validate-completion",
+    "--root",
+    ".",
+    "--task-id",
+    "METHOD-020",
+    "--profile",
+    "claim-grade",
+    "--experiment-root",
+    "tasks/evidence/METHOD-020/experiment"
+  ],
+  "command_display": "python3 tools/agents/experiment_custody.py validate-completion --root . --task-id METHOD-020 --profile claim-grade --experiment-root tasks/evidence/METHOD-020/experiment",
+  "cwd": ".",
+  "duration_ms": 524,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T05:17:24Z",
+  "label": "retirement-completion",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T05:17:23Z",
+  "stderr_path": "tasks/evidence/METHOD-020/commands/retirement-completion.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-020/commands/retirement-completion.stdout.log",
+  "stdout_sha256": "1edeb42aa877c6d860d0962e2578cb43b6efb24ce06c970ca9bc4b965dea6c3d",
+  "task_id": "METHOD-020"
+}

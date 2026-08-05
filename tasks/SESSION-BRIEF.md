@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
+- none
 
 ## Theme B — Rendering modernization
 

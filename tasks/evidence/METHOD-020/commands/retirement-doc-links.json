@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 898,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T05:17:22Z",
+  "label": "retirement-doc-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T05:17:21Z",
+  "stderr_path": "tasks/evidence/METHOD-020/commands/retirement-doc-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-020/commands/retirement-doc-links.stdout.log",
+  "stdout_sha256": "6cc448dbf1c2d058d991bcb00f7d6ec5a1c395577a42d3c40df332ca984b4e8c",
+  "task_id": "METHOD-020"
+}

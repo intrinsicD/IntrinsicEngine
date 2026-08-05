@@ -8,6 +8,30 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-020`](METHOD-020-lop-family-gpu-vulkan-compute-backend.md) — the
+LOP-family Vulkan-compute backend completed on 2026-08-05 at `ParityProven` for
+ordinary LOP and isotropic WLOP. One private runtime/JobService participant
+builds bounded source/projected cell grids with count, shared scan, scatter,
+and exact 27-cell sphere filtering; iterations and convergence remain on the
+device, persistent buffers are reused, and one final shared multi-range
+readback enters the existing stale-safe undo/publication/render-dirty path.
+Null or unavailable devices fall back honestly to the CPU reference. No CUDA,
+public Vulkan recorder/backend interface, per-iteration readback, or private
+scan primitive was added. Anisotropic WLOP, CLOP, and EAR remain explicit
+capability-negative pairs.
+
+Claim-grade v4/run-002 completed eight actual Vulkan requests on the recorded
+NVIDIA RTX 3050 with zero fallback. Worst CPU-parity-or-repeat RMS and
+L-infinity errors were `1.6746e-5` and `1.31344e-4`, below the frozen `5e-4`
+and `2e-3` bounds; timing remains descriptive host service-to-applied-event
+data and supports no speedup claim. The original v3/run-001 is preserved as a
+rejected harness record. The full CPU gate selected 4,091 cases with zero
+failures and one policy skip; ASan passed all 2,676 selected cases; UBSan
+passed 2,675 and retained the LSan-only skip; and all four focused promoted
+Vulkan parity/benchmark/fail-closed cases passed. Strict method, benchmark,
+layering, task, documentation, ARA, custody, durable handoff, and independent
+fixed-surface review gates close the task.
+
 [`BUG-130`](BUG-130-rejected-run-historical-task-seal.md) — corrected
 rejected-run historical task-seal custody completed on 2026-08-05. The
 historical fallback is restricted to exact same-ID, same-profile task blobs

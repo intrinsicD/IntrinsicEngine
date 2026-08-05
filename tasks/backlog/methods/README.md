@@ -174,8 +174,11 @@ end.
   CPU-reference-first in the dependency order encoded in each task's
   `depends_on`; do not open optimized/GPU/engine slices before the reference
   variant they extend is implemented, tested, and benchmark-manifested.
-  `METHOD-020` is now active under
-  [`tasks/active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md`](../../active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md).
+  `METHOD-020` retired at `ParityProven` with ordinary LOP and isotropic WLOP
+  exposed through Vulkan compute; anisotropic WLOP, CLOP, and EAR remain
+  capability-negative pairs. See the
+  [retired task](../../done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
+  and its bounded [result report](../../../methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md).
 - **Parameterization family (METHOD-021..026).** The state-of-the-art mesh
   parameterization variants — ARAP (`METHOD-021`), SLIM (`METHOD-022`), BFF
   (`METHOD-023`), and SCP (`METHOD-024`) — each add a concrete params

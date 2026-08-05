@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 647,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T05:17:20Z",
+  "label": "retirement-task-policy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T05:17:20Z",
+  "stderr_path": "tasks/evidence/METHOD-020/commands/retirement-task-policy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-020/commands/retirement-task-policy.stdout.log",
+  "stdout_sha256": "2e574b19d4b54370a5de6a390e34deed4662b3f2daae113aa2b01f6ef08845c0",
+  "task_id": "METHOD-020"
+}

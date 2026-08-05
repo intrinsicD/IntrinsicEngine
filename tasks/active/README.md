@@ -11,10 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
-  (`in-progress`, owner `Codex-LOPVulkan`, branch `main`): freeze the claim-grade
-  protocol and benchmark intent before implementing the private Vulkan path.
-
 ## History
 
 Retirement narratives live in the append-only
