@@ -258,3 +258,10 @@ sessions:
     events_count: 29
     claims_touched: [C31, C32, C33, C34, C35, C36]
     open_threads: 5
+  - id: "2026-08-06_001"
+    date: "2026-08-06"
+    summary: "Committed the verified path-only runtime source organization directly on local main while preserving the separate semantic-reduction boundary."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 5

@@ -9080,3 +9080,49 @@ tree:
       GeometryIntegration, and PhysicsIntegration after the strict ownership
       checker correctly forced unambiguous runtime-local naming.
     status: resolved
+  - id: N387
+    type: decision
+    title: "Commit the audited runtime organization directly on main"
+    provenance: user
+    timestamp: "2026-08-06T00:40+02:00"
+    also_depends_on: [N385, N386]
+    choice: >
+      Commit the complete reviewed runtime-layout surface and its synchronized
+      documentation, tests, task records, and ARA updates on local main. No
+      merge commit is needed because the worktree already points at main;
+      pushing origin/main remains outside the request.
+    alternatives:
+      - "Leave the verified worktree uncommitted."
+      - "Create an unnecessary feature branch and merge commit after the work was already developed on main."
+      - "Expand the commit with RUNTIME-216 semantic file reduction."
+    evidence:
+      - "User direction: commit all changes, merge to main."
+      - "N385: mechanical-first cleanup boundary"
+      - "N386: verified path-only source organization"
+      - "commit 61fec5c0"
+    status: resolved
+  - id: N388
+    type: experiment
+    title: "Reverify and integrate the runtime-layout commit"
+    provenance: ai-executed
+    timestamp: "2026-08-06T00:40+02:00"
+    also_depends_on: [N386, N387]
+    evidence:
+      - "commit 61fec5c065fb3b861818f4d29f0837b29e92b8b7"
+      - "/tmp/runtime-215-precommit-build.log"
+      - "/tmp/runtime-215-precommit-ctest.log"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict --files <183 changed paths>"
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+    result: >
+      The exact 183-path staged surface passed diff whitespace validation,
+      strict layering, allowlist, test-layout, task, explicit-file docs-sync,
+      documentation-link, ARA, root-hygiene, and clean-workshop automated
+      gates. IntrinsicTests rebuilt successfully and the full CPU selector
+      completed 4,103 entries with zero failures and one expected
+      environment-gated GLFW/LeakSanitizer skip. Commit 61fec5c0 is the local
+      main tip and local main is one commit ahead of origin/main. The
+      pre-existing METHOD-020 task-state-link finding remains tracked by
+      BUG-133, and RUNTIME-214 still awaits its independent high-risk review;
+      neither was represented as a passing global workflow gate.
+    status: resolved

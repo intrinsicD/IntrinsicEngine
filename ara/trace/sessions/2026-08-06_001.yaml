@@ -1,0 +1,54 @@
+session:
+  id: "2026-08-06_001"
+  date: "2026-08-06"
+  started: "2026-08-06T00:40+02:00"
+  last_turn: "2026-08-06T00:40+02:00"
+  turn_count: 1
+  summary: "Committed the verified path-only runtime source organization directly on local main while preserving the separate semantic-reduction boundary."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N387"
+    routing: direct
+    provenance: user
+    summary: "Committed the complete audited runtime-layout surface directly on local main without an unnecessary merge commit."
+  - turn: 1
+    type: experiment
+    id: "N388"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rebuilt IntrinsicTests, passed all 4,103 selected CPU entries with one policy skip, passed structural gates, and created commit 61fec5c0."
+
+ai_actions:
+  - turn: 1
+    action: "Recovered the expired RUNTIME-215 task claim, audited all 183 changed paths, regenerated and checked inventories, reran build/CPU/structural/review gates, staged every user-authorized change, and committed the path-only runtime organization on local main as 61fec5c0."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/"
+      - "tests/"
+      - "docs/"
+      - "tasks/"
+      - "tools/"
+      - "ara/"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The user explicitly requested that all current changes be committed and merged to main."
+  - turn: 1
+    excerpt: "The repository was already on main at origin/main, so commit 61fec5c0 directly advanced local main by one commit and no merge commit was necessary."
+  - turn: 1
+    excerpt: "The exact pre-commit CPU selector completed 4,103 entries with zero failures and one expected GLFW/LeakSanitizer environment skip."
+
+open_threads:
+  - "RUNTIME-215 remains active until its standard completion report is generated and validated before retirement."
+  - "RUNTIME-216 owns the separately reviewed semantic deletion of the private RenderExtractionService forwarding seam."
+  - "BUG-133 owns the pre-existing retired METHOD-020 task-index link finding."
+  - "RUNTIME-214 still requires an independent fixed-surface high-risk review before retirement; its draft review log is absent."
+  - "Local main is ahead of origin/main; push only on an explicit request."
+
+ai_suggestions_pending:
+  - "Generate and validate RUNTIME-215 standard completion evidence before retiring the task."
+  - "Obtain an independent fixed-surface review before retiring RUNTIME-214."

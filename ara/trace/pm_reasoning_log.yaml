@@ -1472,3 +1472,12 @@ entries:
       - "Did not stage the initial Assets/Geometry/Physics folder names as a separate constraint: their strict-layering rejection is an implementation detail captured in N386, not a new lower-layer ownership rule."
       - "Left O93 current because this turn revisited runtime abstraction/seam ownership; left O118, O122, O123, and O130 staged because the layout work does not resolve their lifecycle, acceleration, performance, or queue-architecture proposals."
       - "Recorded BUG-133 and the RUNTIME-214 evidence-validation failure as pre-existing global blockers, not as defects caused by the runtime move."
+  - turn: "2026-08-06_001#1"
+    notes:
+      - "Routed the user's explicit commit-and-main direction as decision N387; local main already owned the worktree, so no synthetic merge commit or feature branch was introduced."
+      - "Routed the exact staged-surface build, 4,103-entry CPU selector, structural checks, and commit as experiment N388."
+      - "Added no staged observation or claim: this turn integrated the already-adopted A35/A36/K31 layout architecture and produced no new capability, behavior, or performance interpretation."
+      - "Did not mark O93 stale because the current integration still concerns runtime abstraction/seam ownership; O118, O122, O123, and O130 have not crossed three later session-days."
+      - "Preserved the mechanical/semantic boundary: commit 61fec5c0 contains RUNTIME-215 organization and taskizes, but does not implement, RUNTIME-216."
+      - "Kept the pre-existing BUG-133 task-state finding and RUNTIME-214 independent-review gap explicit rather than describing the repository-global workflow validator as green."
+      - "Recorded local main as one commit ahead of origin/main; no push was inferred from the user's local commit/merge request."
