@@ -19,7 +19,7 @@ contract_review: The catalog was reviewed; this task repairs internal frame-grap
 
 - Completed on 2026-08-05 at `Operational` on the exercised Vulkan host and
   `CPUContracted` for the backend-neutral compiler/transfer behavior.
-- Implementation commit: pending retirement commit.
+- Implementation commit: `d1d09b08`.
 
 ## Goal
 
