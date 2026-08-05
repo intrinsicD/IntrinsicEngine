@@ -1,0 +1,38 @@
+schema_version: 1
+task_id: METHOD-020
+run_id: run-001
+attempt_id: attempt-001
+status: initialized
+initialized_at: '2026-08-05T03:30:01Z'
+claim_eligible: true
+protocol_path: tasks/evidence/METHOD-020/experiment/protocol.yaml
+protocol_digest: 053381fcf72e2511be75f046f91378220371ee190b920b403c3cf47a8c223f1f
+task_path: tasks/active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md
+task_sha256: cee6e77f813c29415e35bd6fbc409a1c6d7b043f9ed13dc8d265fbe14abf3472
+source:
+  revision: f5f69ea70a8ae9af7716861f4462fdbb6162f0f1
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml
+  sha256: d8f0302774bfac890821ddb9cd2653a0f2879048e1733bed60da019c40f6e6e4
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+datasets:
+- id: lop-family-v3-cpu-radius-screening
+  path: methods/geometry/locally_optimal_projection/reports/METHOD-020-v3-screening.md
+  sha256: 46b24b8cc098c6f80037ac8cc1678a5385bf87be4e8718b38e95ea4dd99b33e1
+  split: screening
+- id: lop-family-v3-vulkan-confirmation
+  path: benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+  sha256: 10a97945f9336424e5eb506d14d33ec03473f8a3fa6c29c5111f20a998481ecd
+  split: confirmation
+implementation_digest: 6430fb5cad1d93a449f3da6fad8c5482ee3a6d00936430068584a8076b0846e9
+command:
+- env
+- GIT_COMMIT=f5f69ea70a8ae9af7716861f4462fdbb6162f0f1
+- build/ci-vulkan-release/bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+- tasks/evidence/METHOD-020/experiment/inputs/benchmark_result.json
+cell_journal: tasks/evidence/METHOD-020/experiment/runs/run-001/cells.jsonl
+bundle: tasks/evidence/METHOD-020/experiment/runs/run-001/bundle.yaml
+audit: tasks/evidence/METHOD-020/experiment/runs/run-001/audit.json

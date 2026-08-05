@@ -1,0 +1,1 @@
+{"attempt_id":"attempt-001","benchmark_id":"geometry.lop_family.gpu_vulkan.v3.smoke","gpu_time_ms":97.3456365,"quality_error_l2":2.2518e-05,"quality_error_linf":0.000217834,"run_id":"method-020-vulkan-v3","runtime_ms":97.3456365}
