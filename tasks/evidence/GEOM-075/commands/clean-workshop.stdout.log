@@ -1,0 +1,24 @@
+[clean-workshop-review] Running scorecard-relevant validators at root: /home/alex/Documents/IntrinsicEngine
+[check_layering] Scan root: /home/alex/Documents/IntrinsicEngine/src
+[check_layering] Files scanned: 751
+[check_layering] References scanned: 7144 import/include, 85 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+[check_layering_allowlist_quality] Allowlist: /home/alex/Documents/IntrinsicEngine/tools/repo/layering_allowlist.yaml
+[check_layering_allowlist_quality] Entries: 0
+[check_layering_allowlist_quality] No findings.
+Validated 215 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 90
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3131
+[check_doc_links] Mode: strict
+[check_doc_links] No broken relative links found.
+[clean-workshop-review] Automated rows complete.
+[clean-workshop-review] Score the manual rows (3-6) and record findings in:
+    docs/reviews/<YYYY-MM-DD>-clean-workshop-review.md
+[clean-workshop-review] Scorecard + 'when required' guidance:
+    docs/agent/clean-workshop-review.md

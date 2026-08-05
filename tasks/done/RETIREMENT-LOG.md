@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GEOM-075`](GEOM-075-property-support-radius-profile.md) — property-specific
+support-radius analysis completed on 2026-08-05 at `Operational`.
+`Geometry.SupportRadius` now builds one exact KD-tree, deterministically samples
+at most 2,048 values from any compatible finite `vec3` property, derives a
+method-policy radius from robust neighbor-rank quantiles, and reports sampled
+support occupancy plus a saturating workload preview. The existing
+point-set-consolidation config, agent, runtime worker, and Sandbox panel share
+one Auto/Manual path; unsafe or degenerate requests fail before method
+execution, while manual world-unit values remain exact. The full CPU gate
+selected 4,087 cases with zero failures and one policy-defined GLFW/LSan skip;
+isolated ASan and UBSan cohorts selected 2,673 cases apiece with zero failures,
+and UBSan retained the same skip. Strict structural checks, durable handoff,
+and independent fixed-surface review close the task. No performance or quality
+claim is made for the heuristic defaults; `METHOD-020` retains Vulkan execution
+and backend-parity ownership.
+
 [`UI-039`](UI-039-lop-multi-domain-discovery.md) — semantic LOP-family slot
 binding completed on 2026-08-04 at `Operational`. Stable Mesh, Graph, and
 PointCloud Processing entries open one shared consolidation panel/state, which

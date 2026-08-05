@@ -31,6 +31,7 @@ export namespace Extrinsic::Runtime
         InvalidProcessingParameters,
         StaleEntity,
         UnsupportedPropertySource,
+        UnsafeSupportRadius,
         GeometryProcessingFailed,
         Cancelled,
         StaleSource,
@@ -109,6 +110,20 @@ export namespace Extrinsic::Runtime
         PointCloudConsolidationConfig Config{};
         std::string ImplementationId{"cpu_reference"};
         std::string StrategyToken{"wlop"};
+        std::string SupportRadiusAnalysisStatus{"not_run"};
+        std::string SupportRadiusSource{"not_run"};
+        std::string SupportRadiusQuantile{"not_run"};
+        std::uint32_t SupportRadiusEstimatorVersion{0u};
+        std::uint32_t SupportRadiusProfileSampleCount{0u};
+        std::uint32_t SupportRadiusNeighborRank{0u};
+        double SupportRadiusNeighborDistance{0.0};
+        double ResolvedSupportRadius{0.0};
+        double SupportRadiusBoundingBoxDiagonal{0.0};
+        double SupportNeighborsP50{0.0};
+        double SupportNeighborsP95{0.0};
+        std::uint32_t SupportNeighborsMax{0u};
+        std::uint64_t PredictedSupportQueryCount{0u};
+        std::uint64_t PredictedContributionCount{0u};
         Geometry::PointCloud::Consolidation::Status GeometryStatus{
             Geometry::PointCloud::Consolidation::Status::EmptyInput};
         std::uint32_t InputPointCount{0u};

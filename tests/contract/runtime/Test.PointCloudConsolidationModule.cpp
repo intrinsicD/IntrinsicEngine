@@ -397,7 +397,11 @@ namespace
                     CompletionThread = std::this_thread::get_id();
                 });
             MainThread = std::this_thread::get_id();
-            Correlation = Service->Run(MakeRequest(Entity));
+            Runtime::PointCloudConsolidationRequest request =
+                MakeRequest(Entity);
+            request.Config.SupportRadiusMode = Runtime::
+                PointCloudConsolidationSupportRadiusMode::Manual;
+            Correlation = Service->Run(std::move(request));
         }
 
         void Frame(double, double) override
@@ -631,13 +635,22 @@ namespace
             rejectedClop.Config.ClopMixtureComponentCount = 26u;
             RejectedClopCorrelation =
                 Service->Run(std::move(rejectedClop));
+
+            Runtime::PointCloudConsolidationRequest unsafe =
+                MakeDomainRequest(
+                    Sources.PointCloud,
+                    Runtime::GeometryElementDomain::PointCloudPoint,
+                    std::string{GS::PropertyNames::kPosition},
+                    "lop:unsafe");
+            unsafe.Config.MaxPredictedContributions = 1u;
+            UnsafeCorrelation = Service->Run(std::move(unsafe));
         }
 
         void Frame(double, double) override
         {
             auto& engine = Kernel();
             ++Ticks;
-            if (Completions.size() == 10u)
+            if (Completions.size() == 11u)
             {
                 Stats = Service->Stats();
                 engine.RequestExit();
@@ -662,6 +675,7 @@ namespace
         std::vector<Runtime::CommandCorrelationId> Correlations{};
         Runtime::CommandCorrelationId RejectedCorrelation{};
         Runtime::CommandCorrelationId RejectedClopCorrelation{};
+        Runtime::CommandCorrelationId UnsafeCorrelation{};
         std::vector<Runtime::PointCloudConsolidationResult> Completions{};
         Runtime::PointCloudConsolidationModuleStats Stats{};
         std::vector<std::uint32_t> MeshEdgeTopologyBefore{};
@@ -842,6 +856,11 @@ TEST(PointCloudConsolidationModule,
     EXPECT_EQ(appPtr->Completion->OutputPointCount, 16u);
     EXPECT_EQ(appPtr->Completion->ImplementationId, "cpu_reference");
     EXPECT_EQ(appPtr->Completion->StrategyToken, "wlop");
+    EXPECT_EQ(appPtr->Completion->SupportRadiusSource, "manual");
+    EXPECT_EQ(appPtr->Completion->SupportRadiusAnalysisStatus, "success");
+    EXPECT_DOUBLE_EQ(appPtr->Completion->ResolvedSupportRadius, 0.65);
+    EXPECT_GT(appPtr->Completion->SupportNeighborsP95, 0.0);
+    EXPECT_GT(appPtr->Completion->PredictedContributionCount, 0u);
     EXPECT_EQ(appPtr->CompletionThread, appPtr->MainThread);
     EXPECT_EQ(appPtr->Stats.ResultsCommitted, 1u);
 
@@ -913,9 +932,10 @@ TEST(PointCloudConsolidationModule,
         }));
     ASSERT_TRUE(appPtr->RejectedCorrelation.IsValid());
     ASSERT_TRUE(appPtr->RejectedClopCorrelation.IsValid());
-    ASSERT_EQ(appPtr->Completions.size(), 10u);
-    EXPECT_EQ(appPtr->Stats.CommandsHandled, 10u);
-    EXPECT_EQ(appPtr->Stats.JobsSubmitted, 8u);
+    ASSERT_TRUE(appPtr->UnsafeCorrelation.IsValid());
+    ASSERT_EQ(appPtr->Completions.size(), 11u);
+    EXPECT_EQ(appPtr->Stats.CommandsHandled, 11u);
+    EXPECT_EQ(appPtr->Stats.JobsSubmitted, 9u);
     EXPECT_EQ(appPtr->Stats.ResultsCommitted, 8u);
 
     const auto rejected = std::find_if(
@@ -944,13 +964,32 @@ TEST(PointCloudConsolidationModule,
                   UnsupportedPropertySource);
     EXPECT_NE(rejectedClop->Message.find("mixture component count"),
               std::string::npos);
+    const auto unsafe = std::find_if(
+        appPtr->Completions.begin(),
+        appPtr->Completions.end(),
+        [appPtr](const Runtime::PointCloudConsolidationResult& result)
+        {
+            return result.Correlation == appPtr->UnsafeCorrelation;
+        });
+    ASSERT_NE(unsafe, appPtr->Completions.end());
+    EXPECT_EQ(unsafe->Status,
+              Runtime::PointCloudConsolidationRunStatus::
+                  UnsafeSupportRadius);
+    EXPECT_EQ(unsafe->SupportRadiusSource, "recommended");
+    EXPECT_EQ(unsafe->SupportRadiusAnalysisStatus,
+              "workload_limit_exceeded");
+    EXPECT_GT(unsafe->PredictedContributionCount, 1u);
     for (const Runtime::PointCloudConsolidationResult& result :
          appPtr->Completions)
     {
         if (result.Correlation != appPtr->RejectedCorrelation &&
-            result.Correlation != appPtr->RejectedClopCorrelation)
+            result.Correlation != appPtr->RejectedClopCorrelation &&
+            result.Correlation != appPtr->UnsafeCorrelation)
         {
             EXPECT_TRUE(result.Succeeded()) << result.Message;
+            EXPECT_EQ(result.SupportRadiusSource, "recommended");
+            EXPECT_EQ(result.SupportRadiusAnalysisStatus, "success");
+            EXPECT_GT(result.ResolvedSupportRadius, 0.0);
             EXPECT_EQ(result.InputPointCount, NoisyPlane().size());
             EXPECT_EQ(result.OutputPointCount, NoisyPlane().size());
         }
@@ -979,6 +1018,7 @@ TEST(PointCloudConsolidationModule,
     }
     EXPECT_FALSE(meshFaces.Exists("lop:rejected"));
     EXPECT_FALSE(pointVertices.Exists("lop:rejected_clop"));
+    EXPECT_FALSE(pointVertices.Exists("lop:unsafe"));
     EXPECT_EQ(meshEdges.Get<std::uint32_t>(GS::PropertyNames::kEdgeV0).Vector(),
               appPtr->MeshEdgeTopologyBefore);
     EXPECT_EQ(meshHalfedges

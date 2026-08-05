@@ -19,9 +19,12 @@ source/projected density weights.
 
 ## Parameter guidance
 
-- `SupportRadius` (`h`) is in input world units. Choose it large enough to span
-  local sampling gaps, but below the separation between distinct surface
-  sheets. An empty compact-support neighborhood is an explicit failure.
+- `SupportRadius` (`h`) is in input world units. Runtime defaults to Auto: the
+  selected position property is deterministically k-distance profiled and the
+  LOP/isotropic-WLOP policy uses rank 16, P75, and a 1.25 multiplier. Manual
+  preserves the configured value exactly. Both modes retain sampled occupancy
+  and contribution limits. See the canonical
+  [support-radius policy](../../../docs/architecture/support-radius-policy.md).
 - `RepulsionWeight` (`mu`) is constrained to `[0, 0.5)`. Values near `0` favor
   denoising; values around `0.4`–`0.45` improve spacing.
 - `TargetPointCount == 0` preserves the input count. A smaller value uses the
@@ -61,5 +64,5 @@ domain; a face-center property is a valid sample set and no `VertexProperty` or
 container conversion is required. Same-cardinality output updates named
 properties on the originating domain with undo/redo. Mesh/graph count changes
 are rejected before scheduling; canonical point-cloud replacement remains the
-explicit count-changing path. `UI-039` owns property-aware Sandbox discovery;
-until it lands, the existing PointCloud panel is the only interactive entry.
+explicit count-changing path. Support profiling runs from the captured property
+on the same job worker before the method; rejected work publishes no geometry.

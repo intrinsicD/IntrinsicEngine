@@ -39,6 +39,18 @@ namespace Extrinsic::Runtime
         return {};
     }
 
+    std::string_view StableToken(
+        const PointCloudConsolidationSupportRadiusMode mode) noexcept
+    {
+        switch (mode)
+        {
+        case PointCloudConsolidationSupportRadiusMode::Auto: return "auto";
+        case PointCloudConsolidationSupportRadiusMode::Manual:
+            return "manual";
+        }
+        return {};
+    }
+
     std::string SerializePointCloudConsolidationConfig(
         const PointCloudConsolidationConfig& config)
     {

@@ -13,6 +13,17 @@
 - Allowed: `core`, GLM, and Eigen3 for geometry-owned CPU numerical kernels.
 - Disallowed: runtime/app-specific ownership and rendering backend internals.
 
+## Point-set support-radius analysis
+
+- `Geometry.SupportRadius` builds one exact KD-tree over a finite `vec3` span,
+  profiles a deterministic sample of at most 2,048 positions, and returns
+  k-distance quantiles plus exact sampled sphere occupancy and bounded-work
+  diagnostics. It accepts values rather than a point-cloud container, so every
+  compatible element-domain property is substitutable.
+- Runtime selects the method policy and Auto/Manual intent. The geometry module
+  does not own an ECS component or cache; see the canonical
+  [support-radius policy](support-radius-policy.md).
+
 ## Primitive and curve modules
 
 - `Geometry.Curve` owns the engine's Bezier curve primitive. It exposes

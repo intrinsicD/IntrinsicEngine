@@ -32,6 +32,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.PointCloud.Consolidation;
 import Geometry.Properties;
+import Geometry.SupportRadius;
 
 #include "Runtime.EditorMutation.Internal.hpp"
 
@@ -42,8 +43,12 @@ namespace Extrinsic::Runtime
         namespace Dirty = ECS::Components::DirtyTags;
         namespace GS = ECS::Components::GeometrySources;
         namespace Consolidation = Geometry::PointCloud::Consolidation;
+        namespace Radius = Geometry::SupportRadius;
 
         constexpr std::size_t kMaximumPointCount = 1'000'000u;
+        constexpr std::uint32_t kMaximumSupportNeighbors = 1'000'000u;
+        constexpr std::uint64_t kMaximumPredictedContributions =
+            1'000'000'000'000u;
 
         struct Vec3PropertySnapshot
         {
@@ -280,8 +285,26 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<Consolidation::Params> BuildParams(
             const PointCloudConsolidationConfig& config) noexcept
         {
+            double resolvedRadius = 1.0;
+            switch (config.SupportRadiusMode)
+            {
+            case PointCloudConsolidationSupportRadiusMode::Auto:
+                break;
+            case PointCloudConsolidationSupportRadiusMode::Manual:
+                resolvedRadius = config.SupportRadius;
+                break;
+            default: return std::nullopt;
+            }
+
             if (!std::isfinite(config.SupportRadius) ||
                 config.SupportRadius <= 0.0 ||
+                !std::isfinite(resolvedRadius) ||
+                resolvedRadius <= 0.0 ||
+                config.MaxSupportNeighbors == 0u ||
+                config.MaxSupportNeighbors > kMaximumSupportNeighbors ||
+                config.MaxPredictedContributions == 0u ||
+                config.MaxPredictedContributions >
+                    kMaximumPredictedContributions ||
                 !std::isfinite(config.RepulsionWeight) ||
                 config.RepulsionWeight < 0.0 ||
                 config.RepulsionWeight >= 0.5 ||
@@ -317,7 +340,7 @@ namespace Extrinsic::Runtime
                 return std::nullopt;
 
             Consolidation::Params params{
-                .SupportRadius = config.SupportRadius,
+                .SupportRadius = resolvedRadius,
                 .RepulsionWeight = config.RepulsionWeight,
                 .MaxIterations = config.MaxIterations,
                 .ConvergenceTolerance = config.ConvergenceTolerance,
@@ -365,6 +388,154 @@ namespace Extrinsic::Runtime
             default: return std::nullopt;
             }
             return params;
+        }
+
+        [[nodiscard]] std::uint64_t SaturatingMultiply(
+            const std::uint64_t lhs,
+            const std::uint64_t rhs) noexcept
+        {
+            if (lhs == 0u || rhs == 0u)
+                return 0u;
+            if (lhs > std::numeric_limits<std::uint64_t>::max() / rhs)
+                return std::numeric_limits<std::uint64_t>::max();
+            return lhs * rhs;
+        }
+
+        [[nodiscard]] std::uint64_t SaturatingAdd(
+            const std::uint64_t lhs,
+            const std::uint64_t rhs) noexcept
+        {
+            if (lhs > std::numeric_limits<std::uint64_t>::max() - rhs)
+                return std::numeric_limits<std::uint64_t>::max();
+            return lhs + rhs;
+        }
+
+        [[nodiscard]] Radius::RecommendationPolicy SupportRadiusPolicy(
+            const PointCloudConsolidationConfig& config) noexcept
+        {
+            const bool directional =
+                config.Strategy == PointCloudConsolidationStrategy::Ear ||
+                (config.Strategy ==
+                     PointCloudConsolidationStrategy::Wlop &&
+                 config.WlopAnisotropic);
+            return Radius::RecommendationPolicy{
+                .NeighborRank = directional ? 24u : 16u,
+                .Quantile = Radius::CoverageQuantile::P75,
+                .RadiusMultiplier = 1.25,
+            };
+        }
+
+        [[nodiscard]] Radius::WorkloadBudget SupportWorkloadBudget(
+            const PointCloudConsolidationSnapshot& snapshot) noexcept
+        {
+            const std::uint64_t input = snapshot.Positions.size();
+            const std::uint64_t requested =
+                snapshot.Params.TargetPointCount == 0u
+                ? input
+                : snapshot.Params.TargetPointCount;
+            const std::uint64_t projected = std::min(input, requested);
+            const std::uint64_t iterations =
+                snapshot.Request.Config.Strategy ==
+                        PointCloudConsolidationStrategy::Ear ||
+                    (snapshot.Request.Config.Strategy ==
+                         PointCloudConsolidationStrategy::Wlop &&
+                     snapshot.Request.Config.WlopAnisotropic)
+                ? snapshot.Request.Config.NormalRefinementRounds
+                : snapshot.Request.Config.MaxIterations;
+
+            std::uint64_t queries = projected;
+            std::uint64_t fixed = 0u;
+            switch (snapshot.Request.Config.Strategy)
+            {
+            case PointCloudConsolidationStrategy::Lop:
+                queries = SaturatingAdd(
+                    projected,
+                    SaturatingMultiply(
+                        SaturatingMultiply(2u, projected), iterations));
+                break;
+            case PointCloudConsolidationStrategy::Wlop:
+                queries = SaturatingAdd(
+                    input,
+                    SaturatingAdd(
+                        projected,
+                        SaturatingMultiply(
+                            SaturatingMultiply(
+                                snapshot.Request.Config.WlopAnisotropic
+                                    ? 4u
+                                    : 2u,
+                                projected),
+                            iterations)));
+                break;
+            case PointCloudConsolidationStrategy::Clop:
+            {
+                queries = SaturatingMultiply(projected, iterations);
+                const std::uint64_t components =
+                    snapshot.Request.Config.ClopMixtureComponentCount;
+                fixed = SaturatingAdd(
+                    SaturatingMultiply(
+                        SaturatingMultiply(input, components),
+                        snapshot.Request.Config.ClopMixtureMaxIterations),
+                    SaturatingMultiply(
+                        SaturatingMultiply(
+                            SaturatingMultiply(3u, projected), components),
+                        iterations));
+                break;
+            }
+            case PointCloudConsolidationStrategy::Ear:
+            {
+                queries = SaturatingAdd(
+                    input,
+                    SaturatingMultiply(
+                        SaturatingMultiply(4u, projected), iterations));
+                const std::uint64_t inserted = requested > projected
+                    ? requested - projected
+                    : 0u;
+                fixed = SaturatingMultiply(
+                    SaturatingMultiply(inserted, requested), 4u);
+                break;
+            }
+            }
+
+            return Radius::WorkloadBudget{
+                .PredictedQueryCount = queries,
+                .FixedContributionCount = fixed,
+                .MaxNeighborsPerSample =
+                    snapshot.Request.Config.MaxSupportNeighbors,
+                .MaxPredictedContributions =
+                    snapshot.Request.Config.MaxPredictedContributions,
+            };
+        }
+
+        void CopySupportRadiusAnalysis(
+            PointCloudConsolidationResult& completion,
+            const Radius::Analysis& analysis)
+        {
+            completion.SupportRadiusAnalysisStatus =
+                std::string{Radius::DebugName(analysis.State)};
+            completion.SupportRadiusSource =
+                std::string{Radius::DebugName(analysis.Source)};
+            completion.SupportRadiusQuantile =
+                std::string{Radius::DebugName(analysis.SelectedQuantile)};
+            completion.SupportRadiusEstimatorVersion =
+                analysis.EstimatorVersion;
+            completion.SupportRadiusProfileSampleCount =
+                static_cast<std::uint32_t>(analysis.ProfileSampleCount);
+            completion.SupportRadiusNeighborRank =
+                analysis.SelectedNeighborRank;
+            completion.SupportRadiusNeighborDistance =
+                analysis.SelectedNeighborDistance;
+            completion.ResolvedSupportRadius = analysis.Radius;
+            completion.SupportRadiusBoundingBoxDiagonal =
+                analysis.BoundingBoxDiagonal;
+            completion.SupportNeighborsP50 = analysis.SupportNeighborsP50;
+            completion.SupportNeighborsP95 = analysis.SupportNeighborsP95;
+            completion.SupportNeighborsMax = analysis.SupportNeighborsMax;
+            completion.PredictedSupportQueryCount =
+                analysis.PredictedQueryCount;
+            completion.PredictedContributionCount =
+                analysis.PredictedContributionCount;
+            completion.InputPointCount = static_cast<std::uint32_t>(
+                analysis.InputPointCount);
         }
 
         [[nodiscard]] PointCloudConsolidationResult MakeCompletion(
@@ -999,6 +1170,70 @@ namespace Extrinsic::Runtime
                 return cancelled;
             }
 
+            const std::optional<double> manualRadius =
+                snapshot.Request.Config.SupportRadiusMode ==
+                        PointCloudConsolidationSupportRadiusMode::Manual
+                ? std::optional<double>{
+                      snapshot.Request.Config.SupportRadius}
+                : std::nullopt;
+            const Radius::RecommendationPolicy radiusPolicy =
+                SupportRadiusPolicy(snapshot.Request.Config);
+            const Radius::Analysis radiusAnalysis = Radius::Analyze(
+                std::span<const glm::vec3>{snapshot.Positions},
+                manualRadius,
+                radiusPolicy,
+                SupportWorkloadBudget(snapshot),
+                Radius::ProfileParams{
+                    .MaxSamples = Radius::kMaximumProfileSamples,
+                    .MaxNeighborRank = std::max(
+                        32u, radiusPolicy.NeighborRank),
+                });
+            if (!radiusAnalysis.Succeeded())
+            {
+                PointCloudConsolidationJobResult rejected{};
+                rejected.Snapshot = std::move(snapshot);
+                rejected.Completion = MakeCompletion(
+                    rejected.Snapshot.Request,
+                    rejected.Snapshot.World,
+                    rejected.Snapshot.Correlation,
+                    PointCloudConsolidationRunStatus::UnsafeSupportRadius,
+                    radiusAnalysis.State ==
+                            Radius::Status::WorkloadLimitExceeded
+                        ? Core::ErrorCode::OutOfRange
+                        : Core::ErrorCode::InvalidArgument,
+                    "Support-radius analysis rejected execution with status " +
+                        std::string{Radius::DebugName(radiusAnalysis.State)} +
+                        "; radius=" +
+                        std::to_string(radiusAnalysis.Radius) +
+                        ", sampled support p95=" +
+                        std::to_string(radiusAnalysis.SupportNeighborsP95) +
+                        ", max=" +
+                        std::to_string(radiusAnalysis.SupportNeighborsMax) +
+                        ", predicted contributions=" +
+                        std::to_string(
+                            radiusAnalysis.PredictedContributionCount) +
+                        ".");
+                CopySupportRadiusAnalysis(
+                    rejected.Completion, radiusAnalysis);
+                return rejected;
+            }
+            snapshot.Params.SupportRadius = radiusAnalysis.Radius;
+            if (cancellation.IsCancelled())
+            {
+                PointCloudConsolidationJobResult cancelled{};
+                cancelled.Snapshot = std::move(snapshot);
+                cancelled.Completion = MakeCompletion(
+                    cancelled.Snapshot.Request,
+                    cancelled.Snapshot.World,
+                    cancelled.Snapshot.Correlation,
+                    PointCloudConsolidationRunStatus::Cancelled,
+                    Core::ErrorCode::InvalidState,
+                    "Point-set consolidation was cancelled after support-radius analysis.");
+                CopySupportRadiusAnalysis(
+                    cancelled.Completion, radiusAnalysis);
+                return cancelled;
+            }
+
             Consolidation::Result consolidated = snapshot.Normals.empty()
                 ? Consolidation::Consolidate(
                       std::span<const glm::vec3>{snapshot.Positions},
@@ -1027,6 +1262,7 @@ namespace Extrinsic::Runtime
                           std::string{Consolidation::DebugName(
                               consolidated.State)} +
                           ".");
+            CopySupportRadiusAnalysis(result.Completion, radiusAnalysis);
             CopyDiagnostics(result.Completion, consolidated);
 
             if (!consolidated.Succeeded())
@@ -1780,6 +2016,8 @@ namespace Extrinsic::Runtime
             return "StaleEntity";
         case PointCloudConsolidationRunStatus::UnsupportedPropertySource:
             return "UnsupportedPropertySource";
+        case PointCloudConsolidationRunStatus::UnsafeSupportRadius:
+            return "UnsafeSupportRadius";
         case PointCloudConsolidationRunStatus::GeometryProcessingFailed:
             return "GeometryProcessingFailed";
         case PointCloudConsolidationRunStatus::Cancelled: return "Cancelled";

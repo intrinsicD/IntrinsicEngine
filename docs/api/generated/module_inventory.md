@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 108 |
+| `geometry` | 109 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 71 |
@@ -215,6 +215,7 @@ Root scanned: `src`
 | `Geometry.Sphere` | `src/geometry/Geometry.Sphere.cppm` | `geometry` |
 | `Geometry.Statistics` | `src/geometry/Geometry.Statistics.cppm` | `geometry` |
 | `Geometry.Support` | `src/geometry/Geometry.Support.cppm` | `geometry` |
+| `Geometry.SupportRadius` | `src/geometry/Geometry.SupportRadius.cppm` | `geometry` |
 | `Geometry.SurfaceReconstruction` | `src/geometry/Geometry.SurfaceReconstruction.cppm` | `geometry` |
 | `Geometry.Triangle` | `src/geometry/Geometry.Triangle.cppm` | `geometry` |
 | `Geometry.UvAtlas` | `src/geometry/Geometry.UvAtlas.cppm` | `geometry` |
@@ -411,4 +412,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 
-Total modules: **384**
+Total modules: **385**

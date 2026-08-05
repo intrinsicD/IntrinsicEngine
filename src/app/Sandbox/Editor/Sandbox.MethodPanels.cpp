@@ -624,7 +624,29 @@ namespace Extrinsic::Sandbox::Editor
             .Status = std::string{Runtime::ToString(result.Status)},
             .ImplementationId = result.ImplementationId,
             .StrategyToken = result.StrategyToken,
+            .SupportRadiusAnalysisStatus =
+                result.SupportRadiusAnalysisStatus,
+            .SupportRadiusSource = result.SupportRadiusSource,
+            .SupportRadiusQuantile = result.SupportRadiusQuantile,
             .Message = result.Message,
+            .SupportRadiusEstimatorVersion =
+                result.SupportRadiusEstimatorVersion,
+            .SupportRadiusProfileSampleCount =
+                result.SupportRadiusProfileSampleCount,
+            .SupportRadiusNeighborRank =
+                result.SupportRadiusNeighborRank,
+            .SupportRadiusNeighborDistance =
+                result.SupportRadiusNeighborDistance,
+            .ResolvedSupportRadius = result.ResolvedSupportRadius,
+            .SupportRadiusBoundingBoxDiagonal =
+                result.SupportRadiusBoundingBoxDiagonal,
+            .SupportNeighborsP50 = result.SupportNeighborsP50,
+            .SupportNeighborsP95 = result.SupportNeighborsP95,
+            .SupportNeighborsMax = result.SupportNeighborsMax,
+            .PredictedSupportQueryCount =
+                result.PredictedSupportQueryCount,
+            .PredictedContributionCount =
+                result.PredictedContributionCount,
             .InputPointCount = result.InputPointCount,
             .OutputPointCount = result.OutputPointCount,
             .Iterations = result.Iterations,
@@ -1207,12 +1229,55 @@ namespace Extrinsic::Sandbox::Editor
         {
             bool changed = DrawPointCloudConsolidationStrategy(config);
             ImGui::SeparatorText("Shared parameters");
+            const bool manualRadius = config.SupportRadiusMode ==
+                Runtime::PointCloudConsolidationSupportRadiusMode::Manual;
+            if (ImGui::BeginCombo(
+                    "Support radius mode##PointCloudConsolidation",
+                    manualRadius ? "Manual" : "Auto"))
+            {
+                if (ImGui::Selectable(
+                        "Auto##PointCloudConsolidation",
+                        !manualRadius))
+                {
+                    config.SupportRadiusMode = Runtime::
+                        PointCloudConsolidationSupportRadiusMode::Auto;
+                    changed = true;
+                }
+                if (!manualRadius)
+                    ImGui::SetItemDefaultFocus();
+                if (ImGui::Selectable(
+                        "Manual##PointCloudConsolidation",
+                        manualRadius))
+                {
+                    config.SupportRadiusMode = Runtime::
+                        PointCloudConsolidationSupportRadiusMode::Manual;
+                    changed = true;
+                }
+                if (manualRadius)
+                    ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
+            }
+            ImGui::BeginDisabled(!manualRadius);
             changed |= ImGui::InputDouble(
                 "Support radius (h)##PointCloudConsolidation",
                 &config.SupportRadius,
                 0.0,
                 0.0,
                 "%.6g");
+            ImGui::EndDisabled();
+            if (!manualRadius)
+            {
+                ImGui::TextDisabled(
+                    "Auto profiles the selected position property on the worker.");
+            }
+            changed |= ImGui::InputScalar(
+                "Maximum sampled support##PointCloudConsolidation",
+                ImGuiDataType_U32,
+                &config.MaxSupportNeighbors);
+            changed |= ImGui::InputScalar(
+                "Maximum predicted contributions##PointCloudConsolidation",
+                ImGuiDataType_U64,
+                &config.MaxPredictedContributions);
             changed |= ImGui::InputDouble(
                 "Repulsion weight (mu)##PointCloudConsolidation",
                 &config.RepulsionWeight,
@@ -1310,6 +1375,45 @@ namespace Extrinsic::Sandbox::Editor
                 "Strategy: %s  implementation: %s",
                 summary.StrategyToken.c_str(),
                 summary.ImplementationId.c_str());
+            if (summary.SupportRadiusAnalysisStatus != "not_run" &&
+                !summary.SupportRadiusAnalysisStatus.empty())
+            {
+                ImGui::Text(
+                    "Support radius: %.6g  source: %s  status: %s",
+                    summary.ResolvedSupportRadius,
+                    summary.SupportRadiusSource.c_str(),
+                    summary.SupportRadiusAnalysisStatus.c_str());
+                if (summary.SupportRadiusSource == "recommended")
+                {
+                    ImGui::Text(
+                        "Profile v%u: %u samples  rank %u %s distance %.6g  bbox %.6g",
+                        summary.SupportRadiusEstimatorVersion,
+                        summary.SupportRadiusProfileSampleCount,
+                        summary.SupportRadiusNeighborRank,
+                        summary.SupportRadiusQuantile.c_str(),
+                        summary.SupportRadiusNeighborDistance,
+                        summary.SupportRadiusBoundingBoxDiagonal);
+                }
+                else
+                {
+                    ImGui::Text(
+                        "Profile v%u: %u samples  bbox %.6g",
+                        summary.SupportRadiusEstimatorVersion,
+                        summary.SupportRadiusProfileSampleCount,
+                        summary.SupportRadiusBoundingBoxDiagonal);
+                }
+                ImGui::Text(
+                    "Sampled support p50 %.1f  p95 %.1f  max %u",
+                    summary.SupportNeighborsP50,
+                    summary.SupportNeighborsP95,
+                    summary.SupportNeighborsMax);
+                ImGui::Text(
+                    "Predicted queries %llu  contributions %llu",
+                    static_cast<unsigned long long>(
+                        summary.PredictedSupportQueryCount),
+                    static_cast<unsigned long long>(
+                        summary.PredictedContributionCount));
+            }
             if (!summary.Queued)
             {
                 ImGui::Text(

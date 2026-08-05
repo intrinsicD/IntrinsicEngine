@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-ubsan",
+    "--target",
+    "IntrinsicCpuTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci-ubsan --target IntrinsicCpuTests -j 4",
+  "cwd": ".",
+  "duration_ms": 779680,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T00:34:54Z",
+  "label": "ci-ubsan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T00:21:55Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/ci-ubsan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/ci-ubsan-build.stdout.log",
+  "stdout_sha256": "e56882ec86a0700f04cc09cd3c07ba8fbb17678d338df58562d86f4d148b3d4c",
+  "task_id": "GEOM-075"
+}

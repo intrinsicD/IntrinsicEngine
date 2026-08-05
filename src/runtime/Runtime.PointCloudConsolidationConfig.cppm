@@ -35,11 +35,21 @@ export namespace Extrinsic::Runtime
         RequireAuthored,
     };
 
+    enum class PointCloudConsolidationSupportRadiusMode : std::uint32_t
+    {
+        Auto = 0u,
+        Manual,
+    };
+
     struct PointCloudConsolidationConfig
     {
         PointCloudConsolidationStrategy Strategy{
             PointCloudConsolidationStrategy::Wlop};
+        PointCloudConsolidationSupportRadiusMode SupportRadiusMode{
+            PointCloudConsolidationSupportRadiusMode::Auto};
         double SupportRadius{1.0};
+        std::uint32_t MaxSupportNeighbors{4'096u};
+        std::uint64_t MaxPredictedContributions{100'000'000u};
         double RepulsionWeight{0.45};
         std::uint32_t MaxIterations{20u};
         double ConvergenceTolerance{1.0e-4};
@@ -64,6 +74,8 @@ export namespace Extrinsic::Runtime
         PointCloudConsolidationStrategy strategy) noexcept;
     [[nodiscard]] std::string_view StableToken(
         PointCloudConsolidationNormalSource source) noexcept;
+    [[nodiscard]] std::string_view StableToken(
+        PointCloudConsolidationSupportRadiusMode mode) noexcept;
 
     [[nodiscard]] std::string SerializePointCloudConsolidationConfig(
         const PointCloudConsolidationConfig& config);

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-asan",
+    "--fresh",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+  ],
+  "command_display": "cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+  "cwd": ".",
+  "duration_ms": 8196,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T00:03:28Z",
+  "label": "ci-asan-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T00:03:20Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/ci-asan-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/ci-asan-configure.stdout.log",
+  "stdout_sha256": "122ffb38db8a5a3881986eef712e1f7bed7bf4784fcdf25a870a109d2bfeaf7c",
+  "task_id": "GEOM-075"
+}

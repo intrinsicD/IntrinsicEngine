@@ -1,0 +1,103 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  761: PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField
+ 1/45 Test  #761: PointCloudConsolidationConfig.RoundTripsAndFallsBackPerField ....................................   Passed    0.01 sec
+      Start  762: PointCloudConsolidationModule.AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain
+ 2/45 Test  #762: PointCloudConsolidationModule.AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain ..........   Passed    0.01 sec
+      Start  763: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo
+ 3/45 Test  #763: PointCloudConsolidationModule.CommitsThroughGeometrySourcesAndOwnsUndoRedo ......................   Passed    0.05 sec
+      Start  764: PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion
+ 4/45 Test  #764: PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion .......   Passed    0.06 sec
+      Start  765: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+ 5/45 Test  #765: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ................................   Passed    0.31 sec
+      Start  766: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput
+ 6/45 Test  #766: PointCloudConsolidationModule.IdenticalInputAndConfigProduceIdenticalRuntimeOutput ..............   Passed    0.05 sec
+      Start 1175: SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
+ 7/45 Test #1175: SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun ......................   Passed    0.05 sec
+      Start 1176: SandboxConfigSections.PhysicsSourcesProduceIdenticalValidatedState
+ 8/45 Test #1176: SandboxConfigSections.PhysicsSourcesProduceIdenticalValidatedState ..............................   Passed    0.12 sec
+      Start 1177: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState
+ 9/45 Test #1177: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState ..............   Passed    0.12 sec
+      Start 1210: SandboxPointCloudConsolidationPanel.ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath
+10/45 Test #1210: SandboxPointCloudConsolidationPanel.ThreeDomainRegistrationsAreStableOpenAndShareOnePanelPath ...   Passed    0.05 sec
+      Start 1211: SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed
+11/45 Test #1211: SandboxPointCloudConsolidationPanel.StrategiesAndTypedRequestAreExactAndFailClosed ..............   Passed    0.00 sec
+      Start 1212: SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure
+12/45 Test #1212: SandboxPointCloudConsolidationPanel.ResultSummaryProjectsIdentityConvergenceAndFailure ..........   Passed    0.00 sec
+      Start 1213: SandboxPointCloudConsolidationPanel.MeshVertexAndFaceSlotsUseTheSameEditorPreflight
+13/45 Test #1213: SandboxPointCloudConsolidationPanel.MeshVertexAndFaceSlotsUseTheSameEditorPreflight .............   Passed    0.04 sec
+      Start 1214: SandboxPointCloudConsolidationPanel.GraphAndPointCloudPositionsUseTheSemanticEditorPreflight
+14/45 Test #1214: SandboxPointCloudConsolidationPanel.GraphAndPointCloudPositionsUseTheSemanticEditorPreflight ....   Passed    0.04 sec
+      Start 1215: SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace
+15/45 Test #1215: SandboxPointCloudConsolidationPanel.ValidatedActionQueuesAndPublishesThroughPreparedWorkspace ...   Passed    0.05 sec
+      Start 2229: SupportRadius.RecommendedProfileIsDeterministicAndBounded
+16/45 Test #2229: SupportRadius.RecommendedProfileIsDeterministicAndBounded .......................................   Passed    0.21 sec
+      Start 2230: SupportRadius.PolicySelectsRankQuantileAndMultiplier
+17/45 Test #2230: SupportRadius.PolicySelectsRankQuantileAndMultiplier ............................................   Passed    0.01 sec
+      Start 2231: SupportRadius.RecommendationClampsRankForSmallInputs
+18/45 Test #2231: SupportRadius.RecommendationClampsRankForSmallInputs ............................................   Passed    0.01 sec
+      Start 2232: SupportRadius.NonUniformAndDuplicateSamplesRemainDiagnosable
+19/45 Test #2232: SupportRadius.NonUniformAndDuplicateSamplesRemainDiagnosable ....................................   Passed    0.01 sec
+      Start 2233: SupportRadius.ManualRadiusIsPreservedAndStillProfilesWork
+20/45 Test #2233: SupportRadius.ManualRadiusIsPreservedAndStillProfilesWork .......................................   Passed    0.01 sec
+      Start 2234: SupportRadius.ExactCutoffExcludesPointsAtTheRadius
+21/45 Test #2234: SupportRadius.ExactCutoffExcludesPointsAtTheRadius ..............................................   Passed    0.01 sec
+      Start 2235: SupportRadius.WorkloadLimitsRetainDiagnosticsAndFailClosed
+22/45 Test #2235: SupportRadius.WorkloadLimitsRetainDiagnosticsAndFailClosed ......................................   Passed    0.01 sec
+      Start 2236: SupportRadius.DegenerateAndInvalidInputsHaveExplicitStatuses
+23/45 Test #2236: SupportRadius.DegenerateAndInvalidInputsHaveExplicitStatuses ....................................   Passed    0.01 sec
+      Start 2376: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic
+24/45 Test #2376: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic ....................   Passed    0.02 sec
+      Start 2377: PointCloudConsolidation.OptimizedCandidateFailureMatchesReference
+25/45 Test #2377: PointCloudConsolidation.OptimizedCandidateFailureMatchesReference ...............................   Passed    0.01 sec
+      Start 2378: PointCloudConsolidation.WlopDenoisesPlaneAndSphere
+26/45 Test #2378: PointCloudConsolidation.WlopDenoisesPlaneAndSphere ..............................................   Passed    0.01 sec
+      Start 2379: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast
+27/45 Test #2379: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast ................................   Passed    0.01 sec
+      Start 2380: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature
+28/45 Test #2380: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature .......................................   Passed    0.01 sec
+      Start 2381: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable
+29/45 Test #2381: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable ...........................   Passed    0.01 sec
+      Start 2382: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload
+30/45 Test #2382: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload ...............................   Passed    0.01 sec
+      Start 2383: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing
+31/45 Test #2383: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing ......................................   Passed    0.02 sec
+      Start 2384: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle
+32/45 Test #2384: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle ....................................   Passed    0.01 sec
+      Start 2385: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop
+33/45 Test #2385: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop ................................   Passed    0.01 sec
+      Start 2386: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch
+34/45 Test #2386: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch .......................   Passed    0.01 sec
+      Start 2387: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation
+35/45 Test #2387: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation ...............................   Passed    0.01 sec
+      Start 2388: PointCloudConsolidation.ClopDenoisesPlaneAndSphere
+36/45 Test #2388: PointCloudConsolidation.ClopDenoisesPlaneAndSphere ..............................................   Passed    0.02 sec
+      Start 2389: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop
+37/45 Test #2389: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop ..................................   Passed    0.02 sec
+      Start 2390: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded
+38/45 Test #2390: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded ..................................   Passed    0.01 sec
+      Start 2391: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed
+39/45 Test #2391: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed .......................................   Passed    0.01 sec
+      Start 2392: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic
+40/45 Test #2392: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic ..................................   Passed    0.06 sec
+      Start 2393: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic
+41/45 Test #2393: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic ................................   Passed    0.01 sec
+      Start 2394: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic
+42/45 Test #2394: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic ............................   Passed    0.01 sec
+      Start 2395: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions
+43/45 Test #2395: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions ...........................   Passed    0.01 sec
+      Start 2396: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite
+44/45 Test #2396: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite ...............................   Passed    0.01 sec
+      Start 2397: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots
+45/45 Test #2397: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots ........................................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 45
+
+Label Time Summary:
+contract       =   0.48 sec*proc (6 tests)
+geometry       =   0.55 sec*proc (30 tests)
+integration    =   0.48 sec*proc (9 tests)
+runtime        =   0.95 sec*proc (15 tests)
+unit           =   0.55 sec*proc (30 tests)
+
+Total Test time (real) =   1.68 sec

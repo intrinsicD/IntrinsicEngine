@@ -205,8 +205,9 @@ the selected entity's provenance. A Position slot accepts any finite `vec3`
 property in the selected entity's canonical property catalog, including mesh
 `v:position` or `f:centroid`, and an optional Normal slot accepts a
 count-matched `vec3` on the same element domain. Named Position/Normal outputs
-publish on that domain without a property alias or converted entity. Shared controls cover support
-radius, repulsion, stopping criteria, target count, and seed; strategy-specific
+publish on that domain without a property alias or converted entity. Shared
+controls cover Auto/Manual support radius, sampled-neighbor/contribution
+limits, repulsion, stopping criteria, target count, and seed; strategy-specific
 controls cover WLOP anisotropy, CLOP mixture fitting, and EAR normal policy,
 refinement, and edge sensitivity. The window keeps a panel-local draft and
 validates it through `Runtime.GeometryProcessingOperations` before applying the
@@ -214,8 +215,9 @@ registered `sandbox.point_cloud_consolidation` section with the `Editor`
 source. Running submits those full property references and that same typed
 config to
 `PointCloudConsolidationService`; completion reports the actual
-`cpu_reference` identity, strategy, convergence/displacement, normal, and
-insertion diagnostics. The runtime then performs the single `GeometrySources`
+`cpu_reference` identity, strategy, resolved radius, profile occupancy/work,
+convergence/displacement, normal, and insertion diagnostics. The runtime then
+performs the single `GeometrySources`
 mutation, so the viewport observes the originating entity and the window's
 undo/redo affordances use the shared document history. The Run button uses the
 runtime's canonical property/publication preflight: same-cardinality mesh and

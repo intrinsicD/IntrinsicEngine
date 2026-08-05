@@ -188,7 +188,11 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     Runtime::PointCloudConsolidationConfig pointCloudConsolidation{};
     pointCloudConsolidation.Strategy =
         Runtime::PointCloudConsolidationStrategy::Ear;
+    pointCloudConsolidation.SupportRadiusMode = Runtime::
+        PointCloudConsolidationSupportRadiusMode::Manual;
     pointCloudConsolidation.SupportRadius = 0.25;
+    pointCloudConsolidation.MaxSupportNeighbors = 1'024u;
+    pointCloudConsolidation.MaxPredictedContributions = 9'876'543u;
     pointCloudConsolidation.TargetPointCount = 17u;
     pointCloudConsolidation.EarEdgeSensitivity = 7.5;
     Runtime::SetPointCloudConsolidationConfig(
@@ -246,7 +250,14 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_EQ(
         bootPointCloudConsolidation->Strategy,
         Runtime::PointCloudConsolidationStrategy::Ear);
+    EXPECT_EQ(
+        bootPointCloudConsolidation->SupportRadiusMode,
+        Runtime::PointCloudConsolidationSupportRadiusMode::Manual);
     EXPECT_DOUBLE_EQ(bootPointCloudConsolidation->SupportRadius, 0.25);
+    EXPECT_EQ(bootPointCloudConsolidation->MaxSupportNeighbors, 1'024u);
+    EXPECT_EQ(
+        bootPointCloudConsolidation->MaxPredictedContributions,
+        9'876'543u);
     EXPECT_EQ(bootPointCloudConsolidation->TargetPointCount, 17u);
     EXPECT_DOUBLE_EQ(
         bootPointCloudConsolidation->EarEdgeSensitivity,
@@ -447,7 +458,11 @@ TEST(SandboxConfigSections,
     };
     Runtime::PointCloudConsolidationConfig requested{};
     requested.Strategy = Runtime::PointCloudConsolidationStrategy::Clop;
+    requested.SupportRadiusMode = Runtime::
+        PointCloudConsolidationSupportRadiusMode::Manual;
     requested.SupportRadius = 0.375;
+    requested.MaxSupportNeighbors = 2'048u;
+    requested.MaxPredictedContributions = 88'000'000u;
     requested.TargetPointCount = 63u;
     requested.Seed = 0x13579bdfu;
     requested.ClopMixtureComponentCount = 11u;
@@ -477,7 +492,12 @@ TEST(SandboxConfigSections,
             control.GetEngineConfigControlState().ActiveConfig);
         ASSERT_TRUE(active.has_value());
         EXPECT_EQ(active->Strategy, requested.Strategy);
+        EXPECT_EQ(active->SupportRadiusMode, requested.SupportRadiusMode);
         EXPECT_DOUBLE_EQ(active->SupportRadius, requested.SupportRadius);
+        EXPECT_EQ(active->MaxSupportNeighbors,
+                  requested.MaxSupportNeighbors);
+        EXPECT_EQ(active->MaxPredictedContributions,
+                  requested.MaxPredictedContributions);
         EXPECT_EQ(active->TargetPointCount, requested.TargetPointCount);
         EXPECT_EQ(active->Seed, requested.Seed);
         EXPECT_EQ(

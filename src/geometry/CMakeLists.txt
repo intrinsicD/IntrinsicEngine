@@ -104,6 +104,7 @@ target_sources(${target_name}
         Geometry.Sphere.cppm
         Geometry.Statistics.cppm
         Geometry.Support.cppm
+        Geometry.SupportRadius.cppm
         Geometry.SurfaceReconstruction.cppm
         Geometry.Triangle.cppm
         Geometry.UvAtlas.cppm
@@ -199,6 +200,7 @@ target_sources(${target_name}
         Geometry.Sphere.cpp
         Geometry.Statistics.cpp
         Geometry.Support.cpp
+        Geometry.SupportRadius.cpp
         Geometry.Sparse.cpp
         Geometry.SurfaceReconstruction.cpp
         Geometry.Triangle.cpp

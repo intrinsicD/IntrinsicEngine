@@ -307,6 +307,8 @@ TEST(SandboxPointCloudConsolidationPanel,
     Runtime::PointCloudConsolidationConfig config{};
     config.Strategy = Strategy::Ear;
     config.SupportRadius = 0.375;
+    config.SupportRadiusMode = Runtime::
+        PointCloudConsolidationSupportRadiusMode::Manual;
     config.RepulsionWeight = 0.25;
     config.MaxIterations = 18u;
     config.ConvergenceTolerance = 2.0e-5;
@@ -356,6 +358,8 @@ TEST(SandboxPointCloudConsolidationPanel,
     EXPECT_DOUBLE_EQ(
         request->Execute.Config.SupportRadius,
         config.SupportRadius);
+    EXPECT_EQ(request->Execute.Config.SupportRadiusMode,
+              Runtime::PointCloudConsolidationSupportRadiusMode::Manual);
     EXPECT_EQ(request->Execute.Config.TargetPointCount, 73u);
     EXPECT_EQ(request->Execute.Config.Seed, 0x1234abcdu);
     EXPECT_EQ(request->Execute.Config.NormalSource, config.NormalSource);
@@ -400,6 +404,20 @@ TEST(SandboxPointCloudConsolidationPanel,
         .Status = Runtime::PointCloudConsolidationRunStatus::Applied,
         .ImplementationId = "cpu_reference",
         .StrategyToken = "ear",
+        .SupportRadiusAnalysisStatus = "success",
+        .SupportRadiusSource = "recommended",
+        .SupportRadiusQuantile = "p75",
+        .SupportRadiusEstimatorVersion = 1u,
+        .SupportRadiusProfileSampleCount = 40u,
+        .SupportRadiusNeighborRank = 16u,
+        .SupportRadiusNeighborDistance = 0.2,
+        .ResolvedSupportRadius = 0.25,
+        .SupportRadiusBoundingBoxDiagonal = 3.0,
+        .SupportNeighborsP50 = 12.0,
+        .SupportNeighborsP95 = 18.0,
+        .SupportNeighborsMax = 21u,
+        .PredictedSupportQueryCount = 2'000u,
+        .PredictedContributionCount = 36'000u,
         .InputPointCount = 40u,
         .OutputPointCount = 57u,
         .Iterations = 6u,
@@ -418,6 +436,11 @@ TEST(SandboxPointCloudConsolidationPanel,
     EXPECT_EQ(summary.Status, "Applied");
     EXPECT_EQ(summary.ImplementationId, "cpu_reference");
     EXPECT_EQ(summary.StrategyToken, "ear");
+    EXPECT_EQ(summary.SupportRadiusAnalysisStatus, "success");
+    EXPECT_EQ(summary.SupportRadiusSource, "recommended");
+    EXPECT_DOUBLE_EQ(summary.ResolvedSupportRadius, 0.25);
+    EXPECT_DOUBLE_EQ(summary.SupportNeighborsP95, 18.0);
+    EXPECT_EQ(summary.PredictedContributionCount, 36'000u);
     EXPECT_EQ(summary.InputPointCount, 40u);
     EXPECT_EQ(summary.OutputPointCount, 57u);
     EXPECT_EQ(summary.Iterations, 6u);
@@ -729,6 +752,10 @@ TEST(SandboxPointCloudConsolidationPanel,
     ASSERT_TRUE(appPtr->Completion->Succeeded())
         << appPtr->Completion->Message;
     EXPECT_EQ(appPtr->Completion->OutputPointCount, 16u);
+    EXPECT_EQ(appPtr->Completion->SupportRadiusSource, "recommended");
+    EXPECT_EQ(appPtr->Completion->SupportRadiusAnalysisStatus, "success");
+    EXPECT_GT(appPtr->Completion->ResolvedSupportRadius, 0.0);
+    EXPECT_GT(appPtr->Completion->PredictedContributionCount, 0u);
     EXPECT_EQ(
         scene->Raw().get<GS::Vertices>(entity).Properties.Size(),
         16u);
@@ -745,6 +772,10 @@ TEST(SandboxPointCloudConsolidationPanel,
         completed.Results.LastPointCloudConsolidationResult
             ->ImplementationId,
         "cpu_reference");
+    EXPECT_EQ(
+        completed.Results.LastPointCloudConsolidationResult
+            ->SupportRadiusSource,
+        "recommended");
 
     Runtime::EditorCommandHistory* history =
         engine.Services().Find<Runtime::EditorCommandHistory>();

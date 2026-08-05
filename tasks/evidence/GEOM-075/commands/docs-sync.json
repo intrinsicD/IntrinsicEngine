@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--diff-mode",
+    "--base-ref",
+    "2c6446cd",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref 2c6446cd --strict",
+  "cwd": ".",
+  "duration_ms": 31,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T00:38:24Z",
+  "label": "docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T00:38:24Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/docs-sync.stdout.log",
+  "stdout_sha256": "606054f580cfc714b10687944f8aa4946e35227b578f559f24a7b691ebaee269",
+  "task_id": "GEOM-075"
+}

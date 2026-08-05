@@ -31,6 +31,16 @@ contracts:
       - A new parameterization backend would otherwise reimplement the shared optimization numerics.
     proofs:
       - tests/unit/geometry/Test.ParameterizationOptimize.cpp
+  geometry.support-radius-policy:
+    owner: geometry-runtime
+    source: docs/architecture/support-radius-policy.md
+    applies_when:
+      - A point-set method introduces or changes a world-unit support-radius default, sampled support occupancy estimate, or neighborhood-workload guard.
+      - A runtime or backend consumes automatic versus manual support-radius intent for LOP, WLOP, CLOP, EAR, or a future compatible compact-support method.
+    proofs:
+      - tests/unit/geometry/Test.SupportRadius.cpp
+      - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+      - tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
   method.engine-integration:
     owner: methods-runtime-app
     source: docs/architecture/method-api-contract.md

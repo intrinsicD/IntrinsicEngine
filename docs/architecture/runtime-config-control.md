@@ -94,13 +94,18 @@ parameterization solver-backend selector.
 
 The `sandbox.point_cloud_consolidation` payload carries the LOP/WLOP/CLOP/EAR
 strategy and the complete promoted CPU-reference parameter set, including the
-authored-or-estimated normal policy. Applying it mutates only the canonical
-generic section record. `PointCloudConsolidationService` snapshots the selected
-entity's `GeometrySources`, runs the chosen strategy on `JobService`, rejects a
-stale world/entity/source at main-thread completion, and commits a current
-result through one undoable geometry mutation. The pointer-free result reports
-the stable `cpu_reference` implementation identity and convergence diagnostics;
-there is no speculative backend selector.
+authored-or-estimated normal policy, Auto/Manual support-radius intent, and
+bounded sampled-neighbor/contribution limits. The additive fields retain schema
+version 1: an older payload without them canonicalizes to Auto and the current
+limits. Applying it mutates only the canonical generic section record.
+`PointCloudConsolidationService` snapshots the selected entity's
+`GeometrySources`, profiles that selected position property on `JobService`,
+and either passes the explicit resolved radius to the chosen strategy or
+rejects unsafe work before method execution. It rejects a stale
+world/entity/source at main-thread completion and commits a current result
+through one undoable geometry mutation. The pointer-free result reports the
+stable `cpu_reference` identity, resolved-radius/occupancy/work diagnostics,
+and convergence diagnostics; there is no speculative backend selector.
 
 The `sandbox.physics` payload carries only enablement, fixed delta,
 accumulation bound, per-frame step budget, and gravity. It defaults disabled.

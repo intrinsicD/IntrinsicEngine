@@ -546,6 +546,18 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             return std::nullopt;
         }
 
+        [[nodiscard]]
+        std::optional<PointCloudConsolidationSupportRadiusMode>
+        ParsePointCloudConsolidationSupportRadiusMode(
+            const std::string_view value) noexcept
+        {
+            if (value == "auto")
+                return PointCloudConsolidationSupportRadiusMode::Auto;
+            if (value == "manual")
+                return PointCloudConsolidationSupportRadiusMode::Manual;
+            return std::nullopt;
+        }
+
         [[nodiscard]] std::optional<KMeansInitialization>
         ParseKMeansInitialization(const std::string_view value) noexcept
         {
@@ -671,6 +683,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
 
         [[nodiscard]] std::string_view ToConfigString(
             const PointCloudConsolidationNormalSource value) noexcept
+        {
+            return StableToken(value);
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const PointCloudConsolidationSupportRadiusMode value) noexcept
         {
             return StableToken(value);
         }
@@ -848,7 +866,10 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 context,
                 *object,
                 {"strategy",
+                 "support_radius_mode",
                  "support_radius",
+                 "max_support_neighbors",
+                 "max_predicted_contributions",
                  "repulsion_weight",
                  "max_iterations",
                  "convergence_tolerance",
@@ -873,10 +894,41 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             {
                 CountParsed(context);
             }
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "support_radius_mode",
+                    ParsePointCloudConsolidationSupportRadiusMode,
+                    config.SupportRadiusMode))
+            {
+                CountParsed(context);
+            }
             if (const auto value = ReadNumber(
                     context, *object, "support_radius", 1.0e-12, 1.0e12))
             {
                 config.SupportRadius = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "max_support_neighbors",
+                    1,
+                    1'000'000))
+            {
+                config.MaxSupportNeighbors =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "max_predicted_contributions",
+                    1,
+                    1'000'000'000'000LL))
+            {
+                config.MaxPredictedContributions =
+                    static_cast<std::uint64_t>(*value);
                 CountParsed(context);
             }
             if (const auto value = ReadNumber(
@@ -1694,7 +1746,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
     {
         return json::object({
             {"strategy", std::string{ToConfigString(config.Strategy)}},
+            {"support_radius_mode",
+             std::string{ToConfigString(config.SupportRadiusMode)}},
             {"support_radius", config.SupportRadius},
+            {"max_support_neighbors", config.MaxSupportNeighbors},
+            {"max_predicted_contributions",
+             config.MaxPredictedContributions},
             {"repulsion_weight", config.RepulsionWeight},
             {"max_iterations", config.MaxIterations},
             {"convergence_tolerance", config.ConvergenceTolerance},

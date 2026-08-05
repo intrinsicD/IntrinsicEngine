@@ -10,7 +10,7 @@ branch:
 worktree:
 claimed_at:
 contract_schema: 1
-contracts: [geometry.element-domain-sources, method.engine-integration]
+contracts: [geometry.element-domain-sources, geometry.support-radius-policy, method.engine-integration]
 maturity_target: ParityProven
 ---
 # METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity

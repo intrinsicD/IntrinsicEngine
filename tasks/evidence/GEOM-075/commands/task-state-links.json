@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_state_links.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_state_links.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 469,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T00:38:24Z",
+  "label": "task-state-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T00:38:23Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/task-state-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/task-state-links.stdout.log",
+  "stdout_sha256": "c4329c621a7bfbad2680c13d6f1438d1bece4cf33560047a3c31dc4871c3de33",
+  "task_id": "GEOM-075"
+}

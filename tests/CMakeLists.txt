@@ -480,6 +480,7 @@ set(_geometry_test_files
     Test_ImplicitPlaneField.cpp
     Test_Containment.cpp
     Test_Support.cpp
+    Test.SupportRadius.cpp
     Test_Simplification.cpp
     Test_Geodesic.cpp
     Test_VectorHeatMethod.cpp

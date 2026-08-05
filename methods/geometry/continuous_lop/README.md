@@ -22,6 +22,11 @@ WLOP remains the simpler discrete reference and the parity comparator. Raising
 component count preserves finer structure but increases analytic contribution
 work; lowering it can blur thin sheets.
 
+Runtime defaults the shared support radius to the deterministic LOP-family Auto
+policy (rank 16, P75, multiplier 1.25), while Manual remains exact. CLOP's
+mixture/component work is included in the same contribution guard; see the
+[support-radius policy](../../../docs/architecture/support-radius-policy.md).
+
 ## Known limitations
 
 - Ordinary EM is used instead of the paper's hierarchical constrained fit.
@@ -50,7 +55,6 @@ the same CPU-reference strategy, async snapshot/stale-result contract, and
 undoable named-property publication as the LOP-family paths. Any finite `vec3`
 property on a resolved mesh, graph, or point-cloud element domain can be the
 sample set; handle-specific property wrappers and conversions are not required.
-Topology-bearing domains use same-cardinality output only. `UI-039` owns the
-matching property-aware Sandbox discovery; the current PointCloud panel still
-exposes the mixture component, iteration, tolerance, covariance-floor, and
-returned implementation/convergence diagnostics in the meantime.
+Topology-bearing domains use same-cardinality output only. The property-aware
+Sandbox panel exposes mixture controls plus resolved-radius, workload,
+implementation, and convergence diagnostics.

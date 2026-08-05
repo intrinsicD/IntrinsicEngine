@@ -125,7 +125,10 @@ imports the application DTO or field vocabulary.
         "version": 1,
         "payload": {
           "strategy": "wlop",
+          "support_radius_mode": "auto",
           "support_radius": 1.0,
+          "max_support_neighbors": 4096,
+          "max_predicted_contributions": 100000000,
           "repulsion_weight": 0.45,
           "max_iterations": 20,
           "convergence_tolerance": 0.0001,
@@ -215,7 +218,10 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `physics` | `max_steps_per_frame` | Integer in `[1, 1024]` |
 | `physics` | `gravity` | Array of exactly three finite numbers, each in `[-100000, 100000]` |
 | `consolidation` | `strategy` | `lop`, `wlop`, `clop`, `ear`; all select the promoted CPU-reference implementation |
-| `consolidation` | `support_radius` | Finite number in `[1e-12, 1e12]`, in input world units |
+| `consolidation` | `support_radius_mode` | `auto` profiles the selected position property; `manual` preserves `support_radius` exactly |
+| `consolidation` | `support_radius` | Finite number in `[1e-12, 1e12]`, in input world units; stored as the Manual value even while Auto is selected |
+| `consolidation` | `max_support_neighbors` | Integer in `[1, 1000000]`; sampled support-occupancy limit |
+| `consolidation` | `max_predicted_contributions` | Integer in `[1, 1000000000000]`; combined neighborhood/analytic work limit |
 | `consolidation` | `repulsion_weight` | Finite number in `[0, 0.499999999999]` |
 | `consolidation` | `max_iterations` | Integer in `[1, 4096]` |
 | `consolidation` | `convergence_tolerance` | Finite number in `[0, 1e12]` |

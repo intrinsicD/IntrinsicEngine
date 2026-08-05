@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_ara_claims.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_ara_claims.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 25,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T00:38:24Z",
+  "label": "ara-claims",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T00:38:24Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/ara-claims.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/ara-claims.stdout.log",
+  "stdout_sha256": "b0912f91105006d2fb1334e824b98f035be1dce0a2aaa25e74e6e532e934597d",
+  "task_id": "GEOM-075"
+}

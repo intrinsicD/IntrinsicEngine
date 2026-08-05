@@ -44,6 +44,11 @@ a method-local copy and never overwrites the source property.
   it does not add a method-manifest backend, runtime config token, or UI
   choice.
 
+Runtime defaults anisotropic WLOP and EAR to the directional Auto support
+policy (rank 24, P75, multiplier 1.25); Manual keeps the configured world-unit
+radius. Both modes use the same occupancy/work guard described by the
+[support-radius policy](../../../docs/architecture/support-radius-policy.md).
+
 ## Verification targets
 
 - Correctness: `tests/unit/geometry/Test.PointCloudConsolidation.cpp` and
@@ -68,6 +73,5 @@ optional normals are named, count-matched `vec3` properties on any one resolved
 element domain; they need not be vertex properties. Same-cardinality output is
 undoable on that originating domain. EAR growth is topology-changing and is
 therefore accepted only for the topology-free point-cloud point domain through
-canonical full-source replacement. `UI-039` owns property-aware Sandbox
-discovery; the current PointCloud panel continues to expose the shared
-normal-source, angle, refinement, and edge-sensitivity config lane meanwhile.
+canonical full-source replacement. The property-aware Sandbox panel exposes the shared Auto/Manual,
+work-limit, normal-source, angle, refinement, and edge-sensitivity config lane.
