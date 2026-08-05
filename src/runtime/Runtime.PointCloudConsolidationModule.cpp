@@ -491,6 +491,76 @@ namespace Extrinsic::Runtime
             return fixed;
         }
 
+        struct NormalPreparationWorkload
+        {
+            std::uint64_t QueryCount{0u};
+            std::uint64_t FixedContributionCount{0u};
+        };
+
+        // Directional WLOP/EAR prepare source normals before refinement. An
+        // authored property still pays normalization plus the worst-case
+        // input-wide local-orientation scan. Estimated normals additionally
+        // build/query a KD-tree, process a bounded KNN neighborhood, and
+        // orient the resulting graph with an MST. These constant-time
+        // envelopes deliberately count the KNN queries separately while also
+        // bounding their worst-case input-wide candidate evaluations in the
+        // fixed term, so a sparse support radius cannot make P95 occupancy
+        // hide quadratic preprocessing.
+        [[nodiscard]] NormalPreparationWorkload
+        NormalPreparationWorkloadUpperBound(
+            const std::uint64_t input,
+            const bool hasAuthoredNormals) noexcept
+        {
+            if (input == 0u)
+                return {};
+
+            const std::uint64_t inputSquared =
+                SaturatingMultiply(input, input);
+            std::uint64_t fixed = SaturatingAdd(input, inputSquared);
+            if (hasAuthoredNormals)
+            {
+                return NormalPreparationWorkload{
+                    .QueryCount = 0u,
+                    .FixedContributionCount = fixed,
+                };
+            }
+
+            constexpr std::uint64_t kDefaultNormalNeighbors = 15u;
+            const std::uint64_t neighbors = std::min(
+                kDefaultNormalNeighbors, input - 1u);
+            const std::uint64_t neighborhoodWidth =
+                SaturatingAdd(neighbors, 1u);
+
+            // One N^2 envelope each for KD-tree construction and worst-case
+            // KNN candidate-distance evaluation.
+            fixed = SaturatingAdd(fixed, inputSquared);
+            fixed = SaturatingAdd(fixed, inputSquared);
+
+            // Per-point sorting/filtering, duplicate checks, and PCA over the
+            // bounded query sample.
+            const std::uint64_t perPointNeighborhood = SaturatingAdd(
+                SaturatingMultiply(neighborhoodWidth, neighborhoodWidth),
+                neighborhoodWidth);
+            fixed = SaturatingAdd(
+                fixed,
+                SaturatingMultiply(input, perPointNeighborhood));
+
+            // The MST seed search can scan N entries for every disconnected
+            // component plus the terminal scan; adjacency visits are bounded
+            // by the retained KNN degree.
+            fixed = SaturatingAdd(
+                fixed,
+                SaturatingMultiply(input, SaturatingAdd(input, 1u)));
+            fixed = SaturatingAdd(
+                fixed,
+                SaturatingMultiply(input, neighbors));
+
+            return NormalPreparationWorkload{
+                .QueryCount = input,
+                .FixedContributionCount = fixed,
+            };
+        }
+
         [[nodiscard]] Radius::RecommendationPolicy SupportRadiusPolicy(
             const PointCloudConsolidationConfig& config) noexcept
         {
@@ -572,6 +642,24 @@ namespace Extrinsic::Runtime
                     projected, requested);
                 break;
             }
+            }
+
+            const bool directional =
+                snapshot.Request.Config.Strategy ==
+                    PointCloudConsolidationStrategy::Ear ||
+                (snapshot.Request.Config.Strategy ==
+                     PointCloudConsolidationStrategy::Wlop &&
+                 snapshot.Request.Config.WlopAnisotropic);
+            if (directional)
+            {
+                const NormalPreparationWorkload normalPreparation =
+                    NormalPreparationWorkloadUpperBound(
+                        input, !snapshot.Normals.empty());
+                queries = SaturatingAdd(
+                    queries, normalPreparation.QueryCount);
+                fixed = SaturatingAdd(
+                    fixed,
+                    normalPreparation.FixedContributionCount);
             }
 
             return Radius::WorkloadBudget{

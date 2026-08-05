@@ -101,6 +101,14 @@ namespace
         return points;
     }
 
+    [[nodiscard]] std::vector<glm::vec3> SparsePlane()
+    {
+        std::vector<glm::vec3> points = NoisyPlane();
+        for (glm::vec3& point : points)
+            point *= 100.0f;
+        return points;
+    }
+
     [[nodiscard]] ECS::EntityHandle AddPointCloud(
         ECS::Scene::Registry& scene,
         const std::vector<glm::vec3>& positions)
@@ -767,6 +775,16 @@ namespace
             }
 
             Entity = AddPointCloud(*Scene, NoisyPlane());
+            SparseEntity = AddPointCloud(*Scene, SparsePlane());
+            AuthoredSparseEntity = AddPointCloud(*Scene, SparsePlane());
+            auto& authoredSparseProperties = Scene->Raw()
+                .get<GS::Vertices>(AuthoredSparseEntity).Properties;
+            SetVec3Property(
+                authoredSparseProperties,
+                std::string{GS::PropertyNames::kNormal},
+                std::vector<glm::vec3>(
+                    authoredSparseProperties.Size(),
+                    glm::vec3{0.0f, 0.0f, 1.0f}));
             CompletionSubscription = Service->SubscribeCompleted(
                 [this](const Runtime::PointCloudConsolidationResult& result)
                 {
@@ -801,15 +819,45 @@ namespace
                 PointCloudConsolidationSupportRadiusMode::Manual;
             ear.Config.SupportRadius = 100.0;
             ear.Config.TargetPointCount = 27u;
-            ear.Config.MaxPredictedContributions = 20'882u;
+            ear.Config.MaxPredictedContributions = 31'232u;
             EarCorrelation = Service->Run(std::move(ear));
+
+            Runtime::PointCloudConsolidationRequest anisotropic =
+                MakeRequest(SparseEntity);
+            anisotropic.Config.WlopAnisotropic = true;
+            anisotropic.Config.SupportRadiusMode = Runtime::
+                PointCloudConsolidationSupportRadiusMode::Manual;
+            anisotropic.Config.SupportRadius = 0.001;
+            anisotropic.Config.MaxPredictedContributions = 9'838u;
+            AnisotropicCorrelation = Service->Run(std::move(anisotropic));
+
+            Runtime::PointCloudConsolidationRequest anisotropicExact =
+                MakeRequest(SparseEntity);
+            anisotropicExact.Config.WlopAnisotropic = true;
+            anisotropicExact.Config.SupportRadiusMode = Runtime::
+                PointCloudConsolidationSupportRadiusMode::Manual;
+            anisotropicExact.Config.SupportRadius = 0.001;
+            anisotropicExact.Config.MaxPredictedContributions = 9'839u;
+            AnisotropicExactCorrelation =
+                Service->Run(std::move(anisotropicExact));
+
+            Runtime::PointCloudConsolidationRequest authoredEar =
+                MakeRequest(AuthoredSparseEntity);
+            authoredEar.Config.Strategy =
+                Runtime::PointCloudConsolidationStrategy::Ear;
+            authoredEar.Config.SupportRadiusMode = Runtime::
+                PointCloudConsolidationSupportRadiusMode::Manual;
+            authoredEar.Config.SupportRadius = 0.001;
+            authoredEar.Config.TargetPointCount = 27u;
+            authoredEar.Config.MaxPredictedContributions = 18'532u;
+            AuthoredEarCorrelation = Service->Run(std::move(authoredEar));
         }
 
         void Frame(double, double) override
         {
             auto& engine = Kernel();
             ++Ticks;
-            if (Completions.size() == 3u)
+            if (Completions.size() == 6u)
                 engine.RequestExit();
             else if (Ticks > 240u)
             {
@@ -827,10 +875,15 @@ namespace
         Runtime::PointCloudConsolidationService* Service{};
         ECS::Scene::Registry* Scene{};
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        ECS::EntityHandle SparseEntity{ECS::InvalidEntityHandle};
+        ECS::EntityHandle AuthoredSparseEntity{ECS::InvalidEntityHandle};
         Runtime::KernelEventSubscription CompletionSubscription{};
         Runtime::CommandCorrelationId WlopCorrelation{};
         Runtime::CommandCorrelationId ClopCorrelation{};
         Runtime::CommandCorrelationId EarCorrelation{};
+        Runtime::CommandCorrelationId AnisotropicCorrelation{};
+        Runtime::CommandCorrelationId AnisotropicExactCorrelation{};
+        Runtime::CommandCorrelationId AuthoredEarCorrelation{};
         std::vector<Runtime::PointCloudConsolidationResult> Completions{};
         std::uint32_t Ticks{0u};
         bool MissingService{false};
@@ -1187,12 +1240,13 @@ TEST(PointCloudConsolidationModule,
 
     EXPECT_FALSE(appPtr->MissingService);
     EXPECT_FALSE(appPtr->TimedOut);
-    ASSERT_EQ(appPtr->Completions.size(), 3u);
+    ASSERT_EQ(appPtr->Completions.size(), 6u);
 
     const auto expectBoundary = [appPtr](
         const Runtime::CommandCorrelationId correlation,
         const std::uint64_t expectedQueries,
-        const std::uint64_t expectedContributions)
+        const std::uint64_t expectedContributions,
+        const double expectedP95)
     {
         const auto found = std::find_if(
             appPtr->Completions.begin(),
@@ -1209,7 +1263,7 @@ TEST(PointCloudConsolidationModule,
         EXPECT_EQ(
             found->SupportRadiusAnalysisStatus,
             "workload_limit_exceeded");
-        EXPECT_EQ(found->SupportNeighborsP95, 25.0);
+        EXPECT_EQ(found->SupportNeighborsP95, expectedP95);
         EXPECT_EQ(found->PredictedSupportQueryCount, expectedQueries);
         EXPECT_EQ(
             found->PredictedContributionCount, expectedContributions);
@@ -1220,13 +1274,37 @@ TEST(PointCloudConsolidationModule,
 
     // Isotropic WLOP: source density + L2 initialization + projected
     // density/attraction/repulsion for one iteration.
-    expectBoundary(appPtr->WlopCorrelation, 89u, 2'225u);
+    expectBoundary(appPtr->WlopCorrelation, 89u, 2'225u, 25.0);
     // CLOP: one projected repulsion pass plus the bounded K-means, EM,
     // continuous initialization, and three-term attraction work.
-    expectBoundary(appPtr->ClopCorrelation, 16u, 1'567u);
-    // EAR: source density + four support-query passes and two conservative
-    // all-pairs/all-points progressive insertion envelopes.
-    expectBoundary(appPtr->EarCorrelation, 125u, 20'883u);
+    expectBoundary(appPtr->ClopCorrelation, 16u, 1'567u, 25.0);
+    // EAR: source density + four support-query passes, estimated-normal
+    // preparation, and two conservative all-pairs/all-points insertion
+    // envelopes.
+    expectBoundary(appPtr->EarCorrelation, 150u, 31'233u, 25.0);
+    // Sparse support occupancy must not hide estimated-normal KNN/MST and
+    // local-orientation work for anisotropic WLOP.
+    expectBoundary(appPtr->AnisotropicCorrelation, 114u, 9'839u, 1.0);
+    // Authored normals avoid KNN/MST but still pay normalization and the
+    // worst-case input-squared local-orientation scan.
+    expectBoundary(
+        appPtr->AuthoredEarCorrelation, 125u, 18'533u, 1.0);
+
+    const auto exactLimit = std::find_if(
+        appPtr->Completions.begin(),
+        appPtr->Completions.end(),
+        [appPtr](const Runtime::PointCloudConsolidationResult& result)
+        {
+            return result.Correlation ==
+                appPtr->AnisotropicExactCorrelation;
+        });
+    ASSERT_NE(exactLimit, appPtr->Completions.end());
+    EXPECT_NE(
+        exactLimit->Status,
+        Runtime::PointCloudConsolidationRunStatus::UnsafeSupportRadius);
+    EXPECT_EQ(exactLimit->SupportNeighborsP95, 1.0);
+    EXPECT_EQ(exactLimit->PredictedSupportQueryCount, 114u);
+    EXPECT_EQ(exactLimit->PredictedContributionCount, 9'839u);
 
     const auto& vertices =
         appPtr->Scene->Raw().get<GS::Vertices>(appPtr->Entity).Properties;

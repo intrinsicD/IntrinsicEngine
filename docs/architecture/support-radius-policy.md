@@ -66,10 +66,17 @@ repulsion passes. CLOP additionally counts component/point evaluations for
 K-means++/Lloyd mixture initialization, EM, continuous L2 initialization, and
 all three attraction terms. EAR bounds every progressive insertion by all
 current point pairs, a worst-case full clearance scan for every supported pair,
-and the four final projection/refinement scans. The geometry analysis combines
-support-query count with sampled P95 occupancy and adds those non-neighborhood
-analytic evaluations using saturating unsigned arithmetic. Configuration
-supplies two non-zero bounds:
+and the four final projection/refinement scans. Directional WLOP/EAR also count
+normal preparation before refinement. Authored normals add normalization and a
+worst-case input-squared local-orientation scan. Estimated normals add one KNN
+query per input point plus conservative input-squared KD-tree build, candidate
+evaluation, and MST seed-scan envelopes; bounded KNN sample processing and MST
+adjacency visits are fixed contributions. Keeping worst-case KNN candidate work
+in the fixed term ensures a sparse manual radius cannot hide quadratic normal
+preparation behind low sampled support occupancy. The geometry analysis
+combines support-query count with sampled P95 occupancy and adds those
+non-neighborhood analytic evaluations using saturating unsigned arithmetic.
+Configuration supplies two non-zero bounds:
 
 - `max_support_neighbors` rejects a sampled support maximum above the limit;
 - `max_predicted_contributions` rejects the combined predicted contribution

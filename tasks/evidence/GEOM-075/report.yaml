@@ -3,12 +3,12 @@ task_id: GEOM-075
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-05T01:10:48Z'
+generated_at: '2026-08-05T01:21:13Z'
 claim_eligible: false
 source:
   base_ref: 2c6446cd
   base_revision: 2c6446cd8bca80b7672b6e9dee08cedcf783a6ab
-  head_revision: 131fc32569911360fda4955d0f6e39a2958eb690
+  head_revision: df68939fa6ce7b8683a73029e0d0bc68a5ccc3c2
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
@@ -64,7 +64,7 @@ source:
   - path: tasks/backlog/methods/METHOD-020-lop-family-gpu-vulkan-compute-backend.md
     sha256: 54c1308c34b0bc4f5316e665134a87e76b5473bdb9823811fd54af7e42c6a835
   - path: tasks/done/GEOM-075-property-support-radius-profile.md
-    sha256: e8d1236d4626d26005a487161f3e639bcd184aa12f7379c6355b7fc978e80e16
+    sha256: 7ae70bcadedafb03cc5921f218cd40f92af5efd5057f1f90c8c221d15da953d2
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: ed949c8c19e0da1840640e471efbe409b6004b30a43eec361c574b5330bbf6e0
   - path: tests/CMakeLists.txt
@@ -79,7 +79,7 @@ source:
     sha256: 8512386f9048a66064ef8a34311d9caf38aa77abe2fe3d93516baad4d506776f
   - path: tests/unit/geometry/Test.SupportRadius.cpp
     sha256: ac675815f8e5fa2cbe3363c2a2de276a17cca49dab32feed106c5ef258c8be11
-  content_digest: e2cbd1a404ee20001572c9c98ff0656f957e7fa5bfb581a32e5138b358a150c8
+  content_digest: ef480de9130eee5b02f9ac3374f7315270d96836203a394790a31110c0a016d3
 touched:
   paths:
   - docs/api/generated/module_inventory.md
@@ -229,7 +229,7 @@ artifacts:
   sha256: b727e253645cb44c0463801e54f4d3a988a01690fd07c8dea0083855b33e67c8
   kind: file
 - path: tasks/done/GEOM-075-property-support-radius-profile.md
-  sha256: e8d1236d4626d26005a487161f3e639bcd184aa12f7379c6355b7fc978e80e16
+  sha256: 7ae70bcadedafb03cc5921f218cd40f92af5efd5057f1f90c8c221d15da953d2
   kind: file
 self_review:
   completed: true
