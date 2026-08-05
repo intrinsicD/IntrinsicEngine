@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "SupportRadius|PointCloudKernels|PointCloudConsolidation|SandboxPointCloudConsolidationPanel",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'SupportRadius|PointCloudKernels|PointCloudConsolidation|SandboxPointCloudConsolidationPanel' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 1992,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T08:06:51Z",
+  "label": "focused-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T08:06:49Z",
+  "stderr_path": "tasks/evidence/BUG-131/commands/focused-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-131/commands/focused-cpu.stdout.log",
+  "stdout_sha256": "ac0fb8116073109fea5241e4a54a0c0fec6058b478ed5c6f1e1dbba48e1cf241",
+  "task_id": "BUG-131"
+}

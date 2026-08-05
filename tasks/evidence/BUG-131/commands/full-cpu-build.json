@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests -j 4",
+  "cwd": ".",
+  "duration_ms": 55080,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T08:09:01Z",
+  "label": "full-cpu-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T08:08:06Z",
+  "stderr_path": "tasks/evidence/BUG-131/commands/full-cpu-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-131/commands/full-cpu-build.stdout.log",
+  "stdout_sha256": "abf56c2f797d81de82fb186a2c0e09858b6cb3f816ee5eadf3d2ad5f27e5d50d",
+  "task_id": "BUG-131"
+}

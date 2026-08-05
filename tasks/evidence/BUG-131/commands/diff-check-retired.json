@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "git diff --check"
+  ],
+  "command_display": "bash -lc 'git diff --check'",
+  "cwd": ".",
+  "duration_ms": 25,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T08:45:46Z",
+  "label": "diff-check-retired",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T08:45:46Z",
+  "stderr_path": "tasks/evidence/BUG-131/commands/diff-check-retired.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-131/commands/diff-check-retired.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-131"
+}

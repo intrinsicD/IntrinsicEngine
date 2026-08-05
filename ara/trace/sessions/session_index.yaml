@@ -253,8 +253,8 @@ sessions:
     open_threads: 4
   - id: "2026-08-05_001"
     date: "2026-08-05"
-    summary: "Implemented and retired property-specific support radii and a private Vulkan LOP backend, hardened experiment custody, proved bounded GPU parity, and converged local main."
-    turn_count: 1
-    events_count: 11
-    claims_touched: [C31, C32, C33, C34]
+    summary: "Implemented and retired property-specific support radii and a private Vulkan LOP backend, then repaired Auto admission and proved visible child.obj position publication on Vulkan."
+    turn_count: 2
+    events_count: 13
+    claims_touched: [C31, C32, C33, C34, C35]
     open_threads: 3

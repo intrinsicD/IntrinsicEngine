@@ -27,7 +27,7 @@ maturity_target: Operational
 - Clean-workshop manual scorecard: row 3 pass (new public fields expose only
   owning-layer scalar data); rows 4–6 not applicable (no renderer subsystem,
   frame-graph pass, or recipe edge was added); no follow-up findings.
-- Commit: pending final evidence binding.
+- Implementation commit: `05f59f8e`.
 
 ## Maturity
 
@@ -157,6 +157,23 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+Executed on 2026-08-05:
+
+- Focused support-radius, consolidation, runtime, and Sandbox panel selectors
+  passed, followed by the full default CPU gate: 4,094 selected, zero failed,
+  and the policy-defined GLFW/LSan control skipped.
+- The isolated ASan gate passed all 2,676 selected cases. The isolated UBSan
+  gate had zero failures across 2,676 selected cases and retained the expected
+  LSan-only control skip.
+- The final promoted-Vulkan selector passed 2/2 cases on the operational
+  device, including real `child.obj` Auto WLOP execution and visible-residency
+  publication. That proof records actual Vulkan, zero fallback, requested rank
+  16 backed off to rank 5, non-zero displacement, and changed position
+  fingerprint/content revision.
+- Strict clean-workshop, task, method-manifest, ARA, test-layout, root-hygiene,
+  layering, and documentation checks passed. Hash-bound command receipts live
+  under `tasks/evidence/BUG-131/commands/`.
 
 ## Forbidden changes
 - Shipping a higher global contribution default as the only fix.

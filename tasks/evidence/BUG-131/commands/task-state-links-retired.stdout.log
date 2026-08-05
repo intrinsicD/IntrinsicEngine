@@ -1,0 +1,6 @@
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 854
+[check_task_state_links] Mode: warning
+[check_task_state_links] Findings:
+  - tasks/backlog/methods/README.md:180: category index links retired task METHOD-020-lop-family-gpu-vulkan-compute-backend.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+[check_task_state_links] WARNING MODE: non-fatal.

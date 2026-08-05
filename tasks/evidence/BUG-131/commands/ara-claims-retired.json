@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "python3 tools/agents/check_ara_claims.py --root . --strict"
+  ],
+  "command_display": "bash -lc 'python3 tools/agents/check_ara_claims.py --root . --strict'",
+  "cwd": ".",
+  "duration_ms": 41,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T08:45:46Z",
+  "label": "ara-claims-retired",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T08:45:46Z",
+  "stderr_path": "tasks/evidence/BUG-131/commands/ara-claims-retired.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-131/commands/ara-claims-retired.stdout.log",
+  "stdout_sha256": "b80538c02bce06586ef526241d89bbc9438f007405358af801551dda47bd2a9f",
+  "task_id": "BUG-131"
+}

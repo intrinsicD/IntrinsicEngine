@@ -2,9 +2,9 @@ session:
   id: "2026-08-05_001"
   date: "2026-08-05"
   started: "2026-08-05T01:17+02:00"
-  last_turn: "2026-08-05T07:29+02:00"
-  turn_count: 1
-  summary: "Implemented and retired property-specific support radii and a private Vulkan LOP backend, hardened experiment custody, proved bounded GPU parity, and converged local main."
+  last_turn: "2026-08-05T10:44+02:00"
+  turn_count: 2
+  summary: "Implemented and retired property-specific support radii and a private Vulkan LOP backend, then repaired Auto admission and proved visible child.obj position publication on Vulkan."
 
 events_logged:
   - turn: 1
@@ -73,6 +73,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Retired all completed tasks, merged the corrected task lineage, removed its merged branch/worktree, and left local main as the only branch."
+  - turn: 2
+    type: experiment
+    id: "N377"
+    routing: direct
+    provenance: ai-executed
+    summary: "Repaired Auto work-budget backoff and WLOP singleton density, then proved actual Vulkan child.obj publication changes canonical positions and render residency."
+  - turn: 2
+    type: claim
+    id: "C35"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the bounded one-asset/one-host Auto WLOP visible-publication result without a speed or visual-quality claim."
 
 ai_actions:
   - turn: 1
@@ -96,6 +108,21 @@ ai_actions:
       - "tasks/evidence/BUG-130/"
       - "tasks/evidence/METHOD-020/"
       - "ara/"
+  - turn: 2
+    action: "Diagnosed BUG-131, implemented deterministic policy-minimum Auto rank backoff, restored Huang et al.'s WLOP density base case on CPU and Vulkan, made Vulkan diagnostic counters saturating, exposed progress/backoff telemetry in the Sandbox, added a real child.obj publication-to-residency smoke, and ran focused, full CPU, ASan, UBSan, Vulkan, structural, and review gates."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.SupportRadius.cpp"
+      - "src/geometry/Geometry.PointCloud.Kernels.cpp"
+      - "src/runtime/Runtime.PointCloudConsolidationGpu.cpp"
+      - "src/runtime/Runtime.PointCloudConsolidationModule.cpp"
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
+      - "assets/shaders/lop_*.comp"
+      - "tests/unit/geometry/Test.SupportRadius.cpp"
+      - "tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
+      - "tasks/done/BUG-131-lop-auto-radius-visible-application.md"
+      - "tasks/evidence/BUG-131/"
+      - "ara/"
 
 claims_touched:
   - id: C31
@@ -110,6 +137,9 @@ claims_touched:
   - id: C34
     action: crystallized
     turn: 1
+  - id: C35
+    action: crystallized
+    turn: 2
 
 key_context:
   - turn: 1
@@ -120,6 +150,10 @@ key_context:
     excerpt: "The production Vulkan backend keeps the source grid static, rebuilds the projected grid each iteration, performs exact support filtering, and reads back only the final shared result."
   - turn: 1
     excerpt: "The accepted result proves bounded parity on exact fixtures and one RTX 3050, not performance superiority or broad backend coverage."
+  - turn: 2
+    excerpt: "The user's reported UnsafeSupportRadius/no-visible-response workflow became the exact real-asset regression target rather than a synthetic-only admission test."
+  - turn: 2
+    excerpt: "On child.obj, Auto selected rank 5 from requested rank 16, actual Vulkan completed without fallback, canonical displacement was non-zero, and render residency advanced."
 
 open_threads:
   - "A performance claim still requires device timestamps, memory and phase accounting, scanner-scale inputs, baselines, and cross-device evidence; current host timing is descriptive only."

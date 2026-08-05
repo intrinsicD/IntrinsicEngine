@@ -5,12 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-131` — LOP Auto radius rejects visible imported-mesh execution](../../active/BUG-131-lop-auto-radius-visible-application.md):
-  `child.obj` with Auto support radius reports `UnsafeSupportRadius` before a
-  Vulkan job applies, leaving the researcher without visible position changes;
-  reproduce the 50k-scale request, repair backend-aware admission without
-  weakening CPU safety, and prove canonical publication changes residency.
-
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all

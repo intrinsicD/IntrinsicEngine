@@ -8,6 +8,29 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-131`](BUG-131-lop-auto-radius-visible-application.md) — the imported-mesh
+Auto LOP workflow completed on 2026-08-05 at `Operational` for ordinary LOP
+and isotropic WLOP on the repository `child.obj` asset and this Vulkan-capable
+host. The shared exact KD-tree radius profile now deterministically backs the
+requested neighborhood rank down to the largest policy-valid rank within the
+unchanged contribution budget; Manual remains exact and fail-closed. Vulkan
+keeps concrete grid/resource admission, no longer mistakes saturating
+diagnostic totals for execution limits, and all CPU/Vulkan WLOP paths retain
+the paper-defined singleton density base value of one.
+
+The Sandbox now distinguishes radius analysis, backend execution, and
+publication, reports requested-to-selected Auto rank backoff, and shows the
+terminal displacement. The final real-asset smoke selected rank 5 from rank
+16, executed actual Vulkan with zero fallback, published non-zero canonical
+position displacement, consumed the render-dirty tags, and changed the
+resident position fingerprint/content revision. The full CPU gate selected
+4,094 cases with zero failures and one policy skip; ASan passed all 2,676
+selected cases; UBSan had zero failures and one expected LSan-only skip across
+2,676 selected cases; and the final promoted-Vulkan selector passed 2/2.
+Strict structural, method, ARA, and clean-workshop checks also passed. This is
+no speedup, convergence, visual-quality, or cross-device claim; anisotropic
+WLOP, CLOP, and EAR remain CPU-only capability-negative Vulkan pairs.
+
 [`METHOD-020`](METHOD-020-lop-family-gpu-vulkan-compute-backend.md) — the
 LOP-family Vulkan-compute backend completed on 2026-08-05 at `ParityProven` for
 ordinary LOP and isotropic WLOP. One private runtime/JobService participant

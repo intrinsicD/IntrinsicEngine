@@ -1,0 +1,30 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointCloudConsolidationGpuParity\\.",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointCloudConsolidationGpuParity\\.' -L gpu -L vulkan --timeout 180",
+  "cwd": ".",
+  "duration_ms": 55643,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T08:39:28Z",
+  "label": "vulkan-postreview",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T08:38:32Z",
+  "stderr_path": "tasks/evidence/BUG-131/commands/vulkan-postreview.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-131/commands/vulkan-postreview.stdout.log",
+  "stdout_sha256": "15ee3a69b5f9475a784995165a30bf7aff6c5a5477746856d2d02f69d05572ce",
+  "task_id": "BUG-131"
+}

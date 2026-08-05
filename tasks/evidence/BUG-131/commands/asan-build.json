@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicCpuTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci-asan --target IntrinsicCpuTests -j 4",
+  "cwd": ".",
+  "duration_ms": 556963,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T08:19:47Z",
+  "label": "asan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T08:10:30Z",
+  "stderr_path": "tasks/evidence/BUG-131/commands/asan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-131/commands/asan-build.stdout.log",
+  "stdout_sha256": "dc4d07ce3e4cae1445c9ea9e38688304c412939ba42f0d74a0c3d5f1645f013c",
+  "task_id": "BUG-131"
+}

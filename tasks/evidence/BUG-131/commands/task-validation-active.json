@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py",
+    "--root",
+    "tasks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py --root tasks --strict",
+  "cwd": ".",
+  "duration_ms": 593,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T08:37:28Z",
+  "label": "task-validation-active",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T08:37:28Z",
+  "stderr_path": "tasks/evidence/BUG-131/commands/task-validation-active.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-131/commands/task-validation-active.stdout.log",
+  "stdout_sha256": "4324a3367ef375965c8b89f8d04a8828327c93615b4fc270ce9a5149efdc5d74",
+  "task_id": "BUG-131"
+}

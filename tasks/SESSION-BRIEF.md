@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-131` — LOP Auto radius rejects visible imported-mesh execution (tasks/active/BUG-131-lop-auto-radius-visible-application.md)
+- none
 
 ## Theme B — Rendering modernization
 

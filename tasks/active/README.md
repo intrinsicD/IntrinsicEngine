@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-131`](BUG-131-lop-auto-radius-visible-application.md) — reproduce and
-  repair Auto-radius admission plus visible canonical-position publication for
-  the Vulkan LOP workflow on imported 50k-scale meshes.
+None.
 
 ## History
 
