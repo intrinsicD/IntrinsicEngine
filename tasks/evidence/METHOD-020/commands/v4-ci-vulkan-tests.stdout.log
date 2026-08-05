@@ -1,0 +1,22 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start    5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run
+1/4 Test    #5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run .......................................................   Passed   11.03 sec
+    Start    6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed
+2/4 Test    #6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed .........................   Passed    3.16 sec
+    Start    7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate
+3/4 Test    #7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate ..................................................   Passed    0.07 sec
+    Start 3377: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat
+4/4 Test #3377: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat ...   Passed    5.96 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Label Time Summary:
+benchmark      =  14.25 sec*proc (3 tests)
+geometry       =  20.21 sec*proc (4 tests)
+gpu            =  20.21 sec*proc (4 tests)
+integration    =   5.96 sec*proc (1 test)
+runtime        =  20.21 sec*proc (4 tests)
+vulkan         =  20.21 sec*proc (4 tests)
+
+Total Test time (real) =  21.86 sec

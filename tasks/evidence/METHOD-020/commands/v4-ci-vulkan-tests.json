@@ -1,0 +1,30 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "-R",
+    "PointCloudConsolidationGpuParity|IntrinsicLopFamilyGpuBenchmarkSmoke",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R 'PointCloudConsolidationGpuParity|IntrinsicLopFamilyGpuBenchmarkSmoke' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 21871,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T04:28:40Z",
+  "label": "v4-ci-vulkan-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T04:28:18Z",
+  "stderr_path": "tasks/evidence/METHOD-020/commands/v4-ci-vulkan-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-020/commands/v4-ci-vulkan-tests.stdout.log",
+  "stdout_sha256": "5babf3a810455544e6b914403485723bbd08372c342d485095fb358d0ee8fc2a",
+  "task_id": "METHOD-020"
+}

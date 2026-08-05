@@ -1,0 +1,22 @@
+{
+  "command": [
+    "env",
+    "GIT_COMMIT=04ec3d256696cce3584721065cd1f6ca651d3d28",
+    "build/ci-vulkan-release/bin/IntrinsicLopFamilyGpuBenchmarkSmoke",
+    "tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json"
+  ],
+  "command_display": "env GIT_COMMIT=04ec3d256696cce3584721065cd1f6ca651d3d28 build/ci-vulkan-release/bin/IntrinsicLopFamilyGpuBenchmarkSmoke tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json",
+  "cwd": ".",
+  "duration_ms": 1208,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T04:21:22Z",
+  "label": "v4-claim-confirmation",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T04:21:21Z",
+  "stderr_path": "tasks/evidence/METHOD-020/commands/v4-claim-confirmation.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-020/commands/v4-claim-confirmation.stdout.log",
+  "stdout_sha256": "3864ecfba70dd70d0840e6a3e55e97a8f48246509a921ebb393d16e18057fe0b",
+  "task_id": "METHOD-020"
+}

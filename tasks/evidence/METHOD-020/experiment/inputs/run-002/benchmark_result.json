@@ -1,0 +1,152 @@
+{
+  "attempt_id": "attempt-002",
+  "backend": "gpu_vulkan_compute",
+  "benchmark_id": "geometry.lop_family.gpu_vulkan.v3.smoke",
+  "claim_eligible": true,
+  "commit": "04ec3d256696cce3584721065cd1f6ca651d3d28",
+  "config_digest": "94df73dc60e9e1844a8d9269b2da1e5a11f7736b7ffa21fd8be9a3ebd43c36a4",
+  "dataset": "builtin.lop_family.gpu_vulkan.v3",
+  "diagnostics": {
+    "actual_backend": "gpu_vulkan_compute",
+    "baseline_comparison": "cpu_reference_same_fixture",
+    "device_identity": "selectedDevice=\"NVIDIA GeForce RTX 3050\"; physicalDeviceApi=1.4.325; loaderInstanceApi=1.4.309; engineRequestedApi=1.3.0; driverName=\"NVIDIA\"; driverInfo=\"590.48.01\"; driverVersion=2475425856; deviceUUID=4cee065aaab797b840be55d516d2a53c; timestampPeriodNs=1; graphicsFamily=0; graphicsValidBits=64; asyncAvailable=true; asyncFamily=2; asyncValidBits=64; capability=Native Vulkan timestamps ready for graphics and async-compute queues.",
+    "diagnostic": "actual Vulkan LOP/WLOP parity passed frozen v3 fixtures",
+    "execution_observed": true,
+    "execution_route": "PointCloudConsolidationService",
+    "fallback_allowed": false,
+    "fallback_observed": false,
+    "gpu_completions": 8,
+    "gpu_fallbacks": 0,
+    "gpu_requests_accepted": 8,
+    "gpu_time_source": "host_service_command_to_applied_event",
+    "lop_cpu_runtime_ms": 4.556277,
+    "lop_gpu_runtime_ms": 89.446669,
+    "lop_linf_delta": 0.000131344,
+    "lop_repeat_linf_delta": 6.1033e-05,
+    "lop_repeat_rms_delta": 6.463e-06,
+    "lop_rms_delta": 1.6746e-05,
+    "measured_iterations": 3,
+    "mode": "gpu_smoke",
+    "requested_backend": "gpu_vulkan_compute",
+    "runner": "IntrinsicLopFamilyGpuBenchmarkSmoke",
+    "speedup_claimed": false,
+    "warmup_iterations": 1,
+    "wlop_cpu_runtime_ms": 12.252183667,
+    "wlop_gpu_runtime_ms": 88.720473333,
+    "wlop_linf_delta": 7.278e-06,
+    "wlop_repeat_linf_delta": 7.123e-06,
+    "wlop_repeat_rms_delta": 9.64e-07,
+    "wlop_rms_delta": 1.025e-06
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml",
+    "sha256": "d8f0302774bfac890821ddb9cd2653a0f2879048e1733bed60da019c40f6e6e4"
+  },
+  "method": "geometry.lop_family.gpu_vulkan",
+  "metrics": {
+    "gpu_time_ms": 89.083571167,
+    "quality_error_l2": 1.6746e-05,
+    "quality_error_linf": 0.000131344,
+    "runtime_ms": 89.083571167
+  },
+  "resolved_params": {
+    "actual_backend_required": "gpu_vulkan_compute",
+    "adopted_candidates": [
+      "lop",
+      "wlop_isotropic"
+    ],
+    "baseline_comparison": "cpu_reference_same_fixture",
+    "capability_negative_pairs": [
+      "wlop_anisotropic",
+      "clop",
+      "ear"
+    ],
+    "execution_route": "point_cloud_consolidation_service",
+    "fallback_allowed": false,
+    "fixture_version": 3,
+    "fixtures": {
+      "lop": {
+        "convergence_tolerance": 0.0,
+        "id": "noisy_plane_32x32",
+        "input_points": 1024,
+        "projection_iterations": 8,
+        "repulsion_weight": 0.35,
+        "seed": 1901,
+        "support_radius": 0.18,
+        "target_points": 256
+      },
+      "wlop_isotropic": {
+        "convergence_tolerance": 0.0,
+        "density_warp_exponent": 1.7,
+        "id": "density_plane_40x24_cpu_screened",
+        "input_points": 960,
+        "projection_iterations": 8,
+        "repulsion_weight": 0.35,
+        "seed": 1902,
+        "support_radius": 0.32,
+        "target_points": 240
+      }
+    },
+    "intent": "gpu",
+    "measured_iterations": 3,
+    "measurement_scope": "service_command_to_applied_event",
+    "position_linf_delta_max": 0.002,
+    "position_rms_delta_max": 0.0005,
+    "same_host_repeat_linf_delta_max": 0.002,
+    "same_host_repeat_rms_delta_max": 0.0005,
+    "timing_interpretation": "descriptive_no_speedup_claim",
+    "warmup_iterations": 1
+  },
+  "run_id": "method-020-vulkan-v4",
+  "schema_version": 2,
+  "source": {
+    "revision": "04ec3d256696cce3584721065cd1f6ca651d3d28",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 30000,
+      "metric": "runtime_ms",
+      "observed": 89.083571167,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 30000,
+      "metric": "gpu_time_ms",
+      "observed": 89.083571167,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "gpu_time_ms_max"
+    },
+    {
+      "limit": 0.0005,
+      "metric": "quality_error_l2",
+      "observed": 1.6746e-05,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0.002,
+      "metric": "quality_error_linf",
+      "observed": 0.000131344,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "gpu_time_ms_max": 30000,
+    "quality_error_l2_max": 0.0005,
+    "quality_error_linf_max": 0.002,
+    "smoke_runtime_ms_max": 30000
+  },
+  "warmup_policy": {
+    "measured_iterations": 3,
+    "warmup_iterations": 1
+  }
+}

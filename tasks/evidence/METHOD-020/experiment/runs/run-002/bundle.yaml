@@ -1,0 +1,99 @@
+schema_version: 1
+task_id: METHOD-020
+run_id: run-002
+attempt_id: attempt-002
+created_at: '2026-08-05T04:21:58Z'
+protocol_digest: 7774197b1d262b64214a9c255cd91104febe0ff48a23ed1db90e0b72cf4ee8b5
+provenance:
+  source:
+    revision: 04ec3d256696cce3584721065cd1f6ca651d3d28
+    clean: true
+  task_sha256: be0c0a21282cf30d5f36c762fc2dcc53d402fb9271c3748959ec6ae236b6a62b
+  implementation_digest: 35241cf2d274b96fcc39e6ae091d38466a241a5cf1dadc8d58577ed816047518
+  datasets:
+  - id: lop-family-v3-cpu-radius-screening
+    path: methods/geometry/locally_optimal_projection/reports/METHOD-020-v3-screening.md
+    sha256: 46b24b8cc098c6f80037ac8cc1678a5385bf87be4e8718b38e95ea4dd99b33e1
+    split: screening
+  - id: lop-family-v3-vulkan-confirmation
+    path: benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+    sha256: 533f1695af7003fb2f47b6cb0eaad7d41103b60731df0353155cec79153c973f
+    split: confirmation
+resolved_config:
+  path: benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml
+  sha256: d8f0302774bfac890821ddb9cd2653a0f2879048e1733bed60da019c40f6e6e4
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+raw_rows:
+  path: tasks/evidence/METHOD-020/experiment/runs/run-002/benchmark_raw_rows.jsonl
+  sha256: ab8d40576c5a78735bc46466ebe35d86f58f6d78becd89657a4cf40e9842b298
+  row_count: 1
+summaries:
+- name: maximum_combined_rms_error
+  column: quality_error_l2
+  statistic: max
+  value: 1.6746e-05
+- name: maximum_combined_linf_error
+  column: quality_error_linf
+  statistic: max
+  value: 0.000131344
+gates:
+- metric: maximum_combined_rms_error
+  operator: <=
+  threshold: 0.0005
+  observed: 1.6746e-05
+  passed: true
+- metric: maximum_combined_linf_error
+  operator: <=
+  threshold: 0.002
+  observed: 0.000131344
+  passed: true
+diagnostics:
+- 'Eight actual Vulkan runs completed: four ordinary LOP and four isotropic WLOP; fallback count was zero.'
+- Top-level quality metrics are the worst of CPU-reference parity and same-host repeat deltas; timing
+  is descriptive host command-to-applied-event only.
+- V3/run-001 remains rejected for its pre-BUG-129 harness seam; v4/run-002 uses the fail-closed runner
+  and custody implementation without fixture or tolerance changes.
+links:
+- path: benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml
+  sha256: d8f0302774bfac890821ddb9cd2653a0f2879048e1733bed60da019c40f6e6e4
+- path: methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol-v3.md
+  sha256: 361625c483553051fd421f43221dba20fa5503ad7c4373b10df8faec141f09fd
+- path: tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+  sha256: 388bc7a55056aa0d25fa228a83e575c50cb3a3d41e3c23a2554961cdfb909513
+- path: src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+  sha256: 77b3b05f903bb9143bfe330a6c7515fe7994cf4b5a87eccecedffb886f7d006e
+- path: benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+  sha256: 533f1695af7003fb2f47b6cb0eaad7d41103b60731df0353155cec79153c973f
+- path: tools/agents/experiment_custody.py
+  sha256: f04e1bd0724d67d65eedb09a050deedb68554019ce79cc5d55d4e20b3f681e7a
+visual: false
+previews: []
+replay_command:
+- env
+- GIT_COMMIT=04ec3d256696cce3584721065cd1f6ca651d3d28
+- build/ci-vulkan-release/bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+- tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json
+view_command:
+- python3
+- tools/benchmark/validate_benchmark_results.py
+- --root
+- tasks/evidence/METHOD-020/experiment/inputs/run-002
+- --manifests-root
+- benchmarks
+- --strict
+smoke_receipts:
+- tasks/evidence/METHOD-020/commands/v4-claim-confirmation.json
+- tasks/evidence/METHOD-020/commands/v4-claim-seal.json
+- tasks/evidence/METHOD-020/commands/v4-claim-result-validate.json
+claim_authorized: false
+benchmark_result:
+  path: tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json
+  sha256: 1b4a87dbcb6fdfa6b5b946dc59aa8b8e0cff846a2dd69d9d9e7043ec5dfba599
+  manifests_root: benchmarks
+  benchmark_id: geometry.lop_family.gpu_vulkan.v3.smoke
+  run_id: method-020-vulkan-v4
+  attempt_id: attempt-002
+  status: passed
+  claim_eligible: true

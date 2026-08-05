@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan-release",
+    "--target",
+    "IntrinsicLopFamilyGpuBenchmarkSmoke"
+  ],
+  "command_display": "cmake --build --preset ci-vulkan-release --target IntrinsicLopFamilyGpuBenchmarkSmoke",
+  "cwd": ".",
+  "duration_ms": 3168,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T04:22:32Z",
+  "label": "v4-release-benchmark-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T04:22:29Z",
+  "stderr_path": "tasks/evidence/METHOD-020/commands/v4-release-benchmark-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-020/commands/v4-release-benchmark-build.stdout.log",
+  "stdout_sha256": "5943c4a644b005995cab526880748a7d59c5172e8c511c4765d6d634830c21c0",
+  "task_id": "METHOD-020"
+}
