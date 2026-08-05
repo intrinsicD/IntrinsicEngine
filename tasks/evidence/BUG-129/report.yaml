@@ -1,0 +1,176 @@
+schema_version: 1
+task_id: BUG-129
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-05T04:14:47Z'
+claim_eligible: false
+source:
+  base_ref: 5ee4ca33
+  base_revision: 5ee4ca33f0b9bf4d976020082b3ca592f16f25ac
+  head_revision: 186b6e8c9bd1519e3dd65a262bed30d86f49ee11
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: benchmarks/CMakeLists.txt
+    sha256: f7a05d04af2f7791974764c4687ee2418d3cea7aa79b42411450f9758c0ac181
+  - path: benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+    sha256: 533f1695af7003fb2f47b6cb0eaad7d41103b60731df0353155cec79153c973f
+  - path: benchmarks/geometry/README.md
+    sha256: 90ffe5acf0267f594a729c269a6c8f8cc5bc351510d0281897a6999546e127d2
+  - path: docs/agent/benchmark-workflow.md
+    sha256: 77f014fb5a8af419df3241d534901f46e32041c874f75251566318b1b9ff448d
+  - path: docs/agent/workflow-evidence.md
+    sha256: 8ea02ffeafe643b12f3a2a5e3c4f35435d4865db2f19dc3d95f8fd743af07ee3
+  - path: docs/benchmarking/result-json-schema.md
+    sha256: dc8ec40ed7d18410507179f0da03f970b84bb3ac2e02f7b19ecb41f0e5a8665a
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 52dfdcb99d14c810db6c373f6ea4d65431125e7899d1fb0d397d4e164df3c889
+  - path: tasks/backlog/bugs/index.md
+    sha256: a57b866e9afdefe3f50956509bede27bea204a8dc21f9cf9e9f314db9bf9bbcd
+  - path: tasks/done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md
+    sha256: cebb1ac1406419b1ec138024a4d2f23b8075768e904394cfe64ad5dd6e614b06
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 03eba221f044d96998e5c70662c6fff6eba7a87f4af1086e74b1d1cd08fceccc
+  - path: tasks/evidence/METHOD-020/experiment/runs/run-001/audit.json
+    sha256: a715d7d3461a8daf9dfe84c11d4f4fdba474fab0aba359a777dfc4ab8e970d86
+  - path: tests/regression/tooling/Test.ExperimentCustody.py
+    sha256: e8604b426777c51ed4979e8f5f701466c006e32cec02f61adc20f61e2c7779c0
+  - path: tests/regression/tooling/Test.LopFamilyGpuBenchmarkUnavailable.py
+    sha256: 83f7170083a982ec74c8d54a5a373240c465889de579ef3e82b36f53f29ee212
+  - path: tools/agents/experiment_custody.py
+    sha256: f04e1bd0724d67d65eedb09a050deedb68554019ce79cc5d55d4e20b3f681e7a
+  - path: tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
+    sha256: ce1a206ed1cd4659fffda5b68cb9619d780a94a6465df87837188f7e171b7fc7
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 8ea02ffeafe643b12f3a2a5e3c4f35435d4865db2f19dc3d95f8fd743af07ee3
+  content_digest: 1d6a8260e8b3f7a642ba1e36180f5a054c4a870d930ccf7b6634c064900ffb5e
+touched:
+  paths:
+  - benchmarks/CMakeLists.txt
+  - benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+  - benchmarks/geometry/README.md
+  - docs/agent/benchmark-workflow.md
+  - docs/agent/workflow-evidence.md
+  - docs/benchmarking/result-json-schema.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/METHOD-020/experiment/runs/run-001/audit.json
+  - tests/regression/tooling/Test.ExperimentCustody.py
+  - tests/regression/tooling/Test.LopFamilyGpuBenchmarkUnavailable.py
+  - tools/agents/experiment_custody.py
+  - tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  layers:
+  - agent-workflow
+  - benchmarks
+  modules:
+  - experiment-custody
+  - lop-family-vulkan-benchmark
+extension_seam: Canonical benchmark results remain portable negative evidence; positive audit is a separate
+  fail-closed acceptance predicate.
+future_change_plan: Add new outcome or backend telemetry only through canonical result validation plus
+  custody and unavailable-runner regressions.
+acceptance:
+- criterion: 'The original headless repro exits nonzero, reports `status: skipped`, and'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Custody creation may retain a non-passed result, but independent audit and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Existing passed experiment bundles and strict repository validators remain green.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Fixed-surface independent review finds no blocker.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-129/commands/benchmark-result-regression-final.json
+- receipt: tasks/evidence/BUG-129/commands/benchmark-result-regression.json
+- receipt: tasks/evidence/BUG-129/commands/ci-vulkan-benchmark-passed-path.json
+- receipt: tasks/evidence/BUG-129/commands/ci-vulkan-runner-build.json
+- receipt: tasks/evidence/BUG-129/commands/ci-vulkan-runner-rebuild.json
+- receipt: tasks/evidence/BUG-129/commands/doc-links-retired.json
+- receipt: tasks/evidence/BUG-129/commands/doc-links.json
+- receipt: tasks/evidence/BUG-129/commands/experiment-custody-regression-final.json
+- receipt: tasks/evidence/BUG-129/commands/experiment-custody-regression.json
+- receipt: tasks/evidence/BUG-129/commands/global-custody-final.json
+- receipt: tasks/evidence/BUG-129/commands/global-experiment-custody-before-rejected-audit.json
+- receipt: tasks/evidence/BUG-129/commands/global-experiment-custody.json
+- receipt: tasks/evidence/BUG-129/commands/method020-result-validation.json
+- receipt: tasks/evidence/BUG-129/commands/session-brief.json
+- receipt: tasks/evidence/BUG-129/commands/skill-mirror-check.json
+- receipt: tasks/evidence/BUG-129/commands/skill-mirrors-retired.json
+- receipt: tasks/evidence/BUG-129/commands/task-policy-retired-before-commit-reference.json
+- receipt: tasks/evidence/BUG-129/commands/task-policy-retired.json
+- receipt: tasks/evidence/BUG-129/commands/task-policy.json
+- receipt: tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.json
+- receipt: tasks/evidence/BUG-129/commands/task-validation-retired.json
+- receipt: tasks/evidence/BUG-129/commands/task-validation.json
+- receipt: tasks/evidence/BUG-129/commands/test-layout.json
+- receipt: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-final.json
+- receipt: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-initial-timeout.json
+- receipt: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-regression.json
+- receipt: tasks/evidence/BUG-129/commands/unavailable-vulkan-runner-requested-actual.json
+changed_public_contracts:
+- Claim-grade native runners return zero only for passed execution and distinguish requested from actual
+  backend telemetry.
+- Benchmark-backed positive audit requires passed execution/status and completed cells; rejected runs
+  remain structurally valid and do not block a later accepted run.
+diagnostics_and_previews:
+- Unavailable GLFW path exits 2 with requested gpu_vulkan_compute, actual none, execution_observed false,
+  and fallback_observed null.
+- METHOD-020 run-001 retains a rejected independent audit instead of an accepted or rewritten record.
+benchmark_or_parity_evidence:
+- ci-vulkan passed actual LOP/WLOP benchmark Run+Validate and the unavailable-environment fail-closed
+  regression.
+docs_sync:
+  task_file: tasks/done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Other non-claim-grade benchmark runners retain their existing skip semantics; this task deliberately
+  scopes the zero-exit rule to claim-grade evidence.
+- Operational evidence covers the resident RTX 3050/driver host plus the deterministic no-window path,
+  not a multi-vendor device matrix.
+skipped_checks:
+- check: full-cpu
+  reason: The changed C++ surface is an opt-in gpu;vulkan benchmark runner; focused ci-vulkan build/passed/unavailable
+    paths plus complete Python custody suites are the strongest relevant gates. METHOD-020 already retained
+    the full 4091-case CPU receipt.
+artifacts:
+- path: tools/agents/experiment_custody.py
+  sha256: f04e1bd0724d67d65eedb09a050deedb68554019ce79cc5d55d4e20b3f681e7a
+  kind: file
+- path: tests/regression/tooling/Test.ExperimentCustody.py
+  sha256: e8604b426777c51ed4979e8f5f701466c006e32cec02f61adc20f61e2c7779c0
+  kind: file
+- path: benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp
+  sha256: 533f1695af7003fb2f47b6cb0eaad7d41103b60731df0353155cec79153c973f
+  kind: file
+- path: tests/regression/tooling/Test.LopFamilyGpuBenchmarkUnavailable.py
+  sha256: 83f7170083a982ec74c8d54a5a373240c465889de579ef3e82b36f53f29ee212
+  kind: file
+- path: tasks/evidence/METHOD-020/experiment/runs/run-001/audit.json
+  sha256: a715d7d3461a8daf9dfe84c11d4f4fdba474fab0aba359a777dfc4ab8e970d86
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-129/handoff.jsonl
+review: tasks/evidence/BUG-129/reviews.jsonl
