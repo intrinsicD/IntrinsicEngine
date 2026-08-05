@@ -8,7 +8,7 @@ evidence: required
 owner: "Codex-LOPVulkan"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-05T01:49:18Z"
+claimed_at: "2026-08-05T04:17:55Z"
 contract_schema: 1
 contracts: [geometry.element-domain-sources, geometry.support-radius-policy, method.engine-integration]
 maturity_target: ParityProven
@@ -16,11 +16,12 @@ maturity_target: ParityProven
 # METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity
 
 ## Status
-- `in-progress` — implementation and dirty-worktree operational screening pass;
-  clean exact-revision confirmation, custody, and independent review remain.
-- Next verification: commit the implementation candidate, initialize the
-  frozen claim-grade v3 run against that exact revision, then run the complete
-  CPU/sanitizer/Vulkan/structural closure bundle.
+- Completed on 2026-08-05 at `ParityProven` for ordinary LOP and isotropic
+  WLOP on the frozen v3 fixtures. Anisotropic WLOP, CLOP, and EAR remain
+  explicit capability-negative Vulkan pairs. The original run-001 is retained
+  as rejected harness evidence; the hardened protocol and accepted result use
+  the separate v4/run-002 custody paths.
+- Commit: pending final evidence binding.
 
 ## Goal
 - Evaluate an explicit command-recording `gpu_vulkan_compute` path for every
@@ -157,18 +158,32 @@ maturity_target: ParityProven
 - [x] Note the GPU backend and its host requirement in the `docs/architecture/algorithm-variant-dispatch.md` current-exemplar section if the family becomes a cited exemplar.
 
 ## Acceptance criteria
-- [ ] Every strategy is evaluated. Each exposed GPU strategy passes the
+- [x] Every strategy is evaluated. Each exposed GPU strategy passes the
       `gpu;vulkan` parity smoke on a Vulkan-capable host and is cited in
       `Verification` as actually run; a miss stays CPU-only with recorded
       negative evidence.
-- [ ] Fallback telemetry is asserted in the default CPU gate.
-- [ ] The GPU benchmark validates and reports a CPU-reference baseline (no bare speedup claim).
-- [ ] Where METHOD-019 exposed `cpu_optimized`, report it as an additional
+- [x] Fallback telemetry is asserted in the default CPU gate.
+- [x] The GPU benchmark validates and reports a CPU-reference baseline (no bare speedup claim).
+- [x] Where METHOD-019 exposed `cpu_optimized`, report it as an additional
       same-fixture comparison; do not fabricate an optimized baseline for a
       strategy that failed its adoption gate.
-- [ ] The actual-GPU result validates; skipped/fallback execution is reported
+- [x] The actual-GPU result validates; skipped/fallback execution is reported
       honestly and cannot satisfy the Vulkan acceptance row.
-- [ ] No `Vk*` types cross the public seam.
+- [x] No `Vk*` types cross the public seam.
+
+## Verification evidence
+- The canonical CPU-supported receipt is
+  `tasks/evidence/METHOD-020/commands/ci-tests.json` (4,091/4,091 selected
+  cases passed), including Null-device fallback and control-surface parity.
+- The isolated ASan receipt is
+  `tasks/evidence/METHOD-020/commands/ci-asan-tests.json`; the promoted Vulkan
+  parity and benchmark receipts are retained alongside the run-002 bundle.
+- METHOD-019 adopted no `cpu_optimized` LOP-family backend, so the Vulkan
+  benchmark reports the same-fixture CPU reference and explicitly makes no
+  optimized-backend or speedup claim.
+- Ordinary LOP and isotropic WLOP are the only exposed Vulkan pairs.
+  Anisotropic WLOP, CLOP, and EAR fail the shared preview preflight with named
+  capability diagnostics rather than substituting another strategy.
 
 ## Verification
 ```bash
