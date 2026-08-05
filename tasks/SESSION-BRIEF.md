@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-129` — Claim custody accepts skipped benchmarks as positive evidence (tasks/active/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md)
 - `METHOD-020` — LOP-family GPU (Vulkan compute) backend and parity (tasks/active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
 
 ## Theme B — Rendering modernization
