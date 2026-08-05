@@ -80,6 +80,20 @@ TEST(SupportRadius, PolicySelectsRankQuantileAndMultiplier)
     EXPECT_GE(result.SupportNeighborsMax, 3u);
 }
 
+TEST(SupportRadius, RecommendationTracksTheSelectedPropertyScale)
+{
+    const std::vector<glm::vec3> unitScale = Line(65u, 0.1F);
+    const std::vector<glm::vec3> largeScale = Line(65u, 10.0F);
+
+    const Radius::Analysis unit = Radius::Analyze(unitScale, std::nullopt);
+    const Radius::Analysis large = Radius::Analyze(largeScale, std::nullopt);
+
+    ASSERT_TRUE(unit.Succeeded()) << Radius::DebugName(unit.State);
+    ASSERT_TRUE(large.Succeeded()) << Radius::DebugName(large.State);
+    EXPECT_GT(large.Radius, unit.Radius * 99.0);
+    EXPECT_LT(large.Radius, unit.Radius * 101.0);
+}
+
 TEST(SupportRadius, RecommendationClampsRankForSmallInputs)
 {
     const std::vector<glm::vec3> points = Line(4u);
@@ -201,6 +215,15 @@ TEST(SupportRadius, DegenerateAndInvalidInputsHaveExplicitStatuses)
     EXPECT_EQ(
         Radius::Analyze(
             Line(8u), std::nullopt, {}, {}, tooManySamples).State,
+        Radius::Status::InvalidParameters);
+    const Radius::RecommendationPolicy invalidQuantile{
+        .NeighborRank = 4u,
+        .Quantile = static_cast<Radius::CoverageQuantile>(255u),
+        .RadiusMultiplier = 1.0,
+    };
+    EXPECT_EQ(
+        Radius::Analyze(
+            Line(8u), std::nullopt, invalidQuantile).State,
         Radius::Status::InvalidParameters);
     EXPECT_EQ(
         Radius::Analyze(Line(8u), 0.0).State,

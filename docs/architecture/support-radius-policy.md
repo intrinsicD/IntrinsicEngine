@@ -59,11 +59,17 @@ workload checks, so a manual value is an override, not a safety bypass.
 
 ## Workload preview and failure
 
-Runtime estimates the number of support queries from strategy, input/output
-counts, and iteration bounds. It includes non-neighborhood analytic work for
-CLOP mixture terms and EAR insertion as a fixed contribution estimate. The
-geometry analysis combines that count with sampled P95 occupancy using
-saturating unsigned arithmetic. Configuration supplies two non-zero bounds:
+Runtime estimates an upper bound on the number of support queries from
+strategy, input/output counts, and iteration bounds. WLOP accounts separately
+for source density, L2 initialization, projected density, attraction, and
+repulsion passes. CLOP additionally counts component/point evaluations for
+K-means++/Lloyd mixture initialization, EM, continuous L2 initialization, and
+all three attraction terms. EAR bounds every progressive insertion by all
+current point pairs, a worst-case full clearance scan for every supported pair,
+and the four final projection/refinement scans. The geometry analysis combines
+support-query count with sampled P95 occupancy and adds those non-neighborhood
+analytic evaluations using saturating unsigned arithmetic. Configuration
+supplies two non-zero bounds:
 
 - `max_support_neighbors` rejects a sampled support maximum above the limit;
 - `max_predicted_contributions` rejects the combined predicted contribution

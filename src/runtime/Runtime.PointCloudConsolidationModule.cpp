@@ -410,6 +410,87 @@ namespace Extrinsic::Runtime
             return lhs + rhs;
         }
 
+        [[nodiscard]] std::uint64_t SaturatingChooseTwo(
+            const std::uint64_t value) noexcept
+        {
+            if (value < 2u)
+                return 0u;
+            std::uint64_t lhs = value;
+            std::uint64_t rhs = value - 1u;
+            if ((lhs & 1u) == 0u)
+                lhs /= 2u;
+            else
+                rhs /= 2u;
+            return SaturatingMultiply(lhs, rhs);
+        }
+
+        // Each EAR insertion examines every current point pair. In the
+        // worst case every pair is inside support and its clearance scan
+        // examines every current point; four further full-set scans project
+        // and refine the selected candidate. Bounding every insertion by the
+        // largest pre-insertion set keeps this preview constant-time and
+        // conservative.
+        [[nodiscard]] std::uint64_t EarInsertionContributionUpperBound(
+            const std::uint64_t projected,
+            const std::uint64_t requested) noexcept
+        {
+            if (requested <= projected)
+                return 0u;
+            const std::uint64_t inserted = requested - projected;
+            const std::uint64_t maximumCurrent = requested - 1u;
+            const std::uint64_t pairs =
+                SaturatingChooseTwo(maximumCurrent);
+            const std::uint64_t pairAndClearance = SaturatingMultiply(
+                pairs, SaturatingAdd(maximumCurrent, 1u));
+            const std::uint64_t selectedCandidateScans =
+                SaturatingMultiply(4u, maximumCurrent);
+            return SaturatingMultiply(
+                inserted,
+                SaturatingAdd(
+                    pairAndClearance, selectedCandidateScans));
+        }
+
+        // CLOP has no support query for continuous attraction, but its CPU
+        // oracle performs bounded component/point work in K-means++ seeding,
+        // Lloyd initialization, EM, L2 initialization, and all three
+        // attraction terms. Count those analytic evaluations separately from
+        // support-neighbor contributions.
+        [[nodiscard]] std::uint64_t ClopFixedContributionUpperBound(
+            const std::uint64_t input,
+            const std::uint64_t projected,
+            const std::uint64_t iterations,
+            const std::uint64_t components,
+            const std::uint64_t mixtureIterations) noexcept
+        {
+            const std::uint64_t componentPoints =
+                SaturatingMultiply(input, components);
+            const std::uint64_t kMeansIterations = std::max<std::uint64_t>(
+                8u, std::min<std::uint64_t>(mixtureIterations, 32u));
+
+            std::uint64_t fixed = SaturatingMultiply(
+                input, components > 0u ? components - 1u : 0u);
+            fixed = SaturatingAdd(
+                fixed,
+                SaturatingMultiply(componentPoints, kMeansIterations));
+            fixed = SaturatingAdd(fixed, input);
+            fixed = SaturatingAdd(fixed, componentPoints);
+            fixed = SaturatingAdd(
+                fixed,
+                SaturatingMultiply(
+                    SaturatingMultiply(3u, componentPoints),
+                    mixtureIterations));
+
+            const std::uint64_t projectedComponents =
+                SaturatingMultiply(projected, components);
+            fixed = SaturatingAdd(fixed, projectedComponents);
+            fixed = SaturatingAdd(
+                fixed,
+                SaturatingMultiply(
+                    SaturatingMultiply(3u, projectedComponents),
+                    iterations));
+            return fixed;
+        }
+
         [[nodiscard]] Radius::RecommendationPolicy SupportRadiusPolicy(
             const PointCloudConsolidationConfig& config) noexcept
         {
@@ -454,31 +535,31 @@ namespace Extrinsic::Runtime
                         SaturatingMultiply(2u, projected), iterations));
                 break;
             case PointCloudConsolidationStrategy::Wlop:
-                queries = SaturatingAdd(
-                    input,
-                    SaturatingAdd(
-                        projected,
+                queries = snapshot.Request.Config.WlopAnisotropic
+                    ? SaturatingAdd(
+                        input,
                         SaturatingMultiply(
+                            SaturatingMultiply(4u, projected),
+                            iterations))
+                    : SaturatingAdd(
+                        input,
+                        SaturatingAdd(
+                            projected,
                             SaturatingMultiply(
-                                snapshot.Request.Config.WlopAnisotropic
-                                    ? 4u
-                                    : 2u,
-                                projected),
-                            iterations)));
+                                SaturatingMultiply(3u, projected),
+                                iterations)));
                 break;
             case PointCloudConsolidationStrategy::Clop:
             {
                 queries = SaturatingMultiply(projected, iterations);
                 const std::uint64_t components =
                     snapshot.Request.Config.ClopMixtureComponentCount;
-                fixed = SaturatingAdd(
-                    SaturatingMultiply(
-                        SaturatingMultiply(input, components),
-                        snapshot.Request.Config.ClopMixtureMaxIterations),
-                    SaturatingMultiply(
-                        SaturatingMultiply(
-                            SaturatingMultiply(3u, projected), components),
-                        iterations));
+                fixed = ClopFixedContributionUpperBound(
+                    input,
+                    projected,
+                    iterations,
+                    components,
+                    snapshot.Request.Config.ClopMixtureMaxIterations);
                 break;
             }
             case PointCloudConsolidationStrategy::Ear:
@@ -487,11 +568,8 @@ namespace Extrinsic::Runtime
                     input,
                     SaturatingMultiply(
                         SaturatingMultiply(4u, projected), iterations));
-                const std::uint64_t inserted = requested > projected
-                    ? requested - projected
-                    : 0u;
-                fixed = SaturatingMultiply(
-                    SaturatingMultiply(inserted, requested), 4u);
+                fixed = EarInsertionContributionUpperBound(
+                    projected, requested);
                 break;
             }
             }

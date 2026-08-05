@@ -135,8 +135,21 @@ namespace Geometry::SupportRadius
             const RecommendationPolicy& policy,
             const ProfileParams& params) noexcept
         {
+            const bool validQuantile = [&policy]() noexcept
+            {
+                switch (policy.Quantile)
+                {
+                case CoverageQuantile::P50:
+                case CoverageQuantile::P75:
+                case CoverageQuantile::P90:
+                case CoverageQuantile::P95:
+                    return true;
+                }
+                return false;
+            }();
             return policy.NeighborRank > 0u &&
                    policy.NeighborRank <= params.MaxNeighborRank &&
+                   validQuantile &&
                    std::isfinite(policy.RadiusMultiplier) &&
                    policy.RadiusMultiplier > 0.0;
         }

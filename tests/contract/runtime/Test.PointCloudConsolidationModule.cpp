@@ -748,6 +748,94 @@ namespace
         bool MissingService{false};
         bool TimedOut{false};
     };
+
+    class ConsolidationWorkloadBoundaryApp final
+        : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        void Resolve() override
+        {
+            auto& engine = Kernel();
+            Service = engine.Services().Find<
+                Runtime::PointCloudConsolidationService>();
+            Scene = engine.Worlds().Get(engine.ActiveWorld());
+            if (Service == nullptr || !Service->Available() || Scene == nullptr)
+            {
+                MissingService = true;
+                engine.RequestExit();
+                return;
+            }
+
+            Entity = AddPointCloud(*Scene, NoisyPlane());
+            CompletionSubscription = Service->SubscribeCompleted(
+                [this](const Runtime::PointCloudConsolidationResult& result)
+                {
+                    Completions.push_back(result);
+                });
+
+            Runtime::PointCloudConsolidationRequest wlop =
+                MakeRequest(Entity);
+            wlop.Config.SupportRadiusMode = Runtime::
+                PointCloudConsolidationSupportRadiusMode::Manual;
+            wlop.Config.SupportRadius = 100.0;
+            wlop.Config.MaxPredictedContributions = 2'224u;
+            WlopCorrelation = Service->Run(std::move(wlop));
+
+            Runtime::PointCloudConsolidationRequest clop =
+                MakeRequest(Entity);
+            clop.Config.Strategy =
+                Runtime::PointCloudConsolidationStrategy::Clop;
+            clop.Config.SupportRadiusMode = Runtime::
+                PointCloudConsolidationSupportRadiusMode::Manual;
+            clop.Config.SupportRadius = 100.0;
+            clop.Config.ClopMixtureComponentCount = 3u;
+            clop.Config.ClopMixtureMaxIterations = 1u;
+            clop.Config.MaxPredictedContributions = 1'566u;
+            ClopCorrelation = Service->Run(std::move(clop));
+
+            Runtime::PointCloudConsolidationRequest ear =
+                MakeRequest(Entity);
+            ear.Config.Strategy =
+                Runtime::PointCloudConsolidationStrategy::Ear;
+            ear.Config.SupportRadiusMode = Runtime::
+                PointCloudConsolidationSupportRadiusMode::Manual;
+            ear.Config.SupportRadius = 100.0;
+            ear.Config.TargetPointCount = 27u;
+            ear.Config.MaxPredictedContributions = 20'882u;
+            EarCorrelation = Service->Run(std::move(ear));
+        }
+
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++Ticks;
+            if (Completions.size() == 3u)
+                engine.RequestExit();
+            else if (Ticks > 240u)
+            {
+                TimedOut = true;
+                engine.RequestExit();
+            }
+        }
+
+        void Shutdown() override
+        {
+            if (Service != nullptr)
+                Service->Unsubscribe(CompletionSubscription);
+        }
+
+        Runtime::PointCloudConsolidationService* Service{};
+        ECS::Scene::Registry* Scene{};
+        ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        Runtime::KernelEventSubscription CompletionSubscription{};
+        Runtime::CommandCorrelationId WlopCorrelation{};
+        Runtime::CommandCorrelationId ClopCorrelation{};
+        Runtime::CommandCorrelationId EarCorrelation{};
+        std::vector<Runtime::PointCloudConsolidationResult> Completions{};
+        std::uint32_t Ticks{0u};
+        bool MissingService{false};
+        bool TimedOut{false};
+    };
 }
 
 TEST(PointCloudConsolidationModule,
@@ -1082,6 +1170,67 @@ TEST(PointCloudConsolidationModule,
     EXPECT_EQ(meshFaces.Get<OpaqueDomainValue>("f:opaque").Vector(),
               appPtr->MeshOpaqueBefore);
 
+    engine.Shutdown();
+}
+
+TEST(PointCloudConsolidationModule,
+     WorkloadGuardCoversReferencePassesAtConfiguredBoundaries)
+{
+    auto app = std::make_unique<ConsolidationWorkloadBoundaryApp>();
+    ConsolidationWorkloadBoundaryApp* appPtr = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine{
+        HeadlessConfig(), std::move(app)};
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_FALSE(appPtr->MissingService);
+    EXPECT_FALSE(appPtr->TimedOut);
+    ASSERT_EQ(appPtr->Completions.size(), 3u);
+
+    const auto expectBoundary = [appPtr](
+        const Runtime::CommandCorrelationId correlation,
+        const std::uint64_t expectedQueries,
+        const std::uint64_t expectedContributions)
+    {
+        const auto found = std::find_if(
+            appPtr->Completions.begin(),
+            appPtr->Completions.end(),
+            [correlation](
+                const Runtime::PointCloudConsolidationResult& result)
+            {
+                return result.Correlation == correlation;
+            });
+        ASSERT_NE(found, appPtr->Completions.end());
+        EXPECT_EQ(
+            found->Status,
+            Runtime::PointCloudConsolidationRunStatus::UnsafeSupportRadius);
+        EXPECT_EQ(
+            found->SupportRadiusAnalysisStatus,
+            "workload_limit_exceeded");
+        EXPECT_EQ(found->SupportNeighborsP95, 25.0);
+        EXPECT_EQ(found->PredictedSupportQueryCount, expectedQueries);
+        EXPECT_EQ(
+            found->PredictedContributionCount, expectedContributions);
+        EXPECT_EQ(
+            found->Config.MaxPredictedContributions,
+            expectedContributions - 1u);
+    };
+
+    // Isotropic WLOP: source density + L2 initialization + projected
+    // density/attraction/repulsion for one iteration.
+    expectBoundary(appPtr->WlopCorrelation, 89u, 2'225u);
+    // CLOP: one projected repulsion pass plus the bounded K-means, EM,
+    // continuous initialization, and three-term attraction work.
+    expectBoundary(appPtr->ClopCorrelation, 16u, 1'567u);
+    // EAR: source density + four support-query passes and two conservative
+    // all-pairs/all-points progressive insertion envelopes.
+    expectBoundary(appPtr->EarCorrelation, 125u, 20'883u);
+
+    const auto& vertices =
+        appPtr->Scene->Raw().get<GS::Vertices>(appPtr->Entity).Properties;
+    EXPECT_EQ(vertices.Size(), NoisyPlane().size());
     engine.Shutdown();
 }
 
