@@ -59,6 +59,14 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-08-05: [`BUG-132` — Vulkan method/render synchronization and
+  resource lifetime](../../done/BUG-132-vulkan-method-render-synchronization.md).
+  Loaded color attachments now compile to one read-write state, transfer
+  readback barriers execute in the transfer submission's graphics-queue
+  serialization domain, and repeated LOP grid clears carry the reverse
+  compute-to-transfer dependency. The validation-enabled child.obj Vulkan LOP
+  regression completes with zero synchronization or lifetime errors.
+
 - Closed 2026-08-05: [`BUG-130` — Rejected experiment runs require their
   historical task seal](../../done/BUG-130-rejected-run-historical-task-seal.md).
   Independently rejected clean-source runs may verify only an exact same-ID,

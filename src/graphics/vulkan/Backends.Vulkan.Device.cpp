@@ -2161,8 +2161,15 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         VulkanTransferQueue::Config transferConfig{};
         transferConfig.Device = m_Device;
         transferConfig.Vma = m_Vma;
-        transferConfig.Queue = m_TransferVkQueue;
-        transferConfig.QueueFamily = m_TransferFamily;
+        // The public transfer service currently has no producer timeline token
+        // with which to establish a graphics -> dedicated-transfer queue
+        // dependency. Use the graphics queue's serialization domain so a
+        // readback submitted after its producer is ordered before the
+        // transfer-owned source barrier and copy. Dedicated transfer execution
+        // can return once the RHI carries an explicit cross-queue handoff.
+        transferConfig.Queue = m_GraphicsQueue;
+        transferConfig.QueueFamily = m_GraphicsFamily;
+        transferConfig.QueueSubmitMutex = &m_QueueMutex;
         m_TransferQueue = std::make_unique<VulkanTransferQueue>(transferConfig);
         serviceDiagnostics.TransferQueueCreated = m_TransferQueue && m_TransferQueue->IsValid();
         if (!serviceDiagnostics.TransferQueueCreated)

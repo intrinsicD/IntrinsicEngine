@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "FrameRecipeContract|RenderGraphValidation|GpuTransferFacade",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'FrameRecipeContract|RenderGraphValidation|GpuTransferFacade' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 874,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T12:23:36Z",
+  "label": "cpu-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T12:23:35Z",
+  "stderr_path": "tasks/evidence/BUG-132/commands/cpu-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-132/commands/cpu-focused.stdout.log",
+  "stdout_sha256": "a09b2d60f03dd4e80835b80166625d5b6b705949fca730eebff3e99d7d8aa34b",
+  "task_id": "BUG-132"
+}

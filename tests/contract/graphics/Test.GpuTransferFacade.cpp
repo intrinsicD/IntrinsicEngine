@@ -386,7 +386,7 @@ TEST(GpuTransferFacade, InCommandUploadRecordsCopyAndBarrierImmediately)
     EXPECT_EQ(diagnostics.UploadsDropped, 0u);
 }
 
-TEST(GpuTransferFacade, ReadbackRecordsTransferReadBracketAndDeliversOnce)
+TEST(GpuTransferFacade, ReadbackDelegatesTransferReadBracketAndDeliversOnce)
 {
     MockTransferQueue queue;
     Graphics::GpuTransfer transfer{queue};
@@ -411,11 +411,7 @@ TEST(GpuTransferFacade, ReadbackRecordsTransferReadBracketAndDeliversOnce)
                                   });
 
     ASSERT_TRUE(ticket.IsValid());
-    ASSERT_EQ(cmd.Events.size(), 1u);
-    EXPECT_EQ(cmd.Events[0].Kind, RecordingCommandContext::EventKind::BufferBarrier);
-    EXPECT_EQ(cmd.Events[0].Buffer, source);
-    EXPECT_EQ(cmd.Events[0].Before, RHI::MemoryAccess::ShaderWrite);
-    EXPECT_EQ(cmd.Events[0].After, RHI::MemoryAccess::TransferRead);
+    EXPECT_TRUE(cmd.Events.empty());
     EXPECT_FALSE(transfer.IsDelivered(ticket));
 
     queue.CollectCompleted();
@@ -433,7 +429,7 @@ TEST(GpuTransferFacade, ReadbackRecordsTransferReadBracketAndDeliversOnce)
     EXPECT_EQ(diagnostics.ReadbacksDropped, 0u);
     EXPECT_EQ(diagnostics.ReadbackBarriersEmitted, 1u);
     EXPECT_EQ(diagnostics.PendingReadbackHighWater, 1u);
-    EXPECT_EQ(cmd.Events.size(), 1u);
+    EXPECT_TRUE(cmd.Events.empty());
 }
 
 TEST(GpuTransferFacade, InvalidRangesFailClosedAndUpdateDiagnostics)
@@ -547,10 +543,9 @@ TEST(GpuTransferFacade, MultiRangeBatchPreservesOrderAndConsumesExactlyOnce)
     EXPECT_EQ(transfer.ReadbackBatchState(ticket),
               Graphics::GpuTransferReadbackBatchState::Pending);
 
-    // The repeated first source shares one transfer-read bracket.
-    ASSERT_EQ(cmd.Events.size(), 2u);
-    EXPECT_EQ(cmd.Events[0].Buffer, first);
-    EXPECT_EQ(cmd.Events[1].Buffer, second);
+    // The facade must not record barriers into a later caller-owned frame.
+    // Each accepted backend download owns its exact transfer-read bracket.
+    EXPECT_TRUE(cmd.Events.empty());
 
     Graphics::GpuTransferReadbackBatchResult result{};
     EXPECT_FALSE(transfer.ConsumeReadbackBatch(ticket, ranges, result));
@@ -583,7 +578,7 @@ TEST(GpuTransferFacade, MultiRangeBatchPreservesOrderAndConsumesExactlyOnce)
         transfer.GetDiagnostics();
     EXPECT_EQ(diagnostics.ReadbacksIssued, 3u);
     EXPECT_EQ(diagnostics.ReadbacksDelivered, 3u);
-    EXPECT_EQ(diagnostics.ReadbackBarriersEmitted, 2u);
+    EXPECT_EQ(diagnostics.ReadbackBarriersEmitted, 3u);
     EXPECT_EQ(diagnostics.ReadbackBatchesIssued, 1u);
     EXPECT_EQ(diagnostics.ReadbackBatchesDelivered, 1u);
     EXPECT_EQ(diagnostics.ReadbackBatchesConsumed, 1u);

@@ -160,8 +160,11 @@ export namespace Extrinsic::RHI
         // ---- Buffer readbacks ----------------------------------------
 
         /// Non-blocking: queues a GPU transfer from `src` at `offset` into
-        /// backend-owned host-visible staging. The requested bytes are delivered
-        /// to `sink` from CollectCompleted() after the transfer timeline reports
+        /// backend-owned host-visible staging. The producer submission must
+        /// already be enqueued before this call. The backend owns the source
+        /// write -> transfer-read memory barrier and must serialize it after the
+        /// producer (or fail closed). The requested bytes are delivered to
+        /// `sink` from CollectCompleted() after the transfer timeline reports
         /// completion. `src` must have BufferUsage::TransferSrc support.
         [[nodiscard]] virtual ReadbackToken DownloadBuffer(BufferHandle src,
                                                            std::uint64_t size,

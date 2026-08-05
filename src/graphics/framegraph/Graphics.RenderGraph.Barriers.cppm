@@ -101,6 +101,7 @@ namespace Extrinsic::Graphics
         TransferDst,
         Present,
         ColorAttachmentRead,
+        ColorAttachmentReadWrite,
     };
 
     export enum class BufferBarrierState : std::uint8_t

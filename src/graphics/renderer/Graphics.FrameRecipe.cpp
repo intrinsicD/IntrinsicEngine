@@ -2446,7 +2446,7 @@ namespace Extrinsic::Graphics
             {
                 const TextureRef input = presentSource;
                 addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
-                    builder.Read(input, TextureUsage::ShaderRead);
+                    builder.Read(input, TextureUsage::ColorAttachmentRead);
                     if (uvViewColor.IsValid())
                     {
                         builder.Read(uvViewColor, TextureUsage::ShaderRead);

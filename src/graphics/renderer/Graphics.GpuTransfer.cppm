@@ -163,12 +163,18 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] bool UploadInCommand(RHI::ICommandContext& cmd,
                                            const GpuTransferInCommandUploadDesc& desc);
 
+        // The producer submission must already be enqueued before this call.
+        // The transfer backend owns the source write -> transfer-read barrier
+        // and queue ordering; `cmd` is retained only for source compatibility
+        // with callers of the original GRAPHICS-096 facade.
         [[nodiscard]] GpuTransferReadbackTicket ScheduleReadback(RHI::ICommandContext& cmd,
                                                                  GpuTransferReadbackDesc desc);
 
-        // Schedule every range as one logical result. The transfer owns copied
-        // host storage until the batch is consumed or its cancelled transfers
-        // retire, so callers never lend a destination span across frames.
+        // Schedule every range as one logical result after its producer
+        // submission has been enqueued. The transfer backend owns the source
+        // barriers and queue ordering. The transfer owns copied host storage
+        // until the batch is consumed or its cancelled transfers retire, so
+        // callers never lend a destination span across frames.
         [[nodiscard]] GpuTransferReadbackBatchTicket ScheduleReadbackBatch(
             RHI::ICommandContext& cmd,
             const GpuTransferReadbackBatchDesc& desc);

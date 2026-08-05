@@ -863,6 +863,21 @@ namespace Extrinsic::Runtime
             const std::uint64_t cellBytes =
                 static_cast<std::uint64_t>(active.Plan.CellCount) *
                 sizeof(std::uint32_t);
+            if (!source && iteration != 0u)
+            {
+                // The projected grid is rebuilt every iteration. Its prior
+                // shader reads/writes must be made available before the next
+                // transfer-stage clear; the post-fill barriers below only
+                // establish the opposite transfer -> compute direction.
+                commandContext.BufferBarrier(
+                    counts,
+                    RHI::MemoryAccess::ShaderRead,
+                    RHI::MemoryAccess::TransferWrite);
+                commandContext.BufferBarrier(
+                    cursors,
+                    RHI::MemoryAccess::ShaderWrite,
+                    RHI::MemoryAccess::TransferWrite);
+            }
             commandContext.FillBuffer(counts, 0u, cellBytes, 0u);
             commandContext.FillBuffer(cursors, 0u, cellBytes, 0u);
             commandContext.BufferBarrier(

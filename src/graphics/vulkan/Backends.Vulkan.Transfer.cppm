@@ -82,6 +82,9 @@ namespace Extrinsic::Backends::Vulkan
             VkQueue      Queue       = VK_NULL_HANDLE;
             uint32_t     QueueFamily = 0;
             size_t       StagingCapacity = kStagingBeltCapacity;
+            // Optional device-wide external-synchronization mutex for a queue
+            // shared with frame submission.
+            std::mutex*  QueueSubmitMutex = nullptr;
         };
 
         explicit VulkanTransferQueue(const Config& cfg);
@@ -161,6 +164,7 @@ namespace Extrinsic::Backends::Vulkan
         VmaAllocator  m_Vma           = VK_NULL_HANDLE;
         VkQueue       m_Queue         = VK_NULL_HANDLE;
         uint32_t      m_QueueFamily   = 0;
+        std::mutex*   m_QueueSubmitMutex = nullptr;
         VkSemaphore   m_Timeline      = VK_NULL_HANDLE;
         VkCommandPool m_CmdPool       = VK_NULL_HANDLE;
         std::atomic<uint64_t> m_NextTicket{1};

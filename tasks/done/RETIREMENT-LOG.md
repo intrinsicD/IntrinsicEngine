@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-132`](BUG-132-vulkan-method-render-synchronization.md) — the promoted
+Vulkan LOP compute/publication/render path is validation-clean. Frame-graph
+passes that load and write one color attachment now coalesce into a single
+read-write state; async buffer readback owns its barrier in the same graphics
+queue serialization domain as the already-submitted producer instead of
+recording a dangling barrier into a later frame; and repeated LOP projected-grid
+clears explicitly transition prior shader access back to transfer-write.
+
+The exact child.obj Auto LOP regression runs with validation enabled, forced
+synchronization validation, and ASan/UBSan. It reports actual Vulkan, non-zero
+position displacement, changed render residency, and zero validation-counter
+growth; the captured log contains neither synchronization hazards nor buffer
+destruction VUIDs. Focused frame-graph and transfer contracts plus strict
+layering/task-policy checks pass. This is a correctness result, not a Vulkan
+performance or dedicated-transfer-queue claim.
+
 [`BUG-131`](BUG-131-lop-auto-radius-visible-application.md) — the imported-mesh
 Auto LOP workflow completed on 2026-08-05 at `Operational` for ordinary LOP
 and isotropic WLOP on the repository `child.obj` asset and this Vulkan-capable

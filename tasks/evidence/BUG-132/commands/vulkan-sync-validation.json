@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation",
+    "VK_LAYER_ENABLES=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointCloudConsolidationGpuParity\\.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement$",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "env VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation VK_LAYER_ENABLES=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointCloudConsolidationGpuParity\\.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement$' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 22778,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T12:24:08Z",
+  "label": "vulkan-sync-validation",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T12:23:46Z",
+  "stderr_path": "tasks/evidence/BUG-132/commands/vulkan-sync-validation.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-132/commands/vulkan-sync-validation.stdout.log",
+  "stdout_sha256": "6ec216925348e7ed54677fdb75ff552a86be1bf4b6962652b00c610f5b37d507",
+  "task_id": "BUG-132"
+}

@@ -813,6 +813,47 @@ TEST(RenderGraphValidation, ColorAttachmentReadUsesReadStateAndSkipsConsecutiveR
     EXPECT_EQ(readPassWriteBarriers, 0u);
 }
 
+TEST(RenderGraphValidation, LoadedColorAttachmentUsesOneReadWriteState)
+{
+    RenderGraph graph;
+    const TextureRef lighting = graph.CreateTexture("Lighting", RHI::TextureDesc{});
+    (void)graph.AddPass("LightingWrite", [lighting](RenderGraphBuilder& builder) {
+        (void)builder.Write(lighting, TextureUsage::ColorAttachmentWrite);
+    });
+    const PassRef overlay = graph.AddPass("Overlay", [lighting](RenderGraphBuilder& builder) {
+        (void)builder.Read(lighting, TextureUsage::ColorAttachmentRead);
+        (void)builder.Write(lighting, TextureUsage::ColorAttachmentWrite);
+        builder.SetRenderPass(
+            RHI::RenderPassDesc{
+                .ColorTargets = kCompilerScratchColorAttachments});
+        builder.SideEffect();
+    });
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    std::vector<TextureBarrierPacket> overlayBarriers{};
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        if (packet.PassIndex != overlay.Index ||
+            packet.Stage != BarrierPacketStage::BeforePass)
+        {
+            continue;
+        }
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex == lighting.Index)
+                overlayBarriers.push_back(barrier);
+        }
+    }
+
+    ASSERT_EQ(overlayBarriers.size(), 1u);
+    EXPECT_EQ(overlayBarriers.front().Before,
+              TextureBarrierState::ColorAttachmentWrite);
+    EXPECT_EQ(overlayBarriers.front().After,
+              TextureBarrierState::ColorAttachmentReadWrite);
+}
+
 TEST(RenderGraphValidation, TransientMemoryEstimateUsesRhiBlockCompressedStorageSize)
 {
     RenderGraph graph;

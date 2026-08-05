@@ -34,7 +34,8 @@ namespace Extrinsic::Backends::Vulkan
 
 VulkanTransferQueue::VulkanTransferQueue(const Config& cfg)
     : m_Device(cfg.Device), m_Vma(cfg.Vma), m_Queue(cfg.Queue),
-      m_QueueFamily(cfg.QueueFamily)
+      m_QueueFamily(cfg.QueueFamily),
+      m_QueueSubmitMutex(cfg.QueueSubmitMutex)
 {
     if (m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || m_Queue == VK_NULL_HANDLE)
     {
@@ -89,7 +90,17 @@ VulkanTransferQueue::VulkanTransferQueue(const Config& cfg)
 VulkanTransferQueue::~VulkanTransferQueue()
 {
     if (m_Queue != VK_NULL_HANDLE)
-        vkQueueWaitIdle(m_Queue);
+    {
+        if (m_QueueSubmitMutex != nullptr)
+        {
+            std::scoped_lock queueLock{*m_QueueSubmitMutex};
+            (void)vkQueueWaitIdle(m_Queue);
+        }
+        else
+        {
+            (void)vkQueueWaitIdle(m_Queue);
+        }
+    }
     RetireCompletedCommandBuffers(std::numeric_limits<std::uint64_t>::max());
     DestroyReadbackSlots();
     if (m_CmdPool   != VK_NULL_HANDLE) vkDestroyCommandPool(m_Device, m_CmdPool, nullptr);
@@ -193,7 +204,15 @@ RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
         submit.signalSemaphoreInfoCount = 1;
         submit.pSignalSemaphoreInfos    = &sigInfo;
 
-        result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        if (m_QueueSubmitMutex != nullptr)
+        {
+            std::scoped_lock queueLock{*m_QueueSubmitMutex};
+            result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        }
+        else
+        {
+            result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        }
         if (result != VK_SUCCESS)
         {
             Core::Log::Error("[VulkanTransferQueue] vkQueueSubmit2 failed; upload skipped");
@@ -250,7 +269,15 @@ RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
         submit.signalSemaphoreInfoCount = 1;
         submit.pSignalSemaphoreInfos = &sigInfo;
 
-        result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        if (m_QueueSubmitMutex != nullptr)
+        {
+            std::scoped_lock queueLock{*m_QueueSubmitMutex};
+            result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        }
+        else
+        {
+            result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        }
         if (result != VK_SUCCESS)
         {
             Core::Log::Error("[VulkanTransferQueue] vkQueueSubmit2 failed; readback skipped");

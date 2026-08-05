@@ -225,6 +225,7 @@ namespace
             return true;
         case TextureBarrierState::ColorAttachmentRead:
         case TextureBarrierState::ColorAttachmentWrite:
+        case TextureBarrierState::ColorAttachmentReadWrite:
             return desc.IsBackbuffer || HasTextureUsage(desc.Desc.Usage, RHI::TextureUsage::ColorTarget);
         case TextureBarrierState::DepthRead:
         case TextureBarrierState::DepthWrite:

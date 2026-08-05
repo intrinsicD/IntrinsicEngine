@@ -1,0 +1,27 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicGraphicsContractTests",
+    "IntrinsicRuntimePointCloudConsolidationGpuParityTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicGraphicsContractTests IntrinsicRuntimePointCloudConsolidationGpuParityTests -j 4",
+  "cwd": ".",
+  "duration_ms": 14986,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T12:23:29Z",
+  "label": "cpu-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T12:23:14Z",
+  "stderr_path": "tasks/evidence/BUG-132/commands/cpu-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-132/commands/cpu-build.stdout.log",
+  "stdout_sha256": "d37ac8e818e486c5dfb4ef083af9da6616769c9b5b30e2a3563790af7fb7bccd",
+  "task_id": "BUG-132"
+}

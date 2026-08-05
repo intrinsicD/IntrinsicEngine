@@ -158,6 +158,13 @@ available through the Vulkan 1.2/1.3 feature chain.
   subresource using `RHI.TextureUpload` layout math. Both copy into a recycled
   mapped host-visible `TRANSFER_DST` staging slot, signal the transfer timeline,
   and deliver bytes to the `ReadbackSink` only from `CollectCompleted()`.
+  Until the RHI exposes an explicit graphics-to-transfer producer timeline
+  token, this public transfer service uses the Vulkan graphics queue/family.
+  Consequently a buffer producer must already be submitted before
+  `DownloadBuffer(...)`; the readback command's own all-write-to-transfer-read
+  barrier then forms the memory dependency in the same queue serialization
+  domain. Dedicated transfer queues remain available to frame-graph work with
+  explicit ownership/synchronization, but are not used by this facade.
   `DownloadTexture(...)` requires caller-owned `TextureLayout::TransferSrc`
   state and records no automatic source layout transition. `IsComplete(ReadbackToken)`
   reports delivery completion, not just queue signal completion, and

@@ -246,6 +246,11 @@ namespace Extrinsic::Graphics
     GpuTransferReadbackTicket GpuTransfer::ScheduleReadback(RHI::ICommandContext& cmd,
                                                             GpuTransferReadbackDesc desc)
     {
+        // Readback is submitted by ITransferQueue, not by this caller-owned
+        // command context. Recording a source barrier here would place it in a
+        // later graphics submission while the transfer can execute immediately,
+        // and would also keep the source alive on an unrelated frame timeline.
+        (void)cmd;
         if (m_Impl == nullptr ||
             m_Impl->TransferQueue == nullptr ||
             !desc.Source.IsValid() ||
@@ -258,11 +263,6 @@ namespace Extrinsic::Graphics
             return {};
         }
 
-        cmd.BufferBarrier(desc.Source,
-                          desc.SourceAccess,
-                          RHI::MemoryAccess::TransferRead);
-        ++m_Impl->Diagnostics.ReadbackBarriersEmitted;
-
         const RHI::ReadbackToken token =
             m_Impl->TransferQueue->DownloadBuffer(desc.Source,
                                                   desc.SourceRange.SizeBytes,
@@ -273,6 +273,7 @@ namespace Extrinsic::Graphics
             ++m_Impl->Diagnostics.ReadbacksDropped;
             return {};
         }
+        ++m_Impl->Diagnostics.ReadbackBarriersEmitted;
 
         GpuTransferReadbackTicket ticket{
             .Id = ++m_Impl->NextReadbackTicket,
@@ -293,6 +294,10 @@ namespace Extrinsic::Graphics
         RHI::ICommandContext& cmd,
         const GpuTransferReadbackBatchDesc& desc)
     {
+        // See ScheduleReadback(): the backend submission owns its source
+        // barrier. Keep the parameter until the wider method-residency API can
+        // replace this compatibility surface without a mixed-risk bug fix.
+        (void)cmd;
         const auto reject = [this]() -> GpuTransferReadbackBatchTicket
         {
             if (m_Impl != nullptr)
@@ -363,31 +368,6 @@ namespace Extrinsic::Graphics
             });
         }
 
-        // Emit one transfer-read bracket per exact source. Multiple result
-        // ranges from the same buffer share that bracket and retain input order.
-        for (std::size_t rangeIndex = 0u;
-             rangeIndex < record->Ranges.size();
-             ++rangeIndex)
-        {
-            const GpuTransferReadbackRangeDesc& range =
-                record->Ranges[rangeIndex].Desc;
-            const bool alreadyBracketed = std::any_of(
-                record->Ranges.begin(),
-                record->Ranges.begin() +
-                    static_cast<std::ptrdiff_t>(rangeIndex),
-                [&range](const Impl::ReadbackBatchRangeRecord& prior)
-                {
-                    return prior.Desc.Source == range.Source;
-                });
-            if (alreadyBracketed)
-                continue;
-
-            cmd.BufferBarrier(range.Source,
-                              range.SourceAccess,
-                              RHI::MemoryAccess::TransferRead);
-            ++m_Impl->Diagnostics.ReadbackBarriersEmitted;
-        }
-
         std::size_t issuedCount = 0u;
         for (Impl::ReadbackBatchRangeRecord& range : record->Ranges)
         {
@@ -414,6 +394,7 @@ namespace Extrinsic::Graphics
             }
             ++issuedCount;
             ++m_Impl->Diagnostics.ReadbacksIssued;
+            ++m_Impl->Diagnostics.ReadbackBarriersEmitted;
         }
 
         const GpuTransferReadbackBatchTicket ticket = record->Ticket;

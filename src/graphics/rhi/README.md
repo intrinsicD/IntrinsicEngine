@@ -133,10 +133,12 @@ This directory contains the `RHI` module/files.
   the GRAPHICS-096 GPU-to-CPU buffer readback seam from
   [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md). It returns a
   `ReadbackToken`, validates the requested sub-range through
-  `RHI.BufferTransfer`, and never blocks the caller thread on a GPU fence. Bytes
-  are delivered from `CollectCompleted()` through `ReadbackSink` (fixed-size
-  destination span and/or drain-time callback). Null/fallback backends fail
-  closed with invalid tokens and dropped-readback diagnostics.
+  `RHI.BufferTransfer`, and never blocks the caller thread on a GPU fence. The
+  producer submission must already be enqueued; the backend owns the source
+  write-to-transfer-read barrier and serializes the copy after that producer.
+  Bytes are delivered from `CollectCompleted()` through `ReadbackSink`
+  (fixed-size destination span and/or drain-time callback). Null/fallback
+  backends fail closed with invalid tokens and dropped-readback diagnostics.
 - `ITransferQueue::DownloadTexture(TextureHandle, TextureLayout, mip, layer,
   ReadbackSink)` is the GRAPHICS-097 texture readback seam over the same
   readback token/sink/drain contract. Callers must transition the source

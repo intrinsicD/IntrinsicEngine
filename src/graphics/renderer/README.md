@@ -1763,14 +1763,17 @@ Concretely:
   variant for staging buffers that are already valid on the supplied command
   timeline. It validates source/destination ranges and records `CopyBuffer`
   followed immediately by the destination `TransferWrite -> readyAccess`
-  barrier. `ScheduleReadback(...)` validates the `TransferSrc` source range,
-  records the source `sourceAccess -> TransferRead` bracket, and submits
-  `DownloadBuffer()` through the GRAPHICS-096 readback ring; callers observe
-  facade `GpuTransferReadbackTicket` delivery after the post-queue drain rather
-  than handling raw readback tokens.
+  barrier. `ScheduleReadback(...)` validates the `TransferSrc` source range and
+  submits `DownloadBuffer()` through the GRAPHICS-096 readback ring after the
+  producer submission has been enqueued. The transfer backend—not the supplied
+  frame command context—owns the source write-to-transfer-read barrier and
+  serialization. This prevents a later frame submission from retaining method
+  result buffers after the readback itself has completed. Callers observe facade
+  `GpuTransferReadbackTicket` delivery after the post-queue drain rather than
+  handling raw readback tokens.
 - `ScheduleReadbackBatch(...)` is the copied multi-range form for one logical
-  compute or method result. It preserves request order, deduplicates the
-  transfer-read barrier for repeated source handles, and owns every destination
+  compute or method result. It preserves request order, delegates one exact
+  source barrier to each accepted backend download, and owns every destination
   byte vector until all underlying tokens complete. `ReadbackBatchState(...)`
   provides the non-blocking readiness predicate used by runtime `JobService`
   publication; `ConsumeReadbackBatch(...)` revalidates the exact generational

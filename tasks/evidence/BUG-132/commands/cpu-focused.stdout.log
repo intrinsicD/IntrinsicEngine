@@ -1,0 +1,184 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 3340: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+ 1/86 Test #3340: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle ........   Passed    0.36 sec
+      Start 3512: GpuTransferFacade.AsyncUploadEmitsReadyBarrierOnlyAfterTokenCompletion
+ 2/86 Test #3512: GpuTransferFacade.AsyncUploadEmitsReadyBarrierOnlyAfterTokenCompletion ....................   Passed    0.00 sec
+      Start 3513: GpuTransferFacade.InCommandUploadRecordsCopyAndBarrierImmediately
+ 3/86 Test #3513: GpuTransferFacade.InCommandUploadRecordsCopyAndBarrierImmediately .........................   Passed    0.00 sec
+      Start 3514: GpuTransferFacade.ReadbackDelegatesTransferReadBracketAndDeliversOnce
+ 4/86 Test #3514: GpuTransferFacade.ReadbackDelegatesTransferReadBracketAndDeliversOnce .....................   Passed    0.00 sec
+      Start 3515: GpuTransferFacade.InvalidRangesFailClosedAndUpdateDiagnostics
+ 5/86 Test #3515: GpuTransferFacade.InvalidRangesFailClosedAndUpdateDiagnostics .............................   Passed    0.00 sec
+      Start 3516: GpuTransferFacade.MultiRangeBatchPreservesOrderAndConsumesExactlyOnce
+ 6/86 Test #3516: GpuTransferFacade.MultiRangeBatchPreservesOrderAndConsumesExactlyOnce .....................   Passed    0.00 sec
+      Start 3517: GpuTransferFacade.MultiRangeBatchRejectsMalformedAndContradictoryRanges
+ 7/86 Test #3517: GpuTransferFacade.MultiRangeBatchRejectsMalformedAndContradictoryRanges ...................   Passed    0.00 sec
+      Start 3518: GpuTransferFacade.CancelledBatchRetainsSinkStorageUntilTransferRetires
+ 8/86 Test #3518: GpuTransferFacade.CancelledBatchRetainsSinkStorageUntilTransferRetires ....................   Passed    0.00 sec
+      Start 3519: GpuTransferFacade.ConsumeRejectsStaleBufferGenerationBeforeExposingBytes
+ 9/86 Test #3519: GpuTransferFacade.ConsumeRejectsStaleBufferGenerationBeforeExposingBytes ..................   Passed    0.00 sec
+      Start 3678: FrameRecipeContract.DefaultRecipeBuildsCanonicalPassOrder
+10/86 Test #3678: FrameRecipeContract.DefaultRecipeBuildsCanonicalPassOrder .................................   Passed    0.00 sec
+      Start 3679: FrameRecipeContract.UvViewIsAbsentFromTheDisabledDefaultRecipe
+11/86 Test #3679: FrameRecipeContract.UvViewIsAbsentFromTheDisabledDefaultRecipe ............................   Passed    0.00 sec
+      Start 3680: FrameRecipeContract.UvViewWritesRetainedImportBeforeImGuiSamplesIt
+12/86 Test #3680: FrameRecipeContract.UvViewWritesRetainedImportBeforeImGuiSamplesIt ........................   Passed    0.00 sec
+      Start 3681: FrameRecipeContract.FirstGenerationUvViewTransitionsFromUndefinedToShaderRead
+13/86 Test #3681: FrameRecipeContract.FirstGenerationUvViewTransitionsFromUndefinedToShaderRead .............   Passed    0.00 sec
+      Start 3682: FrameRecipeContract.UvViewRequiresRetainedTextureImport
+14/86 Test #3682: FrameRecipeContract.UvViewRequiresRetainedTextureImport ...................................   Passed    0.00 sec
+      Start 3683: FrameRecipeContract.DefaultRecipePropagatesTypedPassAndResourceIds
+15/86 Test #3683: FrameRecipeContract.DefaultRecipePropagatesTypedPassAndResourceIds ........................   Passed    0.00 sec
+      Start 3684: FrameRecipeContract.CompiledPassLookupUsesTypedIdWhenDebugNameChanges
+16/86 Test #3684: FrameRecipeContract.CompiledPassLookupUsesTypedIdWhenDebugNameChanges .....................   Passed    0.00 sec
+      Start 3685: FrameRecipeContract.CompiledResourceLookupUsesTypedIdWhenDebugNameChanges
+17/86 Test #3685: FrameRecipeContract.CompiledResourceLookupUsesTypedIdWhenDebugNameChanges .................   Passed    0.00 sec
+      Start 3686: FrameRecipeContract.TypedIdentityDoesNotChangeDebugNames
+18/86 Test #3686: FrameRecipeContract.TypedIdentityDoesNotChangeDebugNames ..................................   Passed    0.00 sec
+      Start 3687: FrameRecipeContract.DuplicateTypedPassIdsAreDiagnosed
+19/86 Test #3687: FrameRecipeContract.DuplicateTypedPassIdsAreDiagnosed .....................................   Passed    0.00 sec
+      Start 3688: FrameRecipeContract.DuplicateTypedPassIdsReportEarliestDuplicateAcrossGroups
+20/86 Test #3688: FrameRecipeContract.DuplicateTypedPassIdsReportEarliestDuplicateAcrossGroups ..............   Passed    0.00 sec
+      Start 3689: FrameRecipeContract.DuplicateTypedResourceIdsAreDiagnosed
+21/86 Test #3689: FrameRecipeContract.DuplicateTypedResourceIdsAreDiagnosed .................................   Passed    0.00 sec
+      Start 3690: FrameRecipeContract.DefaultRecipeDoesNotDepthTransitionColorResources
+22/86 Test #3690: FrameRecipeContract.DefaultRecipeDoesNotDepthTransitionColorResources .....................   Passed    0.00 sec
+      Start 3691: FrameRecipeContract.DefaultRecipeBarriersRespectTextureUsageCapabilities
+23/86 Test #3691: FrameRecipeContract.DefaultRecipeBarriersRespectTextureUsageCapabilities ..................   Passed    0.00 sec
+      Start 3692: FrameRecipeContract.DefaultRecipeCompiledGraphHasNoValidationFindings
+24/86 Test #3692: FrameRecipeContract.DefaultRecipeCompiledGraphHasNoValidationFindings .....................   Passed    0.00 sec
+      Start 3693: FrameRecipeContract.ContributionDescriptorProjectsTypedResourcesIntoRecipeIntrospection
+25/86 Test #3693: FrameRecipeContract.ContributionDescriptorProjectsTypedResourcesIntoRecipeIntrospection ...   Passed    0.00 sec
+      Start 3694: FrameRecipeContract.DisabledContributionDescriptorIsFeatureGatedNoOp
+26/86 Test #3694: FrameRecipeContract.DisabledContributionDescriptorIsFeatureGatedNoOp ......................   Passed    0.00 sec
+      Start 3695: FrameRecipeContract.ContributionValidationFailsClosedForInvalidDescriptors
+27/86 Test #3695: FrameRecipeContract.ContributionValidationFailsClosedForInvalidDescriptors ................   Passed    0.00 sec
+      Start 3696: FrameRecipeContract.DefaultOverlayContributionsProjectLegacyOverlayShape
+28/86 Test #3696: FrameRecipeContract.DefaultOverlayContributionsProjectLegacyOverlayShape ..................   Passed    0.00 sec
+      Start 3697: FrameRecipeContract.ExplicitDefaultOverlayContributionsMatchDefaultBuildShape
+29/86 Test #3697: FrameRecipeContract.ExplicitDefaultOverlayContributionsMatchDefaultBuildShape .............   Passed    0.00 sec
+      Start 3698: FrameRecipeContract.EmptyContributionRegistryCompilesOverlayAbsentCoreRecipe
+30/86 Test #3698: FrameRecipeContract.EmptyContributionRegistryCompilesOverlayAbsentCoreRecipe ..............   Passed    0.00 sec
+      Start 3699: FrameRecipeContract.DefaultRecipeUsesResourceDependenciesWithoutLinearChain
+31/86 Test #3699: FrameRecipeContract.DefaultRecipeUsesResourceDependenciesWithoutLinearChain ...............   Passed    0.00 sec
+      Start 3700: FrameRecipeContract.DependencyDrivenDefaultRecipeKeepsBarrierPacketsTopological
+32/86 Test #3700: FrameRecipeContract.DependencyDrivenDefaultRecipeKeepsBarrierPacketsTopological ...........   Passed    0.00 sec
+      Start 3701: FrameRecipeContract.RenderGraphDebugDumpReportsExplicitDependencyState
+33/86 Test #3701: FrameRecipeContract.RenderGraphDebugDumpReportsExplicitDependencyState ....................   Passed    0.00 sec
+      Start 3702: FrameRecipeContract.DefaultRecipeDrawPassesDeclareRenderPassAttachments
+34/86 Test #3702: FrameRecipeContract.DefaultRecipeDrawPassesDeclareRenderPassAttachments ...................   Passed    0.00 sec
+      Start 3703: FrameRecipeContract.SpatialAARecipeDrawPassesDeclareRenderPassAttachments
+35/86 Test #3703: FrameRecipeContract.SpatialAARecipeDrawPassesDeclareRenderPassAttachments .................   Passed    0.00 sec
+      Start 3704: FrameRecipeContract.OptionalResourcesAreGatedByFeatures
+36/86 Test #3704: FrameRecipeContract.OptionalResourcesAreGatedByFeatures ...................................   Passed    0.00 sec
+      Start 3705: FrameRecipeContract.AAModeSelectorCompilesExpectedPassSets
+37/86 Test #3705: FrameRecipeContract.AAModeSelectorCompilesExpectedPassSets ................................   Passed    0.00 sec
+      Start 3706: FrameRecipeContract.TemporalReconstructionUsesInputAndOutputExtents
+38/86 Test #3706: FrameRecipeContract.TemporalReconstructionUsesInputAndOutputExtents .......................   Passed    0.00 sec
+      Start 3707: FrameRecipeContract.NoJitterNoHistorySuppressesTemporalReconstruction
+39/86 Test #3707: FrameRecipeContract.NoJitterNoHistorySuppressesTemporalReconstruction .....................   Passed    0.00 sec
+      Start 3708: FrameRecipeContract.TemporalReconstructionRequiresHistoryImports
+40/86 Test #3708: FrameRecipeContract.TemporalReconstructionRequiresHistoryImports ..........................   Passed    0.00 sec
+      Start 3709: FrameRecipeContract.LightingPathControlsGBufferResourcesAndComposition
+41/86 Test #3709: FrameRecipeContract.LightingPathControlsGBufferResourcesAndComposition ....................   Passed    0.00 sec
+      Start 3710: FrameRecipeContract.MotionVectorTargetIsOptInRg16SurfaceOutput
+42/86 Test #3710: FrameRecipeContract.MotionVectorTargetIsOptInRg16SurfaceOutput ............................   Passed    0.00 sec
+      Start 3711: FrameRecipeContract.NoJitterNoHistorySuppressesMotionVectorTarget
+43/86 Test #3711: FrameRecipeContract.NoJitterNoHistorySuppressesMotionVectorTarget .........................   Passed    0.00 sec
+      Start 3712: FrameRecipeContract.DepthPrepassFeatureGatesPassAndSurfaceDepthOwnership
+44/86 Test #3712: FrameRecipeContract.DepthPrepassFeatureGatesPassAndSurfaceDepthOwnership ..................   Passed    0.00 sec
+      Start 3713: FrameRecipeContract.HZBBuildRequiresDepthPrepassAndImportedTarget
+45/86 Test #3713: FrameRecipeContract.HZBBuildRequiresDepthPrepassAndImportedTarget .........................   Passed    0.00 sec
+      Start 3714: FrameRecipeContract.ClusterGridBuildRequiresDepthPrepassAndImportedTarget
+46/86 Test #3714: FrameRecipeContract.ClusterGridBuildRequiresDepthPrepassAndImportedTarget .................   Passed    0.00 sec
+      Start 3715: FrameRecipeContract.LightClusterAssignmentRequiresGridBuildAndImportedOutputs
+47/86 Test #3715: FrameRecipeContract.LightClusterAssignmentRequiresGridBuildAndImportedOutputs .............   Passed    0.00 sec
+      Start 3716: FrameRecipeContract.ClusterPassesRequestAsyncComputeAndDemoteToGraphics
+48/86 Test #3716: FrameRecipeContract.ClusterPassesRequestAsyncComputeAndDemoteToGraphics ...................   Passed    0.00 sec
+      Start 3717: FrameRecipeContract.BackbufferIsFinalizedOnlyByPresentDeclaration
+49/86 Test #3717: FrameRecipeContract.BackbufferIsFinalizedOnlyByPresentDeclaration .........................   Passed    0.00 sec
+      Start 3718: FrameRecipeContract.IntrospectionReportsPassResourceReadsAndWrites
+50/86 Test #3718: FrameRecipeContract.IntrospectionReportsPassResourceReadsAndWrites ........................   Passed    0.00 sec
+      Start 3719: FrameRecipeContract.PickingRequiresDepthPrepass
+51/86 Test #3719: FrameRecipeContract.PickingRequiresDepthPrepass ...........................................   Passed    0.00 sec
+      Start 3720: FrameRecipeContract.SelectionOutlineRequiresSelectionIdDepthPrepass
+52/86 Test #3720: FrameRecipeContract.SelectionOutlineRequiresSelectionIdDepthPrepass .......................   Passed    0.00 sec
+      Start 3721: FrameRecipeContract.SelectionOutlineWithoutPendingPickProducesIdsWithoutReadback
+53/86 Test #3721: FrameRecipeContract.SelectionOutlineWithoutPendingPickProducesIdsWithoutReadback ..........   Passed    0.00 sec
+      Start 3722: FrameRecipeContract.PickingPassRunsAfterDepthPrepass
+54/86 Test #3722: FrameRecipeContract.PickingPassRunsAfterDepthPrepass ......................................   Passed    0.00 sec
+      Start 3723: FrameRecipeContract.PickingReadbackImportedFromRenderer
+55/86 Test #3723: FrameRecipeContract.PickingReadbackImportedFromRenderer ...................................   Passed    0.00 sec
+      Start 3724: FrameRecipeContract.PickingIdTargetsDeclareTransferSrcUsageForReadbackCopies
+56/86 Test #3724: FrameRecipeContract.PickingIdTargetsDeclareTransferSrcUsageForReadbackCopies ..............   Passed    0.00 sec
+      Start 3725: FrameRecipeContract.MissingBackbufferReportsDiagnostic
+57/86 Test #3725: FrameRecipeContract.MissingBackbufferReportsDiagnostic ....................................   Passed    0.00 sec
+      Start 3726: FrameRecipeContract.ShadowAtlasUsesImportedHandleWhenProvided
+58/86 Test #3726: FrameRecipeContract.ShadowAtlasUsesImportedHandleWhenProvided .............................   Passed    0.00 sec
+      Start 3727: FrameRecipeContract.ShadowAtlasFallsBackToTransientWhenImportInvalid
+59/86 Test #3727: FrameRecipeContract.ShadowAtlasFallsBackToTransientWhenImportInvalid ......................   Passed    0.00 sec
+      Start 3728: FrameRecipeContract.ShadowAtlasTransientPathAcceptsTypedShadowSizing
+60/86 Test #3728: FrameRecipeContract.ShadowAtlasTransientPathAcceptsTypedShadowSizing ......................   Passed    0.00 sec
+      Start 3729: FrameRecipeContract.PickingPassClearsSelectionIdTargetsToZero
+61/86 Test #3729: FrameRecipeContract.PickingPassClearsSelectionIdTargetsToZero .............................   Passed    0.00 sec
+      Start 3730: FrameRecipeContract.SceneDepthGainsTransferSrcUsageWhenPickingActive
+62/86 Test #3730: FrameRecipeContract.SceneDepthGainsTransferSrcUsageWhenPickingActive ......................   Passed    0.00 sec
+      Start 4010: RenderGraphValidation.EmptyGraphHasNoFindings
+63/86 Test #4010: RenderGraphValidation.EmptyGraphHasNoFindings .............................................   Passed    0.00 sec
+      Start 4011: RenderGraphValidation.LoadWithoutEarlierWriterReportsWarning
+64/86 Test #4011: RenderGraphValidation.LoadWithoutEarlierWriterReportsWarning ..............................   Passed    0.00 sec
+      Start 4012: RenderGraphValidation.TransientBufferReadWithoutProducerReportsError
+65/86 Test #4012: RenderGraphValidation.TransientBufferReadWithoutProducerReportsError ......................   Passed    0.00 sec
+      Start 4013: RenderGraphValidation.TextureReadBeforeProducerReportsMissingProducer
+66/86 Test #4013: RenderGraphValidation.TextureReadBeforeProducerReportsMissingProducer .....................   Passed    0.00 sec
+      Start 4014: RenderGraphValidation.BufferReadBeforeProducerReportsMissingProducer
+67/86 Test #4014: RenderGraphValidation.BufferReadBeforeProducerReportsMissingProducer ......................   Passed    0.00 sec
+      Start 4015: RenderGraphValidation.TransientTextureReadWithoutProducerReportsError
+68/86 Test #4015: RenderGraphValidation.TransientTextureReadWithoutProducerReportsError .....................   Passed    0.00 sec
+      Start 4016: RenderGraphValidation.ImportedBackbufferNonFinalizerWriteReportsError
+69/86 Test #4016: RenderGraphValidation.ImportedBackbufferNonFinalizerWriteReportsError .....................   Passed    0.00 sec
+      Start 4017: RenderGraphValidation.ImportedTextureAuthorizationListControlsWriters
+70/86 Test #4017: RenderGraphValidation.ImportedTextureAuthorizationListControlsWriters .....................   Passed    0.00 sec
+      Start 4018: RenderGraphValidation.ShaderReadBoundaryImportRejectsWriteWithoutAuthorization
+71/86 Test #4018: RenderGraphValidation.ShaderReadBoundaryImportRejectsWriteWithoutAuthorization ............   Passed    0.00 sec
+      Start 4019: RenderGraphValidation.AuthorizedImportedWritePreservesShaderReadBoundaryStates
+72/86 Test #4019: RenderGraphValidation.AuthorizedImportedWritePreservesShaderReadBoundaryStates ............   Passed    0.00 sec
+      Start 4020: RenderGraphValidation.ImportedBufferAuthorizationListControlsWriters
+73/86 Test #4020: RenderGraphValidation.ImportedBufferAuthorizationListControlsWriters ......................   Passed    0.00 sec
+      Start 4021: RenderGraphValidation.ImportedBackbufferFinalStateMismatchReportsError
+74/86 Test #4021: RenderGraphValidation.ImportedBackbufferFinalStateMismatchReportsError ....................   Passed    0.00 sec
+      Start 4022: RenderGraphValidation.CompileInvalidExplicitDependencyReportsStructuredFinding
+75/86 Test #4022: RenderGraphValidation.CompileInvalidExplicitDependencyReportsStructuredFinding ............   Passed    0.00 sec
+      Start 4023: RenderGraphValidation.CompileInvalidResourceAccessReportsStructuredFindings
+76/86 Test #4023: RenderGraphValidation.CompileInvalidResourceAccessReportsStructuredFindings ...............   Passed    0.00 sec
+      Start 4024: RenderGraphValidation.CompileRenderPassAttachmentMismatchesReportStructuredFindings
+77/86 Test #4024: RenderGraphValidation.CompileRenderPassAttachmentMismatchesReportStructuredFindings .......   Passed    0.00 sec
+      Start 4025: RenderGraphValidation.CompileCycleReportsStructuredFinding
+78/86 Test #4025: RenderGraphValidation.CompileCycleReportsStructuredFinding ................................   Passed    0.00 sec
+      Start 4026: RenderGraphValidation.CompileBackbufferWrittenByNonFinalizerReportsStructuredFinding
+79/86 Test #4026: RenderGraphValidation.CompileBackbufferWrittenByNonFinalizerReportsStructuredFinding ......   Passed    0.00 sec
+      Start 4027: RenderGraphValidation.SuccessfulCompileStoresValidationFindings
+80/86 Test #4027: RenderGraphValidation.SuccessfulCompileStoresValidationFindings ...........................   Passed    0.00 sec
+      Start 4028: RenderGraphValidation.FindingsUseDeterministicSeverityCodePassResourceOrdering
+81/86 Test #4028: RenderGraphValidation.FindingsUseDeterministicSeverityCodePassResourceOrdering ............   Passed    0.00 sec
+      Start 4029: RenderGraphValidation.ColorAttachmentReadUsesReadStateAndSkipsConsecutiveReadBarrier
+82/86 Test #4029: RenderGraphValidation.ColorAttachmentReadUsesReadStateAndSkipsConsecutiveReadBarrier ......   Passed    0.00 sec
+      Start 4030: RenderGraphValidation.LoadedColorAttachmentUsesOneReadWriteState
+83/86 Test #4030: RenderGraphValidation.LoadedColorAttachmentUsesOneReadWriteState ..........................   Passed    0.00 sec
+      Start 4031: RenderGraphValidation.TransientMemoryEstimateUsesRhiBlockCompressedStorageSize
+84/86 Test #4031: RenderGraphValidation.TransientMemoryEstimateUsesRhiBlockCompressedStorageSize ............   Passed    0.00 sec
+      Start 4032: RenderGraphValidation.ResetReusedPassRecordClearsStaleDeclarations
+85/86 Test #4032: RenderGraphValidation.ResetReusedPassRecordClearsStaleDeclarations ........................   Passed    0.00 sec
+      Start 4033: RenderGraphValidation.ResetReusedCompilerScratchKeepsCompiledOutputStable
+86/86 Test #4033: RenderGraphValidation.ResetReusedCompilerScratchKeepsCompiledOutputStable .................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 86
+
+Label Time Summary:
+contract    =   0.28 sec*proc (85 tests)
+gpu         =   0.36 sec*proc (1 test)
+graphics    =   0.64 sec*proc (86 tests)
+vulkan      =   0.36 sec*proc (1 test)
+
+Total Test time (real) =   0.86 sec

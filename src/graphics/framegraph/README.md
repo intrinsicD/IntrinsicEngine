@@ -54,6 +54,10 @@ Read-only color attachment uses (`TextureUsage::ColorAttachmentRead`) compile to
 a dedicated read barrier state that lowers to color-attachment layout with
 `ColorAttachmentRead` access, so consecutive read-only color attachment accesses
 do not emit artificial write-state transitions.
+A pass that loads and then writes the same color attachment compiles those two
+declarations into one `ColorAttachmentReadWrite` state. This gives Vulkan's
+`LOAD` operation the required read access without emitting two competing layout
+transitions before the pass.
 
 Tests should assert compiled graph/resource properties by typed recipe identity
 where available, and may assert pass/resource names only for diagnostics and

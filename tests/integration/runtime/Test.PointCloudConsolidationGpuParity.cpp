@@ -500,7 +500,7 @@ TEST(PointCloudConsolidationGpuParity,
     config.Window.Width = 64;
     config.Window.Height = 64;
     config.Window.Resizable = false;
-    config.Render.EnableValidation = false;
+    config.Render.EnableValidation = true;
     config.Render.EnableVSync = false;
     config.ReferenceScene.Enabled = false;
 
@@ -523,6 +523,8 @@ TEST(PointCloudConsolidationGpuParity,
             << "Promoted Vulkan did not reach device/swapchain/command readiness.";
     }
 
+    const auto validationBefore = Extrinsic::Backends::Vulkan::
+        GetVulkanOperationalDiagnosticsSnapshot();
     engine.Run();
 
     EXPECT_FALSE(appPtr->MissingService);
@@ -587,6 +589,10 @@ TEST(PointCloudConsolidationGpuParity,
     EXPECT_EQ(appPtr->Stats.ResultsCommitted, 4u);
 
     engine.Shutdown();
+    const auto validationAfter = Extrinsic::Backends::Vulkan::
+        GetVulkanOperationalDiagnosticsSnapshot();
+    EXPECT_EQ(validationAfter.VulkanValidationErrorCount,
+              validationBefore.VulkanValidationErrorCount);
 }
 
 TEST(PointCloudConsolidationGpuParity,
@@ -622,7 +628,7 @@ TEST(PointCloudConsolidationGpuParity,
     config.Window.Width = 64;
     config.Window.Height = 64;
     config.Window.Resizable = false;
-    config.Render.EnableValidation = false;
+    config.Render.EnableValidation = true;
     config.Render.EnableVSync = false;
     config.ReferenceScene.Enabled = false;
 
@@ -646,6 +652,8 @@ TEST(PointCloudConsolidationGpuParity,
             << "Promoted Vulkan did not reach device/swapchain/command readiness.";
     }
 
+    const auto validationBefore = Extrinsic::Backends::Vulkan::
+        GetVulkanOperationalDiagnosticsSnapshot();
     engine.Run();
 
     EXPECT_FALSE(appPtr->MissingService);
@@ -743,4 +751,8 @@ TEST(PointCloudConsolidationGpuParity,
         std::to_string(appPtr->UpdatedContentRevision));
 
     engine.Shutdown();
+    const auto validationAfter = Extrinsic::Backends::Vulkan::
+        GetVulkanOperationalDiagnosticsSnapshot();
+    EXPECT_EQ(validationAfter.VulkanValidationErrorCount,
+              validationBefore.VulkanValidationErrorCount);
 }

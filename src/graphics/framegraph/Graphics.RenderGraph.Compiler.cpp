@@ -45,6 +45,59 @@ namespace Extrinsic::Graphics
             return TextureBarrierState::Undefined;
         }
 
+        [[nodiscard]] bool RequiresColorAttachmentReadWrite(
+            const RenderPassRecord& pass,
+            const std::uint32_t textureIndex) noexcept
+        {
+            bool readsAttachment = false;
+            bool writesAttachment = false;
+            std::size_t colorAttachmentIndex = 0u;
+
+            for (const TextureAccess& access : pass.TextureAccesses)
+            {
+                if (access.Ref.Index == textureIndex &&
+                    access.Usage == TextureUsage::ColorAttachmentRead)
+                {
+                    readsAttachment = true;
+                }
+
+                if (!access.Write ||
+                    access.Usage != TextureUsage::ColorAttachmentWrite)
+                {
+                    continue;
+                }
+
+                if (access.Ref.Index == textureIndex)
+                {
+                    writesAttachment = true;
+                    if (pass.HasRenderPassDesc &&
+                        colorAttachmentIndex <
+                            pass.RenderPass.ColorTargets.size() &&
+                        pass.RenderPass.ColorTargets[colorAttachmentIndex].Load ==
+                            RHI::LoadOp::Load)
+                    {
+                        readsAttachment = true;
+                    }
+                }
+                ++colorAttachmentIndex;
+            }
+
+            return readsAttachment && writesAttachment;
+        }
+
+        [[nodiscard]] TextureBarrierState ToTextureBarrierState(
+            const RenderPassRecord& pass,
+            const TextureAccess& access) noexcept
+        {
+            if ((access.Usage == TextureUsage::ColorAttachmentRead ||
+                 access.Usage == TextureUsage::ColorAttachmentWrite) &&
+                RequiresColorAttachmentReadWrite(pass, access.Ref.Index))
+            {
+                return TextureBarrierState::ColorAttachmentReadWrite;
+            }
+            return ToTextureBarrierState(access.Usage);
+        }
+
         [[nodiscard]] constexpr TextureBarrierState ToTextureBarrierState(const TextureState state)
         {
             switch (state)
@@ -2196,7 +2249,7 @@ namespace Extrinsic::Graphics
             for (const auto& access : pass.TextureAccesses)
             {
                 const std::uint32_t textureIndex = access.Ref.Index;
-                const auto next = ToTextureBarrierState(access.Usage);
+                const auto next = ToTextureBarrierState(pass, access);
                 const auto prev = textureStateByRef[textureIndex];
                 const QueueSharingMode sharingMode = textureQueueSharingModes[textureIndex];
                 const bool needsOwnershipTransfer =

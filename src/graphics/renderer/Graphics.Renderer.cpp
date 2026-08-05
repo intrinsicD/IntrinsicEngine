@@ -986,6 +986,7 @@ namespace Extrinsic::Graphics
             case TextureBarrierState::Undefined:           return RHI::TextureLayout::Undefined;
             case TextureBarrierState::ColorAttachmentWrite: return RHI::TextureLayout::ColorAttachment;
             case TextureBarrierState::ColorAttachmentRead:  return RHI::TextureLayout::ColorAttachment;
+            case TextureBarrierState::ColorAttachmentReadWrite: return RHI::TextureLayout::ColorAttachment;
             case TextureBarrierState::DepthWrite:           return RHI::TextureLayout::DepthAttachment;
             case TextureBarrierState::DepthRead:            return RHI::TextureLayout::DepthReadOnly;
             case TextureBarrierState::ShaderRead:           return RHI::TextureLayout::ShaderReadOnly;
@@ -1004,6 +1005,9 @@ namespace Extrinsic::Graphics
             case TextureBarrierState::Undefined:            return RHI::MemoryAccess::None;
             case TextureBarrierState::ColorAttachmentWrite: return RHI::MemoryAccess::ColorAttachmentWrite;
             case TextureBarrierState::ColorAttachmentRead:  return RHI::MemoryAccess::ColorAttachmentRead;
+            case TextureBarrierState::ColorAttachmentReadWrite:
+                return RHI::MemoryAccess::ColorAttachmentRead |
+                       RHI::MemoryAccess::ColorAttachmentWrite;
             case TextureBarrierState::DepthRead:            return RHI::MemoryAccess::DepthStencilRead;
             case TextureBarrierState::DepthWrite:           return RHI::MemoryAccess::DepthStencilWrite;
             case TextureBarrierState::ShaderRead:           return RHI::MemoryAccess::ShaderRead;
