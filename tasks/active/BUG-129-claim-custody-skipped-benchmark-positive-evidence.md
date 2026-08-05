@@ -20,8 +20,8 @@ contracts: [repo.task-contract-discovery]
   independent review is pending.
 
 ## Goal
-- Make Vulkan benchmark runners and claim-grade benchmark custody fail closed
-  when the requested backend did not execute successfully.
+- Make the METHOD-020 claim-grade Vulkan benchmark runner and benchmark
+  custody fail closed when the requested backend did not execute successfully.
 
 ## Non-goals
 - Do not invalidate genuine passed benchmark evidence or rewrite frozen

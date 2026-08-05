@@ -27,10 +27,10 @@ This document defines how to create and review benchmark work.
 - Avoid requiring external large datasets for smoke checks.
 - Native producers use `tools/benchmark/run_and_seal.py`; raw output is not a
   publishable result.
-- Native runners return zero only for `passed`; `skipped`, `failed`, and
-  `error` retain raw diagnostics but return nonzero. GPU runners report the
-  requested backend separately from the actual backend and use an explicit
-  non-execution state when no request reached that backend.
+- Claim-grade native runners return zero only for `passed`; `skipped`,
+  `failed`, and `error` retain raw diagnostics but return nonzero. Claim-grade
+  GPU runners report the requested backend separately from the actual backend
+  and use an explicit non-execution state when no request reached that backend.
 - Local or unverified source defaults to non-claim-eligible.
 
 ## Reporting requirements
