@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "SupportRadius|PointCloudConsolidation|SandboxConfigSections|SandboxPointCloudConsolidationPanel",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'SupportRadius|PointCloudConsolidation|SandboxConfigSections|SandboxPointCloudConsolidationPanel' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 1462,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T01:00:59Z",
+  "label": "revision2-focused-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T01:00:58Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/revision2-focused-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/revision2-focused-tests.stdout.log",
+  "stdout_sha256": "79b9d663d2c3bceb32dd3a2b7f2572f89c32e73969904b21225db8cbc1e57e0f",
+  "task_id": "GEOM-075"
+}

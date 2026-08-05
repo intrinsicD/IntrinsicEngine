@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 693,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T01:08:54Z",
+  "label": "revision2-task-policy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T01:08:53Z",
+  "stderr_path": "tasks/evidence/GEOM-075/commands/revision2-task-policy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-075/commands/revision2-task-policy.stdout.log",
+  "stdout_sha256": "a42172af4b4dc6c389adb4df8bed89cb8761f953612ebe43337ab02a09aef880",
+  "task_id": "GEOM-075"
+}
