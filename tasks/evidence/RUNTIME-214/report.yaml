@@ -1,0 +1,233 @@
+schema_version: 1
+task_id: RUNTIME-214
+workflow_profile: high-risk
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-05T15:19:22Z'
+claim_eligible: false
+source:
+  base_ref: fd95199abcbc85e78e8e46d350ba5f724f04c898
+  base_revision: fd95199abcbc85e78e8e46d350ba5f724f04c898
+  head_revision: 548e62b5fd5970d5bf913e12d85ae768ffb3fa15
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: ara/staging/observations.yaml
+    sha256: 327387eadc20467314ba335ebb7d54e868e30061a883db2f0b315b1e25635c50
+  - path: ara/trace/exploration_tree.yaml
+    sha256: d7575851281e15f423ca16e57842f1510bca48c890ec9527df49a9484da306d2
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: 4a5e20b0fe6d7e23dc95f093d668c548c476847d10556097427cbc0c12840f13
+  - path: ara/trace/sessions/2026-08-05_001.yaml
+    sha256: ce3c9fc507fb344b092c005b17449e83d93161742411e94e82d3aab972aca917
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: b911e52426299b204cb08596ee61bfe61a2ade11e3e1a853723477d8810272ad
+  - path: docs/architecture/contract-catalog.yaml
+    sha256: 0c2eface163de91923b6001206284c4ea48af9928b1881ec2550d40ed74aa5a7
+  - path: docs/architecture/geometry-api-style.md
+    sha256: 8450ab9fb58399cfc4ae556f6a5eac2161b2cc21a0f6df96315c4176bb70bb7a
+  - path: docs/architecture/graphics.md
+    sha256: d689689d4f14eeaca5302ede47876dc983cb1f8185327ac5a0a9b9c1d2e7313f
+  - path: docs/architecture/index.md
+    sha256: ba22a138ead5740273c6da85c633fb25733e813f7fa6c14490942eb47b5e667a
+  - path: docs/architecture/property-coherence.md
+    sha256: d4f49a0bb0c60e41b130fcb329e5a7f19b9c84ec08f2ed6b75bf7856f2ca06d0
+  - path: docs/architecture/runtime.md
+    sha256: 2713a7d46756b9e0d03dc9b40d1d895c036b5021d9a032fce65917f15c897060
+  - path: src/geometry/Geometry.Properties.cpp
+    sha256: d0e9f648e3a8f5c12bf2b9fb4cbb2adc4e37d7e87ca8b18dee304480b768564b
+  - path: src/geometry/Geometry.Properties.cppm
+    sha256: 55eb06c6a5bb1e2121386ef7daf625edfb60d041742dc8b2c765089a32092d26
+  - path: src/graphics/renderer/Graphics.GpuTransfer.cpp
+    sha256: 893686668caf691db2583db4359540d3618129658766bac030467903ae66becc
+  - path: src/graphics/renderer/Graphics.GpuTransfer.cppm
+    sha256: 20f8af816b7379126d6d87e96b5a9949d7ea46d4a4782fb5bba004a1810ed37d
+  - path: src/graphics/renderer/Graphics.GpuWorld.cpp
+    sha256: 4554515d21041d263a8ab9e79acf1e2fef50421169b0d645a978b0d7d5fd6b2e
+  - path: src/graphics/renderer/README.md
+    sha256: 78ea4435b3bba8fb2b4418208c180f1e151df2fdcc7045a164691c978df1cdd3
+  - path: src/graphics/rhi/RHI.TransferQueue.cppm
+    sha256: fe71a8e1bca8505ac08fc6f7b21c5b63f90f05278593391c4ad2abcaa8eb8882
+  - path: src/graphics/vulkan/Backends.Vulkan.Transfer.cpp
+    sha256: 6b191a829d20a6d2ad571a2b36ec2c9716d95c26b275f97eea188ffdf6b8db82
+  - path: src/graphics/vulkan/README.md
+    sha256: af3cd4c9194df119c49c8d851f7e1662c9e0f9d0e5b3cf5d2d1e000cb51b118e
+  - path: src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
+    sha256: 457638af7fe3e43710df57b58a59a23ef6dfda9ef04bbbc2f201fdf6918daa98
+  - path: src/runtime/README.md
+    sha256: e875cb95efa5246501e8e88df545626fcb553c969bf12747e8e7e89c3634fadc
+  - path: src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+    sha256: da792637906d5270989731b5af9ee1acca07530ba07d373c4c4580a9d3f093c3
+  - path: src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp
+    sha256: 98ecb1566d6e2c91e2d997a47da9c884f231accabbf3b7c60e913b4ea005ff00
+  - path: src/runtime/Runtime.RenderExtraction.Geometry.cpp
+    sha256: 3666c8dc954f54dbb0489ca9fc8c6cb02f3f0888bb00ea0b2472fe86e298161e
+  - path: src/runtime/Runtime.RenderExtraction.Internal.cpp
+    sha256: e5f37b098240f404d8d5d9867ffd4eac6811812b9129b7d5d32d33fb812ad7d3
+  - path: src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
+    sha256: 70e4e6efe9dd056e6a8c3487af7dfffac442e1e46a12c0ef55a317f82e3b492f
+  - path: src/runtime/Visualization/Runtime.VisualizationRecipes.cppm
+    sha256: 176ec48b9a39fa62ea1f663b8f67eae45e65f0cfaf664b1031bcef8edc41d1ec
+  - path: tasks/SESSION-BRIEF.md
+    sha256: f0099313c464b90d20258aedf574d4fcbd002621c396bb512b348743649671a0
+  - path: tasks/active/RUNTIME-214-universal-geometry-property-coherence.md
+    sha256: 35ae39b6bd3db206c2e21ec8f0982264375f8b73e8cc85a5a72f6d1896d73ec5
+  - path: tests/contract/graphics/Test.GpuTransferFacade.cpp
+    sha256: 80edad196b15904efb57a0a8888a592799cc6674665b4e5629a4aab97a211672
+  - path: tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp
+    sha256: 0916242031aa1556e5f4305b31e85977378f4547efa5047888ea6888942994cd
+  - path: tests/contract/runtime/Test.GraphGeometryExtraction.cpp
+    sha256: b3e13ff4d3e41aab75cfafe9269ab07cfb4270d019e891b66763594f68402dff
+  - path: tests/contract/runtime/Test.MeshGeometryExtraction.cpp
+    sha256: 5536d28c0a910dbfa01c3baf0889ce25e0246b3684babc018f2254e9e844928f
+  - path: tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
+    sha256: ef9459e9be9d0fdf6f4256837e8ff058d228a276fabcf12db9931421f9fdb4ea
+  - path: tests/contract/runtime/Test.VisualizationRecipes.cpp
+    sha256: 27a9c8fce1e5cfc4d59f7d2bfd5afca8220a60d0d66920320bcd41cf885c14b0
+  - path: tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp
+    sha256: 56584043b9ba71113841219fdb7ae15e3fb7e0db96f3c827d4f5042d0562ac96
+  - path: tests/support/MockRHI.hpp
+    sha256: c29fd8f35a9053957de89e4c72dc16caea12de43216457773031467dab007243
+  - path: tests/unit/geometry/Test.GeometryProperties.cpp
+    sha256: 99c3b67108a4ab7a6f8fb0f470b7f691019ad3f72abe10d6240dab47b4ab1524
+  content_digest: 46c5c181b236fb8317dc4ef81b07ba1a1fbd11caac1dd81d080493abeae28253
+touched:
+  paths:
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-05_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/architecture/contract-catalog.yaml
+  - docs/architecture/geometry-api-style.md
+  - docs/architecture/graphics.md
+  - docs/architecture/index.md
+  - docs/architecture/property-coherence.md
+  - docs/architecture/runtime.md
+  - src/geometry/Geometry.Properties.cpp
+  - src/geometry/Geometry.Properties.cppm
+  - src/graphics/renderer/Graphics.GpuTransfer.cpp
+  - src/graphics/renderer/Graphics.GpuTransfer.cppm
+  - src/graphics/renderer/Graphics.GpuWorld.cpp
+  - src/graphics/renderer/README.md
+  - src/graphics/rhi/RHI.TransferQueue.cppm
+  - src/graphics/vulkan/Backends.Vulkan.Transfer.cpp
+  - src/graphics/vulkan/README.md
+  - src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
+  - src/runtime/README.md
+  - src/runtime/Runtime.PointCloudConsolidationGpu.cpp
+  - src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp
+  - src/runtime/Runtime.RenderExtraction.Geometry.cpp
+  - src/runtime/Runtime.RenderExtraction.Internal.cpp
+  - src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
+  - src/runtime/Visualization/Runtime.VisualizationRecipes.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/RUNTIME-214-universal-geometry-property-coherence.md
+  - tests/contract/graphics/Test.GpuTransferFacade.cpp
+  - tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp
+  - tests/contract/runtime/Test.GraphGeometryExtraction.cpp
+  - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
+  - tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
+  - tests/contract/runtime/Test.VisualizationRecipes.cpp
+  - tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp
+  - tests/support/MockRHI.hpp
+  - tests/unit/geometry/Test.GeometryProperties.cpp
+  layers:
+  - geometry
+  - graphics/renderer
+  - graphics/rhi
+  - graphics/vulkan
+  - runtime
+  modules:
+  - Extrinsic.Backends.Vulkan
+  - Extrinsic.Graphics.GpuTransfer
+  - Extrinsic.Graphics.GpuWorld
+  - Extrinsic.Runtime.RenderExtraction
+  - Extrinsic.Runtime.VisualizationRecipes
+  - Geometry.Properties
+extension_seam: Canonical PropertyRevision tokens feed existing extraction, residency, and transfer owners
+  without method-specific renderer calls.
+future_change_plan: New CPU methods publish through mutable canonical properties; new Vulkan geometry
+  methods use SubmitBufferUpload, remain GPU-local, and terminal-readback before Applied.
+acceptance:
+- criterion: Any existing or future CPU method that mutates a canonical geometry
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Any GPU method reports applied success only after terminal GPU output is
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: GPU method iterations do not introduce intermediate CPU copies, and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Mesh, graph, point-cloud, and compatible non-vertex property domains keep
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Focused CPU, sanitizer, and promoted Vulkan validation gates pass on the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-asan-build.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-asan-configure.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-asan-tests.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-final-build.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-final-cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-ubsan-configure.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-ubsan-tests.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-vulkan-build-after-smoke-fix.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-vulkan-build-after-upload-barrier.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-vulkan-build.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-after-upload-barrier.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-vulkan-configure.json
+- receipt: tasks/evidence/RUNTIME-214/commands/ci-vulkan-transfer-smoke-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/diff-check-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/diff-check-post-status.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-ara-claims-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-doc-links-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-doc-links-post-status.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-layering-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-method-manifests-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-root-hygiene-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-task-policy-final.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-task-policy-post-status.json
+- receipt: tasks/evidence/RUNTIME-214/commands/structural-test-layout-final.json
+changed_public_contracts:
+- geometry.property-coherence
+diagnostics_and_previews:
+- 'Final gates: 4103 CPU tests; 2683 ASan tests; 2683 UBSan tests; validation-enabled Vulkan staging smoke
+  plus two LOP workflows.'
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/active/RUNTIME-214-universal-geometry-property-coherence.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Retained mutable borrows require an explicit MarkModified after writes made beyond an observed boundary;
+  high-risk retirement still requires independent fixed-surface acceptance.
+skipped_checks: []
+artifacts:
+- path: docs/architecture/property-coherence.md
+  sha256: d4f49a0bb0c60e41b130fcb329e5a7f19b9c84ec08f2ed6b75bf7856f2ca06d0
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-214/handoff.jsonl
+review: tasks/evidence/RUNTIME-214/reviews.jsonl

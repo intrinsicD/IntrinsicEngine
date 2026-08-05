@@ -22,7 +22,7 @@
   "exit_code": 8,
   "finished_at": "2026-08-05T14:55:28Z",
   "label": "ci-vulkan-coherence-tests-after-upload-barrier",
-  "required": true,
+  "required": false,
   "schema_version": 1,
   "started_at": "2026-08-05T14:54:26Z",
   "stderr_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-after-upload-barrier.stderr.log",

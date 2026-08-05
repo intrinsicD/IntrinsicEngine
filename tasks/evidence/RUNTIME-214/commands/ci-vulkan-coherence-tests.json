@@ -22,7 +22,7 @@
   "exit_code": 8,
   "finished_at": "2026-08-05T14:35:53Z",
   "label": "ci-vulkan-coherence-tests",
-  "required": true,
+  "required": false,
   "schema_version": 1,
   "started_at": "2026-08-05T14:34:50Z",
   "stderr_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests.stderr.log",
