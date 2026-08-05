@@ -3,31 +3,31 @@ task_id: BUG-130
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-05T04:45:33Z'
+generated_at: '2026-08-05T04:58:16Z'
 claim_eligible: false
 source:
   base_ref: 70d38d38
   base_revision: 70d38d38b7f64c37c19d2fc2f2082b5d41fd97d0
-  head_revision: 14a91429727c60528b827f3882d226e79ebd8011
+  head_revision: 59055f40757954ffa922ab6d16a1d08e6cb1bd94
   branch: bug/BUG-130-rejected-run-task-seal
   worktree: /tmp/intrinsic-bug130.8PDH4l/worktree
   dirty: false
   surface:
   - path: docs/agent/workflow-evidence.md
-    sha256: 03e106e6aee756f1a68bec7f04d8219624ba88b7667281e9c8c9b8ae688fdc52
+    sha256: 69ba66d421e9bc59b1163a85b8df6f66f242868f78bc99141fd6483cced94e5d
   - path: tasks/backlog/bugs/index.md
-    sha256: 4d626503e5b6060f4dc313bb65aadc9897bd88b410a1f8c4fe6b3fb5a17fcc08
+    sha256: e678d49ef0e8e68ca3386d9c0425810f3f4a19f1ce057f9b13d4707c2e5aa379
   - path: tasks/done/BUG-130-rejected-run-historical-task-seal.md
-    sha256: 9e434978e0506f644a0402b41381424059849f407631bd6f57506483601b2202
+    sha256: d4cbf1dc6fe1f9cf3e96f56d2137c4d39d50914a275b5d7fd5fded69e43810db
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: 6298d14c636bfed85af42c448d13e83e84bc17175ea3e6db843e6535af9e43ac
+    sha256: fcff16b473ce09b3ca498bbaf334df51e6cb0e7246eee471dfa09b0f027b3ff7
   - path: tests/regression/tooling/Test.ExperimentCustody.py
-    sha256: ebccf0f31bd72d60de6794dbb7de5b745061fde12a064b8f72e4550d38198e3a
+    sha256: 29f708747d6d4c7e7fe3859e647f182b10b30772bc7ac742f971e783f72907a0
   - path: tools/agents/experiment_custody.py
-    sha256: d4adb943ee66b384ee4fefbd9e36bc864f538927ba866a84c4a571a220ddb2ed
+    sha256: 746cb8b1ae53e5f6ad079eebcd589f62d589bad0d925087994f987705bf249e9
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-    sha256: 03e106e6aee756f1a68bec7f04d8219624ba88b7667281e9c8c9b8ae688fdc52
-  content_digest: 05c3e790a659b9883e21adccba6ee705ece7698bc7cca67817f555cf0fd344ec
+    sha256: 69ba66d421e9bc59b1163a85b8df6f66f242868f78bc99141fd6483cced94e5d
+  content_digest: e3cde6cda862179feebb7094698b8e99e10442d24a1f86bd5bc92c9a8174ffe7
 touched:
   paths:
   - docs/agent/workflow-evidence.md
@@ -62,23 +62,33 @@ acceptance:
   evidence: []
   reason: null
 commands:
+- receipt: tasks/evidence/BUG-130/commands/custody-regression-r2.json
 - receipt: tasks/evidence/BUG-130/commands/custody-regression.json
 - receipt: tasks/evidence/BUG-130/commands/doc-links.json
+- receipt: tasks/evidence/BUG-130/commands/global-custody-r2.json
 - receipt: tasks/evidence/BUG-130/commands/global-custody.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-doc-links-r2.json
 - receipt: tasks/evidence/BUG-130/commands/retirement-doc-links.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-session-brief-r2.json
 - receipt: tasks/evidence/BUG-130/commands/retirement-session-brief.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-skill-mirrors-r2.json
 - receipt: tasks/evidence/BUG-130/commands/retirement-skill-mirrors.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-task-policy-r2.json
 - receipt: tasks/evidence/BUG-130/commands/retirement-task-policy.json
+- receipt: tasks/evidence/BUG-130/commands/retirement-task-validation-r2.json
 - receipt: tasks/evidence/BUG-130/commands/retirement-task-validation.json
+- receipt: tasks/evidence/BUG-130/commands/skill-mirror-check-r2.json
 - receipt: tasks/evidence/BUG-130/commands/skill-mirror-check.json
 - receipt: tasks/evidence/BUG-130/commands/task-policy.json
 - receipt: tasks/evidence/BUG-130/commands/task-validation.json
 changed_public_contracts:
 - Accepted experiment evidence remains bound to current task bytes; only clean-source independently rejected
-  evidence may use the exact same-ID, same-profile historical task blob.
+  evidence may use an exact same-ID, same-profile task blob under a canonical lifecycle root.
 diagnostics_and_previews:
 - METHOD-020 run-001 recomputes one genuine positive-audit error and validates globally after the task
   advances.
+- The reviewer-discovered tasks/evidence decoy substitution now fails closed in the 36-case regression
+  suite.
 benchmark_or_parity_evidence: []
 docs_sync:
   task_file: tasks/done/BUG-130-rejected-run-historical-task-seal.md
@@ -91,16 +101,16 @@ residual_risks:
 skipped_checks:
 - check: full-cpu
   reason: Python workflow tooling, policy prose, and Python regressions changed no C++ or runtime surface;
-    the complete 35-case custody suite is the strongest relevant behavioral gate.
+    the complete 36-case custody suite is the strongest relevant behavioral gate.
 artifacts:
 - path: tools/agents/experiment_custody.py
-  sha256: d4adb943ee66b384ee4fefbd9e36bc864f538927ba866a84c4a571a220ddb2ed
+  sha256: 746cb8b1ae53e5f6ad079eebcd589f62d589bad0d925087994f987705bf249e9
   kind: file
 - path: tests/regression/tooling/Test.ExperimentCustody.py
-  sha256: ebccf0f31bd72d60de6794dbb7de5b745061fde12a064b8f72e4550d38198e3a
+  sha256: 29f708747d6d4c7e7fe3859e647f182b10b30772bc7ac742f971e783f72907a0
   kind: file
 - path: docs/agent/workflow-evidence.md
-  sha256: 03e106e6aee756f1a68bec7f04d8219624ba88b7667281e9c8c9b8ae688fdc52
+  sha256: 69ba66d421e9bc59b1163a85b8df6f66f242868f78bc99141fd6483cced94e5d
   kind: file
 self_review:
   completed: true
