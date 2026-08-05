@@ -6577,3 +6577,17 @@ commits all sealed inputs forward and proves the historical run still passes,
 then tampers a current evidence link and proves the gate still rejects it. Both
 28-case tooling suites, global METHOD-016/METHOD-017 custody/workflow
 validation, skill-mirror sync, task policy, task schema, and docs links pass.
+
+[`BUG-129`](BUG-129-claim-custody-skipped-benchmark-positive-evidence.md) —
+claim-grade benchmark non-execution and custody hardening retired on
+2026-08-05. The METHOD-020 Vulkan runner now exits `2` for unavailable or
+failed execution, retains the raw skipped diagnostic, and distinguishes
+requested Vulkan from actual `none`, no execution, and unknown fallback.
+Benchmark-backed positive audit requires both canonical statuses to pass and
+every cell to complete; structurally valid rejected audits remain visible,
+validate globally, and do not block a later accepted run. METHOD-020 run-001
+is preserved as rejected rather than rewritten. The 31-case custody and
+15-case benchmark-result suites, actual passed and unavailable Vulkan runner
+paths, five-protocol/five-run global custody validation, strict task/docs/skill
+checks, and fixed-surface review of `40232d16` all pass without weakening GPU
+labels or making a speedup claim.

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py",
+    "--root",
+    "tasks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py --root tasks --strict",
+  "cwd": ".",
+  "duration_ms": 593,
+  "exit_code": 1,
+  "finished_at": "2026-08-05T04:13:37Z",
+  "label": "task-validation-retired-before-commit-reference",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-08-05T04:13:36Z",
+  "stderr_path": "tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-129/commands/task-validation-retired-before-commit-reference.stdout.log",
+  "stdout_sha256": "ea8b0205a5613758549ac213634bda13d0eb5e826ec94f4e3cf58cbd6ef814c6",
+  "task_id": "BUG-129"
+}

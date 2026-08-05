@@ -5,11 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-129` — Claim custody accepts skipped benchmarks as positive evidence](../../active/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md):
-  the METHOD-020 Vulkan runner can exit zero and assert actual Vulkan identity
-  after GLFW/device readiness skips all work, while benchmark-backed experiment
-  custody does not require a passed execution before accepting the bundle;
-  make both seams fail closed and retain the rejected run as evidence.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
@@ -63,6 +58,14 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-05: [`BUG-129` — Claim custody accepts skipped benchmarks as
+  positive evidence](../../done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md).
+  The claim-grade METHOD-020 runner now returns nonzero for non-passed
+  execution and reports requested Vulkan separately from actual `none` and
+  unknown fallback on non-execution. Positive audit requires passed canonical
+  status plus completed cells; rejected runs remain valid evidence and no
+  longer block a later accepted run.
 
 - Closed 2026-08-03: [`BUG-128` — Parallel pre-policy retired task
   baselines](../../done/BUG-128-parallel-prepolicy-retired-task-baselines.md).

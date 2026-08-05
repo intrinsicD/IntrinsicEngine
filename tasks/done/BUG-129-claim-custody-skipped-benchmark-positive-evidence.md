@@ -15,9 +15,11 @@ contracts: [repo.task-contract-discovery]
 # BUG-129 — Claim custody accepts skipped benchmarks as positive evidence
 
 ## Status
-- Implementation and verification are complete. The original METHOD-020
-  run-001 now carries a structurally valid rejected audit; final fixed-surface
-  independent review is pending.
+- Completed on 2026-08-05. The original METHOD-020 run-001 carries a
+  structurally valid rejected audit, claim-grade non-execution is fail-closed,
+  and independent fixed-surface review accepted revision `40232d16` with no
+  findings.
+- Commit: `40232d16`.
 
 ## Goal
 - Make the METHOD-020 claim-grade Vulkan benchmark runner and benchmark
@@ -58,7 +60,7 @@ contracts: [repo.task-contract-discovery]
 ## Docs
 - [x] Document the positive bundle audit rule and requested-versus-actual
       backend diagnostics in the canonical benchmark/workflow policy.
-- [ ] Update the bug index, session brief, and retirement log on closure; sync
+- [x] Update the bug index, session brief, and retirement log on closure; sync
       generated skill mirrors for changed `docs/agent/*` policy.
 
 ## Acceptance criteria
@@ -67,7 +69,7 @@ contracts: [repo.task-contract-discovery]
 - [x] Custody creation may retain a non-passed result, but independent audit and
       completion cannot accept it as positive evidence.
 - [x] Existing passed experiment bundles and strict repository validators remain green.
-- [ ] Fixed-surface independent review finds no blocker.
+- [x] Fixed-surface independent review finds no blocker.
 
 ## Verification
 ```bash

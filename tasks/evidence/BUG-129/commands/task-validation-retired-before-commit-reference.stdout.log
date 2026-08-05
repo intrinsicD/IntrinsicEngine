@@ -1,0 +1,2 @@
+[ERROR] tasks/done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md: done task must include PR/commit reference placeholder or value.
+Validated 216 task file(s); findings: 1; mode: strict.
