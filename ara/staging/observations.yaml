@@ -2181,20 +2181,20 @@ observations:
     crystallized_via: artifact-commitment
     stale: false
   - id: O127
-    timestamp: "2026-08-05T05:22+02:00"
-    provenance: ai-suggested
+    timestamp: "2026-08-05T07:03+02:00"
+    provenance: ai-executed
     content: >
-      METHOD-020 now has a bounded implementation candidate for ordinary LOP
-      and isotropic WLOP through private Vulkan compute, while anisotropic
-      WLOP, CLOP, and EAR remain explicit capability-negative pairs. The v3
-      confirmation requires actual Vulkan execution, CPU-reference parity,
-      and same-host repeatability before promotion.
+      METHOD-020 v4/run-002 completed eight actual Vulkan requests for ordinary
+      LOP and isotropic WLOP with zero fallback on the frozen v3 fixtures. The
+      worst CPU-reference-or-repeat RMS and L-infinity errors were 1.6746e-5
+      and 1.31344e-4, below the frozen 5e-4 and 2e-3 bounds. Anisotropic WLOP,
+      CLOP, and EAR remain explicit capability-negative pairs.
     context: >
-      Dirty-worktree real-device parity and benchmark smoke runs passed, but
-      claim-grade policy requires a clean exact-revision run, portable bundle,
-      accepted experiment audit, and independent fixed-surface review. The
-      observation therefore records only the candidate and frozen decision
-      boundary, not a confirmed Vulkan capability or performance result.
+      The result binds clean source 04ec3d25, protocol digest 7774197b, the
+      schema-v2 benchmark result, portable bundle, completed cell journal, and
+      accepted independent audit. Timing is descriptive host
+      command-to-applied-event time; no speedup, device-time, scanner-corpus,
+      or cross-device claim is made. Rejected v3/run-001 remains visible.
     potential_type: claim
     bound_to: [N370]
     promoted: true

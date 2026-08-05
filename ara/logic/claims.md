@@ -997,29 +997,31 @@
 - **Tags**: geometry, LOP, WLOP, CPU reference, Vulkan protocol, screening
 - **From staging**: O126
 
-## C34: METHOD-020 has a bounded Vulkan LOP confirmation candidate
-- **Statement**: The METHOD-020 implementation candidate routes ordinary LOP
-  and isotropic WLOP through one private runtime Vulkan-compute participant,
-  retains `cpu_reference` as the oracle and honest fallback, and rejects
-  anisotropic WLOP, CLOP, and EAR as explicit capability-negative backend
-  pairs. The frozen v3 suite requires actual Vulkan identity, no fallback,
-  CPU-reference positional parity, and same-host repeatability before this
-  candidate may be described as parity-proven.
-- **Status**: untested — dirty-worktree operational screening passed, but no
-  clean exact-revision claim-grade bundle or accepted independent audit exists
-  yet
-- **Provenance**: ai-suggested
+## C34: METHOD-020 proves bounded Vulkan parity for LOP and isotropic WLOP
+- **Statement**: On the exact METHOD-020 v3 analytic fixtures and recorded
+  NVIDIA RTX 3050 device, claim-grade v4/run-002 completed eight production
+  `gpu_vulkan_compute` requests for ordinary LOP and isotropic WLOP with zero
+  fallback. The worst CPU-reference-or-repeat positional RMS error was
+  `1.6746e-5` (`<= 5e-4`) and the worst L-infinity error was `1.31344e-4`
+  (`<= 2e-3`). Anisotropic WLOP, CLOP, and EAR remain explicit
+  capability-negative pairs.
+- **Status**: supported — exact fixtures/source/device only; no scanner-corpus,
+  cross-device, device-time, memory-efficiency, or speedup claim
+- **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Falsification criteria**: The clean v3 confirmation observes fallback,
-  an unavailable/non-Vulkan actual backend, a status/cardinality/iteration
-  mismatch, RMS error above `5e-4`, L-infinity error above `2e-3`, a same-host
-  repeat delta above either bound, or a supposedly capability-negative pair
-  passes canonical availability preview.
+- **Falsification criteria**: Replaying the exact frozen v4 protocol observes
+  fallback, a non-Vulkan actual backend, fewer than eight completed requests,
+  a status/cardinality/iteration mismatch, RMS error above `5e-4`, L-infinity
+  error above `2e-3`, a same-host repeat delta above either bound, or a declared
+  capability-negative pair passes canonical availability preview.
 - **Proof**: [src/runtime/Runtime.PointCloudConsolidationGpu.cpp,
   tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp,
   benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml,
-  methods/geometry/locally_optimal_projection/reports/METHOD-020-protocol-v3.md,
-  tasks/active/METHOD-020-lop-family-gpu-vulkan-compute-backend.md]
+  methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md,
+  tasks/evidence/METHOD-020/experiment/protocols/v4/protocol.yaml,
+  tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json,
+  tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml,
+  tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json]
 - **Dependencies**: [C22, C23, C24, C33]
-- **Tags**: geometry, LOP, WLOP, Vulkan, GPU, parity, candidate
+- **Tags**: geometry, LOP, WLOP, Vulkan, GPU, parity, bounded result
 - **From staging**: O127
