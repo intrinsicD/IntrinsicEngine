@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -253,6 +254,94 @@ TEST(GeometryPropertiesContract, DescriptorCatalogReportsTypeAndAccessMetadata)
     {
         return descriptor.Mutable;
     }));
+}
+
+TEST(GeometryPropertiesContract, MutableBorrowsPublishMonotonicContentRevisions)
+{
+    Geometry::PropertySet properties;
+    EXPECT_EQ(properties.Revision(), 0u);
+
+    properties.Resize(3u);
+    auto weights = properties.GetOrAdd<float>("v:weight", 0.0f);
+    ASSERT_TRUE(weights.IsValid());
+
+    const Geometry::PropertyRevision initialSetRevision = properties.Revision();
+    const Geometry::PropertyRevision initialPropertyRevision = weights.Revision();
+    ASSERT_GT(initialSetRevision, 0u);
+    EXPECT_EQ(initialPropertyRevision, initialSetRevision);
+
+    // Lookup alone and every const access path are observational only.
+    (void)properties.Get<float>("v:weight");
+    const Geometry::ConstPropertySet constProperties{properties};
+    const auto constWeights = constProperties.Get<float>("v:weight");
+    ASSERT_TRUE(constWeights.IsValid());
+    EXPECT_EQ(constWeights.Span().size(), 3u);
+    EXPECT_EQ(constWeights.Data(), constWeights.Span().data());
+    EXPECT_EQ(constWeights[0], 0.0f);
+    EXPECT_EQ(properties.Revision(), initialSetRevision);
+    EXPECT_EQ(weights.Revision(), initialPropertyRevision);
+
+    // Per-element writes in one unobserved edit epoch coalesce to one token.
+    weights[0] = 1.0f;
+    weights[1] = 2.0f;
+    weights[2] = 3.0f;
+    const Geometry::PropertyRevision firstEdit = weights.Revision();
+    EXPECT_GT(firstEdit, initialPropertyRevision);
+    EXPECT_EQ(properties.Revision(), firstEdit);
+
+    // Acquiring another mutable view after observation starts the next epoch.
+    auto span = weights.Span();
+    span[1] = 12.0f;
+    const Geometry::PropertyRevision secondEdit = properties.Revision();
+    EXPECT_GT(secondEdit, firstEdit);
+    EXPECT_EQ(weights.Revision(), secondEdit);
+
+    // A retained pointer can explicitly close a later edit at the boundary.
+    float* retained = weights.Data();
+    const Geometry::PropertyRevision borrowRevision = properties.Revision();
+    retained[2] = 24.0f;
+    weights.MarkModified();
+    const Geometry::PropertyRevision retainedEdit = properties.Revision();
+    EXPECT_GT(retainedEdit, borrowRevision);
+    EXPECT_EQ(weights.Revision(), retainedEdit);
+}
+
+TEST(GeometryPropertiesContract, StructuralEditsCopiesAndDescriptorsCarryRevisions)
+{
+    Geometry::PropertySet source;
+    source.Resize(2u);
+    auto values = source.GetOrAdd<std::uint32_t>("v:id", 0u);
+    values.Vector() = {3u, 7u};
+    const Geometry::PropertyRevision sourceRevision = source.Revision();
+    ASSERT_GT(sourceRevision, 0u);
+
+    const auto descriptors = source.Descriptors();
+    ASSERT_EQ(descriptors.size(), 1u);
+    EXPECT_EQ(descriptors.front().ContentRevision, sourceRevision);
+
+    Geometry::PropertySet copy = source;
+    const Geometry::PropertyRevision copyRevision = copy.Revision();
+    EXPECT_GT(copyRevision, sourceRevision);
+    ASSERT_TRUE(copy.Get<std::uint32_t>("v:id").IsValid());
+    EXPECT_EQ(copy.Get<std::uint32_t>("v:id").Revision(), copyRevision);
+
+    Geometry::PropertySet moved = std::move(copy);
+    const Geometry::PropertyRevision movedRevision = moved.Revision();
+    EXPECT_GT(movedRevision, copyRevision);
+    EXPECT_EQ(copy.Size(), 0u);
+    EXPECT_EQ(copy.Revision(), 0u);
+
+    moved.PushBack();
+    const Geometry::PropertyRevision resizedRevision = moved.Revision();
+    EXPECT_GT(resizedRevision, movedRevision);
+    EXPECT_EQ(moved.Size(), 3u);
+
+    auto movedValues = moved.Get<std::uint32_t>("v:id");
+    ASSERT_TRUE(movedValues.IsValid());
+    moved.Remove(movedValues);
+    EXPECT_FALSE(movedValues.IsValid());
+    EXPECT_GT(moved.Revision(), resizedRevision);
+    EXPECT_FALSE(moved.FindPropertyRevision("v:id").has_value());
 }
 
 TEST(GeometryPropertiesContract, ShrinkToFitIsCanonicalSpelling)

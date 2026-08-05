@@ -68,7 +68,7 @@ namespace
             return false;
 
         const std::array<RHI::QueueSubmitBatchDesc, 1> batches{
-            RHI::QueueSubmitBatchDesc{.Queue = RHI::QueueAffinity::Transfer},
+            RHI::QueueSubmitBatchDesc{.Queue = RHI::QueueAffinity::Graphics},
         };
         const RHI::FrameQueueSubmitPlanDesc plan{
             .Batches = std::span<const RHI::QueueSubmitBatchDesc>{batches},
@@ -77,9 +77,12 @@ namespace
             return false;
 
         RHI::ICommandContext& context =
-            device.GetQueueSubmitContext(RHI::QueueAffinity::Transfer, frame.FrameIndex, 0u);
+            device.GetQueueSubmitContext(RHI::QueueAffinity::Graphics, frame.FrameIndex, 0u);
         context.Begin();
         transfer.DrainCompleted(context);
+        context.TextureBarrier(device.GetBackbufferHandle(frame),
+                               RHI::TextureLayout::Undefined,
+                               RHI::TextureLayout::Present);
         context.End();
         device.EndFrame(frame);
         device.Present(frame);
@@ -96,7 +99,7 @@ namespace
             return {};
 
         const std::array<RHI::QueueSubmitBatchDesc, 1> batches{
-            RHI::QueueSubmitBatchDesc{.Queue = RHI::QueueAffinity::Transfer},
+            RHI::QueueSubmitBatchDesc{.Queue = RHI::QueueAffinity::Graphics},
         };
         const RHI::FrameQueueSubmitPlanDesc plan{
             .Batches = std::span<const RHI::QueueSubmitBatchDesc>{batches},
@@ -105,10 +108,13 @@ namespace
             return {};
 
         RHI::ICommandContext& context =
-            device.GetQueueSubmitContext(RHI::QueueAffinity::Transfer, frame.FrameIndex, 0u);
+            device.GetQueueSubmitContext(RHI::QueueAffinity::Graphics, frame.FrameIndex, 0u);
         context.Begin();
         const Graphics::GpuTransferReadbackTicket ticket =
             transfer.ScheduleReadback(context, std::move(desc));
+        context.TextureBarrier(device.GetBackbufferHandle(frame),
+                               RHI::TextureLayout::Undefined,
+                               RHI::TextureLayout::Present);
         context.End();
         device.EndFrame(frame);
         device.Present(frame);
@@ -139,7 +145,7 @@ TEST(GpuTransferFacadeGpuSmoke, UploadThenReadbackRoundTripsThroughFacadeWithout
 
     Extrinsic::Core::Config::RenderConfig renderConfig{};
     renderConfig.EnablePromotedVulkanDevice = true;
-    renderConfig.EnableValidation = false;
+    renderConfig.EnableValidation = true;
 
     std::unique_ptr<RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
     ASSERT_NE(device, nullptr);
@@ -159,6 +165,12 @@ TEST(GpuTransferFacadeGpuSmoke, UploadThenReadbackRoundTripsThroughFacadeWithout
         GTEST_SKIP() << "Promoted Vulkan transfer queue was not service-ready on this host.";
     }
 
+    constexpr std::array<std::byte, 16> initial{
+        std::byte{0xf0}, std::byte{0xe1}, std::byte{0xd2}, std::byte{0xc3},
+        std::byte{0xb4}, std::byte{0xa5}, std::byte{0x96}, std::byte{0x87},
+        std::byte{0x78}, std::byte{0x69}, std::byte{0x5a}, std::byte{0x4b},
+        std::byte{0x3c}, std::byte{0x2d}, std::byte{0x1e}, std::byte{0x0f},
+    };
     constexpr std::array<std::byte, 16> expected{
         std::byte{0x0f}, std::byte{0x1e}, std::byte{0x2d}, std::byte{0x3c},
         std::byte{0x4b}, std::byte{0x5a}, std::byte{0x69}, std::byte{0x78},
@@ -181,7 +193,23 @@ TEST(GpuTransferFacadeGpuSmoke, UploadThenReadbackRoundTripsThroughFacadeWithout
     Graphics::GpuTransfer transfer{queue};
     const std::uint64_t fallbackUploadsBefore =
         Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount();
+    const auto validationBefore =
+        Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
 
+    const Graphics::GpuTransferUploadTicket initialUpload =
+        transfer.ScheduleUpload(Graphics::GpuTransferUploadDesc{
+            .Destination = buffer,
+            .DestinationDesc = bufferDesc,
+            .Source = std::span<const std::byte>{initial},
+            .DestinationOffsetBytes = 0u,
+        });
+    ASSERT_TRUE(initialUpload.IsValid());
+    ASSERT_TRUE(DrainQueueUntilComplete(queue, initialUpload.Token))
+        << "timed out waiting for initial facade upload token completion";
+
+    // Overwrite the same live device-local range before emitting either
+    // transfer-to-consumer barrier. This reproduces the GpuWorld multi-frame
+    // staging pattern and requires UploadBuffer's destination pre-barrier.
     const Graphics::GpuTransferUploadTicket upload =
         transfer.ScheduleUpload(Graphics::GpuTransferUploadDesc{
             .Destination = buffer,
@@ -200,6 +228,7 @@ TEST(GpuTransferFacadeGpuSmoke, UploadThenReadbackRoundTripsThroughFacadeWithout
     EXPECT_FALSE(transfer.IsReady(upload));
     ASSERT_TRUE(SubmitFacadeDrain(*device, transfer))
         << "failed to submit facade upload-ready barrier";
+    EXPECT_TRUE(transfer.IsReady(initialUpload));
     EXPECT_TRUE(transfer.IsReady(upload));
 
     std::array<std::byte, expected.size()> actual{};
@@ -236,12 +265,17 @@ TEST(GpuTransferFacadeGpuSmoke, UploadThenReadbackRoundTripsThroughFacadeWithout
     EXPECT_TRUE(transfer.IsDelivered(readback));
 
     const Graphics::GpuTransferDiagnostics diagnostics = transfer.GetDiagnostics();
-    EXPECT_EQ(diagnostics.UploadsScheduled, 1u);
-    EXPECT_EQ(diagnostics.UploadsReady, 1u);
-    EXPECT_EQ(diagnostics.UploadBarriersEmitted, 1u);
+    EXPECT_EQ(diagnostics.UploadsScheduled, 2u);
+    EXPECT_EQ(diagnostics.UploadsReady, 2u);
+    EXPECT_EQ(diagnostics.UploadBarriersEmitted, 2u);
     EXPECT_EQ(diagnostics.ReadbacksIssued, 1u);
     EXPECT_EQ(diagnostics.ReadbacksDelivered, 1u);
     EXPECT_EQ(diagnostics.ReadbackBarriersEmitted, 1u);
+
+    const auto validationAfter =
+        Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
+    EXPECT_EQ(validationAfter.VulkanValidationErrorCount,
+              validationBefore.VulkanValidationErrorCount);
 
     device->DestroyBuffer(buffer);
     device->Shutdown();

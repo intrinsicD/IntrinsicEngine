@@ -109,6 +109,9 @@ export namespace Extrinsic::RHI
         /// buffer and queues a GPU transfer into `dst` at `offset`.
         /// Returns a token the caller can poll with IsComplete().
         /// `dst` must have been created with BufferUsage::TransferDst.
+        /// The backend orders prior device reads/writes of the destination
+        /// range before this transfer write. The caller still owns the
+        /// transfer-write-to-consumer barrier after the returned token.
         [[nodiscard]] virtual TransferToken UploadBuffer(BufferHandle   dst,
                                                          const void*    data,
                                                          std::uint64_t  size,

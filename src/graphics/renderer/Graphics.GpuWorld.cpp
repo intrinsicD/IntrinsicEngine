@@ -15,6 +15,7 @@ module Extrinsic.Graphics.GpuWorld;
 
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.Graphics.GpuTransfer;
 
 namespace Extrinsic::Graphics
 {
@@ -347,6 +348,17 @@ namespace Extrinsic::Graphics
             }
         };
 
+        [[nodiscard]] bool QueueBufferUpload(
+            RHI::IDevice& device,
+            const RHI::BufferHandle destination,
+            const void* data,
+            const std::uint64_t size,
+            const std::uint64_t offset)
+        {
+            return SubmitBufferUpload(
+                device, destination, data, size, offset).Accepted();
+        }
+
         template <class T>
         [[nodiscard]] bool FlushDirtyRuns(RHI::IDevice& device,
                             RHI::BufferHandle dst,
@@ -376,10 +388,12 @@ namespace Extrinsic::Graphics
                 }
 
                 const std::size_t count = i - begin;
-                device.WriteBuffer(dst,
-                                   cpu.data() + begin,
-                                   static_cast<std::uint64_t>(count * sizeof(T)),
-                                   static_cast<std::uint64_t>(begin * sizeof(T)));
+                (void)QueueBufferUpload(
+                    device,
+                    dst,
+                    cpu.data() + begin,
+                    static_cast<std::uint64_t>(count * sizeof(T)),
+                    static_cast<std::uint64_t>(begin * sizeof(T)));
                 flushed = true;
             }
             return flushed;
@@ -867,26 +881,33 @@ namespace Extrinsic::Graphics
 
             if (!allocation.VertexBytes.empty())
             {
-                Device->WriteBuffer(ManagedVertexLease.GetHandle(),
-                                    allocation.VertexBytes.data(),
-                                    static_cast<std::uint64_t>(allocation.VertexBytes.size()),
-                                    allocation.VertexByteOffset);
+                (void)QueueBufferUpload(
+                    *Device,
+                    ManagedVertexLease.GetHandle(),
+                    allocation.VertexBytes.data(),
+                    static_cast<std::uint64_t>(allocation.VertexBytes.size()),
+                    allocation.VertexByteOffset);
                 PendingManagedVertexUploadBarrier = true;
             }
             if (!allocation.SurfaceIndices.empty())
             {
-                Device->WriteBuffer(ManagedIndexLease.GetHandle(),
-                                    allocation.SurfaceIndices.data(),
-                                    allocation.SurfaceIndexByteCount,
-                                    allocation.IndexByteOffset);
+                (void)QueueBufferUpload(
+                    *Device,
+                    ManagedIndexLease.GetHandle(),
+                    allocation.SurfaceIndices.data(),
+                    allocation.SurfaceIndexByteCount,
+                    allocation.IndexByteOffset);
                 PendingManagedIndexUploadBarrier = true;
             }
             if (!allocation.LineIndices.empty())
             {
-                Device->WriteBuffer(ManagedIndexLease.GetHandle(),
-                                    allocation.LineIndices.data(),
-                                    allocation.LineIndexByteCount,
-                                    allocation.IndexByteOffset + allocation.SurfaceIndexByteCount);
+                (void)QueueBufferUpload(
+                    *Device,
+                    ManagedIndexLease.GetHandle(),
+                    allocation.LineIndices.data(),
+                    allocation.LineIndexByteCount,
+                    allocation.IndexByteOffset +
+                        allocation.SurfaceIndexByteCount);
                 PendingManagedIndexUploadBarrier = true;
             }
         }
@@ -1219,26 +1240,32 @@ namespace Extrinsic::Graphics
         {
             if (managedVertexSize > 0)
             {
-                m_Impl->Device->WriteBuffer(GetManagedVertexBuffer(),
-                                            managedVertexBytes.data(),
-                                            managedVertexSize,
-                                            vbOffset);
+                (void)QueueBufferUpload(
+                    *m_Impl->Device,
+                    GetManagedVertexBuffer(),
+                    managedVertexBytes.data(),
+                    managedVertexSize,
+                    vbOffset);
                 m_Impl->PendingManagedVertexUploadBarrier = true;
             }
             if (surfSize > 0)
             {
-                m_Impl->Device->WriteBuffer(GetManagedIndexBuffer(),
-                                            desc.SurfaceIndices.data(),
-                                            surfSize,
-                                            surfOffset);
+                (void)QueueBufferUpload(
+                    *m_Impl->Device,
+                    GetManagedIndexBuffer(),
+                    desc.SurfaceIndices.data(),
+                    surfSize,
+                    surfOffset);
                 m_Impl->PendingManagedIndexUploadBarrier = true;
             }
             if (lineSize > 0)
             {
-                m_Impl->Device->WriteBuffer(GetManagedIndexBuffer(),
-                                            desc.LineIndices.data(),
-                                            lineSize,
-                                            lineOffset);
+                (void)QueueBufferUpload(
+                    *m_Impl->Device,
+                    GetManagedIndexBuffer(),
+                    desc.LineIndices.data(),
+                    lineSize,
+                    lineOffset);
                 m_Impl->PendingManagedIndexUploadBarrier = true;
             }
         }
@@ -1392,10 +1419,12 @@ namespace Extrinsic::Graphics
                         static_cast<std::size_t>(byteCount));
             if (m_Impl->Device != nullptr && m_Impl->Device->IsOperational())
             {
-                m_Impl->Device->WriteBuffer(GetManagedVertexBuffer(),
-                                            bytes.data(),
-                                            byteCount,
-                                            allocation.VertexByteOffset + byteOffset);
+                (void)QueueBufferUpload(
+                    *m_Impl->Device,
+                    GetManagedVertexBuffer(),
+                    bytes.data(),
+                    byteCount,
+                    allocation.VertexByteOffset + byteOffset);
                 uploadedFlag = true;
                 wroteAnyChannel = true;
             }
@@ -1432,10 +1461,12 @@ namespace Extrinsic::Graphics
                         static_cast<std::size_t>(byteCount));
             if (m_Impl->Device != nullptr && m_Impl->Device->IsOperational())
             {
-                m_Impl->Device->WriteBuffer(GetManagedVertexBuffer(),
-                                            bytes.data(),
-                                            byteCount,
-                                            allocation.VertexByteOffset + byteOffset);
+                (void)QueueBufferUpload(
+                    *m_Impl->Device,
+                    GetManagedVertexBuffer(),
+                    bytes.data(),
+                    byteCount,
+                    allocation.VertexByteOffset + byteOffset);
                 uploadedFlag = true;
                 wroteAnyChannel = true;
             }
@@ -1872,10 +1903,13 @@ namespace Extrinsic::Graphics
         {
             if (!m_Impl->LightsCpu.empty())
             {
-                m_Impl->Device->WriteBuffer(GetLightBuffer(),
-                                            m_Impl->LightsCpu.data(),
-                                            static_cast<std::uint64_t>(m_Impl->LightsCpu.size() * sizeof(RHI::GpuLight)),
-                                            0);
+                (void)QueueBufferUpload(
+                    *m_Impl->Device,
+                    GetLightBuffer(),
+                    m_Impl->LightsCpu.data(),
+                    static_cast<std::uint64_t>(
+                        m_Impl->LightsCpu.size() * sizeof(RHI::GpuLight)),
+                    0u);
                 m_Impl->PendingLightsUploadBarrier = true;
             }
             m_Impl->DirtyLights = false;
@@ -1883,10 +1917,12 @@ namespace Extrinsic::Graphics
 
         if (m_Impl->DirtySceneTable && GetSceneTableBuffer().IsValid())
         {
-            m_Impl->Device->WriteBuffer(GetSceneTableBuffer(),
-                                        &m_Impl->SceneTableCpu,
-                                        sizeof(RHI::GpuSceneTable),
-                                        0);
+            (void)QueueBufferUpload(
+                *m_Impl->Device,
+                GetSceneTableBuffer(),
+                &m_Impl->SceneTableCpu,
+                sizeof(RHI::GpuSceneTable),
+                0u);
             m_Impl->PendingSceneTableUploadBarrier = true;
             m_Impl->DirtySceneTable = false;
         }

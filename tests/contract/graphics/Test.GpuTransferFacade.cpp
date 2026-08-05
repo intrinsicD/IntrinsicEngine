@@ -11,12 +11,16 @@
 
 import Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferTransfer;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
+
+#include "MockRHI.hpp"
 
 namespace
 {
@@ -285,6 +289,39 @@ namespace
 
         std::vector<Event> Events{};
     };
+}
+
+TEST(GpuTransferFacade, ImmediateSubmissionPrefersStagingAndFallsBackExplicitly)
+{
+    Extrinsic::Tests::MockDevice device;
+    const RHI::BufferHandle destination{3u, 1u};
+    const std::array<std::byte, 4u> bytes{
+        std::byte{0x01}, std::byte{0x02},
+        std::byte{0x03}, std::byte{0x04}};
+
+    device.TransferQueue.AcceptBufferUploads = true;
+    const Graphics::GpuBufferUploadSubmission staged =
+        Graphics::SubmitBufferUpload(
+            device, destination, std::span<const std::byte>{bytes}, 8u);
+    EXPECT_TRUE(staged.Accepted());
+    EXPECT_TRUE(staged.IsAsynchronous());
+    EXPECT_EQ(staged.Path, Graphics::GpuBufferUploadPath::TransferQueue);
+    EXPECT_TRUE(device.BufferWrites.empty());
+    ASSERT_EQ(device.TransferQueue.BufferUploads.size(), 1u);
+    EXPECT_EQ(device.TransferQueue.BufferUploads.front().Buffer, destination);
+    EXPECT_EQ(device.TransferQueue.BufferUploads.front().Offset, 8u);
+
+    device.TransferQueue.AcceptBufferUploads = false;
+    const Graphics::GpuBufferUploadSubmission fallback =
+        Graphics::SubmitBufferUpload(
+            device, destination, std::span<const std::byte>{bytes}, 16u);
+    EXPECT_TRUE(fallback.Accepted());
+    EXPECT_FALSE(fallback.IsAsynchronous());
+    EXPECT_EQ(fallback.Path,
+              Graphics::GpuBufferUploadPath::SynchronousFallback);
+    ASSERT_EQ(device.BufferWrites.size(), 1u);
+    EXPECT_EQ(device.BufferWrites.front().Handle, destination);
+    EXPECT_EQ(device.BufferWrites.front().Offset, 16u);
 }
 
 TEST(GpuTransferFacade, AsyncUploadEmitsReadyBarrierOnlyAfterTokenCompletion)

@@ -327,6 +327,63 @@ TEST(GpuWorldLifetimeContract, UpdatingSingleVertexChannelWritesOnlyThatChannel)
               Extrinsic::RHI::MemoryAccess::ShaderRead);
 }
 
+TEST(GpuWorldLifetimeContract, GeometryUpdatesPreferNonBlockingTransferStaging)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.TransferQueue.AcceptBufferUploads = true;
+    Extrinsic::RHI::BufferManager buffers{device};
+    Extrinsic::Graphics::GpuWorld world;
+
+    Extrinsic::Graphics::GpuWorld::InitDesc init{};
+    init.MaxInstances = 1u;
+    init.MaxGeometryRecords = 1u;
+    init.MaxLights = 1u;
+    init.VertexBufferBytes = 1u << 10;
+    init.IndexBufferBytes = 1u << 10;
+    init.DeferredFreeFrames = 0u;
+    ASSERT_TRUE(world.Initialize(device, buffers, init));
+
+    const auto geometry = world.UploadGeometry(SoaTriangleUpload());
+    ASSERT_TRUE(geometry.IsValid());
+    world.SubmitPendingUploadBarriers(device.CommandContext);
+
+    const std::array<glm::vec3, 3> updatedNormals{{
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+    }};
+    device.BufferWrites.clear();
+    device.TransferQueue.BufferUploads.clear();
+    device.CommandContext.BufferBarrierCalls.clear();
+
+    const auto update = world.UpdateGeometryChannels(
+        geometry,
+        SoaTriangleUpload(std::span<const glm::vec3>{updatedNormals}),
+        Extrinsic::Graphics::GpuWorld::GeometryChannelUpdateMask{
+            .Normal = true,
+        });
+
+    EXPECT_EQ(update.Status,
+              Extrinsic::Graphics::GpuWorld::GeometryChannelUpdateStatus::Updated);
+    EXPECT_TRUE(device.BufferWrites.empty());
+    ASSERT_EQ(device.TransferQueue.BufferUploads.size(), 1u);
+    const auto& upload = device.TransferQueue.BufferUploads.front();
+    EXPECT_EQ(upload.Buffer, world.GetManagedVertexBuffer());
+    EXPECT_EQ(upload.Offset, 64u);
+    const std::span<const std::byte> expectedNormalBytes =
+        std::as_bytes(std::span<const glm::vec3>{updatedNormals});
+    EXPECT_EQ(upload.Data,
+              std::vector<std::byte>(expectedNormalBytes.begin(),
+                                     expectedNormalBytes.end()));
+
+    world.SubmitPendingUploadBarriers(device.CommandContext);
+    ASSERT_EQ(device.CommandContext.BufferBarrierCalls.size(), 1u);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls.front().Before,
+              Extrinsic::RHI::MemoryAccess::TransferWrite);
+    EXPECT_EQ(device.CommandContext.BufferBarrierCalls.front().After,
+              Extrinsic::RHI::MemoryAccess::ShaderRead);
+}
+
 TEST(GpuWorldLifetimeContract, ResidencyViewTracksCanonicalSoaContentAndSharedIndexSlice)
 {
     Extrinsic::Tests::MockDevice device;

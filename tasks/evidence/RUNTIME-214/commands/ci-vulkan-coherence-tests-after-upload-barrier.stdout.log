@@ -1,0 +1,58 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3346: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+1/3 Test #3346: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle ...............***Failed    4.26 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from GpuTransferFacadeGpuSmoke
+[ RUN      ] GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[31m[ERR]  [VulkanDevice::Bootstrap] validation: vkCmdPipelineBarrier2(): pDependencyInfo->pBufferMemoryBarriers[0].dstStageMask (VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT) is not compatible with the queue family properties (VK_QUEUE_TRANSFER_BIT|VK_QUEUE_SPARSE_BINDING_BIT) of this command buffer.
+The Vulkan spec states: If a buffer or image memory barrier does not specify an release operation, or if it does but pDependencyInfo->dependencyFlags includes VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR, the respective dstStageMask member of the element of the pBufferMemoryBarriers or pImageMemoryBarriers members of pDependencyInfo must only include pipeline stages valid for the queue family that was used to create the command pool that commandBuffer was allocated from (https://vulkan.lunarg.com/doc/view/1.4.309.0/linux/antora/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-dstStageMask-09676)[0m
+[31m[ERR]  [VulkanDevice::Bootstrap] validation: vkCmdPipelineBarrier2(): pDependencyInfo->pBufferMemoryBarriers[0].dstStageMask (VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT) is not compatible with the queue family properties (VK_QUEUE_TRANSFER_BIT|VK_QUEUE_SPARSE_BINDING_BIT) of this command buffer.
+The Vulkan spec states: If a buffer or image memory barrier does not specify an release operation, or if it does but pDependencyInfo->dependencyFlags includes VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR, the respective dstStageMask member of the element of the pBufferMemoryBarriers or pImageMemoryBarriers members of pDependencyInfo must only include pipeline stages valid for the queue family that was used to create the command pool that commandBuffer was allocated from (https://vulkan.lunarg.com/doc/view/1.4.309.0/linux/antora/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-dstStageMask-09676)[0m
+[31m[ERR]  [VulkanDevice::Bootstrap] validation: vkQueuePresentKHR(): pPresentInfo->pSwapchains[0] images passed to present must be in layout VK_IMAGE_LAYOUT_PRESENT_SRC_KHR or VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR but is in VK_IMAGE_LAYOUT_UNDEFINED.
+The Vulkan spec states: Each element of pImageIndices must be the index of a presentable image acquired from the swapchain specified by the corresponding element of the pSwapchains array, and the presented image subresource must be in the VK_IMAGE_LAYOUT_PRESENT_SRC_KHR or VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR layout at the time the operation is executed on a VkDevice (https://vulkan.lunarg.com/doc/view/1.4.309.0/linux/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-VkPresentInfoKHR-pImageIndices-01430)[0m
+[31m[ERR]  [VulkanDevice::Bootstrap] validation: vkQueuePresentKHR(): pPresentInfo->pSwapchains[0] images passed to present must be in layout VK_IMAGE_LAYOUT_PRESENT_SRC_KHR or VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR but is in VK_IMAGE_LAYOUT_UNDEFINED.
+The Vulkan spec states: Each element of pImageIndices must be the index of a presentable image acquired from the swapchain specified by the corresponding element of the pSwapchains array, and the presented image subresource must be in the VK_IMAGE_LAYOUT_PRESENT_SRC_KHR or VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR layout at the time the operation is executed on a VkDevice (https://vulkan.lunarg.com/doc/view/1.4.309.0/linux/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-VkPresentInfoKHR-pImageIndices-01430)[0m
+[31m[ERR]  [VulkanDevice::Bootstrap] validation: vkQueuePresentKHR(): pPresentInfo->pSwapchains[0] images passed to present must be in layout VK_IMAGE_LAYOUT_PRESENT_SRC_KHR or VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR but is in VK_IMAGE_LAYOUT_UNDEFINED.
+The Vulkan spec states: Each element of pImageIndices must be the index of a presentable image acquired from the swapchain specified by the corresponding element of the pSwapchains array, and the presented image subresource must be in the VK_IMAGE_LAYOUT_PRESENT_SRC_KHR or VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR layout at the time the operation is executed on a VkDevice (https://vulkan.lunarg.com/doc/view/1.4.309.0/linux/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-VkPresentInfoKHR-pImageIndices-01430)[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp:272: Failure
+Expected equality of these values:
+  validationAfter.VulkanValidationErrorCount
+    Which is: 5
+  validationBefore.VulkanValidationErrorCount
+    Which is: 0
+
+[  FAILED  ] GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle (4220 ms)
+[----------] 1 test from GpuTransferFacadeGpuSmoke (4220 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4220 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+
+ 1 FAILED TEST
+
+    Start 3386: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat
+2/3 Test #3386: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat ......   Passed   28.83 sec
+    Start 3387: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement
+3/3 Test #3387: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement ...   Passed   27.70 sec
+
+67% tests passed, 1 tests failed out of 3
+
+Label Time Summary:
+geometry       =  56.53 sec*proc (2 tests)
+gpu            =  60.79 sec*proc (3 tests)
+graphics       =   4.26 sec*proc (1 test)
+integration    =  56.53 sec*proc (2 tests)
+runtime        =  56.53 sec*proc (2 tests)
+vulkan         =  60.79 sec*proc (3 tests)
+
+Total Test time (real) =  62.66 sec
+
+The following tests FAILED:
+	3346 - GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle (Failed)

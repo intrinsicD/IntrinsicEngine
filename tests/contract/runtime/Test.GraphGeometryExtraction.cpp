@@ -368,6 +368,73 @@ TEST(GraphGeometryExtraction, RepeatedExtractionReusesGraphHandleWithoutReupload
     engine.Shutdown();
 }
 
+TEST(GraphGeometryExtraction, PropertyRevisionUpdatesResidentPositionsWithoutDirtyTag)
+{
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeLineGraphRenderable(scene);
+    const auto stableId =
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    ASSERT_EQ(stats.GraphGeometryUploads, 1u);
+    const auto firstView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(firstView.has_value());
+    const auto handle = firstView->GraphGeometry;
+    Extrinsic::Graphics::GpuGeometryResidencyView firstResidency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        handle, firstResidency));
+
+    auto positions = raw.get<gs::Vertices>(entity)
+                         .Properties.Get<glm::vec3>(pn::kPosition);
+    ASSERT_TRUE(positions.IsValid());
+    positions[1] = glm::vec3{3.0f, -1.0f, 0.25f};
+    EXPECT_FALSE((raw.any_of<D::GpuDirty,
+                             D::DirtyVertexPositions,
+                             D::DirtyVertexAttributes>(entity)));
+
+    stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.GraphGeometryReuploads, 1u);
+    EXPECT_EQ(stats.GraphGeometryPartialUploads, 1u);
+    EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
+
+    const auto secondView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(secondView.has_value());
+    EXPECT_EQ(secondView->GraphGeometry, handle);
+    Extrinsic::Graphics::GpuGeometryResidencyView secondResidency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        handle, secondResidency));
+    EXPECT_NE(secondResidency.PositionFingerprint,
+              firstResidency.PositionFingerprint);
+    EXPECT_EQ(secondResidency.PositionFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 0.0f,
+                   3.0f, -1.0f, 0.25f,
+                   0.0f, 1.0f, 0.0f}));
+
+    stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.GraphGeometryReuploads, 0u);
+    EXPECT_EQ(stats.GraphGeometryReuseHits, 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
 TEST(GraphGeometryExtraction, TwoGraphEntitiesAllocateIndependentUploads)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig());

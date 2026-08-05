@@ -160,6 +160,14 @@ inspection goes through descriptors that report the stable name, value kind,
 type metadata, element count, and mutability without exposing writable erased
 storage.
 
+Every registry and typed storage also exposes a process-monotonic content
+revision. Mutable element/vector/span/data access conservatively begins an edit
+epoch; const access does not. Callers retaining a mutable borrow across a
+method/render boundary must call `MarkModified()` after later writes. Runtime
+and graphics consume these tokens according to the canonical
+[geometry property CPU/GPU coherence contract](property-coherence.md); geometry
+itself remains GPU-agnostic.
+
 ## Naming and count terminology
 
 - Prefer `PascalCase` for public functions and methods, matching the dominant

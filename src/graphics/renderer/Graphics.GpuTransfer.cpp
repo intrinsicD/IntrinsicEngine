@@ -14,12 +14,61 @@ module Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 
 namespace Extrinsic::Graphics
 {
+    GpuBufferUploadSubmission SubmitBufferUpload(
+        RHI::IDevice& device,
+        const RHI::BufferHandle destination,
+        const void* source,
+        const std::uint64_t sizeBytes,
+        const std::uint64_t destinationOffsetBytes)
+    {
+        if (!device.IsOperational() || !destination.IsValid() ||
+            source == nullptr || sizeBytes == 0u)
+        {
+            return {};
+        }
+
+        const RHI::TransferToken token =
+            device.GetTransferQueue().UploadBuffer(
+                destination,
+                source,
+                sizeBytes,
+                destinationOffsetBytes);
+        if (token.IsValid())
+        {
+            return GpuBufferUploadSubmission{
+                .Path = GpuBufferUploadPath::TransferQueue,
+                .Token = token,
+            };
+        }
+
+        device.WriteBuffer(
+            destination, source, sizeBytes, destinationOffsetBytes);
+        return GpuBufferUploadSubmission{
+            .Path = GpuBufferUploadPath::SynchronousFallback,
+        };
+    }
+
+    GpuBufferUploadSubmission SubmitBufferUpload(
+        RHI::IDevice& device,
+        const RHI::BufferHandle destination,
+        const std::span<const std::byte> source,
+        const std::uint64_t destinationOffsetBytes)
+    {
+        return SubmitBufferUpload(
+            device,
+            destination,
+            source.data(),
+            static_cast<std::uint64_t>(source.size_bytes()),
+            destinationOffsetBytes);
+    }
+
     namespace
     {
         [[nodiscard]] bool HasValidRange(const RHI::BufferDesc& desc,

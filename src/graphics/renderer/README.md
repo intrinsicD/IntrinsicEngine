@@ -415,10 +415,17 @@ into graphics public contracts.
 ## Ownership contract
 
 - `Runtime` owns live ECS access, extraction, sidecar mappings, dirty-domain
-  interpretation, deletion events, and compaction/relocation handoff.
+  interpretation, consumed geometry-property revision snapshots, deletion
+  events, and compaction/relocation handoff. Property revisions are the
+  correctness signal for canonical CPU content; ECS dirty domains remain
+  precision and compatibility hints.
 - `Graphics` consumes immutable snapshots/views supplied by runtime and owns GPU
   resource/state transitions and pass-level scheduling through
   `Graphics.RenderGraph`.
+- `GpuWorld` submits ordinary device-local scene and geometry byte-range writes
+  through `ITransferQueue`'s bounded staging belt, then exposes the existing
+  transfer-write barriers to later shader consumers. A rejected staging
+  submission alone uses the synchronous device-write fallback.
 - `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
   gates, typed pass/resource IDs, canonical diagnostic names, resource
   declarations, pass-order introspection, and the backend-agnostic graph
@@ -1759,6 +1766,13 @@ Concretely:
   [BUG-049](../../../tasks/archive/BUG-049-gpuworld-geometry-rebind-upload-barriers.md)
   barrier class for caller-owned transfers without changing `GpuWorld`'s
   existing one-shot managed-upload barriers.
+- `Graphics::SubmitBufferUpload(...)` is the immediate staging-first form for
+  uploads whose consumer barrier is already owned by the caller. It copies CPU
+  bytes into `ITransferQueue` staging and returns the transfer token; if the
+  bounded staging service rejects the request, it reports and takes the legacy
+  synchronous `IDevice::WriteBuffer` fallback. `GpuWorld` and every current
+  device-local geometry compute backend use this one boundary. Deliberately
+  host-visible dynamic buffers continue to use direct mapped writes.
 - `Graphics.GpuTransfer::UploadInCommand(...)` is the opt-in same-command
   variant for staging buffers that are already valid on the supplied command
   timeline. It validates source/destination ranges and records `CopyBuffer`

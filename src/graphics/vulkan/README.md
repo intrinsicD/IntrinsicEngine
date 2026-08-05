@@ -107,6 +107,17 @@ available through the Vulkan 1.2/1.3 feature chain.
   guarded live/safety prerequisites are ready (`PublicBindlessHeapExposed =
   true`, `PublicTransferQueueExposed = true`), while texture creation, command
   execution, and frame lifecycle still gate on `IDevice::IsOperational()`.
+- The live `ITransferQueue` is also the ordinary upload path for renderer-owned
+  `GpuWorld` scene tables, lights, and packed geometry ranges. Its persistently
+  mapped staging belt owns the CPU copy and timeline retirement; callers keep
+  only backend-neutral transfer tokens and consumer barriers. Each buffer
+  upload records a range-scoped prior-read/write-to-transfer-write barrier
+  before its copy; queue order alone does not provide that memory dependency.
+  Because this service currently submits through the graphics queue, that
+  barrier orders each copy after prior users of an in-place range and later
+  caller-owned barriers order the copy before draw/compute consumption.
+  A future dedicated transfer queue must add explicit producer waits and
+  queue-family ownership before changing that assumption.
 - `VulkanDevice` constructs one device-lifetime `VulkanProfiler` after logical
   device initialization, even when per-frame profiling is disabled. The
   profiler allocates one fixed `VkQueryPool` only when an actual promoted

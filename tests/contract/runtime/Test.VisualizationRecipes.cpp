@@ -156,7 +156,9 @@ TEST(VisualizationRecipes, EncodesScalarColorAndLabelProperties)
               G::VisualizationAttributeDomain::Face);
     EXPECT_EQ(scalar.Batch.Scalars.front().Colormap,
               G::Colormap::Type::Plasma);
-    EXPECT_EQ(scalar.Batch.PropertyBuffers.front().DirtyStamp, 17u);
+    EXPECT_EQ(
+        scalar.Batch.PropertyBuffers.front().DirtyStamp,
+        source.Faces.Properties.FindPropertyRevision("curvature").value());
 
     const R::VisualizationEncodingResult color = R::EncodeVisualizationRecipe(
         source.Availability,
@@ -195,7 +197,44 @@ TEST(VisualizationRecipes, EncodesScalarColorAndLabelProperties)
     EXPECT_EQ(labels.Batch.Colors.front().Name, "cluster_labels");
     EXPECT_EQ(labels.Batch.PropertyBuffers.front().ValueType,
               G::VisualizationValueType::RgbaFloat4);
-    EXPECT_EQ(labels.Batch.PropertyBuffers.front().DirtyStamp, 21u);
+    EXPECT_EQ(
+        labels.Batch.PropertyBuffers.front().DirtyStamp,
+        source.Vertices.Properties.FindPropertyRevision(
+            "v:kmeans_color").value());
+}
+
+TEST(VisualizationRecipes, CpuBackedDirtyStampTracksCanonicalPropertyRevision)
+{
+    RecipeSourceFixture source{};
+    const R::VisualizationRecipe recipe{
+        .Data = R::ScalarVisualizationRecipe{
+            .Source = {
+                .Domain = R::GeometryElementDomain::MeshFace,
+                .Name = "curvature",
+                .ValueKind = Geometry::PropertyValueKind::Float,
+            },
+            .OutputName = "curvature_faces",
+            .BufferSourceKey = "curvature.upload",
+            .DirtyStamp = 999u,
+        }};
+
+    const R::VisualizationEncodingResult first =
+        R::EncodeVisualizationRecipe(source.Availability, recipe);
+    ASSERT_TRUE(first.Succeeded());
+    ASSERT_EQ(first.Batch.PropertyBuffers.size(), 1u);
+    const std::uint64_t firstRevision =
+        first.Batch.PropertyBuffers.front().DirtyStamp;
+    EXPECT_NE(firstRevision, 999u);
+
+    auto curvature = source.Faces.Properties.Get<float>("curvature");
+    ASSERT_TRUE(curvature.IsValid());
+    curvature[2] = 7.5f;
+
+    const R::VisualizationEncodingResult second =
+        R::EncodeVisualizationRecipe(source.Availability, recipe);
+    ASSERT_TRUE(second.Succeeded());
+    ASSERT_EQ(second.Batch.PropertyBuffers.size(), 1u);
+    EXPECT_GT(second.Batch.PropertyBuffers.front().DirtyStamp, firstRevision);
 }
 
 TEST(VisualizationRecipes, EncodesVectorAndIsolineProperties)
@@ -309,7 +348,9 @@ TEST(VisualizationRecipes, EncodesAtlasMetadataWithoutSchedulingWork)
     EXPECT_EQ(packet.TexcoordProvenance,
               G::VisualizationTexcoordProvenance::RuntimeResolved);
     EXPECT_EQ(packet.TexcoordDirtyStamp, 41u);
-    EXPECT_EQ(packet.SourceAttributeDirtyStamp, 42u);
+    EXPECT_EQ(
+        packet.SourceAttributeDirtyStamp,
+        source.Faces.Properties.FindPropertyRevision("curvature").value());
 
     const R::VisualizationEncodingResult recreate =
         R::EncodeVisualizationRecipe(

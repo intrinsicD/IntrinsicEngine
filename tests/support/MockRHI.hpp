@@ -59,24 +59,48 @@ namespace Extrinsic::Tests
             std::vector<std::byte> Data{};
         };
 
+        struct BufferUploadRecord
+        {
+            RHI::BufferHandle Buffer{};
+            std::uint64_t Offset{0u};
+            std::vector<std::byte> Data{};
+        };
+
         bool AlwaysComplete = true;
+        bool AcceptBufferUploads = false;
         bool FailTextureUploads = false;
         std::vector<RHI::TransferToken> Issued{};
+        std::vector<BufferUploadRecord> BufferUploads{};
         std::vector<TextureUploadRecord> TextureUploads{};
 
-        [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
-                                                     const void*,
-                                                     std::uint64_t,
-                                                     std::uint64_t = 0) override
+        [[nodiscard]] RHI::TransferToken UploadBuffer(
+            RHI::BufferHandle buffer,
+            const void* data,
+            std::uint64_t size,
+            std::uint64_t offset = 0) override
         {
-            return {};
+            if (!AcceptBufferUploads || data == nullptr || size == 0u)
+                return {};
+
+            BufferUploadRecord record{
+                .Buffer = buffer,
+                .Offset = offset,
+            };
+            const auto bytes = std::span{
+                static_cast<const std::byte*>(data),
+                static_cast<std::size_t>(size)};
+            record.Data.assign(bytes.begin(), bytes.end());
+            BufferUploads.push_back(std::move(record));
+            RHI::TransferToken token{++m_Counter};
+            Issued.push_back(token);
+            return token;
         }
 
-        [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
+        [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle buffer,
                                                      std::span<const std::byte> src,
-                                                     std::uint64_t = 0) override
+                                                     std::uint64_t offset = 0) override
         {
-            return {std::uint64_t(src.size())};
+            return UploadBuffer(buffer, src.data(), src.size_bytes(), offset);
         }
 
         [[nodiscard]] RHI::TransferToken UploadTexture(RHI::TextureHandle texture,

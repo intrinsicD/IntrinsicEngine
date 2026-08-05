@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan",
+    "--target",
+    "IntrinsicTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci-vulkan --target IntrinsicTests -j 4",
+  "cwd": ".",
+  "duration_ms": 791738,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T14:52:44Z",
+  "label": "ci-vulkan-build-after-upload-barrier",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T14:39:32Z",
+  "stderr_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-build-after-upload-barrier.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-build-after-upload-barrier.stdout.log",
+  "stdout_sha256": "6519673bd8d68203cd2a44b1f1b77ed40e9b4d01562703860d13a9254392706a",
+  "task_id": "RUNTIME-214"
+}

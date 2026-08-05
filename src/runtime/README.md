@@ -1497,6 +1497,14 @@ owns the live cache instance, pool, last stats, and frame-index counter that
 `Engine` composes into the frame loop; it does not change the extraction
 algorithms or renderer-owned resource policy.
 
+For canonical property-backed geometry, the cache compares the exact content
+revisions and element counts consumed by each resident mesh, graph,
+point-cloud, or primitive-view lane. It merges those changes with ECS dirty
+hints into the existing partial/full upload plans, so every CPU method and
+terminal Vulkan-method publication through `Geometry::PropertySet` reaches
+rendering without a method-specific renderer call. Unchanged and unbound
+properties do not trigger uploads.
+
 `RUNTIME-183` removes the former Engine-private asset-residency declaration and
 its include-only header. The cache/listener and import implementation are folded
 into `AssetWorkflowModule`'s private PImpl; `RUNTIME-190` independently composes

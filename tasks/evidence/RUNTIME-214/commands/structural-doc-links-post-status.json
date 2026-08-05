@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 944,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T15:18:48Z",
+  "label": "structural-doc-links-post-status",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T15:18:47Z",
+  "stderr_path": "tasks/evidence/RUNTIME-214/commands/structural-doc-links-post-status.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-214/commands/structural-doc-links-post-status.stdout.log",
+  "stdout_sha256": "9da1065c5df247853c05f911d1d161d9e5a320720b4ca09520214f477171d48d",
+  "task_id": "RUNTIME-214"
+}

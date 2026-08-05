@@ -954,6 +954,11 @@ namespace Extrinsic::Runtime
 
             options.SourceName = source.Name;
             options.Domain = *domain;
+            if (options.BufferBDA == 0u && options.ColorBufferBDA == 0u)
+            {
+                options.DirtyStamp = properties->FindPropertyRevision(
+                    source.Name).value_or(options.DirtyStamp);
+            }
             encodeProperty(Geometry::ConstPropertySet{*properties},
                            result.Batch,
                            options,
@@ -1059,7 +1064,11 @@ namespace Extrinsic::Runtime
                                     ? authored.PositionSource.Name
                                     : authored.PositionBufferSourceKey,
                             .VectorBufferSourceKey = authored.VectorBufferSourceKey,
-                            .DirtyStamp = authored.DirtyStamp,
+                            .DirtyStamp = authored.VectorBufferBDA == 0u
+                                ? properties->FindPropertyRevision(
+                                      authored.Source.Name).value_or(
+                                      authored.DirtyStamp)
+                                : authored.DirtyStamp,
                             .VectorScale = authored.Scale,
                             .VectorColor = authored.Color,
                             .DepthTested = authored.DepthTested,
@@ -1114,8 +1123,30 @@ namespace Extrinsic::Runtime
                         ++result.Diagnostics.InvalidResourceCount;
                         return;
                     }
-                    if (resolveSource(authored.Source) == nullptr)
+                    const Geometry::PropertySet* sourceProperties =
+                        resolveSource(authored.Source);
+                    if (sourceProperties == nullptr)
                         return;
+
+                    const std::uint64_t sourceAttributeRevision =
+                        sourceProperties->FindPropertyRevision(
+                            authored.Source.Name).value_or(
+                                authored.SourceAttributeDirtyStamp);
+                    std::uint64_t texcoordRevision =
+                        authored.TexcoordDirtyStamp;
+                    if (authored.TexcoordBufferBDA == 0u)
+                    {
+                        if (const Geometry::PropertySet* vertexProperties =
+                            ResolveGeometryPropertySet(
+                                availability,
+                                GeometryElementDomain::MeshVertex);
+                            vertexProperties != nullptr)
+                        {
+                            texcoordRevision =
+                                vertexProperties->FindPropertyRevision(
+                                    "v:texcoord").value_or(texcoordRevision);
+                        }
+                    }
 
                     switch (authored.Mapping)
                     {
@@ -1157,9 +1188,9 @@ namespace Extrinsic::Runtime
                                 authored.Mapping == Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords
                                     ? Graphics::VisualizationTexcoordProvenance::RuntimeResolved
                                     : Graphics::VisualizationTexcoordProvenance::Unknown,
-                            .TexcoordDirtyStamp = authored.TexcoordDirtyStamp,
+                            .TexcoordDirtyStamp = texcoordRevision,
                             .SourceAttributeDirtyStamp =
-                                authored.SourceAttributeDirtyStamp,
+                                sourceAttributeRevision,
                         });
                     ++result.Diagnostics.PacketAppendCount;
                     result.Status = VisualizationRecipeStatus::Encoded;

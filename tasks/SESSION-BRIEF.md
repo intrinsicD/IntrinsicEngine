@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-214` — Universal geometry-property CPU/GPU coherence (tasks/active/RUNTIME-214-universal-geometry-property-coherence.md)
 
 ## Theme B — Rendering modernization
 

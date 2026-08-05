@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation",
+    "VK_LAYER_ENABLES=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^GpuTransferFacadeGpuSmoke\\.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle$",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "env VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation VK_LAYER_ENABLES=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT ctest --test-dir build/ci-vulkan --output-on-failure -R '^GpuTransferFacadeGpuSmoke\\.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle$' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 4419,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T14:58:57Z",
+  "label": "ci-vulkan-transfer-smoke-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T14:58:53Z",
+  "stderr_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-transfer-smoke-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-transfer-smoke-final.stdout.log",
+  "stdout_sha256": "edea39124f3261413aaeec26fb488ee527b9872b03d6ec8ff4e2c2dfb8c3893b",
+  "task_id": "RUNTIME-214"
+}

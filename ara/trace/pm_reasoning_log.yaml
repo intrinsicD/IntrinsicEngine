@@ -1434,3 +1434,12 @@ entries:
       - "Recorded the rank-16-to-rank-5 Auto selection as frozen-default evidence, while keeping Manual exact and preserving the unchanged 100,000,000-contribution guard."
       - "Kept O118, O122, and O123 staged: BUG-131 does not adopt general cancellation/deduplication, prove the broader CLOP acceleration heuristic, or supply scanner-scale/device-timestamp/cross-device performance evidence."
       - "Found no contradiction with C30 or C34: C30's earlier general publication contract remains valid, while C35 supplies the previously missing real-asset Vulkan publication-to-residency proof."
+  - turn: "2026-08-05_001#3"
+    notes:
+      - "Routed the user's general property-to-GPU coherence request as open question N378 and the forced validation reproduction as experiment N379."
+      - "Staged O129 with user provenance for the requested CPU-dirty upload, direct GPU method execution, and one terminal readback architecture."
+      - "Staged O130 separately as an AI refinement because revisioned per-consumer state, destination renaming, timeline dependencies, and token retirement go beyond the user's staging-buffer terminology and await adoption."
+      - "Did not crystallize O129 or O130: the user requested critique and alignment but has not yet affirmed the refined Vulkan design or committed it to a task/artifact."
+      - "Did not mark C34 or C35 contradictory: their bounded numerical/publication statements remain factual, but N379 proves they were not validation-clean and narrows what can be inferred from those runs."
+      - "Recorded the first color-attachment WAW/RAW messages separately from the later two buffer-lifetime VUIDs; the former is renderer-wide and the latter matches the LOP final-readback lifecycle."
+      - "Kept O118, O122, and O123 staged and current; this diagnosis does not settle general cancellation, CLOP acceleration, or performance evidence."

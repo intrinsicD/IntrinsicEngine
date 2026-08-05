@@ -70,6 +70,9 @@ export namespace Extrinsic::Runtime
         std::string OutputName{};
         std::uint64_t BufferBDA{0u};
         std::string BufferSourceKey{};
+        // CPU-backed property buffers use the property's canonical content
+        // revision. This authored value remains for external GPU-address
+        // sources that do not publish through Geometry::PropertySet.
         std::uint64_t DirtyStamp{0u};
         bool AutoRange{true};
         float RangeMin{0.0f};

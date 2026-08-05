@@ -518,6 +518,31 @@ RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
     VkCommandBuffer cmd = Begin();
     if (cmd == VK_NULL_HANDLE)
         return {};
+
+    // Uploads share the graphics queue with frame submissions. Queue order
+    // alone is an execution order, not a memory dependency: a later staged
+    // overwrite still needs to wait for earlier shader reads or transfer
+    // writes of the same destination range. Keep that producer-side ordering
+    // here; callers continue to own the TransferWrite -> consumer barrier.
+    VkBufferMemoryBarrier2 beforeCopy{};
+    beforeCopy.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+    beforeCopy.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    beforeCopy.srcAccessMask =
+        VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    beforeCopy.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    beforeCopy.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    beforeCopy.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    beforeCopy.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    beforeCopy.buffer = buf->Buffer;
+    beforeCopy.offset = offset;
+    beforeCopy.size = size;
+
+    VkDependencyInfo dependency{};
+    dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency.bufferMemoryBarrierCount = 1u;
+    dependency.pBufferMemoryBarriers = &beforeCopy;
+    vkCmdPipelineBarrier2(cmd, &dependency);
+
     VkBufferCopy region{staging.Offset, offset, size};
     vkCmdCopyBuffer(cmd, staging.Buffer, buf->Buffer, 1, &region);
     return Submit(cmd);

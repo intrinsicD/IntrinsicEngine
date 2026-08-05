@@ -6,6 +6,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -45,6 +46,7 @@ import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
+import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
@@ -58,6 +60,354 @@ namespace Extrinsic::Runtime
             .Identity = identity,
             .Lane = lane,
         };
+    }
+
+    namespace
+    {
+        using ECS::Components::GeometrySources::ConstSourceView;
+        using ECS::Components::GeometrySources::PropertyNames::kEdgeV0;
+        using ECS::Components::GeometrySources::PropertyNames::kEdgeV1;
+        using ECS::Components::GeometrySources::PropertyNames::kFaceHalfedge;
+        using ECS::Components::GeometrySources::PropertyNames::kHalfedgeFace;
+        using ECS::Components::GeometrySources::PropertyNames::kHalfedgeNext;
+        using ECS::Components::GeometrySources::PropertyNames::kHalfedgeToVertex;
+        using ECS::Components::GeometrySources::PropertyNames::kNormal;
+        using ECS::Components::GeometrySources::PropertyNames::kPosition;
+
+        [[nodiscard]] Geometry::PropertyRevision PropertyRevisionOf(
+            const Geometry::PropertySet& properties,
+            const std::string_view name) noexcept
+        {
+            return properties.FindPropertyRevision(name).value_or(0u);
+        }
+
+        [[nodiscard]] std::size_t PositionCountOf(
+            const Geometry::PropertySet& properties) noexcept
+        {
+            const auto position =
+                Geometry::ConstPropertySet{properties}.Get<glm::vec3>(kPosition);
+            return position.IsValid() ? position.Size() : 0u;
+        }
+
+        [[nodiscard]] bool BindingMatches(
+            const VertexChannelSourceBinding& binding,
+            const GeometryElementDomain expectedDomain,
+            const bool color) noexcept
+        {
+            if (!IsVertexChannelBindingEnabled(binding) ||
+                binding.Property.Domain != expectedDomain)
+            {
+                return false;
+            }
+            if (color)
+            {
+                return binding.Property.ValueKind ==
+                           Geometry::PropertyValueKind::Vec3 ||
+                    binding.Property.ValueKind ==
+                           Geometry::PropertyValueKind::Vec4;
+            }
+            return binding.Property.ValueKind == Geometry::PropertyValueKind::Vec3;
+        }
+
+        [[nodiscard]] RenderExtractionGeometrySourceRevisions
+        CaptureVertexChannelRevisions(
+            const ConstSourceView& view,
+            const VertexChannelBindingSet* bindings,
+            const GeometryElementDomain expectedDomain,
+            const bool meshDefaults) noexcept
+        {
+            RenderExtractionGeometrySourceRevisions snapshot{};
+            if (view.VertexSource == nullptr)
+                return snapshot;
+
+            const Geometry::PropertySet& properties =
+                view.VertexSource->Properties;
+            snapshot.VertexCount = properties.Size();
+            snapshot.PositionCount = PositionCountOf(properties);
+            snapshot.Position = PropertyRevisionOf(properties, kPosition);
+            if (meshDefaults)
+            {
+                snapshot.Texcoord =
+                    PropertyRevisionOf(properties, "v:texcoord");
+            }
+
+            if (bindings != nullptr)
+            {
+                snapshot.BindingGeneration = bindings->BindingGeneration;
+                if (BindingMatches(bindings->Normal, expectedDomain, false))
+                {
+                    snapshot.Normal = PropertyRevisionOf(
+                        properties, bindings->Normal.Property.Name);
+                }
+                if (BindingMatches(bindings->Color, expectedDomain, true))
+                {
+                    snapshot.Color = PropertyRevisionOf(
+                        properties, bindings->Color.Property.Name);
+                }
+            }
+
+            if (snapshot.Normal == 0u &&
+                meshDefaults &&
+                (bindings == nullptr ||
+                 !IsVertexChannelBindingEnabled(bindings->Normal)))
+            {
+                const auto normal =
+                    Geometry::ConstPropertySet{properties}.Get<glm::vec3>(
+                        kNormal);
+                if (normal.IsValid())
+                    snapshot.Normal = normal.Revision();
+            }
+            if (snapshot.Color == 0u &&
+                meshDefaults &&
+                (bindings == nullptr ||
+                 !IsVertexChannelBindingEnabled(bindings->Color)))
+            {
+                const Geometry::ConstPropertySet constProperties{properties};
+                if (constProperties.Get<glm::vec4>("v:color").IsValid() ||
+                    constProperties.Get<glm::vec3>("v:color").IsValid())
+                {
+                    snapshot.Color =
+                        PropertyRevisionOf(properties, "v:color");
+                }
+            }
+
+            // Acknowledge non-rendering property edits without turning them
+            // into uploads. A later bound-channel mutation receives a new
+            // process-monotonic token.
+            (void)properties.Revision();
+            return snapshot;
+        }
+
+        [[nodiscard]] RenderExtractionGeometrySourceRevisions
+        CaptureMeshSourceRevisions(
+            const ConstSourceView& view,
+            const VertexChannelBindingSet* bindings) noexcept
+        {
+            RenderExtractionGeometrySourceRevisions snapshot =
+                CaptureVertexChannelRevisions(
+                    view,
+                    bindings,
+                    GeometryElementDomain::MeshVertex,
+                    true);
+            if (view.HalfedgeSource != nullptr)
+            {
+                const Geometry::PropertySet& properties =
+                    view.HalfedgeSource->Properties;
+                snapshot.Topology0 =
+                    PropertyRevisionOf(properties, kHalfedgeToVertex);
+                snapshot.Topology1 =
+                    PropertyRevisionOf(properties, kHalfedgeNext);
+                snapshot.Topology2 =
+                    PropertyRevisionOf(properties, kHalfedgeFace);
+                snapshot.TopologyElementCount0 = properties.Size();
+                (void)properties.Revision();
+            }
+            if (view.FaceSource != nullptr)
+            {
+                const Geometry::PropertySet& properties =
+                    view.FaceSource->Properties;
+                snapshot.Topology3 =
+                    PropertyRevisionOf(properties, kFaceHalfedge);
+                snapshot.TopologyElementCount1 = properties.Size();
+                (void)properties.Revision();
+            }
+            return snapshot;
+        }
+
+        [[nodiscard]] RenderExtractionGeometrySourceRevisions
+        CaptureGraphSourceRevisions(
+            const ConstSourceView& view,
+            const VertexChannelBindingSet* bindings,
+            const bool wantLines) noexcept
+        {
+            RenderExtractionGeometrySourceRevisions snapshot =
+                CaptureVertexChannelRevisions(
+                    view,
+                    bindings,
+                    GeometryElementDomain::GraphNode,
+                    false);
+            if (wantLines && view.EdgeSource != nullptr)
+            {
+                const Geometry::PropertySet& properties =
+                    view.EdgeSource->Properties;
+                snapshot.Topology0 = PropertyRevisionOf(properties, kEdgeV0);
+                snapshot.Topology1 = PropertyRevisionOf(properties, kEdgeV1);
+                snapshot.TopologyElementCount0 = properties.Size();
+                (void)properties.Revision();
+            }
+            return snapshot;
+        }
+
+        [[nodiscard]] RenderExtractionGeometrySourceRevisions
+        CapturePointCloudSourceRevisions(
+            const ConstSourceView& view,
+            const VertexChannelBindingSet* bindings) noexcept
+        {
+            return CaptureVertexChannelRevisions(
+                view,
+                bindings,
+                GeometryElementDomain::PointCloudPoint,
+                false);
+        }
+
+        [[nodiscard]] RenderExtractionGeometrySourceRevisions
+        CaptureMeshPrimitiveViewSourceRevisions(
+            const ConstSourceView& view,
+            const bool edgeView) noexcept
+        {
+            RenderExtractionGeometrySourceRevisions snapshot =
+                CaptureVertexChannelRevisions(
+                    view,
+                    nullptr,
+                    GeometryElementDomain::MeshVertex,
+                    false);
+            if (edgeView && view.EdgeSource != nullptr)
+            {
+                const Geometry::PropertySet& properties =
+                    view.EdgeSource->Properties;
+                snapshot.Topology0 = PropertyRevisionOf(properties, kEdgeV0);
+                snapshot.Topology1 = PropertyRevisionOf(properties, kEdgeV1);
+                snapshot.TopologyElementCount0 = properties.Size();
+                (void)properties.Revision();
+            }
+            if (edgeView)
+            {
+                bool usesExplicitEdges = false;
+                if (view.EdgeSource != nullptr)
+                {
+                    const Geometry::ConstPropertySet edges{
+                        view.EdgeSource->Properties};
+                    const auto v0 = edges.Get<std::uint32_t>(kEdgeV0);
+                    const auto v1 = edges.Get<std::uint32_t>(kEdgeV1);
+                    usesExplicitEdges = v0.IsValid() && v1.IsValid() &&
+                        v0.Size() != 0u;
+                }
+                if (!usesExplicitEdges && view.HalfedgeSource != nullptr)
+                {
+                    const Geometry::PropertySet& properties =
+                        view.HalfedgeSource->Properties;
+                    snapshot.Topology2 =
+                        PropertyRevisionOf(properties, kHalfedgeToVertex);
+                    snapshot.Topology3 =
+                        PropertyRevisionOf(properties, kHalfedgeNext);
+                    snapshot.Topology4 =
+                        PropertyRevisionOf(properties, kHalfedgeFace);
+                    snapshot.TopologyElementCount1 = properties.Size();
+                    (void)properties.Revision();
+                }
+                if (!usesExplicitEdges && view.FaceSource != nullptr)
+                {
+                    const Geometry::PropertySet& properties =
+                        view.FaceSource->Properties;
+                    snapshot.Topology5 =
+                        PropertyRevisionOf(properties, kFaceHalfedge);
+                    snapshot.TopologyElementCount2 = properties.Size();
+                    (void)properties.Revision();
+                }
+            }
+            return snapshot;
+        }
+
+        void MergeVertexRevisionDelta(
+            RenderExtractionGeometryDirtyPlan& plan,
+            const RenderExtractionGeometrySourceRevisions& current,
+            const RenderExtractionGeometrySourceRevisions& previous) noexcept
+        {
+            if (current.VertexCount != previous.VertexCount ||
+                current.PositionCount != previous.PositionCount)
+            {
+                plan.RequiresFullUpload = true;
+            }
+            if (current.Position != previous.Position)
+                plan.Channels.Position = true;
+            if (current.Texcoord != previous.Texcoord)
+                plan.Channels.Texcoord = true;
+            if (current.Normal != previous.Normal)
+                plan.Channels.Normal = true;
+            if (current.Color != previous.Color)
+                plan.Channels.Color = true;
+            if (current.BindingGeneration != previous.BindingGeneration)
+            {
+                plan.Channels.Normal = true;
+                plan.Channels.Color = true;
+            }
+        }
+
+        void FinalizeRevisionDirtyPlan(
+            RenderExtractionGeometryDirtyPlan& plan) noexcept
+        {
+            plan.Dirty = plan.RequiresFullUpload || plan.Channels.Any();
+            plan.MeshPrimitiveViewDirty =
+                plan.RequiresFullUpload || plan.Channels.Position;
+        }
+
+        void MergeMeshRevisionDelta(
+            RenderExtractionGeometryDirtyPlan& plan,
+            const RenderExtractionGeometrySourceRevisions& current,
+            const RenderExtractionGeometrySourceRevisions& previous) noexcept
+        {
+            MergeVertexRevisionDelta(plan, current, previous);
+            if (current.Topology0 != previous.Topology0 ||
+                current.Topology1 != previous.Topology1 ||
+                current.Topology2 != previous.Topology2 ||
+                current.Topology3 != previous.Topology3 ||
+                current.TopologyElementCount0 != previous.TopologyElementCount0 ||
+                current.TopologyElementCount1 != previous.TopologyElementCount1)
+            {
+                plan.RequiresFullUpload = true;
+            }
+            FinalizeRevisionDirtyPlan(plan);
+        }
+
+        void MergeGraphRevisionDelta(
+            RenderExtractionGeometryDirtyPlan& plan,
+            const RenderExtractionGeometrySourceRevisions& current,
+            const RenderExtractionGeometrySourceRevisions& previous) noexcept
+        {
+            MergeVertexRevisionDelta(plan, current, previous);
+            if (current.Topology0 != previous.Topology0 ||
+                current.Topology1 != previous.Topology1 ||
+                current.TopologyElementCount0 != previous.TopologyElementCount0)
+            {
+                plan.RequiresFullUpload = true;
+            }
+            FinalizeRevisionDirtyPlan(plan);
+        }
+
+        void MergePointCloudRevisionDelta(
+            RenderExtractionGeometryDirtyPlan& plan,
+            const RenderExtractionGeometrySourceRevisions& current,
+            const RenderExtractionGeometrySourceRevisions& previous) noexcept
+        {
+            MergeVertexRevisionDelta(plan, current, previous);
+            FinalizeRevisionDirtyPlan(plan);
+        }
+
+        [[nodiscard]] bool MeshPrimitiveViewRevisionChanged(
+            const RenderExtractionGeometrySourceRevisions& current,
+            const RenderExtractionGeometrySourceRevisions& previous,
+            const bool edgeView) noexcept
+        {
+            if (current.VertexCount != previous.VertexCount ||
+                current.PositionCount != previous.PositionCount ||
+                current.Position != previous.Position)
+            {
+                return true;
+            }
+            return edgeView &&
+                (current.Topology0 != previous.Topology0 ||
+                 current.Topology1 != previous.Topology1 ||
+                 current.Topology2 != previous.Topology2 ||
+                 current.Topology3 != previous.Topology3 ||
+                 current.Topology4 != previous.Topology4 ||
+                 current.Topology5 != previous.Topology5 ||
+                 current.TopologyElementCount0 !=
+                     previous.TopologyElementCount0 ||
+                 current.TopologyElementCount1 !=
+                     previous.TopologyElementCount1 ||
+                 current.TopologyElementCount2 !=
+                     previous.TopologyElementCount2);
+        }
     }
 
     Graphics::GeometryResidencyCoordinator&
@@ -108,10 +458,19 @@ namespace Extrinsic::Runtime
         RuntimeRenderExtractionStats& stats)
     {
         namespace D = ECS::Components::DirtyTags;
-        const RenderExtractionGeometryDirtyPlan dirtyPlan =
-            BuildRenderExtractionMeshGeometryDirtyPlan(registry, entity);
-        const bool dirty = dirtyPlan.Dirty;
         const bool hadResidency = sidecar.MeshGeometry.IsValid();
+        const auto* channelBindings =
+            registry.try_get<VertexChannelBindingSet>(entity);
+        const RenderExtractionGeometrySourceRevisions sourceRevisions =
+            CaptureMeshSourceRevisions(view, channelBindings);
+        RenderExtractionGeometryDirtyPlan dirtyPlan =
+            BuildRenderExtractionMeshGeometryDirtyPlan(registry, entity);
+        if (hadResidency)
+        {
+            MergeMeshRevisionDelta(
+                dirtyPlan, sourceRevisions, sidecar.MeshSourceRevisions);
+        }
+        const bool dirty = dirtyPlan.Dirty;
         const Graphics::GeometryResidencyKey residencyKey =
             BuildRenderExtractionGeometryResidencyKey(
                 RenderExtractionGeometryResidencyKind::Mesh,
@@ -148,6 +507,7 @@ namespace Extrinsic::Runtime
         // a direct rebind without any cache lookup.
         if (hadResidency && !dirty)
         {
+            sidecar.MeshSourceRevisions = sourceRevisions;
             ++stats.MeshGeometryReuseHits;
             sidecar.Geometry = sidecar.MeshGeometry;
             sidecar.GpuSlot.SetGeometryHandle(sidecar.MeshGeometry);
@@ -160,8 +520,6 @@ namespace Extrinsic::Runtime
 
         const RenderExtractionMeshTexcoordFallbackDiagnostics texcoordFallback =
             DiagnoseRenderExtractionMeshTexcoordFallback(view);
-        const auto* channelBindings =
-            registry.try_get<VertexChannelBindingSet>(entity);
         const bool partialPreferred =
             hadResidency && dirty && !dirtyPlan.RequiresFullUpload;
         MeshPlanBuildResult packResult = BuildMeshGeometryPlan(
@@ -262,6 +620,7 @@ namespace Extrinsic::Runtime
         }
 
         sidecar.MeshGeometry = residency.Handle;
+        sidecar.MeshSourceRevisions = sourceRevisions;
         sidecar.Geometry = residency.Handle;
         sidecar.GpuSlot.SetGeometryHandle(residency.Handle);
         sidecar.GpuSlot.ClearSourceAsset();
@@ -288,10 +647,19 @@ namespace Extrinsic::Runtime
         const bool wantLines = registry.all_of<G::RenderEdges>(entity);
         const bool wantPoints = registry.all_of<G::RenderPoints>(entity);
 
-        const RenderExtractionGeometryDirtyPlan dirtyPlan =
-            BuildRenderExtractionGraphGeometryDirtyPlan(registry, entity);
-        const bool dirty = dirtyPlan.Dirty;
         const bool hadResidency = sidecar.GraphGeometry.IsValid();
+        const auto* channelBindings =
+            registry.try_get<VertexChannelBindingSet>(entity);
+        const RenderExtractionGeometrySourceRevisions sourceRevisions =
+            CaptureGraphSourceRevisions(view, channelBindings, wantLines);
+        RenderExtractionGeometryDirtyPlan dirtyPlan =
+            BuildRenderExtractionGraphGeometryDirtyPlan(registry, entity);
+        if (hadResidency)
+        {
+            MergeGraphRevisionDelta(
+                dirtyPlan, sourceRevisions, sidecar.GraphSourceRevisions);
+        }
+        const bool dirty = dirtyPlan.Dirty;
         const Graphics::GeometryResidencyKey residencyKey =
             BuildRenderExtractionGeometryResidencyKey(
                 RenderExtractionGeometryResidencyKind::Graph,
@@ -330,6 +698,7 @@ namespace Extrinsic::Runtime
         // without any repack.
         if (hadResidency && !dirty && !lanesChanged)
         {
+            sidecar.GraphSourceRevisions = sourceRevisions;
             ++stats.GraphGeometryReuseHits;
             sidecar.Geometry = sidecar.GraphGeometry;
             sidecar.GpuSlot.SetGeometryHandle(sidecar.GraphGeometry);
@@ -340,8 +709,6 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        const auto* channelBindings =
-            registry.try_get<VertexChannelBindingSet>(entity);
         const bool partialPreferred =
             hadResidency && dirty && !dirtyPlan.RequiresFullUpload
             && !lanesChanged;
@@ -429,6 +796,7 @@ namespace Extrinsic::Runtime
         }
 
         sidecar.GraphGeometry = residency.Handle;
+        sidecar.GraphSourceRevisions = sourceRevisions;
         sidecar.GraphPackedLines = wantLines;
         sidecar.GraphPackedPoints = wantPoints;
         sidecar.Geometry = residency.Handle;
@@ -494,15 +862,27 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        const RenderExtractionGeometryDirtyPlan dirtyPlan =
-            BuildRenderExtractionPointCloudGeometryDirtyPlan(registry, entity);
-        const bool dirty = dirtyPlan.Dirty;
         const bool hadResidency = sidecar.PointCloudGeometry.IsValid();
+        const auto* channelBindings =
+            registry.try_get<VertexChannelBindingSet>(entity);
+        const RenderExtractionGeometrySourceRevisions sourceRevisions =
+            CapturePointCloudSourceRevisions(view, channelBindings);
+        RenderExtractionGeometryDirtyPlan dirtyPlan =
+            BuildRenderExtractionPointCloudGeometryDirtyPlan(registry, entity);
+        if (hadResidency)
+        {
+            MergePointCloudRevisionDelta(
+                dirtyPlan,
+                sourceRevisions,
+                sidecar.PointCloudSourceRevisions);
+        }
+        const bool dirty = dirtyPlan.Dirty;
 
         // Reuse path: clean point-cloud entity with a cached upload. Mirrors
         // the single-owner mesh reuse — a direct rebind without any repack.
         if (hadResidency && !dirty)
         {
+            sidecar.PointCloudSourceRevisions = sourceRevisions;
             ++stats.PointCloudGeometryReuseHits;
             sidecar.Geometry = sidecar.PointCloudGeometry;
             sidecar.GpuSlot.SetGeometryHandle(sidecar.PointCloudGeometry);
@@ -513,8 +893,6 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        const auto* channelBindings =
-            registry.try_get<VertexChannelBindingSet>(entity);
         const bool partialPreferred =
             hadResidency && dirty && !dirtyPlan.RequiresFullUpload;
         PointCloudPlanBuildResult packResult =
@@ -598,6 +976,7 @@ namespace Extrinsic::Runtime
         }
 
         sidecar.PointCloudGeometry = residency.Handle;
+        sidecar.PointCloudSourceRevisions = sourceRevisions;
         sidecar.Geometry = residency.Handle;
         sidecar.GpuSlot.SetGeometryHandle(residency.Handle);
         sidecar.GpuSlot.ClearSourceAsset();
@@ -656,6 +1035,16 @@ namespace Extrinsic::Runtime
         }
 
         const bool hadView = geometry.IsValid();
+        RenderExtractionGeometrySourceRevisions& observedSourceRevisions =
+            isEdge
+                ? sidecar.MeshEdgeViewSourceRevisions
+                : sidecar.MeshVertexViewSourceRevisions;
+        const RenderExtractionGeometrySourceRevisions sourceRevisions =
+            CaptureMeshPrimitiveViewSourceRevisions(view, isEdge);
+        const bool sourceRevisionDirty = hadView &&
+            MeshPrimitiveViewRevisionChanged(
+                sourceRevisions, observedSourceRevisions, isEdge);
+        const bool effectiveMeshDirty = meshDirty || sourceRevisionDirty;
 
         // Append the per-frame transform/render record so the view lane renders
         // with the parent surface's transform/bounds/material but its own
@@ -687,8 +1076,9 @@ namespace Extrinsic::Runtime
         };
 
         // Reuse path: resident view, parent clean. Direct re-submit, no repack.
-        if (hadView && !meshDirty)
+        if (hadView && !effectiveMeshDirty)
         {
+            observedSourceRevisions = sourceRevisions;
             if (isEdge)
             {
                 ++stats.MeshEdgeViewReuseHits;
@@ -834,6 +1224,7 @@ namespace Extrinsic::Runtime
         }
 
         geometry = residency.Handle;
+        observedSourceRevisions = sourceRevisions;
         renderer.GetGpuWorld().SetInstanceGeometry(
             instance, residency.Handle);
         submitTransform();

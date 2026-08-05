@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan",
+    "--target",
+    "IntrinsicTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci-vulkan --target IntrinsicTests -j 4",
+  "cwd": ".",
+  "duration_ms": 16454,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T14:58:29Z",
+  "label": "ci-vulkan-build-after-smoke-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T14:58:13Z",
+  "stderr_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-build-after-smoke-fix.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-build-after-smoke-fix.stdout.log",
+  "stdout_sha256": "052a0dc2fef2a14c9c6ae7501e3b26e0f66764a233f4b39a7366618abe99302c",
+  "task_id": "RUNTIME-214"
+}

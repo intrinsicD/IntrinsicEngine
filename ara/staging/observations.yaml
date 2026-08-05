@@ -2226,3 +2226,47 @@ observations:
     promoted_to: "logic/claims.md:C35"
     crystallized_via: empirical-resolution
     stale: false
+  - id: O129
+    timestamp: "2026-08-05T12:10+02:00"
+    provenance: user
+    content: >
+      Every CPU property explicitly selected for rendering or GPU computation
+      should be associated with target GPU storage and tracked for mutation.
+      CPU changes should upload only the affected data; a GPU method should use
+      resident buffers directly, avoid intermediate CPU copies, and copy its
+      terminal result back once so CPU and GPU are coherent at method
+      boundaries.
+    context: >
+      The user restated framework24's property-to-buffer dirty propagation as
+      the expected general engine behavior after observing no visual response
+      and Vulkan validation errors from a smaller LOP input.
+    potential_type: architecture
+    bound_to: [N378]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O130
+    timestamp: "2026-08-05T12:10+02:00"
+    provenance: ai-suggested
+    content: >
+      Vulkan property synchronization should use monotonic CPU and GPU
+      revisions per property consumer, a runtime-owned property-residency
+      sidecar, persistently mapped staging/readback rings, versioned
+      device-local destination slices, explicit submission/timeline
+      dependencies, and token-based retirement. A staging ring and destination
+      double/triple buffering solve different problems; one dirty boolean and
+      frame-count-delayed deletion are insufficient with multiple consumers
+      and queues.
+    context: >
+      Source inspection found no mutation revision in Geometry.Properties,
+      coarse ECS dirty tags for canonical render channels, synchronous
+      temporary staging in GpuWorld updates, a separate host-visible
+      visualization residency path, and private LOP buffers whose final
+      readback crosses command/queue lifetime boundaries.
+    potential_type: architecture
+    bound_to: [N378, N379]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

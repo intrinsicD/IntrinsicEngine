@@ -1,7 +1,9 @@
 module;
 
-#include <ostream>
+#include <atomic>
+#include <memory>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -12,6 +14,109 @@ module Geometry.Properties;
 
 namespace Geometry
 {
+    namespace
+    {
+        std::atomic<PropertyRevision> g_NextPropertyRevision{1u};
+    }
+
+    void Internal::PropertyRevisionState::MarkModified() noexcept
+    {
+        if (m_DirtySinceObservation)
+            return;
+
+        m_Current = g_NextPropertyRevision.fetch_add(
+            1u, std::memory_order_relaxed);
+        if (m_Current == 0u)
+        {
+            // A wrapped revision must never look like the invalid sentinel.
+            m_Current = g_NextPropertyRevision.fetch_add(
+                1u, std::memory_order_relaxed);
+        }
+        m_DirtySinceObservation = true;
+    }
+
+    PropertyRevision Internal::PropertyRevisionState::Observe() const noexcept
+    {
+        m_DirtySinceObservation = false;
+        return m_Current;
+    }
+
+    PropertyRevision Internal::PropertyRevisionState::Current() const noexcept
+    {
+        return m_Current;
+    }
+
+    PropertyRegistry::PropertyRegistry()
+        : m_Revisions(std::make_shared<Internal::PropertyRevisionState>())
+    {
+    }
+
+    PropertyRegistry::PropertyRegistry(PropertyRegistry&& other) noexcept
+        : m_Revisions(std::move(other.m_Revisions)),
+          m_Storages(std::move(other.m_Storages)),
+          m_NameIndex(std::move(other.m_NameIndex)),
+          m_Size(std::exchange(other.m_Size, 0u))
+    {
+        RebaseRevisions();
+    }
+
+    PropertyRegistry& PropertyRegistry::operator=(PropertyRegistry&& other) noexcept
+    {
+        if (this == &other)
+            return *this;
+
+        m_Revisions = std::move(other.m_Revisions);
+        m_Storages = std::move(other.m_Storages);
+        m_NameIndex = std::move(other.m_NameIndex);
+        m_Size = std::exchange(other.m_Size, 0u);
+        RebaseRevisions();
+        return *this;
+    }
+
+    void PropertyRegistry::EnsureRevisionState()
+    {
+        if (m_Revisions == nullptr)
+            m_Revisions = std::make_shared<Internal::PropertyRevisionState>();
+    }
+
+    void PropertyRegistry::MarkModified()
+    {
+        EnsureRevisionState();
+        m_Revisions->MarkModified();
+    }
+
+    void PropertyRegistry::RebaseRevisions()
+    {
+        if (m_Size == 0u && m_Storages.empty())
+            return;
+
+        EnsureRevisionState();
+        (void)m_Revisions->Observe();
+        MarkModified();
+        for (auto& storage : m_Storages)
+        {
+            if (storage != nullptr)
+                storage->MarkModified();
+        }
+    }
+
+    PropertyRevision PropertyRegistry::Revision() const noexcept
+    {
+        return m_Revisions != nullptr ? m_Revisions->Observe() : 0u;
+    }
+
+    std::optional<PropertyRevision> PropertyRegistry::FindPropertyRevision(
+        const std::string_view name) const noexcept
+    {
+        const std::optional<PropertyId> id = Find(name);
+        if (!id.has_value())
+            return std::nullopt;
+        const Internal::PropertyStorageBase* storage = Storage(*id);
+        return storage != nullptr
+            ? std::optional<PropertyRevision>{storage->Revision()}
+            : std::nullopt;
+    }
+
     std::vector<std::string> PropertyRegistry::PropertyNames() const
     {
         std::vector<std::string> out;
@@ -39,6 +144,9 @@ namespace Geometry
 
     void PropertyRegistry::Clear()
     {
+        if (m_Size == 0u && m_Storages.empty())
+            return;
+        MarkModified();
         m_Size = 0;
         m_Storages.clear();
         m_NameIndex.clear();
@@ -51,6 +159,9 @@ namespace Geometry
 
     void PropertyRegistry::Resize(size_t n)
     {
+        if (m_Size == n)
+            return;
+        MarkModified();
         m_Size = n;
         for (auto& storage : m_Storages)
             if (storage) storage->Resize(n);
@@ -64,6 +175,7 @@ namespace Geometry
 
     void PropertyRegistry::PushBack()
     {
+        MarkModified();
         m_Size += 1;
         for (auto& storage : m_Storages)
             if (storage) storage->PushBack();
@@ -71,6 +183,9 @@ namespace Geometry
 
     void PropertyRegistry::Swap(size_t i0, size_t i1)
     {
+        if (i0 == i1)
+            return;
+        MarkModified();
         for (auto& storage : m_Storages)
             if (storage) storage->Swap(i0, i1);
     }
@@ -110,7 +225,11 @@ namespace Geometry
         return m_Storages[id].get();
     }
 
-    PropertyRegistry::PropertyRegistry(const PropertyRegistry& other) : m_Storages(), m_NameIndex(), m_Size(other.m_Size)
+    PropertyRegistry::PropertyRegistry(const PropertyRegistry& other)
+        : m_Revisions(std::make_shared<Internal::PropertyRevisionState>()),
+          m_Storages(),
+          m_NameIndex(),
+          m_Size(other.m_Size)
     {
         m_Storages.reserve(other.m_Storages.size());
         for (size_t i = 0; i < other.m_Storages.size(); ++i)
@@ -121,30 +240,19 @@ namespace Geometry
                 m_Storages.emplace_back(nullptr);
                 continue;
             }
-            m_Storages.push_back(storage->Clone());
+            m_Storages.push_back(storage->Clone(m_Revisions));
             m_NameIndex.emplace(std::string(m_Storages.back()->Name()), i);
         }
+        if ((m_Size != 0u || !m_Storages.empty()) &&
+            m_Revisions->Current() == 0u)
+            MarkModified();
     }
 
     PropertyRegistry& PropertyRegistry::operator=(const PropertyRegistry& other)
     {
         if (this == &other) return *this;
-
-        m_Size = other.m_Size;
-        m_Storages.clear();
-        m_NameIndex.clear();
-        m_Storages.reserve(other.m_Storages.size());
-        for (size_t i = 0; i < other.m_Storages.size(); ++i)
-        {
-            const auto& storage = other.m_Storages[i];
-            if (!storage)
-            {
-                m_Storages.emplace_back(nullptr);
-                continue;
-            }
-            m_Storages.push_back(storage->Clone());
-            m_NameIndex.emplace(std::string(m_Storages.back()->Name()), i);
-        }
+        PropertyRegistry replacement(other);
+        *this = std::move(replacement);
         return *this;
     }
 
@@ -162,6 +270,7 @@ namespace Geometry
 
         // Remove from name index before clearing storage.
         m_NameIndex.erase(std::string(m_Storages[id]->Name()));
+        MarkModified();
         // Preserve IDs by leaving an empty slot.
         m_Storages[id].reset();
         return true;

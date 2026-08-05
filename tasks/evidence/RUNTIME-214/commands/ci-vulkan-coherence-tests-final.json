@@ -1,0 +1,33 @@
+{
+  "command": [
+    "env",
+    "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation",
+    "VK_LAYER_ENABLES=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "-R",
+    "^(GpuTransferFacadeGpuSmoke\\.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle|PointCloudConsolidationGpuParity\\.(VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat|VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement))$",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "env VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation VK_LAYER_ENABLES=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^(GpuTransferFacadeGpuSmoke\\.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle|PointCloudConsolidationGpuParity\\.(VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat|VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement))$' --timeout 180",
+  "cwd": ".",
+  "duration_ms": 60736,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T15:00:07Z",
+  "label": "ci-vulkan-coherence-tests-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T14:59:07Z",
+  "stderr_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.stdout.log",
+  "stdout_sha256": "f5a1067ddfd67fbde73a7183d09ac9d7f415a9ebf442b127779bff4e2c3c2d6e",
+  "task_id": "RUNTIME-214"
+}

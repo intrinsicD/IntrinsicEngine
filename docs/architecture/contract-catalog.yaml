@@ -23,6 +23,23 @@ contracts:
       - tests/contract/runtime/Test.GraphGeometryExtraction.cpp
       - tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
       - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+  geometry.property-coherence:
+    owner: geometry-runtime-graphics
+    source: docs/architecture/property-coherence.md
+    applies_when:
+      - A canonical geometry property is introduced or changed so CPU mutation, GPU method execution, rendering, visualization, upload, readback, or residency observes its content.
+      - A method publishes CPU or GPU results to geometry properties, or a renderer/compute consumer caches property-backed GPU data across boundaries.
+      - Property mutation revisions, staging, transfer barriers, completion tokens, or CPU/GPU authority at method boundaries are changed.
+    proofs:
+      - tests/unit/geometry/Test.GeometryProperties.cpp
+      - tests/contract/graphics/Test.GpuTransferFacade.cpp
+      - tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp
+      - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
+      - tests/contract/runtime/Test.GraphGeometryExtraction.cpp
+      - tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp
+      - tests/contract/runtime/Test.VisualizationRecipes.cpp
+      - tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp
+      - tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
   geometry.parameterization-optimization:
     owner: geometry
     source: docs/architecture/parameterization-mapping-roadmap.md

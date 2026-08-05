@@ -1,0 +1,13 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3346: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+1/1 Test #3346: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle ...   Passed    4.25 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu         =   4.25 sec*proc (1 test)
+graphics    =   4.25 sec*proc (1 test)
+vulkan      =   4.25 sec*proc (1 test)
+
+Total Test time (real) =   4.41 sec

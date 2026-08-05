@@ -2,9 +2,9 @@ session:
   id: "2026-08-05_001"
   date: "2026-08-05"
   started: "2026-08-05T01:17+02:00"
-  last_turn: "2026-08-05T10:44+02:00"
-  turn_count: 2
-  summary: "Implemented and retired property-specific support radii and a private Vulkan LOP backend, then repaired Auto admission and proved visible child.obj position publication on Vulkan."
+  last_turn: "2026-08-05T12:10+02:00"
+  turn_count: 3
+  summary: "Implemented property-specific support radii and private Vulkan LOP, repaired Auto publication, then exposed validation and property-residency synchronization gaps in the interactive path."
 
 events_logged:
   - turn: 1
@@ -85,6 +85,18 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized the bounded one-asset/one-host Auto WLOP visible-publication result without a speed or visual-quality claim."
+  - turn: 3
+    type: question
+    id: "N378"
+    routing: direct
+    provenance: user
+    summary: "Opened a general property-level CPU/GPU coherence design for render bindings and Vulkan methods."
+  - turn: 3
+    type: experiment
+    id: "N379"
+    routing: direct
+    provenance: ai-executed
+    summary: "Forced validation on the child.obj Auto Vulkan path and reproduced render-attachment synchronization hazards plus two in-use buffer destructions."
 
 ai_actions:
   - turn: 1
@@ -123,6 +135,11 @@ ai_actions:
       - "tasks/done/BUG-131-lop-auto-radius-visible-application.md"
       - "tasks/evidence/BUG-131/"
       - "ara/"
+  - turn: 3
+    action: "Compared framework24's property dirty-buffer map with IntrinsicEngine's property, render residency, staging, and LOP readback paths; inspected the RTX 3050 queue-family topology; ran the exact child.obj Vulkan test with Khronos synchronization validation forced; and isolated the first render-graph hazards and later LOP resource-lifetime VUIDs."
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
 
 claims_touched:
   - id: C31
@@ -154,13 +171,17 @@ key_context:
     excerpt: "The user's reported UnsafeSupportRadius/no-visible-response workflow became the exact real-asset regression target rather than a synthetic-only admission test."
   - turn: 2
     excerpt: "On child.obj, Auto selected rank 5 from requested rank 16, actual Vulkan completed without fallback, canonical displacement was non-zero, and render residency advanced."
+  - turn: 3
+    excerpt: "The desired contract is property-level CPU/GPU coherence: CPU mutations upload bound data, Vulkan methods consume resident data, and terminal outputs read back once."
+  - turn: 3
+    excerpt: "With synchronization validation forced, the child.obj case emitted color-attachment WAW/RAW hazards and two in-use buffer-destruction VUIDs despite the GTest reporting success."
 
 open_threads:
   - "A performance claim still requires device timestamps, memory and phase accounting, scanner-scale inputs, baselines, and cross-device evidence; current host timing is descriptive only."
   - "Anisotropic WLOP, CLOP, and EAR remain explicit Vulkan capability-negative pairs; CLOP caching, LBVH, or CUDA require separately justified work."
-  - "Local main is ahead of origin/main and unrelated detached worktrees/stashes remain untouched because remote push and broader cleanup were not authorized."
+  - "The render-attachment synchronization and LOP buffer-lifetime VUIDs must become validation-failing regressions before a unified versioned property-residency path can be treated as operational."
 
 ai_suggestions_pending:
-  - "Keep ordinary LOP and isotropic WLOP on the private Vulkan grid while the bounded workload guard passes."
+  - "Repair validation and lifetime ordering before relying on ordinary LOP or isotropic WLOP for interactive visual evidence."
   - "Add device timestamp and scanner-scale benchmark evidence before making any speedup or backend-selection claim."
-  - "Open a new scoped task only if a concrete anisotropic WLOP, CLOP, EAR, LBVH, or CUDA consumer is selected."
+  - "Introduce one versioned property-residency sidecar shared by rendering and GPU methods rather than adding another private upload path."

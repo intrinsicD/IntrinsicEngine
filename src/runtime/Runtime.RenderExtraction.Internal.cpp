@@ -40,6 +40,7 @@ import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.WorldHandle;
+import Geometry.Properties;
 
 // Single non-exported implementation-partition unit for the cache state shared by
 // the independently compiled base, geometry, and adapter implementation units.
@@ -62,6 +63,26 @@ namespace Extrinsic::Runtime
             RenderExtractionGeometryResidencyKind kind,
             std::uint64_t identity,
             std::uint32_t lane = 0u) noexcept;
+
+    struct RenderExtractionGeometrySourceRevisions
+    {
+        Geometry::PropertyRevision Position{0u};
+        Geometry::PropertyRevision Texcoord{0u};
+        Geometry::PropertyRevision Normal{0u};
+        Geometry::PropertyRevision Color{0u};
+        Geometry::PropertyRevision Topology0{0u};
+        Geometry::PropertyRevision Topology1{0u};
+        Geometry::PropertyRevision Topology2{0u};
+        Geometry::PropertyRevision Topology3{0u};
+        Geometry::PropertyRevision Topology4{0u};
+        Geometry::PropertyRevision Topology5{0u};
+        std::size_t VertexCount{0u};
+        std::size_t PositionCount{0u};
+        std::size_t TopologyElementCount0{0u};
+        std::size_t TopologyElementCount1{0u};
+        std::size_t TopologyElementCount2{0u};
+        std::uint64_t BindingGeneration{0u};
+    };
 
     struct RenderExtractionGeometryDirtyPlan
     {
@@ -168,15 +189,20 @@ namespace Extrinsic::Runtime
             Graphics::GpuGeometryHandle Geometry{};
             std::optional<Graphics::GeometryResidencyKey> ProceduralKey{};
             Graphics::GpuGeometryHandle MeshGeometry{};
+            RenderExtractionGeometrySourceRevisions MeshSourceRevisions{};
             Graphics::GpuGeometryHandle GraphGeometry{};
+            RenderExtractionGeometrySourceRevisions GraphSourceRevisions{};
             bool GraphPackedLines{false};
             bool GraphPackedPoints{false};
             Graphics::GpuInstanceHandle GraphPointLaneInstance{};
             Graphics::GpuGeometryHandle PointCloudGeometry{};
+            RenderExtractionGeometrySourceRevisions PointCloudSourceRevisions{};
             Graphics::GpuInstanceHandle MeshEdgeViewInstance{};
             Graphics::GpuGeometryHandle MeshEdgeViewGeometry{};
+            RenderExtractionGeometrySourceRevisions MeshEdgeViewSourceRevisions{};
             Graphics::GpuInstanceHandle MeshVertexViewInstance{};
             Graphics::GpuGeometryHandle MeshVertexViewGeometry{};
+            RenderExtractionGeometrySourceRevisions MeshVertexViewSourceRevisions{};
         };
 
         enum class MeshPrimitiveViewKind : std::uint8_t

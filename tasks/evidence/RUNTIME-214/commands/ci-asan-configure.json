@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-asan",
+    "--fresh",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+  ],
+  "command_display": "cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+  "cwd": ".",
+  "duration_ms": 8483,
+  "exit_code": 0,
+  "finished_at": "2026-08-05T13:42:07Z",
+  "label": "ci-asan-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-05T13:41:59Z",
+  "stderr_path": "tasks/evidence/RUNTIME-214/commands/ci-asan-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-214/commands/ci-asan-configure.stdout.log",
+  "stdout_sha256": "e917edbd25961aff3c80852ef6dc0388336dda70388d830e82d725ad1c1a6102",
+  "task_id": "RUNTIME-214"
+}

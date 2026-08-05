@@ -27,6 +27,10 @@ export namespace Geometry
     /// Stable identifier for a property storage inside a registry.
     using PropertyId = size_t;
 
+    /// Process-monotonic content token for canonical geometry properties.
+    /// Zero denotes an invalid or never-mutated source.
+    using PropertyRevision = std::uint64_t;
+
     class PropertyRegistry;
 
     namespace Internal
@@ -68,6 +72,7 @@ export namespace Geometry
         Internal::TypeID Type{0};
         PropertyValueKind ValueKind{PropertyValueKind::Unknown};
         std::size_t ElementCount{0};
+        PropertyRevision ContentRevision{0};
         bool Mutable{false};
         bool SupportsContiguousSpan{false};
         bool SupportsRawData{false};
@@ -75,6 +80,18 @@ export namespace Geometry
 
     namespace Internal
     {
+        class PropertyRevisionState
+        {
+        public:
+            void MarkModified() noexcept;
+            [[nodiscard]] PropertyRevision Observe() const noexcept;
+            [[nodiscard]] PropertyRevision Current() const noexcept;
+
+        private:
+            PropertyRevision m_Current{0};
+            mutable bool m_DirtySinceObservation{false};
+        };
+
         template <class T>
         [[nodiscard]] constexpr PropertyValueKind ValueKindOf() noexcept
         {
@@ -94,14 +111,35 @@ export namespace Geometry
         class PropertyStorageBase
         {
         public:
-            PropertyStorageBase() = default;
+            explicit PropertyStorageBase(std::shared_ptr<PropertyRevisionState> revisions)
+                : m_Revisions(std::move(revisions))
+            {
+            }
             virtual ~PropertyStorageBase() = default;
 
             PropertyStorageBase(const PropertyStorageBase&) = delete;
             PropertyStorageBase& operator=(const PropertyStorageBase&) = delete;
 
             /// Clones the concrete storage and its data.
-            [[nodiscard]] virtual std::unique_ptr<PropertyStorageBase> Clone() const = 0;
+            [[nodiscard]] virtual std::unique_ptr<PropertyStorageBase> Clone(
+                std::shared_ptr<PropertyRevisionState> revisions) const = 0;
+
+            /// Marks a mutable borrow or structural edit as potentially modified.
+            void MarkModified() noexcept
+            {
+                if (m_Revisions == nullptr)
+                    return;
+                m_Revisions->MarkModified();
+                m_ContentRevision = m_Revisions->Current();
+            }
+
+            /// Returns this storage's last content token and opens a new edit epoch.
+            [[nodiscard]] PropertyRevision Revision() const noexcept
+            {
+                if (m_Revisions != nullptr)
+                    (void)m_Revisions->Observe();
+                return m_ContentRevision;
+            }
 
             /// Property name used for lookup and debugging.
             [[nodiscard]] virtual std::string_view Name() const = 0;
@@ -120,6 +158,10 @@ export namespace Geometry
             [[nodiscard]] virtual TypeID Type() const noexcept = 0;
             /// Returns descriptor metadata that does not expose typed storage.
             [[nodiscard]] virtual PropertyDescriptor Describe(PropertyId id, bool isMutable) const = 0;
+
+        private:
+            std::shared_ptr<PropertyRevisionState> m_Revisions{};
+            PropertyRevision m_ContentRevision{0};
         };
 
         template <class T>
@@ -127,40 +169,53 @@ export namespace Geometry
         {
         public:
             /// Creates typed storage with a name and a default element value.
-            PropertyStorage(std::string name, T defaultValue)
-                : PropertyStorageBase(), m_Name(std::move(name)), m_Data(), m_Default(std::move(defaultValue))
+            PropertyStorage(std::shared_ptr<PropertyRevisionState> revisions,
+                            std::string name,
+                            T defaultValue)
+                : PropertyStorageBase(std::move(revisions)),
+                  m_Name(std::move(name)),
+                  m_Data(),
+                  m_Default(std::move(defaultValue))
             {
             }
 
-            PropertyStorage(const PropertyStorage& other)
-                : PropertyStorageBase(), m_Name(other.m_Name), m_Data(other.m_Data), m_Default(other.m_Default)
+            PropertyStorage(const PropertyStorage& other,
+                            std::shared_ptr<PropertyRevisionState> revisions)
+                : PropertyStorageBase(std::move(revisions)),
+                  m_Name(other.m_Name),
+                  m_Data(other.m_Data),
+                  m_Default(other.m_Default)
             {
+                MarkModified();
             }
 
-            PropertyStorage& operator=(const PropertyStorage& other)
+            [[nodiscard]] std::unique_ptr<PropertyStorageBase> Clone(
+                std::shared_ptr<PropertyRevisionState> revisions) const override
             {
-                if (this != &other)
-                {
-                    m_Name = other.m_Name;
-                    m_Data = other.m_Data;
-                    m_Default = other.m_Default;
-                }
-                return *this;
-            }
-
-            [[nodiscard]] std::unique_ptr<PropertyStorageBase> Clone() const override
-            {
-                return std::make_unique<PropertyStorage<T>>(*this);
+                return std::make_unique<PropertyStorage<T>>(*this, std::move(revisions));
             }
 
             [[nodiscard]] std::string_view Name() const override { return m_Name; }
             void Reserve(size_t n) override { m_Data.reserve(n); }
-            void Resize(size_t n) override { m_Data.resize(n, m_Default); }
+            void Resize(size_t n) override
+            {
+                if (m_Data.size() == n)
+                    return;
+                MarkModified();
+                m_Data.resize(n, m_Default);
+            }
             void ShrinkToFit() override { m_Data.shrink_to_fit(); }
-            void PushBack() override { m_Data.push_back(m_Default); }
+            void PushBack() override
+            {
+                MarkModified();
+                m_Data.push_back(m_Default);
+            }
 
             void Swap(size_t i0, size_t i1) override
             {
+                if (i0 == i1)
+                    return;
+                MarkModified();
                 using std::swap;
                 swap(m_Data[i0], m_Data[i1]);
             }
@@ -178,6 +233,7 @@ export namespace Geometry
                     .Type = TypeInfo<T>::ID(),
                     .ValueKind = ValueKindOf<T>(),
                     .ElementCount = m_Data.size(),
+                    .ContentRevision = Revision(),
                     .Mutable = isMutable,
                     .SupportsContiguousSpan = !std::is_same_v<T, bool>,
                     .SupportsRawData = !std::is_same_v<T, bool>};
@@ -204,18 +260,23 @@ export namespace Geometry
     class PropertyRegistry
     {
     public:
-        PropertyRegistry() = default;
+        PropertyRegistry();
         ~PropertyRegistry() = default;
 
         PropertyRegistry(const PropertyRegistry& other);
-        PropertyRegistry(PropertyRegistry&&) noexcept = default;
+        PropertyRegistry(PropertyRegistry&& other) noexcept;
         PropertyRegistry& operator=(const PropertyRegistry& other);
-        PropertyRegistry& operator=(PropertyRegistry&&) noexcept = default;
+        PropertyRegistry& operator=(PropertyRegistry&& other) noexcept;
 
         /// Number of elements in each property array.
         [[nodiscard]] size_t Size() const noexcept { return m_Size; }
         /// Count of property storages (including different types).
         [[nodiscard]] size_t PropertyCount() const noexcept { return m_Storages.size(); }
+        /// Last mutation token for any property or shared element-count edit.
+        [[nodiscard]] PropertyRevision Revision() const noexcept;
+        /// Last mutation token for one named property.
+        [[nodiscard]] std::optional<PropertyRevision> FindPropertyRevision(
+            std::string_view name) const noexcept;
 
         /// Returns the names of all properties in insertion order.
         [[nodiscard]] std::vector<std::string> PropertyNames() const;
@@ -277,6 +338,10 @@ export namespace Geometry
         bool Remove(PropertyId id);
 
     private:
+        void EnsureRevisionState();
+        void MarkModified();
+        void RebaseRevisions();
+
         [[nodiscard]] bool IsValidId(PropertyId id) const noexcept;
 
         [[nodiscard]] Internal::PropertyStorageBase* Storage(PropertyId id) noexcept;
@@ -303,6 +368,7 @@ export namespace Geometry
             }
         };
 
+        std::shared_ptr<Internal::PropertyRevisionState> m_Revisions{};
         std::vector<std::unique_ptr<Internal::PropertyStorageBase>> m_Storages;
         std::unordered_map<std::string, PropertyId, StringHash, std::equal_to<>> m_NameIndex;
         size_t m_Size{0};
@@ -327,11 +393,30 @@ export namespace Geometry
 
         /// True if this buffer refers to a valid storage.
         [[nodiscard]] explicit operator bool() const noexcept { return m_Storage != nullptr; }
+        /// Number of values in the storage.
+        [[nodiscard]] size_t Size() const noexcept
+        {
+            assert(m_Storage != nullptr);
+            return static_cast<const Internal::PropertyStorage<T>*>(m_Storage)->Data().size();
+        }
+        /// Last mutation token for this storage.
+        [[nodiscard]] PropertyRevision Revision() const noexcept
+        {
+            assert(m_Storage != nullptr);
+            return m_Storage->Revision();
+        }
+        /// Explicitly marks a retained mutable borrow as modified.
+        void MarkModified() noexcept
+        {
+            assert(m_Storage != nullptr);
+            m_Storage->MarkModified();
+        }
 
         /// Direct access to the backing vector; asserts if invalid.
         [[nodiscard]] std::vector<T>& Vector() noexcept
         {
             assert(m_Storage != nullptr);
+            m_Storage->MarkModified();
             return m_Storage->Data();
         }
 
@@ -346,6 +431,7 @@ export namespace Geometry
         {
             assert(m_Storage != nullptr);
             assert(index < m_Storage->Data().size());
+            m_Storage->MarkModified();
             return m_Storage->Data()[index];
         }
 
@@ -368,6 +454,7 @@ export namespace Geometry
         [[nodiscard]] std::span<T> Span() noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
+            m_Storage->MarkModified();
             return std::span<T>(m_Storage->Data());
         }
 
@@ -382,6 +469,7 @@ export namespace Geometry
         [[nodiscard]] T* Data() noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
+            m_Storage->MarkModified();
             return m_Storage->Data().data();
         }
 
@@ -422,6 +510,18 @@ export namespace Geometry
 
         /// True if this buffer refers to a valid storage.
         [[nodiscard]] explicit operator bool() const noexcept { return m_Storage != nullptr; }
+        /// Number of values in the storage.
+        [[nodiscard]] size_t Size() const noexcept
+        {
+            assert(m_Storage != nullptr);
+            return m_Storage->Data().size();
+        }
+        /// Last mutation token for this storage.
+        [[nodiscard]] PropertyRevision Revision() const noexcept
+        {
+            assert(m_Storage != nullptr);
+            return m_Storage->Revision();
+        }
 
         /// Direct access to the backing vector; asserts if invalid.
         [[nodiscard]] const std::vector<T>& Vector() const noexcept
@@ -502,7 +602,7 @@ export namespace Geometry
         {
             return Geometry::Linalg::MapAsMatrix(std::span<T>{}, 0u, 0u, 0);
         }
-        return Geometry::Linalg::MapAsMatrix(property.Span(), property.Vector().size(), 1u, 1);
+        return Geometry::Linalg::MapAsMatrix(property.Span(), property.Size(), 1u, 1);
     }
 
     template <class T>
@@ -513,7 +613,7 @@ export namespace Geometry
         {
             return Geometry::Linalg::MapAsMatrix(std::span<const T>{}, 0u, 0u, 0);
         }
-        return Geometry::Linalg::MapAsMatrix(property.Span(), property.Vector().size(), 1u, 1);
+        return Geometry::Linalg::MapAsMatrix(property.Span(), property.Size(), 1u, 1);
     }
 
     template <class T>
@@ -590,7 +690,11 @@ export namespace Geometry
             return std::nullopt;
         }
 
-        auto storage = std::make_unique<Internal::PropertyStorage<T>>(std::move(name), std::move(m_Defaultvalue));
+        EnsureRevisionState();
+        MarkModified();
+        auto storage = std::make_unique<Internal::PropertyStorage<T>>(
+            m_Revisions, std::move(name), std::move(m_Defaultvalue));
+        storage->MarkModified();
         storage->Resize(m_Size);
         auto* raw = storage.get();
         PropertyId id = m_Storages.size();
@@ -680,6 +784,9 @@ export namespace Geometry
 
         /// Property name (asserts if invalid).
         [[nodiscard]] std::string_view Name() const { return m_Buffer.Name(); }
+        [[nodiscard]] size_t Size() const noexcept { return m_Buffer.Size(); }
+        [[nodiscard]] PropertyRevision Revision() const noexcept { return m_Buffer.Revision(); }
+        void MarkModified() noexcept { m_Buffer.MarkModified(); }
 
         /// Element access (asserts on invalid/out-of-range).
         [[nodiscard]] decltype(auto) operator[](size_t index) const { return m_Buffer[index]; }
@@ -727,6 +834,8 @@ export namespace Geometry
         explicit operator bool() const noexcept { return static_cast<bool>(m_Buffer); }
 
         [[nodiscard]] std::string_view Name() const { return m_Buffer.Name(); }
+        [[nodiscard]] size_t Size() const noexcept { return m_Buffer.Size(); }
+        [[nodiscard]] PropertyRevision Revision() const noexcept { return m_Buffer.Revision(); }
 
         [[nodiscard]] decltype(auto) operator[](size_t index) const { return m_Buffer[index]; }
 
@@ -783,6 +892,14 @@ export namespace Geometry
 
         /// Number of elements in each property array.
         [[nodiscard]] size_t Size() const noexcept { return m_Registry.Size(); }
+        /// Last mutation token for this property set.
+        [[nodiscard]] PropertyRevision Revision() const noexcept { return m_Registry.Revision(); }
+        /// Last mutation token for one named property.
+        [[nodiscard]] std::optional<PropertyRevision> FindPropertyRevision(
+            std::string_view name) const noexcept
+        {
+            return m_Registry.FindPropertyRevision(name);
+        }
 
         inline void Clear() { m_Registry.Clear(); }
         inline void Reserve(size_t n) { m_Registry.Reserve(n); }
@@ -834,6 +951,15 @@ export namespace Geometry
         [[nodiscard]] explicit operator bool() const noexcept { return IsValid(); }
 
         [[nodiscard]] size_t Size() const noexcept { return m_Set ? m_Set->Size() : 0u; }
+        [[nodiscard]] PropertyRevision Revision() const noexcept
+        {
+            return m_Set ? m_Set->Revision() : 0u;
+        }
+        [[nodiscard]] std::optional<PropertyRevision> FindPropertyRevision(
+            std::string_view name) const noexcept
+        {
+            return m_Set ? m_Set->FindPropertyRevision(name) : std::nullopt;
+        }
         [[nodiscard]] bool Empty() const { return m_Set == nullptr || m_Set->Empty(); }
         [[nodiscard]] bool Exists(std::string_view name) const { return m_Set != nullptr && m_Set->Exists(name); }
         [[nodiscard]] std::vector<std::string> Properties() const { return m_Set ? m_Set->Properties() : std::vector<std::string>{}; }

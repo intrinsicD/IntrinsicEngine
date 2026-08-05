@@ -207,10 +207,12 @@ namespace Extrinsic::Runtime
                     const KMeansGpuBufferSpan* span = FindSpan(layout, role);
                     if (span == nullptr || sizeBytes == 0u || data == nullptr)
                         return;
-                    device.WriteBuffer(resources.Resources.Work,
-                                       data,
-                                       sizeBytes,
-                                       span->OffsetBytes);
+                    (void)Graphics::SubmitBufferUpload(
+                        device,
+                        resources.Resources.Work,
+                        data,
+                        sizeBytes,
+                        span->OffsetBytes);
                     ++result.UploadWriteCount;
                 };
 
@@ -613,7 +615,12 @@ namespace Extrinsic::Runtime
         // visible to the compute passes.
         const KMeansGpuStateBufferRecord stateRecord =
             BuildKMeansGpuStateRecord(device, desc.Resources, result.Plan.Layout);
-        device.WriteBuffer(desc.Resources.State, &stateRecord, sizeof(stateRecord), 0u);
+        (void)Graphics::SubmitBufferUpload(
+            device,
+            desc.Resources.State,
+            &stateRecord,
+            sizeof(stateRecord),
+            0u);
         result.StateRecordUploaded = true;
         cmd.BufferBarrier(desc.Resources.State,
                           RHI::MemoryAccess::TransferWrite,

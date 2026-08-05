@@ -8880,3 +8880,38 @@ tree:
       observed a changed resident position fingerprint/content revision. This
       is bounded operational evidence, not a performance or quality claim.
     status: resolved
+  - id: N378
+    type: question
+    title: "Define property-level CPU/GPU synchronization for rendering and methods"
+    provenance: user
+    timestamp: "2026-08-05T12:10+02:00"
+    also_depends_on: [N364, N377]
+    description: >
+      Determine how every CPU geometry property selected for rendering or GPU
+      computation should acquire tracked GPU residency, automatically upload
+      changed CPU data, let Vulkan methods operate directly on resident data,
+      and restore CPU coherence once at the method boundary without stalls or
+      stale visual output.
+    status: open
+  - id: N379
+    type: experiment
+    title: "Reproduce child.obj LOP with Vulkan validation enabled"
+    provenance: ai-executed
+    timestamp: "2026-08-05T12:10+02:00"
+    also_depends_on: [N377, N378]
+    evidence:
+      - "tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp: both Vulkan parity cases explicitly disable validation"
+      - "/tmp/intrinsic-lop-gpu-parity-validation.log: forced Khronos validation and synchronization validation on the child.obj Auto Vulkan case"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cpp: records source barriers in the frame command context, then immediately submits separate transfer-queue downloads"
+      - "src/runtime/Runtime.PointCloudConsolidationGpu.cpp: releases active resource leases after readback delivery"
+    result: >
+      The exact child.obj Auto Vulkan test still returned success, but
+      validation first reported repeated SYNC-HAZARD-WRITE-AFTER-WRITE and
+      SYNC-HAZARD-READ-AFTER-WRITE errors for color-attachment transitions and
+      LOAD operations. It later reported two
+      VUID-vkDestroyBuffer-buffer-00922 errors for buffers destroyed while a
+      submitted command buffer still referenced them. This exposes a
+      validation-coverage gap plus separate renderer barrier and LOP readback
+      lifetime defects; the prior numerical/publication result was not a
+      validation-clean Vulkan result.
+    status: resolved

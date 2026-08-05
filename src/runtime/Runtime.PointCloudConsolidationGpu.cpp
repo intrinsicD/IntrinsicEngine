@@ -996,42 +996,49 @@ namespace Extrinsic::Runtime
                     resources.Diagnostics),
             };
 
-            Device->WriteBuffer(
+            (void)Graphics::SubmitBufferUpload(
+                *Device,
                 resources.SourcePositions,
                 source.data(),
                 static_cast<std::uint64_t>(source.size()) *
                     sizeof(glm::vec4),
                 0u);
-            Device->WriteBuffer(
+            (void)Graphics::SubmitBufferUpload(
+                *Device,
                 resources.ProjectedB,
                 projected.data(),
                 static_cast<std::uint64_t>(projected.size()) *
                     sizeof(glm::vec4),
                 0u);
-            Device->WriteBuffer(
+            (void)Graphics::SubmitBufferUpload(
+                *Device,
                 resources.SourceWeights,
                 sourceWeights.data(),
                 static_cast<std::uint64_t>(sourceWeights.size()) *
                     sizeof(float),
                 0u);
-            Device->WriteBuffer(
+            (void)Graphics::SubmitBufferUpload(
+                *Device,
                 resources.ProjectedWeights,
                 projectedWeights.data(),
                 static_cast<std::uint64_t>(projectedWeights.size()) *
                     sizeof(float),
                 0u);
-            Device->WriteBuffer(
+            (void)Graphics::SubmitBufferUpload(
+                *Device,
                 resources.Displacements,
                 displacements.data(),
                 static_cast<std::uint64_t>(displacements.size()) *
                     sizeof(float),
                 0u);
-            Device->WriteBuffer(
+            (void)Graphics::SubmitBufferUpload(
+                *Device,
                 resources.Diagnostics,
                 &diagnostics,
                 sizeof(diagnostics),
                 0u);
-            Device->WriteBuffer(
+            (void)Graphics::SubmitBufferUpload(
+                *Device,
                 resources.State,
                 &state,
                 sizeof(state),

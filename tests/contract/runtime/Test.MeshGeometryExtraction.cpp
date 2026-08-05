@@ -543,6 +543,136 @@ TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
     engine.Shutdown();
 }
 
+TEST(MeshGeometryExtraction, PropertyRevisionUpdatesResidentPositionsWithoutDirtyTag)
+{
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+    const auto stableId =
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+
+    const auto firstView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(firstView.has_value());
+    const auto handle = firstView->MeshGeometry;
+    Extrinsic::Graphics::GpuGeometryResidencyView firstResidency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        handle, firstResidency));
+
+    auto positions = raw.get<gs::Vertices>(entity)
+                         .Properties.Get<glm::vec3>(pn::kPosition);
+    ASSERT_TRUE(positions.IsValid());
+    positions[0] = glm::vec3{-2.0f, 0.5f, 1.0f};
+    EXPECT_FALSE((raw.any_of<D::GpuDirty,
+                             D::DirtyVertexPositions,
+                             D::DirtyVertexAttributes>(entity)));
+
+    stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryPartialUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+
+    const auto secondView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(secondView.has_value());
+    EXPECT_EQ(secondView->MeshGeometry, handle);
+    Extrinsic::Graphics::GpuGeometryResidencyView secondResidency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        handle, secondResidency));
+    EXPECT_NE(secondResidency.PositionFingerprint,
+              firstResidency.PositionFingerprint);
+    EXPECT_EQ(secondResidency.PositionFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {-2.0f, 0.5f, 1.0f,
+                   1.0f, 0.0f, 0.0f,
+                   0.0f, 1.0f, 0.0f}));
+
+    stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryReuploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 1u);
+
+    auto normals = raw.get<gs::Vertices>(entity)
+                       .Properties.GetOrAdd<glm::vec3>(
+                           std::string{pn::kNormal},
+                           glm::vec3{0.0f, 0.0f, 1.0f});
+    normals.Vector() = {
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+    };
+    EXPECT_FALSE((raw.any_of<D::GpuDirty,
+                             D::DirtyVertexPositions,
+                             D::DirtyVertexNormals,
+                             D::DirtyVertexAttributes>(entity)));
+
+    stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryPartialUploads, 1u);
+    Extrinsic::Graphics::GpuGeometryResidencyView normalResidency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        handle, normalResidency));
+    EXPECT_EQ(normalResidency.PositionFingerprint,
+              secondResidency.PositionFingerprint);
+    EXPECT_NE(normalResidency.NormalFingerprint,
+              secondResidency.NormalFingerprint);
+    EXPECT_EQ(normalResidency.NormalFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {1.0f, 0.0f, 0.0f,
+                   0.0f, 1.0f, 0.0f,
+                   0.0f, 0.0f, 1.0f}));
+
+    auto faceHalfedge = raw.get<gs::Faces>(entity)
+                            .Properties.Get<std::uint32_t>(
+                                pn::kFaceHalfedge);
+    ASSERT_TRUE(faceHalfedge.IsValid());
+    faceHalfedge[0] = 1u;
+    EXPECT_FALSE((raw.any_of<D::GpuDirty,
+                             D::DirtyFaceTopology,
+                             D::DirtyEdgeTopology>(entity)));
+
+    stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryPartialUploads, 0u);
+
+    const auto topologyView =
+        extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(topologyView.has_value());
+    Extrinsic::Graphics::GpuGeometryResidencyView topologyResidency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        topologyView->MeshGeometry, topologyResidency));
+    EXPECT_EQ(topologyResidency.PositionFingerprint,
+              normalResidency.PositionFingerprint);
+    EXPECT_NE(topologyResidency.SurfaceIndexFingerprint,
+              normalResidency.SurfaceIndexFingerprint);
+    EXPECT_EQ(topologyResidency.SurfaceIndexFingerprint,
+              Extrinsic::Tests::GeometryUint32Fingerprint({2u, 0u, 1u}));
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
 TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig());

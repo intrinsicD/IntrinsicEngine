@@ -806,6 +806,20 @@ values, and Sandbox graph-domain models resolve each logical domain to its
 physical source. Connectivity properties remain visible as catalogued
 internal/connectivity rows and are not offered as visualization attributes.
 
+All of those canonical property domains share one CPU/GPU coherence boundary.
+Mutable geometry-property access publishes a process-monotonic content
+revision; render extraction remembers only the revisions and counts consumed by
+each resident mesh, graph, point-cloud, or primitive-view lane. A changed
+position or resolved attribute merges into the existing partial upload plan,
+while count or consumed-topology changes request full reconciliation. Explicit
+ECS dirty tags remain precise compatibility hints, but methods do not need a
+renderer-specific dirty call. CPU methods finish by publishing canonical CPU
+properties. Vulkan methods upload inputs before dispatch, keep iterations
+GPU-local, and publish one terminal readback into those same CPU properties
+before reporting an applied result. The complete ownership, staging, and
+failure contract is documented in
+[geometry property CPU/GPU coherence](property-coherence.md).
+
 Scene JSON version 2 remains backend-neutral. Version 2 makes graph halfedge
 connectivity mandatory so a loaded graph satisfies the same
 `Vertices + Halfedges + Edges` source contract as a freshly materialized one.

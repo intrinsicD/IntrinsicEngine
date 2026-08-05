@@ -557,7 +557,8 @@ namespace Extrinsic::Runtime
             {
                 if (handle.IsValid() && sizeBytes > 0u)
                 {
-                    device.WriteBuffer(handle, data, sizeBytes, 0u);
+                    (void)Graphics::SubmitBufferUpload(
+                        device, handle, data, sizeBytes, 0u);
                     ++result.UploadWriteCount;
                 }
             };
@@ -1158,10 +1159,12 @@ namespace Extrinsic::Runtime
 
         const ProgressivePoissonGpuStateBufferRecord state =
             BuildProgressivePoissonGpuStateRecord(*desc.Device, desc.Resources);
-        desc.Device->WriteBuffer(desc.Resources.State,
-                                 &state,
-                                 sizeof(state),
-                                 0u);
+        (void)Graphics::SubmitBufferUpload(
+            *desc.Device,
+            desc.Resources.State,
+            &state,
+            sizeof(state),
+            0u);
         result.StateRecordUploaded = true;
 
         if (plan.Levels.empty())

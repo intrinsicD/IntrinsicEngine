@@ -11,12 +11,52 @@ export module Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 
 export namespace Extrinsic::Graphics
 {
+    enum class GpuBufferUploadPath : std::uint8_t
+    {
+        Rejected,
+        TransferQueue,
+        SynchronousFallback,
+    };
+
+    struct GpuBufferUploadSubmission
+    {
+        GpuBufferUploadPath Path{GpuBufferUploadPath::Rejected};
+        RHI::TransferToken Token{};
+
+        [[nodiscard]] bool Accepted() const noexcept
+        {
+            return Path != GpuBufferUploadPath::Rejected;
+        }
+        [[nodiscard]] bool IsAsynchronous() const noexcept
+        {
+            return Path == GpuBufferUploadPath::TransferQueue &&
+                Token.IsValid();
+        }
+    };
+
+    /// Copies CPU bytes into transfer staging when available. The source bytes
+    /// are owned by staging before this function returns. A rejected bounded
+    /// staging submission uses IDevice::WriteBuffer as a correctness fallback.
+    [[nodiscard]] GpuBufferUploadSubmission SubmitBufferUpload(
+        RHI::IDevice& device,
+        RHI::BufferHandle destination,
+        const void* source,
+        std::uint64_t sizeBytes,
+        std::uint64_t destinationOffsetBytes = 0u);
+
+    [[nodiscard]] GpuBufferUploadSubmission SubmitBufferUpload(
+        RHI::IDevice& device,
+        RHI::BufferHandle destination,
+        std::span<const std::byte> source,
+        std::uint64_t destinationOffsetBytes = 0u);
+
     struct GpuTransferUploadTicket
     {
         std::uint64_t Id = 0;
