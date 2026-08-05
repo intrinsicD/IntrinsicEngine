@@ -1416,3 +1416,13 @@ entries:
       - "Staged O123 as a constraint after the scientist pass found METHOD-019 and current ci-vulkan evidence too narrowly scoped for the proposed production performance decision; its historical negative result remains valid within its frozen Debug smoke."
       - "Did not crystallize O118 or O121-O123: the user asked for a recommendation but has not affirmed one, and no new benchmark empirically resolves the alternatives."
       - "Recorded the local GPU and source/preset audit as an AI action, not a performance experiment; no speedup, parity, Vulkan execution, or CUDA capability claim was added."
+  - turn: "2026-08-05_001#1"
+    notes:
+      - "Routed the user's explicit Vulkan-over-CUDA adoption as decision N371 and resolved the previously open acceleration question N370."
+      - "Routed GEOM-075 implementation and verification as experiment N372, the unusable v1/v2 plus skipped-run evidence path as dead end N373, the reviewer-discovered historical-task decoy bypass as dead end N374, final Vulkan parity as experiment N375, and task/branch convergence as decision N376."
+      - "Crystallized O121 to A32 through verbal affirmation and upgraded its provenance to user-revised; the production implementation matches the private fixed-radius Vulkan cell-grid design."
+      - "Recorded C31 and C32 as refuted fixture claims, C33 as the bounded CPU screening result, and C34 as the exact source/device Vulkan parity claim; no result was generalized into a speedup or broad hardware claim."
+      - "Kept O122 staged because CLOP mixture reuse and broader acceleration heuristics are only partially exercised, and kept O123 staged because device timing, memory accounting, scanner-scale input, and cross-device evidence remain absent."
+      - "Preserved rejected METHOD-020 run-001 and both rejected BUG-130 review rounds as useful negative evidence rather than rewriting or deleting them."
+      - "Marked no other observation stale: this is the first later session-day after O118 and the same session-day as O122-O127."
+      - "Recorded local main convergence and branch cleanup without inferring authorization to push origin/main or delete unrelated detached worktrees and stashes."

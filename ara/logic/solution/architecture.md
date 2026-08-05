@@ -484,3 +484,26 @@
   src/runtime/Runtime.GeometryAvailability.cppm,
   src/runtime/Runtime.PointCloudConsolidationConfig.cppm]
 - **From staging**: O120
+
+## A32: LOP Vulkan Acceleration Uses a Private Fixed-Radius Cell Grid
+- **Decision**: The first production LOP-family GPU backend is Vulkan compute,
+  not CUDA. It sizes a bounded dense cell grid from the resolved support radius,
+  builds the immutable source grid once, rebuilds the projected grid per
+  iteration through count, shared prefix scan, and scatter, and streams exact
+  27-cell sphere-filtered accumulation without a global neighbor-pair list.
+  Iteration and convergence state remain on-device, persistent buffers are
+  reused, and one final shared multi-range readback enters the existing runtime
+  publication path. The participant remains private to runtime/JobService;
+  CUDA, LBVH, and a public generic neighbor-index framework require separate
+  evidence before adoption.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N370, N371,
+  src/runtime/Runtime.PointCloudConsolidationGpu.cpp,
+  src/runtime/internal/Runtime.PointCloudConsolidationGpu.Internal.hpp,
+  assets/shaders/lop_grid_count.comp,
+  assets/shaders/lop_grid_scatter.comp,
+  assets/shaders/lop_project.comp,
+  tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp,
+  tasks/done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md]
+- **From staging**: O121

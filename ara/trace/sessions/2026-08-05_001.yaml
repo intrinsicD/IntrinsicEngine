@@ -1,0 +1,132 @@
+session:
+  id: "2026-08-05_001"
+  date: "2026-08-05"
+  started: "2026-08-05T01:17+02:00"
+  last_turn: "2026-08-05T07:29+02:00"
+  turn_count: 1
+  summary: "Implemented and retired property-specific support radii and a private Vulkan LOP backend, hardened experiment custody, proved bounded GPU parity, and converged local main."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N371"
+    routing: direct
+    provenance: user-revised
+    summary: "Adopted the recommended private Vulkan fixed-radius cell-grid backend instead of CUDA, LBVH, or a public spatial-index framework."
+  - turn: 1
+    type: experiment
+    id: "N372"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and verified the shared bounded KD-tree support-radius profile plus Auto/Manual method-policy path."
+  - turn: 1
+    type: dead_end
+    id: "N373"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected two nonexecuting WLOP fixtures and a skipped benchmark run as positive Vulkan evidence."
+  - turn: 1
+    type: claim
+    id: "C31"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the frozen v1 fixture's pre-Vulkan empty-neighborhood rejection."
+  - turn: 1
+    type: claim
+    id: "C32"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the frozen v2 fixture's pre-Vulkan empty-neighborhood rejection."
+  - turn: 1
+    type: claim
+    id: "C33"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the bounded CPU screen selecting h=0.32 for the v3 WLOP oracle."
+  - turn: 1
+    type: dead_end
+    id: "N374"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected broad tasks/ historical lookup after independent review proved a non-lifecycle decoy bypass."
+  - turn: 1
+    type: experiment
+    id: "N375"
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed eight actual Vulkan requests with zero fallback and bounded LOP/isotropic-WLOP CPU parity."
+  - turn: 1
+    type: claim
+    id: "C34"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the exact fixture/source/RTX-3050 Vulkan parity result without a speedup or cross-device claim."
+  - turn: 1
+    type: architecture
+    id: "A32"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the private Vulkan count-scan-scatter fixed-radius grid through verbal affirmation of O121."
+  - turn: 1
+    type: decision
+    id: "N376"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired all completed tasks, merged the corrected task lineage, removed its merged branch/worktree, and left local main as the only branch."
+
+ai_actions:
+  - turn: 1
+    action: "Implemented GEOM-075's property-specific support-radius analysis and shared config/runtime/UI path; implemented METHOD-020's private Vulkan compute backend and parity benchmark; repaired BUG-129 and BUG-130 experiment custody defects; preserved rejected evidence; ran CPU, ASan, UBSan, Vulkan, structural, custody, handoff, and independent fixed-surface gates; retired every completed task; and converged the local repository on main."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.SupportRadius.cppm"
+      - "src/geometry/Geometry.SupportRadius.cpp"
+      - "src/runtime/Runtime.PointCloudConsolidationGpu.cpp"
+      - "src/runtime/Runtime.PointCloudConsolidationModule.cpp"
+      - "assets/shaders/lop_*.comp"
+      - "tests/unit/geometry/Test.SupportRadius.cpp"
+      - "tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
+      - "methods/geometry/locally_optimal_projection/"
+      - "tasks/done/GEOM-075-property-support-radius-profile.md"
+      - "tasks/done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md"
+      - "tasks/done/BUG-130-rejected-run-historical-task-seal.md"
+      - "tasks/done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md"
+      - "tasks/evidence/GEOM-075/"
+      - "tasks/evidence/BUG-129/"
+      - "tasks/evidence/BUG-130/"
+      - "tasks/evidence/METHOD-020/"
+      - "ara/"
+
+claims_touched:
+  - id: C31
+    action: crystallized
+    turn: 1
+  - id: C32
+    action: crystallized
+    turn: 1
+  - id: C33
+    action: crystallized
+    turn: 1
+  - id: C34
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "The user explicitly selected Vulkan over CUDA after accepting the proposed fixed-radius grid direction."
+  - turn: 1
+    excerpt: "Automatic radius resolution now measures local property spacing and bounded support occupancy; a bounding-box diagonal is diagnostic and fallback context, not the default estimator."
+  - turn: 1
+    excerpt: "The production Vulkan backend keeps the source grid static, rebuilds the projected grid each iteration, performs exact support filtering, and reads back only the final shared result."
+  - turn: 1
+    excerpt: "The accepted result proves bounded parity on exact fixtures and one RTX 3050, not performance superiority or broad backend coverage."
+
+open_threads:
+  - "A performance claim still requires device timestamps, memory and phase accounting, scanner-scale inputs, baselines, and cross-device evidence; current host timing is descriptive only."
+  - "Anisotropic WLOP, CLOP, and EAR remain explicit Vulkan capability-negative pairs; CLOP caching, LBVH, or CUDA require separately justified work."
+  - "Local main is ahead of origin/main and unrelated detached worktrees/stashes remain untouched because remote push and broader cleanup were not authorized."
+
+ai_suggestions_pending:
+  - "Keep ordinary LOP and isotropic WLOP on the private Vulkan grid while the bounded workload guard passes."
+  - "Add device timestamp and scanner-scale benchmark evidence before making any speedup or backend-selection claim."
+  - "Open a new scoped task only if a concrete anisotropic WLOP, CLOP, EAR, LBVH, or CUDA consumer is selected."

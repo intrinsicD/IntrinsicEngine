@@ -2050,7 +2050,7 @@ observations:
     stale: false
   - id: O121
     timestamp: "2026-08-04T23:45+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       The first production LOP-family GPU backend should remain the planned
       Vulkan-compute path, using the CPU k-distance profile to choose h and a
@@ -2068,9 +2068,9 @@ observations:
       and operational Vulkan so hardware does not force a vendor-only path.
     potential_type: architecture
     bound_to: [N370]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A32"
+    crystallized_via: verbal-affirmation
     stale: false
   - id: O122
     timestamp: "2026-08-04T23:45+02:00"

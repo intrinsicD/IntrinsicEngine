@@ -8727,4 +8727,135 @@ tree:
       implementations should use CUDA, Vulkan compute, a different spatial
       index, CPU parallelism, or a method-level reformulation, and define the
       evidence sequence for an efficient production path.
-    status: open
+    status: resolved
+  - id: N371
+    type: decision
+    title: "Adopt Vulkan compute instead of CUDA for LOP acceleration"
+    provenance: user-revised
+    timestamp: "2026-08-05T01:17+02:00"
+    also_depends_on: [N370]
+    choice: >
+      Implement the recommended private Vulkan-compute fixed-radius cell-grid
+      path after the shared automatic-radius work, without adding a CUDA
+      backend or a public generic spatial-index framework.
+    alternatives:
+      - "Implement CUDA as the first production GPU backend."
+      - "Keep the LOP family on the serial CPU reference path."
+      - "Start with a GPU LBVH or public reusable neighbor-index abstraction."
+    evidence:
+      - "User direction: ok, then please do that. use vulkan instead of cuda."
+      - "O121: staged Vulkan count-scan-scatter cell-grid architecture"
+    status: resolved
+  - id: N372
+    type: experiment
+    title: "Implement and verify property-specific automatic support radii"
+    provenance: ai-executed
+    timestamp: "2026-08-05T03:45+02:00"
+    also_depends_on: [N368, N369, N371]
+    evidence:
+      - "src/geometry/Geometry.SupportRadius.cppm and Geometry.SupportRadius.cpp"
+      - "src/runtime/Runtime.PointCloudConsolidationConfig.cppm and Runtime.PointCloudConsolidationModule.cpp"
+      - "tasks/done/GEOM-075-property-support-radius-profile.md"
+      - "GEOM-075 accepted independent fixed-surface review and completion evidence"
+    result: >
+      One exact KD-tree now profiles at most 2,048 deterministic samples,
+      computes robust neighbor-rank quantiles, resolves method-specific Auto or
+      exact Manual radii, and rejects sampled neighbor/contribution budgets
+      before execution. Config, agent, runtime, and Sandbox UI share this path.
+      The complete CPU gate selected 4,087 cases with zero failures and one
+      policy skip; ASan selected and passed 2,673, while UBSan passed 2,672
+      with the same policy skip. This is an operational contract, not a
+      performance or default-quality claim.
+    status: resolved
+  - id: N373
+    type: dead_end
+    title: "Reject nonexecuting fixtures and skipped runs as Vulkan parity"
+    provenance: ai-executed
+    timestamp: "2026-08-05T06:15+02:00"
+    also_depends_on: [N370, N371]
+    hypothesis: >
+      METHOD-020's original WLOP fixtures and a benchmark process that exits
+      successfully are sufficient positive evidence for the requested Vulkan
+      backend.
+    failure_mode: >
+      Frozen v1 and v2 WLOP fixtures reached empty_neighborhood in the CPU
+      oracle before any Vulkan request, while v3/run-001 exposed a harness path
+      that could skip the requested backend yet emit apparently passing claim
+      evidence. The records remain frozen and rejected through C31, C32,
+      BUG-129, and run-001.
+    lesson: >
+      Screen the CPU oracle before freezing parity fixtures and bind positive
+      evidence to requested versus actual backend, completed request count,
+      fallback count, and independently recomputed custody rather than process
+      exit alone.
+    evidence:
+      - "methods/geometry/locally_optimal_projection/reports/METHOD-020-v1-screening.md"
+      - "methods/geometry/locally_optimal_projection/reports/METHOD-020-v2-screening.md"
+      - "tasks/done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md"
+      - "tasks/evidence/METHOD-020/experiment/runs/run-001/bundle.yaml"
+    status: resolved
+  - id: N374
+    type: dead_end
+    title: "Reject broad historical task lookup for rejected-run custody"
+    provenance: ai-executed
+    timestamp: "2026-08-05T06:53+02:00"
+    also_depends_on: [N373]
+    hypothesis: >
+      Any same-ID, same-profile task-shaped file below tasks/ at the frozen
+      revision can preserve a rejected run's historical task digest.
+    failure_mode: >
+      Independent fixed-surface review constructed a same-ID/profile decoy
+      below tasks/evidence that satisfied the broad path check. The first
+      BUG-130 retirement was rejected and the rule was narrowed to canonical
+      active, backlog, done, or archive lifecycle roots.
+    lesson: >
+      Historical negative evidence may preserve exact retired task bytes, but
+      only from canonical lifecycle roots and only with clean source plus a
+      valid independently rejected recomputed audit.
+    evidence:
+      - "tasks/done/BUG-130-rejected-run-historical-task-seal.md"
+      - "tests/regression/tooling/Test.ExperimentCustody.py"
+      - "commit 44855326"
+    status: resolved
+  - id: N375
+    type: experiment
+    title: "Prove bounded LOP and isotropic-WLOP Vulkan parity"
+    provenance: ai-executed
+    timestamp: "2026-08-05T07:25+02:00"
+    also_depends_on: [N371, N372, N373, N374]
+    evidence:
+      - "tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml"
+      - "methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md"
+      - "tasks/evidence/METHOD-020/report.yaml"
+      - "tasks/done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md"
+    result: >
+      Claim-grade v4/run-002 completed eight actual Vulkan requests on the
+      recorded RTX 3050 with zero fallback. Worst CPU-reference-or-repeat RMS
+      and L-infinity errors were 1.6746e-5 and 1.31344e-4, below the frozen
+      5e-4 and 2e-3 gates. The full CPU selector had zero failures across 4,091
+      selected cases and one policy skip; ASan passed 2,676/2,676, UBSan passed
+      2,675 with one policy skip, and all four focused Vulkan cases passed.
+      Anisotropic WLOP, CLOP, and EAR remain capability-negative, and the
+      evidence supports no speedup, device-time, scanner-corpus, or
+      cross-device claim.
+    status: resolved
+  - id: N376
+    type: decision
+    title: "Retire completed work and converge the local repository on main"
+    provenance: ai-executed
+    timestamp: "2026-08-05T07:29+02:00"
+    also_depends_on: [N372, N375]
+    choice: >
+      Retire GEOM-075, BUG-129, corrected BUG-130, and METHOD-020 after their
+      required evidence and independent reviews; fast-forward the corrected
+      BUG-130 lineage into main; remove its merged local branch and worktree;
+      and leave main as the only local branch with no active task.
+    alternatives:
+      - "Leave completed tasks active after their acceptance gates pass."
+      - "Retain merged local feature branches indefinitely."
+      - "Delete unrelated detached worktrees or push origin/main without explicit scope."
+    evidence:
+      - "tasks/active/README.md: no active task entries"
+      - "git branch --list: main is the only local branch"
+      - "commit d798fc9b: accepted METHOD-020 completion evidence"
+    status: resolved
