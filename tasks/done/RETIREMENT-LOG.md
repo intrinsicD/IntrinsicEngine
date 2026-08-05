@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-130`](BUG-130-rejected-run-historical-task-seal.md) — corrected
+rejected-run historical task-seal custody completed on 2026-08-05. The
+historical fallback is restricted to exact same-ID, same-profile task blobs
+under `tasks/active`, `tasks/backlog`, `tasks/done`, or `tasks/archive`; a
+reviewer-discovered task-shaped decoy under `tasks/evidence` now fails closed
+alongside accepted, unaudited, dirty-source, forged, malformed, stale-bundle,
+and arbitrary non-task substitutions. METHOD-020 run-001 remains valid
+negative evidence without weakening its accepted run-002. The corrected
+36-case custody suite, six-protocol/five-run global validation, strict
+task/docs/skill checks, and independent source review of `44855326` pass. The
+rejected first retirement round remains visible below; no C++, Vulkan, or
+performance behavior changed.
+
 `BUG-130` retirement correction — the 2026-08-05 fixed-surface review of
 revision `14a91429` found that its broad `tasks/` path check admitted a
 same-ID/profile decoy below non-lifecycle storage. The task was immediately

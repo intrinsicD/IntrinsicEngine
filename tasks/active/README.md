@@ -11,10 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [BUG-130 — Rejected experiment runs require their historical task seal](BUG-130-rejected-run-historical-task-seal.md)
-  (`in-progress`, owner `Codex-RejectedTaskSeal`, branch
-  `bug/BUG-130-rejected-run-task-seal`): restrict the historical fallback to
-  canonical lifecycle task paths after a fixed-surface review found a decoy bypass.
 - [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
   (`in-progress`, owner `Codex-LOPVulkan`, branch `main`): freeze the claim-grade
   protocol and benchmark intent before implementing the private Vulkan path.

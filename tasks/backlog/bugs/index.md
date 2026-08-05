@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-130` — Rejected experiment runs require their historical task seal](../../active/BUG-130-rejected-run-historical-task-seal.md):
-  the first historical-task fix admitted a same-ID/profile decoy below
-  non-lifecycle `tasks/` storage; restrict source lookup to canonical task
-  lifecycle roots and add the exact adversarial regression before retirement.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
@@ -62,6 +58,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-05: [`BUG-130` — Rejected experiment runs require their
+  historical task seal](../../done/BUG-130-rejected-run-historical-task-seal.md).
+  Independently rejected clean-source runs may verify only an exact same-ID,
+  same-profile blob under the canonical active/backlog/done/archive lifecycle
+  roots. Accepted, unaudited, dirty-source, forged, malformed, stale-bundle,
+  and non-lifecycle decoy evidence remains current-task-bound and fail-closed.
 
 - Closed 2026-08-05: [`BUG-129` — Claim custody accepts skipped benchmarks as
   positive evidence](../../done/BUG-129-claim-custody-skipped-benchmark-positive-evidence.md).
