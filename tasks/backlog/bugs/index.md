@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-130` — Rejected experiment runs require their historical task seal](../../active/BUG-130-rejected-run-historical-task-seal.md):
+  repository-wide custody compares every official run to the current task bytes,
+  so a retained independently rejected run becomes invalid when its task advances
+  to a corrected run; allow only clean-source rejected evidence to verify the
+  exact historical task blob while accepted evidence remains current-only.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
