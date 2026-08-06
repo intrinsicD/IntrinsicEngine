@@ -6,9 +6,9 @@ workflow_schema: 1
 workflow_profile: standard
 evidence: required
 owner: "codex-root"
-branch: "runtime215-completion"
-worktree: "/tmp/intrinsic-runtime215-completion.ZA5LJe"
-claimed_at: "2026-08-06T07:07:34Z"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T07:09:07Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this task changes only physical source paths while preserving every module name, dependency, public contract, data domain, publication rule, and control surface."
@@ -138,14 +138,15 @@ contract_review: "Reviewed the full catalog; this task changes only physical sou
   task. Runtime capability maturity is unchanged.
 - Implementation commit: `61fec5c0` (with the corresponding ARA integration
   record at `aec75527`).
-- The final
-  Clang 23 build succeeded, all 4,103 selected CPU tests passed (with the
+- The final Clang 23 build succeeded, all 4,103 selected CPU tests passed (with the
   expected environment-gated GLFW/LSan skip), and the focused tooling suites
   passed 22/22 and 27/27 cases.
 - Hash-bound completion receipts additionally cover strict layering, test
   layout, task policy/format/state, docs sync/links, ARA, root hygiene, exact
   runtime-root layout, preserved module declarations, and repository-global
   workflow evidence.
+- The standard completion report fixes source revision `200870ac` and content
+  digest `3ba4d3cf36cb4565308530024e2cb33a5f141ab22a8f0f228d0714e71daf8d49`.
 
 ## Verification
 

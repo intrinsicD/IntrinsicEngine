@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-215`](RUNTIME-215-organize-runtime-source-layout.md) — the crowded
+flat runtime root is now organized into broad cohesive ownership directories
+for kernel composition, asset workflow, configuration, editor operations,
+geometry integration, rendering, scene ownership, and feature modules. Only
+`CMakeLists.txt` and `README.md` remain direct `src/runtime` files. All C++23
+module names, implementation bodies, target membership, imports, dependency
+edges, and behavior remain unchanged; the separately reviewed `RUNTIME-216`
+task owns the first semantic forwarding-layer deletion.
+
+The clean fixed surface passed a fresh Clang 23 configure and `IntrinsicTests`
+build, all 4,103 selected CPU tests with only the expected environment-gated
+GLFW/LSan skip, exact root-layout and module-declaration checks, and strict
+layering, test-layout, task, docs, ARA, root-hygiene, and workflow-evidence
+gates. The standard report keeps the mechanical source move isolated from the
+preceding BUG-133 repair and RUNTIME-214 retirement records.
+
 [`RUNTIME-214`](RUNTIME-214-universal-geometry-property-coherence.md) —
 canonical mutable-property revisions now drive resident mesh, graph,
 point-cloud, primitive-view, and CPU-backed visualization updates without

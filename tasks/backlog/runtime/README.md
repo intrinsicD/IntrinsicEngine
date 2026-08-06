@@ -49,6 +49,11 @@ production owners while preserving public behavior first.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-215` — Organize runtime sources by cohesive ownership](../../done/RUNTIME-215-organize-runtime-source-layout.md)
+  moved the crowded flat runtime root into broad owner/lifecycle directories
+  without changing module names, target membership, imports, behavior, or
+  dependency edges. Only `CMakeLists.txt` and `README.md` remain direct
+  `src/runtime` files; `RUNTIME-216` owns the first semantic file reduction.
 - [`RUNTIME-214` — Universal geometry-property CPU/GPU coherence](../../done/RUNTIME-214-universal-geometry-property-coherence.md)
   makes canonical mutable-property revisions drive mesh, graph, point-cloud,
   and visualization extraction without method-specific renderer calls. The

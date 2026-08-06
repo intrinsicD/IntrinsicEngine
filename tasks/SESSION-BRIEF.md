@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-215` — Organize runtime sources by cohesive ownership (tasks/active/RUNTIME-215-organize-runtime-source-layout.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -29,7 +29,7 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
-- blocked by `RUNTIME-215`: `RUNTIME-216` — Inline shallow render-extraction Engine glue (tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md)
+- unblocked: `RUNTIME-216` — Inline shallow render-extraction Engine glue (tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 
 ## Theme G — Active bugs
