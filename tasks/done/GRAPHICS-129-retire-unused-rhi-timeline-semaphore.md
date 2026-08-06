@@ -27,8 +27,6 @@ contracts:
   configure/build, strict retired-symbol, inventory, clean-workshop, layering,
   task, docs-sync/link, and whitespace gates pass.
 - Completion commit: this implementation/retirement commit.
-- In progress on `main`: delete the unused object interface while preserving
-  compiled submit-plan and Vulkan timeline synchronization behavior.
 
 ## Goal
 

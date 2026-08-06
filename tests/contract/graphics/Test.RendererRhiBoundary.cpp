@@ -107,17 +107,29 @@ TEST(RendererRhiBoundary, RhiLayerDoesNotImportVulkan)
 TEST(RendererRhiBoundary, RetiredTimelineSemaphoreAbstractionStaysAbsent)
 {
     const auto root = RepoRoot();
+    const auto ratchetPath =
+        root / "tests/contract/graphics/Test.RendererRhiBoundary.cpp";
     EXPECT_FALSE(std::filesystem::exists(
         root / "src/graphics/rhi/RHI.TimelineSemaphore.cppm"));
 
     const auto rhiCMake = ReadFile(root / "src/graphics/rhi/CMakeLists.txt");
     EXPECT_EQ(rhiCMake.find("RHI.TimelineSemaphore"), std::string::npos);
 
-    const auto crossQueueContract =
-        ReadFile(root / "tests/contract/graphics/Test.CrossQueueTimeline.cpp");
-    EXPECT_EQ(crossQueueContract.find("ITimelineSemaphore"), std::string::npos);
-    EXPECT_EQ(crossQueueContract.find("import Extrinsic.RHI.TimelineSemaphore"),
-              std::string::npos);
+    for (const auto& searchRoot : {root / "src", root / "tests"})
+    {
+        for (const auto& path : FilesUnder(searchRoot))
+        {
+            if (path == ratchetPath)
+                continue;
+
+            const auto content = ReadFile(path);
+            EXPECT_EQ(content.find("ITimelineSemaphore"), std::string::npos)
+                << path.string();
+            EXPECT_EQ(content.find("Extrinsic.RHI.TimelineSemaphore"),
+                      std::string::npos)
+                << path.string();
+        }
+    }
 }
 
 TEST(RendererRhiBoundary, PromotedGraphicsAndRuntimeDoNotImportCuda)
