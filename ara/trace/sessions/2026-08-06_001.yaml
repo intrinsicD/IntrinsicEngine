@@ -2,9 +2,9 @@ session:
   id: "2026-08-06_001"
   date: "2026-08-06"
   started: "2026-08-06T00:40+02:00"
-  last_turn: "2026-08-06T00:40+02:00"
-  turn_count: 1
-  summary: "Committed the verified path-only runtime source organization directly on local main while preserving the separate semantic-reduction boundary."
+  last_turn: "2026-08-06T09:12+02:00"
+  turn_count: 2
+  summary: "Retired every active task in dependency order after independent property-coherence acceptance and clean fixed-surface runtime-layout evidence."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,24 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Rebuilt IntrinsicTests, passed all 4,103 selected CPU entries with one policy skip, passed structural gates, and created commit 61fec5c0."
+  - turn: 2
+    type: decision
+    id: "N389"
+    routing: direct
+    provenance: user
+    summary: "Authorized independent review and ordered all active tasks completed, merged to main, and pushed."
+  - turn: 2
+    type: experiment
+    id: "N390"
+    routing: direct
+    provenance: ai-executed
+    summary: "Independent fixed-surface review accepted RUNTIME-214 after fresh CPU and sanitizer-enabled Vulkan verification."
+  - turn: 2
+    type: experiment
+    id: "N391"
+    routing: direct
+    provenance: ai-executed
+    summary: "Repaired BUG-133, sealed and retired RUNTIME-214/RUNTIME-215, and passed final repository-global gates with no active tasks."
 
 ai_actions:
   - turn: 1
@@ -31,8 +49,35 @@ ai_actions:
       - "tasks/"
       - "tools/"
       - "ara/"
+  - turn: 2
+    action: "Right-sized BUG-133 to a micro repair, replaced the invalid retired-task link with lifecycle-safe prose, passed strict task-state/task-policy/task-format validation, and retired it through commits 312f32fe and 0270ce91."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/methods/README.md"
+      - "tasks/done/BUG-133-method-backlog-retired-link-outside-history.md"
+      - "tasks/backlog/bugs/index.md"
+  - turn: 2
+    action: "Commissioned the user-authorized independent RUNTIME-214 audit, recorded its accepted fixed-surface verdict, completed the high-risk report, advanced C36, and retired the task at f9faa787."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-214-universal-geometry-property-coherence.md"
+      - "tasks/evidence/RUNTIME-214/report.yaml"
+      - "tasks/evidence/RUNTIME-214/reviews.jsonl"
+      - "ara/logic/claims.md"
+  - turn: 2
+    action: "Captured 17 hash-bound RUNTIME-215 command receipts, generated its clean standard report on an isolated evidence branch, merged that branch at 8a7df0bf, retired the task at ae02c7c1, and reran final global gates."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-215-organize-runtime-source-layout.md"
+      - "tasks/evidence/RUNTIME-215/"
+      - "tasks/active/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
 
-claims_touched: []
+claims_touched:
+  - id: C36
+    action: confirmed
+    turn: 2
 
 key_context:
   - turn: 1
@@ -41,14 +86,15 @@ key_context:
     excerpt: "The repository was already on main at origin/main, so commit 61fec5c0 directly advanced local main by one commit and no merge commit was necessary."
   - turn: 1
     excerpt: "The exact pre-commit CPU selector completed 4,103 entries with zero failures and one expected GLFW/LeakSanitizer environment skip."
+  - turn: 2
+    excerpt: "The user explicitly authorized independent review sub-agents, allowing the high-risk task to close without self-acceptance."
+  - turn: 2
+    excerpt: "RUNTIME-214's independent reviewer returned verdict accepted with no blocking finding after fresh CPU and Vulkan reruns."
+  - turn: 2
+    excerpt: "RUNTIME-215's fixed report excludes the prerequisite BUG-133 and RUNTIME-214 retirement bookkeeping from its mechanical source surface."
 
 open_threads:
-  - "RUNTIME-215 remains active until its standard completion report is generated and validated before retirement."
   - "RUNTIME-216 owns the separately reviewed semantic deletion of the private RenderExtractionService forwarding seam."
-  - "BUG-133 owns the pre-existing retired METHOD-020 task-index link finding."
-  - "RUNTIME-214 still requires an independent fixed-surface high-risk review before retirement; its draft review log is absent."
-  - "Local main is ahead of origin/main; push only on an explicit request."
 
 ai_suggestions_pending:
-  - "Generate and validate RUNTIME-215 standard completion evidence before retiring the task."
-  - "Obtain an independent fixed-surface review before retiring RUNTIME-214."
+  - "Implement RUNTIME-216 only as its separately reviewed semantic deletion slice; do not fold it back into the completed mechanical layout task."

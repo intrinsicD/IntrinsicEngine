@@ -1481,3 +1481,12 @@ entries:
       - "Preserved the mechanical/semantic boundary: commit 61fec5c0 contains RUNTIME-215 organization and taskizes, but does not implement, RUNTIME-216."
       - "Kept the pre-existing BUG-133 task-state finding and RUNTIME-214 independent-review gap explicit rather than describing the repository-global workflow validator as green."
       - "Recorded local main as one commit ahead of origin/main; no push was inferred from the user's local commit/merge request."
+  - turn: "2026-08-06_001#2"
+    notes:
+      - "Routed the user's ordered completion/push direction and explicit independent-agent authorization as decision N389; this supplied the missing authority without weakening the high-risk gate."
+      - "Routed the independent fixed-surface audit as experiment N390 and confirmed C36 rather than creating a duplicate coherence claim; the accepted result remains exact-revision and host bounded."
+      - "Routed BUG-133 repair plus RUNTIME-214/RUNTIME-215 retirement and final global verification as experiment N391."
+      - "Used an isolated RUNTIME-215 evidence branch rooted after the mechanical layout commit so its report surface excludes BUG-133 and RUNTIME-214 retirement bookkeeping; merged only the generated evidence back to main."
+      - "Added no new observation or crystallized layer: A35/A36/K31 already encode the accepted runtime-layout architecture, while this turn supplied terminal workflow evidence and task closure."
+      - "Left O93 non-stale because RUNTIME-216 keeps runtime abstraction/seam ownership open; O118, O122, O123, and O130 have not crossed three later session-days and were not resolved by this task closure."
+      - "Preserved the reviewer-noted primitive-view no-tag regression as nonblocking evidence rather than widening the completed task or inventing a new capability/performance claim."

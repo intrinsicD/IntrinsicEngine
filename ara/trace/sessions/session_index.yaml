@@ -260,8 +260,8 @@ sessions:
     open_threads: 5
   - id: "2026-08-06_001"
     date: "2026-08-06"
-    summary: "Committed the verified path-only runtime source organization directly on local main while preserving the separate semantic-reduction boundary."
-    turn_count: 1
-    events_count: 2
-    claims_touched: []
-    open_threads: 5
+    summary: "Retired every active task in dependency order after independent property-coherence acceptance and clean fixed-surface runtime-layout evidence."
+    turn_count: 2
+    events_count: 5
+    claims_touched: [C36]
+    open_threads: 1

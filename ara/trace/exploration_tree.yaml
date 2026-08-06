@@ -9126,3 +9126,72 @@ tree:
       BUG-133, and RUNTIME-214 still awaits its independent high-risk review;
       neither was represented as a passing global workflow gate.
     status: resolved
+  - id: N389
+    type: decision
+    title: "Finish active tasks through their evidence gates"
+    provenance: user
+    timestamp: "2026-08-06T09:12+02:00"
+    also_depends_on: [N382, N386, N388]
+    choice: >
+      Complete every active task in dependency order, authorize a distinct
+      independent reviewer for RUNTIME-214, preserve its high-risk acceptance
+      gate, seal RUNTIME-215 on an isolated fixed surface, merge the result to
+      main, and push the completed history.
+    alternatives:
+      - "Self-accept RUNTIME-214 or retire it without the required independent review."
+      - "Retire RUNTIME-215 while repository-global task/evidence validation still fails."
+      - "Leave the verified tasks active and push only their implementation commits."
+    evidence:
+      - "User direction: complete all active tasks in the correct order, commit, merge to main, and push."
+      - "User authorization: independent review sub-agents are authorized."
+      - "docs/agent/workflow-evidence.md"
+      - "tasks/done/RUNTIME-214-universal-geometry-property-coherence.md"
+      - "tasks/done/RUNTIME-215-organize-runtime-source-layout.md"
+    status: resolved
+  - id: N390
+    type: experiment
+    title: "Independently accept the RUNTIME-214 fixed surface"
+    provenance: ai-executed
+    timestamp: "2026-08-06T09:12+02:00"
+    also_depends_on: [N382, N389]
+    evidence:
+      - "tasks/evidence/RUNTIME-214/report.yaml"
+      - "tasks/evidence/RUNTIME-214/handoff.jsonl"
+      - "tasks/evidence/RUNTIME-214/reviews.jsonl"
+      - "commit 548e62b5fd5970d5bf913e12d85ae768ffb3fa15"
+      - "commit f9faa787"
+    result: >
+      Reviewer runtime214-independent-review recomputed the clean report surface
+      and receipt hashes, passed a fresh Clang 23 CPU build and 8/8 focused
+      contracts, passed a fresh 1,401-step ASan+UBSan ci-vulkan build, and
+      passed the exact 3/3 validation-enabled staging/LOP publication proofs.
+      The reviewer accepted content digest
+      46c5c181b236fb8317dc4ef81b07ba1a1fbd11caac1dd81d080493abeae28253
+      with no blocking finding. One nonblocking opportunity remains for a
+      direct-mutation/no-tag primitive-view regression; no performance,
+      visual-quality, cross-device, or dedicated-transfer-queue claim follows.
+    status: resolved
+  - id: N391
+    type: experiment
+    title: "Seal and retire every active task on main"
+    provenance: ai-executed
+    timestamp: "2026-08-06T09:12+02:00"
+    also_depends_on: [N389, N390]
+    evidence:
+      - "commit 312f32fe"
+      - "commit 0270ce91"
+      - "commit f9faa787"
+      - "commit 8a7df0bf"
+      - "commit ae02c7c1"
+      - "tasks/evidence/RUNTIME-215/report.yaml"
+      - "tasks/evidence/RUNTIME-215/commands/ci-full-cpu-tests.json"
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+    result: >
+      BUG-133 restored strict lifecycle-link validation and retired first.
+      RUNTIME-214 then retired with accepted high-risk evidence. RUNTIME-215's
+      clean report bound an isolated mechanical surface, merged into main, and
+      retired last. Its fresh Clang 23 build passed, all 4,103 selected CPU
+      tests passed with one expected environment-gated skip, and final strict
+      task, workflow, ARA, documentation, layering, test-layout, root-hygiene,
+      and clean-workshop gates passed. tasks/active now contains no task files.
+    status: resolved
