@@ -8,7 +8,7 @@ evidence: required
 owner: "codex-bug136"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-06T18:09:44Z"
+claimed_at: "2026-08-06T18:10:59Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this task reconciles a generated-by-audit test-routing case baseline with existing registered cases and changes no engine, geometry, method, publication, configuration, runtime, UI, or reusable task-workflow contract."
@@ -44,8 +44,9 @@ contract_review: "Reviewed the full catalog; this task reconciles a generated-by
 - [ ] Audit the live `Test.RuntimeEngineLayering.cpp` case inventory against
       CTest discovery and the affected-source map.
 - [ ] Replace the two retired case rows with the exact six live rows reported
-      by reconciliation; preserve every unaffected row and exact-equality
-      check.
+      by reconciliation, then synchronize the coupled Runtime-target and total
+      count ratchets from `35`/`222` to `39`/`226`; preserve every unaffected
+      row and exact-equality check.
 
 ## Tests
 
@@ -62,7 +63,8 @@ contract_review: "Reviewed the full catalog; this task reconciles a generated-by
 
 - [ ] The reported missing/extra set is empty without changing source
       ownership or checker logic.
-- [ ] The baseline remains a sorted exact inventory of the affected cases.
+- [ ] The baseline remains an exact inventory of the affected cases with
+      explicit per-target and total count ratchets.
 - [ ] Strict task, test-layout, and whitespace gates pass.
 
 ## Verification
