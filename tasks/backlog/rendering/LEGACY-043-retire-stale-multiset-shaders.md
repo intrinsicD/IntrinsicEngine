@@ -52,7 +52,7 @@ contracts:
   `RendererFrameLifecycle` and is one of `GRAPHICS-105`'s two promoted
   `ResolveSurfaceNormal` contract paths even though the production descriptor
   currently loads `deferred/default_debug_gbuffer.frag.spv`; and root
-  root `assets/shaders/line.frag` was named only by the now-retired isolated
+  `assets/shaders/line.frag` was named only by the now-retired isolated
   pipeline-registry fixture. It is therefore a current deletion candidate,
   subject to the same execution-time full-path re-verification as the others.
 - Current deletion candidates are root `surface.vert`, `surface.frag`,
