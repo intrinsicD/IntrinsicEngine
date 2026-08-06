@@ -372,7 +372,7 @@ The LOP property-domain pair `RUNTIME-206`/`UI-039` is now fully retired;
 remaining rows keep their named runtime/UI owners.
 
 Open members (kernel-seam priority set first):
-- [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+- [`REVIEW-003`](../active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
   (one-shot post-convergence admission gate; re-gated by the 2026-07-24 runtime
   surface remediation set).
 - The dependency-ordered
