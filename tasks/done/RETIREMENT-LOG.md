@@ -6837,3 +6837,11 @@ currently owned by the audited source, with coupled count ratchets updated to
 reconciliations and all 19 hermetic routing regressions pass without changing
 test ownership, labels, registration, aggregate membership, or fail-closed
 checker behavior.
+
+[`BUG-135`](BUG-135-lop-benchmark-missing-manual-ctest-classification.md) —
+the missing manual CTest producer classification retired on 2026-08-06.
+`IntrinsicLopFamilyGpuBenchmarkSmoke` is now classified alongside the existing
+standalone benchmark runners, restoring live reconciliation for both the CPU
+and complete aggregates. All 19 hermetic routing regressions pass, and the
+benchmark implementation, CTest registration, labels, aggregate membership,
+and execution policy remain unchanged.

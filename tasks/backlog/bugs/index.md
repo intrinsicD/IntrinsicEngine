@@ -5,12 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-135` — LOP benchmark lacks manual CTest classification](../../active/BUG-135-lop-benchmark-missing-manual-ctest-classification.md):
-  the live routing reconciler rejects every aggregate because the standalone
-  LOP-family GPU benchmark registers CTest cases manually but was omitted from
-  the explicit manual-producer set. Classify that existing target without
-  changing its labels, registration, aggregate membership, or benchmark
-  behavior.
 - [`BUG-134` — ImGui adapter panel draw-list test fails intermittently](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
   one default CPU run reported the panel draw-list contract as its sole
   failure, followed by ten passing isolated repetitions and a clean 4,103-case
@@ -70,6 +64,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-06: [`BUG-135` — LOP benchmark lacks manual CTest
+  classification](../../done/BUG-135-lop-benchmark-missing-manual-ctest-classification.md).
+  The standalone LOP-family GPU benchmark now appears in the explicit manual
+  CTest producer set alongside the existing standalone runners. Both live
+  aggregates and all 19 hermetic fail-closed regressions pass without changing
+  benchmark behavior, registration, labels, or aggregate membership.
 
 - Closed 2026-08-06: [`BUG-136` — Test-gate routing affected-case baseline
   drift](../../done/BUG-136-test-gate-routing-affected-case-baseline-drift.md).
