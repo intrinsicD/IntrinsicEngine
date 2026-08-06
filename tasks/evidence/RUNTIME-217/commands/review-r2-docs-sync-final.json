@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 5931,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:44:07Z",
+  "label": "review-r2-docs-sync-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:44:01Z",
+  "stderr_path": "tasks/evidence/RUNTIME-217/commands/review-r2-docs-sync-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-217/commands/review-r2-docs-sync-final.stdout.log",
+  "stdout_sha256": "44d7310e800fc5c1994d0ea657dd0a4191c611cfab6337adae432b30025c0e38",
+  "task_id": "RUNTIME-217"
+}

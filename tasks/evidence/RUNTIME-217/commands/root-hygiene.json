@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_root_hygiene.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/repo/check_root_hygiene.py --root .",
+  "cwd": ".",
+  "duration_ms": 37,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:28:02Z",
+  "label": "root-hygiene",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:28:02Z",
+  "stderr_path": "tasks/evidence/RUNTIME-217/commands/root-hygiene.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-217/commands/root-hygiene.stdout.log",
+  "stdout_sha256": "8d38b04848c739fcc11692324b26c83f7a27c97b696acaf5f269ad4c2e13dcb2",
+  "task_id": "RUNTIME-217"
+}

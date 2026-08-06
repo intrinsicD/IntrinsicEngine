@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root .",
+  "cwd": ".",
+  "duration_ms": 7190,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:28:01Z",
+  "label": "docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:27:53Z",
+  "stderr_path": "tasks/evidence/RUNTIME-217/commands/docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-217/commands/docs-sync.stdout.log",
+  "stdout_sha256": "ab49830ebf6981d7d1ad37bd159a3d43cf7ce1c9f1664d84606331b9ac6d691d",
+  "task_id": "RUNTIME-217"
+}

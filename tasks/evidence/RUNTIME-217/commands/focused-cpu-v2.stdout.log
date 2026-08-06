@@ -1,0 +1,413 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+        Start   91: GraphicsGpuWorld.Smoke_AllocateUploadSyncShutdown
+  1/198 Test   #91: GraphicsGpuWorld.Smoke_AllocateUploadSyncShutdown ............................................................   Passed    0.00 sec
+        Start  133: GraphicsRenderGraph.TransferDstThenShaderReadEmitsTransition
+  2/198 Test  #133: GraphicsRenderGraph.TransferDstThenShaderReadEmitsTransition .................................................   Passed    0.00 sec
+        Start  350: RuntimeAssetImportFormatCoverage.AssetWorkflowModuleAccessorExposesQueueAndEventState
+  3/198 Test  #350: RuntimeAssetImportFormatCoverage.AssetWorkflowModuleAccessorExposesQueueAndEventState ........................   Passed    0.08 sec
+        Start  352: RuntimeAssetImportFormatCoverage.AssetWorkflowModulePreservesImportDirtyState
+  4/198 Test  #352: RuntimeAssetImportFormatCoverage.AssetWorkflowModulePreservesImportDirtyState ................................   Passed    0.06 sec
+        Start  368: AssetWorkflowModule.PublishesExactServicesGatesInitializationAndReinitializes
+  5/198 Test  #368: AssetWorkflowModule.PublishesExactServicesGatesInitializationAndReinitializes ................................   Passed    0.05 sec
+        Start  369: AssetWorkflowModule.CallerOwnedBakeReconciliationIsAtomicAndPreservesUnrelatedChannels
+  6/198 Test  #369: AssetWorkflowModule.CallerOwnedBakeReconciliationIsAtomicAndPreservesUnrelatedChannels .......................   Passed    0.05 sec
+        Start  370: AssetWorkflowModule.RegistrationConflictsLeaveOnlyTheExactExistingProvider
+  7/198 Test  #370: AssetWorkflowModule.RegistrationConflictsLeaveOnlyTheExactExistingProvider ...................................   Passed    0.12 sec
+        Start  371: AssetWorkflowModule.MissingDeviceFailsRegistrationWithoutPartialPublication
+  8/198 Test  #371: AssetWorkflowModule.MissingDeviceFailsRegistrationWithoutPartialPublication ..................................   Passed    0.05 sec
+        Start  372: AssetWorkflowModule.MissingDocumentOrHistoryRollsBackEveryPublication
+  9/198 Test  #372: AssetWorkflowModule.MissingDocumentOrHistoryRollsBackEveryPublication ........................................   Passed    0.09 sec
+        Start  373: AssetWorkflowModule.DocumentParticipantConflictRollsBackEveryPublication
+ 10/198 Test  #373: AssetWorkflowModule.DocumentParticipantConflictRollsBackEveryPublication .....................................   Passed    0.05 sec
+        Start  374: AssetWorkflowModule.DocumentAndWorldReplacementRebindBeforeSceneUse
+ 11/198 Test  #374: AssetWorkflowModule.DocumentAndWorldReplacementRebindBeforeSceneUse ..........................................   Passed    0.07 sec
+        Start  375: AssetWorkflowModule.AnnouncementDetachesImportsAndParticipantBeforeGpuBoundary
+ 12/198 Test  #375: AssetWorkflowModule.AnnouncementDetachesImportsAndParticipantBeforeGpuBoundary ...............................   Passed    0.05 sec
+        Start  376: AssetWorkflowModule.BakeParticipantRegistersOncePerBootAndCleansBeforeOwnedState
+ 13/198 Test  #376: AssetWorkflowModule.BakeParticipantRegistersOncePerBootAndCleansBeforeOwnedState .............................   Passed    0.05 sec
+        Start  377: AssetWorkflowModule.BlockedImportIsSafeInBothOrdinaryOwnerShutdownOrders
+ 14/198 Test  #377: AssetWorkflowModule.BlockedImportIsSafeInBothOrdinaryOwnerShutdownOrders .....................................   Passed    0.11 sec
+        Start  378: AssetWorkflowModule.RenderExtractionRetirementSurvivesEitherOptionalOwnerOmission
+ 15/198 Test  #378: AssetWorkflowModule.RenderExtractionRetirementSurvivesEitherOptionalOwnerOmission ............................   Passed    0.12 sec
+        Start  379: AssetWorkflowModule.RealEngineReverseShutdownIsAsyncBeforeAssetWorkflow
+ 16/198 Test  #379: AssetWorkflowModule.RealEngineReverseShutdownIsAsyncBeforeAssetWorkflow ......................................   Passed    0.05 sec
+        Start  380: AssetWorkflowModule.OmittedAssetWorkflowPlatformDropFailsClosedWithoutQueuedWorkOrSceneMutation
+ 17/198 Test  #380: AssetWorkflowModule.OmittedAssetWorkflowPlatformDropFailsClosedWithoutQueuedWorkOrSceneMutation ..............   Passed    0.05 sec
+        Start  381: AssetWorkflowModule.RealEngineRunSupportsCompositionOmissionAndReinitialize
+ 18/198 Test  #381: AssetWorkflowModule.RealEngineRunSupportsCompositionOmissionAndReinitialize ..................................   Passed    0.14 sec
+        Start  384: RuntimeAsyncWorkModule.ShutdownWithdrawsServiceBeforeLaterModulesRun
+ 19/198 Test  #384: RuntimeAsyncWorkModule.ShutdownWithdrawsServiceBeforeLaterModulesRun .........................................   Passed    0.06 sec
+        Start  385: RuntimeAsyncWorkModule.ShutdownCancelsParkedJobServiceSurvivor
+ 20/198 Test  #385: RuntimeAsyncWorkModule.ShutdownCancelsParkedJobServiceSurvivor ...............................................   Passed    0.02 sec
+        Start  405: EditorUiModule.ReverseShutdownWithdrawsHostAndDetachesLiveRenderer
+ 21/198 Test  #405: EditorUiModule.ReverseShutdownWithdrawsHostAndDetachesLiveRenderer ...........................................   Passed    0.07 sec
+        Start  406: EditorUiModule.ShutdownReinitializeStartsFromFreshEditorState
+ 22/198 Test  #406: EditorUiModule.ShutdownReinitializeStartsFromFreshEditorState ................................................   Passed    0.12 sec
+        Start  448: MeshGeometryExtraction.ShutdownReleasesPendingMeshResidency
+ 23/198 Test  #448: MeshGeometryExtraction.ShutdownReleasesPendingMeshResidency ..................................................   Passed    0.11 sec
+        Start  474: MeshPrimitiveViewExtraction.ShutdownReleasesViewResidency
+ 24/198 Test  #474: MeshPrimitiveViewExtraction.ShutdownReleasesViewResidency ....................................................   Passed    0.10 sec
+        Start  499: RenderExtractionContract.WorldMatrixWithoutRenderHintPublishesNoDrawCandidate
+ 25/198 Test  #499: RenderExtractionContract.WorldMatrixWithoutRenderHintPublishesNoDrawCandidate ................................   Passed    0.10 sec
+        Start  500: RenderExtractionContract.FailedMeshPackPublishesNoDrawCandidate
+ 26/198 Test  #500: RenderExtractionContract.FailedMeshPackPublishesNoDrawCandidate ..............................................   Passed    0.09 sec
+        Start  501: RenderExtractionContract.SnapshotSurvivesLiveEcsMutationAndDestruction
+ 27/198 Test  #501: RenderExtractionContract.SnapshotSurvivesLiveEcsMutationAndDestruction .......................................   Passed    0.10 sec
+        Start  522: GraphGeometryExtraction.ShutdownReleasesPendingGraphResidency
+ 28/198 Test  #522: GraphGeometryExtraction.ShutdownReleasesPendingGraphResidency ................................................   Passed    0.08 sec
+        Start  559: PointCloudGeometryExtraction.ShutdownReleasesPendingPointCloudResidency
+ 29/198 Test  #559: PointCloudGeometryExtraction.ShutdownReleasesPendingPointCloudResidency ......................................   Passed    0.10 sec
+        Start  648: CameraModuleLifecycle.PublishesExactRegistryResolvesAndWithdrawsOnShutdown
+ 30/198 Test  #648: CameraModuleLifecycle.PublishesExactRegistryResolvesAndWithdrawsOnShutdown ...................................   Passed    0.01 sec
+        Start  651: CameraModuleLifecycle.ShutdownWithdrawsOnlyOwnedInstance
+ 31/198 Test  #651: CameraModuleLifecycle.ShutdownWithdrawsOnlyOwnedInstance .....................................................   Passed    0.00 sec
+        Start  652: CameraModuleLifecycle.ShutdownReinitializeWithRecycledBitsStartsEmpty
+ 32/198 Test  #652: CameraModuleLifecycle.ShutdownReinitializeWithRecycledBitsStartsEmpty ........................................   Passed    0.01 sec
+        Start  684: RuntimeConfigControl.ShutdownAndReinitializeWithdrawRebindAndResetExactControl
+ 33/198 Test  #684: RuntimeConfigControl.ShutdownAndReinitializeWithdrawRebindAndResetExactControl ...............................   Passed    0.09 sec
+        Start  686: RuntimeEngineConfigBoot.CommandLineConfigOverridesReferenceDefaults
+ 34/198 Test  #686: RuntimeEngineConfigBoot.CommandLineConfigOverridesReferenceDefaults ..........................................   Passed    0.01 sec
+        Start  687: RuntimeEngineConfigBoot.MissingExplicitPathFallsBackToReferenceConfig
+ 35/198 Test  #687: RuntimeEngineConfigBoot.MissingExplicitPathFallsBackToReferenceConfig ........................................   Passed    0.00 sec
+        Start  688: RuntimeEngineConfigBoot.RegistryDefaultsAndFileSectionsFlowThroughBoot
+ 36/198 Test  #688: RuntimeEngineConfigBoot.RegistryDefaultsAndFileSectionsFlowThroughBoot .......................................   Passed    0.00 sec
+        Start  689: RuntimeEngineLayering.RunFrameDoesNotUseGpuResourceOrPassLevelDetails
+ 37/198 Test  #689: RuntimeEngineLayering.RunFrameDoesNotUseGpuResourceOrPassLevelDetails ........................................   Passed    0.00 sec
+        Start  690: RuntimeEngineLayering.ProductionSourceHasNoApplicationCallbackLifecycle
+ 38/198 Test  #690: RuntimeEngineLayering.ProductionSourceHasNoApplicationCallbackLifecycle ......................................   Passed    0.01 sec
+        Start  691: RuntimeEngineLayering.RunFrameOwnsDocumentedBroadPhaseOrder
+ 39/198 Test  #691: RuntimeEngineLayering.RunFrameOwnsDocumentedBroadPhaseOrder ..................................................   Passed    0.00 sec
+        Start  692: RuntimeEngineLayering.PhysicsModuleIsAppComposedAndThePublicBridgeSurfaceIsRetired
+ 40/198 Test  #692: RuntimeEngineLayering.PhysicsModuleIsAppComposedAndThePublicBridgeSurfaceIsRetired ...........................   Passed    0.02 sec
+        Start  693: RuntimeEngineLayering.RunFrameAppliesJobCompletionsWithBoundedBudget
+ 41/198 Test  #693: RuntimeEngineLayering.RunFrameAppliesJobCompletionsWithBoundedBudget .........................................   Passed    0.01 sec
+        Start  694: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRenderer
+ 42/198 Test  #694: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRenderer ..........................................   Passed    0.00 sec
+        Start  695: RuntimeEngineLayering.EnginePrivatelyOwnsGpuQueueHookLifecycle
+ 43/198 Test  #695: RuntimeEngineLayering.EnginePrivatelyOwnsGpuQueueHookLifecycle ...............................................   Passed    0.00 sec
+        Start  696: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition
+ 44/198 Test  #696: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition .................................   Passed    0.01 sec
+        Start  697: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsGizmoFrameState
+ 45/198 Test  #697: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsGizmoFrameState ...........................................   Passed    0.00 sec
+        Start  698: RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface
+ 46/198 Test  #698: RuntimeEngineLayering.UnifiedEditorMutationHistoryHasNoParallelProductionSurface .............................   Passed    0.01 sec
+        Start  699: RuntimeEngineLayering.RunFrameCarriesDataOnlyFrameContext
+ 47/198 Test  #699: RuntimeEngineLayering.RunFrameCarriesDataOnlyFrameContext ....................................................   Passed    0.00 sec
+        Start  700: RuntimeEngineLayering.GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction
+ 48/198 Test  #700: RuntimeEngineLayering.GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction ..........................   Passed    0.01 sec
+        Start  701: RuntimeEngineLayering.RuntimeOwnedFrameLoopPreservesRendererAndMaintenanceOrder
+ 49/198 Test  #701: RuntimeEngineLayering.RuntimeOwnedFrameLoopPreservesRendererAndMaintenanceOrder ..............................   Passed    0.00 sec
+        Start  702: RuntimeEngineLayering.RunFrameRegistersPromotedEcsSystemsBeforeCompile
+ 50/198 Test  #702: RuntimeEngineLayering.RunFrameRegistersPromotedEcsSystemsBeforeCompile .......................................   Passed    0.01 sec
+        Start  703: RuntimeEngineLayering.SupersededWorkSurfacesAreRetiredFromBuild
+ 51/198 Test  #703: RuntimeEngineLayering.SupersededWorkSurfacesAreRetiredFromBuild ..............................................   Passed    0.01 sec
+        Start  704: RuntimeEngineLayering.SupersededGpuResultReadbackSurfacesAreRetiredFromBuild
+ 52/198 Test  #704: RuntimeEngineLayering.SupersededGpuResultReadbackSurfacesAreRetiredFromBuild .................................   Passed    0.01 sec
+        Start  705: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService
+ 53/198 Test  #705: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService ...........................................   Passed    0.00 sec
+        Start  706: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine
+ 54/198 Test  #706: RuntimeEngineLayering.EngineConfigControlIsAnAppComposedModuleOutsideEngine ..................................   Passed    0.00 sec
+        Start  707: RuntimeEngineLayering.MaintenanceHasNoOptionalStreamingFacade
+ 55/198 Test  #707: RuntimeEngineLayering.MaintenanceHasNoOptionalStreamingFacade ................................................   Passed    0.00 sec
+        Start  708: RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope
+ 56/198 Test  #708: RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope ........................................   Passed    0.01 sec
+        Start  709: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface
+ 57/198 Test  #709: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface ............................................   Passed    0.01 sec
+        Start  710: RuntimeEngineLayering.CoreFrameLoopModuleStaysRetiredAndRuntimeOwnsComposition
+ 58/198 Test  #710: RuntimeEngineLayering.CoreFrameLoopModuleStaysRetiredAndRuntimeOwnsComposition ...............................   Passed    0.00 sec
+        Start  711: RuntimeEngineLayering.DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine
+ 59/198 Test  #711: RuntimeEngineLayering.DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine ................................   Passed    0.01 sec
+        Start  712: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted
+ 60/198 Test  #712: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted ............................................   Passed    0.00 sec
+        Start  713: RuntimeEngineLayering.CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine
+ 61/198 Test  #713: RuntimeEngineLayering.CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine ...............................   Passed    0.00 sec
+        Start  714: RuntimeEngineLayering.InputActionsKeepRegistryAndDispatchOutOfEngine
+ 62/198 Test  #714: RuntimeEngineLayering.InputActionsKeepRegistryAndDispatchOutOfEngine .........................................   Passed    0.01 sec
+        Start  715: RuntimeEngineLayering.RetiredEngineCompositionHelperBmisAreAbsent
+ 63/198 Test  #715: RuntimeEngineLayering.RetiredEngineCompositionHelperBmisAreAbsent ............................................   Passed    0.01 sec
+        Start  716: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsPickCorrelationState
+ 64/198 Test  #716: RuntimeEngineLayering.SceneInteractionPrivatelyOwnsPickCorrelationState ......................................   Passed    0.01 sec
+        Start  717: RuntimeEngineLayering.EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics
+ 65/198 Test  #717: RuntimeEngineLayering.EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics ..............................   Passed    0.01 sec
+        Start  718: RuntimeEngineLayering.AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence
+ 66/198 Test  #718: RuntimeEngineLayering.AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence .................................   Passed    0.00 sec
+        Start  719: RuntimeEngineLayering.RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers
+ 67/198 Test  #719: RuntimeEngineLayering.RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers ...................................   Passed    0.01 sec
+        Start  720: RuntimeEngineLayering.RetiredSpatialDebugRegistryHasNoProductionSurface
+ 68/198 Test  #720: RuntimeEngineLayering.RetiredSpatialDebugRegistryHasNoProductionSurface ......................................   Passed    0.00 sec
+        Start  721: RuntimeEngineLayering.RetiredProgressivePresentationModulesAndSymbolsStayDeleted
+ 69/198 Test  #721: RuntimeEngineLayering.RetiredProgressivePresentationModulesAndSymbolsStayDeleted .............................   Passed    0.02 sec
+        Start  722: RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains
+ 70/198 Test  #722: RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains ...........................................   Passed    0.01 sec
+        Start  723: RuntimeEngineLayering.RetiredGeometryPackerAndLifecycleSurfacesStayDeleted
+ 71/198 Test  #723: RuntimeEngineLayering.RetiredGeometryPackerAndLifecycleSurfacesStayDeleted ...................................   Passed    0.01 sec
+        Start  724: RuntimeEnginePrivateGlue.FrameLoopHelpersArePrivateTextualGlue
+ 72/198 Test  #724: RuntimeEnginePrivateGlue.FrameLoopHelpersArePrivateTextualGlue ...............................................   Passed    0.01 sec
+        Start  725: RuntimeEnginePrivateGlue.TypedViewportInputDispatchKeepsCameraOutOfGenericFrameContext
+ 73/198 Test  #725: RuntimeEnginePrivateGlue.TypedViewportInputDispatchKeepsCameraOutOfGenericFrameContext .......................   Passed    0.00 sec
+        Start  726: RuntimeEnginePrivateGlue.EditorUiModuleOwnsOptionalEditorUiComposition
+ 74/198 Test  #726: RuntimeEnginePrivateGlue.EditorUiModuleOwnsOptionalEditorUiComposition .......................................   Passed    0.01 sec
+        Start  727: RuntimeEnginePrivateGlue.RenderExtractionStateLivesDirectlyInEngineImpl
+ 75/198 Test  #727: RuntimeEnginePrivateGlue.RenderExtractionStateLivesDirectlyInEngineImpl ......................................   Passed    0.01 sec
+        Start  728: RuntimeEnginePrivateGlue.EngineInterfaceCarriesOnlyOpaqueImplementationState
+ 76/198 Test  #728: RuntimeEnginePrivateGlue.EngineInterfaceCarriesOnlyOpaqueImplementationState .................................   Passed    0.00 sec
+        Start  729: RuntimeEnginePrivateGlue.AssetWorkflowAndTextureBakeCompositionAreModuleOwned
+ 77/198 Test  #729: RuntimeEnginePrivateGlue.AssetWorkflowAndTextureBakeCompositionAreModuleOwned ................................   Passed    0.03 sec
+        Start  730: RuntimeEnginePrivateGlue.AssetWorkflowImplementationModulesStayPrivateAndRetiredNamesStayDeleted
+ 78/198 Test  #730: RuntimeEnginePrivateGlue.AssetWorkflowImplementationModulesStayPrivateAndRetiredNamesStayDeleted .............   Passed    0.00 sec
+        Start  731: RuntimeEnginePrivateGlue.ClusteringServiceIsTheSoleKMeansRuntimeRoute
+ 79/198 Test  #731: RuntimeEnginePrivateGlue.ClusteringServiceIsTheSoleKMeansRuntimeRoute ........................................   Passed    0.01 sec
+        Start  786: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder
+ 80/198 Test  #786: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder .............................................   Passed    0.00 sec
+        Start  839: RuntimeRenderExtraction.VisualizationRecipeRevisionTracksMutations
+ 81/198 Test  #839: RuntimeRenderExtraction.VisualizationRecipeRevisionTracksMutations ...........................................   Passed    0.00 sec
+        Start  871: SceneInteractionModule.ShutdownAnnouncementReleasesDocumentParticipant
+ 82/198 Test  #871: SceneInteractionModule.ShutdownAnnouncementReleasesDocumentParticipant .......................................   Passed    0.00 sec
+        Start  876: SceneInteractionModule.ShutdownReinitializeStartsEmptyWithRecycledBootHandle
+ 83/198 Test  #876: SceneInteractionModule.ShutdownReinitializeStartsEmptyWithRecycledBootHandle .................................   Passed    0.08 sec
+        Start  936: SandboxEditorUi.AssetWorkflowReportsMissingFile
+ 84/198 Test  #936: SandboxEditorUi.AssetWorkflowReportsMissingFile ..............................................................   Passed    0.04 sec
+        Start  937: SandboxEditorUi.AssetWorkflowMaterializesStandaloneGeometryDomains
+ 85/198 Test  #937: SandboxEditorUi.AssetWorkflowMaterializesStandaloneGeometryDomains ...........................................   Passed    0.04 sec
+        Start  938: SandboxEditorUi.AssetWorkflowMaterializesNonManifoldObjAsRenderableMesh
+ 86/198 Test  #938: SandboxEditorUi.AssetWorkflowMaterializesNonManifoldObjAsRenderableMesh ......................................   Passed    0.05 sec
+        Start  939: SandboxEditorUi.AssetWorkflowMaterializesObjWithoutAuthoredTexcoordsAsRenderableMesh
+ 87/198 Test  #939: SandboxEditorUi.AssetWorkflowMaterializesObjWithoutAuthoredTexcoordsAsRenderableMesh .........................   Passed    0.05 sec
+        Start  942: SandboxEditorUi.ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown
+ 88/198 Test  #942: SandboxEditorUi.ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown ....................................   Passed    0.08 sec
+        Start 1148: RenderWorldPoolEngineWiring.ConfiguresPrivatePoolFromExtractionMode
+ 89/198 Test #1148: RenderWorldPoolEngineWiring.ConfiguresPrivatePoolFromExtractionMode ..........................................   Passed    0.00 sec
+        Start 1149: RenderWorldPoolEngineWiring.FrameLoopOwnsPoolLifecycleWithoutPublicForwarders
+ 90/198 Test #1149: RenderWorldPoolEngineWiring.FrameLoopOwnsPoolLifecycleWithoutPublicForwarders ................................   Passed    0.00 sec
+        Start 1188: SandboxAppComposition.MissingAssetWorkflowStillComposesIndependentFocusAction
+ 91/198 Test #1188: SandboxAppComposition.MissingAssetWorkflowStillComposesIndependentFocusAction ................................   Passed    0.04 sec
+        Start 1191: SandboxAppComposition.ReinitializeAndRepeatedShutdownDoNotDuplicateState
+ 92/198 Test #1191: SandboxAppComposition.ReinitializeAndRepeatedShutdownDoNotDuplicateState .....................................   Passed    0.08 sec
+        Start 1192: SandboxAppComposition.BlockedImportShutdownCancelsBeforeRealSandboxUnregister
+ 93/198 Test #1192: SandboxAppComposition.BlockedImportShutdownCancelsBeforeRealSandboxUnregister ................................   Passed    0.04 sec
+        Start 1214: SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow
+ 94/198 Test #1214: SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow ........................................   Passed    0.05 sec
+        Start 1323: PhysicsModule.PerWorldStateIsRemovedOnDestroyAndShutdown
+ 95/198 Test #1323: PhysicsModule.PerWorldStateIsRemovedOnDestroyAndShutdown .....................................................   Passed    0.00 sec
+        Start 1599: MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer
+ 96/198 Test #1599: MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer ...................................   Passed    0.01 sec
+        Start 3174: CoreHandleLease.MoveConstructionTransfersOwnership
+ 97/198 Test #3174: CoreHandleLease.MoveConstructionTransfersOwnership ...........................................................   Passed    0.00 sec
+        Start 3212: CoreMemoryScopeStack.MoveTransfersDestructorListOnce
+ 98/198 Test #3212: CoreMemoryScopeStack.MoveTransfersDestructorListOnce .........................................................   Passed    0.00 sec
+        Start 3328: CoreTasks.SchedulerShutdownReclaimsParkedFrameWithoutResuming
+ 99/198 Test #3328: CoreTasks.SchedulerShutdownReclaimsParkedFrameWithoutResuming ................................................   Passed    0.01 sec
+        Start 3432: GpuAssetCache.GpuProducedTextureRejectsReadyFrameForTransferUpload
+100/198 Test #3432: GpuAssetCache.GpuProducedTextureRejectsReadyFrameForTransferUpload ...........................................   Passed    0.00 sec
+        Start 3448: BufferTransferRange.ValidatesExactSubranges
+101/198 Test #3448: BufferTransferRange.ValidatesExactSubranges ..................................................................   Passed    0.00 sec
+        Start 3449: BufferTransferRange.RejectsEmptyBuffersAndZeroByteRanges
+102/198 Test #3449: BufferTransferRange.RejectsEmptyBuffersAndZeroByteRanges .....................................................   Passed    0.00 sec
+        Start 3450: BufferTransferRange.RejectsOutOfBoundsWithoutOverflow
+103/198 Test #3450: BufferTransferRange.RejectsOutOfBoundsWithoutOverflow ........................................................   Passed    0.00 sec
+        Start 3451: BufferTransferAlignment.AlignsWithNonPowerOfTwoValues
+104/198 Test #3451: BufferTransferAlignment.AlignsWithNonPowerOfTwoValues ........................................................   Passed    0.00 sec
+        Start 3452: BufferTransferAlignment.RejectsInvalidAndOverflowingAlignment
+105/198 Test #3452: BufferTransferAlignment.RejectsInvalidAndOverflowingAlignment ................................................   Passed    0.00 sec
+        Start 3453: BufferTransferAlignment.ExpandsDestinationRangeAndRevalidatesCapacity
+106/198 Test #3453: BufferTransferAlignment.ExpandsDestinationRangeAndRevalidatesCapacity ........................................   Passed    0.00 sec
+        Start 3454: BufferTransferPlan.SortsCoalescesAndPacksSourceOffsets
+107/198 Test #3454: BufferTransferPlan.SortsCoalescesAndPacksSourceOffsets .......................................................   Passed    0.00 sec
+        Start 3455: BufferTransferPlan.CanPreserveSeparateOverlappingRanges
+108/198 Test #3455: BufferTransferPlan.CanPreserveSeparateOverlappingRanges ......................................................   Passed    0.00 sec
+        Start 3456: BufferTransferPlan.AlignsDirtyRangesBeforeCoalescing
+109/198 Test #3456: BufferTransferPlan.AlignsDirtyRangesBeforeCoalescing .........................................................   Passed    0.00 sec
+        Start 3457: BufferTransferPlan.RejectsOutOfRangeDirtyRanges
+110/198 Test #3457: BufferTransferPlan.RejectsOutOfRangeDirtyRanges ..............................................................   Passed    0.00 sec
+        Start 3458: BufferTransferDimensions.ExactTightRangeMatches
+111/198 Test #3458: BufferTransferDimensions.ExactTightRangeMatches ..............................................................   Passed    0.00 sec
+        Start 3459: BufferTransferDimensions.FitWithinAllowsPaddingButExactRejectsIt
+112/198 Test #3459: BufferTransferDimensions.FitWithinAllowsPaddingButExactRejectsIt .............................................   Passed    0.00 sec
+        Start 3460: BufferTransferDimensions.StrideDefinesFootprint
+113/198 Test #3460: BufferTransferDimensions.StrideDefinesFootprint ..............................................................   Passed    0.00 sec
+        Start 3461: BufferTransferDimensions.RejectsInvalidStrideAndOverflow
+114/198 Test #3461: BufferTransferDimensions.RejectsInvalidStrideAndOverflow .....................................................   Passed    0.00 sec
+        Start 3462: GraphicsColormapSystem.InitializeSubmitsLutUploadsThroughTransferQueue
+115/198 Test #3462: GraphicsColormapSystem.InitializeSubmitsLutUploadsThroughTransferQueue .......................................   Passed    0.00 sec
+        Start 3463: GraphicsColormapSystem.ReadinessTracksPendingTransferTokens
+116/198 Test #3463: GraphicsColormapSystem.ReadinessTracksPendingTransferTokens ..................................................   Passed    0.00 sec
+        Start 3464: GraphicsColormapSystem.InvalidTransferTokensKeepColormapsNotReady
+117/198 Test #3464: GraphicsColormapSystem.InvalidTransferTokensKeepColormapsNotReady ............................................   Passed    0.00 sec
+        Start 3512: GpuTransferFacade.ImmediateSubmissionPrefersStagingAndFallsBackExplicitly
+118/198 Test #3512: GpuTransferFacade.ImmediateSubmissionPrefersStagingAndFallsBackExplicitly ....................................   Passed    0.00 sec
+        Start 3513: GpuTransferFacade.AsyncUploadEmitsReadyBarrierOnlyAfterTokenCompletion
+119/198 Test #3513: GpuTransferFacade.AsyncUploadEmitsReadyBarrierOnlyAfterTokenCompletion .......................................   Passed    0.00 sec
+        Start 3514: GpuTransferFacade.InCommandUploadRecordsCopyAndBarrierImmediately
+120/198 Test #3514: GpuTransferFacade.InCommandUploadRecordsCopyAndBarrierImmediately ............................................   Passed    0.00 sec
+        Start 3515: GpuTransferFacade.ReadbackDelegatesTransferReadBracketAndDeliversOnce
+121/198 Test #3515: GpuTransferFacade.ReadbackDelegatesTransferReadBracketAndDeliversOnce ........................................   Passed    0.00 sec
+        Start 3516: GpuTransferFacade.InvalidRangesFailClosedAndUpdateDiagnostics
+122/198 Test #3516: GpuTransferFacade.InvalidRangesFailClosedAndUpdateDiagnostics ................................................   Passed    0.00 sec
+        Start 3517: GpuTransferFacade.MultiRangeBatchPreservesOrderAndConsumesExactlyOnce
+123/198 Test #3517: GpuTransferFacade.MultiRangeBatchPreservesOrderAndConsumesExactlyOnce ........................................   Passed    0.00 sec
+        Start 3518: GpuTransferFacade.MultiRangeBatchRejectsMalformedAndContradictoryRanges
+124/198 Test #3518: GpuTransferFacade.MultiRangeBatchRejectsMalformedAndContradictoryRanges ......................................   Passed    0.00 sec
+        Start 3519: GpuTransferFacade.CancelledBatchRetainsSinkStorageUntilTransferRetires
+125/198 Test #3519: GpuTransferFacade.CancelledBatchRetainsSinkStorageUntilTransferRetires .......................................   Passed    0.00 sec
+        Start 3520: GpuTransferFacade.ConsumeRejectsStaleBufferGenerationBeforeExposingBytes
+126/198 Test #3520: GpuTransferFacade.ConsumeRejectsStaleBufferGenerationBeforeExposingBytes .....................................   Passed    0.00 sec
+        Start 3572: TransferQueueFullChain.NullBackendRejectsFullChainUploadsFailClosed
+127/198 Test #3572: TransferQueueFullChain.NullBackendRejectsFullChainUploadsFailClosed ..........................................   Passed    0.00 sec
+        Start 3573: TransferQueueReadback.NullBackendRejectsDownloadsFailClosed
+128/198 Test #3573: TransferQueueReadback.NullBackendRejectsDownloadsFailClosed ..................................................   Passed    0.00 sec
+        Start 3574: TransferQueueReadback.MockQueueDeliversReadbackOnCollectCompleted
+129/198 Test #3574: TransferQueueReadback.MockQueueDeliversReadbackOnCollectCompleted ............................................   Passed    0.00 sec
+        Start 3575: TransferQueueReadback.MockQueueDropsOutOfRangeRequests
+130/198 Test #3575: TransferQueueReadback.MockQueueDropsOutOfRangeRequests .......................................................   Passed    0.00 sec
+        Start 3590: VulkanFailClosedContract.FallbackTransferQueueIncrementsUploadCounter
+131/198 Test #3590: VulkanFailClosedContract.FallbackTransferQueueIncrementsUploadCounter ........................................   Passed    0.00 sec
+        Start 3602: VulkanFailClosedContract.FallbackCountersAreProcessMonotonicAcrossInitializeShutdownCycles
+132/198 Test #3602: VulkanFailClosedContract.FallbackCountersAreProcessMonotonicAcrossInitializeShutdownCycles ...................   Passed    0.00 sec
+        Start 3606: VulkanFailClosedContract.DeviceLostFlagStaysFalseAcrossInitializeShutdownCyclesOnNullWindow
+133/198 Test #3606: VulkanFailClosedContract.DeviceLostFlagStaysFalseAcrossInitializeShutdownCyclesOnNullWindow ..................   Passed    0.00 sec
+        Start 3631: VulkanOperationalDiagnosticsSnapshot.CountersSurviveDeviceInitializeShutdownCycles
+134/198 Test #3631: VulkanOperationalDiagnosticsSnapshot.CountersSurviveDeviceInitializeShutdownCycles ...........................   Passed    0.00 sec
+        Start 3730: FrameRecipeContract.PickingIdTargetsDeclareTransferSrcUsageForReadbackCopies
+135/198 Test #3730: FrameRecipeContract.PickingIdTargetsDeclareTransferSrcUsageForReadbackCopies .................................   Passed    0.00 sec
+        Start 3736: FrameRecipeContract.SceneDepthGainsTransferSrcUsageWhenPickingActive
+136/198 Test #3736: FrameRecipeContract.SceneDepthGainsTransferSrcUsageWhenPickingActive .........................................   Passed    0.00 sec
+        Start 3750: GpuWorldLifetimeContract.GeometryUpdatesPreferNonBlockingTransferStaging
+137/198 Test #3750: GpuWorldLifetimeContract.GeometryUpdatesPreferNonBlockingTransferStaging .....................................   Passed    0.00 sec
+        Start 3793: GraphicsLightingShadowContracts.ShadowSystemReleasesAtlasAndSamplerOnShutdown
+138/198 Test #3793: GraphicsLightingShadowContracts.ShadowSystemReleasesAtlasAndSamplerOnShutdown ................................   Passed    0.00 sec
+        Start 3822: GraphicsOwnershipTransferBarriers.BarrierPacketRangeUsesSortedPassStageWindow
+139/198 Test #3822: GraphicsOwnershipTransferBarriers.BarrierPacketRangeUsesSortedPassStageWindow ................................   Passed    0.00 sec
+        Start 3823: GraphicsOwnershipTransferBarriers.ExecutorRejectsUnsortedBarrierPackets
+140/198 Test #3823: GraphicsOwnershipTransferBarriers.ExecutorRejectsUnsortedBarrierPackets ......................................   Passed    0.00 sec
+        Start 3824: GraphicsOwnershipTransferBarriers.ImportedTextureCrossQueueEmitsReleaseAcquirePair
+141/198 Test #3824: GraphicsOwnershipTransferBarriers.ImportedTextureCrossQueueEmitsReleaseAcquirePair ...........................   Passed    0.00 sec
+        Start 3825: GraphicsOwnershipTransferBarriers.ImportedBufferCrossQueueEmitsReleaseAcquirePair
+142/198 Test #3825: GraphicsOwnershipTransferBarriers.ImportedBufferCrossQueueEmitsReleaseAcquirePair ............................   Passed    0.00 sec
+        Start 3826: GraphicsOwnershipTransferBarriers.ExplicitDependencyDoesNotSuppressCrossQueueTransferRecords
+143/198 Test #3826: GraphicsOwnershipTransferBarriers.ExplicitDependencyDoesNotSuppressCrossQueueTransferRecords .................   Passed    0.00 sec
+        Start 3827: GraphicsOwnershipTransferBarriers.TransientCrossQueueResourceUsesConcurrentSharingWithoutOwnershipTransfer
+144/198 Test #3827: GraphicsOwnershipTransferBarriers.TransientCrossQueueResourceUsesConcurrentSharingWithoutOwnershipTransfer ...   Passed    0.00 sec
+        Start 3828: GraphicsOwnershipTransferBarriers.SingleQueueResourceKeepsExclusiveBarriersWithoutQueueFamilies
+145/198 Test #3828: GraphicsOwnershipTransferBarriers.SingleQueueResourceKeepsExclusiveBarriersWithoutQueueFamilies ..............   Passed    0.00 sec
+        Start 3829: OwnershipTransferBarriers.LiveCrossQueueTransferDependsOnDeviceProfile
+146/198 Test #3829: OwnershipTransferBarriers.LiveCrossQueueTransferDependsOnDeviceProfile .......................................   Passed    0.00 sec
+        Start 3908: RenderSubsystemRegistry.ShutdownIsSafeAfterPartialInitialization
+147/198 Test #3908: RenderSubsystemRegistry.ShutdownIsSafeAfterPartialInitialization .............................................   Passed    0.03 sec
+        Start 4007: RendererFrameLifecycle.GpuProfilerShutdownDiscardsActiveCandidateBeforeReinitialize
+148/198 Test #4007: RendererFrameLifecycle.GpuProfilerShutdownDiscardsActiveCandidateBeforeReinitialize ..........................   Passed    0.15 sec
+        Start 4058: TransformSyncSystem.ShutdownClearsTrackedState
+149/198 Test #4058: TransformSyncSystem.ShutdownClearsTrackedState ...............................................................   Passed    0.03 sec
+        Start 4113: RuntimeRenderExtraction.CreatesUpdatesAndClearsDirtyTransformSidecar
+150/198 Test #4113: RuntimeRenderExtraction.CreatesUpdatesAndClearsDirtyTransformSidecar .........................................   Passed    0.03 sec
+        Start 4114: RuntimeRenderExtraction.ClearSceneStateDropsSidecarsAndPerEntityRecipes
+151/198 Test #4114: RuntimeRenderExtraction.ClearSceneStateDropsSidecarsAndPerEntityRecipes ......................................   Passed    0.03 sec
+        Start 4115: RuntimeRenderExtraction.RetiresDestroyedRenderableSidecar
+152/198 Test #4115: RuntimeRenderExtraction.RetiresDestroyedRenderableSidecar ....................................................   Passed    0.03 sec
+        Start 4116: RuntimeRenderExtraction.ReusesLiveRenderableKeyScratchAcrossExtractions
+153/198 Test #4116: RuntimeRenderExtraction.ReusesLiveRenderableKeyScratchAcrossExtractions ......................................   Passed    0.03 sec
+        Start 4117: RuntimeRenderExtraction.ExtractsVisualizationAndLightsWithoutRenderableOwnership
+154/198 Test #4117: RuntimeRenderExtraction.ExtractsVisualizationAndLightsWithoutRenderableOwnership .............................   Passed    0.03 sec
+        Start 4118: RuntimeRenderExtraction.VisualizationScalarRecipeReachesRenderWorld
+155/198 Test #4118: RuntimeRenderExtraction.VisualizationScalarRecipeReachesRenderWorld ..........................................   Passed    0.03 sec
+        Start 4119: RuntimeRenderExtraction.VisualizationScalarConfigMissingSourceFailsClosed
+156/198 Test #4119: RuntimeRenderExtraction.VisualizationScalarConfigMissingSourceFailsClosed ....................................   Passed    0.03 sec
+        Start 4120: RuntimeRenderExtraction.VisualizationScalarRecipeMissingBdaUploadsPropertyBuffer
+157/198 Test #4120: RuntimeRenderExtraction.VisualizationScalarRecipeMissingBdaUploadsPropertyBuffer .............................   Passed    0.03 sec
+        Start 4121: RuntimeRenderExtraction.VisualizationPropertyBufferKeysAreStableIdScoped
+158/198 Test #4121: RuntimeRenderExtraction.VisualizationPropertyBufferKeysAreStableIdScoped .....................................   Passed    0.03 sec
+        Start 4122: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferUploadsFromGeometrySources
+159/198 Test #4122: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferUploadsFromGeometrySources .......................   Passed    0.03 sec
+        Start 4123: RuntimeRenderExtraction.PointCloudVisualizationPropertyBuffersUploadFromGeometrySources
+160/198 Test #4123: RuntimeRenderExtraction.PointCloudVisualizationPropertyBuffersUploadFromGeometrySources ......................   Passed    0.03 sec
+        Start 4124: RuntimeRenderExtraction.MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange
+161/198 Test #4124: RuntimeRenderExtraction.MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange .....................   Passed    0.07 sec
+        Start 4125: RuntimeRenderExtraction.MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig
+162/198 Test #4125: RuntimeRenderExtraction.MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig ....................   Passed    0.07 sec
+        Start 4126: RuntimeRenderExtraction.MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig
+163/198 Test #4126: RuntimeRenderExtraction.MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig ......................   Passed    0.07 sec
+        Start 4127: RuntimeRenderExtraction.MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames
+164/198 Test #4127: RuntimeRenderExtraction.MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames ......................   Passed    0.10 sec
+        Start 4128: RuntimeRenderExtraction.MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig
+165/198 Test #4128: RuntimeRenderExtraction.MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig ...........................   Passed    0.07 sec
+        Start 4129: RuntimeRenderExtraction.GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains
+166/198 Test #4129: RuntimeRenderExtraction.GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains ........................   Passed    0.04 sec
+        Start 4130: RuntimeRenderExtraction.GeometryPresentationPropertyBuffersProjectToVisualizationRecipes
+167/198 Test #4130: RuntimeRenderExtraction.GeometryPresentationPropertyBuffersProjectToVisualizationRecipes .....................   Passed    0.03 sec
+        Start 4131: RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream
+168/198 Test #4131: RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream .....................   Passed    0.08 sec
+        Start 4132: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferFailsClosed
+169/198 Test #4132: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferFailsClosed ......................................   Passed    0.03 sec
+        Start 4133: RuntimeRenderExtraction.VisualizationNonScalarRecipesReachRenderWorld
+170/198 Test #4133: RuntimeRenderExtraction.VisualizationNonScalarRecipesReachRenderWorld ........................................   Passed    0.04 sec
+        Start 4134: RuntimeRenderExtraction.VisualizationNonScalarRecipeFailuresAreCounted
+171/198 Test #4134: RuntimeRenderExtraction.VisualizationNonScalarRecipeFailuresAreCounted .......................................   Passed    0.04 sec
+        Start 4135: RuntimeRenderExtraction.ObservesAssetSourceAsUnavailableWithoutGpuAssetCache
+172/198 Test #4135: RuntimeRenderExtraction.ObservesAssetSourceAsUnavailableWithoutGpuAssetCache .................................   Passed    0.03 sec
+        Start 4136: RuntimeRenderExtraction.ObservesReadyAssetGenerationAsRebindRequired
+173/198 Test #4136: RuntimeRenderExtraction.ObservesReadyAssetGenerationAsRebindRequired .........................................   Passed    0.03 sec
+        Start 4137: RuntimeRenderExtraction.HelperDoesNotMarkRebindGenerationAsSeen
+174/198 Test #4137: RuntimeRenderExtraction.HelperDoesNotMarkRebindGenerationAsSeen ..............................................   Passed    0.03 sec
+        Start 4138: RuntimeRenderExtraction.AcknowledgeRebindAdvancesLastSeenGeneration
+175/198 Test #4138: RuntimeRenderExtraction.AcknowledgeRebindAdvancesLastSeenGeneration ..........................................   Passed    0.03 sec
+        Start 4139: RuntimeRenderExtraction.AcknowledgeRebindRejectsObservationsWithoutGeneration
+176/198 Test #4139: RuntimeRenderExtraction.AcknowledgeRebindRejectsObservationsWithoutGeneration ................................   Passed    0.00 sec
+        Start 4140: RuntimeRenderExtraction.AcknowledgeRebindRejectsAssetMismatch
+177/198 Test #4140: RuntimeRenderExtraction.AcknowledgeRebindRejectsAssetMismatch ................................................   Passed    0.00 sec
+        Start 4141: RuntimeRenderExtraction.AcknowledgeRebindRejectsSlotWithoutSourceAsset
+178/198 Test #4141: RuntimeRenderExtraction.AcknowledgeRebindRejectsSlotWithoutSourceAsset .......................................   Passed    0.00 sec
+        Start 4142: RuntimeRenderExtraction.ExtractAndSubmitDoesNotAutoAcknowledgeRebinds
+179/198 Test #4142: RuntimeRenderExtraction.ExtractAndSubmitDoesNotAutoAcknowledgeRebinds ........................................   Passed    0.03 sec
+        Start 4146: RuntimeFrameLoopContract.PlatformBeginFramePollsBeforeMinimizedWait
+180/198 Test #4146: RuntimeFrameLoopContract.PlatformBeginFramePollsBeforeMinimizedWait ..........................................   Passed    0.00 sec
+        Start 4147: RuntimeFrameLoopContract.PlatformBeginFrameStopsWhenPollRequestsClose
+181/198 Test #4147: RuntimeFrameLoopContract.PlatformBeginFrameStopsWhenPollRequestsClose ........................................   Passed    0.00 sec
+        Start 4148: RuntimeFrameLoopContract.RenderFrameOrdersPromotedRendererPhases
+182/198 Test #4148: RuntimeFrameLoopContract.RenderFrameOrdersPromotedRendererPhases .............................................   Passed    0.00 sec
+        Start 4149: RuntimeFrameLoopContract.RenderFrameSkipsExtractionWhenBeginFrameFails
+183/198 Test #4149: RuntimeFrameLoopContract.RenderFrameSkipsExtractionWhenBeginFrameFails .......................................   Passed    0.00 sec
+        Start 4150: RuntimeFrameLoopContract.MaintenanceOrdersTransferBeforeAssetAndGeometryMaintenance
+184/198 Test #4150: RuntimeFrameLoopContract.MaintenanceOrdersTransferBeforeAssetAndGeometryMaintenance ..........................   Passed    0.00 sec
+        Start 4151: RuntimeFrameLoopContract.OperationalTransitionWaitsIdleThenRebuildsRendererOnce
+185/198 Test #4151: RuntimeFrameLoopContract.OperationalTransitionWaitsIdleThenRebuildsRendererOnce ..............................   Passed    0.00 sec
+        Start 4152: RuntimeFrameLoopContract.OperationalTransitionNoOpsUntilDeviceBecomesOperational
+186/198 Test #4152: RuntimeFrameLoopContract.OperationalTransitionNoOpsUntilDeviceBecomesOperational .............................   Passed    0.00 sec
+        Start 4153: RuntimeFrameLoopContract.OperationalTransitionDoesNotMarkRendererWhenRebuildFails
+187/198 Test #4153: RuntimeFrameLoopContract.OperationalTransitionDoesNotMarkRendererWhenRebuildFails ............................   Passed    0.00 sec
+        Start 4154: RuntimeFrameLoopContract.ShutdownOrdersRuntimeModulesAndSubsystemTeardown
+188/198 Test #4154: RuntimeFrameLoopContract.ShutdownOrdersRuntimeModulesAndSubsystemTeardown ....................................   Passed    0.04 sec
+        Start 4156: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction
+189/198 Test #4156: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction ....................................   Passed    0.04 sec
+        Start 4157: RuntimeSandboxAcceptance.CameraControllerProducesFiniteInvertibleFrameCamera
+190/198 Test #4157: RuntimeSandboxAcceptance.CameraControllerProducesFiniteInvertibleFrameCamera .................................   Passed    0.00 sec
+        Start 4158: RuntimeSandboxAcceptance.ComposedCameraModuleDrivesFiniteFirstFrame
+191/198 Test #4158: RuntimeSandboxAcceptance.ComposedCameraModuleDrivesFiniteFirstFrame ..........................................   Passed    0.04 sec
+        Start 4159: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily
+192/198 Test #4159: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily ........................................   Passed    0.04 sec
+        Start 4160: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene
+193/198 Test #4160: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene ....................................   Passed    0.04 sec
+        Start 4161: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily
+194/198 Test #4161: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily .......................................   Passed    0.04 sec
+        Start 4162: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity
+195/198 Test #4162: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity ..................................   Passed    0.04 sec
+        Start 4163: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+196/198 Test #4163: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick ...............................................   Passed    0.04 sec
+        Start 4164: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+197/198 Test #4164: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush ...............................................   Passed    0.04 sec
+        Start 4165: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+198/198 Test #4165: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame .................................   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 198
+
+Label Time Summary:
+contract       =   3.20 sec*proc (120 tests)
+core           =   0.04 sec*proc (3 tests)
+ecs            =   0.00 sec*proc (1 test)
+geometry       =   0.01 sec*proc (1 test)
+graphics       =   1.89 sec*proc (101 tests)
+integration    =   1.79 sec*proc (56 tests)
+physics        =   0.00 sec*proc (1 test)
+runtime        =   4.70 sec*proc (142 tests)
+unit           =   0.08 sec*proc (22 tests)
+
+Total Test time (real) =   6.36 sec

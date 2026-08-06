@@ -1,0 +1,436 @@
+schema_version: 1
+task_id: RUNTIME-217
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T18:44:59Z'
+claim_eligible: false
+source:
+  base_ref: e067e9f7a1e12ba5a70e4102d2896328376eec4b
+  base_revision: e067e9f7a1e12ba5a70e4102d2896328376eec4b
+  head_revision: a95ca02874cf86b889cafb535ce9703a4ca9aa45
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: b1b5aef41ade26966dc3cfe8d76bf175940e0f76f97ca0bd50c737ffb5bd4a33
+  - path: docs/architecture/runtime.md
+    sha256: 44f92c3683fc5e65f85048d21c6cbfbeccc73b804e10eb98dd0dd821ff877e91
+  - path: docs/architecture/test-strategy.md
+    sha256: 6b5c9c94fcc916d3f43c6e96f8ea04491d9f7eb88ccc78a2743404acc67d3f1f
+  - path: docs/migration/nonlegacy-parity-matrix.md
+    sha256: b98931bf38f3722e5bdc528a0c08bae79b5763129e12b77b93e43128a97cbee8
+  - path: src/core/CMakeLists.txt
+    sha256: b1aedf103ec7a1c54beccf39982f626fd3f6c60b0241871187e49780a733ca25
+  - path: src/core/Core.FrameLoop.cpp
+    sha256: null
+  - path: src/core/Core.FrameLoop.cppm
+    sha256: null
+  - path: src/graphics/assets/README.md
+    sha256: 092dc88dc948fdb5c51538cec8b1f843c2608b6e187a6504f2f25647e232a038
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp
+    sha256: 22870b0b2f784c0e9efb088b260e8b9d0198db607a734ce70697ebab7b1a70f3
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm
+    sha256: 12a70fc66e76a4d2e1440bd1b6938b2ebdd29bc0174682db797016bc04580f4a
+  - path: src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp
+    sha256: ad99ddae6ca460507aad2df13374551e1b96b3509ca8c33f4f1a8f3fb9d97170
+  - path: src/runtime/Kernel/Runtime.Engine.cpp
+    sha256: 33ff0b5f0f809f9973bd62cd50f66b77138fcc46c82ba49165a34d434ea51ffc
+  - path: src/runtime/README.md
+    sha256: 6fc85f3b6f951123229e82e3e606e878b1b763b131cb87a28cf0cc8d66ea3b63
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 00dce93101f8986942c7a0f0d3959416e53457111bd66116c2206290a7a26638
+  - path: tasks/active/README.md
+    sha256: 8a69305b3755abb082fd270adcc40db4e5fbd526b89a589d37b6d9112bd0d42d
+  - path: tasks/backlog/README.md
+    sha256: 0182e72f521caf2613fee1e162d4bb028a8a45ef33fc90c354d869984dfc2166
+  - path: tasks/backlog/architecture/README.md
+    sha256: f8c0fbd92942feefa325a6eb3bea04f16155ed4fa0b52d20ac88363130601263
+  - path: tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+    sha256: 4cbf057384794bee3e057a10e5c0d5e26bbd34983b660bd3be2ca88fe9c0516b
+  - path: tasks/backlog/bugs/index.md
+    sha256: 8a7cf2899c3911305f55ea5dbe767cc01fb516e9ac000d469f0cffa5b159951f
+  - path: tasks/backlog/runtime/README.md
+    sha256: 1267093cb7dc79c13fb80920f161cb5d4e1e4b32ff0a7764b507d61cb31032fa
+  - path: tasks/done/BUG-135-lop-benchmark-missing-manual-ctest-classification.md
+    sha256: 6a5bed13d56dd742846ea5fa481d44827f6cb24be13ff64d3fcd60ce38901dec
+  - path: tasks/done/BUG-136-test-gate-routing-affected-case-baseline-drift.md
+    sha256: e3c5aca4f96b1013563549913068e003fb521be76ef873a0d33b1b8c39900f86
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 1640b5d7d56a4e3c716dba04c3f517bb83929f4825be78dc51f9c1e8b2536390
+  - path: tasks/done/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md
+    sha256: 14178f8679403050329690054dbeb7d473ba099995b2da558715b5857af949e1
+  - path: tasks/evidence/BUG-135/commands/diff-check.json
+    sha256: a0ad71cc48ea2d4387cc02e96ab36b19fe6dc00dbf8de43178b35ffaaec321e9
+  - path: tasks/evidence/BUG-135/commands/diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/doc-links.json
+    sha256: 02c055ecb60580e8168836a051c1c1301a8346e4b40d1ac3a105e687a69b44a7
+  - path: tasks/evidence/BUG-135/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/doc-links.stdout.log
+    sha256: 296baa47c0ace8f9712960db7cdf528f0b8d9d45b90f8cc9c9858632fc2ff7a6
+  - path: tasks/evidence/BUG-135/commands/routing-all-live.json
+    sha256: 9d92ae5f856cd70023fdea4b318d8e990cfa141e4fc5a76740a01d4b0a647cbb
+  - path: tasks/evidence/BUG-135/commands/routing-all-live.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/routing-all-live.stdout.log
+    sha256: 10f5b7656519e2702622797eb410c8ca3ec9000470914ee9051bed7ceb4c2ad3
+  - path: tasks/evidence/BUG-135/commands/routing-cpu-live.json
+    sha256: 904ca863ba5d3fd441ebd5e6d2e2b9f2f9384991013b1b429710760b576f33ae
+  - path: tasks/evidence/BUG-135/commands/routing-cpu-live.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/routing-cpu-live.stdout.log
+    sha256: cea9638bb39f831d4ee2bbfb437a5372d3d9d140d08aa396427764456631d3fb
+  - path: tasks/evidence/BUG-135/commands/routing-self-test.json
+    sha256: 2079ded1557e16fbbad3b24a33244431a7842d914eeef16d5c7ae112633e9d7f
+  - path: tasks/evidence/BUG-135/commands/routing-self-test.stderr.log
+    sha256: 919e93a935131f2930abe307f3d9b8cc4efd312e291dde776ad911de76ff775d
+  - path: tasks/evidence/BUG-135/commands/routing-self-test.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/session-brief.json
+    sha256: f2fc99632acdc14a66ce4253741d9fb62428c150fbbfaa4e334b38ca731f31f1
+  - path: tasks/evidence/BUG-135/commands/session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/BUG-135/commands/task-policy.json
+    sha256: c38716d4c69ab71f4a4f0312ae8d16e5aabf58129375c23a6fa2541fa9e8128d
+  - path: tasks/evidence/BUG-135/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/task-policy.stdout.log
+    sha256: 83d0cd4d15939e8de594d596f952db5b340465fd45c2c8d27ce3e13f25c7b56f
+  - path: tasks/evidence/BUG-135/commands/task-schema.json
+    sha256: e0fa1cc852459aac00da1d348c6dc65042beb17304b7f5a6cdc19a0cff1e30b8
+  - path: tasks/evidence/BUG-135/commands/task-schema.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/task-schema.stdout.log
+    sha256: 991d720ba6661d78eb34016fb798d21a46d2844d98d116b16bd2d94f36481f8e
+  - path: tasks/evidence/BUG-135/commands/task-state-links.json
+    sha256: d2f0e1030107abdc010feb7f5d7999c2314fae9c876eb8315f0003dcf0e2dd90
+  - path: tasks/evidence/BUG-135/commands/task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/task-state-links.stdout.log
+    sha256: bd555fffc46937360ef8e87ff404861daea861d33bb487914fc7d8c0873fb031
+  - path: tasks/evidence/BUG-135/commands/test-layout.json
+    sha256: 256306773d1c608ab3f4edea2b0b7ebad939fa00ea10a2f569d4b91739872658
+  - path: tasks/evidence/BUG-135/commands/test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-135/commands/test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/BUG-135/report.yaml
+    sha256: 7d097c6376b119e706fae8c21aa17515efb78121b3bdc028aff86453fbd6e162
+  - path: tasks/evidence/BUG-136/commands/diff-check.json
+    sha256: dde707338994fb4f081aaef57a827c6d0c0261f077795dbcf75cb0f3651a277c
+  - path: tasks/evidence/BUG-136/commands/diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/doc-links.json
+    sha256: 0a49139a7d26ce43b8242696a7c1b2c8aaf41f8c7ae3dbe6b62172d836b64288
+  - path: tasks/evidence/BUG-136/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/doc-links.stdout.log
+    sha256: 560e597bd73c96899261fe287d28a846719a3ede7ec74df765146f863d8c2cba
+  - path: tasks/evidence/BUG-136/commands/routing-all-live.json
+    sha256: 0d859adc493b0901e8825b326fac5846ac15b5478ae63b626b1c8a5882b54fc3
+  - path: tasks/evidence/BUG-136/commands/routing-all-live.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/routing-all-live.stdout.log
+    sha256: 10f5b7656519e2702622797eb410c8ca3ec9000470914ee9051bed7ceb4c2ad3
+  - path: tasks/evidence/BUG-136/commands/routing-cpu-live.json
+    sha256: c6c7c28e58bc8507ff80b63b3e9039431c4d7bc7e138c12f2fa59151808eb052
+  - path: tasks/evidence/BUG-136/commands/routing-cpu-live.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/routing-cpu-live.stdout.log
+    sha256: cea9638bb39f831d4ee2bbfb437a5372d3d9d140d08aa396427764456631d3fb
+  - path: tasks/evidence/BUG-136/commands/routing-self-test.json
+    sha256: 5939f2e2e39796c65505dfc1210af4a0469032ff8108487a5692f034ae77a425
+  - path: tasks/evidence/BUG-136/commands/routing-self-test.stderr.log
+    sha256: 919e93a935131f2930abe307f3d9b8cc4efd312e291dde776ad911de76ff775d
+  - path: tasks/evidence/BUG-136/commands/routing-self-test.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/session-brief.json
+    sha256: 75cf490fe46a4ba130d8b62fc4c724b2e2bae0c9e9883ae2995d41c057ba7819
+  - path: tasks/evidence/BUG-136/commands/session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/BUG-136/commands/task-policy.json
+    sha256: 4f7c6001f6f80301778892a3750955a7c2d84c5c20a669030adb1f0307e8f899
+  - path: tasks/evidence/BUG-136/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/task-policy.stdout.log
+    sha256: 0d86a4cdd2ddb69f3ad114b752b78c77cf880303612961ab732aa7bf23d1c788
+  - path: tasks/evidence/BUG-136/commands/task-schema.json
+    sha256: b1cf3cdc04b3ef605dedb2e1931522eb7b88d68cb432d5786fe15582bb1bf6de
+  - path: tasks/evidence/BUG-136/commands/task-schema.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/task-schema.stdout.log
+    sha256: 991d720ba6661d78eb34016fb798d21a46d2844d98d116b16bd2d94f36481f8e
+  - path: tasks/evidence/BUG-136/commands/task-state-links.json
+    sha256: cfac457979c5144336a0a02df5627f14665bf5c8f89cce3c32b87ed80496b4c9
+  - path: tasks/evidence/BUG-136/commands/task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/task-state-links.stdout.log
+    sha256: bd555fffc46937360ef8e87ff404861daea861d33bb487914fc7d8c0873fb031
+  - path: tasks/evidence/BUG-136/commands/test-layout.json
+    sha256: 4256f419849d49a0b4298044219a22b1617fb266d7a91e9dd58b8126e5822372
+  - path: tasks/evidence/BUG-136/commands/test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/BUG-136/report.yaml
+    sha256: 3ba2f5119f30af15bf9fa0b8561ccee9d0aa49f636ed615f194a8e49194ff7ce
+  - path: tests/README.md
+    sha256: c952e681886262874b44855eea083bb59e3c76295b4d6a4eddbdc6bdc5c634f4
+  - path: tests/contract/runtime/Test.AssetWorkflowModule.cpp
+    sha256: 27da669f126f613778cc07a34c535d8b8d7fac438a6b30eee1f9a57c2d05a063
+  - path: tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp
+    sha256: fe1c5a22e509deca64e6582e4f5eaf116f3571fd2bce201601e96a8c2f8f6d2b
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: 28e3b746900453733881c60c4b03e6dd4e5dd59799b63b06f87cebbb0b950f12
+  - path: tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+    sha256: a77fd439a8b96cdb151273331f3547528299229567ac684d23528b27a8c42b43
+  - path: tests/contract/runtime/Test.RuntimeFrameLoopContract.cpp
+    sha256: 59df59722843e788fb0d7a16ec630cd773398916c8711868f61e8e5fe48b69eb
+  - path: tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp
+    sha256: 1cf93aca02cbca7a8fa14fc62712a4516aa114ffe3f7f5c03f8320c84445c65f
+  - path: tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+    sha256: 0598b3b01772c19342fc3c9e201c5c9179529b4832424a70b65810fcd93d0a2b
+  - path: tests/regression/tooling/Test.TestGateRouting.py
+    sha256: 7d31f7e8b739b16f66105b84bc14ecbb433c240ee548bdd70999d55d979c7afe
+  content_digest: 352b4db402ba6c8562f5a6086428d8b08b25de342d565e30088de84109fe82a2
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/runtime.md
+  - docs/architecture/test-strategy.md
+  - docs/migration/nonlegacy-parity-matrix.md
+  - src/core/CMakeLists.txt
+  - src/core/Core.FrameLoop.cpp
+  - src/core/Core.FrameLoop.cppm
+  - src/graphics/assets/README.md
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm
+  - src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp
+  - src/runtime/Kernel/Runtime.Engine.cpp
+  - src/runtime/README.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/architecture/README.md
+  - tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/BUG-135-lop-benchmark-missing-manual-ctest-classification.md
+  - tasks/done/BUG-136-test-gate-routing-affected-case-baseline-drift.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md
+  - tasks/evidence/BUG-135/commands/diff-check.json
+  - tasks/evidence/BUG-135/commands/diff-check.stderr.log
+  - tasks/evidence/BUG-135/commands/diff-check.stdout.log
+  - tasks/evidence/BUG-135/commands/doc-links.json
+  - tasks/evidence/BUG-135/commands/doc-links.stderr.log
+  - tasks/evidence/BUG-135/commands/doc-links.stdout.log
+  - tasks/evidence/BUG-135/commands/routing-all-live.json
+  - tasks/evidence/BUG-135/commands/routing-all-live.stderr.log
+  - tasks/evidence/BUG-135/commands/routing-all-live.stdout.log
+  - tasks/evidence/BUG-135/commands/routing-cpu-live.json
+  - tasks/evidence/BUG-135/commands/routing-cpu-live.stderr.log
+  - tasks/evidence/BUG-135/commands/routing-cpu-live.stdout.log
+  - tasks/evidence/BUG-135/commands/routing-self-test.json
+  - tasks/evidence/BUG-135/commands/routing-self-test.stderr.log
+  - tasks/evidence/BUG-135/commands/routing-self-test.stdout.log
+  - tasks/evidence/BUG-135/commands/session-brief.json
+  - tasks/evidence/BUG-135/commands/session-brief.stderr.log
+  - tasks/evidence/BUG-135/commands/session-brief.stdout.log
+  - tasks/evidence/BUG-135/commands/task-policy.json
+  - tasks/evidence/BUG-135/commands/task-policy.stderr.log
+  - tasks/evidence/BUG-135/commands/task-policy.stdout.log
+  - tasks/evidence/BUG-135/commands/task-schema.json
+  - tasks/evidence/BUG-135/commands/task-schema.stderr.log
+  - tasks/evidence/BUG-135/commands/task-schema.stdout.log
+  - tasks/evidence/BUG-135/commands/task-state-links.json
+  - tasks/evidence/BUG-135/commands/task-state-links.stderr.log
+  - tasks/evidence/BUG-135/commands/task-state-links.stdout.log
+  - tasks/evidence/BUG-135/commands/test-layout.json
+  - tasks/evidence/BUG-135/commands/test-layout.stderr.log
+  - tasks/evidence/BUG-135/commands/test-layout.stdout.log
+  - tasks/evidence/BUG-135/report.yaml
+  - tasks/evidence/BUG-136/commands/diff-check.json
+  - tasks/evidence/BUG-136/commands/diff-check.stderr.log
+  - tasks/evidence/BUG-136/commands/diff-check.stdout.log
+  - tasks/evidence/BUG-136/commands/doc-links.json
+  - tasks/evidence/BUG-136/commands/doc-links.stderr.log
+  - tasks/evidence/BUG-136/commands/doc-links.stdout.log
+  - tasks/evidence/BUG-136/commands/routing-all-live.json
+  - tasks/evidence/BUG-136/commands/routing-all-live.stderr.log
+  - tasks/evidence/BUG-136/commands/routing-all-live.stdout.log
+  - tasks/evidence/BUG-136/commands/routing-cpu-live.json
+  - tasks/evidence/BUG-136/commands/routing-cpu-live.stderr.log
+  - tasks/evidence/BUG-136/commands/routing-cpu-live.stdout.log
+  - tasks/evidence/BUG-136/commands/routing-self-test.json
+  - tasks/evidence/BUG-136/commands/routing-self-test.stderr.log
+  - tasks/evidence/BUG-136/commands/routing-self-test.stdout.log
+  - tasks/evidence/BUG-136/commands/session-brief.json
+  - tasks/evidence/BUG-136/commands/session-brief.stderr.log
+  - tasks/evidence/BUG-136/commands/session-brief.stdout.log
+  - tasks/evidence/BUG-136/commands/task-policy.json
+  - tasks/evidence/BUG-136/commands/task-policy.stderr.log
+  - tasks/evidence/BUG-136/commands/task-policy.stdout.log
+  - tasks/evidence/BUG-136/commands/task-schema.json
+  - tasks/evidence/BUG-136/commands/task-schema.stderr.log
+  - tasks/evidence/BUG-136/commands/task-schema.stdout.log
+  - tasks/evidence/BUG-136/commands/task-state-links.json
+  - tasks/evidence/BUG-136/commands/task-state-links.stderr.log
+  - tasks/evidence/BUG-136/commands/task-state-links.stdout.log
+  - tasks/evidence/BUG-136/commands/test-layout.json
+  - tasks/evidence/BUG-136/commands/test-layout.stderr.log
+  - tasks/evidence/BUG-136/commands/test-layout.stdout.log
+  - tasks/evidence/BUG-136/report.yaml
+  - tests/README.md
+  - tests/contract/runtime/Test.AssetWorkflowModule.cpp
+  - tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  - tests/contract/runtime/Test.RuntimeFrameLoopContract.cpp
+  - tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp
+  - tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+  - tests/regression/tooling/Test.TestGateRouting.py
+  layers:
+  - core
+  - docs
+  - graphics
+  - runtime
+  - tasks
+  - tests
+  modules:
+  - Extrinsic.Core.FrameLoop (removed)
+  - Extrinsic.Runtime.AssetWorkflowModule
+  - Extrinsic.Runtime.Engine
+extension_seam: None; Runtime Engine is the sole present composition owner and calls concrete subsystem/service
+  operations directly.
+future_change_plan: Reintroduce a shared lifecycle boundary only when a present second production composition
+  root or test-double boundary needs the same complete ordered contract.
+acceptance:
+- criterion: '`Extrinsic.Core.FrameLoop`, all six hook interface names, its three'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Engine behavior and ordering remain identical under owner-level tests.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Runtime file count does not increase and no replacement public or private
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Optional AssetWorkflow omission and lifecycle remain operational.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the revision-bound deletion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-217/commands/build-tests.json
+- receipt: tasks/evidence/RUNTIME-217/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-217/commands/configure-ci-after-discovery-race.json
+- receipt: tasks/evidence/RUNTIME-217/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-217/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-217/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-217/commands/docs-sync.json
+- receipt: tasks/evidence/RUNTIME-217/commands/focused-cpu-v2.json
+- receipt: tasks/evidence/RUNTIME-217/commands/focused-cpu.json
+- receipt: tasks/evidence/RUNTIME-217/commands/full-cpu-v2.json
+- receipt: tasks/evidence/RUNTIME-217/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-217/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-217/commands/module-inventory.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-diff-check.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-doc-links-final.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-doc-links.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-docs-sync-final.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-docs-sync.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-routing-all-live.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-routing-cpu-live.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-routing-self-test.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-session-brief.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-task-policy.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-task-schema.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-test-layout-final.json
+- receipt: tasks/evidence/RUNTIME-217/commands/review-r2-test-layout.json
+- receipt: tasks/evidence/RUNTIME-217/commands/root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-217/commands/routing-all-live-v2.json
+- receipt: tasks/evidence/RUNTIME-217/commands/routing-cpu-live-v2.json
+- receipt: tasks/evidence/RUNTIME-217/commands/runtime-file-count.json
+- receipt: tasks/evidence/RUNTIME-217/commands/session-brief.json
+- receipt: tasks/evidence/RUNTIME-217/commands/task-policy.json
+- receipt: tasks/evidence/RUNTIME-217/commands/task-schema.json
+- receipt: tasks/evidence/RUNTIME-217/commands/task-state-links.json
+- receipt: tasks/evidence/RUNTIME-217/commands/test-layout.json
+changed_public_contracts:
+- Removed Extrinsic.Core.FrameLoop, its six hook interfaces, three result/phase records, and five Execute*
+  ordering functions.
+- AssetWorkflowModule now exposes concrete RunFrameMaintenance() through its already-published service;
+  redundant IAssetFrameHooks publication is removed.
+diagnostics_and_previews:
+- Nine owner-level frame-loop contracts plus existing real-Engine lifecycle/omission suites preserve platform,
+  render, maintenance, operational-transition, shutdown, and pool ordering without wrapper doubles.
+- Runtime remains at 168 files and the generated inventory drops from 383 to 382 modules; no replacement
+  aggregate or frame-loop module was introduced.
+- BUG-135 and BUG-136 were separately claimed, implemented, retired, and evidence-sealed when RUNTIME-217
+  verification exposed their pre-existing routing blockers; the authorized linear blocker batch is visible
+  in this report surface.
+- The initial parallel evidence-only CTest pair raced PRE_TEST discovery files; its failed routing receipts
+  are retained under diagnostics and serial v2 receipts pass at the unchanged code candidate. Archived
+  JSON path fields intentionally retain their original pre-archive commands/ locations.
+- Independent review revision 1 found stale BUG-136 case-count prose; revision 2 reconciles both authoritative
+  test documents to the checked 39-case baseline and clarifies the retired Runtime hook-adapter wording.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Opt-in GPU/Vulkan execution was not rerun; no RHI, backend, shader, resource layout, command recording,
+  or device-selection behavior changed.
+- ASan/UBSan variants were not rerun; this deletion preserves the same direct object ownership and call
+  order, while owner-level and complete CPU execution cover initialization, omission, frame, and shutdown
+  paths.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No RHI, Vulkan backend, shader, resource, command-recording, or device-selection behavior changed;
+    focused and complete CPU owner-level execution covers the relocated composition.
+- check: asan-ubsan
+  reason: No allocation, pointer ownership, asynchronous lifetime, container, or backend lifetime changed;
+    direct operations are byte-for-byte the former adapter bodies and complete CPU lifecycle coverage
+    is green.
+artifacts:
+- path: tasks/done/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md
+  sha256: 14178f8679403050329690054dbeb7d473ba099995b2da558715b5857af949e1
+  kind: file
+- path: docs/api/generated/module_inventory.md
+  sha256: b1b5aef41ade26966dc3cfe8d76bf175940e0f76f97ca0bd50c737ffb5bd4a33
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-217/handoff.jsonl
+review: tasks/evidence/RUNTIME-217/reviews.jsonl

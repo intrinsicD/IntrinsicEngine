@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 3031,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:29:46Z",
+  "label": "configure-ci-after-discovery-race",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:29:43Z",
+  "stderr_path": "tasks/evidence/RUNTIME-217/commands/configure-ci-after-discovery-race.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-217/commands/configure-ci-after-discovery-race.stdout.log",
+  "stdout_sha256": "ad24a57b1bf7b6c1266140625d3ecd6f73f553f90773bce9b1076ac18ebfe819",
+  "task_id": "RUNTIME-217"
+}
