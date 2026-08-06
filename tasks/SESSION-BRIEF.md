@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-135` — LOP benchmark lacks manual CTest classification (tasks/active/BUG-135-lop-benchmark-missing-manual-ctest-classification.md)
 - `RUNTIME-217` — Inline single-use Core frame-loop contracts (tasks/active/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md)
 
 ## Theme B — Rendering modernization
