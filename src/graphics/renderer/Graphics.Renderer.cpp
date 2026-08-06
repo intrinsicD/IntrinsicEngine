@@ -1723,10 +1723,9 @@ namespace Extrinsic::Graphics
             // `UploadTriangles(...)` can lease a single growing host-
             // visible vertex buffer. Reset in `Shutdown()` before the
             // BufferManager so its `BufferLease` destructor observes a
-            // live manager. The default in-renderer implementation is
-            // CPU-functional against `MockDevice` for the contract gate;
-            // the Vulkan-tuned concrete implementation lands with
-            // GRAPHICS-077 Slice D.
+            // live manager. The same concrete RHI-backed helper serves Null
+            // and promoted Vulkan devices; CPU contract tests exercise it
+            // against `MockDevice`.
             m_TransientDebugUploadHelper =
                 std::make_unique<TransientDebugUploadHelper>(device, *m_Subsystems.BufferManager());
             // GRAPHICS-078 Slice B — backend-local visualization-overlay
@@ -10927,9 +10926,8 @@ namespace Extrinsic::Graphics
         // manager.
         std::unique_ptr<IVisualizationOverlayUploadHelper> m_VisualizationOverlayUploadHelper;
         std::unique_ptr<VisualizationPropertyBufferResidency> m_VisualizationPropertyBufferResidency;
-        // GRAPHICS-079 Slice C — renderer-owned ImGui transient upload helper.
-        // Held as an interface pointer for parity with the transient-debug and
-        // visualization-overlay helpers and reset before BufferManager teardown.
+        // GRAPHICS-079 Slice C — renderer-owned ImGui transient upload helper,
+        // reset before BufferManager teardown.
         std::unique_ptr<IImGuiUploadHelper> m_ImGuiUploadHelper;
         // GRAPHICS-119 Slice C.5: pass recording can eventually run on worker
         // threads, so renderer-owned dynamic upload helpers share one guard for
