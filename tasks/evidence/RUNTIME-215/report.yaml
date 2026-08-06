@@ -1,0 +1,647 @@
+schema_version: 1
+task_id: RUNTIME-215
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T07:08:24Z'
+claim_eligible: false
+source:
+  base_ref: d5d86a8cef353dfd7be927edafe839bbeafda761
+  base_revision: d5d86a8cef353dfd7be927edafe839bbeafda761
+  head_revision: 200870ac8e3cfc3cd8178a76e24d76cbae19bc08
+  branch: runtime215-completion
+  worktree: /tmp/intrinsic-runtime215-completion.ZA5LJe
+  dirty: false
+  surface:
+  - path: ara/logic/claims.md
+    sha256: 0bd62c5152d687eb33dc7519224dd98060f6d507d319de7049c13db1be821b17
+  - path: ara/logic/solution/architecture.md
+    sha256: 9c162ca56cbfae9389cb13c6e5779b40e7358d14f40ad49be11538eb6320d485
+  - path: ara/logic/solution/constraints.md
+    sha256: 43933c6e82b15a26316b389c8ffc6f332d84cfd3c3ac9b156840f11650676a8d
+  - path: ara/logic/solution/heuristics.md
+    sha256: 21d27482c652bac80651f08108e9e98195beb52ef39f2f4ce4e1120b5ae04036
+  - path: ara/staging/observations.yaml
+    sha256: 8bf225e4b54346597ced5748617a770dcef412867fa312fe457e5ba941b93087
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 289874d7d3f1ee274ab5fbbed8f83dac813e626fabce8b0ab3cf25fe51178457
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: fbc3b0cf182ecca864145f6776090057f5f9bdde6e700e6aba2dc5b1c9001d76
+  - path: ara/trace/sessions/2026-08-05_001.yaml
+    sha256: b37a44b5c8b239303d1080717977fd9c551712b232d34ae3d015402df87ee79b
+  - path: ara/trace/sessions/2026-08-06_001.yaml
+    sha256: 9236dc964e3115c38df8b091a22387ea69b54e4264c156b952c9cbfde5b4fac2
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: 5495e7ae8b056bde69ecf7eee8b123e70d08342d5c1761e806ad7701e1376177
+  - path: docs/adr/0015-reference-scene-bootstrap.md
+    sha256: 9d807715f0537cb24ae3d1a37aca95f3cfe3d20d4a71ad5baaf64a413280f187
+  - path: docs/api/generated/module_inventory.md
+    sha256: 3c0632a6260a0f01436a6cd94988e16f56af27b325b60c065f2b8b08b18c4cc4
+  - path: docs/architecture/ecs.md
+    sha256: 2c6d4a7b4925efa055bf146aae18cabd6cf21c5b1f8582e262dd2bc7e4feb68f
+  - path: docs/architecture/geometry-pipeline-modularity.md
+    sha256: 7cacee11ee05cd72a38c21405b7e84df8bce3ed5622f8b17ed02b254b2373c7b
+  - path: docs/benchmarking/ci-policy.md
+    sha256: 6ea55f9bff8ba28c895faf595c5aa7f027b4a0b8826723d38c243160b95c6c35
+  - path: docs/reports/2026-06-06-drift-audit.md
+    sha256: e867cea5f3627f009523a943df36b122b635dc2bc1cab159b3b90c99ec2b9111
+  - path: docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md
+    sha256: 99bcf5a195627d3da059cc84a2ad0f0a1b8d914cceef540b8273b2ee6df43af0
+  - path: docs/reviews/2026-05-30-sandbox-app-remaining-gates.md
+    sha256: 93c21ef67a172f9ac1b8194a82f34a137ed95468320dc2b848472a423161c6a8
+  - path: docs/reviews/2026-06-02-repository-quality-assessment.md
+    sha256: ee4252bb1a93585d398bbb35036dd3578cb5c96cc5bda45c2650ced0bb163b81
+  - path: docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md
+    sha256: a5d58e8145e1a670935354c34c1570260500bae02a03ca7b2519930efc80d1e0
+  - path: docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+    sha256: 402395477db0b63aad2557f014488fa99fd21792caa6969cb15e01f55beefacc
+  - path: docs/roadmap.md
+    sha256: 3e3ed036b18d9827b619252634216e34fda5c23d929a1bd4173ecbbb3e668766
+  - path: src/ecs/Components/README.md
+    sha256: 442370fcf5d5d4760d1cfa248fca8d8a42ee3f0527756ce133de552c0bbc4056
+  - path: src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cpp
+    sha256: f6384b723a68caadb1a2fa2c3aba7d8ce8fb910c156a228fdda33e49f0e004df
+  - path: src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cppm
+    sha256: be70ca41afd76e949e042b7fc99d20c245c083d7345d07620eb919bb33990856
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+    sha256: 2fbc7509a933d8b61efc7962e5b1efbc243c1370fed0264a27a09433568500f1
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm
+    sha256: 44104d7db3f3ad8c08b846b16032bb3da4381325d8c47680a2d6619421f572da
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+    sha256: 388b247640fb73d5bfac371a4011113f4e570f3e23b53482a45880723d2f7eee
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm
+    sha256: bcbb615d491d2f4627b5086a8ab3829aee998b9cda54fd40379051963669491d
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+    sha256: 132e4370bdd5387b7d2107471c464c61c0d55471af2152be3ef2481d5b68e4fe
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+    sha256: ce6566d57b903cb2e0015908e674f5400d2022ca1dabe0c0c34958e7cbe62f96
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cpp
+    sha256: e8bb4b239f0e5ce17be3a7670f4d786ff43084cb49387f872265857f155332c4
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cppm
+    sha256: c0cac4dd3336701db72eb4b4d8e4d42ceb4f523c6de91f430907543dc6adacec
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp
+    sha256: 5f6641f8eaad674961ca57735e649451e6c8c9875782993771258416cf5152ac
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm
+    sha256: 985b3e409fd7e9669ad8cd74613acd3ae3907025a05f4403996685948caa8516
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp
+    sha256: a1d8d403ad08e766ae3ee8b9e4e7e94633e24b2580aa18d1577df4f49a1a8e93
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cppm
+    sha256: 76a485013662e2ffeadc0e2ebdd21cf643e165f93fd5bcd2b7ca206fadb126d9
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cpp
+    sha256: f682dd5c1cff0489e3e49f8aaafda35deb712e32fd1a9688c6a2ff8171898815
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cppm
+    sha256: 2934d0a737b57d56fb6db3c5b96f5041403004c55f6c2a3ee64174d934238192
+  - path: src/runtime/CMakeLists.txt
+    sha256: 5143b4fd15f9c03a13891d36c6c6abdc4a0ef6c1878aa03a10baf1271e922409
+  - path: src/runtime/Config/Runtime.EngineConfigBoot.cpp
+    sha256: 7127ca3e56f4b244bcdf7a6b7c73b7cf0f5166e11269d3983d635720543416e5
+  - path: src/runtime/Config/Runtime.EngineConfigBoot.cppm
+    sha256: 3da7e8a1f35c6b95903a82e90f7a4356ff5346df3711c8722ee07aa1ca3a684d
+  - path: src/runtime/Config/Runtime.EngineConfigControl.cpp
+    sha256: 079dbbcd0d1f9a8159a142f39d14279220d6499b7bda2900d681b55f52275388
+  - path: src/runtime/Config/Runtime.EngineConfigControl.cppm
+    sha256: ba3922a805f80196dcba984438802199f7a778cffbcd02c377f3257a390e145b
+  - path: src/runtime/Config/Runtime.RenderRecipeActivation.cpp
+    sha256: 5b6ce5f6fff582d298835980179d3cd98de42c0beaa05f48efc0048790f81689
+  - path: src/runtime/Config/Runtime.RenderRecipeActivation.cppm
+    sha256: 18dddd3145878f9bdc83949526045c1c2e5ba9e1a287ae2c4cc93ecc349c3f75
+  - path: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: 6b34d73a84855fa571531da951ca67dfabf974d2d0dc5ce1327786499d69588e
+  - path: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+    sha256: 19daf8941f49a5d561d8f8fa1c9231c83d74843fd497af1a50dce5f444082b9d
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp
+    sha256: 64ed24132325e61ffec41eff34d6178e5035906d47a7f6b8efd8c02b83751989
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 6fbaa126c8aea4722b1e454aef9f002e707f19d204684c8f438aeed36c575f91
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: 523f70a60d274588ca9c7926073051611e7877739598c1b687070cd3bf26a468
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    sha256: 3c8b5c0d832b602af02fecb04cc8c20b5d08910bab3c9646da58180c80b04681
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: aa5e762180a915d64feda0b632ce383ce8fd8d33006100a700dc1e69e42cdc42
+  - path: src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+    sha256: 583d3d8241585a97ad301ad49be879ddf98b48d1bb407570b1a9dc929c8669b4
+  - path: src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Debug.cpp
+    sha256: 789c87be63b3d84c944c1b8331cae5926fda7e0b3e6d424928204db7eab95305
+  - path: src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp
+    sha256: 6fb8185d27839d477251fe154cead45810ddb4e96edd20506b14000106f50ff0
+  - path: src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
+    sha256: 51e77ef092b0f05e8b1b6347f1da3a11d921fc57fa45fed08069ad160f3e05d3
+  - path: src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm
+    sha256: 1be27bf1e1ab2bfd87ae3abf7f07126dc024a66833738ead2a9d3c9fc4a1f3ba
+  - path: src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+    sha256: 5871f78a08864650bd37c901209dd92a09e5f6372b9ce80ab7662db9aa2ed09b
+  - path: src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp
+    sha256: 0be65ae5067813dbeed063c1093f0a3a2a3dc20a32ab99be131db5597da2c824
+  - path: src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
+    sha256: 1b87d11bb291d955911969c3588d9890ce8eace62d20e59970b2fa9501ca09ca
+  - path: src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm
+    sha256: 5aad934dee4473c43459fc75c955ce7bc85d970151c2f66f455da2ea0ec0e4ff
+  - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+    sha256: 5ca8626782a45a6fbf3fb45e4d2e46bcc93b737ff7e7c23c9adedd1bfa89cfd1
+  - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Debug.cpp
+    sha256: c6d50a3d90f2ede74838d2c8a950303d85fdc722f5d44f767c91b2dde9c59dc6
+  - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
+    sha256: 494a245783d9e25d0de168c5989c1f7f098992d0e292e1c2afd884e0100ae5db
+  - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm
+    sha256: 3ab1164d7a76e76b0ca0a9fbcc7d66d650eeef03662405701ad65d9771ae96dd
+  - path: src/runtime/Editor/Runtime.EditorCommandHistory.cpp
+    sha256: 7e561772dfa1be6476edf3cd9f46242c39cccd33a6a2813c622d4730e9d39775
+  - path: src/runtime/Editor/Runtime.EditorCommandHistory.cppm
+    sha256: 54c2ae0c39a8fa25ce85517ff1bfaeb2c965599d41e3dca0f44b97ad83b52fd5
+  - path: src/runtime/Editor/Runtime.EditorCommon.Public.cpp
+    sha256: 5dc7d4069e858965de1cf8a418498c6436f0e05127e26468c4e61ac6fc4df2c5
+  - path: src/runtime/Editor/Runtime.EditorCommon.cppm
+    sha256: 3d979f4ffd49ff2c4da7d21edbb0051a34516b7e9c3d9d38051512cac3fc447e
+  - path: src/runtime/Editor/Runtime.EditorJobProjection.Public.cpp
+    sha256: f2114914073671074b8f45c164ca3cd6531a27416a8778615bc6dc59dbeed2b9
+  - path: src/runtime/Editor/Runtime.EditorJobProjection.cppm
+    sha256: b54568278d1db57b68b6304faf5ed42f20ec136db8177bb55fc0697e622be300
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cpp
+    sha256: f8836dcace2107a1b28aaf4f52a0e79c778b82d7c65ea94b854688579d7218f6
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm
+    sha256: bc89ee5e875be9fc2ca7390e14169b17f3924cf125901fe9b151748743609a3b
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: c13b459417edc023ecab1615f9a9d053f295b8130c6cb4699bf882a32001fd13
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+    sha256: 82f3f92bb7b3c999e72c54115c71b580a61761590f65e0c9c002d9a9eca83e64
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
+    sha256: f04019160f72dcabc439e62e35db9445cd6b608e0857c6d700f71bd667e13ca0
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: 9e6e5849e18dd339cfe2484bc12569b4cdc506f17b1b39e5799407b7a734e1d2
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: bd9609e160752c233ca6b85d01f4f7d8f78524e1c65b2a38386d4c12e2a0d54b
+  - path: src/runtime/Editor/internal/Runtime.EditorMutation.Internal.hpp
+    sha256: ba8ab54e58ff4abf48cab2bce71370f72f36621235b1de06c4d50a1a60e8b654
+  - path: src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
+    sha256: a7ad565bbc64931800cd128a49e3ae44ac2b4e5ac62aa6d2b665f293d9234e8d
+  - path: src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+    sha256: 148104862fa5101e901b542be329881874f3065d79ec668c805623a814b8cdef
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cpp
+    sha256: 10803ba4181137f6ea4ebe65fd48f3514f095821c03788407f5afc372b7ca7c8
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm
+    sha256: 25b2cc8a0f55704e3320b224e9aa34ffa13bac2ad92ab7ef0cb225cb0151a27f
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Graph.cpp
+    sha256: c51951525b31d2eccd88c4681b9c1a7cbec0b21596bfa4e2c40d470de16a3812
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp
+    sha256: 7f5620685f9fb819c59380fd0ec67e1bfde0c45f08b35bd5372537da9ba19939
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp
+    sha256: 1e4f7905f758f349a261493e094a837511953cde3f4c66c559e3217ab1f96300
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.PointCloud.cpp
+    sha256: d3fb558436106531ee9784a8ff1aa9a5b36a0f85100562a9fd0483fae90de17b
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Procedural.cpp
+    sha256: 99f85f8540f826e279200299b26ed82be809533fcf103c79b43a7db21377e791
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm
+    sha256: 87504514e0ecc966bbe97105f04b1b496d24a4354e72d479fe5809b65022d93a
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cpp
+    sha256: 8f85ecf78f066aa46e5e4c6afb5ab4a64ea62f0e9a4ade8aada6072d7d4e4735
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm
+    sha256: b577d8722d246181bc07cc7b1062716ceae94de9448df6b0ca302aefa15619ff
+  - path: src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm
+    sha256: 95a6585392ac5a7d80f8cc51d06374bcfdfe2a8fb359f63f3d88496f83da87de
+  - path: src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp
+    sha256: 410b30338c28b648af5cdc353d3049b39ccb4e15b7f336c38c864ee41aad9f64
+  - path: src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
+    sha256: 2b1ed637e096137328608b5aa34642eb4ee47a260671cfdc9df94ba9fa578af6
+  - path: src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cpp
+    sha256: 533b76104293d898344ce48e92f5bb69ad2a77b72d5f92f5e4972271f4fe338f
+  - path: src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm
+    sha256: b25776e56971ebcbb4348486fa86994b24510ed8e4cbbf1024ba667a17e22656
+  - path: src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cpp
+    sha256: 6ccdcff7411ecc4f2f4982ec891cff2b7540da7c206d4d815067599b52f8a20b
+  - path: src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cppm
+    sha256: 12876110be7c08f251e6905a5f07dae859befc54b9bbe4f0eeefd417575afffa
+  - path: src/runtime/GeometryIntegration/Runtime.VertexChannelBindings.cppm
+    sha256: ec30467b45fc5999e1e15bb8ff8ed3030d60b4fd2bfdd6bc45088c5affa91212
+  - path: src/runtime/GeometryIntegration/Runtime.VertexChannelStreams.cpp
+    sha256: 5746445df9fa871bcb27c42915b7ca3719d9753056136192464d0eaa472046eb
+  - path: src/runtime/GeometryIntegration/Runtime.VertexChannelStreams.cppm
+    sha256: 1c29050aab34424d6bc5f55c160c4022112ade81f183d5c7f83ff59a1b61e51f
+  - path: src/runtime/Gizmos/Runtime.GizmoInteraction.cpp
+    sha256: 296eb8a44431c31814d399b51615da8a14164a918dae1f2236d63c291495c28b
+  - path: src/runtime/Kernel/Runtime.AsyncWorkModule.cpp
+    sha256: ee195c82f5bd344b307833e05fddf7528c4ecadcab845a00c24aa9c9d9176d96
+  - path: src/runtime/Kernel/Runtime.AsyncWorkModule.cppm
+    sha256: 114d1a1f24c228d8e21651e7eec379b169a2d70768fada6ebf848caa9cc78194
+  - path: src/runtime/Kernel/Runtime.CommandBus.cpp
+    sha256: cee8745fbedafeebfc331a3e9c334a4348a47663b9bc8a4e5c30622b671d1ed2
+  - path: src/runtime/Kernel/Runtime.CommandBus.cppm
+    sha256: 166b769aa01ecc142bac840119cac281f3014dcc87678c29756aad5c4eba3329
+  - path: src/runtime/Kernel/Runtime.DeviceBootstrap.cpp
+    sha256: 98a3a2ff3d0b460108df6867d8c1fd309a796d0f1ef65e4e8d4a89a3b87c9aec
+  - path: src/runtime/Kernel/Runtime.DeviceBootstrap.cppm
+    sha256: cb2b1bfa2c1be15fa1002dbf581c4d00022f8ce9f32dc376f486b1c0961a2f8a
+  - path: src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp
+    sha256: 9f8832622c05bc7427e6f6cba44707da99c5b5fbbd3518c2e530a1f8f91bcf96
+  - path: src/runtime/Kernel/Runtime.Engine.cpp
+    sha256: b9f46e9b87d5510d4d18b69d8531cb47b6876b18b30a0c5303053dda28bb212e
+  - path: src/runtime/Kernel/Runtime.Engine.cppm
+    sha256: 1c1b2626e92a6f55db9e003cd100e0811ac794e2bb84ef7f6c3f6649c9a8ab83
+  - path: src/runtime/Kernel/Runtime.FramePacingDiagnostics.cpp
+    sha256: 2e1f571fb87d96b85c2772391a93f14e64a01541c84e3344960610f014a792e6
+  - path: src/runtime/Kernel/Runtime.FramePacingDiagnostics.cppm
+    sha256: b83119f9397ccd5a169a81e0b8f30bf131ac12decd44cfc10317278ccef11108
+  - path: src/runtime/Kernel/Runtime.InputActions.cpp
+    sha256: b1cbf21599ebcad371249b23dad58350ddc11a9a7fe49abfaf6b699235f22b84
+  - path: src/runtime/Kernel/Runtime.InputActions.cppm
+    sha256: 7fc581713934d0f46ad239189faacfdebd3769cce541d89c9c08ce032ae39a84
+  - path: src/runtime/Kernel/Runtime.JobService.cpp
+    sha256: c35dee2e03d929309620c6ac98da4ab4f0b651ec80115d35190092e919efbbea
+  - path: src/runtime/Kernel/Runtime.JobService.cppm
+    sha256: 90d05a9e59aa9ab39f49fdd803ba196dd1348cb8e3b4df6d291ef4340aa07698
+  - path: src/runtime/Kernel/Runtime.KernelEvents.cpp
+    sha256: 924840029118c5bd55635f014827ee8db9a3ee85128462fbb0d6d0f80093d0f9
+  - path: src/runtime/Kernel/Runtime.KernelEvents.cppm
+    sha256: d34a423844a8917c32a264ef16d444600687d94d55e9df4bb9708aa08a90d365
+  - path: src/runtime/Kernel/Runtime.Module.cppm
+    sha256: 1eacbe8a39551b28211557e7cacc2dd463c74ea668ceaaa31c7a4c1883a80d04
+  - path: src/runtime/Kernel/Runtime.ServiceRegistry.cpp
+    sha256: 85e888fc44978d99e4b23a2a9624ac1fb867ed36acb727ffafbae0013d6bd019
+  - path: src/runtime/Kernel/Runtime.ServiceRegistry.cppm
+    sha256: 48dabaf8f188cfb3e1d3efb18cd6f74d9decdb6586cb5c5546335bbac2b7eb01
+  - path: src/runtime/Kernel/Runtime.WorldHandle.cppm
+    sha256: ed20952afd0585df1d3979dac1ee0204919c4944d8cf7f2d19c17d6c71cac10f
+  - path: src/runtime/Kernel/Runtime.WorldRegistry.cpp
+    sha256: c34b9e3676d0162d1fdf0eec62873a0e6533e15fe0f29729cfadea13da600419
+  - path: src/runtime/Kernel/Runtime.WorldRegistry.cppm
+    sha256: e2f92e311232cbd8be59da07e1547c63316d182a4c3b510e2d435a49255bc550
+  - path: src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp
+    sha256: 3e818ed49a8ebe353e703058e09d48f8fdcff12b15c46a73bb039958ece728b1
+  - path: src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp
+    sha256: 2a7d87c440e09dcd3579817e558b8330ea863b5489569c92098a95010674848e
+  - path: src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp
+    sha256: 0d84129b7605866daf2405679b8195ecd85e4e7c83b88c3012259efb85d9e5b1
+  - path: src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm
+    sha256: 56cc699eb13d84dafe371a5421a611bfe7b7428a3225e214995acc6b410015b9
+  - path: src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp
+    sha256: 3d01c997cadc1d46967b4695d85a16d97bb1ce2369bd24d731987c13bc1d77b8
+  - path: src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm
+    sha256: 95b59bcefef6bffd6450decb980ad849799d86ae6da80f89131661f8b8526fbc
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+    sha256: 00fad1b176b2bfb0d72f2eada1f1deb5f64b318f005eb2679b4b0bc97f56fc13
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+    sha256: 793ef6a1e6d7300765ab8a59846fab8f55d29c88ebf8bd12db2ce1149710e225
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp
+    sha256: c6cb36cb5a747885cca98d27019569fb442934a8ac712cf795684ca08c6425b5
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
+    sha256: b4627d5fcde624359f45caef7d4606d175d959898cd8bf02ea2d5a2099f695af
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
+    sha256: fda6bf2c7247c5d087d7f6d32666df4493ef8b0ec0ab4c083a8d031c660f85d7
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
+    sha256: 94b2063346b713dcc2c6a2303dedc5a84add8efa396172cbbb2fcc56847e15ae
+  - path: src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
+    sha256: 15ead74add047a0f75e751fb1883f169fe6b56237472c496be7bbdcd72023bf2
+  - path: src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+    sha256: c7457ce1e9d11816a8f7fa0e25b977eb3242785e097a1e20051909a9643f8a72
+  - path: src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp
+    sha256: 98ecb1566d6e2c91e2d997a47da9c884f231accabbf3b7c60e913b4ea005ff00
+  - path: src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm
+    sha256: de57ecda81f36b5eddb7abbd737299bbd5c6069b54ae52b57855c192c6be6eac
+  - path: src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+    sha256: 267dd914d0e7778acb89ad0dce53889e416b826d2be2949d4740f5dec4fd26af
+  - path: src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm
+    sha256: bbcfb67937f02c93f18d3b3fa60e98a63cf239a3e5e46a80f9b4e86c9628894e
+  - path: src/runtime/README.md
+    sha256: 571b1e5215b9d44731280f440d8e834c3d980ff14fc6db1a7b1fc442ff46d88b
+  - path: src/runtime/Rendering/Runtime.RenderArtifactPublication.cpp
+    sha256: c25dcb2caf5828ae6ae0ef5fed2442642e6220193e98a1391f8ffb2f290d2209
+  - path: src/runtime/Rendering/Runtime.RenderArtifactPublication.cppm
+    sha256: 6bc2fe869c349e1d0ce91e6cdceac2680fc7a136b95b82f51bf899c71f4bdb04
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+    sha256: 3666c8dc954f54dbb0489ca9fc8c6cb02f3f0888bb00ea0b2472fe86e298161e
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp
+    sha256: e5f37b098240f404d8d5d9867ffd4eac6811812b9129b7d5d32d33fb812ad7d3
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp
+    sha256: 4c0478f053115f74fdcd885a79f22f946a64988b07d3dac6088d8911a8a470fa
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.cpp
+    sha256: 9a22e577b27e2f32d5822cbe76d8e054f6c45220cb955f860f92628112f9e8b2
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.cppm
+    sha256: 137639de77c3ad7f5096d6f7f36780334e8cbed6281575c8062ac357f62fe4d5
+  - path: src/runtime/Rendering/Runtime.RenderExtractionService.Internal.hpp
+    sha256: 7ee74bd0d79f943dd62f07b2ae16f82f7343a9250303a65572e0388c34dd748d
+  - path: src/runtime/Rendering/Runtime.RenderExtractionService.cpp
+    sha256: 543f8308d94ead237b912aa4f856f124ca779fd740514027552f4eec0c343249
+  - path: src/runtime/Rendering/Runtime.RenderWorldPool.cpp
+    sha256: 6a97fe0d1923082157a6812594204d9188914cfd95afdec1ec2fb8f7c46f13b7
+  - path: src/runtime/Rendering/Runtime.RenderWorldPool.cppm
+    sha256: e93f1747970ab9a13c4307add05b7abccf94a31bc02556b020a971b4d62630d0
+  - path: src/runtime/Scene/Runtime.ReferenceScene.cpp
+    sha256: af505c74a747e26ab002ef829de6c94ab9f0386620b4de9517be5d09b488615e
+  - path: src/runtime/Scene/Runtime.ReferenceScene.cppm
+    sha256: d2d1b96502c2cc449a3deeca692e620f4b5904cfd8da69b068ec5d821dd1acc0
+  - path: src/runtime/Scene/Runtime.SceneSerialization.cpp
+    sha256: 294f014833ea8320c79b3ef942f7a254bd7a99145167d3b86c6f1db8ac46a41c
+  - path: src/runtime/Scene/Runtime.SceneSerialization.cppm
+    sha256: db286035af909db6ec1cedd11ed9d0b078434fde262689af939518f0b9cfc843
+  - path: src/runtime/Scene/Runtime.SelectionController.cpp
+    sha256: 78cb1ebca936f6d617517d4a6243d9aab88f1c3f29473f9892586fc385a88ecd
+  - path: src/runtime/Scene/Runtime.SelectionController.cppm
+    sha256: e63e5811c88610003824f04d4886b26fcedf603ed0ed0b58e4aed8ce0bdbbeb2
+  - path: src/runtime/Scene/Runtime.StableEntityLookup.cpp
+    sha256: c7641a9bc7be8fc5b47c5142230c008d0f72d63cc2d69c6200c19a13c5a8a2b4
+  - path: src/runtime/Scene/Runtime.StableEntityLookup.cppm
+    sha256: be58cdd73a825837407bf4a73ef48010bc7d1ec61d3416dfd996fba3ef05ae9b
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 7c555602cbe4ac77fd7cf9b876f7daf3f8c2c21bd70d10c5db2315c94eb6eeb8
+  - path: tasks/active/README.md
+    sha256: 0d337521154ddd14aa96c33bbad5dc276590ec1151e2801bc3fa0333ab34e58c
+  - path: tasks/active/RUNTIME-215-organize-runtime-source-layout.md
+    sha256: 7269ea3eada5535a91713a95f197f2558ea4420e8907c9bbf767fa81553d5583
+  - path: tasks/backlog/bugs/BUG-133-method-backlog-retired-link-outside-history.md
+    sha256: e46e215ef2d1af9ca6d6eafacab716fc4f4e85a4d3ee4599e28da615a807a0ee
+  - path: tasks/backlog/bugs/index.md
+    sha256: a13503ad8f0795d94f7e200b0cf3a46f0d6fa8efe9545fde64ef66507ad1e507
+  - path: tasks/backlog/rendering/README.md
+    sha256: 701d02db78d01c1a8446bf6aa319a4c20c440b73702b62723fe6cdf53b8c4f65
+  - path: tasks/backlog/runtime/README.md
+    sha256: b38713149456dfd470a8982d3ad4852c7877bbc9976d4bf182bd61234e897b31
+  - path: tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md
+    sha256: 9a2f6d3ac38984d24434625630078a2df2b1e66b9a85932e55c94e6b666428aa
+  - path: tests/contract/graphics/Test.GpuWorldUniformSoAContract.cpp
+    sha256: fde745ede57a06a87aa42d16c1615ed23d14a199bb391fe6ee15c017fb9ea45b
+  - path: tests/contract/runtime/Test.EditorCommandHistory.cpp
+    sha256: a9c9e491b03645974f7be9dbfb90f6e36914bb7c0d8ca9a2c9ffbd041ad01384
+  - path: tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp
+    sha256: b7f89dd7f293117952dacb609988d5e38f6d6a6bb8581da540c2892e8a74662f
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: 1feb5f6c52dee260c4be28dd078ff7e4edc52dee9bca04f1f094fd6c952435a3
+  - path: tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+    sha256: 635aec108c0989972478faf025c98e3ba3b3c7860f2baa05d21bb01579ba66e6
+  - path: tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+    sha256: d1c3a63f2e4d0c02c9e9f274444a176b94347664645257e6a992d73ad5dd16f5
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 6200f8c2cad619b05d6fbe23050379b0b8b2b8035e3f16da08f6d6d1b28eeb85
+  - path: tests/regression/tooling/Test.CheckKernelConvergence.py
+    sha256: 27e41a3ab554ee97e1a724f53c0de00e260cc28d97c99150b1221082226eacfa
+  - path: tests/regression/tooling/Test.TouchedScope.py
+    sha256: c2a1bba6b00ccb25ccc2df2ef022434d9efd1d8c5836d98757a9d42a5ed51c01
+  - path: tools/analysis/compile_hotspot_baseline.json
+    sha256: c82ec6c486b40876b272d9da9c92c067087a8378c74f6cfaf7f17d68e2365aae
+  - path: tools/ci/touched_scope.py
+    sha256: 6f743fc9b2fb71b8a881ed14fe6234ce5b44c1922fb1c200eab17b17af0060f8
+  - path: tools/repo/kernel_convergence_policy.json
+    sha256: 0755ec43f4108bce6e86715c93078ab4e10d3b8463f3d25815da905d1426f0ea
+  content_digest: 3ba4d3cf36cb4565308530024e2cb33a5f141ab22a8f0f228d0714e71daf8d49
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/logic/solution/architecture.md
+  - ara/logic/solution/constraints.md
+  - ara/logic/solution/heuristics.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-05_001.yaml
+  - ara/trace/sessions/2026-08-06_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/adr/0015-reference-scene-bootstrap.md
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/ecs.md
+  - docs/architecture/geometry-pipeline-modularity.md
+  - docs/benchmarking/ci-policy.md
+  - docs/reports/2026-06-06-drift-audit.md
+  - docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md
+  - docs/reviews/2026-05-30-sandbox-app-remaining-gates.md
+  - docs/reviews/2026-06-02-repository-quality-assessment.md
+  - docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md
+  - docs/reviews/2026-08-02-method-engine-integration-contract-audit.md
+  - docs/roadmap.md
+  - src/ecs/Components/README.md
+  - src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cppm
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Config/Runtime.EngineConfigBoot.cpp
+  - src/runtime/Config/Runtime.EngineConfigBoot.cppm
+  - src/runtime/Config/Runtime.EngineConfigControl.cpp
+  - src/runtime/Config/Runtime.EngineConfigControl.cppm
+  - src/runtime/Config/Runtime.RenderRecipeActivation.cpp
+  - src/runtime/Config/Runtime.RenderRecipeActivation.cppm
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Debug.cpp
+  - src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+  - src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp
+  - src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Debug.cpp
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm
+  - src/runtime/Editor/Runtime.EditorCommandHistory.cpp
+  - src/runtime/Editor/Runtime.EditorCommandHistory.cppm
+  - src/runtime/Editor/Runtime.EditorCommon.Public.cpp
+  - src/runtime/Editor/Runtime.EditorCommon.cppm
+  - src/runtime/Editor/Runtime.EditorJobProjection.Public.cpp
+  - src/runtime/Editor/Runtime.EditorJobProjection.cppm
+  - src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cpp
+  - src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorMutation.Internal.hpp
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Graph.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.PointCloud.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Procedural.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm
+  - src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm
+  - src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm
+  - src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp
+  - src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
+  - src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cpp
+  - src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm
+  - src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cpp
+  - src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cppm
+  - src/runtime/GeometryIntegration/Runtime.VertexChannelBindings.cppm
+  - src/runtime/GeometryIntegration/Runtime.VertexChannelStreams.cpp
+  - src/runtime/GeometryIntegration/Runtime.VertexChannelStreams.cppm
+  - src/runtime/Gizmos/Runtime.GizmoInteraction.cpp
+  - src/runtime/Kernel/Runtime.AsyncWorkModule.cpp
+  - src/runtime/Kernel/Runtime.AsyncWorkModule.cppm
+  - src/runtime/Kernel/Runtime.CommandBus.cpp
+  - src/runtime/Kernel/Runtime.CommandBus.cppm
+  - src/runtime/Kernel/Runtime.DeviceBootstrap.cpp
+  - src/runtime/Kernel/Runtime.DeviceBootstrap.cppm
+  - src/runtime/Kernel/Runtime.Engine.FrameLoop.Internal.hpp
+  - src/runtime/Kernel/Runtime.Engine.cpp
+  - src/runtime/Kernel/Runtime.Engine.cppm
+  - src/runtime/Kernel/Runtime.FramePacingDiagnostics.cpp
+  - src/runtime/Kernel/Runtime.FramePacingDiagnostics.cppm
+  - src/runtime/Kernel/Runtime.InputActions.cpp
+  - src/runtime/Kernel/Runtime.InputActions.cppm
+  - src/runtime/Kernel/Runtime.JobService.cpp
+  - src/runtime/Kernel/Runtime.JobService.cppm
+  - src/runtime/Kernel/Runtime.KernelEvents.cpp
+  - src/runtime/Kernel/Runtime.KernelEvents.cppm
+  - src/runtime/Kernel/Runtime.Module.cppm
+  - src/runtime/Kernel/Runtime.ServiceRegistry.cpp
+  - src/runtime/Kernel/Runtime.ServiceRegistry.cppm
+  - src/runtime/Kernel/Runtime.WorldHandle.cppm
+  - src/runtime/Kernel/Runtime.WorldRegistry.cpp
+  - src/runtime/Kernel/Runtime.WorldRegistry.cppm
+  - src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp
+  - src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp
+  - src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp
+  - src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm
+  - src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp
+  - src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
+  - src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
+  - src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+  - src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp
+  - src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm
+  - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+  - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm
+  - src/runtime/README.md
+  - src/runtime/Rendering/Runtime.RenderArtifactPublication.cpp
+  - src/runtime/Rendering/Runtime.RenderArtifactPublication.cppm
+  - src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+  - src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp
+  - src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp
+  - src/runtime/Rendering/Runtime.RenderExtraction.cpp
+  - src/runtime/Rendering/Runtime.RenderExtraction.cppm
+  - src/runtime/Rendering/Runtime.RenderExtractionService.Internal.hpp
+  - src/runtime/Rendering/Runtime.RenderExtractionService.cpp
+  - src/runtime/Rendering/Runtime.RenderWorldPool.cpp
+  - src/runtime/Rendering/Runtime.RenderWorldPool.cppm
+  - src/runtime/Scene/Runtime.ReferenceScene.cpp
+  - src/runtime/Scene/Runtime.ReferenceScene.cppm
+  - src/runtime/Scene/Runtime.SceneSerialization.cpp
+  - src/runtime/Scene/Runtime.SceneSerialization.cppm
+  - src/runtime/Scene/Runtime.SelectionController.cpp
+  - src/runtime/Scene/Runtime.SelectionController.cppm
+  - src/runtime/Scene/Runtime.StableEntityLookup.cpp
+  - src/runtime/Scene/Runtime.StableEntityLookup.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/active/RUNTIME-215-organize-runtime-source-layout.md
+  - tasks/backlog/bugs/BUG-133-method-backlog-retired-link-outside-history.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/rendering/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md
+  - tests/contract/graphics/Test.GpuWorldUniformSoAContract.cpp
+  - tests/contract/runtime/Test.EditorCommandHistory.cpp
+  - tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  - tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/regression/tooling/Test.CheckKernelConvergence.py
+  - tests/regression/tooling/Test.TouchedScope.py
+  - tools/analysis/compile_hotspot_baseline.json
+  - tools/ci/touched_scope.py
+  - tools/repo/kernel_convergence_policy.json
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.* (module names preserved)
+extension_seam: Cohesive owner directories inside the existing single ExtrinsicRuntime target preserve
+  module names, target membership, and lower-layer boundaries.
+future_change_plan: RUNTIME-216 owns the separately reviewed semantic deletion; future runtime sources
+  join an existing cohesive owner or justify exceptional root placement in a reviewed task.
+acceptance:
+- criterion: '`find src/runtime -maxdepth 1 -type f` reports exactly'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every pre-move runtime module name still has exactly one defining
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No C++ behavior body, exported declaration, import, target link, config
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Source paths and documentation agree with the new layout, and generated
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Focused structural checks, a fresh meaningful build, and the default CPU
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-215/commands/ci-fresh-configure.json
+- receipt: tasks/evidence/RUNTIME-215/commands/ci-full-cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-215/commands/ci-intrinsic-tests-build.json
+- receipt: tasks/evidence/RUNTIME-215/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-215/commands/runtime-module-declarations-preserved.json
+- receipt: tasks/evidence/RUNTIME-215/commands/runtime-root-layout.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-ara-claims.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-doc-links.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-docs-sync.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-layering.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-root-hygiene.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-session-brief.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-task-format.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-task-policy.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-task-state-links.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-test-layout.json
+- receipt: tasks/evidence/RUNTIME-215/commands/structural-workflow-evidence.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- Only CMakeLists.txt and README.md remain direct src/runtime files; the runtime module-declaration multiset
+  is unchanged; a fresh Clang 23 IntrinsicTests build and all 4103 selected CPU tests passed.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/active/RUNTIME-215-organize-runtime-source-layout.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Broad physical path churn touched CMake, source-reading tests, tooling, and documentation; exact-path
+  structural receipts, a fresh module build, the full CPU selector, and strict path-consumer gates mitigate
+  stale-reference risk.
+skipped_checks: []
+artifacts:
+- path: docs/api/generated/module_inventory.md
+  sha256: 3c0632a6260a0f01436a6cd94988e16f56af27b325b60c065f2b8b08b18c4cc4
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
