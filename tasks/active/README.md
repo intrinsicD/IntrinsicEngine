@@ -11,8 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- No task is currently active. `GRAPHICS-133` is the next eligible
-  `REVIEW-003` remediation.
+- [`GRAPHICS-133`](GRAPHICS-133-concretize-visualization-overlay-upload-helper.md) —
+  remove the single-owner visualization-overlay upload-helper base while
+  retaining the concrete Renderer-owned behavior. `REVIEW-003` remains
+  backlogged until its remaining audit remediations retire.
 
 ## History
 

@@ -37,7 +37,7 @@ without requiring them to read every file.
     deleted while concrete reference TAA behavior remains unchanged.
   - `GRAPHICS-132` is retired: the transient-debug helper is concrete and its
     Renderer-owned behavior is unchanged.
-  - [`GRAPHICS-133`](GRAPHICS-133-concretize-visualization-overlay-upload-helper.md)
+  - [`GRAPHICS-133`](../../active/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md)
     and [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) each
     remove one remaining single-owner upload-helper base while retaining its
     concrete feature-owned helper.
