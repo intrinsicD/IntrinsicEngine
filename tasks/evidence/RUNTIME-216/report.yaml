@@ -1,0 +1,127 @@
+schema_version: 1
+task_id: RUNTIME-216
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T14:58:44Z'
+claim_eligible: false
+source:
+  base_ref: 94c612d9
+  base_revision: 94c612d9910412e6ae5ea4048e1f102d5f059129
+  head_revision: d7d39e61954cd12b367ea6e95b7aaa22522c9198
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/runtime/CMakeLists.txt
+    sha256: 149b90fc0fc64e4c56949864a9407970ab5483ee00f155bab54fdac2db7581ec
+  - path: src/runtime/Kernel/Runtime.Engine.cpp
+    sha256: 4296d9d957ff9431c590cc097b109614a90e534c29b053cb5ddb7dd266969b44
+  - path: src/runtime/README.md
+    sha256: c5be871b12bd4fd0a47a2de4ba0c43b0b28bbdcd6c0405b02af53082a17a6e00
+  - path: src/runtime/Rendering/Runtime.RenderExtractionService.Internal.hpp
+    sha256: null
+  - path: src/runtime/Rendering/Runtime.RenderExtractionService.cpp
+    sha256: null
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 9b3ab4aba0cb18ed5ba1aeeec85b5fa1830932e55591e62156ed8d5d85bab804
+  - path: tasks/backlog/README.md
+    sha256: b295d70abfce92e89f520284d5f078ea312357d7bef83468b76b6d8c5f334170
+  - path: tasks/backlog/runtime/README.md
+    sha256: df7ba2306bf04e823e98a410a13afab68f648f41ae213d9e35b82463f267ebb5
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 239c8c7a51b2c502fbacf7ca5541b04c649ea6617375a60c8d876a68de63cae6
+  - path: tasks/done/RUNTIME-216-inline-render-extraction-engine-glue.md
+    sha256: 35a1e38b420d53b58d9263d1545883ed23764188ad94b25aef6ec4268d1d07b1
+  - path: tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp
+    sha256: 0751359c5447442a01248406ff194271149b2229d96ad538f5b5015eca735100
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: 2c1bdc4f924385ffdcd602bb225d1425fd9258343d0654b39b0da82c5477b084
+  - path: tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+    sha256: b588a185299f32ddc2f3bbc7612e0f5d49add82776453c1a9bb1065af67a96ee
+  content_digest: 82d5e9d29fac38aea7e5d04123ef42dee9bd543d8e0641f28d3e11758a5cc2ea
+touched:
+  paths:
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Kernel/Runtime.Engine.cpp
+  - src/runtime/README.md
+  - src/runtime/Rendering/Runtime.RenderExtractionService.Internal.hpp
+  - src/runtime/Rendering/Runtime.RenderExtractionService.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-216-inline-render-extraction-engine-glue.md
+  - tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.Engine
+  - Extrinsic.Runtime.RenderExtraction
+  - Extrinsic.Runtime.RenderWorldPool
+extension_seam: A cohesive cache/pool/frame-index owner may be reintroduced only for a present second
+  production owner or genuine test-double seam.
+future_change_plan: Keep the three values direct in Engine::Impl until a second production lifecycle proves
+  a reusable unit is needed.
+acceptance:
+- criterion: The two `RenderExtractionService` files and class name are absent.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Runtime file count decreases by exactly two without a replacement file,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Engine teardown order and all extraction/pool behavior remain unchanged
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No unrelated runtime consolidation is mixed into this task.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-216/commands/ci-build.json
+- receipt: tasks/evidence/RUNTIME-216/commands/ci-configure.json
+- receipt: tasks/evidence/RUNTIME-216/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-216/commands/diff-check.json
+- receipt: tasks/evidence/RUNTIME-216/commands/doc-links.json
+- receipt: tasks/evidence/RUNTIME-216/commands/docs-sync.json
+- receipt: tasks/evidence/RUNTIME-216/commands/focused-runtime-tests.json
+- receipt: tasks/evidence/RUNTIME-216/commands/full-cpu-tests.json
+- receipt: tasks/evidence/RUNTIME-216/commands/layering.json
+- receipt: tasks/evidence/RUNTIME-216/commands/module-inventory-generate.json
+- receipt: tasks/evidence/RUNTIME-216/commands/module-inventory-match.json
+- receipt: tasks/evidence/RUNTIME-216/commands/runtime-file-count.json
+- receipt: tasks/evidence/RUNTIME-216/commands/task-policy.json
+changed_public_contracts:
+- Public Engine, RenderExtraction, and RenderWorldPool module surfaces are unchanged.
+diagnostics_and_previews:
+- Runtime source file count decreased from 170 to 168; focused runtime tests passed 70/70 and the final
+  CPU selector passed 4103/4103.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-216-inline-render-extraction-engine-glue.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- Promoted Vulkan was not rerun because this private forwarding deletion changes no RHI, shader, backend,
+  command, or byte-layout behavior.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No graphics/RHI/backend/shader/byte-layout behavior changed; focused runtime and full CPU owner-level
+    execution cover the shared composition path.
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
