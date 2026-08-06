@@ -47,7 +47,7 @@ layer after the path-only change was independently reviewed. Extraction
 behavior and the public module surface remain unchanged.
 
 The rejected 2026-08-06 `REVIEW-003` baseline then opened
-[`RUNTIME-217`](RUNTIME-217-inline-single-use-core-frame-loop-contracts.md):
+[`RUNTIME-217`](../../active/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md):
 delete the six single-use `Core.FrameLoop` hook interfaces and Runtime adapter
 family, preserve the exact ordered Engine lifecycle through owner-level tests,
 and use the already-published concrete AssetWorkflow service for optional

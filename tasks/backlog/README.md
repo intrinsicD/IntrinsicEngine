@@ -376,7 +376,7 @@ Open members (kernel-seam priority set first):
   (one-shot post-convergence admission gate; its rejected 2026-08-06 baseline
   is blocked by `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and
   `RORG-031E`).
-- [`RUNTIME-217`](runtime/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md),
+- [`RUNTIME-217`](../active/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md),
   the remaining concrete Runtime/Core right-sizing leaf found by the rejected
   audit baseline.
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).

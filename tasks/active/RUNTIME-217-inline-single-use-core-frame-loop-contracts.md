@@ -7,15 +7,20 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-runtime217"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T17:45:03Z"
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
 ---
 # RUNTIME-217 — Inline single-use Core frame-loop contracts
+
+## Status
+
+- In progress on `main`: preserve owner-level lifecycle assertions first, then
+  delete the Core hook family and inline its fixed ordering in Runtime Engine.
 
 ## Goal
 

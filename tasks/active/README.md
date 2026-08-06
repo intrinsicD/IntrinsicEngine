@@ -11,9 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- No task is currently active. `RUNTIME-217` is the next eligible
-  `REVIEW-003` blocker; the readiness audit remains backlogged until that
-  runtime cleanup retires.
+- [`RUNTIME-217`](RUNTIME-217-inline-single-use-core-frame-loop-contracts.md) —
+  inline the single-use Core frame-loop hook family into its Runtime Engine
+  owner while preserving all lifecycle branches. `REVIEW-003` remains
+  backlogged until this final remediation retires.
 
 ## History
 
