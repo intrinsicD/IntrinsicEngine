@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root .",
+  "cwd": ".",
+  "duration_ms": 1044,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T17:35:38Z",
+  "label": "doc-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T17:35:37Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-134/commands/doc-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-134/commands/doc-links.stdout.log",
+  "stdout_sha256": "0e8530c87b47e77d7d613330e5789fd00a8c792c627cc65c9471a42b032658a3",
+  "task_id": "GRAPHICS-134"
+}

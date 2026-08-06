@@ -1,0 +1,24 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--quiet",
+    "0d690956bc53344ba7f8ab748c2e90bfa3da64d6..HEAD",
+    "--",
+    "src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp"
+  ],
+  "command_display": "git diff --quiet 0d690956bc53344ba7f8ab748c2e90bfa3da64d6..HEAD -- src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp",
+  "cwd": ".",
+  "duration_ms": 2,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T17:35:36Z",
+  "label": "helper-body-unchanged",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T17:35:36Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-134/commands/helper-body-unchanged.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-134/commands/helper-body-unchanged.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "GRAPHICS-134"
+}

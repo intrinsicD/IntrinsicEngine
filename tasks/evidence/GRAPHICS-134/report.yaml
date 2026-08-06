@@ -1,0 +1,116 @@
+schema_version: 1
+task_id: GRAPHICS-134
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T17:36:02Z'
+claim_eligible: false
+source:
+  base_ref: 0d690956bc53344ba7f8ab748c2e90bfa3da64d6
+  base_revision: 0d690956bc53344ba7f8ab748c2e90bfa3da64d6
+  head_revision: db23d1d0a0dd5e32684b44afafa550d5c26936c4
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm
+    sha256: 91bf52fc916774df6ecfa5b7767fe1800071682fe5af9b80275030c012bd4909
+  - path: src/graphics/renderer/Graphics.Renderer.cpp
+    sha256: d85d6b21f9cd1a7902cb8dae182de60e2e4871379234c1d399a06c380ba2e590
+  - path: tasks/SESSION-BRIEF.md
+    sha256: a272c041f77d9eb98b9d5a53bd4a852fc63a94f48d3b9c4741836ac4087ff0ae
+  - path: tasks/active/README.md
+    sha256: 766506c2d8da00d129984851d64a5abac26aaa618185d26676dacc5702d3f8d7
+  - path: tasks/backlog/rendering/README.md
+    sha256: 2c68f2ef6a144d5f7806431255f688b380cbbae888a852e26883f7e45843f5cc
+  - path: tasks/done/GRAPHICS-134-concretize-imgui-upload-helper.md
+    sha256: 3b503737cbf5bcb387a4e94b3ef56b14396541b15158629770204ce45baebb2f
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 92df4447331a0b2698f1ef5f16737a656846f3dbc041b16a2bd07ef3be286c23
+  - path: tests/contract/graphics/Test.ImGuiPass.cpp
+    sha256: 02e9782ea94c83031cbede6875e87bd5b23abd5dd22a914032fd3db272b38bbc
+  - path: tests/contract/graphics/Test.RendererRhiBoundary.cpp
+    sha256: 4cf4002786fc684c92deaf31cfd18d1834c591879f9b649781e7cd4e4b0d8730
+  content_digest: 3724e68ef15553445e23890c6e6d71f0a2a622f9cc066b472e114278f8c939d3
+touched:
+  paths:
+  - src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm
+  - src/graphics/renderer/Graphics.Renderer.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/rendering/README.md
+  - tasks/done/GRAPHICS-134-concretize-imgui-upload-helper.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/graphics/Test.ImGuiPass.cpp
+  - tests/contract/graphics/Test.RendererRhiBoundary.cpp
+  layers:
+  - docs
+  - graphics
+  - tests
+  modules:
+  - Extrinsic.Graphics.ImGuiUploadHelper
+extension_seam: None; ImGuiUploadHelper is the one present implementation and Renderer owner, so no polymorphic
+  seam remains.
+future_change_plan: Introduce a shared upload-helper boundary only when a real second implementation shares
+  a present production selection and call site.
+acceptance:
+- criterion: The interface name is absent; concrete behavior stays covered.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No other helper family or replacement abstraction changes.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the revision-bound deletion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GRAPHICS-134/commands/build-tests.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/clean-workshop.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/configure-ci.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/diff-check.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/doc-links.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/docs-sync.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/focused-cpu.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/full-cpu.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/helper-body-unchanged.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/layering.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/module-inventory.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/retired-symbol-scan.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/stale-prose-scan.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/task-policy.json
+- receipt: tasks/evidence/GRAPHICS-134/commands/task-state-links.json
+changed_public_contracts:
+- Removed Graphics::IImGuiUploadHelper; ImGuiUploadHelper retains the same BeginFrame, UploadFrame, allocation
+  diagnostics, frame-slot buffer lifecycle, and Renderer call path.
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GRAPHICS-134-concretize-imgui-upload-helper.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- Opt-in Vulkan execution was not rerun; the helper implementation unit, Renderer calls, RHI/backend code,
+  resources, and shaders are unchanged.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No RHI, Vulkan, shader, buffer algorithm, Renderer call-site, or resource-lifecycle behavior
+    changed; focused and complete CPU contracts cover the removed dispatch layer.
+artifacts:
+- path: tasks/done/GRAPHICS-134-concretize-imgui-upload-helper.md
+  sha256: 3b503737cbf5bcb387a4e94b3ef56b14396541b15158629770204ce45baebb2f
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GRAPHICS-134/handoff.jsonl
+review: tasks/evidence/GRAPHICS-134/reviews.jsonl
