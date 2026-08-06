@@ -5,10 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-133` — Method backlog links a retired task outside history](BUG-133-method-backlog-retired-link-outside-history.md):
+- [`BUG-133` — Method backlog links a retired task outside history](../../active/BUG-133-method-backlog-retired-link-outside-history.md):
   the strict task-state-link gate finds the retired `METHOD-020` link beneath
-  live method-family guidance rather than an explicitly historical heading;
-  repair the index context without reopening the task or weakening the gate.
+  live method-family guidance; the claimed micro repair replaces that retired
+  task link with lifecycle-safe prose without reopening it or weakening the gate.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all

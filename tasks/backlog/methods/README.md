@@ -176,9 +176,8 @@ end.
   variant they extend is implemented, tested, and benchmark-manifested.
   `METHOD-020` retired at `ParityProven` with ordinary LOP and isotropic WLOP
   exposed through Vulkan compute; anisotropic WLOP, CLOP, and EAR remain
-  capability-negative pairs. See the
-  [retired task](../../done/METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
-  and its bounded [result report](../../../methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md).
+  capability-negative pairs. See retired task record `METHOD-020` and its
+  bounded [result report](../../../methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md).
 - **Parameterization family (METHOD-021..026).** The state-of-the-art mesh
   parameterization variants — ARAP (`METHOD-021`), SLIM (`METHOD-022`), BFF
   (`METHOD-023`), and SCP (`METHOD-024`) — each add a concrete params

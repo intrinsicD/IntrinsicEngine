@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-133` — Method backlog links a retired task outside history (tasks/active/BUG-133-method-backlog-retired-link-outside-history.md)
 - `RUNTIME-214` — Universal geometry-property CPU/GPU coherence (tasks/active/RUNTIME-214-universal-geometry-property-coherence.md)
 - `RUNTIME-215` — Organize runtime sources by cohesive ownership (tasks/active/RUNTIME-215-organize-runtime-source-layout.md)
 
@@ -43,7 +44,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-110` — Implicit smoothing applies boundary pins after rather than during solve (tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot (tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md)
-- unblocked: `BUG-133` — Method backlog links a retired task outside history (tasks/backlog/bugs/BUG-133-method-backlog-retired-link-outside-history.md)
 
 ## Theme H — Agentic workflow hardening
 
