@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "GraphicsCrossQueueTimeline|RendererRhiBoundary|QueueSubmit|FrameGraph",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'GraphicsCrossQueueTimeline|RendererRhiBoundary|QueueSubmit|FrameGraph' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 4699,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:49:31Z",
+  "label": "focused-cpu-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:49:26Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-129/commands/focused-cpu-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-129/commands/focused-cpu-r2.stdout.log",
+  "stdout_sha256": "72bff3cb2ced690eac1f412a1f3a217122bfea2a1ab83230a93ee80559285645",
+  "task_id": "GRAPHICS-129"
+}

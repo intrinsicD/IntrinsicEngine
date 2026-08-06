@@ -1,0 +1,119 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start   63: FrameGraphParallel.DefaultOverloadStillWorks
+ 1/52 Test   #63: FrameGraphParallel.DefaultOverloadStillWorks .........................................   Passed    0.00 sec
+      Start   64: FrameGraphParallel.TypedReadReadCanRunInParallel
+ 2/52 Test   #64: FrameGraphParallel.TypedReadReadCanRunInParallel .....................................   Passed    0.04 sec
+      Start   65: FrameGraphParallel.PriorityAffectsReadyNodeOrdering
+ 3/52 Test   #65: FrameGraphParallel.PriorityAffectsReadyNodeOrdering ..................................   Passed    0.00 sec
+      Start   66: FrameGraphParallel.EstimatedCostAffectsCriticalPathTieBreaker
+ 4/52 Test   #66: FrameGraphParallel.EstimatedCostAffectsCriticalPathTieBreaker ........................   Passed    0.00 sec
+      Start   67: FrameGraphParallel.TypedWriteReadMustSerialize
+ 5/52 Test   #67: FrameGraphParallel.TypedWriteReadMustSerialize .......................................   Passed    0.00 sec
+      Start   68: FrameGraphParallel.TypedReadWriteMustSerialize
+ 6/52 Test   #68: FrameGraphParallel.TypedReadWriteMustSerialize .......................................   Passed    0.00 sec
+      Start   69: FrameGraphParallel.StructuralTokenSerializesStructureChanges
+ 7/52 Test   #69: FrameGraphParallel.StructuralTokenSerializesStructureChanges .........................   Passed    0.00 sec
+      Start   70: FrameGraphParallel.CommitTokenOrdersCommitAndExtraction
+ 8/52 Test   #70: FrameGraphParallel.CommitTokenOrdersCommitAndExtraction ..............................   Passed    0.00 sec
+      Start   71: FrameGraphParallel.MainThreadOnlyPassRunsOnCallerThread
+ 9/52 Test   #71: FrameGraphParallel.MainThreadOnlyPassRunsOnCallerThread ..............................   Passed    0.01 sec
+      Start   72: FrameGraphParallel.GraphLocalCompletionDoesNotWaitForUnrelatedSchedulerWork
+10/52 Test   #72: FrameGraphParallel.GraphLocalCompletionDoesNotWaitForUnrelatedSchedulerWork ..........   Passed    0.32 sec
+      Start   73: FrameGraphParallel.DeterministicSingleThreadFallbackOrder
+11/52 Test   #73: FrameGraphParallel.DeterministicSingleThreadFallbackOrder ............................   Passed    0.01 sec
+      Start  243: ECSBoundsPropagation.FrameGraphRegistersAfterTransformHierarchy
+12/52 Test  #243: ECSBoundsPropagation.FrameGraphRegistersAfterTransformHierarchy ......................   Passed    0.01 sec
+      Start  259: ECSRenderSync.FrameGraphPipelineForwardsTagsAfterTransformAndBoundsPasses
+13/52 Test  #259: ECSRenderSync.FrameGraphPipelineForwardsTagsAfterTransformAndBoundsPasses ............   Passed    0.01 sec
+      Start 1208: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+14/52 Test #1208: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow .......   Passed    0.02 sec
+      Start 3127: CoreFrameGraph.TypeTokenStableAcrossTranslationUnits
+15/52 Test #3127: CoreFrameGraph.TypeTokenStableAcrossTranslationUnits .................................   Passed    0.00 sec
+      Start 3128: CoreFrameGraph.LinearChain
+16/52 Test #3128: CoreFrameGraph.LinearChain ...........................................................   Passed    0.00 sec
+      Start 3129: CoreFrameGraph.WriteAfterWrite
+17/52 Test #3129: CoreFrameGraph.WriteAfterWrite .......................................................   Passed    0.00 sec
+      Start 3130: CoreFrameGraph.WriteAfterRead
+18/52 Test #3130: CoreFrameGraph.WriteAfterRead ........................................................   Passed    0.02 sec
+      Start 3131: CoreFrameGraph.ParallelReaders
+19/52 Test #3131: CoreFrameGraph.ParallelReaders .......................................................   Passed    0.02 sec
+      Start 3132: CoreFrameGraph.DiamondDependency
+20/52 Test #3132: CoreFrameGraph.DiamondDependency .....................................................   Passed    0.02 sec
+      Start 3133: CoreFrameGraph.ReadyQueueExecutionBypassesCoarseLayerBarrier
+21/52 Test #3133: CoreFrameGraph.ReadyQueueExecutionBypassesCoarseLayerBarrier .........................   Passed    0.07 sec
+      Start 3134: CoreFrameGraph.LabelOrdering
+22/52 Test #3134: CoreFrameGraph.LabelOrdering .........................................................   Passed    0.00 sec
+      Start 3135: CoreFrameGraph.MixedLabelsAndResources
+23/52 Test #3135: CoreFrameGraph.MixedLabelsAndResources ...............................................   Passed    0.01 sec
+      Start 3136: CoreFrameGraph.EmptyGraph
+24/52 Test #3136: CoreFrameGraph.EmptyGraph ............................................................   Passed    0.00 sec
+      Start 3137: CoreFrameGraph.SinglePass
+25/52 Test #3137: CoreFrameGraph.SinglePass ............................................................   Passed    0.00 sec
+      Start 3138: CoreFrameGraph.MultiFrameReset
+26/52 Test #3138: CoreFrameGraph.MultiFrameReset .......................................................   Passed    0.00 sec
+      Start 3139: CoreFrameGraph.ReadWriteSameType
+27/52 Test #3139: CoreFrameGraph.ReadWriteSameType .....................................................   Passed    0.00 sec
+      Start 3140: CoreFrameGraph.IndependentPassesParallelize
+28/52 Test #3140: CoreFrameGraph.IndependentPassesParallelize ..........................................   Passed    0.00 sec
+      Start 3141: CoreFrameGraph.PassNameIntrospection
+29/52 Test #3141: CoreFrameGraph.PassNameIntrospection .................................................   Passed    0.00 sec
+      Start 3142: CoreFrameGraph.ParallelExecutionStress
+30/52 Test #3142: CoreFrameGraph.ParallelExecutionStress ...............................................   Passed    0.01 sec
+      Start 3143: CoreFrameGraph.ReadyQueueExecutionDoesNotWaitForSlowSiblingLayerBarrier
+31/52 Test #3143: CoreFrameGraph.ReadyQueueExecutionDoesNotWaitForSlowSiblingLayerBarrier ..............   Passed    0.13 sec
+      Start 3144: CoreFrameGraph.RealisticFrame
+32/52 Test #3144: CoreFrameGraph.RealisticFrame ........................................................   Passed    0.01 sec
+      Start 3145: CoreFrameGraph.NoCycleFromSequentialRegistration
+33/52 Test #3145: CoreFrameGraph.NoCycleFromSequentialRegistration .....................................   Passed    0.00 sec
+      Start 3146: CoreFrameGraph.ErrorRecovery_ResetAfterFailedCompile
+34/52 Test #3146: CoreFrameGraph.ErrorRecovery_ResetAfterFailedCompile .................................   Passed    0.00 sec
+      Start 3147: CoreFrameGraph.ReadyQueueNestedDispatchStressHighWorkerCount
+35/52 Test #3147: CoreFrameGraph.ReadyQueueNestedDispatchStressHighWorkerCount .........................   Passed    0.14 sec
+      Start 3148: CoreFrameGraph.ResetRebuildsTheCpuGraphCleanly
+36/52 Test #3148: CoreFrameGraph.ResetRebuildsTheCpuGraphCleanly .......................................   Passed    0.00 sec
+      Start 3538: RendererRhiBoundary.RendererPublicSurfaceCompilesThroughRhiOnly
+37/52 Test #3538: RendererRhiBoundary.RendererPublicSurfaceCompilesThroughRhiOnly ......................   Passed    0.00 sec
+      Start 3539: RendererRhiBoundary.RendererDoesNotImportVulkanBackend
+38/52 Test #3539: RendererRhiBoundary.RendererDoesNotImportVulkanBackend ...............................   Passed    0.01 sec
+      Start 3540: RendererRhiBoundary.RendererDoesNotImportLiveEcsOwnership
+39/52 Test #3540: RendererRhiBoundary.RendererDoesNotImportLiveEcsOwnership ............................   Passed    0.01 sec
+      Start 3541: RendererRhiBoundary.RhiLayerDoesNotImportVulkan
+40/52 Test #3541: RendererRhiBoundary.RhiLayerDoesNotImportVulkan ......................................   Passed    0.00 sec
+      Start 3542: RendererRhiBoundary.RetiredTimelineSemaphoreAbstractionStaysAbsent
+41/52 Test #3542: RendererRhiBoundary.RetiredTimelineSemaphoreAbstractionStaysAbsent ...................   Passed    0.02 sec
+      Start 3543: RendererRhiBoundary.PromotedGraphicsAndRuntimeDoNotImportCuda
+42/52 Test #3543: RendererRhiBoundary.PromotedGraphicsAndRuntimeDoNotImportCuda ........................   Passed    0.01 sec
+      Start 3544: RendererRhiBoundary.SamplerBorderColorStaysBackendNeutralAndMapsInVulkanBackend
+43/52 Test #3544: RendererRhiBoundary.SamplerBorderColorStaysBackendNeutralAndMapsInVulkanBackend ......   Passed    0.00 sec
+      Start 3545: RendererRhiBoundary.VulkanBackendDefinesPromotedSymbols
+44/52 Test #3545: RendererRhiBoundary.VulkanBackendDefinesPromotedSymbols ..............................   Passed    0.00 sec
+      Start 3585: VulkanFailClosedContract.FrameGraphBarrierFamiliesCollapseUnderGraphicsOnlyProfile
+45/52 Test #3585: VulkanFailClosedContract.FrameGraphBarrierFamiliesCollapseUnderGraphicsOnlyProfile ...   Passed    0.00 sec
+      Start 3634: GraphicsCrossQueueTimeline.EmitsSignalAndWaitAtCrossQueueBoundary
+46/52 Test #3634: GraphicsCrossQueueTimeline.EmitsSignalAndWaitAtCrossQueueBoundary ....................   Passed    0.00 sec
+      Start 3635: GraphicsCrossQueueTimeline.ValuesAreMonotonicPerProducingQueueAndDeterministic
+47/52 Test #3635: GraphicsCrossQueueTimeline.ValuesAreMonotonicPerProducingQueueAndDeterministic .......   Passed    0.00 sec
+      Start 3636: GraphicsCrossQueueTimeline.CulledProducerBranchEmitsNoTimelineEdges
+48/52 Test #3636: GraphicsCrossQueueTimeline.CulledProducerBranchEmitsNoTimelineEdges ..................   Passed    0.00 sec
+      Start 3637: GraphicsCrossQueueTimeline.CrossQueueCycleReportsStructuredFinding
+49/52 Test #3637: GraphicsCrossQueueTimeline.CrossQueueCycleReportsStructuredFinding ...................   Passed    0.00 sec
+      Start 3866: GraphicsQueueAffinity.MockDeviceRecordsFrameQueueSubmitPlanAndBatchContexts
+50/52 Test #3866: GraphicsQueueAffinity.MockDeviceRecordsFrameQueueSubmitPlanAndBatchContexts ..........   Passed    0.00 sec
+      Start 3869: GraphicsQueueAffinity.BuildQueueSubmitPlanCreatesBatchesAndTimelineBoundaries
+51/52 Test #3869: GraphicsQueueAffinity.BuildQueueSubmitPlanCreatesBatchesAndTimelineBoundaries ........   Passed    0.00 sec
+      Start 3870: GraphicsQueueAffinity.BuildQueueSubmitPlanDemotesMissingOptionalQueues
+52/52 Test #3870: GraphicsQueueAffinity.BuildQueueSubmitPlanDemotesMissingOptionalQueues ...............   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 52
+
+Label Time Summary:
+contract       =   0.07 sec*proc (16 tests)
+core           =   1.50 sec*proc (22 tests)
+ecs            =   0.02 sec*proc (2 tests)
+graphics       =   0.07 sec*proc (16 tests)
+integration    =   1.52 sec*proc (12 tests)
+runtime        =   1.52 sec*proc (12 tests)
+unit           =   1.52 sec*proc (24 tests)
+
+Total Test time (real) =   4.69 sec

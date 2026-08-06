@@ -1,0 +1,146 @@
+schema_version: 1
+task_id: GRAPHICS-129
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T15:51:49Z'
+claim_eligible: false
+source:
+  base_ref: 88118759590a44d81e46b7647e05650378970168
+  base_revision: 88118759590a44d81e46b7647e05650378970168
+  head_revision: 0c91ed4d798efa4cd7ff6075e5bd2531eb30a875
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: b2a395de16db1b32fa2599cfda074ce6b404bbaa80d3744c871547a6b0fb7d26
+  - path: docs/migration/nonlegacy-parity-matrix.md
+    sha256: 5ccf0b0837fba65282c86dfef4aca5d89f874d58d32ff60333681cfd3f7ddd02
+  - path: src/graphics/renderer/README.md
+    sha256: f82e974331e492f7317fdcd9542ba7fa04d7a55d3781a5a5706d605da1cd12a4
+  - path: src/graphics/rhi/CMakeLists.txt
+    sha256: 232619d062372fe92ce147f0bbfe5e1e34e1055b2d1ba637edb4591a010ed42a
+  - path: src/graphics/rhi/README.md
+    sha256: 98883d41671925496bad2c5efcb0522e2344247432e4d2ed5372a9c2198b645d
+  - path: src/graphics/rhi/RHI.TimelineSemaphore.cppm
+    sha256: null
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 3dcd095196024e057b7f64a4e36205f1a3cd23ff327f23d7cf96c4dd588f675b
+  - path: tasks/active/README.md
+    sha256: 6b90a1203ccdf42a84cb15cb5c8c5de086eccb9e38df90d3c22cfac280d5f9bd
+  - path: tasks/backlog/rendering/README.md
+    sha256: 6e25cb0dd58daf5856b167ad1a4a636e74349c52e9f01962d8bcb8372c281a7c
+  - path: tasks/done/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md
+    sha256: c1eb1e291b25068b78305ccf0e00006c5b986a89101c69268ca9b90c169ad492
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 921b6f201dc2145ef7ba845f025c077a1c9d48e15ddcff29be0243d49ac85bf2
+  - path: tests/contract/graphics/Test.CrossQueueTimeline.cpp
+    sha256: 54bea7f96e1f5ccad7aad277e5b20a31e701557c00dc800ef9b261209c78286e
+  - path: tests/contract/graphics/Test.RendererRhiBoundary.cpp
+    sha256: 478449d2d693feefad9b70caf99a86a020e94ebadee0b14a3b718598e3409b76
+  content_digest: 83acf25c34cc5fd69a7a3590e39ef518e821c943c1ba331a665e27cf786aa872
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - docs/migration/nonlegacy-parity-matrix.md
+  - src/graphics/renderer/README.md
+  - src/graphics/rhi/CMakeLists.txt
+  - src/graphics/rhi/README.md
+  - src/graphics/rhi/RHI.TimelineSemaphore.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/rendering/README.md
+  - tasks/done/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/graphics/Test.CrossQueueTimeline.cpp
+  - tests/contract/graphics/Test.RendererRhiBoundary.cpp
+  layers:
+  - docs
+  - graphics
+  - tests
+  modules:
+  - Extrinsic.RHI.TimelineSemaphore
+extension_seam: None; the object-level interface is deleted and the existing plain submit-plan records
+  remain the only backend-neutral synchronization seam.
+future_change_plan: Introduce an object-level timeline abstraction only with a present production caller
+  plus a second implementation or exact test-double boundary.
+acceptance:
+- criterion: No module, CMake entry, direct test, or current-state claim for
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Real cross-queue behavior stays covered and unchanged.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No replacement abstraction appears.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the revision-bound deletion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GRAPHICS-129/commands/build-tests-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/build-tests.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/clean-workshop-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/clean-workshop.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/configure-ci-fresh-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/configure-ci-fresh.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/diff-check-final.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/diff-check-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/diff-check.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/doc-links-final.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/doc-links-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/doc-links.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/docs-sync-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/docs-sync.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/focused-cpu-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/focused-cpu.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/full-cpu-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/full-cpu.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/module-inventory-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/module-inventory.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/retired-symbol-scan-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/retired-symbol-scan.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/session-brief.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/task-policy-final.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/task-policy-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/task-policy.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/task-state-links-r2.json
+- receipt: tasks/evidence/GRAPHICS-129/commands/task-state-links.json
+changed_public_contracts:
+- Removed unused Extrinsic.RHI.TimelineSemaphore/ITimelineSemaphore; retained FrameQueueSubmitPlanDesc
+  and compiled cross-queue records.
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Vulkan timeline execution is unchanged and was not re-run; fresh module build plus complete CPU contracts
+  prove the backend-neutral surface.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No Vulkan implementation or submission code changed; the deleted module had zero production
+    consumers and existing opt-in backend evidence remains scoped to the retained submit-plan path.
+artifacts:
+- path: tasks/done/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md
+  sha256: c1eb1e291b25068b78305ccf0e00006c5b986a89101c69268ca9b90c169ad492
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GRAPHICS-129/handoff.jsonl
+review: tasks/evidence/GRAPHICS-129/reviews.jsonl
