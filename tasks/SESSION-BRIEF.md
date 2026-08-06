@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GRAPHICS-130` — Retire unused RHI pipeline registry (tasks/active/GRAPHICS-130-retire-unused-rhi-pipeline-registry.md)
 
 ## Theme B — Rendering modernization
 
@@ -26,7 +26,6 @@ the authoritative open/unblocked view.
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - unblocked: `BUG-134` — ImGui adapter panel draw-list test fails intermittently (tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md)
-- unblocked: `GRAPHICS-130` — Retire unused RHI pipeline registry (tasks/backlog/rendering/GRAPHICS-130-retire-unused-rhi-pipeline-registry.md)
 - unblocked: `GRAPHICS-131` — Concretize the reference reconstructor (tasks/backlog/rendering/GRAPHICS-131-concretize-reference-reconstructor.md)
 - unblocked: `GRAPHICS-132` — Concretize the transient-debug upload helper (tasks/backlog/rendering/GRAPHICS-132-concretize-transient-debug-upload-helper.md)
 - unblocked: `GRAPHICS-133` — Concretize the visualization-overlay upload helper (tasks/backlog/rendering/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md)

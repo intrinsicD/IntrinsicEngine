@@ -6,15 +6,20 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-graphics130"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T15:56:14Z"
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
 ---
 # GRAPHICS-130 — Retire unused RHI pipeline registry
+
+## Status
+
+- In progress on `main`: remove the test-only registry and its stale capability
+  prose while preserving the concrete PipelineManager/renderer path.
 
 ## Goal
 
