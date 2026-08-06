@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci",
+    "--fresh"
+  ],
+  "command_display": "cmake --preset ci --fresh",
+  "cwd": ".",
+  "duration_ms": 8279,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T06:36:17Z",
+  "label": "ci-fresh-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T06:36:09Z",
+  "stderr_path": "tasks/evidence/RUNTIME-215/commands/ci-fresh-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-215/commands/ci-fresh-configure.stdout.log",
+  "stdout_sha256": "51534e7a24e96f4f3d772d426800f780cd83a7e6e2d545bd7275d44aa57e995c",
+  "task_id": "RUNTIME-215"
+}

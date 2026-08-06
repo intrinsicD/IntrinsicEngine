@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--diff-mode",
+    "--base-ref",
+    "origin/main",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict",
+  "cwd": ".",
+  "duration_ms": 40,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T06:38:06Z",
+  "label": "structural-docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T06:38:06Z",
+  "stderr_path": "tasks/evidence/RUNTIME-215/commands/structural-docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-215/commands/structural-docs-sync.stdout.log",
+  "stdout_sha256": "d76c868bdc84747a32660c828a35cb0794487dba4aeffe56e6a72c785a76729f",
+  "task_id": "RUNTIME-215"
+}

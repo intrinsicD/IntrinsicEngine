@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "diff -u <(git grep -h -E \"^(export )?module [A-Za-z0-9_.:]+;\" d5d86a8c -- src/runtime | LC_ALL=C sort) <(rg --no-filename \"^(export )?module [A-Za-z0-9_.:]+;\" src/runtime | LC_ALL=C sort)"
+  ],
+  "command_display": "bash -lc 'diff -u <(git grep -h -E \"^(export )?module [A-Za-z0-9_.:]+;\" d5d86a8c -- src/runtime | LC_ALL=C sort) <(rg --no-filename \"^(export )?module [A-Za-z0-9_.:]+;\" src/runtime | LC_ALL=C sort)'",
+  "cwd": ".",
+  "duration_ms": 28,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T06:43:04Z",
+  "label": "runtime-module-declarations-preserved",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T06:43:04Z",
+  "stderr_path": "tasks/evidence/RUNTIME-215/commands/runtime-module-declarations-preserved.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-215/commands/runtime-module-declarations-preserved.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "RUNTIME-215"
+}

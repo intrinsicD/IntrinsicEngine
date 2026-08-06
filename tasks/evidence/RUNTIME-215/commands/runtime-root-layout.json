@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "diff -u <(printf \"CMakeLists.txt\\nREADME.md\\n\") <(find src/runtime -maxdepth 1 -type f -printf \"%f\\n\" | LC_ALL=C sort)"
+  ],
+  "command_display": "bash -lc 'diff -u <(printf \"CMakeLists.txt\\nREADME.md\\n\") <(find src/runtime -maxdepth 1 -type f -printf \"%f\\n\" | LC_ALL=C sort)'",
+  "cwd": ".",
+  "duration_ms": 19,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T06:42:48Z",
+  "label": "runtime-root-layout",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T06:42:48Z",
+  "stderr_path": "tasks/evidence/RUNTIME-215/commands/runtime-root-layout.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-215/commands/runtime-root-layout.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "RUNTIME-215"
+}
