@@ -1,0 +1,125 @@
+schema_version: 1
+task_id: HARDEN-088
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T15:34:27Z'
+claim_eligible: false
+source:
+  base_ref: ce72d745
+  base_revision: ce72d745e84af97b9800ea9d6cc8d372fc2e0c94
+  head_revision: c696921561c01953eac953281abb4165e53b9458
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/graphics/renderer/Backends/Null/Backends.Null.cppm
+    sha256: b70ab72b9223f19857b4a50cdb07249a68eeb9ad997dfa5adde9358479e00406
+  - path: src/graphics/renderer/Backends/Null/README.md
+    sha256: e58ba9a3e285fdfa387b2f7e7cc23e1cf1ab6a61d62e98d4eacf805f19891832
+  - path: src/graphics/renderer/README.md
+    sha256: 6cef9c19e4fdb39409cab908afe92a7f6a092a6cd1ed57efba184e528b0b3dee
+  - path: src/graphics/vulkan/Backends.Vulkan.CommandContext.cpp
+    sha256: fbbf5e40425b888b46971cae0b17a1ee2bdbab1d6b0de90e8f337f9b4af71578
+  - path: src/graphics/vulkan/Backends.Vulkan.Descriptors.cppm
+    sha256: 9725eafca1ad48474c2c8dc414225a8ffa3d0e3a187d0421f3e6ffaf01cf3edc
+  - path: src/graphics/vulkan/Backends.Vulkan.Device.cpp
+    sha256: 02ece5f7c455ff7482099d6f49802bd00081f8c7c9d34acc72d5017c3fe9bf80
+  - path: src/graphics/vulkan/Backends.Vulkan.Device.cppm
+    sha256: b0f2d86e38f633965386c23e56ddefc15bbac931ab2a93288f79add41d7256ac
+  - path: src/graphics/vulkan/README.md
+    sha256: ee7846f004ac6c87bae60185e70b0235c9bf6ef907a9804b007579152679cd49
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 531a0fe6078bff74ccd68b59cad2c3219dd1f1077ee3394031ad3fa946a4dbfa
+  - path: tasks/active/README.md
+    sha256: 6b90a1203ccdf42a84cb15cb5c8c5de086eccb9e38df90d3c22cfac280d5f9bd
+  - path: tasks/backlog/architecture/README.md
+    sha256: 235ca0447d94bf4a18748f321009869e78ace2ae95167acf9b5c2f5c1fcdb07f
+  - path: tasks/done/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md
+    sha256: bd464baeee6ccad189ce923eccfe47579d45658bad67eea5bd2ab4e2f8f753a9
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 76115626c55f1787b48e9f099188b8b83a94617a3b74c5cb5cd362a714a81588
+  content_digest: ee3fc21f0a99405d4bed372c0419240bc6769fe1956ecca21073f892ff54fa57
+touched:
+  paths:
+  - src/graphics/renderer/Backends/Null/Backends.Null.cppm
+  - src/graphics/renderer/Backends/Null/README.md
+  - src/graphics/renderer/README.md
+  - src/graphics/vulkan/Backends.Vulkan.CommandContext.cpp
+  - src/graphics/vulkan/Backends.Vulkan.Descriptors.cppm
+  - src/graphics/vulkan/Backends.Vulkan.Device.cpp
+  - src/graphics/vulkan/Backends.Vulkan.Device.cppm
+  - src/graphics/vulkan/README.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/architecture/README.md
+  - tasks/done/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md
+  - tasks/done/RETIREMENT-LOG.md
+  layers:
+  - graphics
+  - tasks
+  modules: []
+extension_seam: None; retained frame-sampled descriptor binding already passes the backend-boundary and
+  multi-consumer keep-list.
+future_change_plan: Change the reserved descriptor range only in a scoped graphics task with matched renderer,
+  shader, backend, docs, and GPU evidence.
+acceptance:
+- criterion: No promoted graphics source or current-state backend README calls the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No promoted backend TODO names retired `GRAPHICS-018` work.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Null and Vulkan current-state descriptions match the existing tree and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: '`git diff` contains no executable C++ change.'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/HARDEN-088/commands/clean-workshop.json
+- receipt: tasks/evidence/HARDEN-088/commands/comment-only-cpp-diff.json
+- receipt: tasks/evidence/HARDEN-088/commands/diff-check-final.json
+- receipt: tasks/evidence/HARDEN-088/commands/diff-check.json
+- receipt: tasks/evidence/HARDEN-088/commands/doc-links-final.json
+- receipt: tasks/evidence/HARDEN-088/commands/doc-links.json
+- receipt: tasks/evidence/HARDEN-088/commands/docs-sync.json
+- receipt: tasks/evidence/HARDEN-088/commands/graphics-contract-build.json
+- receipt: tasks/evidence/HARDEN-088/commands/graphics-cpu-tests.json
+- receipt: tasks/evidence/HARDEN-088/commands/session-brief.json
+- receipt: tasks/evidence/HARDEN-088/commands/stale-marker-scan.json
+- receipt: tasks/evidence/HARDEN-088/commands/task-policy-final.json
+- receipt: tasks/evidence/HARDEN-088/commands/task-schema-final.json
+- receipt: tasks/evidence/HARDEN-088/commands/task-schema.json
+- receipt: tasks/evidence/HARDEN-088/commands/task-state-links-final.json
+- receipt: tasks/evidence/HARDEN-088/commands/task-state-links.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- No executable behavior changed; future slot additions must keep renderer and Vulkan documentation synchronized
+  with the backend constant.
+skipped_checks: []
+artifacts:
+- path: tasks/done/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md
+  sha256: bd464baeee6ccad189ce923eccfe47579d45658bad67eea5bd2ab4e2f8f753a9
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
