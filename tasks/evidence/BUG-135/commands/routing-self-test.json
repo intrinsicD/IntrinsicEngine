@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.TestGateRouting.py",
+    "--self-test"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.TestGateRouting.py --self-test",
+  "cwd": ".",
+  "duration_ms": 46,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:17:53Z",
+  "label": "routing-self-test",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:17:53Z",
+  "stderr_path": "tasks/evidence/BUG-135/commands/routing-self-test.stderr.log",
+  "stderr_sha256": "919e93a935131f2930abe307f3d9b8cc4efd312e291dde776ad911de76ff775d",
+  "stdout_path": "tasks/evidence/BUG-135/commands/routing-self-test.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-135"
+}

@@ -1,0 +1,195 @@
+schema_version: 1
+task_id: BUG-135
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T18:18:16Z'
+claim_eligible: false
+source:
+  base_ref: 7f4f6b5da52b83cb8f7413828619e94d650ed131
+  base_revision: 7f4f6b5da52b83cb8f7413828619e94d650ed131
+  head_revision: 6532d3ae957324ec3916001b547fa4cce1503818
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: tasks/backlog/bugs/index.md
+    sha256: 8a7cf2899c3911305f55ea5dbe767cc01fb516e9ac000d469f0cffa5b159951f
+  - path: tasks/done/BUG-135-lop-benchmark-missing-manual-ctest-classification.md
+    sha256: 6a5bed13d56dd742846ea5fa481d44827f6cb24be13ff64d3fcd60ce38901dec
+  - path: tasks/done/BUG-136-test-gate-routing-affected-case-baseline-drift.md
+    sha256: e3c5aca4f96b1013563549913068e003fb521be76ef873a0d33b1b8c39900f86
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 41aecd642637199b72e4b4e0eb7a589fa4c73520b8a3d654ef7bfe58ab2f3f47
+  - path: tasks/evidence/BUG-136/commands/diff-check.json
+    sha256: dde707338994fb4f081aaef57a827c6d0c0261f077795dbcf75cb0f3651a277c
+  - path: tasks/evidence/BUG-136/commands/diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/doc-links.json
+    sha256: 0a49139a7d26ce43b8242696a7c1b2c8aaf41f8c7ae3dbe6b62172d836b64288
+  - path: tasks/evidence/BUG-136/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/doc-links.stdout.log
+    sha256: 560e597bd73c96899261fe287d28a846719a3ede7ec74df765146f863d8c2cba
+  - path: tasks/evidence/BUG-136/commands/routing-all-live.json
+    sha256: 0d859adc493b0901e8825b326fac5846ac15b5478ae63b626b1c8a5882b54fc3
+  - path: tasks/evidence/BUG-136/commands/routing-all-live.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/routing-all-live.stdout.log
+    sha256: 10f5b7656519e2702622797eb410c8ca3ec9000470914ee9051bed7ceb4c2ad3
+  - path: tasks/evidence/BUG-136/commands/routing-cpu-live.json
+    sha256: c6c7c28e58bc8507ff80b63b3e9039431c4d7bc7e138c12f2fa59151808eb052
+  - path: tasks/evidence/BUG-136/commands/routing-cpu-live.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/routing-cpu-live.stdout.log
+    sha256: cea9638bb39f831d4ee2bbfb437a5372d3d9d140d08aa396427764456631d3fb
+  - path: tasks/evidence/BUG-136/commands/routing-self-test.json
+    sha256: 5939f2e2e39796c65505dfc1210af4a0469032ff8108487a5692f034ae77a425
+  - path: tasks/evidence/BUG-136/commands/routing-self-test.stderr.log
+    sha256: 919e93a935131f2930abe307f3d9b8cc4efd312e291dde776ad911de76ff775d
+  - path: tasks/evidence/BUG-136/commands/routing-self-test.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/session-brief.json
+    sha256: 75cf490fe46a4ba130d8b62fc4c724b2e2bae0c9e9883ae2995d41c057ba7819
+  - path: tasks/evidence/BUG-136/commands/session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/BUG-136/commands/task-policy.json
+    sha256: 4f7c6001f6f80301778892a3750955a7c2d84c5c20a669030adb1f0307e8f899
+  - path: tasks/evidence/BUG-136/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/task-policy.stdout.log
+    sha256: 0d86a4cdd2ddb69f3ad114b752b78c77cf880303612961ab732aa7bf23d1c788
+  - path: tasks/evidence/BUG-136/commands/task-schema.json
+    sha256: b1cf3cdc04b3ef605dedb2e1931522eb7b88d68cb432d5786fe15582bb1bf6de
+  - path: tasks/evidence/BUG-136/commands/task-schema.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/task-schema.stdout.log
+    sha256: 991d720ba6661d78eb34016fb798d21a46d2844d98d116b16bd2d94f36481f8e
+  - path: tasks/evidence/BUG-136/commands/task-state-links.json
+    sha256: cfac457979c5144336a0a02df5627f14665bf5c8f89cce3c32b87ed80496b4c9
+  - path: tasks/evidence/BUG-136/commands/task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/task-state-links.stdout.log
+    sha256: bd555fffc46937360ef8e87ff404861daea861d33bb487914fc7d8c0873fb031
+  - path: tasks/evidence/BUG-136/commands/test-layout.json
+    sha256: 4256f419849d49a0b4298044219a22b1617fb266d7a91e9dd58b8126e5822372
+  - path: tasks/evidence/BUG-136/commands/test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-136/commands/test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/BUG-136/report.yaml
+    sha256: 3ba2f5119f30af15bf9fa0b8561ccee9d0aa49f636ed615f194a8e49194ff7ce
+  - path: tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+    sha256: 0598b3b01772c19342fc3c9e201c5c9179529b4832424a70b65810fcd93d0a2b
+  - path: tests/regression/tooling/Test.TestGateRouting.py
+    sha256: 7d31f7e8b739b16f66105b84bc14ecbb433c240ee548bdd70999d55d979c7afe
+  content_digest: 935d74db47d4ee6443f4ebb51bb73c6f6479d965df3cc5744b96b09b408a97f4
+touched:
+  paths:
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-135-lop-benchmark-missing-manual-ctest-classification.md
+  - tasks/done/BUG-136-test-gate-routing-affected-case-baseline-drift.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/BUG-136/commands/diff-check.json
+  - tasks/evidence/BUG-136/commands/diff-check.stderr.log
+  - tasks/evidence/BUG-136/commands/diff-check.stdout.log
+  - tasks/evidence/BUG-136/commands/doc-links.json
+  - tasks/evidence/BUG-136/commands/doc-links.stderr.log
+  - tasks/evidence/BUG-136/commands/doc-links.stdout.log
+  - tasks/evidence/BUG-136/commands/routing-all-live.json
+  - tasks/evidence/BUG-136/commands/routing-all-live.stderr.log
+  - tasks/evidence/BUG-136/commands/routing-all-live.stdout.log
+  - tasks/evidence/BUG-136/commands/routing-cpu-live.json
+  - tasks/evidence/BUG-136/commands/routing-cpu-live.stderr.log
+  - tasks/evidence/BUG-136/commands/routing-cpu-live.stdout.log
+  - tasks/evidence/BUG-136/commands/routing-self-test.json
+  - tasks/evidence/BUG-136/commands/routing-self-test.stderr.log
+  - tasks/evidence/BUG-136/commands/routing-self-test.stdout.log
+  - tasks/evidence/BUG-136/commands/session-brief.json
+  - tasks/evidence/BUG-136/commands/session-brief.stderr.log
+  - tasks/evidence/BUG-136/commands/session-brief.stdout.log
+  - tasks/evidence/BUG-136/commands/task-policy.json
+  - tasks/evidence/BUG-136/commands/task-policy.stderr.log
+  - tasks/evidence/BUG-136/commands/task-policy.stdout.log
+  - tasks/evidence/BUG-136/commands/task-schema.json
+  - tasks/evidence/BUG-136/commands/task-schema.stderr.log
+  - tasks/evidence/BUG-136/commands/task-schema.stdout.log
+  - tasks/evidence/BUG-136/commands/task-state-links.json
+  - tasks/evidence/BUG-136/commands/task-state-links.stderr.log
+  - tasks/evidence/BUG-136/commands/task-state-links.stdout.log
+  - tasks/evidence/BUG-136/commands/test-layout.json
+  - tasks/evidence/BUG-136/commands/test-layout.stderr.log
+  - tasks/evidence/BUG-136/commands/test-layout.stdout.log
+  - tasks/evidence/BUG-136/report.yaml
+  - tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+  - tests/regression/tooling/Test.TestGateRouting.py
+  layers:
+  - tasks
+  - tests
+  modules: []
+extension_seam: Explicit enumeration of standalone manual CTest producers; no new runtime or benchmark
+  extension seam.
+future_change_plan: Any new non-GoogleTest CTest executable must be added to the manual-producer set in
+  the same registration change and proved by live reconciliation.
+acceptance:
+- criterion: The exact unclassified-target failure no longer reproduces.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Removing the classification would still make live reconciliation fail
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Strict task, test-layout, and whitespace gates pass.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-135/commands/diff-check.json
+- receipt: tasks/evidence/BUG-135/commands/doc-links.json
+- receipt: tasks/evidence/BUG-135/commands/routing-all-live.json
+- receipt: tasks/evidence/BUG-135/commands/routing-cpu-live.json
+- receipt: tasks/evidence/BUG-135/commands/routing-self-test.json
+- receipt: tasks/evidence/BUG-135/commands/session-brief.json
+- receipt: tasks/evidence/BUG-135/commands/task-policy.json
+- receipt: tasks/evidence/BUG-135/commands/task-schema.json
+- receipt: tasks/evidence/BUG-135/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-135/commands/test-layout.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- The first live run failed on the unclassified LOP benchmark. Clearing that failure exposed independently
+  tracked BUG-136 baseline drift, which was completed before BUG-135's final live gates; the authorized
+  linear blocker batch is therefore visible in this report surface.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-135-lop-benchmark-missing-manual-ctest-classification.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- No benchmark, engine, CTest registration, label, or aggregate behavior changed; omission of a future
+  manual producer remains fail-closed.
+skipped_checks:
+- check: compiled-test-execution
+  reason: No C++ source, test body, module, CMake input, label, target, or registration changed; the freshly
+    built registry plus hermetic and both live reconciliation modes are the direct owning gates.
+artifacts:
+- path: tests/regression/tooling/Test.TestGateRouting.py
+  sha256: 7d31f7e8b739b16f66105b84bc14ecbb433c240ee548bdd70999d55d979c7afe
+  kind: file
+- path: tasks/done/BUG-135-lop-benchmark-missing-manual-ctest-classification.md
+  sha256: 6a5bed13d56dd742846ea5fa481d44827f6cb24be13ff64d3fcd60ce38901dec
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

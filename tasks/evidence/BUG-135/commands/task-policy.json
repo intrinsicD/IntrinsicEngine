@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 691,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:17:55Z",
+  "label": "task-policy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:17:54Z",
+  "stderr_path": "tasks/evidence/BUG-135/commands/task-policy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-135/commands/task-policy.stdout.log",
+  "stdout_sha256": "83d0cd4d15939e8de594d596f952db5b340465fd45c2c8d27ce3e13f25c7b56f",
+  "task_id": "BUG-135"
+}
