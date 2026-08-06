@@ -17,6 +17,11 @@ contract_review: "Reviewed the full catalog; this defect is confined to task-ind
 ---
 # BUG-133 — Method backlog links a retired task outside history
 
+## Status
+
+- Completed on 2026-08-06 as a micro documentation repair.
+- Implementation commit: `312f32fe`.
+
 ## Goal
 
 - Restore the strict task-state-link gate by citing retired task `METHOD-020`
@@ -52,7 +57,7 @@ contract_review: "Reviewed the full catalog; this defect is confined to task-ind
 
 ## Docs
 
-- [ ] Regenerate `tasks/SESSION-BRIEF.md` after opening and retiring this bug.
+- [x] Regenerate `tasks/SESSION-BRIEF.md` after opening and retiring this bug.
 
 ## Acceptance criteria
 
@@ -69,6 +74,10 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/generate_session_brief.py --check
 git diff --check
 ```
+
+Executed on 2026-08-06: all five commands passed. The task-state checker
+reported no findings across the repository, and no validator policy or task
+lifecycle was changed.
 
 ## Forbidden changes
 

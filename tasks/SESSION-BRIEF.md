@@ -8,7 +8,6 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-133` — Method backlog links a retired task outside history (tasks/active/BUG-133-method-backlog-retired-link-outside-history.md)
 - `RUNTIME-214` — Universal geometry-property CPU/GPU coherence (tasks/active/RUNTIME-214-universal-geometry-property-coherence.md)
 - `RUNTIME-215` — Organize runtime sources by cohesive ownership (tasks/active/RUNTIME-215-organize-runtime-source-layout.md)
 

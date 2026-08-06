@@ -8,6 +8,12 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-133`](BUG-133-method-backlog-retired-link-outside-history.md) — live
+LOP-family guidance now cites retired `METHOD-020` as lifecycle-safe non-link
+prose while retaining its bounded result-report link. The strict repository
+task-state, task-policy, and task-format validators pass; no task was reopened
+and no lifecycle rule or allowlist changed.
+
 [`BUG-132`](BUG-132-vulkan-method-render-synchronization.md) — the promoted
 Vulkan LOP compute/publication/render path is validation-clean. Frame-graph
 passes that load and write one color attachment now coalesce into a single

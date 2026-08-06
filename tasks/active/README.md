@@ -11,9 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-133` — Method backlog links a retired task outside history](BUG-133-method-backlog-retired-link-outside-history.md)
-  is a verified micro repair under `codex-root` on `main`; its next step is
-  retirement bookkeeping and a regenerated session brief.
 - [`RUNTIME-215` — Organize runtime sources by cohesive ownership](RUNTIME-215-organize-runtime-source-layout.md)
   has completed implementation and runtime-scoped verification under
   `codex-root` on `main`. Its next step is standard evidence sealing after the

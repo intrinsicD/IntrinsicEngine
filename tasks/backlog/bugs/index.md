@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-133` — Method backlog links a retired task outside history](../../active/BUG-133-method-backlog-retired-link-outside-history.md):
-  the strict task-state-link gate finds the retired `METHOD-020` link beneath
-  live method-family guidance; the claimed micro repair replaces that retired
-  task link with lifecycle-safe prose without reopening it or weakening the gate.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
@@ -62,6 +58,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-06: [`BUG-133` — Method backlog links a retired task outside
+  history](../../done/BUG-133-method-backlog-retired-link-outside-history.md).
+  Live LOP-family guidance now cites retired `METHOD-020` as non-link prose;
+  strict task-state, task-policy, and task-format validation pass without a
+  lifecycle exemption or task reopening.
 
 - Closed 2026-08-05: [`BUG-132` — Vulkan method/render synchronization and
   resource lifetime](../../done/BUG-132-vulkan-method-render-synchronization.md).
