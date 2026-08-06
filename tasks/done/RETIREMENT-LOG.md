@@ -6828,3 +6828,12 @@ returning before a real second implementation and production selection seam
 exist. Focused ImGui/renderer coverage passed 194/194 and the full default CPU
 selector passed 4,102/4,102 with its expected GLFW/LSan skip; layering,
 task/docs, clean-workshop, inventory, and whitespace gates pass.
+
+[`BUG-136`](BUG-136-test-gate-routing-affected-case-baseline-drift.md) — the
+BUG-106 affected-case baseline drift retired on 2026-08-06. Two obsolete
+Runtime Engine layering names were replaced by the exact six registered cases
+currently owned by the audited source, with coupled count ratchets updated to
+39 Runtime contract cases and 226 total affected cases. Both live aggregate
+reconciliations and all 19 hermetic routing regressions pass without changing
+test ownership, labels, registration, aggregate membership, or fail-closed
+checker behavior.

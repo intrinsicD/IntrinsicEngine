@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `BUG-135` — LOP benchmark lacks manual CTest classification (tasks/active/BUG-135-lop-benchmark-missing-manual-ctest-classification.md)
-- `BUG-136` — Test-gate routing affected-case baseline drift (tasks/active/BUG-136-test-gate-routing-affected-case-baseline-drift.md)
 - `RUNTIME-217` — Inline single-use Core frame-loop contracts (tasks/active/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md)
 
 ## Theme B — Rendering modernization

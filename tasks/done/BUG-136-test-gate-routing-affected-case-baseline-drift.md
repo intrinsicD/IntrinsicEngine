@@ -15,6 +15,11 @@ contract_review: "Reviewed the full catalog; this task reconciles a generated-by
 ---
 # BUG-136 — Test-gate routing affected-case baseline drift
 
+## Status
+
+- Completed on 2026-08-06.
+- Implementation commit: `89c4e9ed`.
+
 ## Goal
 
 - Restore the BUG-106 affected-case parity check by making its baseline name
@@ -41,31 +46,31 @@ contract_review: "Reviewed the full catalog; this task reconciles a generated-by
 
 ## Required changes
 
-- [ ] Audit the live `Test.RuntimeEngineLayering.cpp` case inventory against
+- [x] Audit the live `Test.RuntimeEngineLayering.cpp` case inventory against
       CTest discovery and the affected-source map.
-- [ ] Replace the two retired case rows with the exact six live rows reported
+- [x] Replace the two retired case rows with the exact six live rows reported
       by reconciliation, then synchronize the coupled Runtime-target and total
       count ratchets from `35`/`222` to `39`/`226`; preserve every unaffected
       row and exact-equality check.
 
 ## Tests
 
-- [ ] The 19 hermetic routing regressions pass unchanged.
-- [ ] Live `IntrinsicCpuTests` and `IntrinsicTests` reconciliation pass against
+- [x] The 19 hermetic routing regressions pass unchanged.
+- [x] Live `IntrinsicCpuTests` and `IntrinsicTests` reconciliation pass against
       the freshly built `build/ci` registry.
 
 ## Docs
 
-- [ ] Record the audited mismatch, correction, and verification here and in
+- [x] Record the audited mismatch, correction, and verification here and in
       the bug index; no architecture documentation change is required.
 
 ## Acceptance criteria
 
-- [ ] The reported missing/extra set is empty without changing source
+- [x] The reported missing/extra set is empty without changing source
       ownership or checker logic.
-- [ ] The baseline remains an exact inventory of the affected cases with
+- [x] The baseline remains an exact inventory of the affected cases with
       explicit per-target and total count ratchets.
-- [ ] Strict task, test-layout, and whitespace gates pass.
+- [x] Strict task, test-layout, and whitespace gates pass.
 
 ## Verification
 
@@ -77,6 +82,13 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 git diff --check
 ```
+
+Executed on 2026-08-06: all 19 hermetic regressions passed. Live
+reconciliation passed for `IntrinsicCpuTests` (26 targets, 4,101 cases, 327
+sources) and `IntrinsicTests` (37 targets, 4,158 cases, 327 sources). Strict
+test-layout, task-policy, task-format, task-state-link, documentation-link, and
+whitespace checks passed. The repair changed only the exact case inventory and
+its coupled Runtime-target/total count ratchets.
 
 ## Forbidden changes
 

@@ -5,11 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-136` — Test-gate routing affected-case baseline drift](../../active/BUG-136-test-gate-routing-affected-case-baseline-drift.md):
-  the BUG-106 exact case baseline still names two retired Runtime Engine
-  layering cases and omits six current cases in the same audited source.
-  Reconcile only those rows while preserving exact source, registration, and
-  aggregate parity.
 - [`BUG-135` — LOP benchmark lacks manual CTest classification](../../active/BUG-135-lop-benchmark-missing-manual-ctest-classification.md):
   the live routing reconciler rejects every aggregate because the standalone
   LOP-family GPU benchmark registers CTest cases manually but was omitted from
@@ -75,6 +70,14 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-06: [`BUG-136` — Test-gate routing affected-case baseline
+  drift](../../done/BUG-136-test-gate-routing-affected-case-baseline-drift.md).
+  The exact BUG-106 inventory now replaces two retired Runtime Engine layering
+  names with all six live cases and synchronizes its explicit count ratchets to
+  39 Runtime contract cases / 226 total. Both live aggregates and all 19
+  hermetic fail-closed regressions pass without changing ownership or checker
+  semantics.
 
 - Closed 2026-08-06: [`BUG-133` — Method backlog links a retired task outside
   history](../../done/BUG-133-method-backlog-retired-link-outside-history.md).
