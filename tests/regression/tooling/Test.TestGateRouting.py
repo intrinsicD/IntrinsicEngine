@@ -167,6 +167,7 @@ MANUAL_CTEST_TARGETS = frozenset(
         "IntrinsicBenchmarkSmoke",
         "IntrinsicGlfwLifecycleLsanProcess",
         "IntrinsicKMeansGpuBenchmarkSmoke",
+        "IntrinsicLopFamilyGpuBenchmarkSmoke",
     }
 )
 AFFECTED_DEDICATED_TARGETS = frozenset(
