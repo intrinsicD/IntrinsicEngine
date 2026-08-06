@@ -11,10 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-- [`GRAPHICS-132`](GRAPHICS-132-concretize-transient-debug-upload-helper.md) —
-  remove the single-owner transient-debug upload-helper base while retaining
-  the concrete Renderer-owned behavior. `REVIEW-003` remains backlogged until
-  its remaining audit remediations retire.
+- No task is currently active. `GRAPHICS-133` is the next eligible
+  `REVIEW-003` remediation.
 
 ## History
 

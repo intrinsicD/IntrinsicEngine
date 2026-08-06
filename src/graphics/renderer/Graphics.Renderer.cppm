@@ -52,9 +52,9 @@ export import Extrinsic.Graphics.RenderSubsystemRegistry;
 // `RenderGraphFrameStats::TransientDebugUpload` (e.g. contract tests,
 // editor diagnostics) reach the `TransientDebugUploadDiagnostics`
 // struct without separately importing this internal renderer module.
-// The helper interfaces themselves (`ITransientDebugUploadHelper`,
-// `TransientDebugTriangleUploadResult`) ride along for the same
-// consumers but are not part of the renderer's narrow public API.
+// The helper result records (for example
+// `TransientDebugTriangleUploadResult`) ride along for the same consumers but
+// are not part of the renderer's narrow public API.
 export import Extrinsic.Graphics.TransientDebugUploadHelper;
 // GRAPHICS-078 Slice B — re-export the visualization-overlay upload
 // helper module so consumers of

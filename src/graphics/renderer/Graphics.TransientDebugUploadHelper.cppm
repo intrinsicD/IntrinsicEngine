@@ -22,7 +22,7 @@ import Extrinsic.RHI.Handles;
 // helper can record deterministic `BindPipeline + PushConstants +
 // Draw(...)` shapes.
 //
-// Slice B wired the triangle lane; Slice C extends the interface to
+// Slice B wired the triangle lane; Slice C extends the helper to
 // the line + point lanes with the same shape (per-lane buffer lease,
 // per-lane growth, per-lane upload result). All three lanes share the
 // `position(vec3) + packed RGBA8 color(uint32)` 16-byte packed-vertex
@@ -38,9 +38,8 @@ import Extrinsic.RHI.Handles;
 // `IRenderer`-internal `Pass.TransientDebug.Surface` consumes the
 // upload result), and must not route through the retained
 // `GpuRender_Line` / `GpuRender_Point` cull buckets. The helper is
-// declared here in the renderer module so the abstract interface is
-// reachable from CPU contract tests; the Vulkan-tuned concrete
-// implementation lands with Slice D (see the task file).
+// declared here in the renderer module so CPU contract tests can exercise
+// its concrete buffer-partitioning contract directly.
 
 export namespace Extrinsic::Graphics
 {
@@ -107,39 +106,7 @@ export namespace Extrinsic::Graphics
         bool              Overflow{false};
     };
 
-    class ITransientDebugUploadHelper
-    {
-    public:
-        virtual ~ITransientDebugUploadHelper() = default;
-
-        ITransientDebugUploadHelper(const ITransientDebugUploadHelper&)            = delete;
-        ITransientDebugUploadHelper& operator=(const ITransientDebugUploadHelper&) = delete;
-
-        virtual void BeginFrame(std::uint32_t frameIndex,
-                                std::uint32_t framesInFlight) = 0;
-
-        [[nodiscard]] virtual TransientDebugTriangleUploadResult UploadTriangles(
-            std::span<const DebugTrianglePacket> triangles) = 0;
-
-        // GRAPHICS-077 Slice C — line + point lane uploads. Same per-
-        // lane buffer-lease + geometric-growth shape as the triangle
-        // lane. Returns `Uploaded = false` when the lane has no
-        // packets, the device is non-operational, or no manager is
-        // attached; `Overflow = true` when the requested vertex count
-        // exceeds the per-lane cap or buffer creation fails.
-        [[nodiscard]] virtual TransientDebugLineUploadResult UploadLines(
-            std::span<const DebugLinePacket> lines) = 0;
-
-        [[nodiscard]] virtual TransientDebugPointUploadResult UploadPoints(
-            std::span<const DebugPointPacket> points) = 0;
-
-        [[nodiscard]] virtual std::uint64_t GetBufferAllocationCount() const noexcept = 0;
-
-    protected:
-        ITransientDebugUploadHelper() = default;
-    };
-
-    // Default in-renderer implementation. Pairs `RHI::BufferManager` with
+    // Renderer-owned upload helper. Pairs `RHI::BufferManager` with
     // the device's `WriteBuffer(...)` path: per frame the helper resets
     // its bookkeeping, the renderer calls
     // `UploadTriangles(...)`/`UploadLines(...)`/`UploadPoints(...)` once
@@ -162,25 +129,25 @@ export namespace Extrinsic::Graphics
     // (the renderer owns both and resets the helper before the manager in
     // `Shutdown()`). The `Upload*` methods therefore only guard the device's
     // operational state and the empty-input case, not the member pointers.
-    class TransientDebugUploadHelper final : public ITransientDebugUploadHelper
+    class TransientDebugUploadHelper
     {
     public:
         TransientDebugUploadHelper(RHI::IDevice& device, RHI::BufferManager& bufferManager);
-        ~TransientDebugUploadHelper() override;
+        ~TransientDebugUploadHelper();
 
         void BeginFrame(std::uint32_t frameIndex,
-                        std::uint32_t framesInFlight) override;
+                        std::uint32_t framesInFlight);
 
         [[nodiscard]] TransientDebugTriangleUploadResult UploadTriangles(
-            std::span<const DebugTrianglePacket> triangles) override;
+            std::span<const DebugTrianglePacket> triangles);
 
         [[nodiscard]] TransientDebugLineUploadResult UploadLines(
-            std::span<const DebugLinePacket> lines) override;
+            std::span<const DebugLinePacket> lines);
 
         [[nodiscard]] TransientDebugPointUploadResult UploadPoints(
-            std::span<const DebugPointPacket> points) override;
+            std::span<const DebugPointPacket> points);
 
-        [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept override
+        [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept
         {
             return m_BufferAllocationCount;
         }

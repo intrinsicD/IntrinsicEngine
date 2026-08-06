@@ -10910,14 +10910,11 @@ namespace Extrinsic::Graphics
         // fail-closed.
         std::optional<RHI::PipelineManager::PipelineLease> m_ClusterGridBuildPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ClusterLightAssignmentPipelineLease;
-        // GRAPHICS-077 Slice B — backend-local transient-debug upload
-        // helper. Held as `unique_ptr<ITransientDebugUploadHelper>` so
-        // Slice D can swap in a Vulkan-tuned concrete implementation
-        // without disturbing the renderer-side wiring. Constructed in
-        // `Initialize(device)` against the live `BufferManager`; reset
-        // in `Shutdown()` before the `BufferManager` so the helper's
-        // internal lease destructor observes a live manager.
-        std::unique_ptr<ITransientDebugUploadHelper> m_TransientDebugUploadHelper;
+        // GRAPHICS-077 Slice B — renderer-owned transient-debug upload
+        // helper. Constructed in `Initialize(device)` against the live
+        // `BufferManager`; reset in `Shutdown()` before the `BufferManager` so
+        // the helper's internal lease destructor observes a live manager.
+        std::unique_ptr<TransientDebugUploadHelper> m_TransientDebugUploadHelper;
         // GRAPHICS-078 Slice B — backend-local visualization-overlay
         // upload helper. Same lifetime contract as the transient-
         // debug helper above: held as

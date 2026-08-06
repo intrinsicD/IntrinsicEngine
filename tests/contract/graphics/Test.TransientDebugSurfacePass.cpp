@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -46,6 +47,8 @@ import Extrinsic.RHI.Handles;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
+
+static_assert(!std::is_polymorphic_v<Graphics::TransientDebugUploadHelper>);
 
 namespace
 {

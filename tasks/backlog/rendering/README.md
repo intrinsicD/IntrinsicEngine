@@ -35,11 +35,12 @@ without requiring them to read every file.
     pipeline behavior remain.
   - `GRAPHICS-131` is retired: the single-implementation reconstructor base is
     deleted while concrete reference TAA behavior remains unchanged.
-  - [`GRAPHICS-132`](../../active/GRAPHICS-132-concretize-transient-debug-upload-helper.md),
-    [`GRAPHICS-133`](GRAPHICS-133-concretize-visualization-overlay-upload-helper.md),
+  - `GRAPHICS-132` is retired: the transient-debug helper is concrete and its
+    Renderer-owned behavior is unchanged.
+  - [`GRAPHICS-133`](GRAPHICS-133-concretize-visualization-overlay-upload-helper.md)
     and [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) each
-    remove one single-owner upload-helper base while retaining its concrete
-    feature-owned helper.
+    remove one remaining single-owner upload-helper base while retaining its
+    concrete feature-owned helper.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:
@@ -71,6 +72,10 @@ or CPU-clock profiler behavior.
 
 ## Retired cross-domain rendering leaves
 
+- [`GRAPHICS-132`](../../done/GRAPHICS-132-concretize-transient-debug-upload-helper.md) —
+  retired the unused transient-debug upload-helper base while preserving the
+  concrete implementation and Renderer lifecycle; focused 161/161 and full
+  4,100/4,100 CPU selectors pass with the expected environment skip.
 - [`GRAPHICS-129`](../../done/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md) —
   retired the zero-production-consumer RHI timeline object interface; focused
   52/52 and full 4,103/4,103 CPU selectors pass with the expected environment

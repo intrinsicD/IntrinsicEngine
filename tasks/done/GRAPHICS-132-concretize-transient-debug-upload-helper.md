@@ -18,8 +18,13 @@ contracts:
 
 ## Status
 
-- In progress on `main`: remove only the unused base and virtual qualifiers;
-  keep the concrete helper implementation and Renderer lifecycle unchanged.
+- Completed and retired on 2026-08-06. The unused
+  `ITransientDebugUploadHelper` base and virtual dispatch are gone; the
+  concrete helper implementation unit, Renderer call sequence, buffer
+  partitioning, upload behavior, and teardown order are unchanged. Focused
+  transient-debug/renderer coverage passed 161/161 and the complete default
+  CPU selector passed 4,100/4,100 with its expected GLFW/LSan skip.
+- Completion commit: this implementation/retirement commit.
 
 ## Goal
 
@@ -53,31 +58,31 @@ contracts:
 
 ## Required changes
 
-- [ ] Remove the interface and concrete inheritance.
-- [ ] Make Renderer own the concrete helper while preserving initialize,
+- [x] Remove the interface and concrete inheritance.
+- [x] Make Renderer own the concrete helper while preserving initialize,
       upload, reset, release, and teardown order.
-- [ ] Update focused source-contract tests and remove hypothetical
+- [x] Update focused source-contract tests and remove hypothetical
       backend-variant prose.
-- [ ] Add a structural ratchet proving the base name is absent.
+- [x] Add a structural ratchet proving the base name is absent.
 
 ## Tests
 
-- [ ] Focused transient-debug and renderer lifecycle contracts pass.
-- [ ] Complete default CPU-supported gate passes.
-- [ ] Strict layering, docs/task, clean-workshop, and inventory checks pass.
+- [x] Focused transient-debug and renderer lifecycle contracts pass.
+- [x] Complete default CPU-supported gate passes.
+- [x] Strict layering, docs/task, clean-workshop, and inventory checks pass.
 
 ## Docs
 
-- [ ] Update renderer/canonical graphics prose to name the concrete current
+- [x] Update renderer/canonical graphics prose to name the concrete current
       owner without a future-variant claim; refresh task/session records.
 
 ## Acceptance criteria
 
-- [ ] `ITransientDebugUploadHelper` is absent from production, tests, and
+- [x] `ITransientDebugUploadHelper` is absent from production, tests, and
       current-state docs.
-- [ ] Concrete behavior remains covered and unchanged.
-- [ ] No replacement abstraction appears.
-- [ ] Independent fixed-surface review accepts the revision-bound deletion.
+- [x] Concrete behavior remains covered and unchanged.
+- [x] No replacement abstraction appears.
+- [x] Independent fixed-surface review accepts the revision-bound deletion.
 
 ## Verification
 
