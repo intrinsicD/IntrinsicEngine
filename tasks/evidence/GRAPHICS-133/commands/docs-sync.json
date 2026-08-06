@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 5706,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T17:12:01Z",
+  "label": "docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T17:11:55Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-133/commands/docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-133/commands/docs-sync.stdout.log",
+  "stdout_sha256": "26ae2a2fffebdb639bc94324ab961f3698612bf54e9a189f7769aed280a4ce5d",
+  "task_id": "GRAPHICS-133"
+}

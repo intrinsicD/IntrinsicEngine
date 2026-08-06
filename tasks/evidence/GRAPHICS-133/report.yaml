@@ -1,0 +1,120 @@
+schema_version: 1
+task_id: GRAPHICS-133
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T17:12:13Z'
+claim_eligible: false
+source:
+  base_ref: dab24c195e73946618bdb47d59a7469f7e8fe21f
+  base_revision: dab24c195e73946618bdb47d59a7469f7e8fe21f
+  head_revision: 68db4bf174a746b6e45f86292a98f6479ff2e89f
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/graphics/renderer/Graphics.Renderer.cpp
+    sha256: 1066bb9c4806f15e7ba2a61c6899cf422a8d64e7f7ff2533be54e83eaedec512
+  - path: src/graphics/renderer/Graphics.Renderer.cppm
+    sha256: 919b05998f726f415e1e7f5bea34bcc8a6c5c9d4594094ded669f6879a8877d0
+  - path: src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm
+    sha256: 4866887657cacc104571c0e732ae0ea0d2cf62832bd063e59608246a981dd85a
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 6614116a74802ec07a0b1e1a06c0e76a12012252aace6ec64eb3442ffae073df
+  - path: tasks/active/README.md
+    sha256: f926616b4cf5f605d7fcab467c1629bb5c9113f793a4c7f626ffd9b369125c59
+  - path: tasks/backlog/rendering/README.md
+    sha256: e335c9b760ec4bae8399d4a196507c917c55a1df8f48040c3a4c1df84d7da9e3
+  - path: tasks/done/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md
+    sha256: 180b766aa1307386c01904ff2a5c66bfd446b22f644f600e5ffdeb478f5ecba3
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 557d9ddbea48fb4a6eb5955a2074375996f059bf5ff1995efaf64a4fef2da7f8
+  - path: tests/contract/graphics/Test.RendererRhiBoundary.cpp
+    sha256: ebfe5a06339699214abff9623e870008317e8f9e35aedbc694bd9c738cc31dc6
+  - path: tests/contract/graphics/Test.VisualizationOverlayPass.cpp
+    sha256: f780c9bd02f8c2640136cdd4cf81ddd60543836a49328d7b12b5e83d5b359d9e
+  content_digest: 31fd2c36992a831ea01fa338a83b042be4b00d3ec9593eccfad505d7bd1dafb6
+touched:
+  paths:
+  - src/graphics/renderer/Graphics.Renderer.cpp
+  - src/graphics/renderer/Graphics.Renderer.cppm
+  - src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/rendering/README.md
+  - tasks/done/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/graphics/Test.RendererRhiBoundary.cpp
+  - tests/contract/graphics/Test.VisualizationOverlayPass.cpp
+  layers:
+  - docs
+  - graphics
+  - tests
+  modules:
+  - Extrinsic.Graphics.VisualizationOverlayUploadHelper
+extension_seam: None; VisualizationOverlayUploadHelper is the one present implementation and Renderer
+  owner, so no polymorphic seam remains.
+future_change_plan: Introduce a shared upload-helper boundary only when a real second implementation shares
+  a present production selection and call site.
+acceptance:
+- criterion: The interface name is absent; concrete behavior stays covered.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No other helper family or replacement abstraction changes.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the revision-bound deletion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GRAPHICS-133/commands/build-tests.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/clean-workshop.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/configure-ci.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/diff-check.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/doc-links.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/docs-sync.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/focused-cpu.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/full-cpu.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/helper-body-unchanged.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/layering.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/module-inventory.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/retired-symbol-scan.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/stale-prose-scan.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/task-policy.json
+- receipt: tasks/evidence/GRAPHICS-133/commands/task-state-links.json
+changed_public_contracts:
+- Removed Graphics::IVisualizationOverlayUploadHelper; VisualizationOverlayUploadHelper retains the same
+  BeginFrame, UploadVectorFields, UploadIsolines, diagnostics, per-lane buffer lifecycle, and Renderer
+  call path.
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- Opt-in Vulkan execution was not rerun; the helper implementation unit, Renderer calls, RHI/backend code,
+  resources, and shaders are unchanged.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No RHI, Vulkan, shader, buffer algorithm, Renderer call-site, or resource-lifecycle behavior
+    changed; focused and complete CPU contracts cover the removed dispatch layer.
+artifacts:
+- path: tasks/done/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md
+  sha256: 180b766aa1307386c01904ff2a5c66bfd446b22f644f600e5ffdeb478f5ecba3
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GRAPHICS-133/handoff.jsonl
+review: tasks/evidence/GRAPHICS-133/reviews.jsonl

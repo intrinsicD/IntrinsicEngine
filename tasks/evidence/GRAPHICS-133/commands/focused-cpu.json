@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "VisualizationOverlay|Renderer",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'VisualizationOverlay|Renderer' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 9373,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T17:10:24Z",
+  "label": "focused-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T17:10:15Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-133/commands/focused-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-133/commands/focused-cpu.stdout.log",
+  "stdout_sha256": "5a8aa70e240227b954e456b3e368568d37e8423aedb6b18990f4aee88682e8d5",
+  "task_id": "GRAPHICS-133"
+}
