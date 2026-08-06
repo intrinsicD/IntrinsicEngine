@@ -28,7 +28,7 @@ without requiring them to read every file.
   render-pass command recording via the task scheduler on 2026-07-07.
 - The rejected 2026-08-06 `REVIEW-003` baseline opened six Theme F
   right-sizing blockers that must retire before the readiness audit restarts:
-  - [`GRAPHICS-129`](GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md)
+  - Active [`GRAPHICS-129`](../../active/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md)
     deletes the production-unused TimelineSemaphore module.
   - [`GRAPHICS-130`](GRAPHICS-130-retire-unused-rhi-pipeline-registry.md)
     deletes the zero-production-consumer PipelineRegistry module.

@@ -11,8 +11,12 @@ Each active task should include:
 
 ## Currently active
 
-- None. `REVIEW-003` remains in the architecture backlog after its rejected
-  2026-08-06 baseline opened concrete remediation dependencies.
+- [`GRAPHICS-129`](GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md) — in
+  progress on `main` by `codex-graphics129`; retire the production-unused RHI
+  timeline-semaphore object interface.
+
+`REVIEW-003` remains in the architecture backlog after its rejected 2026-08-06
+baseline opened concrete remediation dependencies.
 
 ## History
 

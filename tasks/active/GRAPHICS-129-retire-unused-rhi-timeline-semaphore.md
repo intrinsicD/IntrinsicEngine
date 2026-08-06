@@ -6,15 +6,20 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-graphics129"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T15:35:42Z"
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
 ---
 # GRAPHICS-129 — Retire unused RHI timeline-semaphore abstraction
+
+## Status
+
+- In progress on `main`: delete the unused object interface while preserving
+  compiled submit-plan and Vulkan timeline synchronization behavior.
 
 ## Goal
 
