@@ -145,7 +145,7 @@
 - **Provenance**: user-revised
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [N222,
-  tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
+  tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
   tasks/SESSION-BRIEF.md]
 - **From staging**: O47
 
@@ -314,7 +314,7 @@
   tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md,
   tasks/evidence/RUNTIME-203/report.yaml,
   tasks/evidence/RUNTIME-205/report.yaml,
-  tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
+  tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
   src/runtime/Kernel/Runtime.Engine.cpp,
   src/runtime/Scene/Runtime.SceneInteractionModule.cpp,
   src/runtime/Config/Runtime.EngineConfigControl.cpp,
