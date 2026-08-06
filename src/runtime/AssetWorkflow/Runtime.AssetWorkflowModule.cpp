@@ -21,7 +21,6 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
-import Extrinsic.Core.FrameLoop;
 import Extrinsic.Core.Logging;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
@@ -633,7 +632,6 @@ namespace Extrinsic::Runtime
         bool AssetServicePublished{false};
         bool WorkflowServicePublished{false};
         bool CachePublished{false};
-        bool AssetHooksPublished{false};
 
         void Unsubscribe(
             KernelEventBus* const events) noexcept
@@ -664,13 +662,6 @@ namespace Extrinsic::Runtime
         {
             if (services == nullptr)
                 return;
-
-            if (AssetHooksPublished)
-            {
-                (void)services->Withdraw<Core::IAssetFrameHooks>(
-                    module);
-            }
-            AssetHooksPublished = false;
 
             if (Shared != nullptr &&
                 CachePublished &&
@@ -853,7 +844,6 @@ namespace Extrinsic::Runtime
             m_Impl->AssetServicePublished ||
             m_Impl->WorkflowServicePublished ||
             m_Impl->CachePublished ||
-            m_Impl->AssetHooksPublished ||
             m_Impl->ActiveWorldChangedSubscription.IsValid() ||
             m_Impl->WorldDestroyedSubscription.IsValid() ||
             m_Impl->ShutdownSubscription.IsValid() ||
@@ -864,8 +854,6 @@ namespace Extrinsic::Runtime
             setup.Services().Find<AssetWorkflowModule>() !=
                 nullptr ||
             setup.Services().Find<Graphics::GpuAssetCache>() !=
-                nullptr ||
-            setup.Services().Find<Core::IAssetFrameHooks>() !=
                 nullptr)
         {
             return Core::Err(Core::ErrorCode::InvalidState);
@@ -994,21 +982,6 @@ namespace Extrinsic::Runtime
         }
         m_Impl->CachePublished = true;
 
-        if (Core::Result provided =
-                setup.Services().Provide<Core::IAssetFrameHooks>(
-                    *this, Name());
-            !provided.has_value())
-        {
-            m_Impl->RollBack(
-                *this,
-                &setup.Events(),
-                &setup.Jobs(),
-                &setup.Services(),
-                true);
-            return provided;
-        }
-        m_Impl->AssetHooksPublished = true;
-
         const std::weak_ptr<Impl::State> weakState =
             m_Impl->Shared;
         m_Impl->ActiveWorldChangedSubscription =
@@ -1064,14 +1037,11 @@ namespace Extrinsic::Runtime
             !m_Impl->AssetServicePublished ||
             !m_Impl->WorkflowServicePublished ||
             !m_Impl->CachePublished ||
-            !m_Impl->AssetHooksPublished ||
             setup.Services().Find<Assets::AssetService>() !=
                 m_Impl->Shared->Assets.get() ||
             setup.Services().Find<AssetWorkflowModule>() != this ||
             setup.Services().Find<Graphics::GpuAssetCache>() !=
-                m_Impl->Shared->Cache.get() ||
-            setup.Services().Find<Core::IAssetFrameHooks>() !=
-                this)
+                m_Impl->Shared->Cache.get())
         {
             if (m_Impl->Shared)
             {
@@ -1208,7 +1178,7 @@ namespace Extrinsic::Runtime
             false);
     }
 
-    void AssetWorkflowModule::TickAssets()
+    void AssetWorkflowModule::RunFrameMaintenance()
     {
         if (!m_Impl || !m_Impl->Shared)
             return;

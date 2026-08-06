@@ -52,7 +52,6 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -653,81 +652,26 @@ namespace Extrinsic::Runtime
         if (!m_Impl->m_ShutdownBegun)
             return;
 
-        struct ShutdownHooks final : Core::IShutdownHooks
+        ShutdownRuntimeModules();
+        m_Impl->m_Scene = nullptr;
+        m_Impl->m_WorldRegistry.Clear();
+        m_Impl->m_FrameGraph.reset();
+        if (m_Impl->m_Renderer)
         {
-            Engine& Owner;
-            bool& Initialized;
-            std::unique_ptr<Platform::IWindow>& Window;
-            std::unique_ptr<RHI::IDevice>& Device;
-            std::unique_ptr<Graphics::IRenderer>& Renderer;
-            std::unique_ptr<Core::FrameGraph>& FrameGraph;
-            WorldRegistry& Worlds;
-            ECS::Scene::Registry*& Scene;
-
-            ShutdownHooks(Engine& owner,
-                          bool& initialized,
-                          std::unique_ptr<Platform::IWindow>& window,
-                          std::unique_ptr<RHI::IDevice>& device,
-                          std::unique_ptr<Graphics::IRenderer>& renderer,
-                          std::unique_ptr<Core::FrameGraph>& frameGraph,
-                          WorldRegistry& worlds,
-                          ECS::Scene::Registry*& scene)
-                : Owner(owner)
-                , Initialized(initialized)
-                , Window(window)
-                , Device(device)
-                , Renderer(renderer)
-                , FrameGraph(frameGraph)
-                , Worlds(worlds)
-                , Scene(scene)
-            {
-            }
-            void ShutdownRuntimeModules() override
-            {
-                Owner.ShutdownRuntimeModules();
-            }
-            void DestroyScene() override
-            {
-                Scene = nullptr;
-                Worlds.Clear();
-            }
-            void DestroyFrameGraph() override { FrameGraph.reset(); }
-            void ShutdownRenderer() override
-            {
-                if (Renderer)
-                {
-                    Owner.m_Impl->m_RenderExtractionCache.Shutdown(*Renderer);
-                    Renderer->Shutdown();
-                    Renderer.reset();
-                }
-            }
-            void ShutdownDevice() override
-            {
-                if (Device)
-                {
-                    Device->Shutdown();
-                    Device.reset();
-                }
-            }
-            void DestroyWindow() override { Window.reset(); }
-            void ShutdownScheduler() override
-            {
-                // Shut down the fiber scheduler last — worker threads must exit cleanly
-                // before any other thread-local storage or allocators are destroyed.
-                Core::Tasks::Scheduler::Shutdown();
-            }
-            void MarkUninitialized() override { Initialized = false; }
-        };
-
-        ShutdownHooks hooks(*this,
-                            m_Impl->m_Initialized,
-                            m_Impl->m_Window,
-                            m_Impl->m_Device,
-                            m_Impl->m_Renderer,
-                            m_Impl->m_FrameGraph,
-                            m_Impl->m_WorldRegistry,
-                            m_Impl->m_Scene);
-        Core::ExecuteShutdownContract(hooks);
+            m_Impl->m_RenderExtractionCache.Shutdown(*m_Impl->m_Renderer);
+            m_Impl->m_Renderer->Shutdown();
+            m_Impl->m_Renderer.reset();
+        }
+        if (m_Impl->m_Device)
+        {
+            m_Impl->m_Device->Shutdown();
+            m_Impl->m_Device.reset();
+        }
+        m_Impl->m_Window.reset();
+        // Shut down the fiber scheduler last — worker threads must exit cleanly
+        // before any other thread-local storage or allocators are destroyed.
+        Core::Tasks::Scheduler::Shutdown();
+        m_Impl->m_Initialized = false;
         m_Impl->m_ShutdownBegun = false;
     }
 
@@ -759,14 +703,20 @@ namespace Extrinsic::Runtime
         };
 
         // ── Phase 1: Platform ─────────────────────────────────────────────
-        PlatformFrameHooks platformHooks{*m_Impl->m_Window};
         const auto platformBegin = std::chrono::steady_clock::now();
-        const Core::PlatformFrameResult platformResult =
-            Core::ExecutePlatformBeginFrameContract(platformHooks,
-                                                    kIdleSleepSeconds);
+        m_Impl->m_Window->PollEvents();
+        const bool platformShouldClose = m_Impl->m_Window->ShouldClose();
+        bool platformContinueFrame = false;
+        if (!platformShouldClose)
+        {
+            if (m_Impl->m_Window->IsMinimized())
+                m_Impl->m_Window->WaitForEventsTimeout(kIdleSleepSeconds);
+            else
+                platformContinueFrame = true;
+        }
         pacing.PlatformBeginMicros = ElapsedMicros(platformBegin);
-        pacing.PlatformContinueFrame = platformResult.ContinueFrame;
-        if (platformResult.ShouldClose)
+        pacing.PlatformContinueFrame = platformContinueFrame;
+        if (platformShouldClose)
         {
             RequestExitFromWindowClose("platform-poll");
             publishPacingSample();
@@ -780,7 +730,7 @@ namespace Extrinsic::Runtime
 
         m_Impl->m_FrameClock.BeginFrame();
 
-        if (!platformResult.ContinueFrame)
+        if (!platformContinueFrame)
         {
             m_Impl->m_FrameClock.Resample();
             publishPacingSample();
@@ -804,9 +754,17 @@ namespace Extrinsic::Runtime
         }
         pacing.ResizeMicros = ElapsedMicros(resizeBegin);
 
-        OperationalTransitionHooks operationalHooks(*m_Impl->m_Device, *m_Impl->m_Renderer, m_Impl->m_RendererOperational);
         const auto operationalBegin = std::chrono::steady_clock::now();
-        (void)Core::ExecuteOperationalTransitionContract(operationalHooks);
+        if (m_Impl->m_Device->IsOperational() &&
+            !m_Impl->m_RendererOperational)
+        {
+            m_Impl->m_Device->WaitIdle();
+            if (m_Impl->m_Renderer->RebuildOperationalResources(
+                    *m_Impl->m_Device))
+            {
+                m_Impl->m_RendererOperational = true;
+            }
+        }
         pacing.OperationalTransitionMicros = ElapsedMicros(operationalBegin);
 
         // ── Command drain (pre-sim; ARCH-007 / ADR-0024 D5) ───────────────
@@ -1001,12 +959,12 @@ namespace Extrinsic::Runtime
             frameContext.EditorCapture,
             pacing);
 
-        // ── Phases 5–9: promoted render-frame contract ───────────────────
+        // ── Phases 5–9: renderer lifecycle ───────────────────────────────
         RHI::FrameHandle frame{};
         Graphics::RenderWorld renderWorld{};
 
         // GRAPHICS-036C — the render-world pool slot lifecycle is driven around
-        // extraction inside the hook (producer: AcquireBack/PublishFront;
+        // extraction below (producer: AcquireBack/PublishFront;
         // consumer: AcquireFront) and the front reference is released after the
         // frame retires below. `frameIndex` stamps the acquired slot so the
         // consumer's frame-age diagnostic reads 0 in the synchronous baseline.
@@ -1014,50 +972,100 @@ namespace Extrinsic::Runtime
 
         Graphics::GpuAssetCache* const gpuAssetCache =
             m_Impl->m_ServiceRegistry.Find<Graphics::GpuAssetCache>();
-        RuntimeRenderFrameHooks renderHooks(*m_Impl->m_Renderer,
-                                            *m_Impl->m_Scene,
-                                            m_Impl->m_RenderExtractionCache,
-                                            gpuAssetCache,
-                                            *m_Impl->m_RenderWorldPool,
-                                            m_Impl->m_Config.Render.SynchronousExtraction,
-                                            frameContext.ExtractionStats,
-                                            frameContext.FrameIndex,
-                                            frameContext.PooledFrontSlot,
-                                            frame,
-                                            renderInput,
-                                            ActiveWorld(),
-                                            renderWorld,
-                                            &pacing);
-
         const auto renderContractBegin = std::chrono::steady_clock::now();
-        const Core::RenderFrameResult renderResult = Core::ExecuteRenderFrameContract(renderHooks);
-        pacing.RenderContractMicros = ElapsedMicros(renderContractBegin);
-        pacing.RendererBeganFrame = renderResult.BeganFrame;
-        pacing.RendererCompletedFrame = renderResult.CompletedFrame;
-        if (!renderResult.BeganFrame)
+        const auto renderBeginFrameBegin = std::chrono::steady_clock::now();
+        pacing.RendererBeganFrame = m_Impl->m_Renderer->BeginFrame(frame);
+        pacing.RenderBeginFrameMicros = ElapsedMicros(renderBeginFrameBegin);
+        if (!pacing.RendererBeganFrame)
         {
             // BeginFrame failed before extraction ran, so no slot was acquired
             // (PooledFrontSlot stays kInvalidSlot) — nothing to release.
+            pacing.RenderContractMicros = ElapsedMicros(renderContractBegin);
             m_Impl->m_FrameClock.EndFrame();
             publishPacingSample();
             return;
         }
 
-        const std::uint64_t completedGpuValue = renderResult.CompletedGpuValue;
+        const auto renderExtractionBegin = std::chrono::steady_clock::now();
+        RenderWorldPool& renderWorldPool = *m_Impl->m_RenderWorldPool;
+        // GRAPHICS-036C — producer half: acquire a back slot, write the
+        // snapshot into it via ExtractAndSubmit, then publish it as the front.
+        // AcquireBack only fails closed when the pool is exhausted; in that
+        // case the previous front stays current and no in-flight slot changes.
+        const std::uint32_t backSlot =
+            renderWorldPool.AcquireBack(frameContext.FrameIndex);
+        const std::uint32_t submitSlot =
+            backSlot != RenderWorldPool::kInvalidSlot ? backSlot : 0u;
+        if (backSlot != RenderWorldPool::kInvalidSlot)
+        {
+            frameContext.ExtractionStats =
+                m_Impl->m_RenderExtractionCache.ExtractAndSubmit(
+                    *m_Impl->m_Scene,
+                    *m_Impl->m_Renderer,
+                    gpuAssetCache,
+                    submitSlot,
+                    ActiveWorld());
+            renderWorldPool.PublishFront(backSlot);
+        }
+        else
+        {
+            frameContext.ExtractionStats =
+                m_Impl->m_RenderExtractionCache.GetLastStats();
+        }
+
+        // Synchronous mode consumes the same-frame snapshot. Pipelined mode
+        // intentionally consumes the previously published front.
+        frameContext.PooledFrontSlot =
+            m_Impl->m_Config.Render.SynchronousExtraction
+                ? renderWorldPool.AcquireFront(frameContext.FrameIndex)
+                : renderWorldPool.AcquirePreviousFront(
+                      frameContext.FrameIndex);
+        const std::uint32_t extractSlot =
+            frameContext.PooledFrontSlot != RenderWorldPool::kInvalidSlot
+                ? frameContext.PooledFrontSlot
+                : submitSlot;
+        renderWorld =
+            m_Impl->m_Renderer->ExtractRenderWorld(renderInput, extractSlot);
+        MirrorRenderWorldPoolDiagnostics(
+            renderWorldPool, frameContext.ExtractionStats);
+        pacing.RenderExtractionMicros = ElapsedMicros(renderExtractionBegin);
+
+        const auto renderPrepareBegin = std::chrono::steady_clock::now();
+        m_Impl->m_Renderer->PrepareFrame(renderWorld);
+        pacing.RenderPrepareMicros = ElapsedMicros(renderPrepareBegin);
+
+        const auto renderExecuteBegin = std::chrono::steady_clock::now();
+        m_Impl->m_Renderer->ExecuteFrame(frame, renderWorld);
+        pacing.RenderExecuteMicros = ElapsedMicros(renderExecuteBegin);
+
+        const auto renderEndFrameBegin = std::chrono::steady_clock::now();
+        const std::uint64_t completedGpuValue =
+            m_Impl->m_Renderer->EndFrame(frame);
+        pacing.RenderEndFrameMicros = ElapsedMicros(renderEndFrameBegin);
+        pacing.RendererCompletedFrame = true;
+        pacing.RenderContractMicros = ElapsedMicros(renderContractBegin);
+
         const auto presentBegin = std::chrono::steady_clock::now();
         m_Impl->m_Device->Present(frame);
         pacing.PresentMicros = ElapsedMicros(presentBegin);
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
-        TransferHooks transferHooks(*m_Impl->m_Device);
-        AssetHooks assetHooks(
-                              m_Impl->m_ServiceRegistry.Find<
-                                  Core::IAssetFrameHooks>(),
-                              *m_Impl->m_Device,
-                              m_Impl->m_RenderExtractionCache,
-                              *m_Impl->m_Renderer);
         const auto maintenanceBegin = std::chrono::steady_clock::now();
-        Core::ExecuteMaintenanceContract(transferHooks, assetHooks);
+        // GPU-side resource retirement, staging GC, readback processing.
+        m_Impl->m_Device->GetTransferQueue().CollectCompleted();
+        if (AssetWorkflowModule* const assetWorkflow =
+                m_Impl->m_ServiceRegistry.Find<AssetWorkflowModule>();
+            assetWorkflow != nullptr)
+        {
+            assetWorkflow->RunFrameMaintenance();
+        }
+        // RUNTIME-197: one graphics-owned coordinator drives every
+        // runtime-authored geometry lane through the same frame-safe
+        // retirement window.
+        m_Impl->m_RenderExtractionCache.TickGeometryResidency(
+            m_Impl->m_Device->GetGlobalFrameNumber(),
+            m_Impl->m_Device->GetFramesInFlight(),
+            *m_Impl->m_Renderer);
         // ARCH-009 — drop terminal job records after the frame has observed
         // their completion/cancellation state. Does not wait on workers.
         (void)m_Impl->m_JobService.ReapCompleted();

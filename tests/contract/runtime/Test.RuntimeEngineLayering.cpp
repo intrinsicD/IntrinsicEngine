@@ -69,19 +69,24 @@ namespace
 TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
-    const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cpp");
     const auto runFrame = SliceBetween(content,
                                        "void Engine::RunFrame()",
                                        "bool Engine::IsRunning() const noexcept");
 
     // Runtime must orchestrate renderer phases, not GPU barriers/resources.
-    EXPECT_NE(content.find("import Extrinsic.Core.FrameLoop"), std::string::npos);
-    EXPECT_NE(content.find("Core::ExecuteRenderFrameContract(renderHooks)"), std::string::npos);
-    EXPECT_NE(frameLoop.find("hooks.BeginFrame()"), std::string::npos);
-    EXPECT_NE(frameLoop.find("hooks.ExtractRenderWorld()"), std::string::npos);
-    EXPECT_NE(frameLoop.find("hooks.PrepareFrame()"), std::string::npos);
-    EXPECT_NE(frameLoop.find("hooks.ExecuteFrame()"), std::string::npos);
-    EXPECT_NE(frameLoop.find("hooks.EndFrame()"), std::string::npos);
+    EXPECT_EQ(content.find(
+                  std::string{"import Extrinsic.Core."} + "FrameLoop"),
+              std::string::npos);
+    EXPECT_NE(runFrame.find("m_Impl->m_Renderer->BeginFrame(frame)"),
+              std::string::npos);
+    EXPECT_NE(runFrame.find("m_Impl->m_Renderer->ExtractRenderWorld("),
+              std::string::npos);
+    EXPECT_NE(runFrame.find("m_Impl->m_Renderer->PrepareFrame(renderWorld)"),
+              std::string::npos);
+    EXPECT_NE(runFrame.find("m_Impl->m_Renderer->ExecuteFrame(frame, renderWorld)"),
+              std::string::npos);
+    EXPECT_NE(runFrame.find("m_Impl->m_Renderer->EndFrame(frame)"),
+              std::string::npos);
 
     EXPECT_EQ(runFrame.find("TextureBarrier"), std::string::npos);
     EXPECT_EQ(runFrame.find("BufferBarrier"), std::string::npos);
@@ -119,7 +124,7 @@ TEST(RuntimeEngineLayering, ProductionSourceHasNoApplicationCallbackLifecycle)
     }
 }
 
-TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder)
+TEST(RuntimeEngineLayering, RunFrameOwnsDocumentedBroadPhaseOrder)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto runFrame = SliceBetween(content,
@@ -127,32 +132,32 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
                                        "bool Engine::IsRunning() const noexcept");
 
     const auto frameContext = runFrame.find("RuntimeFrameContext frameContext{};");
-    const auto platformContract = runFrame.find("Core::ExecutePlatformBeginFrameContract(platformHooks");
+    const auto platform = runFrame.find("m_Impl->m_Window->PollEvents()");
     const auto fixedStep      = runFrame.find("RunFixedStepSimulationTicks(");
     const auto simulation     = runFrame.find("FramePhase::Simulation");
     const auto uiBuild        = runFrame.find("FramePhase::UiBuild");
-    const auto renderContract = runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
+    const auto render = runFrame.find("m_Impl->m_Renderer->BeginFrame(frame)");
     const auto present = runFrame.find("m_Impl->m_Device->Present(frame);");
-    const auto maintenance =
-        runFrame.find("Core::ExecuteMaintenanceContract(");
+    const auto maintenance = runFrame.find(
+        "m_Impl->m_Device->GetTransferQueue().CollectCompleted()");
     const auto clockEnd = runFrame.rfind("m_Impl->m_FrameClock.EndFrame();");
 
     ASSERT_NE(frameContext, std::string::npos);
-    ASSERT_NE(platformContract, std::string::npos);
+    ASSERT_NE(platform, std::string::npos);
     ASSERT_NE(fixedStep, std::string::npos);
     ASSERT_NE(simulation, std::string::npos);
     ASSERT_NE(uiBuild, std::string::npos);
-    ASSERT_NE(renderContract, std::string::npos);
+    ASSERT_NE(render, std::string::npos);
     ASSERT_NE(present, std::string::npos);
     ASSERT_NE(maintenance, std::string::npos);
     ASSERT_NE(clockEnd, std::string::npos);
 
-    EXPECT_LT(frameContext, platformContract);
-    EXPECT_LT(platformContract, fixedStep);
+    EXPECT_LT(frameContext, platform);
+    EXPECT_LT(platform, fixedStep);
     EXPECT_LT(fixedStep, simulation);
     EXPECT_LT(simulation, uiBuild);
-    EXPECT_LT(uiBuild, renderContract);
-    EXPECT_LT(renderContract, present);
+    EXPECT_LT(uiBuild, render);
+    EXPECT_LT(render, present);
     EXPECT_LT(present, maintenance);
     EXPECT_LT(maintenance, clockEnd);
 }
@@ -255,29 +260,29 @@ TEST(RuntimeEngineLayering, RunFrameAppliesJobCompletionsWithBoundedBudget)
               std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContract)
+TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRenderer)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
     const auto runFrame = SliceBetween(content,
                                        "void Engine::RunFrame()",
                                        "bool Engine::IsRunning() const noexcept");
 
-    const auto platformContract = runFrame.find("Core::ExecutePlatformBeginFrameContract(platformHooks");
-    const auto closeBranch = runFrame.find("platformResult.ShouldClose");
+    const auto platform = runFrame.find("m_Impl->m_Window->PollEvents()");
+    const auto closeBranch = runFrame.find("if (platformShouldClose)");
     const auto requestExit = runFrame.find("RequestExitFromWindowClose(", closeBranch);
     const auto returnFromClose = runFrame.find("return;", requestExit);
-    const auto renderContract = runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
+    const auto render = runFrame.find("m_Impl->m_Renderer->BeginFrame(frame)");
 
-    ASSERT_NE(platformContract, std::string::npos);
+    ASSERT_NE(platform, std::string::npos);
     ASSERT_NE(closeBranch, std::string::npos);
     ASSERT_NE(requestExit, std::string::npos);
     ASSERT_NE(returnFromClose, std::string::npos);
-    ASSERT_NE(renderContract, std::string::npos);
+    ASSERT_NE(render, std::string::npos);
 
-    EXPECT_LT(platformContract, closeBranch);
+    EXPECT_LT(platform, closeBranch);
     EXPECT_LT(closeBranch, requestExit);
     EXPECT_LT(requestExit, returnFromClose);
-    EXPECT_LT(returnFromClose, renderContract);
+    EXPECT_LT(returnFromClose, render);
 }
 
 TEST(RuntimeEngineLayering, EnginePrivatelyOwnsGpuQueueHookLifecycle)
@@ -291,7 +296,7 @@ TEST(RuntimeEngineLayering, EnginePrivatelyOwnsGpuQueueHookLifecycle)
     const auto participantShutdown =
         beginShutdown.find("m_Impl->m_JobService.ShutdownGpuQueueParticipants(");
     const auto beginShutdownCall = shutdown.find("BeginShutdown();");
-    const auto executeShutdown = shutdown.find("Core::ExecuteShutdownContract(hooks)");
+    const auto executeShutdown = shutdown.find("ShutdownRuntimeModules();");
     const auto installDirectHook =
         content.find("m_Impl->m_Renderer->RegisterRuntimeFrameCommandHook(");
     const auto recordCommands =
@@ -771,16 +776,16 @@ TEST(RuntimeEngineLayering,
         runFrame.find(".EnableGpuProfiling =");
     const auto beforeExtraction =
         runFrame.find("FramePhase::BeforeExtraction");
-    const auto renderContract =
-        runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
+    const auto render =
+        runFrame.find("m_Impl->m_Renderer->BeginFrame(frame)");
 
     ASSERT_NE(uiEndCapture, std::string::npos);
     ASSERT_NE(sample, std::string::npos);
     ASSERT_NE(beforeExtraction, std::string::npos);
-    ASSERT_NE(renderContract, std::string::npos);
+    ASSERT_NE(render, std::string::npos);
     EXPECT_LT(uiEndCapture, sample);
     EXPECT_LT(sample, beforeExtraction);
-    EXPECT_LT(sample, renderContract);
+    EXPECT_LT(sample, render);
     EXPECT_EQ(
         CountOccurrences(runFrame, ".EnableGpuProfiling ="),
         1u);
@@ -789,15 +794,20 @@ TEST(RuntimeEngineLayering,
         std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder)
+TEST(RuntimeEngineLayering, RuntimeOwnedFrameLoopPreservesRendererAndMaintenanceOrder)
 {
-    const auto content = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cpp");
+    const auto engine =
+        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
+    const auto content = SliceBetween(
+        engine,
+        "void Engine::RunFrame()",
+        "bool Engine::IsRunning() const noexcept");
 
-    const auto beginFrame = content.find("hooks.BeginFrame()");
-    const auto extract = content.find("hooks.ExtractRenderWorld()");
-    const auto prepare = content.find("hooks.PrepareFrame()");
-    const auto execute = content.find("hooks.ExecuteFrame()");
-    const auto endFrame = content.find("hooks.EndFrame()");
+    const auto beginFrame = content.find("m_Impl->m_Renderer->BeginFrame(frame)");
+    const auto extract = content.find("m_Impl->m_Renderer->ExtractRenderWorld(");
+    const auto prepare = content.find("m_Impl->m_Renderer->PrepareFrame(renderWorld)");
+    const auto execute = content.find("m_Impl->m_Renderer->ExecuteFrame(frame, renderWorld)");
+    const auto endFrame = content.find("m_Impl->m_Renderer->EndFrame(frame)");
 
     ASSERT_NE(beginFrame, std::string::npos);
     ASSERT_NE(extract, std::string::npos);
@@ -810,8 +820,9 @@ TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMainten
     EXPECT_LT(prepare, execute);
     EXPECT_LT(execute, endFrame);
 
-    const auto transfers = content.find("transfer.CollectCompletedTransfers()");
-    const auto assets = content.find("assets.TickAssets()");
+    const auto transfers = content.find(
+        "m_Impl->m_Device->GetTransferQueue().CollectCompleted()");
+    const auto assets = content.find("assetWorkflow->RunFrameMaintenance()");
 
     ASSERT_NE(transfers, std::string::npos);
     ASSERT_NE(assets, std::string::npos);
@@ -953,7 +964,6 @@ TEST(RuntimeEngineLayering, AsyncWorkModulePublishesOnlyKernelJobService)
         ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cppm");
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
-    const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
     const auto moduleInterface =
         ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.AsyncWorkModule.cppm");
     const auto moduleImpl =
@@ -966,7 +976,7 @@ TEST(RuntimeEngineLayering, AsyncWorkModulePublishesOnlyKernelJobService)
     EXPECT_EQ(engineImpl.find("AsyncWorkModule"), std::string::npos);
     EXPECT_NE(engineImpl.find("JobService m_JobService{}"), std::string::npos);
     EXPECT_EQ(engineImpl.find("Provide<JobService>"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("IStreamingFrameHooks"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("IStreamingFrameHooks"), std::string::npos);
 
     EXPECT_NE(moduleInterface.find(
                   "export module Extrinsic.Runtime.AsyncWorkModule"),
@@ -1095,28 +1105,19 @@ TEST(RuntimeEngineLayering, MaintenanceHasNoOptionalStreamingFacade)
 {
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
-    const auto frameLoop =
-        ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cpp");
     const auto runFrame = SliceBetween(
         engineImpl,
         "void Engine::RunFrame()",
         "bool Engine::IsRunning() const noexcept");
-    const auto maintenanceContract = SliceBetween(
-        frameLoop,
-        "void ExecuteMaintenanceContract(",
-        "bool ExecuteOperationalTransitionContract(");
-
     EXPECT_EQ(runFrame.find("IStreamingFrameHooks"), std::string::npos);
-    EXPECT_NE(runFrame.find("Core::ExecuteMaintenanceContract("),
-              std::string::npos);
 
     const auto transfer =
-        maintenanceContract.find("transfer.CollectCompletedTransfers()");
-    const auto asset = maintenanceContract.find("assets.TickAssets()");
+        runFrame.find("m_Impl->m_Device->GetTransferQueue().CollectCompleted()");
+    const auto asset = runFrame.find("assetWorkflow->RunFrameMaintenance()");
     ASSERT_NE(transfer, std::string::npos);
     ASSERT_NE(asset, std::string::npos);
     EXPECT_LT(transfer, asset);
-    EXPECT_EQ(maintenanceContract.find("streaming"), std::string::npos);
+    EXPECT_EQ(runFrame.find("streaming"), std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
@@ -1248,20 +1249,25 @@ TEST(RuntimeEngineLayering, SandboxEditorJobsUseSingleJobServiceSurface)
               std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)
+TEST(RuntimeEngineLayering, CoreFrameLoopModuleStaysRetiredAndRuntimeOwnsComposition)
 {
-    const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
+    const auto root = RepoRoot();
+    const auto coreCMake = ReadFile(root / "src/core/CMakeLists.txt");
+    const auto engine =
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
 
-    EXPECT_EQ(frameLoop.find("import Extrinsic.Platform"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("import Extrinsic.Graphics"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("import Extrinsic.Asset"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("import Extrinsic.ECS"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("import Extrinsic.RHI"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("CreateWindow"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("CreateRenderer"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("CreateDevice"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("AssetService"), std::string::npos);
-    EXPECT_EQ(frameLoop.find("StreamingExecutor"), std::string::npos);
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/core/Core.FrameLoop.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/core/Core.FrameLoop.cpp"));
+    EXPECT_EQ(coreCMake.find("Core.FrameLoop"), std::string::npos);
+    EXPECT_NE(engine.find("m_Impl->m_Window->PollEvents()"),
+              std::string::npos);
+    EXPECT_NE(engine.find("m_Impl->m_Renderer->BeginFrame(frame)"),
+              std::string::npos);
+    EXPECT_NE(engine.find(
+                  "m_Impl->m_Device->GetTransferQueue().CollectCompleted()"),
+              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEngine)
@@ -1840,8 +1846,6 @@ TEST(RuntimeEngineLayering,
         ReadFile(
             root /
             "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp");
-    const auto coreFrameLoop =
-        ReadFile(root / "src/core/Core.FrameLoop.cpp");
     const auto announcement = SliceBetween(
         engineImpl,
         "void Engine::AnnounceRuntimeShutdown()",
@@ -1934,8 +1938,7 @@ TEST(RuntimeEngineLayering,
         beginShutdown.find(
             "m_Impl->m_JobService.ShutdownGpuQueueParticipants(");
     const auto beginShutdownCall = shutdown.find("BeginShutdown();");
-    const auto executeShutdown =
-        shutdown.find("Core::ExecuteShutdownContract(hooks)");
+    const auto executeShutdown = shutdown.find("ShutdownRuntimeModules();");
     ASSERT_NE(discardCommands, std::string::npos);
     ASSERT_NE(invokeAnnouncement, std::string::npos);
     ASSERT_NE(quiesceParticipants, std::string::npos);
@@ -1944,14 +1947,7 @@ TEST(RuntimeEngineLayering,
     EXPECT_LT(discardCommands, invokeAnnouncement);
     EXPECT_LT(invokeAnnouncement, quiesceParticipants);
     EXPECT_LT(beginShutdownCall, executeShutdown);
-    const auto moduleHook =
-        shutdown.find("void ShutdownRuntimeModules() override");
-    const auto invokeModuleShutdown =
-        shutdown.find("Owner.ShutdownRuntimeModules();", moduleHook);
-    ASSERT_NE(moduleHook, std::string::npos);
-    ASSERT_NE(invokeModuleShutdown, std::string::npos);
     EXPECT_EQ(shutdown.find("ShutdownApplication"), std::string::npos);
-    EXPECT_EQ(coreFrameLoop.find("ShutdownApplication"), std::string::npos);
 
     const auto reverseModules =
         moduleShutdown.find("m_Impl->m_RuntimeModules.rbegin()");

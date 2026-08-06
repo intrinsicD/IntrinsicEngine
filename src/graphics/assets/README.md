@@ -231,7 +231,7 @@ stages call `RequestUpload` once their CPU payload is final: texture residency
 covers decoded texture payloads, while model materialization covers model-scene
 entity/material records plus embedded texture child asset uploads.
 
-`AssetHooks::TickAssets()` calls `cache.Tick(device.GetGlobalFrameNumber(),
+`AssetWorkflowModule::RunFrameMaintenance()` calls `cache.Tick(device.GetGlobalFrameNumber(),
 device.GetFramesInFlight())` once per frame, after `AssetService::Tick()`.
 
 ## Tests

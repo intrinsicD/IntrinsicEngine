@@ -18,7 +18,6 @@ export module Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
-import Extrinsic.Core.FrameLoop;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.Module;
@@ -301,9 +300,7 @@ namespace Extrinsic::Runtime
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
     };
 
-    export class AssetWorkflowModule final
-        : public IRuntimeModule
-        , public Core::IAssetFrameHooks
+    export class AssetWorkflowModule final : public IRuntimeModule
     {
     public:
         AssetWorkflowModule();
@@ -344,10 +341,9 @@ namespace Extrinsic::Runtime
             RuntimeAssetIngestHandle operation);
         void CancelActiveAssetImportsForShutdown();
         void ImportDroppedFilePaths(std::span<const std::string> paths);
+        void RunFrameMaintenance();
 
     private:
-        void TickAssets() override;
-
         struct Impl;
         std::unique_ptr<Impl> m_Impl{};
     };

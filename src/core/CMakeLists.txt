@@ -27,7 +27,6 @@ target_sources(${target_name}
         Core.CallbackRegistry.cppm
         Core.Error.cppm
         Core.FrameClock.cppm
-        Core.FrameLoop.cppm
         Core.Geometry2D.cppm
         Core.Filesystem.PathResolver.cppm
         Core.Filesystem.cppm
@@ -58,7 +57,6 @@ target_sources(${target_name}
         Core.Dag.Scheduler.cpp
         Core.Dag.TaskGraph.cpp
         Core.FrameGraph.cpp
-        Core.FrameLoop.cpp
         Core.Filesystem.cpp
         Core.Filesystem.PathResolver.cpp
         Core.IOBackend.cpp

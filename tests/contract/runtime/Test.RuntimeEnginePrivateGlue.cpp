@@ -516,7 +516,8 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionStateLivesDirectlyInEngineImpl)
               std::string::npos);
     EXPECT_EQ(engineImpl.find("m_LastExtractionStats ="),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RenderExtractionCache.Shutdown(*Renderer)"),
+    EXPECT_NE(engineImpl.find(
+                  "m_RenderExtractionCache.Shutdown(*m_Impl->m_Renderer)"),
               std::string::npos);
     EXPECT_EQ(engineImpl.find(
                   "m_RenderExtractionCache.SetVisualizationAdapterBinding("),
@@ -693,8 +694,9 @@ TEST(RuntimeEnginePrivateGlue,
     EXPECT_NE(workflowInterface.find(
                   "export module Extrinsic.Runtime.AssetWorkflowModule;"),
               std::string::npos);
-    EXPECT_NE(workflowInterface.find(
-                  "public Core::IAssetFrameHooks"),
+    EXPECT_EQ(workflowInterface.find(std::string{"IAsset"} + "FrameHooks"),
+              std::string::npos);
+    EXPECT_NE(workflowInterface.find("void RunFrameMaintenance();"),
               std::string::npos);
     constexpr std::string_view ownedCompositionTokens[] = {
         "std::unique_ptr<Assets::AssetService> Assets{}",
@@ -703,7 +705,6 @@ TEST(RuntimeEnginePrivateGlue,
         "Provide<Assets::AssetService>",
         "Provide<AssetWorkflowModule>",
         "Provide<Graphics::GpuAssetCache>",
-        "Provide<Core::IAssetFrameHooks>",
         "std::make_unique<AssetWorkflowTextureResidency>",
         "std::make_unique<AssetWorkflowModelMaterializer>",
     };
@@ -772,15 +773,16 @@ TEST(RuntimeEnginePrivateGlue,
     EXPECT_NE(engineImpl.find(
                   "m_Impl->m_ServiceRegistry.Find<Graphics::GpuAssetCache>()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find(
-                  "Core::IAssetFrameHooks>()"),
+    EXPECT_EQ(engineImpl.find(std::string{"IAsset"} + "FrameHooks"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
                   "m_Impl->m_ServiceRegistry.Find<AssetWorkflowModule>()"),
               std::string::npos);
-    EXPECT_NE(frameLoop.find("if (AssetWorkflow != nullptr)"),
+    EXPECT_EQ(frameLoop.find("AssetWorkflow"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("pipeline != nullptr"),
+    EXPECT_NE(engineImpl.find("assetWorkflow != nullptr"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("assetWorkflow->RunFrameMaintenance()"),
               std::string::npos);
 
     EXPECT_NE(runtimeCMake.find("Runtime.AssetWorkflowModule.cppm"),

@@ -50,13 +50,16 @@ path. A composed control copies the resulting transient startup state during
 registration and then owns the persistent live state; omission leaves editor
 and agent control unavailable without changing the rendered boot result.
 
-`Engine::RunFrame()` is the promoted runtime lifecycle pipeline. Runtime owns the
-cross-layer composition, while reusable phase contracts live in
-`Extrinsic.Core.FrameLoop` so `core` stays dependency-free.
-The runtime-side hook adapters and per-frame helpers are implementation-local
-textual glue in `Runtime.Engine.FrameLoop.Internal.hpp`, included only by
+`Engine::RunFrame()` is the promoted runtime lifecycle pipeline. Runtime owns
+the cross-layer composition and writes its fixed platform, operational,
+render, maintenance, and shutdown order directly; Core exports no
+runtime-specific hook family. Per-frame data and fixed-step helpers remain
+implementation-local textual glue in
+`Runtime.Engine.FrameLoop.Internal.hpp`, included only by
 `Runtime.Engine.cpp`; they are not a module surface or an independently owned
-subsystem.
+subsystem. Optional asset maintenance uses the already-published concrete
+`AssetWorkflowModule::RunFrameMaintenance()` operation between transfer
+collection and geometry-residency retirement.
 
 Runtime modules compose through `Engine::AddModule(...)` before
 `Engine::Initialize()`. Boot sorts modules by stable name, invokes every

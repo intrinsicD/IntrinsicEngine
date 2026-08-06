@@ -1,319 +1,271 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
+#include <array>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <string>
-#include <vector>
-
-import Extrinsic.Core.FrameLoop;
+#include <string_view>
 
 namespace
 {
-    using Trace = std::vector<std::string>;
-
-    class FakePlatformHooks final : public Extrinsic::Core::IPlatformFrameHooks
+    std::filesystem::path RepoRoot()
     {
-    public:
-        explicit FakePlatformHooks(Trace& trace)
-            : m_Trace(trace)
-        {
-        }
+        return std::filesystem::path(__FILE__).parent_path().parent_path()
+            .parent_path().parent_path();
+    }
 
-        void PollEvents() override { m_Trace.emplace_back("platform:poll_events"); }
-        [[nodiscard]] bool ShouldClose() const override
-        {
-            m_Trace.emplace_back("platform:should_close");
-            return CloseRequested;
-        }
-        [[nodiscard]] bool IsMinimized() const override
-        {
-            m_Trace.emplace_back("platform:is_minimized");
-            return Minimized;
-        }
-        void WaitForEventsTimeout(double seconds) override
-        {
-            WaitSeconds = seconds;
-            m_Trace.emplace_back("platform:wait_for_events_timeout");
-        }
-
-        bool CloseRequested{false};
-        bool Minimized{false};
-        double WaitSeconds{0.0};
-
-    private:
-        Trace& m_Trace;
-    };
-
-    class FakeRendererHooks final : public Extrinsic::Core::IRenderFrameHooks
+    std::string ReadFile(const std::filesystem::path& path)
     {
-    public:
-        explicit FakeRendererHooks(Trace& trace)
-            : m_Trace(trace)
-        {
-        }
+        std::ifstream input(path);
+        EXPECT_TRUE(input.good()) << "Unable to open: " << path.string();
+        std::ostringstream contents;
+        contents << input.rdbuf();
+        return contents.str();
+    }
 
-        [[nodiscard]] bool BeginFrame() override
-        {
-            m_Trace.emplace_back("renderer:begin_frame");
-            return BeginFrameSucceeds;
-        }
-        void ExtractRenderWorld() override { m_Trace.emplace_back("renderer:extract_render_world"); }
-        void PrepareFrame() override { m_Trace.emplace_back("renderer:prepare_frame"); }
-        void ExecuteFrame() override { m_Trace.emplace_back("renderer:execute_frame"); }
-        [[nodiscard]] std::uint64_t EndFrame() override
-        {
-            m_Trace.emplace_back("renderer:end_frame");
-            return CompletedGpuValue;
-        }
-
-        bool BeginFrameSucceeds{true};
-        std::uint64_t CompletedGpuValue{42};
-
-    private:
-        Trace& m_Trace;
-    };
-
-    class FakeTransferHooks final : public Extrinsic::Core::ITransferFrameHooks
+    std::string SliceBetween(const std::string& content,
+                             const std::string_view beginMarker,
+                             const std::string_view endMarker)
     {
-    public:
-        explicit FakeTransferHooks(Trace& trace)
-            : m_Trace(trace)
-        {
-        }
+        const std::size_t begin = content.find(beginMarker);
+        EXPECT_NE(begin, std::string::npos);
+        const std::size_t end = content.find(endMarker, begin);
+        EXPECT_NE(end, std::string::npos);
+        if (begin == std::string::npos || end == std::string::npos)
+            return {};
+        return content.substr(begin, end - begin);
+    }
 
-        void CollectCompletedTransfers() override { m_Trace.emplace_back("transfer:collect_completed"); }
-
-    private:
-        Trace& m_Trace;
-    };
-
-    class FakeAssetHooks final : public Extrinsic::Core::IAssetFrameHooks
+    std::string EngineRunFrame()
     {
-    public:
-        explicit FakeAssetHooks(Trace& trace)
-            : m_Trace(trace)
-        {
-        }
-
-        void TickAssets() override { m_Trace.emplace_back("assets:tick"); }
-
-    private:
-        Trace& m_Trace;
-    };
-
-    class FakeOperationalTransitionHooks final : public Extrinsic::Core::IOperationalTransitionHooks
-    {
-    public:
-        explicit FakeOperationalTransitionHooks(Trace& trace)
-            : m_Trace(trace)
-        {
-        }
-
-        [[nodiscard]] bool IsDeviceOperational() const override
-        {
-            m_Trace.emplace_back("operational:device_query");
-            return DeviceOperational;
-        }
-        [[nodiscard]] bool IsRendererOperational() const override
-        {
-            m_Trace.emplace_back("operational:renderer_query");
-            return RendererOperational;
-        }
-        void WaitDeviceIdle() override { m_Trace.emplace_back("operational:wait_idle"); }
-        [[nodiscard]] bool RebuildRendererOperationalResources() override
-        {
-            m_Trace.emplace_back("operational:renderer_rebuild");
-            return RebuildSucceeds;
-        }
-        void MarkRendererOperational() override
-        {
-            RendererOperational = true;
-            m_Trace.emplace_back("operational:mark_renderer_operational");
-        }
-
-        bool DeviceOperational{false};
-        bool RendererOperational{false};
-        bool RebuildSucceeds{true};
-
-    private:
-        Trace& m_Trace;
-    };
-
-    class FakeShutdownHooks final : public Extrinsic::Core::IShutdownHooks
-    {
-    public:
-        explicit FakeShutdownHooks(Trace& trace)
-            : m_Trace(trace)
-        {
-        }
-
-        void ShutdownRuntimeModules() override { m_Trace.emplace_back("shutdown:runtime_modules"); }
-        void DestroyScene() override { m_Trace.emplace_back("shutdown:destroy_scene"); }
-        void DestroyFrameGraph() override { m_Trace.emplace_back("shutdown:destroy_frame_graph"); }
-        void ShutdownRenderer() override { m_Trace.emplace_back("shutdown:renderer"); }
-        void ShutdownDevice() override { m_Trace.emplace_back("shutdown:device"); }
-        void DestroyWindow() override { m_Trace.emplace_back("shutdown:destroy_window"); }
-        void ShutdownScheduler() override { m_Trace.emplace_back("shutdown:scheduler"); }
-        void MarkUninitialized() override { m_Trace.emplace_back("shutdown:mark_uninitialized"); }
-
-    private:
-        Trace& m_Trace;
-    };
+        return SliceBetween(
+            ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp"),
+            "void Engine::RunFrame()",
+            "bool Engine::IsRunning() const noexcept");
+    }
 }
 
 TEST(RuntimeFrameLoopContract, PlatformBeginFramePollsBeforeMinimizedWait)
 {
-    Trace trace;
-    FakePlatformHooks platform(trace);
-    platform.Minimized = true;
+    const std::string runFrame = EngineRunFrame();
+    const auto poll = runFrame.find("m_Impl->m_Window->PollEvents()");
+    const auto close = runFrame.find("m_Impl->m_Window->ShouldClose()", poll);
+    const auto minimized = runFrame.find("m_Impl->m_Window->IsMinimized()", close);
+    const auto wait = runFrame.find(
+        "m_Impl->m_Window->WaitForEventsTimeout(kIdleSleepSeconds)", minimized);
 
-    const Extrinsic::Core::PlatformFrameResult result =
-        Extrinsic::Core::ExecutePlatformBeginFrameContract(platform, 0.25);
-
-    EXPECT_FALSE(result.ContinueFrame);
-    EXPECT_FALSE(result.ShouldClose);
-    EXPECT_TRUE(result.Minimized);
-    EXPECT_DOUBLE_EQ(platform.WaitSeconds, 0.25);
-    EXPECT_EQ(trace, (Trace{
-                         "platform:poll_events",
-                         "platform:should_close",
-                         "platform:is_minimized",
-                         "platform:wait_for_events_timeout",
-                     }));
+    ASSERT_NE(poll, std::string::npos);
+    ASSERT_NE(close, std::string::npos);
+    ASSERT_NE(minimized, std::string::npos);
+    ASSERT_NE(wait, std::string::npos);
+    EXPECT_LT(poll, close);
+    EXPECT_LT(close, minimized);
+    EXPECT_LT(minimized, wait);
 }
 
 TEST(RuntimeFrameLoopContract, PlatformBeginFrameStopsWhenPollRequestsClose)
 {
-    Trace trace;
-    FakePlatformHooks platform(trace);
-    platform.CloseRequested = true;
+    const std::string runFrame = EngineRunFrame();
+    const auto closeBranch = runFrame.find("if (platformShouldClose)");
+    const auto requestExit =
+        runFrame.find("RequestExitFromWindowClose(\"platform-poll\")", closeBranch);
+    const auto closeReturn = runFrame.find("return;", requestExit);
+    const auto rendererBegin =
+        runFrame.find("m_Impl->m_Renderer->BeginFrame(frame)");
 
-    const Extrinsic::Core::PlatformFrameResult result =
-        Extrinsic::Core::ExecutePlatformBeginFrameContract(platform, 0.25);
-
-    EXPECT_FALSE(result.ContinueFrame);
-    EXPECT_TRUE(result.ShouldClose);
-    EXPECT_FALSE(result.Minimized);
-    EXPECT_EQ(trace, (Trace{
-                         "platform:poll_events",
-                         "platform:should_close",
-                     }));
+    ASSERT_NE(closeBranch, std::string::npos);
+    ASSERT_NE(requestExit, std::string::npos);
+    ASSERT_NE(closeReturn, std::string::npos);
+    ASSERT_NE(rendererBegin, std::string::npos);
+    EXPECT_LT(closeBranch, requestExit);
+    EXPECT_LT(requestExit, closeReturn);
+    EXPECT_LT(closeReturn, rendererBegin);
 }
 
 TEST(RuntimeFrameLoopContract, RenderFrameOrdersPromotedRendererPhases)
 {
-    Trace trace;
-    FakeRendererHooks renderer(trace);
-    renderer.CompletedGpuValue = 99;
+    const std::string runFrame = EngineRunFrame();
+    const auto begin = runFrame.find("m_Impl->m_Renderer->BeginFrame(frame)");
+    const auto submit = runFrame.find(
+        "m_Impl->m_RenderExtractionCache.ExtractAndSubmit(", begin);
+    const auto extract = runFrame.find(
+        "m_Impl->m_Renderer->ExtractRenderWorld(renderInput, extractSlot)", submit);
+    const auto prepare = runFrame.find(
+        "m_Impl->m_Renderer->PrepareFrame(renderWorld)", extract);
+    const auto execute = runFrame.find(
+        "m_Impl->m_Renderer->ExecuteFrame(frame, renderWorld)", prepare);
+    const auto end = runFrame.find("m_Impl->m_Renderer->EndFrame(frame)", execute);
 
-    const Extrinsic::Core::RenderFrameResult result =
-        Extrinsic::Core::ExecuteRenderFrameContract(renderer);
-
-    EXPECT_TRUE(result.BeganFrame);
-    EXPECT_TRUE(result.CompletedFrame);
-    EXPECT_EQ(result.CompletedGpuValue, 99u);
-    EXPECT_EQ(trace, (Trace{
-                         "renderer:begin_frame",
-                         "renderer:extract_render_world",
-                         "renderer:prepare_frame",
-                         "renderer:execute_frame",
-                         "renderer:end_frame",
-                     }));
+    ASSERT_NE(begin, std::string::npos);
+    ASSERT_NE(submit, std::string::npos);
+    ASSERT_NE(extract, std::string::npos);
+    ASSERT_NE(prepare, std::string::npos);
+    ASSERT_NE(execute, std::string::npos);
+    ASSERT_NE(end, std::string::npos);
+    EXPECT_LT(begin, submit);
+    EXPECT_LT(submit, extract);
+    EXPECT_LT(extract, prepare);
+    EXPECT_LT(prepare, execute);
+    EXPECT_LT(execute, end);
 }
 
 TEST(RuntimeFrameLoopContract, RenderFrameSkipsExtractionWhenBeginFrameFails)
 {
-    Trace trace;
-    FakeRendererHooks renderer(trace);
-    renderer.BeginFrameSucceeds = false;
+    const std::string runFrame = EngineRunFrame();
+    const auto begin = runFrame.find("m_Impl->m_Renderer->BeginFrame(frame)");
+    const auto failure = runFrame.find("if (!pacing.RendererBeganFrame)", begin);
+    const auto failureReturn = runFrame.find("return;", failure);
+    const auto extraction = runFrame.find(
+        "m_Impl->m_RenderExtractionCache.ExtractAndSubmit(", failure);
 
-    const Extrinsic::Core::RenderFrameResult result =
-        Extrinsic::Core::ExecuteRenderFrameContract(renderer);
-
-    EXPECT_FALSE(result.BeganFrame);
-    EXPECT_FALSE(result.CompletedFrame);
-    EXPECT_EQ(result.CompletedGpuValue, 0u);
-    EXPECT_EQ(trace, Trace{"renderer:begin_frame"});
+    ASSERT_NE(begin, std::string::npos);
+    ASSERT_NE(failure, std::string::npos);
+    ASSERT_NE(failureReturn, std::string::npos);
+    ASSERT_NE(extraction, std::string::npos);
+    EXPECT_LT(begin, failure);
+    EXPECT_LT(failure, failureReturn);
+    EXPECT_LT(failureReturn, extraction);
 }
 
-TEST(RuntimeFrameLoopContract, MaintenanceOrdersTransferBeforeAssetHooks)
+TEST(RuntimeFrameLoopContract,
+     MaintenanceOrdersTransferBeforeAssetAndGeometryMaintenance)
 {
-    Trace trace;
-    FakeTransferHooks transfer(trace);
-    FakeAssetHooks assets(trace);
+    const std::string runFrame = EngineRunFrame();
+    const auto transfer = runFrame.find(
+        "m_Impl->m_Device->GetTransferQueue().CollectCompleted()");
+    const auto asset = runFrame.find("assetWorkflow->RunFrameMaintenance()", transfer);
+    const auto geometry = runFrame.find(
+        "m_Impl->m_RenderExtractionCache.TickGeometryResidency(", asset);
 
-    Extrinsic::Core::ExecuteMaintenanceContract(transfer, assets);
-
-    EXPECT_EQ(trace, (Trace{
-                         "transfer:collect_completed",
-                         "assets:tick",
-                     }));
+    ASSERT_NE(transfer, std::string::npos);
+    ASSERT_NE(asset, std::string::npos);
+    ASSERT_NE(geometry, std::string::npos);
+    EXPECT_LT(transfer, asset);
+    EXPECT_LT(asset, geometry);
 }
 
 TEST(RuntimeFrameLoopContract, OperationalTransitionWaitsIdleThenRebuildsRendererOnce)
 {
-    Trace trace;
-    FakeOperationalTransitionHooks hooks(trace);
-    hooks.DeviceOperational = true;
+    const std::string runFrame = EngineRunFrame();
+    const auto device = runFrame.find("m_Impl->m_Device->IsOperational()");
+    const auto renderer = runFrame.find("!m_Impl->m_RendererOperational", device);
+    const auto wait = runFrame.find("m_Impl->m_Device->WaitIdle()", renderer);
+    const auto rebuild = runFrame.find(
+        "m_Impl->m_Renderer->RebuildOperationalResources(", wait);
+    const auto mark = runFrame.find(
+        "m_Impl->m_RendererOperational = true", rebuild);
 
-    const bool transitioned = Extrinsic::Core::ExecuteOperationalTransitionContract(hooks);
-
-    EXPECT_TRUE(transitioned);
-    EXPECT_TRUE(hooks.RendererOperational);
-    EXPECT_EQ(trace, (Trace{
-                         "operational:device_query",
-                         "operational:renderer_query",
-                         "operational:wait_idle",
-                         "operational:renderer_rebuild",
-                         "operational:mark_renderer_operational",
-                     }));
+    ASSERT_NE(device, std::string::npos);
+    ASSERT_NE(renderer, std::string::npos);
+    ASSERT_NE(wait, std::string::npos);
+    ASSERT_NE(rebuild, std::string::npos);
+    ASSERT_NE(mark, std::string::npos);
+    EXPECT_LT(device, renderer);
+    EXPECT_LT(renderer, wait);
+    EXPECT_LT(wait, rebuild);
+    EXPECT_LT(rebuild, mark);
 }
 
 TEST(RuntimeFrameLoopContract, OperationalTransitionNoOpsUntilDeviceBecomesOperational)
 {
-    Trace trace;
-    FakeOperationalTransitionHooks hooks(trace);
+    const std::string runFrame = EngineRunFrame();
+    const std::string transition = SliceBetween(
+        runFrame,
+        "const auto operationalBegin",
+        "pacing.OperationalTransitionMicros");
 
-    const bool transitioned = Extrinsic::Core::ExecuteOperationalTransitionContract(hooks);
-
-    EXPECT_FALSE(transitioned);
-    EXPECT_FALSE(hooks.RendererOperational);
-    EXPECT_EQ(trace, Trace{"operational:device_query"});
+    EXPECT_NE(transition.find(
+                  "if (m_Impl->m_Device->IsOperational() &&"),
+              std::string::npos);
+    EXPECT_EQ(
+        transition.find("m_Impl->m_Device->WaitIdle()"),
+        transition.rfind("m_Impl->m_Device->WaitIdle()"));
 }
 
 TEST(RuntimeFrameLoopContract, OperationalTransitionDoesNotMarkRendererWhenRebuildFails)
 {
-    Trace trace;
-    FakeOperationalTransitionHooks hooks(trace);
-    hooks.DeviceOperational = true;
-    hooks.RebuildSucceeds = false;
+    const std::string runFrame = EngineRunFrame();
+    const std::string transition = SliceBetween(
+        runFrame,
+        "const auto operationalBegin",
+        "pacing.OperationalTransitionMicros");
+    const auto rebuildGuard = transition.find(
+        "if (m_Impl->m_Renderer->RebuildOperationalResources(");
+    const auto mark = transition.find(
+        "m_Impl->m_RendererOperational = true", rebuildGuard);
 
-    const bool transitioned = Extrinsic::Core::ExecuteOperationalTransitionContract(hooks);
-
-    EXPECT_FALSE(transitioned);
-    EXPECT_FALSE(hooks.RendererOperational);
-    EXPECT_EQ(trace, (Trace{
-                         "operational:device_query",
-                         "operational:renderer_query",
-                         "operational:wait_idle",
-                         "operational:renderer_rebuild",
-                     }));
+    ASSERT_NE(rebuildGuard, std::string::npos);
+    ASSERT_NE(mark, std::string::npos);
+    EXPECT_LT(rebuildGuard, mark);
 }
 
 TEST(RuntimeFrameLoopContract, ShutdownOrdersRuntimeModulesAndSubsystemTeardown)
 {
-    Trace trace;
-    FakeShutdownHooks shutdown(trace);
+    const auto root = RepoRoot();
+    const std::string engine =
+        ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
+    const std::string shutdown = SliceBetween(
+        engine, "void Engine::Shutdown()", "// ── Main loop");
+    const std::array<std::string_view, 8u> ordered{
+        "ShutdownRuntimeModules();",
+        "m_Impl->m_WorldRegistry.Clear();",
+        "m_Impl->m_FrameGraph.reset();",
+        "m_Impl->m_Renderer->Shutdown();",
+        "m_Impl->m_Device->Shutdown();",
+        "m_Impl->m_Window.reset();",
+        "Core::Tasks::Scheduler::Shutdown();",
+        "m_Impl->m_Initialized = false;",
+    };
+    std::size_t previous = 0u;
+    for (const std::string_view token : ordered)
+    {
+        const std::size_t position = shutdown.find(token, previous);
+        ASSERT_NE(position, std::string::npos) << token;
+        previous = position + token.size();
+    }
 
-    Extrinsic::Core::ExecuteShutdownContract(shutdown);
+    EXPECT_FALSE(std::filesystem::exists(root / "src/core/Core.FrameLoop.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(root / "src/core/Core.FrameLoop.cpp"));
 
-    EXPECT_EQ(trace, (Trace{
-                         "shutdown:runtime_modules",
-                         "shutdown:destroy_scene",
-                         "shutdown:destroy_frame_graph",
-                         "shutdown:renderer",
-                         "shutdown:device",
-                         "shutdown:destroy_window",
-                         "shutdown:scheduler",
-                         "shutdown:mark_uninitialized",
-                     }));
+    const std::array<std::string, 17u> retiredTokens{
+        std::string{"Extrinsic.Core."} + "FrameLoop",
+        std::string{"I"} + "RenderFrameHooks",
+        std::string{"I"} + "PlatformFrameHooks",
+        std::string{"I"} + "TransferFrameHooks",
+        std::string{"I"} + "AssetFrameHooks",
+        std::string{"I"} + "OperationalTransitionHooks",
+        std::string{"I"} + "ShutdownHooks",
+        std::string{"RenderFrame"} + "Phase",
+        std::string{"RenderFrame"} + "Result",
+        std::string{"PlatformFrame"} + "Result",
+        std::string{"PlatformFrame"} + "Hooks",
+        std::string{"OperationalTransition"} + "Hooks",
+        std::string{"RuntimeRenderFrame"} + "Hooks",
+        std::string{"Transfer"} + "Hooks",
+        std::string{"Asset"} + "Hooks",
+        std::string{"Shutdown"} + "Hooks",
+        std::string{"FrameLoop"} + "Hooks",
+    };
+    const auto ratchet = root /
+        "tests/contract/runtime/Test.RuntimeFrameLoopContract.cpp";
+    for (const auto relativeRoot : {"src", "tests"})
+    {
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(root / relativeRoot))
+        {
+            if (!entry.is_regular_file() || entry.path() == ratchet)
+                continue;
+            const auto extension = entry.path().extension();
+            if (extension != ".cpp" && extension != ".cppm" &&
+                extension != ".h" && extension != ".hpp")
+            {
+                continue;
+            }
+            const std::string content = ReadFile(entry.path());
+            for (const std::string& token : retiredTokens)
+                EXPECT_EQ(content.find(token), std::string::npos)
+                    << token << " in " << entry.path();
+        }
+    }
 }

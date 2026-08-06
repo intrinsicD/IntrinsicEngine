@@ -26,7 +26,6 @@ import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
-import Extrinsic.Core.FrameLoop;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -171,11 +170,6 @@ namespace
         std::filesystem::path Path;
     };
 
-    struct NoopAssetHooks final : Core::IAssetFrameHooks
-    {
-        void TickAssets() override {}
-    };
-
     class RunOnceApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
@@ -249,9 +243,6 @@ namespace
                     nullptr &&
                 engine.Services()
                     .Find<Graphics::GpuAssetCache>() !=
-                    nullptr &&
-                engine.Services()
-                    .Find<Core::IAssetFrameHooks>() !=
                     nullptr;
             if (exactAssetsPresent == ExpectAssets)
                 ++MatchingServiceObservations;
@@ -342,9 +333,6 @@ namespace
                     nullptr &&
                 context.Services
                         .Find<Graphics::GpuAssetCache>() !=
-                    nullptr &&
-                context.Services
-                        .Find<Core::IAssetFrameHooks>() !=
                     nullptr;
         }
 
@@ -794,12 +782,9 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Runtime::AssetWorkflowModule>();
     Graphics::GpuAssetCache* const firstCache =
         harness.Services.Find<Graphics::GpuAssetCache>();
-    Core::IAssetFrameHooks* const firstHooks =
-        harness.Services.Find<Core::IAssetFrameHooks>();
     ASSERT_NE(firstAssets, nullptr);
     ASSERT_NE(firstPipeline, nullptr);
     ASSERT_NE(firstCache, nullptr);
-    ASSERT_NE(firstHooks, nullptr);
     EXPECT_EQ(
         harness.Services.Find<Runtime::SelectionController>(),
         nullptr);
@@ -849,10 +834,6 @@ TEST(AssetWorkflowModule,
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
         nullptr);
-    EXPECT_EQ(
-        harness.Services.Find<Core::IAssetFrameHooks>(),
-        nullptr);
-
     ASSERT_TRUE(harness.Start(
         /*assetFirst=*/false).has_value());
     EXPECT_EQ(
@@ -874,12 +855,12 @@ TEST(AssetWorkflowModule,
 
     Assets::AssetService* const assets =
         harness.Services.Find<Assets::AssetService>();
-    Core::IAssetFrameHooks* const hooks =
-        harness.Services.Find<Core::IAssetFrameHooks>();
+    Runtime::AssetWorkflowModule* const pipeline =
+        harness.Services.Find<Runtime::AssetWorkflowModule>();
     ECS::Scene::Registry* const scene =
         harness.Worlds.Get(harness.InitialWorld);
     ASSERT_NE(assets, nullptr);
-    ASSERT_NE(hooks, nullptr);
+    ASSERT_NE(pipeline, nullptr);
     ASSERT_NE(scene, nullptr);
 
     const auto loadTexture =
@@ -1018,7 +999,7 @@ TEST(AssetWorkflowModule,
             .RoughnessFromRed = true,
         });
 
-    hooks->TickAssets();
+    pipeline->RunFrameMaintenance();
 
     const auto ready =
         harness.Extraction.GetMaterialTextureAssetBindings(stableId);
@@ -1038,7 +1019,7 @@ TEST(AssetWorkflowModule,
 
     outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Pending;
     outputs.Records[0].Diagnostic = "rebake pending";
-    hooks->TickAssets();
+    pipeline->RunFrameMaintenance();
     const auto pending =
         harness.Extraction.GetMaterialTextureAssetBindings(stableId);
     ASSERT_TRUE(pending.has_value());
@@ -1047,7 +1028,7 @@ TEST(AssetWorkflowModule,
 
     outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Failed;
     outputs.Records[0].Diagnostic = "rebake failed";
-    hooks->TickAssets();
+    pipeline->RunFrameMaintenance();
     const auto failed =
         harness.Extraction.GetMaterialTextureAssetBindings(stableId);
     ASSERT_TRUE(failed.has_value());
@@ -1084,14 +1065,12 @@ TEST(
         AssetService,
         Pipeline,
         Cache,
-        Hooks,
     };
 
     for (const Conflict conflict :
          {Conflict::AssetService,
           Conflict::Pipeline,
-          Conflict::Cache,
-          Conflict::Hooks})
+          Conflict::Cache})
     {
         DirectHarness harness;
         harness.Services.BeginRegistration();
@@ -1104,7 +1083,6 @@ TEST(
             harness.Renderer->GetTextureManager(),
             harness.Renderer->GetSamplerManager(),
             harness.Device.GetTransferQueue()};
-        NoopAssetHooks existingHooks{};
 
         switch (conflict)
         {
@@ -1124,12 +1102,6 @@ TEST(
             ASSERT_TRUE(harness.Services
                 .Provide<Graphics::GpuAssetCache>(
                     existingCache, "Conflict")
-                .has_value());
-            break;
-        case Conflict::Hooks:
-            ASSERT_TRUE(harness.Services
-                .Provide<Core::IAssetFrameHooks>(
-                    existingHooks, "Conflict")
                 .has_value());
             break;
         }
@@ -1154,11 +1126,6 @@ TEST(
             harness.Services.Find<Graphics::GpuAssetCache>(),
             conflict == Conflict::Cache
                 ? &existingCache
-                : nullptr);
-        EXPECT_EQ(
-            harness.Services.Find<Core::IAssetFrameHooks>(),
-            conflict == Conflict::Hooks
-                ? &existingHooks
                 : nullptr);
     }
 }
@@ -1187,9 +1154,6 @@ TEST(AssetWorkflowModule,
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
-        nullptr);
-    EXPECT_EQ(
-        harness.Services.Find<Core::IAssetFrameHooks>(),
         nullptr);
 }
 
@@ -1221,9 +1185,6 @@ TEST(AssetWorkflowModule,
             nullptr);
         EXPECT_EQ(
             harness.Services.Find<Graphics::GpuAssetCache>(),
-            nullptr);
-        EXPECT_EQ(
-            harness.Services.Find<Core::IAssetFrameHooks>(),
             nullptr);
         EXPECT_EQ(
             harness.Jobs.ShutdownGpuQueueParticipants(),
@@ -1268,9 +1229,6 @@ TEST(AssetWorkflowModule,
             nullptr);
         EXPECT_EQ(
             harness.Services.Find<Graphics::GpuAssetCache>(),
-            nullptr);
-        EXPECT_EQ(
-            harness.Services.Find<Core::IAssetFrameHooks>(),
             nullptr);
         EXPECT_EQ(
             harness.Jobs.ShutdownGpuQueueParticipants(),
@@ -1324,9 +1282,6 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Graphics::GpuAssetCache>(),
         nullptr);
     EXPECT_EQ(
-        harness.Services.Find<Core::IAssetFrameHooks>(),
-        nullptr);
-    EXPECT_EQ(
         harness.Jobs.ShutdownGpuQueueParticipants(),
         0u);
     EXPECT_TRUE(
@@ -1343,8 +1298,6 @@ TEST(AssetWorkflowModule,
     harness.Initialized = true;
     Runtime::AssetWorkflowModule* const pipeline =
         harness.Services.Find<Runtime::AssetWorkflowModule>();
-    Core::IAssetFrameHooks* const hooks =
-        harness.Services.Find<Core::IAssetFrameHooks>();
     Graphics::GpuAssetCache* const cache =
         harness.Services.Find<Graphics::GpuAssetCache>();
     Assets::AssetService* const assets =
@@ -1352,7 +1305,6 @@ TEST(AssetWorkflowModule,
     Runtime::TextureBakeService* const textureBake =
         harness.Services.Find<Runtime::TextureBakeService>();
     ASSERT_NE(pipeline, nullptr);
-    ASSERT_NE(hooks, nullptr);
     ASSERT_NE(cache, nullptr);
     ASSERT_NE(assets, nullptr);
     ASSERT_NE(textureBake, nullptr);
@@ -1685,7 +1637,7 @@ TEST(AssetWorkflowModule,
     ASSERT_FALSE(stale.has_value());
     EXPECT_EQ(stale.error(), Core::ErrorCode::InvalidState);
 
-    hooks->TickAssets();
+    pipeline->RunFrameMaintenance();
     auto rebound = pipeline->ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = awayMesh.Path.string(),
@@ -1877,9 +1829,6 @@ TEST(AssetWorkflowModule,
         nullptr);
     EXPECT_EQ(
         harness.Services.Find<Graphics::GpuAssetCache>(),
-        nullptr);
-    EXPECT_EQ(
-        harness.Services.Find<Core::IAssetFrameHooks>(),
         nullptr);
 
     harness.Stop();
@@ -2326,7 +2275,7 @@ TEST(AssetWorkflowModule,
 
         EXPECT_EQ(
             engine.Services()
-                .Find<Core::IAssetFrameHooks>() == nullptr,
+                .Find<Runtime::AssetWorkflowModule>() == nullptr,
             omitted == OmittedOwner::AssetWorkflow);
         EXPECT_EQ(
             engine.Services().Find<Runtime::JobService>() == nullptr,
@@ -2413,10 +2362,6 @@ TEST(AssetWorkflowModule,
     EXPECT_EQ(
         engine.Services().Find<Graphics::GpuAssetCache>(),
         nullptr);
-    EXPECT_EQ(
-        engine.Services().Find<Core::IAssetFrameHooks>(),
-        nullptr);
-
     ECS::Scene::Registry* const scene =
         engine.Worlds().Get(engine.ActiveWorld());
     ASSERT_NE(scene, nullptr);

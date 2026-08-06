@@ -55,8 +55,11 @@ TEST(RenderWorldPoolEngineWiring, FrameLoopOwnsPoolLifecycleWithoutPublicForward
     const std::string engine =
         ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
 
-    EXPECT_NE(engine.find("*m_Impl->m_RenderWorldPool,"),
+    EXPECT_NE(engine.find(
+                  "RenderWorldPool& renderWorldPool = *m_Impl->m_RenderWorldPool;"),
               std::string::npos);
+    EXPECT_NE(engine.find("renderWorldPool.AcquireBack("), std::string::npos);
+    EXPECT_NE(engine.find("renderWorldPool.PublishFront("), std::string::npos);
     EXPECT_NE(engine.find(
                   "m_Impl->m_RenderWorldPool->ReleaseFront("),
               std::string::npos);

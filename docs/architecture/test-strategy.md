@@ -181,8 +181,9 @@ former mixed graphics/runtime set as follows:
 - `IntrinsicRuntimeContractTests` owns the 35 `CoreGraphInterfaces` and
   `RuntimeEngineLayering` cases under `contract;runtime`.
 - `IntrinsicRuntimeGraphicsCpuTests` is the sole owner of
-  `RuntimeFrameLoopContract` and its nine cases under
-  `integration;runtime;graphics`.
+  `RuntimeFrameLoopContract` and its nine owner-level Engine ordering cases
+  under `integration;runtime;graphics`; they inspect the real Runtime owner,
+  not hook-interface doubles.
 - `IntrinsicGraphicsIntegrationCpuTests` owns three MockDevice integration
   sources and 74 cases under `integration;graphics`.
 - `IntrinsicGraphicsUnitTests` owns three MockDevice unit sources and 20 cases

@@ -16,7 +16,6 @@
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
-import Extrinsic.Core.FrameLoop;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.MetaData;
