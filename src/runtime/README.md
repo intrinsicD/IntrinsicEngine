@@ -49,7 +49,7 @@ The retired Sandbox facade export ledger and current owner map are recorded in
 | `Extrinsic.Runtime.PointCloudConsolidationConfig` | Consolidation-owned schema, canonical JSON codec/validator, lookup/update helper, and registration factory for `sandbox.point_cloud_consolidation`. Its backend request, strategy, Auto/Manual support-radius intent, workload limits, and method parameters are shared by config files, editor controls, and agent/programmatic hot apply. Core sees only the generic application-section record. |
 | `Extrinsic.Runtime.InputActions` | Runtime-owned input-action registry from `RUNTIME-155`, finalized by `RUNTIME-186`. Exports the action binding/handle/context/service/descriptor API plus `RuntimeInputActionRegistry`, which owns handle allocation, registration/unregistration state, key-edge trigger checks, ImGui keyboard-capture suppression, callback failure logging, and per-frame dispatch after the pre-render transform flush. Its generic service aggregate carries config, scene, and mutable render input; camera- and selection-aware actions capture their exact optional services when app policy registers them. Engine publishes the registry as a built-in service and dispatches it, but no longer re-exports its records or forwards registration/unregistration. App owners import this module and retain their exact registry handles directly. |
 | `Extrinsic.Runtime.AsyncWorkModule` | App-composed `JobService` lifecycle owner finalized by `RUNTIME-194`. Registration publishes the Engine kernel's exact borrowed `JobService` through `ServiceRegistry`; it creates no worker pool, scheduler, registry, frame hook, or feature facade. Shutdown first withdraws that exact service so later modules cannot discover a stale publication, then requests cancellation for every surviving job; Engine owns scheduler quiescence after reverse module teardown. World-scoped cancellation remains in `WorldRegistry`. Sandbox and tests that need app-side job discovery compose the module explicitly; omitting it leaves the kernel service and bounded Engine drain operational but publishes no editor/module lookup surface. `Runtime.Engine` never imports or names the concrete module. |
-| `Extrinsic.Runtime.Engine` | Domain-free composition root and frame-loop owner. Its interface owns no application callback object and no asset/import/residency/bake, scene-document/history, scene-interaction, camera, async, config-control, editor-UI, reference-scene, selection, lookup, readback, gizmo, or mesh primitive-view capability. Optional owners publish exact services and contribute typed hooks; Engine retains their records only inside `Engine::Impl`, clears them on every boot, sorts deterministically, and dispatches them at the established frame/viewport phases. Engine also directly composes the three ECS-owned transform/bounds/render-sync systems for fixed-step and gated pre-render execution, and owns the renderer hook token that delegates GPU participant recording to `JobService` before detaching it ahead of participant shutdown. None of those one-owner roles has a standalone public helper module. Before module registration Engine publishes the exact live `RHI::IDevice`, `Platform::IWindow`, `Graphics::IRenderer`, `RenderExtractionCache`, and `RuntimeInputActionRegistry` built-ins; `AsyncWorkModule` separately publishes the kernel-owned `JobService`. Reinitialization republishes fresh borrowed instances. `BeginShutdown()` publishes and pumps the announcement after command discard, detaches the GPU command hook, drains GPU participants, stops the loop, and waits for device idle while worlds/services remain live so concrete app state can detach. `Shutdown()` invokes that boundary when needed, then performs ordinary reverse module and subsystem teardown. Render-extraction cache/pool/frame-index ownership remains in the Engine-private `RenderExtractionService`; callers read extraction or visualization state from the published cache rather than Engine forwarders. `RUNTIME-187` puts every private field behind `Engine::Impl`. The exact final surface is `12/0/0/5`: twelve declaration-required plain imports, zero domain imports, zero re-exports, and only `GetDevice`, `GetEngineConfig`, `GetLastFramePacingDiagnostics`, `GetRenderer`, and `GetWindow`, each ratcheted with its return/owning type and owning import. |
+| `Extrinsic.Runtime.Engine` | Domain-free composition root and frame-loop owner. Its interface owns no application callback object and no asset/import/residency/bake, scene-document/history, scene-interaction, camera, async, config-control, editor-UI, reference-scene, selection, lookup, readback, gizmo, or mesh primitive-view capability. Optional owners publish exact services and contribute typed hooks; Engine retains their records only inside `Engine::Impl`, clears them on every boot, sorts deterministically, and dispatches them at the established frame/viewport phases. Engine also directly composes the three ECS-owned transform/bounds/render-sync systems for fixed-step and gated pre-render execution, and owns the renderer hook token that delegates GPU participant recording to `JobService` before detaching it ahead of participant shutdown. None of those one-owner roles has a standalone public helper module. Before module registration Engine publishes the exact live `RHI::IDevice`, `Platform::IWindow`, `Graphics::IRenderer`, `RenderExtractionCache`, and `RuntimeInputActionRegistry` built-ins; `AsyncWorkModule` separately publishes the kernel-owned `JobService`. Reinitialization republishes fresh borrowed instances. `BeginShutdown()` publishes and pumps the announcement after command discard, detaches the GPU command hook, drains GPU participants, stops the loop, and waits for device idle while worlds/services remain live so concrete app state can detach. `Shutdown()` invokes that boundary when needed, then performs ordinary reverse module and subsystem teardown. The render-extraction cache, pool, and frame index live directly in `Engine::Impl`; callers read extraction or visualization state from the published cache rather than Engine forwarders. `RUNTIME-187` puts every private field behind `Engine::Impl`. The exact final surface is `12/0/0/5`: twelve declaration-required plain imports, zero domain imports, zero re-exports, and only `GetDevice`, `GetEngineConfig`, `GetLastFramePacingDiagnostics`, `GetRenderer`, and `GetWindow`, each ratcheted with its return/owning type and owning import. |
 | `Extrinsic.Runtime.FramePacingDiagnostics` | Runtime-owned frame-pacing diagnostics module from `RUNTIME-158`. Exports `RuntimeFramePacingDiagnostics` plus the pure helper that copies renderer `RenderGraphFrameStats` compile/execute timings into the current frame sample. `EditorUiModule` privately copies ImGui adapter timings/counters into the borrowed sample, so this generic module no longer imports the adapter. `Engine::RunFrame()` writes phase-boundary timings and publishes the last sample through `Engine::GetLastFramePacingDiagnostics()`. |
 | `Extrinsic.Runtime.SceneDocumentModule` | Optional app-composed document owner from `RUNTIME-172`. The concrete `final IRuntimeModule` publishes itself and its exact owned `EditorCommandHistory`, binds document path/event/sequence/history to one validated active `{WorldHandle, Scene::Registry*, binding epoch}`, and resets that complete durable state instead of retaining a per-world map. It preserves synchronous save/load/new/close, and queues snapshot saves and temporary-registry loads on the kernel-owned `JobService` (`RUNTIME-194` Slice B3; the optional `StreamingExecutor` dependency is retired). Every completion captures weak operation state plus module generation, binding epoch, world, and registry identity. That captured binding is re-checked through `JobDesc::ValidateBeforeApply` immediately before the drain would commit, so a stale result is discarded rather than applied; a queued operation that terminates without publishing — cancelled, discarded as stale, or dropped — reconciles through `JobDesc::FinalizeUnpublishedOnMainThread`, which publishes the terminal failure event exactly once when the captured binding still holds. New/load/close snapshot strong-handle participants in deterministic name/registration order, run every `BeforeReplace` callback while the outgoing registry is live, replace, run every `AfterReplace` callback against the rebound registry, then reset history. Parse failure invokes no participant and mutates no document state. Shutdown invalidates generation/epoch and cancels owned tasks before reverse module teardown; omission leaves Engine and the active world operational while document/history services are unavailable. |
 | `Extrinsic.Runtime.SceneInteractionModule` | Optional app-composed one-world interaction owner from `RUNTIME-188`, with its one-consumer frame helpers internalized by `RUNTIME-205`. Its PImpl directly owns `SelectionController`, `StableEntityLookup` plus its scene binding, `GizmoInteraction`, packet/scratch storage, bounded pick-correlation records, and the refined-primitive cache; it publishes only the exact module and exact controller. Every input, `BeforeExtraction`, and `Maintenance` hook validates `{WorldHandle, Registry*, interaction epoch}` directly. The typed viewport hook runs after camera/capture, borrows the exact document `EditorCommandHistory` when composed, and disables transform dragging when that history is unavailable. `BeforeExtraction` drains one pick and submits a copied world-tagged selection/hover/gizmo snapshot after input actions and transform flush, and `Maintenance` drains completed readbacks. A strong scene-document participant clears the complete cohort while the outgoing registry is live and rebuilds lookup on New/Load/Close; active-world mismatch, retirement, announcement, and recycled-handle reinitialize use the same reset. Pick sequences remain monotonic while zero, unknown, wrong-world, and wrong-epoch results fail closed. Announcement unregisters the document participant and detaches borrows before ordinary exact withdrawal. Omission leaves document, camera, generic input, component-driven primitive views, rendering, and Engine operational with empty interaction snapshots. |
@@ -1235,8 +1235,8 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
     context. Unknown, evicted, old-world, and old-epoch results cannot mutate
     selection or refined output. The exact `SceneInteractionModule` exposes the
     latest refined result; graphics only produces the hint.
-    After the readback drain the Engine-private `RenderExtractionService` releases the
-    `RenderWorldPool` snapshot reference acquired in phase 6 at frame retire;
+    After the readback drain `Engine::RunFrame()` directly releases the
+    Engine-private `RenderWorldPool` snapshot reference acquired in phase 6;
     this is the current front in synchronous mode and the previous front in
     pipelined mode. In the default synchronous mode the single logical slot is
     reclaimable next frame.
@@ -1283,17 +1283,17 @@ initialized-state cleanup.
 
 ### Pipelined render-world pool (`GRAPHICS-036C`/`GRAPHICS-036D`)
 
-The Engine-private `RenderExtractionService` owns the runtime-side
+`Engine::Impl` directly owns the runtime-side
 `Extrinsic.Runtime.RenderWorldPool`, configured during `Engine::Initialize()`
 from `Core::Config::RenderConfig::SynchronousExtraction` (default `true`): one
 logical buffer in the synchronous baseline, or the triple-buffered default when
-pipelined extraction is requested. `RunFrame` still drives the phase order, but
-it reaches the slot lifecycle through the service/cache/pool boundary:
+pipelined extraction is requested. `RunFrame` drives the phase order and the
+pool lifecycle directly:
 `AcquireBack`/`PublishFront` around `ExtractAndSubmit`, `AcquireFront` for
 synchronous consume, `AcquirePreviousFront` for the render-N-1 consume path, and
-service-mediated `ReleaseFront` at frame retire. The pool's
-`PipelineStallCount`/`ExtractionSkipCount`/`LastConsumedFrameAge` counters are
-mirrored onto the service-owned last extraction stats each frame.
+`ReleaseFront` at frame retire. The pool's `PipelineStallCount`,
+`ExtractionSkipCount`, and `LastConsumedFrameAge` counters are mirrored onto
+the current frame's extraction stats.
 
 The renderer retains one stable `RuntimeRenderSnapshotBatch` copy per pool slot.
 `SubmitRuntimeSnapshots(..., storageSlot)` clears and rewrites only the target
@@ -1512,10 +1512,10 @@ the `GRAPHICS-023C` asset-generation observation bridge: when a renderable has
 `AssetInstance::Source`, extraction can compare the normalized `Assets::AssetId`
 with a supplied `Graphics::GpuAssetCache` view and `GpuSceneSlot` metadata to
 report pending/up-to-date/rebind-required states without performing the later
-GPU geometry or material rebind. The Engine-private `RenderExtractionService`
-owns the live cache instance, pool, last stats, and frame-index counter that
-`Engine` composes into the frame loop; it does not change the extraction
-algorithms or renderer-owned resource policy.
+GPU geometry or material rebind. `Engine::Impl` directly owns the live cache
+instance, pool, and frame-index counter that its frame loop consumes; this
+composition state does not change the extraction algorithms or renderer-owned
+resource policy.
 
 For canonical property-backed geometry, the cache compares the exact content
 revisions and element counts consumed by each resident mesh, graph,
@@ -1533,10 +1533,10 @@ implementation therefore carry no asset-domain owner, import, bake facade, or
 transition.
 `RUNTIME-182` deletes the former private
 `ImGuiEditorBridge`; the app-composed `EditorUiModule` now owns that optional
-lifetime without an Engine member or facade. `RenderExtractionService` stays
-by value because the Engine API independently requires its public extraction
-and render-world-pool types. During module-service registration, Engine
-provides that service's existing `RenderExtractionCache` instance as a borrowed
+lifetime without an Engine member or facade. `RUNTIME-216` likewise removed
+the one-owner render-extraction forwarding class: `Engine::Impl` stores its
+required public cache, pool, and frame-index values directly. During
+module-service registration, Engine provides that `RenderExtractionCache` as a borrowed
 `ServiceRegistry` entry. Sandbox UV-view composition resolves the stable cache
 once when it builds an attached editor context and queries geometry/material
 availability directly; copied command surfaces remain bounded by the existing

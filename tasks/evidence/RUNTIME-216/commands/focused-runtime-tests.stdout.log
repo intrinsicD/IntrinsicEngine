@@ -1,0 +1,152 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  378: AssetWorkflowModule.RenderExtractionRetirementSurvivesEitherOptionalOwnerOmission
+ 1/70 Test  #378: AssetWorkflowModule.RenderExtractionRetirementSurvivesEitherOptionalOwnerOmission ..................   Passed    0.08 sec
+      Start  499: RenderExtractionContract.WorldMatrixWithoutRenderHintPublishesNoDrawCandidate
+ 2/70 Test  #499: RenderExtractionContract.WorldMatrixWithoutRenderHintPublishesNoDrawCandidate ......................   Passed    0.05 sec
+      Start  500: RenderExtractionContract.FailedMeshPackPublishesNoDrawCandidate
+ 3/70 Test  #500: RenderExtractionContract.FailedMeshPackPublishesNoDrawCandidate ....................................   Passed    0.05 sec
+      Start  501: RenderExtractionContract.SnapshotSurvivesLiveEcsMutationAndDestruction
+ 4/70 Test  #501: RenderExtractionContract.SnapshotSurvivesLiveEcsMutationAndDestruction .............................   Passed    0.05 sec
+      Start  724: RuntimeEnginePrivateGlue.FrameLoopHelpersArePrivateTextualGlue
+ 5/70 Test  #724: RuntimeEnginePrivateGlue.FrameLoopHelpersArePrivateTextualGlue .....................................   Passed    0.01 sec
+      Start  725: RuntimeEnginePrivateGlue.TypedViewportInputDispatchKeepsCameraOutOfGenericFrameContext
+ 6/70 Test  #725: RuntimeEnginePrivateGlue.TypedViewportInputDispatchKeepsCameraOutOfGenericFrameContext .............   Passed    0.00 sec
+      Start  726: RuntimeEnginePrivateGlue.EditorUiModuleOwnsOptionalEditorUiComposition
+ 7/70 Test  #726: RuntimeEnginePrivateGlue.EditorUiModuleOwnsOptionalEditorUiComposition .............................   Passed    0.00 sec
+      Start  727: RuntimeEnginePrivateGlue.RenderExtractionStateLivesDirectlyInEngineImpl
+ 8/70 Test  #727: RuntimeEnginePrivateGlue.RenderExtractionStateLivesDirectlyInEngineImpl ............................   Passed    0.00 sec
+      Start  728: RuntimeEnginePrivateGlue.EngineInterfaceCarriesOnlyOpaqueImplementationState
+ 9/70 Test  #728: RuntimeEnginePrivateGlue.EngineInterfaceCarriesOnlyOpaqueImplementationState .......................   Passed    0.00 sec
+      Start  729: RuntimeEnginePrivateGlue.AssetWorkflowAndTextureBakeCompositionAreModuleOwned
+10/70 Test  #729: RuntimeEnginePrivateGlue.AssetWorkflowAndTextureBakeCompositionAreModuleOwned ......................   Passed    0.03 sec
+      Start  730: RuntimeEnginePrivateGlue.AssetWorkflowImplementationModulesStayPrivateAndRetiredNamesStayDeleted
+11/70 Test  #730: RuntimeEnginePrivateGlue.AssetWorkflowImplementationModulesStayPrivateAndRetiredNamesStayDeleted ...   Passed    0.00 sec
+      Start  731: RuntimeEnginePrivateGlue.ClusteringServiceIsTheSoleKMeansRuntimeRoute
+12/70 Test  #731: RuntimeEnginePrivateGlue.ClusteringServiceIsTheSoleKMeansRuntimeRoute ..............................   Passed    0.00 sec
+      Start  839: RuntimeRenderExtraction.VisualizationRecipeRevisionTracksMutations
+13/70 Test  #839: RuntimeRenderExtraction.VisualizationRecipeRevisionTracksMutations .................................   Passed    0.00 sec
+      Start 1134: RenderWorldPool.DefaultsToTripleBuffer
+14/70 Test #1134: RenderWorldPool.DefaultsToTripleBuffer .............................................................   Passed    0.00 sec
+      Start 1135: RenderWorldPool.BufferCountClampsToSupportedRange
+15/70 Test #1135: RenderWorldPool.BufferCountClampsToSupportedRange ..................................................   Passed    0.00 sec
+      Start 1136: RenderWorldPool.AcquireFrontBeforeAnyPublishReturnsInvalid
+16/70 Test #1136: RenderWorldPool.AcquireFrontBeforeAnyPublishReturnsInvalid .........................................   Passed    0.00 sec
+      Start 1137: RenderWorldPool.DeterministicRotationSchedule
+17/70 Test #1137: RenderWorldPool.DeterministicRotationSchedule ......................................................   Passed    0.00 sec
+      Start 1138: RenderWorldPool.HeldFrontIsNotRecycledUntilReleased
+18/70 Test #1138: RenderWorldPool.HeldFrontIsNotRecycledUntilReleased ................................................   Passed    0.00 sec
+      Start 1139: RenderWorldPool.RefcountTracksConcurrentFrontHolders
+19/70 Test #1139: RenderWorldPool.RefcountTracksConcurrentFrontHolders ...............................................   Passed    0.00 sec
+      Start 1140: RenderWorldPool.ConsumerReusesFrontAndCountsStall
+20/70 Test #1140: RenderWorldPool.ConsumerReusesFrontAndCountsStall ..................................................   Passed    0.00 sec
+      Start 1141: RenderWorldPool.ProducerReplacesUnpublishedBackAndCountsSkip
+21/70 Test #1141: RenderWorldPool.ProducerReplacesUnpublishedBackAndCountsSkip .......................................   Passed    0.00 sec
+      Start 1142: RenderWorldPool.ExhaustedPoolDoesNotReuseReferencedSlot
+22/70 Test #1142: RenderWorldPool.ExhaustedPoolDoesNotReuseReferencedSlot ............................................   Passed    0.00 sec
+      Start 1143: RenderWorldPool.SynchronousModeReusesSingleSlotWithoutCounters
+23/70 Test #1143: RenderWorldPool.SynchronousModeReusesSingleSlotWithoutCounters .....................................   Passed    0.00 sec
+      Start 1144: RenderWorldPool.FrameAgeReflectsPublishToConsumeDelta
+24/70 Test #1144: RenderWorldPool.FrameAgeReflectsPublishToConsumeDelta ..............................................   Passed    0.00 sec
+      Start 1145: RenderWorldPool.PreviousFrontAcquireConsumesRenderNMinusOneWithoutStall
+25/70 Test #1145: RenderWorldPool.PreviousFrontAcquireConsumesRenderNMinusOneWithoutStall ............................   Passed    0.00 sec
+      Start 1146: RenderWorldPoolDiagnostics.MirrorIsZeroForUntouchedPool
+26/70 Test #1146: RenderWorldPoolDiagnostics.MirrorIsZeroForUntouchedPool ............................................   Passed    0.00 sec
+      Start 1147: RenderWorldPoolDiagnostics.MirrorCopiesStallSkipAndFrameAge
+27/70 Test #1147: RenderWorldPoolDiagnostics.MirrorCopiesStallSkipAndFrameAge ........................................   Passed    0.00 sec
+      Start 1148: RenderWorldPoolEngineWiring.ConfiguresPrivatePoolFromExtractionMode
+28/70 Test #1148: RenderWorldPoolEngineWiring.ConfiguresPrivatePoolFromExtractionMode ................................   Passed    0.01 sec
+      Start 1149: RenderWorldPoolEngineWiring.FrameLoopOwnsPoolLifecycleWithoutPublicForwarders
+29/70 Test #1149: RenderWorldPoolEngineWiring.FrameLoopOwnsPoolLifecycleWithoutPublicForwarders ......................   Passed    0.00 sec
+      Start 4114: RuntimeRenderExtraction.CreatesUpdatesAndClearsDirtyTransformSidecar
+30/70 Test #4114: RuntimeRenderExtraction.CreatesUpdatesAndClearsDirtyTransformSidecar ...............................   Passed    0.03 sec
+      Start 4115: RuntimeRenderExtraction.ClearSceneStateDropsSidecarsAndPerEntityRecipes
+31/70 Test #4115: RuntimeRenderExtraction.ClearSceneStateDropsSidecarsAndPerEntityRecipes ............................   Passed    0.03 sec
+      Start 4116: RuntimeRenderExtraction.RetiresDestroyedRenderableSidecar
+32/70 Test #4116: RuntimeRenderExtraction.RetiresDestroyedRenderableSidecar ..........................................   Passed    0.03 sec
+      Start 4117: RuntimeRenderExtraction.ReusesLiveRenderableKeyScratchAcrossExtractions
+33/70 Test #4117: RuntimeRenderExtraction.ReusesLiveRenderableKeyScratchAcrossExtractions ............................   Passed    0.03 sec
+      Start 4118: RuntimeRenderExtraction.ExtractsVisualizationAndLightsWithoutRenderableOwnership
+34/70 Test #4118: RuntimeRenderExtraction.ExtractsVisualizationAndLightsWithoutRenderableOwnership ...................   Passed    0.03 sec
+      Start 4119: RuntimeRenderExtraction.VisualizationScalarRecipeReachesRenderWorld
+35/70 Test #4119: RuntimeRenderExtraction.VisualizationScalarRecipeReachesRenderWorld ................................   Passed    0.03 sec
+      Start 4120: RuntimeRenderExtraction.VisualizationScalarConfigMissingSourceFailsClosed
+36/70 Test #4120: RuntimeRenderExtraction.VisualizationScalarConfigMissingSourceFailsClosed ..........................   Passed    0.03 sec
+      Start 4121: RuntimeRenderExtraction.VisualizationScalarRecipeMissingBdaUploadsPropertyBuffer
+37/70 Test #4121: RuntimeRenderExtraction.VisualizationScalarRecipeMissingBdaUploadsPropertyBuffer ...................   Passed    0.03 sec
+      Start 4122: RuntimeRenderExtraction.VisualizationPropertyBufferKeysAreStableIdScoped
+38/70 Test #4122: RuntimeRenderExtraction.VisualizationPropertyBufferKeysAreStableIdScoped ...........................   Passed    0.03 sec
+      Start 4123: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferUploadsFromGeometrySources
+39/70 Test #4123: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferUploadsFromGeometrySources .............   Passed    0.03 sec
+      Start 4124: RuntimeRenderExtraction.PointCloudVisualizationPropertyBuffersUploadFromGeometrySources
+40/70 Test #4124: RuntimeRenderExtraction.PointCloudVisualizationPropertyBuffersUploadFromGeometrySources ............   Passed    0.03 sec
+      Start 4125: RuntimeRenderExtraction.MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange
+41/70 Test #4125: RuntimeRenderExtraction.MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange ...........   Passed    0.06 sec
+      Start 4126: RuntimeRenderExtraction.MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig
+42/70 Test #4126: RuntimeRenderExtraction.MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig ..........   Passed    0.06 sec
+      Start 4127: RuntimeRenderExtraction.MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig
+43/70 Test #4127: RuntimeRenderExtraction.MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig ............   Passed    0.06 sec
+      Start 4128: RuntimeRenderExtraction.MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames
+44/70 Test #4128: RuntimeRenderExtraction.MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames ............   Passed    0.10 sec
+      Start 4129: RuntimeRenderExtraction.MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig
+45/70 Test #4129: RuntimeRenderExtraction.MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig .................   Passed    0.06 sec
+      Start 4130: RuntimeRenderExtraction.GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains
+46/70 Test #4130: RuntimeRenderExtraction.GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains ..............   Passed    0.03 sec
+      Start 4131: RuntimeRenderExtraction.GeometryPresentationPropertyBuffersProjectToVisualizationRecipes
+47/70 Test #4131: RuntimeRenderExtraction.GeometryPresentationPropertyBuffersProjectToVisualizationRecipes ...........   Passed    0.03 sec
+      Start 4132: RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream
+48/70 Test #4132: RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream ...........   Passed    0.07 sec
+      Start 4133: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferFailsClosed
+49/70 Test #4133: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferFailsClosed ............................   Passed    0.03 sec
+      Start 4134: RuntimeRenderExtraction.VisualizationNonScalarRecipesReachRenderWorld
+50/70 Test #4134: RuntimeRenderExtraction.VisualizationNonScalarRecipesReachRenderWorld ..............................   Passed    0.03 sec
+      Start 4135: RuntimeRenderExtraction.VisualizationNonScalarRecipeFailuresAreCounted
+51/70 Test #4135: RuntimeRenderExtraction.VisualizationNonScalarRecipeFailuresAreCounted .............................   Passed    0.03 sec
+      Start 4136: RuntimeRenderExtraction.ObservesAssetSourceAsUnavailableWithoutGpuAssetCache
+52/70 Test #4136: RuntimeRenderExtraction.ObservesAssetSourceAsUnavailableWithoutGpuAssetCache .......................   Passed    0.03 sec
+      Start 4137: RuntimeRenderExtraction.ObservesReadyAssetGenerationAsRebindRequired
+53/70 Test #4137: RuntimeRenderExtraction.ObservesReadyAssetGenerationAsRebindRequired ...............................   Passed    0.03 sec
+      Start 4138: RuntimeRenderExtraction.HelperDoesNotMarkRebindGenerationAsSeen
+54/70 Test #4138: RuntimeRenderExtraction.HelperDoesNotMarkRebindGenerationAsSeen ....................................   Passed    0.03 sec
+      Start 4139: RuntimeRenderExtraction.AcknowledgeRebindAdvancesLastSeenGeneration
+55/70 Test #4139: RuntimeRenderExtraction.AcknowledgeRebindAdvancesLastSeenGeneration ................................   Passed    0.03 sec
+      Start 4140: RuntimeRenderExtraction.AcknowledgeRebindRejectsObservationsWithoutGeneration
+56/70 Test #4140: RuntimeRenderExtraction.AcknowledgeRebindRejectsObservationsWithoutGeneration ......................   Passed    0.00 sec
+      Start 4141: RuntimeRenderExtraction.AcknowledgeRebindRejectsAssetMismatch
+57/70 Test #4141: RuntimeRenderExtraction.AcknowledgeRebindRejectsAssetMismatch ......................................   Passed    0.00 sec
+      Start 4142: RuntimeRenderExtraction.AcknowledgeRebindRejectsSlotWithoutSourceAsset
+58/70 Test #4142: RuntimeRenderExtraction.AcknowledgeRebindRejectsSlotWithoutSourceAsset .............................   Passed    0.00 sec
+      Start 4143: RuntimeRenderExtraction.ExtractAndSubmitDoesNotAutoAcknowledgeRebinds
+59/70 Test #4143: RuntimeRenderExtraction.ExtractAndSubmitDoesNotAutoAcknowledgeRebinds ..............................   Passed    0.03 sec
+      Start 4156: RenderWorldPoolPipelined.ConsumesRenderNMinusOneWhileExtractionWritesN
+60/70 Test #4156: RenderWorldPoolPipelined.ConsumesRenderNMinusOneWhileExtractionWritesN .............................   Passed    0.03 sec
+      Start 4157: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction
+61/70 Test #4157: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction ..........................   Passed    0.04 sec
+      Start 4158: RuntimeSandboxAcceptance.CameraControllerProducesFiniteInvertibleFrameCamera
+62/70 Test #4158: RuntimeSandboxAcceptance.CameraControllerProducesFiniteInvertibleFrameCamera .......................   Passed    0.00 sec
+      Start 4159: RuntimeSandboxAcceptance.ComposedCameraModuleDrivesFiniteFirstFrame
+63/70 Test #4159: RuntimeSandboxAcceptance.ComposedCameraModuleDrivesFiniteFirstFrame ................................   Passed    0.04 sec
+      Start 4160: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily
+64/70 Test #4160: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily ..............................   Passed    0.04 sec
+      Start 4161: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene
+65/70 Test #4161: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene ..........................   Passed    0.04 sec
+      Start 4162: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily
+66/70 Test #4162: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily .............................   Passed    0.04 sec
+      Start 4163: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity
+67/70 Test #4163: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity ........................   Passed    0.04 sec
+      Start 4164: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+68/70 Test #4164: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick .....................................   Passed    0.04 sec
+      Start 4165: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+69/70 Test #4165: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush .....................................   Passed    0.04 sec
+      Start 4166: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+70/70 Test #4166: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame .......................   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 70
+
+Label Time Summary:
+contract       =   0.36 sec*proc (29 tests)
+graphics       =   1.44 sec*proc (41 tests)
+integration    =   1.44 sec*proc (41 tests)
+runtime        =   1.80 sec*proc (70 tests)
+
+Total Test time (real) =   2.80 sec

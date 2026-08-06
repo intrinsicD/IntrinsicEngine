@@ -171,7 +171,6 @@ target_sources(${target_name}
         Rendering/Runtime.RenderExtraction.cpp
         Rendering/Runtime.RenderExtraction.Recipes.cpp
         Rendering/Runtime.RenderExtraction.Geometry.cpp
-        Rendering/Runtime.RenderExtractionService.cpp
         Rendering/Runtime.RenderWorldPool.cpp
         Scene/Runtime.SelectionController.cpp
         Scene/Runtime.StableEntityLookup.cpp

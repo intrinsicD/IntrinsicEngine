@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`RUNTIME-216`](RUNTIME-216-inline-render-extraction-engine-glue.md) —
+  in progress on `main` by `codex-runtime216`; remove the Engine-private
+  render-extraction forwarding class, then run the focused runtime and complete
+  CPU gates.
 
 ## History
 

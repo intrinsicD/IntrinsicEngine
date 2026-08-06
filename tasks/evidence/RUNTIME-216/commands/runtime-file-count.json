@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "base_count=$(git ls-tree -r --name-only 94c612d9 src/runtime | wc -l); current_count=$(find src/runtime -type f | wc -l); echo base=$base_count current=$current_count; test \"$base_count\" -eq 170; test \"$current_count\" -eq 168; test $((base_count-current_count)) -eq 2"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'base_count=$(git ls-tree -r --name-only 94c612d9 src/runtime | wc -l); current_count=$(find src/runtime -type f | wc -l); echo base=$base_count current=$current_count; test \"$base_count\" -eq 170; test \"$current_count\" -eq 168; test $((base_count-current_count)) -eq 2'",
+  "cwd": ".",
+  "duration_ms": 5,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T14:57:07Z",
+  "label": "runtime-file-count",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T14:57:07Z",
+  "stderr_path": "tasks/evidence/RUNTIME-216/commands/runtime-file-count.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-216/commands/runtime-file-count.stdout.log",
+  "stdout_sha256": "d03a7690e8872713d4de8845fd8f88a78b70f5f0006b7dbf5cb7b8b17cc4c2b3",
+  "task_id": "RUNTIME-216"
+}

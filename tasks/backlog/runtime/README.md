@@ -41,11 +41,10 @@ The source-complete runtime surface audit re-gated `REVIEW-003`. `RUNTIME-203`
 and `RUNTIME-205` closed the one-consumer helper findings through their concrete
 production owners while preserving public behavior first.
 
-- [RUNTIME-216 — Inline shallow render-extraction Engine glue](RUNTIME-216-inline-render-extraction-engine-glue.md)
-  follows the mechanical `RUNTIME-215` layout move. It deletes the two-file,
-  Engine-private `RenderExtractionService` forwarding layer only after the
-  path-only change is independently reviewable; extraction behavior and the
-  public module surface remain unchanged.
+Active `RUNTIME-216` follows the mechanical `RUNTIME-215` layout move. It
+deletes the two-file, Engine-private `RenderExtractionService` forwarding
+layer now that the path-only change is independently reviewable; extraction
+behavior and the public module surface remain unchanged.
 
 #### Retired prerequisites and completed paths
 
@@ -295,9 +294,10 @@ selected-entity scratch, the gizmo/selection pointer interlock, and packet
 building. `RUNTIME-205` later internalized that one-consumer frame state
 directly in `SceneInteractionModule` and deletes the helper BMI; the durable
 `GizmoInteraction` contract remains.
-`RUNTIME-163` is retired; `RenderExtractionCache`, render-world pool, last
-extraction stats, frame-index ownership, and render-extraction facade delegation
-now live in an Engine-private `RenderExtractionService`.
+`RUNTIME-163` is retired; it first moved `RenderExtractionCache`, render-world
+pool, frame-index ownership, and render-extraction facade delegation into an
+Engine-private `RenderExtractionService`. Active `RUNTIME-216` removes that
+one-owner forwarding layer and stores the values directly in `Engine::Impl`.
 `RUNTIME-164` is retired; `Graphics::GpuAssetCache`, the cache's
 `AssetEventBus` listener token, `AssetModelTextureHandoff`,
 `AssetModelSceneHandoff`, fallback bootstrap delegation, pending material
@@ -475,7 +475,9 @@ transitive kernel-convergence prerequisite is therefore satisfied.
   (done, 2026-07-09, `Operational`): live render-extraction cache, render-world
   pool, last extraction stats, and frame-index ownership now live in an
   Engine-private `RenderExtractionService`. `Engine` keeps render-frame phase
-  ordering plus public render-extraction compatibility facades.
+  ordering plus public render-extraction compatibility facades. `RUNTIME-216`
+  later removes the remaining private forwarding class after those public
+  facades are gone.
 
 ### Retired compile-hotspot decomposition (seeded 2026-07-09)
 

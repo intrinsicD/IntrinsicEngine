@@ -36,15 +36,14 @@ TEST(RenderWorldPoolEngineWiring, ConfiguresPrivatePoolFromExtractionMode)
     const auto root = RepoRoot();
     const std::string engine =
         ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
-    const std::string service =
-        ReadFile(root / "src/runtime/Rendering/Runtime.RenderExtractionService.cpp");
 
     EXPECT_NE(engine.find(
-                  "m_Impl->m_RenderExtractionService.ConfigurePool(\n"
-                  "            m_Impl->m_Config.Render.SynchronousExtraction);"),
+                  "m_Impl->m_RenderWorldPool = std::make_unique<RenderWorldPool>("),
               std::string::npos);
-    EXPECT_NE(service.find(
-                  "synchronousExtraction ? 1u : RenderWorldPool::kDefaultBuffers"),
+    EXPECT_NE(engine.find(
+                  "m_Impl->m_Config.Render.SynchronousExtraction"),
+              std::string::npos);
+    EXPECT_NE(engine.find("RenderWorldPool::kDefaultBuffers"),
               std::string::npos);
 }
 
@@ -56,10 +55,10 @@ TEST(RenderWorldPoolEngineWiring, FrameLoopOwnsPoolLifecycleWithoutPublicForward
     const std::string engine =
         ReadFile(root / "src/runtime/Kernel/Runtime.Engine.cpp");
 
-    EXPECT_NE(engine.find("m_Impl->m_RenderExtractionService.Pool(),"),
+    EXPECT_NE(engine.find("*m_Impl->m_RenderWorldPool,"),
               std::string::npos);
     EXPECT_NE(engine.find(
-                  "m_Impl->m_RenderExtractionService.ReleaseFrontSlot("),
+                  "m_Impl->m_RenderWorldPool->ReleaseFront("),
               std::string::npos);
     EXPECT_EQ(engineInterface.find("GetRenderWorldPool"), std::string::npos);
     EXPECT_EQ(engineInterface.find("GetLastRenderExtractionStats"),

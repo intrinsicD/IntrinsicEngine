@@ -65,7 +65,6 @@ import Extrinsic.ECS.System.RenderSync;
 import Extrinsic.ECS.System.TransformHierarchy;
 
 #include "Kernel/Runtime.Engine.FrameLoop.Internal.hpp"
-#include "Rendering/Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -101,7 +100,9 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Platform::IWindow> m_Window;
         std::unique_ptr<RHI::IDevice> m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
-        RenderExtractionService m_RenderExtractionService{};
+        RenderExtractionCache m_RenderExtractionCache{};
+        std::unique_ptr<RenderWorldPool> m_RenderWorldPool{};
+        std::uint64_t m_RenderExtractionFrameIndex{0u};
         std::unique_ptr<Core::FrameGraph> m_FrameGraph;
         RuntimeInputActionRegistry m_InputActions{};
         CommandBus m_CommandBus{};
@@ -248,7 +249,7 @@ namespace Extrinsic::Runtime
             }
         };
         requireProvide(m_Impl->m_ServiceRegistry.Provide<RenderExtractionCache>(
-                           m_Impl->m_RenderExtractionService.Cache(), "Engine"),
+                           m_Impl->m_RenderExtractionCache, "Engine"),
                        "RenderExtractionCache");
         requireProvide(m_Impl->m_ServiceRegistry.Provide<RHI::IDevice>(
                            *m_Impl->m_Device, "Engine"),
@@ -408,8 +409,7 @@ namespace Extrinsic::Runtime
             .Services = m_Impl->m_ServiceRegistry,
             .EditorCapture = editorCapture,
             .Pacing = pacing,
-            .FrameIndex =
-                m_Impl->m_RenderExtractionService.CurrentFrameIndex(),
+            .FrameIndex = m_Impl->m_RenderExtractionFrameIndex,
             .FrameDeltaSeconds = frameDt,
             .FixedStepAlpha = alpha,
         };
@@ -473,7 +473,7 @@ namespace Extrinsic::Runtime
         // rebind their own world-scoped borrowers independently.
         if (m_Impl->m_Renderer != nullptr)
         {
-            m_Impl->m_RenderExtractionService.Cache().ClearSceneState(
+            m_Impl->m_RenderExtractionCache.ClearSceneState(
                 *m_Impl->m_Renderer);
         }
 
@@ -577,8 +577,10 @@ namespace Extrinsic::Runtime
         // extraction is requested. The production default remains synchronous;
         // GRAPHICS-036D proves the opt-in render-N-1 path by consuming the
         // previous front while extraction writes the newly acquired back slot.
-        m_Impl->m_RenderExtractionService.ConfigurePool(
-            m_Impl->m_Config.Render.SynchronousExtraction);
+        m_Impl->m_RenderWorldPool = std::make_unique<RenderWorldPool>(
+            m_Impl->m_Config.Render.SynchronousExtraction
+                ? 1u
+                : RenderWorldPool::kDefaultBuffers);
 
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
         m_Impl->m_FrameGraph = std::make_unique<Core::FrameGraph>();
@@ -694,7 +696,7 @@ namespace Extrinsic::Runtime
             {
                 if (Renderer)
                 {
-                    Owner.m_Impl->m_RenderExtractionService.Shutdown(*Renderer);
+                    Owner.m_Impl->m_RenderExtractionCache.Shutdown(*Renderer);
                     Renderer->Shutdown();
                     Renderer.reset();
                 }
@@ -745,7 +747,7 @@ namespace Extrinsic::Runtime
         RuntimeFrameContext frameContext{};
         RuntimeFramePacingDiagnostics pacing{};
         pacing.Valid = true;
-        pacing.FrameIndex = m_Impl->m_RenderExtractionService.CurrentFrameIndex();
+        pacing.FrameIndex = m_Impl->m_RenderExtractionFrameIndex;
         const auto framePacingBegin = std::chrono::steady_clock::now();
         const auto publishPacingSample = [&]()
         {
@@ -1008,15 +1010,15 @@ namespace Extrinsic::Runtime
         // consumer: AcquireFront) and the front reference is released after the
         // frame retires below. `frameIndex` stamps the acquired slot so the
         // consumer's frame-age diagnostic reads 0 in the synchronous baseline.
-        frameContext.FrameIndex = m_Impl->m_RenderExtractionService.ConsumeFrameIndex();
+        frameContext.FrameIndex = m_Impl->m_RenderExtractionFrameIndex++;
 
         Graphics::GpuAssetCache* const gpuAssetCache =
             m_Impl->m_ServiceRegistry.Find<Graphics::GpuAssetCache>();
         RuntimeRenderFrameHooks renderHooks(*m_Impl->m_Renderer,
                                             *m_Impl->m_Scene,
-                                            m_Impl->m_RenderExtractionService.Cache(),
+                                            m_Impl->m_RenderExtractionCache,
                                             gpuAssetCache,
-                                            m_Impl->m_RenderExtractionService.Pool(),
+                                            *m_Impl->m_RenderWorldPool,
                                             m_Impl->m_Config.Render.SynchronousExtraction,
                                             frameContext.ExtractionStats,
                                             frameContext.FrameIndex,
@@ -1052,7 +1054,7 @@ namespace Extrinsic::Runtime
                               m_Impl->m_ServiceRegistry.Find<
                                   Core::IAssetFrameHooks>(),
                               *m_Impl->m_Device,
-                              m_Impl->m_RenderExtractionService.Cache(),
+                              m_Impl->m_RenderExtractionCache,
                               *m_Impl->m_Renderer);
         const auto maintenanceBegin = std::chrono::steady_clock::now();
         Core::ExecuteMaintenanceContract(transferHooks, assetHooks);
@@ -1080,7 +1082,12 @@ namespace Extrinsic::Runtime
         // front; pipelined mode releases the previous front consumed by render-N
         // after extraction-N has already published the new front.
         const auto releaseFrontBegin = std::chrono::steady_clock::now();
-        m_Impl->m_RenderExtractionService.ReleaseFrontSlot(frameContext.PooledFrontSlot);
+        if (frameContext.PooledFrontSlot != RenderWorldPool::kInvalidSlot &&
+            m_Impl->m_RenderWorldPool != nullptr)
+        {
+            m_Impl->m_RenderWorldPool->ReleaseFront(
+                frameContext.PooledFrontSlot);
+        }
         pacing.ReleaseRenderWorldMicros = ElapsedMicros(releaseFrontBegin);
 
         // ARCH-010 — world mutations are deferred to the Maintenance boundary.

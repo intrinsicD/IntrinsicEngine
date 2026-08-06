@@ -298,8 +298,8 @@ normal bake GPU-queue ownership, ready-frame dependency setup, JobService
 participant registration, diagnostics access, shutdown dependency clearing,
 transform-gizmo frame state, selected-entity scratch, gizmo/selection pointer
 interlock, and transform-gizmo packet production now live outside
-`Runtime.Engine.cpp`; render-extraction cache/pool/stats/frame-index ownership
-now lives in an Engine-private `RenderExtractionService`, and GPU asset
+`Runtime.Engine.cpp`; render-extraction cache/pool/frame-index composition
+state now lives directly in `Engine::Impl`, and GPU asset
 cache/model-handoff residency ownership now lives in the app-composed
 `AssetWorkflowModule`; the persistent streaming executor, derived-job
 registry, world-retirement gate, maintenance drains, and shutdown now live in

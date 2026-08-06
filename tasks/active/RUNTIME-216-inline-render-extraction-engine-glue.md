@@ -5,10 +5,10 @@ depends_on: [RUNTIME-215]
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-runtime216"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T14:45:49Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this follow-up changes only an Engine-private storage/forwarding shape and preserves public extraction, rendering, lifecycle, data-domain, and control contracts."

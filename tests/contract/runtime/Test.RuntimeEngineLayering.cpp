@@ -749,7 +749,7 @@ TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
     EXPECT_NE(content.find("frameContext.FrameDeltaSeconds = frameDt;"), std::string::npos);
     EXPECT_NE(content.find("frameContext.FixedStepAlpha = alpha;"), std::string::npos);
     EXPECT_NE(content.find("frameContext.FrameIndex = "
-                           "m_Impl->m_RenderExtractionService.ConsumeFrameIndex();"),
+                           "m_Impl->m_RenderExtractionFrameIndex++;"),
               std::string::npos);
     EXPECT_NE(content.find("frameContext.ExtractionStats"), std::string::npos);
     EXPECT_NE(content.find("frameContext.PooledFrontSlot"), std::string::npos);

@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicRuntimeContractTests",
+    "IntrinsicRuntimeIntegrationTests",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 42292,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T14:54:59Z",
+  "label": "ci-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T14:54:17Z",
+  "stderr_path": "tasks/evidence/RUNTIME-216/commands/ci-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-216/commands/ci-build.stdout.log",
+  "stdout_sha256": "85ecebf50a9d1eabf5d1f454fd7eb4521b4773fe719d1242c25995ef9f84b27e",
+  "task_id": "RUNTIME-216"
+}
