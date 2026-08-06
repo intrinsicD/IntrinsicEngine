@@ -1,0 +1,100 @@
+schema_version: 1
+task_id: BUG-136
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T18:15:07Z'
+claim_eligible: false
+source:
+  base_ref: 0424ea4348fc91fb1ef8b734a5e209df06b590c7
+  base_revision: 0424ea4348fc91fb1ef8b734a5e209df06b590c7
+  head_revision: 3fe2ab7714b9cb4c83bc38dbe2e54e9ee75511a2
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: tasks/backlog/bugs/index.md
+    sha256: f2636534faae4bab46ba06a58eee26538e91eaa0497fd3e4c71818b03a2463e3
+  - path: tasks/done/BUG-136-test-gate-routing-affected-case-baseline-drift.md
+    sha256: e3c5aca4f96b1013563549913068e003fb521be76ef873a0d33b1b8c39900f86
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: c940308f0c2b29e45f6722d824f85734483c06c5dfe340797e2bc9d504a4ebc0
+  - path: tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+    sha256: 0598b3b01772c19342fc3c9e201c5c9179529b4832424a70b65810fcd93d0a2b
+  - path: tests/regression/tooling/Test.TestGateRouting.py
+    sha256: 7d31f7e8b739b16f66105b84bc14ecbb433c240ee548bdd70999d55d979c7afe
+  content_digest: 2dbf353116e69c3aad050913eef7730717efe474a26b6ffb6b33aabf8a02004d
+touched:
+  paths:
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-136-test-gate-routing-affected-case-baseline-drift.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+  - tests/regression/tooling/Test.TestGateRouting.py
+  layers:
+  - tasks
+  - tests
+  modules: []
+extension_seam: Exact checked-in routing inventory and count ratchets; no new extension seam.
+future_change_plan: Update the affected-case rows and coupled counts in the same change whenever an audited
+  source adds, removes, or renames a registered case.
+acceptance:
+- criterion: The reported missing/extra set is empty without changing source
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The baseline remains an exact inventory of the affected cases with
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Strict task, test-layout, and whitespace gates pass.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-136/commands/diff-check.json
+- receipt: tasks/evidence/BUG-136/commands/doc-links.json
+- receipt: tasks/evidence/BUG-136/commands/routing-all-live.json
+- receipt: tasks/evidence/BUG-136/commands/routing-cpu-live.json
+- receipt: tasks/evidence/BUG-136/commands/routing-self-test.json
+- receipt: tasks/evidence/BUG-136/commands/session-brief.json
+- receipt: tasks/evidence/BUG-136/commands/task-policy.json
+- receipt: tasks/evidence/BUG-136/commands/task-schema.json
+- receipt: tasks/evidence/BUG-136/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-136/commands/test-layout.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- The live reconciler first reported two missing retired names and six extra current RuntimeEngineLayering
+  names, then reported the coupled 35/222 count drift after the rows were corrected.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-136-test-gate-routing-affected-case-baseline-drift.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- No engine or test behavior changed; future affected-source drift remains fail-closed through live registry
+  reconciliation and explicit count ratchets.
+skipped_checks:
+- check: compiled-test-execution
+  reason: No C++ source, test body, module, CMake input, label, target, or registration changed; the fresh
+    built registry plus hermetic and both live reconciliation modes are the direct owning gates.
+artifacts:
+- path: tests/regression/tooling/Test.TestGateRouting.py
+  sha256: 7d31f7e8b739b16f66105b84bc14ecbb433c240ee548bdd70999d55d979c7afe
+  kind: file
+- path: tests/regression/tooling/Test.TestGateRouting.baseline.tsv
+  sha256: 0598b3b01772c19342fc3c9e201c5c9179529b4832424a70b65810fcd93d0a2b
+  kind: file
+- path: tasks/done/BUG-136-test-gate-routing-affected-case-baseline-drift.md
+  sha256: e3c5aca4f96b1013563549913068e003fb521be76ef873a0d33b1b8c39900f86
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

@@ -1,0 +1,24 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.TestGateRouting.py",
+    "--build-dir",
+    "build/ci",
+    "--aggregate",
+    "IntrinsicTests"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 476,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:14:16Z",
+  "label": "routing-all-live",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:14:15Z",
+  "stderr_path": "tasks/evidence/BUG-136/commands/routing-all-live.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-136/commands/routing-all-live.stdout.log",
+  "stdout_sha256": "10f5b7656519e2702622797eb410c8ca3ec9000470914ee9051bed7ceb4c2ad3",
+  "task_id": "BUG-136"
+}
