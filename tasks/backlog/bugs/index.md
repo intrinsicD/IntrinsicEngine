@@ -5,6 +5,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-134` — ImGui adapter panel draw-list test fails intermittently](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
+  one default CPU run reported the panel draw-list contract as its sole
+  failure, followed by ten passing isolated repetitions and a clean 4,103-case
+  full rerun. Preserve the next failed assertion, establish a deterministic
+  cause, and fix the owning test or adapter surface without quarantine,
+  retries, or weakened coverage.
 - [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
   the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
   expects an unsupported slot from a fixture whose current combinations all
