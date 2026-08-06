@@ -61,36 +61,50 @@ contract_review: "Reviewed the full catalog; this follow-up changes only an Engi
 
 ## Required changes
 
-- [ ] Move the cache, pool, and frame-index values into `Engine::Impl` at the
+- [x] Move the cache, pool, and frame-index values into `Engine::Impl` at the
       same relative lifetime position.
-- [ ] Replace forwarding calls with direct owner operations while preserving
+- [x] Replace forwarding calls with direct owner operations while preserving
       pool configuration, slot release, cache publication, scene clearing,
-      maintenance, and renderer-before-cache shutdown order.
-- [ ] Delete both private service files and remove them from CMake/includes.
-- [ ] Update source-contract tests to assert the direct Engine-owned shape
+      maintenance, and cache-before-renderer shutdown order.
+- [x] Delete both private service files and remove them from CMake/includes.
+- [x] Update source-contract tests to assert the direct Engine-owned shape
       rather than a private forwarding class.
 
 ## Tests
 
-- [ ] Focused Engine-private glue, render extraction, render-world pool,
+- [x] Focused Engine-private glue, render extraction, render-world pool,
       lifecycle, and Sandbox acceptance tests pass.
-- [ ] The complete default CPU-supported selector and strict layering gate pass.
+- [x] The complete default CPU-supported selector and strict layering gate pass.
 
 ## Docs
 
-- [ ] Update runtime ownership prose to describe direct Engine-private cache,
+- [x] Update runtime ownership prose to describe direct Engine-private cache,
       pool, and frame-index state.
-- [ ] Refresh task/session indexes and generated inventory if the generator
+- [x] Refresh task/session indexes and generated inventory if the generator
       changes.
 
 ## Acceptance criteria
 
-- [ ] The two `RenderExtractionService` files and class name are absent.
-- [ ] Runtime file count decreases by exactly two without a replacement file,
+- [x] The two `RenderExtractionService` files and class name are absent.
+- [x] Runtime file count decreases by exactly two without a replacement file,
       wrapper, interface, module, or public API.
-- [ ] Engine teardown order and all extraction/pool behavior remain unchanged
+- [x] Engine teardown order and all extraction/pool behavior remain unchanged
       under focused and complete CPU verification.
-- [ ] No unrelated runtime consolidation is mixed into this task.
+- [x] No unrelated runtime consolidation is mixed into this task.
+
+## Status
+
+- Completed on 2026-08-06 as the semantic right-sizing follow-up to the
+  independently reviewed `RUNTIME-215` path move.
+- Implementation commit: `7e61e215`.
+- The facade's 130 declaration/implementation lines are deleted; runtime file
+  count moved from 170 to 168 with no replacement file or public surface.
+- Focused runtime coverage passed 70/70 and the final default CPU selector
+  passed 4,103/4,103 with only the expected environment-gated GLFW/LSan skip.
+  Strict layering, task policy, docs sync/links, module-inventory equality, and
+  clean-workshop automated rows pass. Manual clean-workshop rows 3–6 are
+  `n/a`: no public API, renderer member/subsystem, frame-graph pass, recipe
+  dependency, or dependency edge changed.
 
 ## Verification
 

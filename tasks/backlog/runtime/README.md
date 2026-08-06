@@ -41,13 +41,18 @@ The source-complete runtime surface audit re-gated `REVIEW-003`. `RUNTIME-203`
 and `RUNTIME-205` closed the one-consumer helper findings through their concrete
 production owners while preserving public behavior first.
 
-Active `RUNTIME-216` follows the mechanical `RUNTIME-215` layout move. It
-deletes the two-file, Engine-private `RenderExtractionService` forwarding
-layer now that the path-only change is independently reviewable; extraction
+Retired `RUNTIME-216` followed the mechanical `RUNTIME-215` layout move and
+deleted the two-file, Engine-private `RenderExtractionService` forwarding
+layer after the path-only change was independently reviewed. Extraction
 behavior and the public module surface remain unchanged.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-216` — Inline shallow render-extraction Engine glue](../../done/RUNTIME-216-inline-render-extraction-engine-glue.md)
+  stores the cache, pool, and frame index directly in `Engine::Impl`, removes
+  the one-owner forwarding class and its two files, and preserves extraction,
+  pool, frame-loop, and shutdown behavior under the focused and complete CPU
+  gates.
 - [`RUNTIME-215` — Organize runtime sources by cohesive ownership](../../done/RUNTIME-215-organize-runtime-source-layout.md)
   moved the crowded flat runtime root into broad owner/lifecycle directories
   without changing module names, target membership, imports, behavior, or
@@ -296,7 +301,7 @@ directly in `SceneInteractionModule` and deletes the helper BMI; the durable
 `GizmoInteraction` contract remains.
 `RUNTIME-163` is retired; it first moved `RenderExtractionCache`, render-world
 pool, frame-index ownership, and render-extraction facade delegation into an
-Engine-private `RenderExtractionService`. Active `RUNTIME-216` removes that
+Engine-private `RenderExtractionService`. Retired `RUNTIME-216` removes that
 one-owner forwarding layer and stores the values directly in `Engine::Impl`.
 `RUNTIME-164` is retired; `Graphics::GpuAssetCache`, the cache's
 `AssetEventBus` listener token, `AssetModelTextureHandoff`,

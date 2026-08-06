@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-216`](RUNTIME-216-inline-render-extraction-engine-glue.md) — the
+Engine-private `RenderExtractionService` forwarding class is gone. Its
+`RenderExtractionCache`, `RenderWorldPool`, and monotonic frame index now live
+directly in `Engine::Impl`; Engine performs the same publication, scene clear,
+pool configuration/release, maintenance, and cache-before-renderer shutdown
+operations without a second ownership wrapper. Runtime loses exactly two
+files and gains no replacement abstraction or public API.
+
+The focused runtime selector passed 70/70 and the final CPU selector passed
+4,103/4,103 with only the expected environment-gated GLFW/LSan skip. Strict
+layering, task policy, docs sync/links, module-inventory equality, and the
+clean-workshop automated rows pass; its manual rows are inapplicable because
+the deletion adds no public API, renderer subsystem, pass, recipe edge, or
+dependency edge.
+
 [`RUNTIME-215`](RUNTIME-215-organize-runtime-source-layout.md) — the crowded
 flat runtime root is now organized into broad cohesive ownership directories
 for kernel composition, asset workflow, configuration, editor operations,
