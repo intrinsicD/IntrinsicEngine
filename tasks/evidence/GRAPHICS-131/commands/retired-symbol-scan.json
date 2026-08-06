@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "! rg -n \"IReconstructor\" src tests --glob \"!Test.RendererRhiBoundary.cpp\""
+  ],
+  "command_display": "bash -lc '! rg -n \"IReconstructor\" src tests --glob \"!Test.RendererRhiBoundary.cpp\"'",
+  "cwd": ".",
+  "duration_ms": 17,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T16:22:12Z",
+  "label": "retired-symbol-scan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T16:22:11Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-131/commands/retired-symbol-scan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-131/commands/retired-symbol-scan.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "GRAPHICS-131"
+}

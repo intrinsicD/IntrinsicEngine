@@ -1,0 +1,340 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+        Start  155: GraphicsRenderer.NullRendererExecutesRenderGraphPath
+  1/163 Test  #155: GraphicsRenderer.NullRendererExecutesRenderGraphPath ....................................................   Passed    0.08 sec
+        Start  156: GraphicsRenderer.NullRendererReusesCompiledGraphForSteadyStateFrames
+  2/163 Test  #156: GraphicsRenderer.NullRendererReusesCompiledGraphForSteadyStateFrames ....................................   Passed    0.08 sec
+        Start  157: GraphicsRenderer.NullRendererRecompilesOnFeatureAndSizingChangesAndRebindsImports
+  3/163 Test  #157: GraphicsRenderer.NullRendererRecompilesOnFeatureAndSizingChangesAndRebindsImports .......................   Passed    0.11 sec
+        Start  158: GraphicsRenderer.NullRendererCachedDebugDumpMatchesInitialCompileWhenEnabled
+  4/163 Test  #158: GraphicsRenderer.NullRendererCachedDebugDumpMatchesInitialCompileWhenEnabled ............................   Passed    0.08 sec
+        Start  159: GraphicsRenderer.NullRendererForwardDebugDumpContainsCanonicalPassesAndDataflowOrder
+  5/163 Test  #159: GraphicsRenderer.NullRendererForwardDebugDumpContainsCanonicalPassesAndDataflowOrder ....................   Passed    0.07 sec
+        Start  160: GraphicsRenderer.NullRendererDeferredDebugDumpPlacesCompositionBetweenSurfaceAndLine
+  6/163 Test  #160: GraphicsRenderer.NullRendererDeferredDebugDumpPlacesCompositionBetweenSurfaceAndLine ....................   Passed    0.07 sec
+        Start  161: GraphicsRenderer.NullRendererEnablesDebugChainWhenRequested
+  7/163 Test  #161: GraphicsRenderer.NullRendererEnablesDebugChainWhenRequested .............................................   Passed    0.06 sec
+        Start  162: GraphicsRenderer.NullRendererAddsPickingPassWhenPickIsPending
+  8/163 Test  #162: GraphicsRenderer.NullRendererAddsPickingPassWhenPickIsPending ...........................................   Passed    0.07 sec
+        Start  163: GraphicsRenderer.NullRendererExecuteFrameRequiresPreparePhase
+  9/163 Test  #163: GraphicsRenderer.NullRendererExecuteFrameRequiresPreparePhase ...........................................   Passed    0.03 sec
+        Start  164: GraphicsRenderer.NullRendererPrepareBeforeExtractPreventsExecute
+ 10/163 Test  #164: GraphicsRenderer.NullRendererPrepareBeforeExtractPreventsExecute ........................................   Passed    0.03 sec
+        Start  405: EditorUiModule.ReverseShutdownWithdrawsHostAndDetachesLiveRenderer
+ 11/163 Test  #405: EditorUiModule.ReverseShutdownWithdrawsHostAndDetachesLiveRenderer ......................................   Passed    0.04 sec
+        Start  679: RuntimeConfigControl.BootGpuProfilingConfigReachesRendererWithoutControlOrEditor
+ 12/163 Test  #679: RuntimeConfigControl.BootGpuProfilingConfigReachesRendererWithoutControlOrEditor ........................   Passed    0.04 sec
+        Start  694: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRendererContract
+ 13/163 Test  #694: RuntimeEngineLayering.RunFrameStopsAfterPlatformCloseBeforeRendererContract .............................   Passed    0.00 sec
+        Start  701: RuntimeEngineLayering.PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder
+ 14/163 Test  #701: RuntimeEngineLayering.PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder .....................   Passed    0.00 sec
+        Start  895: SandboxEditorUi.RenderGraphPanelModelCopiesRendererStats
+ 15/163 Test  #895: SandboxEditorUi.RenderGraphPanelModelCopiesRendererStats ................................................   Passed    0.00 sec
+        Start 1694: SurfaceReconstruction.EmptyPointsReturnsNullopt
+ 16/163 Test #1694: SurfaceReconstruction.EmptyPointsReturnsNullopt .........................................................   Passed    0.00 sec
+        Start 1695: SurfaceReconstruction.TooFewPointsReturnsNullopt
+ 17/163 Test #1695: SurfaceReconstruction.TooFewPointsReturnsNullopt ........................................................   Passed    0.00 sec
+        Start 1696: SurfaceReconstruction.MismatchedNormalsReturnsNullopt
+ 18/163 Test #1696: SurfaceReconstruction.MismatchedNormalsReturnsNullopt ...................................................   Passed    0.00 sec
+        Start 1697: SurfaceReconstruction.NoNormalsAndNoEstimationReturnsNullopt
+ 19/163 Test #1697: SurfaceReconstruction.NoNormalsAndNoEstimationReturnsNullopt ............................................   Passed    0.00 sec
+        Start 1698: SurfaceReconstruction.ZeroResolutionReturnsNullopt
+ 20/163 Test #1698: SurfaceReconstruction.ZeroResolutionReturnsNullopt ......................................................   Passed    0.00 sec
+        Start 1699: SurfaceReconstruction.InvalidNormalsAreRejected
+ 21/163 Test #1699: SurfaceReconstruction.InvalidNormalsAreRejected .........................................................   Passed    0.04 sec
+        Start 1700: SurfaceReconstruction.AllInvalidNormalsReturnNullopt
+ 22/163 Test #1700: SurfaceReconstruction.AllInvalidNormalsReturnNullopt ....................................................   Passed    0.00 sec
+        Start 1701: SurfaceReconstruction.SphereWithProvidedNormals
+ 23/163 Test #1701: SurfaceReconstruction.SphereWithProvidedNormals .........................................................   Passed    0.07 sec
+        Start 1702: SurfaceReconstruction.SphereWithEstimatedNormals
+ 24/163 Test #1702: SurfaceReconstruction.SphereWithEstimatedNormals ........................................................   Passed    0.08 sec
+        Start 1703: SurfaceReconstruction.SphereWithWeightedDistance
+ 25/163 Test #1703: SurfaceReconstruction.SphereWithWeightedDistance ........................................................   Passed    0.18 sec
+        Start 1704: SurfaceReconstruction.OutputMeshHasVerticesAndFaces
+ 26/163 Test #1704: SurfaceReconstruction.OutputMeshHasVerticesAndFaces .....................................................   Passed    0.04 sec
+        Start 1705: SurfaceReconstruction.HigherResolutionMoreDetail
+ 27/163 Test #1705: SurfaceReconstruction.HigherResolutionMoreDetail ........................................................   Passed    0.15 sec
+        Start 1706: SurfaceReconstruction.SphereReconstructionApproximatesRadius
+ 28/163 Test #1706: SurfaceReconstruction.SphereReconstructionApproximatesRadius ............................................   Passed    0.13 sec
+        Start 1707: SurfaceReconstruction.AcceptsBorrowedSpanInput
+ 29/163 Test #1707: SurfaceReconstruction.AcceptsBorrowedSpanInput ..........................................................   Passed    0.01 sec
+        Start 3532: RendererRhiBoundary.RendererPublicSurfaceCompilesThroughRhiOnly
+ 30/163 Test #3532: RendererRhiBoundary.RendererPublicSurfaceCompilesThroughRhiOnly .........................................   Passed    0.00 sec
+        Start 3533: RendererRhiBoundary.RendererDoesNotImportVulkanBackend
+ 31/163 Test #3533: RendererRhiBoundary.RendererDoesNotImportVulkanBackend ..................................................   Passed    0.01 sec
+        Start 3534: RendererRhiBoundary.RendererDoesNotImportLiveEcsOwnership
+ 32/163 Test #3534: RendererRhiBoundary.RendererDoesNotImportLiveEcsOwnership ...............................................   Passed    0.01 sec
+        Start 3535: RendererRhiBoundary.RhiLayerDoesNotImportVulkan
+ 33/163 Test #3535: RendererRhiBoundary.RhiLayerDoesNotImportVulkan .........................................................   Passed    0.00 sec
+        Start 3536: RendererRhiBoundary.RetiredTimelineSemaphoreAbstractionStaysAbsent
+ 34/163 Test #3536: RendererRhiBoundary.RetiredTimelineSemaphoreAbstractionStaysAbsent ......................................   Passed    0.02 sec
+        Start 3537: RendererRhiBoundary.RetiredPipelineRegistryStaysAbsent
+ 35/163 Test #3537: RendererRhiBoundary.RetiredPipelineRegistryStaysAbsent ..................................................   Passed    0.01 sec
+        Start 3538: RendererRhiBoundary.RetiredReconstructorBaseStaysAbsent
+ 36/163 Test #3538: RendererRhiBoundary.RetiredReconstructorBaseStaysAbsent .................................................   Passed    0.01 sec
+        Start 3539: RendererRhiBoundary.PromotedGraphicsAndRuntimeDoNotImportCuda
+ 37/163 Test #3539: RendererRhiBoundary.PromotedGraphicsAndRuntimeDoNotImportCuda ...........................................   Passed    0.01 sec
+        Start 3540: RendererRhiBoundary.SamplerBorderColorStaysBackendNeutralAndMapsInVulkanBackend
+ 38/163 Test #3540: RendererRhiBoundary.SamplerBorderColorStaysBackendNeutralAndMapsInVulkanBackend .........................   Passed    0.00 sec
+        Start 3541: RendererRhiBoundary.VulkanBackendDefinesPromotedSymbols
+ 39/163 Test #3541: RendererRhiBoundary.VulkanBackendDefinesPromotedSymbols .................................................   Passed    0.00 sec
+        Start 3634: CurrentRendererContractAdapter.DescriptorDeclaresCurrentRendererContractSurface
+ 40/163 Test #3634: CurrentRendererContractAdapter.DescriptorDeclaresCurrentRendererContractSurface .........................   Passed    0.00 sec
+        Start 3635: CurrentRendererContractAdapter.BindingSetMapsCurrentMaterialGeometryAndVisualizationInputs
+ 41/163 Test #3635: CurrentRendererContractAdapter.BindingSetMapsCurrentMaterialGeometryAndVisualizationInputs ..............   Passed    0.00 sec
+        Start 3636: CurrentRendererContractAdapter.FrameInputBuildsCompatibleSnapshotRecipeAndDiagnostics
+ 42/163 Test #3636: CurrentRendererContractAdapter.FrameInputBuildsCompatibleSnapshotRecipeAndDiagnostics ...................   Passed    0.00 sec
+        Start 3637: CurrentRendererContractAdapter.RenderWorldKeepsCurrentFrameDiagnosticsNonBlocking
+ 43/163 Test #3637: CurrentRendererContractAdapter.RenderWorldKeepsCurrentFrameDiagnosticsNonBlocking .......................   Passed    0.00 sec
+        Start 3638: CurrentRendererContractAdapter.RecipeDescriptorUsesOnlyDeclaredCurrentRendererSlots
+ 44/163 Test #3638: CurrentRendererContractAdapter.RecipeDescriptorUsesOnlyDeclaredCurrentRendererSlots .....................   Passed    0.00 sec
+        Start 3675: DebugViewPassContract.RendererRoutesAndRecordsDebugViewPass
+ 45/163 Test #3675: DebugViewPassContract.RendererRoutesAndRecordsDebugViewPass .............................................   Passed    0.07 sec
+        Start 3709: FrameRecipeContract.TemporalReconstructionUsesInputAndOutputExtents
+ 46/163 Test #3709: FrameRecipeContract.TemporalReconstructionUsesInputAndOutputExtents .....................................   Passed    0.00 sec
+        Start 3710: FrameRecipeContract.NoJitterNoHistorySuppressesTemporalReconstruction
+ 47/163 Test #3710: FrameRecipeContract.NoJitterNoHistorySuppressesTemporalReconstruction ...................................   Passed    0.00 sec
+        Start 3711: FrameRecipeContract.TemporalReconstructionRequiresHistoryImports
+ 48/163 Test #3711: FrameRecipeContract.TemporalReconstructionRequiresHistoryImports ........................................   Passed    0.00 sec
+        Start 3726: FrameRecipeContract.PickingReadbackImportedFromRenderer
+ 49/163 Test #3726: FrameRecipeContract.PickingReadbackImportedFromRenderer .................................................   Passed    0.00 sec
+        Start 3831: GraphicsPostProcessChainContract.TemporalAAFeedsPostProcessFromReconstruction
+ 50/163 Test #3831: GraphicsPostProcessChainContract.TemporalAAFeedsPostProcessFromReconstruction ...........................   Passed    0.00 sec
+        Start 3849: PresentPassContract.RendererRoutesAndRecordsPresentPass
+ 51/163 Test #3849: PresentPassContract.RendererRoutesAndRecordsPresentPass .................................................   Passed    0.07 sec
+        Start 3872: GraphicsReconstructionContract.ConcreteReferenceRejectsInvalidInputsFailClosed
+ 52/163 Test #3872: GraphicsReconstructionContract.ConcreteReferenceRejectsInvalidInputsFailClosed ..........................   Passed    0.00 sec
+        Start 3873: GraphicsReconstructionContract.ResetInvalidatesHistoryAndCopiesCurrent
+ 53/163 Test #3873: GraphicsReconstructionContract.ResetInvalidatesHistoryAndCopiesCurrent ..................................   Passed    0.00 sec
+        Start 3874: GraphicsReconstructionContract.ReferenceTAAClipsHistoryAgainstFiveByFiveYCoCgNeighborhood
+ 54/163 Test #3874: GraphicsReconstructionContract.ReferenceTAAClipsHistoryAgainstFiveByFiveYCoCgNeighborhood ...............   Passed    0.00 sec
+        Start 3875: GraphicsReconstructionContract.ExposureWeightingReducesHistoryContribution
+ 55/163 Test #3875: GraphicsReconstructionContract.ExposureWeightingReducesHistoryContribution ..............................   Passed    0.00 sec
+        Start 3876: GraphicsReconstructionContract.DisocclusionFallbackReportsFraction
+ 56/163 Test #3876: GraphicsReconstructionContract.DisocclusionFallbackReportsFraction ......................................   Passed    0.00 sec
+        Start 3877: GraphicsReconstructionHistory.PingPongHistoryRetiresOldPairThroughWindow
+ 57/163 Test #3877: GraphicsReconstructionHistory.PingPongHistoryRetiresOldPairThroughWindow ................................   Passed    0.00 sec
+        Start 3882: RenderingContract.RendererDescriptorRequiresStableContractFields
+ 58/163 Test #3882: RenderingContract.RendererDescriptorRequiresStableContractFields ........................................   Passed    0.00 sec
+        Start 3897: RenderRecipeConfig.FixedRendererCoreCannotBeReplacedByConfig
+ 59/163 Test #3897: RenderRecipeConfig.FixedRendererCoreCannotBeReplacedByConfig ............................................   Passed    0.00 sec
+        Start 3907: RendererFrameLifecycle.ActiveGpuSceneVertexShadersUseSceneTableCameraViewProjection
+ 60/163 Test #3907: RendererFrameLifecycle.ActiveGpuSceneVertexShadersUseSceneTableCameraViewProjection .....................   Passed    0.00 sec
+        Start 3908: RendererFrameLifecycle.FrameRecipeOverrideProjectionDisablesPostProcess
+ 61/163 Test #3908: RendererFrameLifecycle.FrameRecipeOverrideProjectionDisablesPostProcess .................................   Passed    0.00 sec
+        Start 3909: RendererFrameLifecycle.FrameRecipeOverrideProjectionDisablesMappedFeatureSlots
+ 62/163 Test #3909: RendererFrameLifecycle.FrameRecipeOverrideProjectionDisablesMappedFeatureSlots ..........................   Passed    0.00 sec
+        Start 3910: RendererFrameLifecycle.FrameRecipeOverrideProjectionFailsClosedForUnknownSlot
+ 63/163 Test #3910: RendererFrameLifecycle.FrameRecipeOverrideProjectionFailsClosedForUnknownSlot ...........................   Passed    0.00 sec
+        Start 3911: RendererFrameLifecycle.FrameRecipeOverrideProjectionRejectsUnmappedExtensionDisable
+ 64/163 Test #3911: RendererFrameLifecycle.FrameRecipeOverrideProjectionRejectsUnmappedExtensionDisable .....................   Passed    0.00 sec
+        Start 3912: RendererFrameLifecycle.FrameRecipeOverrideProjectionFailsClosedForFixedCoreChanges
+ 65/163 Test #3912: RendererFrameLifecycle.FrameRecipeOverrideProjectionFailsClosedForFixedCoreChanges ......................   Passed    0.00 sec
+        Start 3913: RendererFrameLifecycle.PrepareFramePublishesCameraIntoGpuSceneTable
+ 66/163 Test #3913: RendererFrameLifecycle.PrepareFramePublishesCameraIntoGpuSceneTable .....................................   Passed    0.07 sec
+        Start 3914: RendererFrameLifecycle.ActiveFrameRecipeOverrideOmitsPostProcessPasses
+ 67/163 Test #3914: RendererFrameLifecycle.ActiveFrameRecipeOverrideOmitsPostProcessPasses ..................................   Passed    0.07 sec
+        Start 3915: RendererFrameLifecycle.ActiveFrameRecipeOverrideDiagnosticsLeaveDefaultsUntouched
+ 68/163 Test #3915: RendererFrameLifecycle.ActiveFrameRecipeOverrideDiagnosticsLeaveDefaultsUntouched .......................   Passed    0.07 sec
+        Start 3916: RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext
+ 69/163 Test #3916: RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext ..............................   Passed    0.07 sec
+        Start 3917: RendererFrameLifecycle.PlacedTransientAliasingUsesMemoryBlocksAndAliasBarriers
+ 70/163 Test #3917: RendererFrameLifecycle.PlacedTransientAliasingUsesMemoryBlocksAndAliasBarriers ..........................   Passed    0.07 sec
+        Start 3918: RendererFrameLifecycle.PlacedTransientAliasingDefaultsToPerResourceFallback
+ 71/163 Test #3918: RendererFrameLifecycle.PlacedTransientAliasingDefaultsToPerResourceFallback .............................   Passed    0.07 sec
+        Start 3919: RendererFrameLifecycle.PlacedTransientAliasingFallsBackWhenMemoryBlocksUnavailable
+ 72/163 Test #3919: RendererFrameLifecycle.PlacedTransientAliasingFallsBackWhenMemoryBlocksUnavailable ......................   Passed    0.08 sec
+        Start 3920: RendererFrameLifecycle.RuntimeFrameCommandHooksRunInsideExecuteFrameCommandContext
+ 73/163 Test #3920: RendererFrameLifecycle.RuntimeFrameCommandHooksRunInsideExecuteFrameCommandContext ......................   Passed    0.09 sec
+        Start 3921: RendererFrameLifecycle.RenderGraphReportsCurrentRendererContractAndDeclaredArtifacts
+ 74/163 Test #3921: RendererFrameLifecycle.RenderGraphReportsCurrentRendererContractAndDeclaredArtifacts ....................   Passed    0.07 sec
+        Start 3922: RendererFrameLifecycle.AsyncComputeQueuePlanIncrementsUtilizationStat
+ 75/163 Test #3922: RendererFrameLifecycle.AsyncComputeQueuePlanIncrementsUtilizationStat ...................................   Passed    0.07 sec
+        Start 3923: RendererFrameLifecycle.ParallelRecordingFlagFallsBackWhenDeviceDeclinesContextPlan
+ 76/163 Test #3923: RendererFrameLifecycle.ParallelRecordingFlagFallsBackWhenDeviceDeclinesContextPlan ......................   Passed    0.07 sec
+        Start 3924: RendererFrameLifecycle.ParallelRecordingUsesAcceptedContextPlanInSerialSubmitOrder
+ 77/163 Test #3924: RendererFrameLifecycle.ParallelRecordingUsesAcceptedContextPlanInSerialSubmitOrder ......................   Passed    0.07 sec
+        Start 3925: RendererFrameLifecycle.ParallelRecordingUsesSchedulerWorkersWhenAvailable
+ 78/163 Test #3925: RendererFrameLifecycle.ParallelRecordingUsesSchedulerWorkersWhenAvailable ...............................   Passed    0.08 sec
+        Start 3926: RendererFrameLifecycle.ParallelRecordingUsesAcceptedContextsForAsyncComputeQueuePlan
+ 79/163 Test #3926: RendererFrameLifecycle.ParallelRecordingUsesAcceptedContextsForAsyncComputeQueuePlan ....................   Passed    0.08 sec
+        Start 3927: RendererFrameLifecycle.ParallelRecordingRecordsDynamicUploadPassesThroughAcceptedContexts
+ 80/163 Test #3927: RendererFrameLifecycle.ParallelRecordingRecordsDynamicUploadPassesThroughAcceptedContexts ...............   Passed    0.07 sec
+        Start 3928: RendererFrameLifecycle.InvalidDeviceBackbufferReportsRecipeDiagnostic
+ 81/163 Test #3928: RendererFrameLifecycle.InvalidDeviceBackbufferReportsRecipeDiagnostic ...................................   Passed    0.06 sec
+        Start 3929: RendererFrameLifecycle.PublishesRecipeGraphValidationOnSuccessfulCompile
+ 82/163 Test #3929: RendererFrameLifecycle.PublishesRecipeGraphValidationOnSuccessfulCompile ................................   Passed    0.07 sec
+        Start 3930: RendererFrameLifecycle.PublishesFailClosedRecipeValidationOnRecipeBuildFailure
+ 83/163 Test #3930: RendererFrameLifecycle.PublishesFailClosedRecipeValidationOnRecipeBuildFailure ..........................   Passed    0.06 sec
+        Start 3931: RendererFrameLifecycle.NonOperationalDeviceSkipsCullingCommandsButExecutesGraph
+ 84/163 Test #3931: RendererFrameLifecycle.NonOperationalDeviceSkipsCullingCommandsButExecutesGraph .........................   Passed    0.03 sec
+        Start 3932: RendererFrameLifecycle.OperationalRebuildAfterNonOperationalStartupRecordsRoutedCommands
+ 85/163 Test #3932: RendererFrameLifecycle.OperationalRebuildAfterNonOperationalStartupRecordsRoutedCommands ................   Passed    0.08 sec
+        Start 3933: RendererFrameLifecycle.DepthPrepassPipelineFailureSkipsUnavailableCommandPass
+ 86/163 Test #3933: RendererFrameLifecycle.DepthPrepassPipelineFailureSkipsUnavailableCommandPass ...........................   Passed    0.07 sec
+        Start 3934: RendererFrameLifecycle.CullingPipelineFailureSkipsRoutedCommandPassesUnavailable
+ 87/163 Test #3934: RendererFrameLifecycle.CullingPipelineFailureSkipsRoutedCommandPassesUnavailable ........................   Passed    0.06 sec
+        Start 3935: RendererFrameLifecycle.BeginFrameWithoutDeviceReportsLifecycleDiagnostic
+ 88/163 Test #3935: RendererFrameLifecycle.BeginFrameWithoutDeviceReportsLifecycleDiagnostic ................................   Passed    0.00 sec
+        Start 3936: RendererFrameLifecycle.BeginFrameSkipDoesNotRecordCommands
+ 89/163 Test #3936: RendererFrameLifecycle.BeginFrameSkipDoesNotRecordCommands ..............................................   Passed    0.03 sec
+        Start 3937: RendererFrameLifecycle.ExecuteFrameRejectsAfterRenderPrepFailure
+ 90/163 Test #3937: RendererFrameLifecycle.ExecuteFrameRejectsAfterRenderPrepFailure ........................................   Passed    0.03 sec
+        Start 3938: RendererFrameLifecycle.FrameRecipePassesAllProduceStructuredCommandRecordStatuses
+ 91/163 Test #3938: RendererFrameLifecycle.FrameRecipePassesAllProduceStructuredCommandRecordStatuses .......................   Passed    0.07 sec
+        Start 3939: RendererFrameLifecycle.DefaultDebugSurfacePipelineSurvivesOperationalRebuild
+ 92/163 Test #3939: RendererFrameLifecycle.DefaultDebugSurfacePipelineSurvivesOperationalRebuild ............................   Passed    0.07 sec
+        Start 3940: RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild
+ 93/163 Test #3940: RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild .................................   Passed    0.07 sec
+        Start 3941: RendererFrameLifecycle.ForwardLinePointPipelinesSurviveOperationalRebuild
+ 94/163 Test #3941: RendererFrameLifecycle.ForwardLinePointPipelinesSurviveOperationalRebuild ...............................   Passed    0.07 sec
+        Start 3942: RendererFrameLifecycle.ForwardPointSphereImpostorsWriteCorrectedDepth
+ 95/163 Test #3942: RendererFrameLifecycle.ForwardPointSphereImpostorsWriteCorrectedDepth ...................................   Passed    0.00 sec
+        Start 3943: RendererFrameLifecycle.ForwardLinePointShadersUseSharedVisualizationColorHelpers
+ 96/163 Test #3943: RendererFrameLifecycle.ForwardLinePointShadersUseSharedVisualizationColorHelpers ........................   Passed    0.00 sec
+        Start 3944: RendererFrameLifecycle.ShadowPipelineSurvivesOperationalRebuild
+ 97/163 Test #3944: RendererFrameLifecycle.ShadowPipelineSurvivesOperationalRebuild .........................................   Passed    0.07 sec
+        Start 3945: RendererFrameLifecycle.ShadowAtlasSurvivesOperationalRebuild
+ 98/163 Test #3945: RendererFrameLifecycle.ShadowAtlasSurvivesOperationalRebuild ............................................   Passed    0.07 sec
+        Start 3946: RendererFrameLifecycle.ForwardSurfacePassSkipsUnavailableWhenCullOutputMissing
+ 99/163 Test #3946: RendererFrameLifecycle.ForwardSurfacePassSkipsUnavailableWhenCullOutputMissing ..........................   Passed    0.06 sec
+        Start 3947: RendererFrameLifecycle.ForwardLinePointPassesSkipUnavailableWhenCullOutputMissing
+100/163 Test #3947: RendererFrameLifecycle.ForwardLinePointPassesSkipUnavailableWhenCullOutputMissing .......................   Passed    0.07 sec
+        Start 3948: RendererFrameLifecycle.DeferredGBufferPipelineSurvivesOperationalRebuild
+101/163 Test #3948: RendererFrameLifecycle.DeferredGBufferPipelineSurvivesOperationalRebuild ................................   Passed    0.07 sec
+        Start 3949: RendererFrameLifecycle.DeferredSurfacePassRecordsWhenLightingPathIsDeferred
+102/163 Test #3949: RendererFrameLifecycle.DeferredSurfacePassRecordsWhenLightingPathIsDeferred .............................   Passed    0.07 sec
+        Start 3950: RendererFrameLifecycle.DeferredSurfacePassSkipsUnavailableWhenPipelineMissing
+103/163 Test #3950: RendererFrameLifecycle.DeferredSurfacePassSkipsUnavailableWhenPipelineMissing ...........................   Passed    0.07 sec
+        Start 3951: RendererFrameLifecycle.DeferredLightingPipelineSurvivesOperationalRebuild
+104/163 Test #3951: RendererFrameLifecycle.DeferredLightingPipelineSurvivesOperationalRebuild ...............................   Passed    0.07 sec
+        Start 3952: RendererFrameLifecycle.DeferredLightingPassSkipsUnavailableWhenPipelineMissing
+105/163 Test #3952: RendererFrameLifecycle.DeferredLightingPassSkipsUnavailableWhenPipelineMissing ..........................   Passed    0.07 sec
+        Start 3953: RendererFrameLifecycle.DeferredGBufferToCompositionEmitsColorToShaderReadBarriers
+106/163 Test #3953: RendererFrameLifecycle.DeferredGBufferToCompositionEmitsColorToShaderReadBarriers .......................   Passed    0.07 sec
+        Start 3954: RendererFrameLifecycle.DeferredLightingShadowAtlasTransitionsDepthToShaderReadBeforeComposition
+107/163 Test #3954: RendererFrameLifecycle.DeferredLightingShadowAtlasTransitionsDepthToShaderReadBeforeComposition .........   Passed    0.07 sec
+        Start 3955: RendererFrameLifecycle.DeferredLightingPushConstantsCarryShadowAtlasBindlessIndex
+108/163 Test #3955: RendererFrameLifecycle.DeferredLightingPushConstantsCarryShadowAtlasBindlessIndex .......................   Passed    0.07 sec
+        Start 3956: RendererFrameLifecycle.EntityIdPickingPipelineSurvivesOperationalRebuild
+109/163 Test #3956: RendererFrameLifecycle.EntityIdPickingPipelineSurvivesOperationalRebuild ................................   Passed    0.07 sec
+        Start 3957: RendererFrameLifecycle.EntityIdOutlinePipelineUsesSingleTargetShape
+110/163 Test #3957: RendererFrameLifecycle.EntityIdOutlinePipelineUsesSingleTargetShape .....................................   Passed    0.07 sec
+        Start 3958: RendererFrameLifecycle.FaceIdPickingPipelineSurvivesOperationalRebuild
+111/163 Test #3958: RendererFrameLifecycle.FaceIdPickingPipelineSurvivesOperationalRebuild ..................................   Passed    0.07 sec
+        Start 3959: RendererFrameLifecycle.EdgeIdPickingPipelineSurvivesOperationalRebuild
+112/163 Test #3959: RendererFrameLifecycle.EdgeIdPickingPipelineSurvivesOperationalRebuild ..................................   Passed    0.07 sec
+        Start 3960: RendererFrameLifecycle.PointIdPickingPipelineSurvivesOperationalRebuild
+113/163 Test #3960: RendererFrameLifecycle.PointIdPickingPipelineSurvivesOperationalRebuild .................................   Passed    0.07 sec
+        Start 3961: RendererFrameLifecycle.SelectionOutlinePipelineSurvivesOperationalRebuild
+114/163 Test #3961: RendererFrameLifecycle.SelectionOutlinePipelineSurvivesOperationalRebuild ...............................   Passed    0.07 sec
+        Start 3962: RendererFrameLifecycle.PostProcessToneMapPipelineSurvivesOperationalRebuild
+115/163 Test #3962: RendererFrameLifecycle.PostProcessToneMapPipelineSurvivesOperationalRebuild .............................   Passed    0.07 sec
+        Start 3963: RendererFrameLifecycle.PostProcessBloomPipelinesSurviveOperationalRebuild
+116/163 Test #3963: RendererFrameLifecycle.PostProcessBloomPipelinesSurviveOperationalRebuild ...............................   Passed    0.07 sec
+        Start 3964: RendererFrameLifecycle.PostProcessFXAAPipelineSurvivesOperationalRebuild
+117/163 Test #3964: RendererFrameLifecycle.PostProcessFXAAPipelineSurvivesOperationalRebuild ................................   Passed    0.07 sec
+        Start 3965: RendererFrameLifecycle.PostProcessSMAAPipelinesSurviveOperationalRebuild
+118/163 Test #3965: RendererFrameLifecycle.PostProcessSMAAPipelinesSurviveOperationalRebuild ................................   Passed    0.07 sec
+        Start 3966: RendererFrameLifecycle.PostProcessHistogramPipelineSurvivesOperationalRebuild
+119/163 Test #3966: RendererFrameLifecycle.PostProcessHistogramPipelineSurvivesOperationalRebuild ...........................   Passed    0.07 sec
+        Start 3967: RendererFrameLifecycle.HZBBuildPipelineSurvivesOperationalRebuild
+120/163 Test #3967: RendererFrameLifecycle.HZBBuildPipelineSurvivesOperationalRebuild .......................................   Passed    0.07 sec
+        Start 3968: RendererFrameLifecycle.ClusterLightingPipelinesAndSceneTablePublishSurviveRebuild
+121/163 Test #3968: RendererFrameLifecycle.ClusterLightingPipelinesAndSceneTablePublishSurviveRebuild .......................   Passed    0.10 sec
+        Start 3969: RendererFrameLifecycle.HZBBuildPassRecordsFallbackDispatches
+122/163 Test #3969: RendererFrameLifecycle.HZBBuildPassRecordsFallbackDispatches ............................................   Passed    0.07 sec
+        Start 3970: RendererFrameLifecycle.PostProcessSMAALookupTexturesSurviveOperationalRebuild
+123/163 Test #3970: RendererFrameLifecycle.PostProcessSMAALookupTexturesSurviveOperationalRebuild ...........................   Passed    0.07 sec
+        Start 3971: RendererFrameLifecycle.PostProcessSMAALookupTexturesRetryAfterFailedUpload
+124/163 Test #3971: RendererFrameLifecycle.PostProcessSMAALookupTexturesRetryAfterFailedUpload ..............................   Passed    0.07 sec
+        Start 3972: RendererFrameLifecycle.TAARecordsReconstructionPassAndDiagnostics
+125/163 Test #3972: RendererFrameLifecycle.TAARecordsReconstructionPassAndDiagnostics .......................................   Passed    0.07 sec
+        Start 3973: RendererFrameLifecycle.FXAASelectedWithoutPipelineKeepsResolveSkippedAndPresentOnSceneColorLDR
+126/163 Test #3973: RendererFrameLifecycle.FXAASelectedWithoutPipelineKeepsResolveSkippedAndPresentOnSceneColorLDR ..........   Passed    0.07 sec
+        Start 3974: RendererFrameLifecycle.SMAASelectedWithoutResolvePipelineKeepsResolveSkippedAndPresentOnSceneColorLDR
+127/163 Test #3974: RendererFrameLifecycle.SMAASelectedWithoutResolvePipelineKeepsResolveSkippedAndPresentOnSceneColorLDR ...   Passed    0.07 sec
+        Start 3975: RendererFrameLifecycle.SelectionOutlinePassRecordsWhenSelectableEntityPresent
+128/163 Test #3975: RendererFrameLifecycle.SelectionOutlinePassRecordsWhenSelectableEntityPresent ...........................   Passed    0.07 sec
+        Start 3976: RendererFrameLifecycle.SelectionOutlineBindsEntityIdToDedicatedSampledSlot
+129/163 Test #3976: RendererFrameLifecycle.SelectionOutlineBindsEntityIdToDedicatedSampledSlot ..............................   Passed    0.07 sec
+        Start 3977: RendererFrameLifecycle.SelectionOutlinePushConstantsMatchRecipeInputs
+130/163 Test #3977: RendererFrameLifecycle.SelectionOutlinePushConstantsMatchRecipeInputs ...................................   Passed    0.07 sec
+        Start 3978: RendererFrameLifecycle.PickingReadbackBufferSurvivesOperationalRebuild
+131/163 Test #3978: RendererFrameLifecycle.PickingReadbackBufferSurvivesOperationalRebuild ..................................   Passed    0.07 sec
+        Start 3979: RendererFrameLifecycle.PickingReadbackBufferReallocatesWhenFramesInFlightChanges
+132/163 Test #3979: RendererFrameLifecycle.PickingReadbackBufferReallocatesWhenFramesInFlightChanges ........................   Passed    0.11 sec
+        Start 3980: RendererFrameLifecycle.PickingReadbackCopyRecordedWhenPickPending
+133/163 Test #3980: RendererFrameLifecycle.PickingReadbackCopyRecordedWhenPickPending .......................................   Passed    0.07 sec
+        Start 3981: RendererFrameLifecycle.PickingReadbackCopySkippedWhenNotPending
+134/163 Test #3981: RendererFrameLifecycle.PickingReadbackCopySkippedWhenNotPending .........................................   Passed    0.07 sec
+        Start 3982: RendererFrameLifecycle.PickingReadbackPublishesPickResultForHitPixel
+135/163 Test #3982: RendererFrameLifecycle.PickingReadbackPublishesPickResultForHitPixel ....................................   Passed    0.07 sec
+        Start 3983: RendererFrameLifecycle.PickingReadbackPreservesCorrelationSequence
+136/163 Test #3983: RendererFrameLifecycle.PickingReadbackPreservesCorrelationSequence ......................................   Passed    0.07 sec
+        Start 3984: RendererFrameLifecycle.PickingReadbackPublishesNoHitForMissPixel
+137/163 Test #3984: RendererFrameLifecycle.PickingReadbackPublishesNoHitForMissPixel ........................................   Passed    0.07 sec
+        Start 3985: RendererFrameLifecycle.PickingReadbackPublishesNoHitForInvalidatedRequest
+138/163 Test #3985: RendererFrameLifecycle.PickingReadbackPublishesNoHitForInvalidatedRequest ...............................   Passed    0.10 sec
+        Start 3986: RendererFrameLifecycle.PickingReadbackPublishesNoHitForTruncatedSlotOnFifShrink
+139/163 Test #3986: RendererFrameLifecycle.PickingReadbackPublishesNoHitForTruncatedSlotOnFifShrink .........................   Passed    0.10 sec
+        Start 3987: RendererFrameLifecycle.HistogramReadbackBufferSurvivesOperationalRebuild
+140/163 Test #3987: RendererFrameLifecycle.HistogramReadbackBufferSurvivesOperationalRebuild ................................   Passed    0.07 sec
+        Start 3988: RendererFrameLifecycle.HistogramReadbackCopyRecordedOnOperationalFrame
+141/163 Test #3988: RendererFrameLifecycle.HistogramReadbackCopyRecordedOnOperationalFrame ..................................   Passed    0.07 sec
+        Start 3989: RendererFrameLifecycle.HistogramReadbackDrainPublishesEachSlotExactlyOnce
+142/163 Test #3989: RendererFrameLifecycle.HistogramReadbackDrainPublishesEachSlotExactlyOnce ...............................   Passed    0.07 sec
+        Start 3990: RendererFrameLifecycle.HistogramReadbackCopySkippedWhenStageDisabled
+143/163 Test #3990: RendererFrameLifecycle.HistogramReadbackCopySkippedWhenStageDisabled ....................................   Passed    0.07 sec
+        Start 3991: RendererFrameLifecycle.PublishHistogramReadbackUpdatesExposureHistory
+144/163 Test #3991: RendererFrameLifecycle.PublishHistogramReadbackUpdatesExposureHistory ...................................   Passed    0.03 sec
+        Start 3992: RendererFrameLifecycle.NativeGpuProfilerSubmitsExactCompiledPlanAndPublishesOnlyRecordedPasses
+145/163 Test #3992: RendererFrameLifecycle.NativeGpuProfilerSubmitsExactCompiledPlanAndPublishesOnlyRecordedPasses ..........   Passed    0.08 sec
+        Start 3993: RendererFrameLifecycle.NativeGpuProfilerUsesAcceptedParallelMultiQueueAttribution
+146/163 Test #3993: RendererFrameLifecycle.NativeGpuProfilerUsesAcceptedParallelMultiQueueAttribution .......................   Passed    0.08 sec
+        Start 3994: RendererFrameLifecycle.NativeGpuProfilerLabelsRejectedAsyncPlanAsGraphicsFallback
+147/163 Test #3994: RendererFrameLifecycle.NativeGpuProfilerLabelsRejectedAsyncPlanAsGraphicsFallback .......................   Passed    0.07 sec
+        Start 3995: RendererFrameLifecycle.NativeGpuProfilerDiscardsWhenDeviceSubmissionDoesNotAdvance
+148/163 Test #3995: RendererFrameLifecycle.NativeGpuProfilerDiscardsWhenDeviceSubmissionDoesNotAdvance ......................   Passed    0.07 sec
+        Start 3996: RendererFrameLifecycle.DeviceLostAfterActiveProfileDeviceEndOverridesInvalidLifecycle
+149/163 Test #3996: RendererFrameLifecycle.DeviceLostAfterActiveProfileDeviceEndOverridesInvalidLifecycle ...................   Passed    0.08 sec
+        Start 3997: RendererFrameLifecycle.DeviceLostAfterHotDisabledDeviceEndOverridesDisabledProfile
+150/163 Test #3997: RendererFrameLifecycle.DeviceLostAfterHotDisabledDeviceEndOverridesDisabledProfile ......................   Passed    0.08 sec
+        Start 3998: RendererFrameLifecycle.GpuProfilerScopeFailureDoesNotAbortRenderingAndDiscardsWholeCandidate
+151/163 Test #3998: RendererFrameLifecycle.GpuProfilerScopeFailureDoesNotAbortRenderingAndDiscardsWholeCandidate ............   Passed    0.07 sec
+        Start 3999: RendererFrameLifecycle.GpuProfilerNoFreshBeginPathsClearPriorTelemetry
+152/163 Test #3999: RendererFrameLifecycle.GpuProfilerNoFreshBeginPathsClearPriorTelemetry ..................................   Passed    0.07 sec
+        Start 4000: RendererFrameLifecycle.GpuProfilerPerFrameUnsupportedPlanDoesNotAbortRendering
+153/163 Test #4000: RendererFrameLifecycle.GpuProfilerPerFrameUnsupportedPlanDoesNotAbortRendering ..........................   Passed    0.07 sec
+        Start 4001: RendererFrameLifecycle.HotDisabledGpuProfilerPreservesDeviceLostStaleLastGoodProfile
+154/163 Test #4001: RendererFrameLifecycle.HotDisabledGpuProfilerPreservesDeviceLostStaleLastGoodProfile ....................   Passed    0.08 sec
+        Start 4002: RendererFrameLifecycle.DeviceLostProfilerStatusMapsFailedDeviceBeginFrame
+155/163 Test #4002: RendererFrameLifecycle.DeviceLostProfilerStatusMapsFailedDeviceBeginFrame ...............................   Passed    0.08 sec
+        Start 4003: RendererFrameLifecycle.GpuProfilerHotDisableOmitsScopesAndReenableReusesAdapter
+156/163 Test #4003: RendererFrameLifecycle.GpuProfilerHotDisableOmitsScopesAndReenableReusesAdapter .........................   Passed    0.09 sec
+        Start 4004: RendererFrameLifecycle.GpuProfilerShutdownDiscardsActiveCandidateBeforeReinitialize
+157/163 Test #4004: RendererFrameLifecycle.GpuProfilerShutdownDiscardsActiveCandidateBeforeReinitialize .....................   Passed    0.13 sec
+        Start 4008: RenderWorldContract.ExposesRendererOwnedImmutableRuntimeSnapshots
+158/163 Test #4008: RenderWorldContract.ExposesRendererOwnedImmutableRuntimeSnapshots .......................................   Passed    0.03 sec
+        Start 4039: VisibilityRecipe.RendererProductCompatibilityUsesDeclaredCapabilitiesAndProducedProducts
+159/163 Test #4039: VisibilityRecipe.RendererProductCompatibilityUsesDeclaredCapabilitiesAndProducedProducts ................   Passed    0.00 sec
+        Start 4109: VisualizationPropertyBufferResidencyContract.RendererPublishesAddressBeforePacketValidation
+160/163 Test #4109: VisualizationPropertyBufferResidencyContract.RendererPublishesAddressBeforePacketValidation .............   Passed    0.07 sec
+        Start 4145: RuntimeFrameLoopContract.RenderFrameOrdersPromotedRendererPhases
+161/163 Test #4145: RuntimeFrameLoopContract.RenderFrameOrdersPromotedRendererPhases ........................................   Passed    0.00 sec
+        Start 4148: RuntimeFrameLoopContract.OperationalTransitionWaitsIdleThenRebuildsRendererOnce
+162/163 Test #4148: RuntimeFrameLoopContract.OperationalTransitionWaitsIdleThenRebuildsRendererOnce .........................   Passed    0.00 sec
+        Start 4150: RuntimeFrameLoopContract.OperationalTransitionDoesNotMarkRendererWhenRebuildFails
+163/163 Test #4150: RuntimeFrameLoopContract.OperationalTransitionDoesNotMarkRendererWhenRebuildFails .......................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 163
+
+Label Time Summary:
+contract       =   7.34 sec*proc (136 tests)
+geometry       =   0.73 sec*proc (14 tests)
+graphics       =   7.94 sec*proc (144 tests)
+integration    =   0.68 sec*proc (13 tests)
+runtime        =   0.09 sec*proc (8 tests)
+unit           =   0.73 sec*proc (14 tests)
+
+Total Test time (real) =   8.84 sec

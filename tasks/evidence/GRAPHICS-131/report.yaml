@@ -1,0 +1,123 @@
+schema_version: 1
+task_id: GRAPHICS-131
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T16:22:51Z'
+claim_eligible: false
+source:
+  base_ref: a37b478a023c06cee48e3152608541f8fac0ce26
+  base_revision: a37b478a023c06cee48e3152608541f8fac0ce26
+  head_revision: 152b84e2e8f35f42f967dcf91fbfeb2ff0332291
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: docs/architecture/graphics.md
+    sha256: 88be3b8352078fc8e10afa63169292cba3a01dd1b9e6e4e4114c94db49482074
+  - path: src/graphics/renderer/Graphics.Reconstruction.cppm
+    sha256: a752877651eb69d75130139ce14e2b0ba236609b17db3c8d7d1e8a0f22f4ec1c
+  - path: src/graphics/renderer/README.md
+    sha256: 6d7ec02086a94972fdf0ce1868595ff4be9a7e616effaa2b558b66956b3f4ee3
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 0fe953c7d0e4ffcf7acb827b5c815964e76b9579617f1edcaf472e55427cbc97
+  - path: tasks/active/README.md
+    sha256: c9475ed3c532c7897327ac13648dcca18721c6027a8883dab305966e1af66685
+  - path: tasks/backlog/rendering/README.md
+    sha256: 546934829c77f3c21ff231df837a2a9c37bbd853f1311af46fa6ce0156ca3b78
+  - path: tasks/done/GRAPHICS-131-concretize-reference-reconstructor.md
+    sha256: 3bdaff33d65d6ac864f5becf239e028dd7370e134be7446a5926f5f954b7df68
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: a4fb04964184af997308b3056d447b4737d5fc3ae564ae64896bc3878aebd702
+  - path: tests/contract/graphics/Test.ReconstructionContract.cpp
+    sha256: 19bc7d158373813551924d3e2e57725795b2fe8d4ca09689c9c7254fcf464ff1
+  - path: tests/contract/graphics/Test.RendererRhiBoundary.cpp
+    sha256: 09b30ba248b9500163b3e163b1fd3c6fc90e268a498dd81e26b80d05ca404347
+  content_digest: f30deb130a5eb8d403c58d81d2ab13d8e6c98a22cd3e2e87304e118218a4ad81
+touched:
+  paths:
+  - docs/architecture/graphics.md
+  - src/graphics/renderer/Graphics.Reconstruction.cppm
+  - src/graphics/renderer/README.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/rendering/README.md
+  - tasks/done/GRAPHICS-131-concretize-reference-reconstructor.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/graphics/Test.ReconstructionContract.cpp
+  - tests/contract/graphics/Test.RendererRhiBoundary.cpp
+  layers:
+  - docs
+  - graphics
+  - tests
+  modules:
+  - Extrinsic.Graphics.Reconstruction
+extension_seam: None; ReferenceTAAReconstructor is the one present implementation and renderer owner,
+  so no polymorphic seam remains.
+future_change_plan: Introduce a shared reconstructor boundary only when a real second implementation shares
+  a present production selection and call site.
+acceptance:
+- criterion: '`IReconstructor` is absent from production, tests, and current-state'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: '`ReferenceTAAReconstructor` behavior and public data records are'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No replacement abstraction or vendor placeholder appears.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the revision-bound deletion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GRAPHICS-131/commands/algorithm-body-unchanged.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/build-tests.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/clean-workshop.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/configure-ci.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/diff-check.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/doc-links.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/docs-sync.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/focused-cpu.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/full-cpu.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/layering.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/module-inventory.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/retired-symbol-scan.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/task-policy.json
+- receipt: tasks/evidence/GRAPHICS-131/commands/task-state-links.json
+changed_public_contracts:
+- Removed Graphics::IReconstructor; ReferenceTAAReconstructor retains the same Apply signature, ReconstructionResult/Hints/views,
+  algorithm body, and renderer call path.
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GRAPHICS-131-concretize-reference-reconstructor.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Opt-in Vulkan execution was not rerun; the renderer call site, reconstruction algorithm body, history
+  ownership, RHI/backend code, and shaders are unchanged.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No RHI, Vulkan, shader, history-resource, renderer call-site, or algorithm behavior changed;
+    focused and complete CPU contracts cover the removed dispatch layer.
+artifacts:
+- path: tasks/done/GRAPHICS-131-concretize-reference-reconstructor.md
+  sha256: 3bdaff33d65d6ac864f5becf239e028dd7370e134be7446a5926f5f954b7df68
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GRAPHICS-131/handoff.jsonl
+review: tasks/evidence/GRAPHICS-131/reviews.jsonl
