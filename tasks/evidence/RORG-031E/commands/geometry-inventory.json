@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "for t in GEOM-013 GEOM-024 GEOM-059 GEOM-060 GEOM-061 GEOM-065 GEOM-066 GEOM-067 GEOM-068 GEOM-069 GEOM-070 GEOM-071 GEOM-072 GEOM-073 GEOM-074; do ls tasks/backlog/geometry/${t}-*.md >/dev/null || exit 1; done; for t in GEOM-058 GEOM-062 GEOM-064; do ls tasks/done/${t}-*.md >/dev/null || exit 1; done"
+  ],
+  "command_display": "bash -lc 'for t in GEOM-013 GEOM-024 GEOM-059 GEOM-060 GEOM-061 GEOM-065 GEOM-066 GEOM-067 GEOM-068 GEOM-069 GEOM-070 GEOM-071 GEOM-072 GEOM-073 GEOM-074; do ls tasks/backlog/geometry/${t}-*.md >/dev/null || exit 1; done; for t in GEOM-058 GEOM-062 GEOM-064; do ls tasks/done/${t}-*.md >/dev/null || exit 1; done'",
+  "cwd": ".",
+  "duration_ms": 27,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:27:45Z",
+  "label": "geometry-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:27:45Z",
+  "stderr_path": "tasks/evidence/RORG-031E/commands/geometry-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-031E/commands/geometry-inventory.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "RORG-031E"
+}

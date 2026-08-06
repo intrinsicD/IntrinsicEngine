@@ -3,6 +3,9 @@ id: GEOM-054
 theme: none
 depends_on: []
 completed: 2026-07-05
+contract_schema: 1
+contracts: []
+contract_review: "Mechanical state-link maintenance only: RORG-031E moved from backlog to done; GEOM-054's geometry/API contracts are unchanged."
 ---
 # GEOM-054 — Registration pipeline: extract named ICP stages (zero behavior change)
 
@@ -51,7 +54,7 @@ completed: 2026-07-05
   axis via the Algorithm-Variant-Dispatch idiom
   ([`algorithm-variant-dispatch.md`](../../docs/architecture/algorithm-variant-dispatch.md)).
 - Coordinates with the geometry umbrella
-  [`RORG-031E`](../backlog/geometry/RORG-031-geometry-method-readiness.md); listed in
+  [`RORG-031E`](../done/RORG-031-geometry-method-readiness.md); listed in
   [`README.md`](../backlog/geometry/README.md).
 
 <!-- Control surfaces / backends unchanged by this slice. -->
@@ -96,7 +99,7 @@ completed: 2026-07-05
       because the public module surface is unchanged; confirm the inventory diff
       is empty.
 - [x] Keep [`README.md`](../backlog/geometry/README.md) and
-      [`RORG-031E`](../backlog/geometry/RORG-031-geometry-method-readiness.md) child inventory
+      [`RORG-031E`](../done/RORG-031-geometry-method-readiness.md) child inventory
       consistent (updated in this change); regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria

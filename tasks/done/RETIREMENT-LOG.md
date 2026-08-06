@@ -6741,3 +6741,13 @@ is preserved as rejected rather than rewritten. The 31-case custody and
 paths, five-protocol/five-run global custody validation, strict task/docs/skill
 checks, and fixed-surface review of `40232d16` all pass without weakening GPU
 labels or making a speedup claim.
+
+[`RORG-031E`](RORG-031-geometry-method-readiness.md) — geometry and
+method-readiness coordination seed retired on 2026-08-06. The rejected
+`REVIEW-003` baseline found that its duplicate child inventory still called
+retired `GEOM-058`, `GEOM-062`, and `GEOM-064` open while omitting current
+`GEOM-073/074`. The final reconciliation records the exact open geometry set,
+confirms concrete method gates in consuming task front matter, corrects stale
+root Theme F prose, and leaves the geometry category index plus generated
+session brief as the sole live maps. No code, algorithm, dependency edge, or
+replacement umbrella was introduced.

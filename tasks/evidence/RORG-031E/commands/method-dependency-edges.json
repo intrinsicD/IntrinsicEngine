@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "for pair in METHOD-006:GEOM-024 METHOD-024:GEOM-024 METHOD-015:GEOM-058 METHOD-017:GEOM-058 METHOD-017:GEOM-062 METHOD-016:GEOM-062 METHOD-018:GEOM-062 METHOD-021:GEOM-064 METHOD-022:GEOM-064; do method=${pair%%:*}; gate=${pair##*:}; file=$(find tasks -type f -name \"${method}-*.md\" -print -quit); test -n \"$file\" && rg -q \"$gate\" \"$file\" || exit 1; done"
+  ],
+  "command_display": "bash -lc 'for pair in METHOD-006:GEOM-024 METHOD-024:GEOM-024 METHOD-015:GEOM-058 METHOD-017:GEOM-058 METHOD-017:GEOM-062 METHOD-016:GEOM-062 METHOD-018:GEOM-062 METHOD-021:GEOM-064 METHOD-022:GEOM-064; do method=${pair%%:*}; gate=${pair##*:}; file=$(find tasks -type f -name \"${method}-*.md\" -print -quit); test -n \"$file\" && rg -q \"$gate\" \"$file\" || exit 1; done'",
+  "cwd": ".",
+  "duration_ms": 85,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:27:45Z",
+  "label": "method-dependency-edges",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:27:45Z",
+  "stderr_path": "tasks/evidence/RORG-031E/commands/method-dependency-edges.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-031E/commands/method-dependency-edges.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "RORG-031E"
+}

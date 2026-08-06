@@ -53,10 +53,6 @@ map.
 - [GEOM-074 — Graph property and adjacency contracts](GEOM-074-graph-property-adjacency-contracts.md)
   (lets graph algorithms consume named properties plus adjacency so equivalent
   mesh primal graphs enter without conversion).
-- [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md)
-  is a `REVIEW-003` blocker after its 2026-08-06 deletion test found that the
-  independently maintained task/index graph superseded its stale duplicate
-  child inventory; reconcile the maps and retire the seed.
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
 
@@ -198,7 +194,6 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   observer and emits read-only transform/RMSE/inlier traces without changing the
   serializable `RegistrationParams` config. The editor ICP convergence
   visualization consumer retired under `UI-029`.
-- RORG-031E is part of **Theme F — Architecture/runtime/UI foundation seeds**.
 - Future geometry algorithm packages should follow
   [`docs/agent/method-workflow.md`](../../../docs/agent/method-workflow.md):
   CPU reference first, correctness tests, benchmark harness, optimized CPU,
@@ -209,6 +204,9 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RORG-031E — Geometry and method-readiness backlog seed](../../done/RORG-031-geometry-method-readiness.md)
+  (done, 2026-08-06): reconciled its stale duplicate child/dependency inventory
+  with the category/task maps and retired without a replacement umbrella.
 - [GEOM-062 — Point-set projection and weighting kernels seam](../../done/GEOM-062-point-set-projection-weighting-kernels.md)
   (done, 2026-08-01, `CPUContracted`): adds compactly supported radial weights,
   finite WLOP repulsion primitives, and deterministic direct/reciprocal local

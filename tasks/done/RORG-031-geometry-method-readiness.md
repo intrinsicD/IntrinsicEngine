@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-rorg031e"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T15:25:13Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this planning-seed retirement reconciles task inventories and dependency records without changing a reusable subsystem, geometry data-domain, method integration, publication, or control-surface contract."
@@ -17,6 +17,18 @@ contract_review: "Reviewed the full catalog; this planning-seed retirement recon
 
 ## Status
 
+- Completed and retired on 2026-08-06. The final exact backlog snapshot is
+  `GEOM-013`, `GEOM-024`, `GEOM-059..061`, and `GEOM-065..074`; retired
+  `GEOM-058`, `GEOM-062`, and `GEOM-064` are no longer presented as open, and
+  the omitted `GEOM-073/074` property-domain leaves are now included. All
+  concrete geometry-to-method edges named here resolve in consuming task front
+  matter. The geometry category index and generated session brief remain the
+  authoritative live maps, the stale Theme F runtime-leaf prose was removed,
+  and no replacement coordination umbrella was created.
+- Completion commit: this retirement commit.
+- In progress on `main`: reconcile the final exact inventory, remove the
+  duplicate seed from open maps, and retire it without creating a replacement
+  umbrella.
 - Re-gated as a `REVIEW-003` blocker on 2026-08-06. Its open-child inventory
   and verification still name retired `GEOM-058`, `GEOM-062`, and `GEOM-064`
   while omitting open `GEOM-073` and `GEOM-074`. The independently maintained
@@ -52,34 +64,34 @@ contract_review: "Reviewed the full catalog; this planning-seed retirement recon
   consuming task are not coordination work for a permanent seed.
 
 ## Required changes
-- [ ] Replace the stale child snapshot with the exact current open set and
+- [x] Replace the stale child snapshot with the exact current open set and
       verify each child is independently indexed in the geometry README.
-- [ ] Verify every concrete geometry→method gate named above exists in the
+- [x] Verify every concrete geometry→method gate named above exists in the
       consuming task's `depends_on`; drop speculative future edges from the
       umbrella premise.
-- [ ] Reconcile the root Theme F open-set prose with the generated task state;
+- [x] Reconcile the root Theme F open-set prose with the generated task state;
       remove retired runtime leaves and this seed when it retires.
-- [ ] Retire this seed and record that category indexes, task front matter, and
+- [x] Retire this seed and record that category indexes, task front matter, and
       `tasks/SESSION-BRIEF.md` supersede its duplicate inventory.
 
 ## Tests
-- [ ] No code changes; exact current/retired path probes and strict task/link
+- [x] No code changes; exact current/retired path probes and strict task/link
       validators prove the reconciled map.
 
 ## Docs
-- [ ] Remove this seed from the geometry/root open-member lists, correct the
+- [x] Remove this seed from the geometry/root open-member lists, correct the
       stale root runtime-leaf claim, append its retirement record, and
       regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria
-- [ ] The final recorded open-child snapshot matches the files under
+- [x] The final recorded open-child snapshot matches the files under
       `tasks/backlog/geometry/` before this seed moves out of that directory.
-- [ ] Every geometry→method gate this seed names is encoded in the consuming
+- [x] Every geometry→method gate this seed names is encoded in the consuming
       task's `depends_on` front-matter.
-- [ ] Root/category task maps agree with `tasks/SESSION-BRIEF.md` about the
+- [x] Root/category task maps agree with `tasks/SESSION-BRIEF.md` about the
       current Theme F and geometry open sets.
-- [ ] No second long-lived geometry child inventory replaces this seed.
-- [ ] This task resides in `tasks/done/` and no open index presents it as
+- [x] No second long-lived geometry child inventory replaces this seed.
+- [x] This task resides in `tasks/done/` and no open index presents it as
       selectable work.
 
 ## Verification

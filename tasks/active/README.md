@@ -11,7 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- None. `REVIEW-003` returned to the architecture backlog after its rejected
+- None. `REVIEW-003` remains in the architecture backlog after its rejected
   2026-08-06 baseline opened concrete remediation dependencies.
 
 ## History

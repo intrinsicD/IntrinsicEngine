@@ -447,7 +447,7 @@ every run records its backend identity and diagnostics for reproducibility.
 Each slice is independently shippable, CPU-reference-first, with tests + docs,
 following the nine-section task template. Slices coordinate with the geometry
 umbrella
-[`RORG-031E`](../../tasks/backlog/geometry/RORG-031-geometry-method-readiness.md);
+[`RORG-031E`](../../tasks/done/RORG-031-geometry-method-readiness.md);
 the UI slice follows the `UI-024..028` panel pattern under the UI umbrella; the
 method slice cites retired
 [`GEOM-017`](../../tasks/archive/GEOM-017-point-cloud-descriptors-registration-seams.md)'s
