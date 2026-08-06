@@ -261,9 +261,10 @@ by retired `RUNTIME-172`'s app-composed
 `Extrinsic.Runtime.SceneDocumentModule`. `RUNTIME-149` is retired; render-recipe
 activation and hot-config control now live in
 `Extrinsic.Runtime.EngineConfigControl`. `RUNTIME-150` is retired, and
-`RUNTIME-167` replaced its one-consumer partition; the frame-loop hook adapters
-and per-frame helpers now live in the include-only
-`Runtime.Engine.FrameLoop.Internal.hpp` helper. `RUNTIME-151` is retired;
+`RUNTIME-167` replaced its one-consumer partition with the include-only
+`Runtime.Engine.FrameLoop.Internal.hpp` helper; retired `RUNTIME-217` later
+deleted the frame-loop hook adapters while retaining the private per-frame
+helpers there. `RUNTIME-151` is retired;
 StableId signal tracking is owned by `StableEntityLookupSceneBinding`, and
 `Runtime.Engine.cppm` no longer exposes EnTT.
 `RUNTIME-152` is retired; device bootstrap policy now lives in

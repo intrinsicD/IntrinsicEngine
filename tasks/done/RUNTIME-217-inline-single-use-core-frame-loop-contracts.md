@@ -10,7 +10,7 @@ evidence: required
 owner: "codex-runtime217"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-06T18:18:44Z"
+claimed_at: "2026-08-06T18:42:11Z"
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
@@ -26,6 +26,10 @@ contracts:
   ordering; the concrete optional AssetWorkflow service retains its lifecycle.
   Focused owner-level coverage passed 198/198 and the complete default CPU
   selector passed 4,102/4,102 with its expected GLFW/LSan skip.
+- Independent review revision 1 rejected stale BUG-136 routing-count prose in
+  the test strategy and test README. Revision 2 reconciles both authoritative
+  counts to the checked 39-case baseline and clarifies that RUNTIME-217 removed
+  the hook adapters while retaining only private per-frame helpers.
 - Completion commit: this implementation/retirement commit.
 
 ## Goal
