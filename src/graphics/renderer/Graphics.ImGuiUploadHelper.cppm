@@ -63,39 +63,19 @@ export namespace Extrinsic::Graphics
         bool Overflow{false};
     };
 
-    class IImGuiUploadHelper
-    {
-    public:
-        virtual ~IImGuiUploadHelper() = default;
-
-        IImGuiUploadHelper(const IImGuiUploadHelper&) = delete;
-        IImGuiUploadHelper& operator=(const IImGuiUploadHelper&) = delete;
-
-        virtual void BeginFrame(std::uint32_t frameIndex,
-                                std::uint32_t framesInFlight) = 0;
-
-        [[nodiscard]] virtual ImGuiUploadResult UploadFrame(
-            const ImGuiOverlayFrame& frame) = 0;
-
-        [[nodiscard]] virtual std::uint64_t GetBufferAllocationCount() const noexcept = 0;
-
-    protected:
-        IImGuiUploadHelper() = default;
-    };
-
-    class ImGuiUploadHelper final : public IImGuiUploadHelper
+    class ImGuiUploadHelper
     {
     public:
         ImGuiUploadHelper(RHI::IDevice& device, RHI::BufferManager& bufferManager);
-        ~ImGuiUploadHelper() override;
+        ~ImGuiUploadHelper();
 
         void BeginFrame(std::uint32_t frameIndex,
-                        std::uint32_t framesInFlight) override;
+                        std::uint32_t framesInFlight);
 
         [[nodiscard]] ImGuiUploadResult UploadFrame(
-            const ImGuiOverlayFrame& frame) override;
+            const ImGuiOverlayFrame& frame);
 
-        [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept override
+        [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept
         {
             return m_BufferAllocationCount;
         }

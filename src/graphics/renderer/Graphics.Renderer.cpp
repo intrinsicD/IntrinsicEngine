@@ -10921,7 +10921,7 @@ namespace Extrinsic::Graphics
         std::unique_ptr<VisualizationPropertyBufferResidency> m_VisualizationPropertyBufferResidency;
         // GRAPHICS-079 Slice C — renderer-owned ImGui transient upload helper,
         // reset before BufferManager teardown.
-        std::unique_ptr<IImGuiUploadHelper> m_ImGuiUploadHelper;
+        std::unique_ptr<ImGuiUploadHelper> m_ImGuiUploadHelper;
         // GRAPHICS-119 Slice C.5: pass recording can eventually run on worker
         // threads, so renderer-owned dynamic upload helpers share one guard for
         // per-frame reset plus Upload/Execute sections that touch BufferManager

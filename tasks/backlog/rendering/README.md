@@ -39,9 +39,8 @@ without requiring them to read every file.
     Renderer-owned behavior is unchanged.
   - `GRAPHICS-133` is retired: the visualization-overlay helper is concrete
     and its Renderer-owned behavior is unchanged.
-  - [`GRAPHICS-134`](../../active/GRAPHICS-134-concretize-imgui-upload-helper.md) removes the
-    final single-owner upload-helper base while retaining its concrete
-    feature-owned helper.
+  - `GRAPHICS-134` is retired: the final single-owner upload-helper base is
+    deleted while its concrete feature-owned helper and behavior remain.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:
@@ -73,6 +72,10 @@ or CPU-clock profiler behavior.
 
 ## Retired cross-domain rendering leaves
 
+- [`GRAPHICS-134`](../../done/GRAPHICS-134-concretize-imgui-upload-helper.md) —
+  retired the unused ImGui upload-helper base while preserving the concrete
+  implementation and Renderer lifecycle; focused 194/194 and full
+  4,102/4,102 CPU selectors pass with the expected environment skip.
 - [`GRAPHICS-133`](../../done/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md) —
   retired the unused visualization-overlay upload-helper base while preserving
   the concrete implementation and Renderer lifecycle; focused 161/161 and

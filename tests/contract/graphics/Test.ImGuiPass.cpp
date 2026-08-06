@@ -28,6 +28,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -54,6 +55,8 @@ import Extrinsic.RHI.Types;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
+
+static_assert(!std::is_polymorphic_v<Graphics::ImGuiUploadHelper>);
 
 namespace
 {

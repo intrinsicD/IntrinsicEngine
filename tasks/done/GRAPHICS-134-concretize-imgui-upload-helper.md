@@ -18,8 +18,13 @@ contracts:
 
 ## Status
 
-- In progress on `main`: remove only the unused base and virtual qualifiers;
-  keep the concrete helper implementation and Renderer lifecycle unchanged.
+- Completed and retired on 2026-08-06. The unused `IImGuiUploadHelper` base
+  and virtual dispatch are gone; the concrete helper implementation unit,
+  Renderer call sequence, frame-slot buffers, upload behavior, and teardown
+  order are unchanged. Focused ImGui/renderer coverage passed 194/194 and the
+  complete default CPU selector passed 4,102/4,102 with its expected
+  GLFW/LSan skip.
+- Completion commit: this implementation/retirement commit.
 
 ## Goal
 
@@ -51,26 +56,27 @@ contracts:
 
 ## Required changes
 
-- [ ] Remove the interface and concrete inheritance.
-- [ ] Preserve concrete initialization, upload, reset/release, and teardown
+- [x] Remove the interface and concrete inheritance.
+- [x] Preserve concrete initialization, upload, reset/release, and teardown
       order under Renderer ownership.
-- [ ] Update focused source-contract tests/docs and add an absence ratchet.
+- [x] Update focused source-contract tests/docs and add an absence ratchet.
 
 ## Tests
 
-- [ ] Focused ImGui upload/overlay and renderer lifecycle contracts pass.
-- [ ] Complete default CPU-supported gate plus strict structural/docs gates
+- [x] Focused ImGui upload/overlay and renderer lifecycle contracts pass.
+- [x] Complete default CPU-supported gate plus strict structural/docs gates
       pass.
 
 ## Docs
 
-- [ ] Update renderer/canonical graphics prose and task/session records.
+- [x] Audit the already-concrete renderer/canonical graphics prose and refresh
+      task/session records.
 
 ## Acceptance criteria
 
-- [ ] The interface name is absent; concrete behavior stays covered.
-- [ ] No other helper family or replacement abstraction changes.
-- [ ] Independent fixed-surface review accepts the revision-bound deletion.
+- [x] The interface name is absent; concrete behavior stays covered.
+- [x] No other helper family or replacement abstraction changes.
+- [x] Independent fixed-surface review accepts the revision-bound deletion.
 
 ## Verification
 
