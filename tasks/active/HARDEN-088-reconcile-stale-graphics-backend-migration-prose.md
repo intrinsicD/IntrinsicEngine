@@ -8,15 +8,20 @@ depends_on:
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-harden088"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T15:30:28Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this task reconciles comments and current-state documentation with existing graphics-backend behavior and changes no reusable API, backend selection, data-domain, publication, or control-surface contract."
 ---
 # HARDEN-088 — Reconcile stale graphics-backend migration prose
+
+## Status
+
+- In progress on `main`: correct the identified Vulkan/Null current-state
+  comments and READMEs without modifying executable C++.
 
 ## Goal
 

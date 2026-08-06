@@ -35,7 +35,7 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
   while adding existing `RORG-031E` as the task-map blocker. Partial evidence
   is discarded; the complete audit resumes only after those leaves retire on a
   fresh commit.
-- [`HARDEN-088`](HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —
+- Active [`HARDEN-088`](../../active/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —
   reconcile retired-owner TODO/temporary markers, descriptor-slot prose, and
   obsolete future-Vulkan claims without changing backend behavior.
 

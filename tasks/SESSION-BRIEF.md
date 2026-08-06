@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `HARDEN-088` — Reconcile stale graphics-backend migration prose (tasks/active/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md)
 
 ## Theme B — Rendering modernization
 
@@ -32,7 +32,6 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-132` — Concretize the transient-debug upload helper (tasks/backlog/rendering/GRAPHICS-132-concretize-transient-debug-upload-helper.md)
 - unblocked: `GRAPHICS-133` — Concretize the visualization-overlay upload helper (tasks/backlog/rendering/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md)
 - unblocked: `GRAPHICS-134` — Concretize the ImGui upload helper (tasks/backlog/rendering/GRAPHICS-134-concretize-imgui-upload-helper.md)
-- unblocked: `HARDEN-088` — Reconcile stale graphics-backend migration prose (tasks/backlog/architecture/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - blocked by `GRAPHICS-129`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
