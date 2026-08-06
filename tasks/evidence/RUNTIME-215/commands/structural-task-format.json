@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py",
+    "--root",
+    "tasks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py --root tasks --strict",
+  "cwd": ".",
+  "duration_ms": 746,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T06:38:06Z",
+  "label": "structural-task-format",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T06:38:05Z",
+  "stderr_path": "tasks/evidence/RUNTIME-215/commands/structural-task-format.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-215/commands/structural-task-format.stdout.log",
+  "stdout_sha256": "bb6f95017b88ed8757e4d5994448b3160084fec9b0c9e4fb0f5cd2b665dfc77e",
+  "task_id": "RUNTIME-215"
+}

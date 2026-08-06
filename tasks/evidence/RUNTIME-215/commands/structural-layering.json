@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_layering.py",
+    "--root",
+    "src",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_layering.py --root src --strict",
+  "cwd": ".",
+  "duration_ms": 228,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T06:38:06Z",
+  "label": "structural-layering",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T06:38:05Z",
+  "stderr_path": "tasks/evidence/RUNTIME-215/commands/structural-layering.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-215/commands/structural-layering.stdout.log",
+  "stdout_sha256": "37654279e9d4de09e0d1c4ba901030c6ef936c71b7b928e9b6b1274fe9f240c6",
+  "task_id": "RUNTIME-215"
+}
