@@ -16,7 +16,7 @@ Root scanned: `src`
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 71 |
-| `graphics/rhi` | 19 |
+| `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
@@ -310,7 +310,6 @@ Root scanned: `src`
 | `Extrinsic.RHI.FrameHandle` | `src/graphics/rhi/RHI.FrameHandle.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Handles` | `src/graphics/rhi/RHI.Handles.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.PipelineManager` | `src/graphics/rhi/RHI.PipelineManager.cppm` | `graphics/rhi` |
-| `Extrinsic.RHI.PipelineRegistry` | `src/graphics/rhi/RHI.PipelineRegistry.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Profiler` | `src/graphics/rhi/RHI.Profiler.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.QueueAffinity` | `src/graphics/rhi/RHI.QueueAffinity.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.SamplerManager` | `src/graphics/rhi/RHI.SamplerManager.cppm` | `graphics/rhi` |
@@ -411,4 +410,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **384**
+Total modules: **383**

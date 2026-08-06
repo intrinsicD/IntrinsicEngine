@@ -22,7 +22,6 @@ target_sources(${target_name}
         RHI.TextureManager.cppm
         RHI.SamplerManager.cppm
         RHI.PipelineManager.cppm
-        RHI.PipelineRegistry.cppm
         PRIVATE
         RHI.CommandContext.cpp
         RHI.BufferTransfer.cpp
@@ -31,7 +30,6 @@ target_sources(${target_name}
         RHI.TextureManager.cpp
         RHI.SamplerManager.cpp
         RHI.PipelineManager.cpp
-        RHI.PipelineRegistry.cpp
         RHI.Profiler.cpp
         RHI.TextureUpload.cpp
 )

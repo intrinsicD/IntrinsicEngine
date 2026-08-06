@@ -167,12 +167,10 @@ See [ADR-0015 — Runtime reference scene bootstrap](../adr/0015-reference-scene
 
 See [ADR-0016 — Texture residency, fallback, and asset cache policy](../adr/0016-texture-residency-and-asset-cache-policy.md) for the GRAPHICS-015Q follow-ups: the explicitly non-evicting cache + future bounded-eviction constraints, the `RHI::TextureManager::Reupload()` streaming-mip preservation seam vs full-lease-replacement `RequestUpload`, the single 4x4 magenta-and-black fallback texture + per-channel shader-side neutrality contract, the `InitializeFallbackTexture()` failure behavior, the per-frame coalesced bindless descriptor write batch (mirroring `Picking.Readback` / histogram drain) + `RHI::SamplerManager` dedup + `BindlessDescriptorRewrites` counter, and the runtime ownership of fallback initialization, `Extrinsic.Runtime.AssetBridges.Texture` event subscription, and synchronous `RequestUpload`/`NotifyDestroyed` calls.
 
-## Pipeline and shader registry contract
+## Pipeline reload contract
 
-- `Extrinsic.RHI.PipelineRegistry` is the promoted CPU-testable cache layer for deterministic shader/pipeline identities: `PipelineKey` values from shader paths + generations + `PipelineDesc` render state return the same graphics-owned pipeline handle without requiring Vulkan shader compilation in the default CPU gate.
-- Shader reload is explicit invalidation by shader path: the registry drops affected cached leases and reports reload invalidation counts; callers request a new key with an updated shader generation to recreate the pipeline through `RHI::PipelineManager`.
 - `RHI::PipelineManager` is the promoted recompilation seam: `Recompile()` stages a backend-created replacement pipeline and `CommitPending()` promotes it on the render thread. Failed recompiles keep the previously active device pipeline alive and are reported through `PipelineManagerDiagnostics`, so last-known-good fallback is CPU-testable without a file watcher or Vulkan smoke in the default gate.
-- Missing shader IDs, key/descriptor mismatches, and backend pipeline creation failures are deterministic diagnostics; backend-specific shader compilation remains behind RHI/backend integration and stays opt-in for GPU/Vulkan tests.
+- Backend pipeline creation failures are deterministic diagnostics; backend-specific shader compilation remains behind RHI/backend integration and stays opt-in for GPU/Vulkan tests.
 
 ## Material registry and slot contract
 

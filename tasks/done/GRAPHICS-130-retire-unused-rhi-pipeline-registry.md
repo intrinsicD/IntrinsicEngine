@@ -18,8 +18,13 @@ contracts:
 
 ## Status
 
-- In progress on `main`: remove the test-only registry and its stale capability
-  prose while preserving the concrete PipelineManager/renderer path.
+- Completed and retired on 2026-08-06. The zero-production-consumer registry,
+  isolated unit fixture, and stale capability claims are deleted. The concrete
+  `PipelineManager` and renderer-owned pipeline lifecycle are unchanged.
+  Focused pipeline/reload/renderer coverage passed 223/223 and the complete
+  default CPU selector passed 4,098/4,098 with its expected GLFW/LSan skip;
+  fresh configure/build and the structural retirement ratchet pass.
+- Completion commit: this implementation/retirement commit.
 
 ## Goal
 
@@ -56,34 +61,34 @@ contracts:
 
 ## Required changes
 
-- [ ] Delete the module, implementation unit, CMake entry, and isolated unit
+- [x] Delete the module, implementation unit, CMake entry, and isolated unit
       tests.
-- [ ] Preserve focused PipelineManager and renderer pipeline coverage.
-- [ ] Remove current-state architecture/RHI/parity claims for the unused cache.
-- [ ] Update `LEGACY-043` so the removed registry fixture is no longer a
+- [x] Preserve focused PipelineManager and renderer pipeline coverage.
+- [x] Remove current-state architecture/RHI/parity claims for the unused cache.
+- [x] Update `LEGACY-043` so the removed registry fixture is no longer a
       prerequisite for eventual `line.frag` cleanup.
-- [ ] Add a structural ratchet proving the module/name is not recreated.
+- [x] Add a structural ratchet proving the module/name is not recreated.
 
 ## Tests
 
-- [ ] Focused PipelineManager, renderer pipeline, reload, and fail-closed
+- [x] Focused PipelineManager, renderer pipeline, reload, and fail-closed
       contracts pass.
-- [ ] Complete default CPU-supported gate passes.
-- [ ] Strict layering, docs/task, clean-workshop, and inventory gates pass.
+- [x] Complete default CPU-supported gate passes.
+- [x] Strict layering, docs/task, clean-workshop, and inventory gates pass.
 
 ## Docs
 
-- [ ] Update canonical graphics/RHI/parity inventories and `LEGACY-043` to name
+- [x] Update canonical graphics/RHI/parity inventories and `LEGACY-043` to name
       only surviving production owners.
-- [ ] Regenerate module/task/session records.
+- [x] Regenerate module/task/session records.
 
 ## Acceptance criteria
 
-- [ ] No `RHI.PipelineRegistry` module, implementation, CMake entry, isolated
+- [x] No `RHI.PipelineRegistry` module, implementation, CMake entry, isolated
       test, or current capability claim remains.
-- [ ] PipelineManager/renderer behavior stays covered and unchanged.
-- [ ] No replacement abstraction appears.
-- [ ] Independent fixed-surface review accepts the revision-bound deletion.
+- [x] PipelineManager/renderer behavior stays covered and unchanged.
+- [x] No replacement abstraction appears.
+- [x] Independent fixed-surface review accepts the revision-bound deletion.
 
 ## Verification
 

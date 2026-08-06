@@ -132,6 +132,43 @@ TEST(RendererRhiBoundary, RetiredTimelineSemaphoreAbstractionStaysAbsent)
     }
 }
 
+TEST(RendererRhiBoundary, RetiredPipelineRegistryStaysAbsent)
+{
+    const auto root = RepoRoot();
+    const auto ratchetPath =
+        root / "tests/contract/graphics/Test.RendererRhiBoundary.cpp";
+
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/graphics/rhi/RHI.PipelineRegistry.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/graphics/rhi/RHI.PipelineRegistry.cpp"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "tests/unit/graphics/Test.RHI.PipelineRegistry.cpp"));
+
+    for (const auto& buildFile : {
+             root / "src/graphics/rhi/CMakeLists.txt",
+             root / "tests/CMakeLists.txt",
+         })
+    {
+        EXPECT_EQ(ReadFile(buildFile).find("PipelineRegistry"),
+                  std::string::npos)
+            << buildFile.string();
+    }
+
+    for (const auto& searchRoot : {root / "src", root / "tests"})
+    {
+        for (const auto& path : FilesUnder(searchRoot))
+        {
+            if (path == ratchetPath)
+                continue;
+
+            EXPECT_EQ(ReadFile(path).find("PipelineRegistry"),
+                      std::string::npos)
+                << path.string();
+        }
+    }
+}
+
 TEST(RendererRhiBoundary, PromotedGraphicsAndRuntimeDoNotImportCuda)
 {
     const std::vector<std::filesystem::path> roots{

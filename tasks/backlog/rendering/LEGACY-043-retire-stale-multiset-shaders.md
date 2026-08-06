@@ -4,6 +4,16 @@ theme: F
 depends_on:
   - GRAPHICS-105
 maturity_target: Retired
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts:
+  - repo.task-contract-discovery
 ---
 # LEGACY-043 — Retire stale multi-descriptor-set shader sources
 
@@ -42,13 +52,13 @@ maturity_target: Retired
   `RendererFrameLifecycle` and is one of `GRAPHICS-105`'s two promoted
   `ResolveSurfaceNormal` contract paths even though the production descriptor
   currently loads `deferred/default_debug_gbuffer.frag.spv`; and root
-  `assets/shaders/line.frag` is named by the `RHI.PipelineRegistry` fixture.
-  Those files are not currently unreferenced deletion candidates.
+  root `assets/shaders/line.frag` was named only by the now-retired isolated
+  pipeline-registry fixture. It is therefore a current deletion candidate,
+  subject to the same execution-time full-path re-verification as the others.
 - Current deletion candidates are root `surface.vert`, `surface.frag`,
   `surface_gbuffer.frag`, `deferred_lighting.frag`,
   `deferred/gbuffer.vert`, root `triangle.vert`, `triangle.frag`,
-  `point.vert`, `point.frag`, and `line.vert`. Root `line.frag` becomes a
-  candidate only after its test fixture is redirected to a surviving shader.
+  `point.vert`, `point.frag`, `line.vert`, and `line.frag`.
   `deferred/gbuffer.frag` becomes eligible only if `GRAPHICS-105` explicitly
   consolidates its contract into the surviving default deferred path; if
   `GRAPHICS-105` retains it, this task must retain it too.
@@ -77,8 +87,8 @@ maturity_target: Retired
       `deferred/gbuffer.frag` if it remains a promoted contract path, or add it
       to the deletion inventory only if its contract has been consolidated
       into a surviving shader.
-- [ ] Redirect the `RHI.PipelineRegistry` root `line.frag` fixture to a
-      surviving shader path before treating root `line.frag` as stale.
+- [ ] Re-verify root `line.frag` has no surviving full-path references and
+      retain it only if execution-time evidence finds a current consumer.
 - [ ] Delete the confirmed-stale shader sources.
 - [ ] Remove or update stale mentions of the deleted files in
       renderer/FrameRecipe/pass source comments, renderer contract tests,

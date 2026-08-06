@@ -6773,3 +6773,14 @@ Focused coverage passed 52/52 and the full default CPU selector passed
 4,103/4,103 with its expected GLFW/LSan skip; fresh configure/build, strict
 retired-symbol, inventory, clean-workshop, layering, task, docs-sync/link, and
 whitespace gates pass.
+
+[`GRAPHICS-130`](GRAPHICS-130-retire-unused-rhi-pipeline-registry.md) — unused
+RHI PipelineRegistry retired on 2026-08-06. The module had zero production
+consumers; its shader-path/generation cache and diagnostics existed only for an
+isolated unit fixture. The module, implementation, CMake/test registration,
+fixture, and stale capability prose are deleted. The live PipelineManager and
+renderer pipeline lifecycle are unchanged, and a full-source/test ratchet
+prevents the registry name from reappearing. Focused pipeline/reload/renderer
+coverage passed 223/223 and the full default CPU selector passed 4,098/4,098
+with its expected GLFW/LSan skip; fresh configure/build, inventory, layering,
+task/docs, clean-workshop, and whitespace gates pass.

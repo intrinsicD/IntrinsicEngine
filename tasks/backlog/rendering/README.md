@@ -30,8 +30,9 @@ without requiring them to read every file.
   right-sizing blockers that must retire before the readiness audit restarts:
   - `GRAPHICS-129` is retired: the production-unused TimelineSemaphore module
     is deleted while compiled submit-plan/Vulkan timeline behavior remains.
-  - [`GRAPHICS-130`](../../active/GRAPHICS-130-retire-unused-rhi-pipeline-registry.md)
-    deletes the zero-production-consumer PipelineRegistry module.
+  - `GRAPHICS-130` is retired: the production-unused PipelineRegistry module
+    and its isolated tests are deleted while PipelineManager and renderer-owned
+    pipeline behavior remain.
   - [`GRAPHICS-131`](GRAPHICS-131-concretize-reference-reconstructor.md)
     removes the single-implementation reconstructor base while retaining
     concrete reference TAA behavior.

@@ -157,10 +157,6 @@ This directory contains the `RHI` module/files.
 
 ## Pipeline reload contracts
 
-- `RHI.PipelineRegistry` owns CPU-testable pipeline identity and cache
-  invalidation. `PipelineKey` combines shader paths, shader generations, and
-  render-state fields from `PipelineDesc`; `InvalidateShaderPath(path)` drops
-  affected cached leases and increments reload invalidation diagnostics.
 - `RHI.PipelineManager` owns the promoted backend recompilation seam.
   `Recompile(handle, desc)` creates a replacement backend pipeline and stages it
   without changing the caller-held pool handle; `CommitPending()` promotes the

@@ -798,7 +798,6 @@ intrinsic_test_object_lib(GraphicsUnitTestObjs
 
 set(_graphics_rhi_cpu_unit_test_files
     Test.RHI.PipelineManager.cpp
-    Test.RHI.PipelineRegistry.cpp
     Test.RHI.Profiler.cpp
 )
 intrinsic_resolve_test_sources(_graphics_rhi_cpu_unit_test_sources
