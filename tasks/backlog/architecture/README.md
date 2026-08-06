@@ -16,27 +16,15 @@ seams-first migration order. All additive seams (`ARCH-007`..`ARCH-011`), the
 proving extraction (`ARCH-012`), and the post-seam collision sweep (`ARCH-013`)
 are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
 
-- Active [`REVIEW-003`](../../active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
-  one-shot, commit-anchored architecture stability and right-sizing audit. It
-  was re-gated on 2026-07-24 after the runtime surface audit opened
-  `RUNTIME-191..204` and `PHYSICS-004` as explicit
-  abstraction/adoption/legacy-deletion dependencies. It remains the
-  machine-visible admission gate for deferred post-stability research and
-  rendering ideas; audit findings become separate dependencies rather than
-  fixes inside the review task. The 2026-08-01 coherence re-gate retired the
-  unsupported RUNTIME-138 umbrella, split helper cleanup into Engine-owned
-  RUNTIME-203 and SceneInteraction-owned RUNTIME-205, and added RUNTIME-139's
-  speculative-AoS-surface removal as a static prerequisite. A concrete future
-  selected-editor finding would return as its own scoped remediation task. The
-  first 2026-08-06 right-sizing re-gate added RUNTIME-216 because its deletion test
-  identifies the remaining Engine-private render-extraction service as a
-  one-owner forwarding facade. The subsequent clean audit baseline rejected
-  readiness and opened `GRAPHICS-129..134`, `RUNTIME-217`, and `HARDEN-088`,
-  while adding existing `RORG-031E` as the task-map blocker. Partial evidence
-  is discarded. All nine leaves are now retired; the complete audit must
-  restart from scratch on a fresh clean commit.
 ### Retired seam tasks
 
+- [`REVIEW-003`](../../done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
+  retired 2026-08-06 after a fresh audit of clean `main` commit `51e7fadd`.
+  All 47 dependencies, architecture and clean-workshop rows, nine drift rows,
+  nine complete-interval agent-output rows, seven open Theme F dispositions,
+  and 35 right-sizing surfaces are clean or justified. The default CPU gate
+  passed 4,102/4,102; the result is a commit-scoped readiness baseline, not a
+  permanent or GPU/sanitizer claim.
 - [`HARDEN-088`](../../done/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —
   retired-owner TODO/temporary markers and obsolete future-Vulkan claims are
   gone without behavior changes; slots `0..5` are documented consistently and

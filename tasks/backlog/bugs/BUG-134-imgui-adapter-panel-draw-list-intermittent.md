@@ -45,9 +45,8 @@ contract_review: "Reviewed the full catalog; this task diagnoses an intermittent
   produces a non-empty ImGui draw list on every initialized Null/headless
   adapter frame.
 - Impact: a recurrence can make the required full CPU gate nondeterministic.
-  This task is nonblocking for `REVIEW-003` while its fresh audit gate remains
-  green; any recurrence during that audit promotes this task to a static
-  dependency before the audit can retire.
+  The fresh `REVIEW-003` audit completed without recurrence, so that readiness
+  gate retired cleanly and this bug remains an independent follow-up.
 
 ## Required changes
 

@@ -89,15 +89,16 @@ end.
   (LSCM/SCP/BFF) record no GPU follow-up in their own tasks).
 - [METHOD-027 — Adaptive Delaunay/QEF implicit meshing](METHOD-027-adaptive-delaunay-qef-implicit-meshing.md)
   (post-stability, opt-in method; paper intake and a frozen method contract
-  precede a 2D adversarial killing test and any 3D CPU reference; gated by
-  `REVIEW-003`, `GEOM-013`, and `METHOD-007`).
+  precede a 2D adversarial killing test and any 3D CPU reference; the retired
+  `REVIEW-003` gate is satisfied, while `GEOM-013` and `METHOD-007` remain).
 - [METHOD-028 — Confidence-driven Walk on Stars guiding](METHOD-028-confidence-driven-walk-on-stars-guiding.md)
-  (post-stability CPU reference and equal-memory variance study; gated by
-  `REVIEW-003` and the base `METHOD-004` WoSt reference).
+  (post-stability CPU reference and equal-memory variance study; the retired
+  `REVIEW-003` gate is satisfied and the base `METHOD-004` WoSt reference remains).
 - [METHOD-029 — Discontinuity-aware material derivatives](METHOD-029-discontinuity-aware-material-derivatives-and-jacobian-portability.md)
   (post-stability custom-derivative/optimization evidence on a fixed
-  method-local expression corpus; gated by `REVIEW-003` and the Slang pilot,
-  with no MaterialX or production material-graph surface).
+  method-local expression corpus; the retired `REVIEW-003` gate is satisfied
+  and the Slang pilot remains, with no MaterialX or production material-graph
+  surface).
 - [METHOD-030 — Neural Render Proxy path-replay reference](METHOD-030-neural-render-proxy-path-replay-reference.md)
   (post-stability intake, deterministic path replay, correctness tests, and a
   validated reference benchmark first; a small CPU proxy may start only after

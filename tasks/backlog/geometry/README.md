@@ -23,15 +23,16 @@ map.
   downsampling; framework24 port-gap follow-up).
 - [GEOM-065 — Invariant-aware scientific-field mip pyramids](GEOM-065-invariant-aware-scientific-field-mip-pyramids.md)
   (post-stability method/evidence-local CPU study for unit normals, discrete
-  labels, and signed scalar fields; blocked by `REVIEW-003`, with no
-  `src/geometry`, asset, or RHI integration).
+  labels, and signed scalar fields; the `REVIEW-003` prerequisite is satisfied,
+  with no `src/geometry`, asset, or RHI integration).
 - [GEOM-066 — meshoptimizer v1.2 geometry oracle](GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
   (post-stability dependency/oracle decision covering tangent frames,
-  simplification comparison, and exact meshlet round-trip; blocked by
-  `REVIEW-003` and the canonical attribute-authority task `GRAPHICS-105`).
+  simplification comparison, and exact meshlet round-trip; the `REVIEW-003`
+  prerequisite is satisfied and the canonical attribute-authority task
+  `GRAPHICS-105` remains blocking).
 - [GEOM-067 — Memory-aware BVH merged-node evidence](GEOM-067-memory-aware-bvh-merged-node-evidence.md)
   (post-stability CPU median/SAH/MSAH comparison with exact query parity;
-  blocked by `REVIEW-003`, with no default BVH or RHI change).
+  the `REVIEW-003` prerequisite is satisfied, with no default BVH or RHI change).
 - [GEOM-068 — Weighted Dijkstra edge-cost contract](GEOM-068-weighted-dijkstra-edge-cost-contract.md)
   (optional borrowed nonnegative edge costs on the existing indexed-heap
   Dijkstra; Euclidean behavior remains the exact default).

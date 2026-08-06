@@ -64,14 +64,17 @@ contract_review: "Reviewed the full catalog; this audit records whether existing
 
 ## Status
 
-- In progress on 2026-08-06 from a new clean `main` baseline after
-  RUNTIME-217 evidence sealing. This run discards the rejected baseline and
-  reruns every automated and manual surface before publishing a verdict.
-- Ready to restart from scratch after RUNTIME-217 retirement on 2026-08-06.
-  Every static dependency and all nine leaves opened by the rejected baseline
-  are retired. No partial evidence from the rejected run is reusable; the next
-  audit must bind a fresh clean commit and rerun every automated and manual
-  surface.
+- Completed on 2026-08-06 against clean `main` commit
+  `51e7faddad943ab7727e407d008e474ec076566d`. All 47 static dependencies are
+  retired; the architecture, clean-workshop, drift, complete-interval
+  agent-output, Theme F, and 35-surface right-sizing reviews pass with no fresh
+  blocker. The fresh `ci` configure/build and complete default CPU gate pass
+  4,102/4,102 with the expected headless GLFW/LSan skip.
+- The commit-scoped verdict and evidence limits are recorded in
+  `docs/reports/2026-08-06-architecture-stability-readiness.md`; the standard
+  drift, agent-output, and clean-workshop reports are dated the same day. The
+  rejected baseline and its partial evidence were not reused.
+- Completion commit: this report and retirement commit.
 - Audit stop on 2026-08-06: the clean baseline
   `fcbb2feeb38e86ba757a991d7448420fb052a4ae` failed the independent
   agent-output, drift/right-sizing, and architecture/task-map review. The
@@ -202,76 +205,76 @@ contract_review: "Reviewed the full catalog; this audit records whether existing
 
 ## Required changes
 
-- [ ] Confirm every static front-matter dependency is retired on `main` before
+- [x] Confirm every static front-matter dependency is retired on `main` before
       beginning the audit.
-- [ ] Record the audited `main` commit SHA, date, host/toolchain identity, and
+- [x] Record the audited `main` commit SHA, date, host/toolchain identity, and
       clean-worktree state in a dated architecture-readiness report.
-- [ ] Run the full architecture-review checklist and record every row as
+- [x] Run the full architecture-review checklist and record every row as
       `pass`, justified `not-applicable`, or `finding`.
-- [ ] Run the clean-workshop scorecard, including manual rows 3–6, and record
+- [x] Run the clean-workshop scorecard, including manual rows 3–6, and record
       every row as `pass`, justified `not-applicable`, or `finding`.
-- [ ] Run a fresh whole-tree drift audit and a fresh agent-output audit covering
+- [x] Run a fresh whole-tree drift audit and a fresh agent-output audit covering
       the complete interval since their preceding reports.
-- [ ] Inventory every then-open Theme F task and every task originating from a
+- [x] Inventory every then-open Theme F task and every task originating from a
       right-sizing finding; classify each as readiness-blocking or nonblocking
       with a concrete rationale.
-- [ ] Inventory exported `I*` interfaces and public `*Service`, `*Bridge`,
+- [x] Inventory exported `I*` interfaces and public `*Service`, `*Bridge`,
       `*Registry`, `*Queue`, `*Binding`, and `*Submission` surfaces. Apply the
       `intrinsicengine-right-sizing` keep-list to each flagged surface and
       record its implementation/consumer count, deletion-test result, and
       verdict.
-- [ ] For every blocking finding, open one scoped remediation task, add its ID
+- [x] For every blocking finding, open one scoped remediation task, add its ID
       to this task's `depends_on`, regenerate `tasks/SESSION-BRIEF.md`, and stop
       this audit without recording readiness.
-- [ ] After every discovered blocker retires, rerun all automated and manual
+- [x] After every discovered blocker retires, rerun all automated and manual
       checks on a fresh `main` commit and publish the final readiness verdict.
 
 ## Tests
 
-- [ ] Configure the `ci` preset, build `IntrinsicTests`, and pass the complete
+- [x] Configure the `ci` preset, build `IntrinsicTests`, and pass the complete
       default CPU-supported CTest gate on the audited commit.
-- [ ] Pass the strict clean-workshop bundle, task/task-state validators,
+- [x] Pass the strict clean-workshop bundle, task/task-state validators,
       docs-sync checks, test-layout check, and root-hygiene check.
-- [ ] Regenerate the module inventory to a temporary file and prove it matches
+- [x] Regenerate the module inventory to a temporary file and prove it matches
       the committed inventory exactly.
-- [ ] Confirm the freshly written standard audit reports satisfy the local
+- [x] Confirm the freshly written standard audit reports satisfy the local
       audit-cadence check; do not wire cadence strictness into PR CI.
 
 ## Docs
 
-- [ ] Write `docs/reviews/<YYYY-MM-DD>-clean-workshop-review.md` with automated
+- [x] Write `docs/reviews/<YYYY-MM-DD>-clean-workshop-review.md` with automated
       and manual scorecard outcomes and task-linked findings.
-- [ ] Write fresh `docs/reports/<YYYY-MM-DD>-agent-output-audit.md` and
+- [x] Write fresh `docs/reports/<YYYY-MM-DD>-agent-output-audit.md` and
       `docs/reports/<YYYY-MM-DD>-drift-audit.md` reports using their canonical
       checklist formats.
-- [ ] Write `docs/reports/<YYYY-MM-DD>-architecture-stability-readiness.md`
+- [x] Write `docs/reports/<YYYY-MM-DD>-architecture-stability-readiness.md`
       summarizing the audited commit, dependency disposition, architecture
       review, right-sizing inventory, verification evidence, and final verdict.
-- [ ] Update the architecture backlog index and regenerate
+- [x] Update the architecture backlog index and regenerate
       `tasks/SESSION-BRIEF.md` whenever this task is re-gated or retired.
 
 ## Acceptance criteria
 
-- [ ] Every static dependency and every blocker discovered by this audit is in
+- [x] Every static dependency and every blocker discovered by this audit is in
       `tasks/done/` or `tasks/archive/`.
-- [ ] The `ARCH-014` kernel target-state scorecard is fully green on the
+- [x] The `ARCH-014` kernel target-state scorecard is fully green on the
       audited `main` commit.
-- [ ] Architecture-review, clean-workshop, drift-audit, and agent-output rows
+- [x] Architecture-review, clean-workshop, drift-audit, and agent-output rows
       are all `pass` or justified `not-applicable`; no `finding` lacks a retired
       remediation task.
-- [ ] Every right-sizing flag either passes a named keep-list justification or
+- [x] Every right-sizing flag either passes a named keep-list justification or
       cites a retired remediation task; no unresolved premature abstraction,
       single-consumer framework, pure-forwarding facade, fragmented feature,
       or speculative-generalization finding remains.
-- [ ] No readiness-blocking dead public seam, untracked compatibility shim,
+- [x] No readiness-blocking dead public seam, untracked compatibility shim,
       temporary migration exception, stale aspirational claim, or unowned
       TODO marker remains in the audited tree.
-- [ ] The final readiness report identifies the exact commit and evidence and
+- [x] The final readiness report identifies the exact commit and evidence and
       describes the result as a commit-scoped baseline, not a permanent
       guarantee.
-- [ ] The default CPU-supported gate and every command in `## Verification`
+- [x] The default CPU-supported gate and every command in `## Verification`
       pass against the audited commit.
-- [ ] Deferred idea tasks remain machine-blocked by `REVIEW-003` until this
+- [x] Deferred idea tasks remain machine-blocked by `REVIEW-003` until this
       audit retires with the clean verdict above.
 
 ## Verification

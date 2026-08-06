@@ -8,18 +8,18 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+- none
 
 ## Theme B — Rendering modernization
 
-- blocked by `REVIEW-003`: `ASSETIO-009` — Loss-aware MaterialX subset import (tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md)
-- blocked by `REVIEW-003`: `GEOM-066` — meshoptimizer v1.2 geometry oracle and adoption evidence (tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
-- blocked by `REVIEW-003`: `GEOM-067` — Memory-aware BVH and merged-node evidence (tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md)
+- blocked by `GRAPHICS-105`: `ASSETIO-009` — Loss-aware MaterialX subset import (tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md)
+- blocked by `GRAPHICS-105`: `GEOM-066` — meshoptimizer v1.2 geometry oracle and adoption evidence (tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
+- unblocked: `GEOM-067` — Memory-aware BVH and merged-node evidence (tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md)
 - unblocked: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- blocked by `REVIEW-003`: `GRAPHICS-123` — Slang single-kernel gradient pilot (tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md)
-- blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
-- blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
-- blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
+- blocked by `LEGACY-043`: `GRAPHICS-123` — Slang single-kernel gradient pilot (tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md)
+- unblocked: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
+- blocked by `GEOM-066`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
+- unblocked: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -63,7 +63,7 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-059` — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam (tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
 - unblocked: `GEOM-060` — Permutohedral lattice fast high-dimensional filtering seam (tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md)
 - blocked by `BUG-109`: `GEOM-061` — Point-cloud grid-downsampling reduction strategies (tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md)
-- blocked by `REVIEW-003`: `GEOM-065` — Invariant-aware scientific-field mip pyramids (tasks/backlog/geometry/GEOM-065-invariant-aware-scientific-field-mip-pyramids.md)
+- unblocked: `GEOM-065` — Invariant-aware scientific-field mip pyramids (tasks/backlog/geometry/GEOM-065-invariant-aware-scientific-field-mip-pyramids.md)
 - unblocked: `GEOM-068` — Weighted Dijkstra edge-cost contract (tasks/backlog/geometry/GEOM-068-weighted-dijkstra-edge-cost-contract.md)
 - blocked by `GEOM-068`: `GEOM-069` — A* graph shortest path (tasks/backlog/geometry/GEOM-069-astar-graph-shortest-path.md)
 - unblocked: `GEOM-070` — Rectangular sparse LSQR and LSCM adoption (tasks/backlog/geometry/GEOM-070-sparse-lsqr-lscm-adoption.md)
@@ -71,7 +71,7 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-071`: `GEOM-072` — Catmull-Clark crease masks (tasks/backlog/geometry/GEOM-072-catmull-clark-crease-masks.md)
 - unblocked: `GEOM-073` — Point-analysis property/span contracts (tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md)
 - blocked by `GEOM-068`: `GEOM-074` — Graph property and adjacency contracts (tasks/backlog/geometry/GEOM-074-graph-property-adjacency-contracts.md)
-- blocked by `REVIEW-003`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
+- blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
@@ -84,11 +84,11 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
 - blocked by `METHOD-022`: `METHOD-025` — Progressive SLIM optimized CPU backend and comparison benchmark (tasks/backlog/methods/METHOD-025-parameterization-family-optimized-cpu-backend.md)
 - blocked by `METHOD-025`: `METHOD-026` — Parameterization family GPU (Vulkan compute) backend and parity (tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
-- blocked by `REVIEW-003`: `METHOD-027` — Adaptive Delaunay/QEF implicit meshing reference (tasks/backlog/methods/METHOD-027-adaptive-delaunay-qef-implicit-meshing.md)
-- blocked by `REVIEW-003`: `METHOD-028` — Confidence-driven spatial guiding for Walk on Stars (tasks/backlog/methods/METHOD-028-confidence-driven-walk-on-stars-guiding.md)
-- blocked by `REVIEW-003`: `METHOD-029` — Discontinuity-aware material derivatives (tasks/backlog/methods/METHOD-029-discontinuity-aware-material-derivatives-and-jacobian-portability.md)
-- blocked by `REVIEW-003`: `METHOD-030` — Neural render proxy path-replay reference (tasks/backlog/methods/METHOD-030-neural-render-proxy-path-replay-reference.md)
-- blocked by `REVIEW-003`: `METHOD-031` — Cross-artifact Jacobian portability prediction (tasks/backlog/methods/METHOD-031-jacobian-portability-predictive-study.md)
+- blocked by `GEOM-013`: `METHOD-027` — Adaptive Delaunay/QEF implicit meshing reference (tasks/backlog/methods/METHOD-027-adaptive-delaunay-qef-implicit-meshing.md)
+- blocked by `METHOD-004`: `METHOD-028` — Confidence-driven spatial guiding for Walk on Stars (tasks/backlog/methods/METHOD-028-confidence-driven-walk-on-stars-guiding.md)
+- blocked by `GRAPHICS-123`: `METHOD-029` — Discontinuity-aware material derivatives (tasks/backlog/methods/METHOD-029-discontinuity-aware-material-derivatives-and-jacobian-portability.md)
+- unblocked: `METHOD-030` — Neural render proxy path-replay reference (tasks/backlog/methods/METHOD-030-neural-render-proxy-path-replay-reference.md)
+- blocked by `METHOD-029`: `METHOD-031` — Cross-artifact Jacobian portability prediction (tasks/backlog/methods/METHOD-031-jacobian-portability-predictive-study.md)
 - unblocked: `METHOD-032` — Octree parity normal orientation reference backend (tasks/backlog/methods/METHOD-032-octree-parity-normal-orientation.md)
 - unblocked: `METHOD-033` — Screened Poisson surface reconstruction reference backend (tasks/backlog/methods/METHOD-033-screened-poisson-reconstruction-reference.md)
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
@@ -120,5 +120,5 @@ Last recorded report per recurring human audit (dates are tree facts so
 this file stays deterministic; overdue judgment comes from
 `python3 tools/agents/check_audit_cadence.py`, also run nightly).
 
-- agent-output audit: last report 2026-05-28 (docs/reports/2026-05-28-agent-output-audit.md)
-- drift audit: last report 2026-06-06 (docs/reports/2026-06-06-drift-audit.md)
+- agent-output audit: last report 2026-08-06 (docs/reports/2026-08-06-agent-output-audit.md)
+- drift audit: last report 2026-08-06 (docs/reports/2026-08-06-drift-audit.md)

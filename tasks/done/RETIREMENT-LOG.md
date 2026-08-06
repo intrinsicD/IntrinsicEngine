@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
+architecture stability and right-sizing readiness retired on 2026-08-06 at
+clean `main` commit `51e7fadd`. All 47 static dependencies and every blocker
+from prior re-gates are retired. The fresh architecture and clean-workshop
+scorecards, nine-row drift audit, complete-interval nine-row agent-output
+audit, seven-task Theme F disposition, and independent 35-surface right-sizing
+review found no new blocker. The Clang 23 `ci` configure/build passed and the
+complete default CPU selector passed 4,102/4,102 with its expected headless
+GLFW/LSan skip. This is a commit-scoped readiness baseline; it makes no fresh
+GPU/Vulkan, sanitizer, performance, or permanent-regression claim.
+
 [`RUNTIME-216`](RUNTIME-216-inline-render-extraction-engine-glue.md) — the
 Engine-private `RenderExtractionService` forwarding class is gone. Its
 `RenderExtractionCache`, `RenderWorldPool`, and monotonic frame index now live

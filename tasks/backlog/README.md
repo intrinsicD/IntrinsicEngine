@@ -94,9 +94,9 @@ retired: canonical `frame-graph.md` now documents the recipe-config lane.
 
 The Issue 445 literature scan seeded a deliberately deferred incubation set:
 `GEOM-066`/`067`, `GRAPHICS-123..126`, and `ASSETIO-009`. Every member lists
-`REVIEW-003` as its first dependency, so none is selectable until the
-architecture-stability/right-sizing audit retires cleanly. The leaves reopen
-only bounded evidence or vertical-pilot slices from the archived Slang,
+retired `REVIEW-003` as its first dependency, so that stability gate is now
+satisfied; each leaf is selectable only when its remaining individual
+dependencies are also satisfied. The leaves reopen only bounded evidence or vertical-pilot slices from the archived Slang,
 meshlet, cluster-LOD, and differentiable-rendering plans; they do not recreate
 those broad umbrellas. Historical FetchContent instructions in the archived
 plans are superseded by the current vcpkg-manifest-only contract.
@@ -372,11 +372,6 @@ The LOP property-domain pair `RUNTIME-206`/`UI-039` is now fully retired;
 remaining rows keep their named runtime/UI owners.
 
 Open members (kernel-seam priority set first):
-- [`REVIEW-003`](../active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
-  (one-shot post-convergence admission gate; its rejected 2026-08-06 baseline
-  opened `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and `RORG-031E`;
-  all nine leaves are now retired, so the audit must restart from scratch on a
-  fresh clean commit).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).
 - [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md)
@@ -512,10 +507,11 @@ Dijkstra, `GEOM-069` A* (blocked by `GEOM-068`), `GEOM-070` rectangular
 LSQR/LSCM, `GEOM-071` shared sharp-feature classification, and `GEOM-072`
 Catmull-Clark creases (blocked by `GEOM-071`). Retired `GEOM-058` and
 `GEOM-062` delivered the Gaussian-mixture and shared projection-kernel
-prerequisites consumed by the LOP reference family. The post-stability Issue 445 research incubations are
-`GEOM-065`, `METHOD-027..031`, and `HARDEN-084`; each is blocked first by
-`REVIEW-003`, and their task files require killing tests or concrete
-two-consumer evidence before opening broader engine integration. The
+prerequisites consumed by the LOP reference family. The post-stability Issue
+445 research incubations are `GEOM-065`, `METHOD-027..031`, and `HARDEN-084`;
+their retired `REVIEW-003` prerequisite is satisfied, while remaining
+dependencies, killing tests, and concrete two-consumer evidence still govern
+broader engine integration. The
 2026-07-19 in-house octree-parity normal-orientation method (original
 formulation, no upstream paper) opens unblocked as `METHOD-032`; its
 publication track seeds screened-Poisson reconstruction `METHOD-033`, the
@@ -536,14 +532,15 @@ are preserved in the retirement log.
   complete; rendering modernization leaves are now gated by their individual
   task dependencies and the rendering DAG.
 - **Issue 445 incubations ⇐ REVIEW-003.** The deferred Theme B/Theme I tasks
-  created from the 2026-07-15 literature scan remain blocked until the
-  commit-scoped architecture stability and right-sizing audit retires cleanly.
-- **REVIEW-003 ⇐ 2026-08-06 remediation leaves.** Retired `HARDEN-086`,
+  created from the 2026-07-15 literature scan now have their commit-scoped
+  architecture stability/right-sizing prerequisite satisfied; their other
+  front-matter dependencies still govern selection.
+- **REVIEW-003 ⇐ 2026-08-06 remediation leaves (satisfied).** Retired `HARDEN-086`,
   `GRAPHICS-127`, and the earlier runtime consolidation set satisfy their
   historical gates. The rejected clean baseline's nine leaves —
   `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and `RORG-031E` — are all
-  retired; the audit is eligible to restart from scratch on a fresh clean
-  commit and may not reuse the rejected evidence.
+  retired. The fresh audit then retired cleanly at commit `51e7fadd`; rejected
+  partial evidence was not reused.
 - **GEOM-061 ⇐ BUG-109.** Grid reduction strategies build only on the repaired
   fail-closed quantization and deterministic cell ordering baseline.
 

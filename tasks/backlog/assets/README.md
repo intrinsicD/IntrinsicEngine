@@ -21,9 +21,9 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 - [ASSETIO-009 — Loss-aware MaterialX subset import](ASSETIO-009-loss-aware-materialx-subset-import.md):
   post-stability standalone material-library routing that reuses the canonical
   material descriptor; assets own transport/callback validation while runtime
-  privately owns the MaterialX decoder. Blocked by `REVIEW-003` and
-  `GRAPHICS-105`; no renderer handoff, arbitrary graph runtime, or Slang code
-  generation.
+  privately owns the MaterialX decoder. The retired `REVIEW-003` prerequisite
+  is satisfied; `GRAPHICS-105` remains blocking. No renderer handoff, arbitrary
+  graph runtime, or Slang code generation.
 
 ## Retired
 - [ASSETIO-008 — Default UV atlas materialization for imported meshes](../../archive/ASSETIO-008-default-uv-atlas-materialization.md):

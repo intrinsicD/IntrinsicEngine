@@ -27,7 +27,8 @@ without requiring them to read every file.
 - The 2026-07-03 review R13 follow-up `GRAPHICS-119` retired parallel
   render-pass command recording via the task scheduler on 2026-07-07.
 - The rejected 2026-08-06 `REVIEW-003` baseline opened six Theme F
-  right-sizing blockers that must retire before the readiness audit restarts:
+  right-sizing blockers; all retired before the fresh readiness audit, which
+  then retired cleanly at `51e7fadd`:
   - `GRAPHICS-129` is retired: the production-unused TimelineSemaphore module
     is deleted while compiled submit-plan/Vulkan timeline behavior remains.
   - `GRAPHICS-130` is retired: the production-unused PipelineRegistry module
@@ -41,9 +42,9 @@ without requiring them to read every file.
     and its Renderer-owned behavior is unchanged.
   - `GRAPHICS-134` is retired: the final single-owner upload-helper base is
     deleted while its concrete feature-owned helper and behavior remain.
-- The following Theme B incubation leaves are deliberately blocked by the
-  architecture-stability gate `REVIEW-003`; they are not eligible for
-  implementation during the current convergence/right-sizing phase:
+- The following Theme B incubation leaves have satisfied the retired
+  architecture-stability gate `REVIEW-003`; their remaining front-matter
+  dependencies and task-specific promotion criteria now govern selection:
   - [`GRAPHICS-123`](GRAPHICS-123-slang-single-kernel-gradient-pilot.md) — one
     offline Slang → SPIR-V/reflection/gradient pilot; no canonical shader
     migration or differentiable frame graph.
