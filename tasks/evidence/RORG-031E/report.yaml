@@ -1,0 +1,108 @@
+schema_version: 1
+task_id: RORG-031E
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T15:30:04Z'
+claim_eligible: false
+source:
+  base_ref: 9b388e94
+  base_revision: 9b388e94b868bb4002971fc1fa5008487557ff38
+  head_revision: 20911a32f9750601607dd1767d62c734cf5104d2
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: docs/architecture/geometry-pipeline-modularity.md
+    sha256: 9666f23b801b9e6d0c5b427af9b5602ccd291168a789e49617010121c76a5c5f
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 8e32b32750d775c15e4b69e931a7a92d50cf899c7ff593561b9c04381c279eed
+  - path: tasks/active/README.md
+    sha256: 6b90a1203ccdf42a84cb15cb5c8c5de086eccb9e38df90d3c22cfac280d5f9bd
+  - path: tasks/archive/GEOM-054-registration-pipeline-stage-extraction.md
+    sha256: 1abef4d6e13d6b46a08e555b97a3ae29a42db008774e6ec7feb37e585a22a0fd
+  - path: tasks/backlog/README.md
+    sha256: be6931ca910f48ed9ec102147d35c3a74aeb94d23202d8c958655cf6ed13fd8d
+  - path: tasks/backlog/geometry/README.md
+    sha256: a0ecd7d110012e4589bea0a9336e9f2db9bcfc32f9e9d97dae27ef848d06d6f0
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: a7ca465bc1852fe103cc5627eb5e1a26048fbd25312d329c60e2bd30db2c13c9
+  - path: tasks/done/RORG-031-geometry-method-readiness.md
+    sha256: 3b195fe9aa9af1227b127c6352ef51c54d83c9aeaffb076a007cec65c8cd4221
+  content_digest: 4f84ff5491c4efe371a1944fe323cb23f453f10432568db4357a08e7bdf46d0f
+touched:
+  paths:
+  - docs/architecture/geometry-pipeline-modularity.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/archive/GEOM-054-registration-pipeline-stage-extraction.md
+  - tasks/backlog/README.md
+  - tasks/backlog/geometry/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RORG-031-geometry-method-readiness.md
+  layers:
+  - tasks
+  modules: []
+extension_seam: None; this retirement removes a duplicate planning inventory and introduces no extension
+  seam.
+future_change_plan: Track future geometry work only in category indexes and individual task front matter;
+  open a new scoped task for any real cross-child coordination need.
+acceptance:
+- criterion: The final recorded open-child snapshot matches the files under
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every geometry→method gate this seed names is encoded in the consuming
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Root/category task maps agree with `tasks/SESSION-BRIEF.md` about the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No second long-lived geometry child inventory replaces this seed.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: This task resides in `tasks/done/` and no open index presents it as
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RORG-031E/commands/diff-check.json
+- receipt: tasks/evidence/RORG-031E/commands/doc-links.json
+- receipt: tasks/evidence/RORG-031E/commands/geometry-inventory.json
+- receipt: tasks/evidence/RORG-031E/commands/method-dependency-edges.json
+- receipt: tasks/evidence/RORG-031E/commands/session-brief.json
+- receipt: tasks/evidence/RORG-031E/commands/task-policy.json
+- receipt: tasks/evidence/RORG-031E/commands/task-schema.json
+- receipt: tasks/evidence/RORG-031E/commands/task-state-links.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RORG-031-geometry-method-readiness.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- No runtime or code risk; future drift is bounded by generated session state and strict task/link validators.
+skipped_checks:
+- check: build-and-ctest
+  reason: No engine source, CMake input, module surface, or compiled test changed; exact inventory probes
+    and strict task/docs validators are the strongest relevant gates.
+artifacts:
+- path: tasks/done/RORG-031-geometry-method-readiness.md
+  sha256: 3b195fe9aa9af1227b127c6352ef51c54d83c9aeaffb076a007cec65c8cd4221
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
