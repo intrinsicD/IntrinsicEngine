@@ -18,8 +18,12 @@ contracts:
 
 ## Status
 
-- In progress on `main`: remove the unused base while leaving the concrete
-  reference TAA implementation and its algorithm body unchanged.
+- Completed and retired on 2026-08-06. The unused `IReconstructor` base and
+  virtual dispatch are gone; the concrete reference TAA algorithm body, data
+  records, renderer ownership, and history lifecycle are unchanged. Focused
+  reconstruction/TAA/renderer coverage passed 163/163 and the complete default
+  CPU selector passed 4,099/4,099 with its expected GLFW/LSan skip.
+- Completion commit: this implementation/retirement commit.
 
 ## Goal
 
@@ -54,36 +58,36 @@ contracts:
 
 ## Required changes
 
-- [ ] Remove `IReconstructor` and make the concrete reference class own the
+- [x] Remove `IReconstructor` and make the concrete reference class own the
       existing methods directly.
-- [ ] Preserve result, diagnostics, reset, and deterministic CPU algorithm
+- [x] Preserve result, diagnostics, reset, and deterministic CPU algorithm
       behavior byte-for-byte.
-- [ ] Update tests and docs to name the concrete current seam without a
+- [x] Update tests and docs to name the concrete current seam without a
       hypothetical vendor-polymorphism claim.
-- [ ] Add a structural ratchet against recreating the deleted base without a
+- [x] Add a structural ratchet against recreating the deleted base without a
       second implementation.
 
 ## Tests
 
-- [ ] Reconstruction unit/contract and renderer integration coverage passes.
-- [ ] Complete default CPU-supported gate passes.
-- [ ] Strict layering, docs/task, clean-workshop, and inventory checks pass.
+- [x] Reconstruction unit/contract and renderer integration coverage passes.
+- [x] Complete default CPU-supported gate passes.
+- [x] Strict layering, docs/task, clean-workshop, and inventory checks pass.
 
 ## Docs
 
-- [ ] Update canonical graphics and renderer architecture prose plus task
+- [x] Update canonical graphics and renderer architecture prose plus task
       index history to distinguish retained TAA behavior from removed
       speculative polymorphism.
-- [ ] Regenerate module/task/session records when required.
+- [x] Regenerate module/task/session records when required.
 
 ## Acceptance criteria
 
-- [ ] `IReconstructor` is absent from production, tests, and current-state
+- [x] `IReconstructor` is absent from production, tests, and current-state
       documentation.
-- [ ] `ReferenceTAAReconstructor` behavior and public data records are
+- [x] `ReferenceTAAReconstructor` behavior and public data records are
       unchanged and covered.
-- [ ] No replacement abstraction or vendor placeholder appears.
-- [ ] Independent fixed-surface review accepts the revision-bound deletion.
+- [x] No replacement abstraction or vendor placeholder appears.
+- [x] Independent fixed-surface review accepts the revision-bound deletion.
 
 ## Verification
 

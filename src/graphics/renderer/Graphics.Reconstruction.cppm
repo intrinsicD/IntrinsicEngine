@@ -96,21 +96,7 @@ export namespace Extrinsic::Graphics
         ReconstructionFailReason FailReason{ReconstructionFailReason::None};
     };
 
-    class IReconstructor
-    {
-    public:
-        virtual ~IReconstructor() = default;
-
-        [[nodiscard]] virtual ReconstructionResult Apply(
-            ReconstructionColorView jitteredColor,
-            ReconstructionDepthView depth,
-            ReconstructionMotionVectorView motionVectors,
-            ReconstructionColorView historyColor,
-            ReconstructionOutputView output,
-            const ReconstructionHints& hints) noexcept = 0;
-    };
-
-    class ReferenceTAAReconstructor final : public IReconstructor
+    class ReferenceTAAReconstructor
     {
     public:
         [[nodiscard]] ReconstructionResult Apply(
@@ -119,7 +105,7 @@ export namespace Extrinsic::Graphics
             ReconstructionMotionVectorView motionVectors,
             ReconstructionColorView historyColor,
             ReconstructionOutputView output,
-            const ReconstructionHints& hints) noexcept override;
+            const ReconstructionHints& hints) noexcept;
     };
 
     struct ReconstructionHistoryDesc

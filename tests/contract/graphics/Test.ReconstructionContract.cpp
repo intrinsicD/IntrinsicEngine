@@ -1,6 +1,7 @@
 #include <array>
 #include <cstdint>
 #include <cstddef>
+#include <type_traits>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -55,8 +56,10 @@ namespace
     }
 }
 
-TEST(GraphicsReconstructionContract, InterfaceRejectsInvalidInputsFailClosed)
+TEST(GraphicsReconstructionContract, ConcreteReferenceRejectsInvalidInputsFailClosed)
 {
+    static_assert(!std::is_polymorphic_v<Graphics::ReferenceTAAReconstructor>);
+
     constexpr Core::Extent2D extent{2u, 2u};
     std::vector<glm::vec4> current(4u, glm::vec4{0.25f, 0.25f, 0.25f, 1.f});
     std::vector<float> depth(3u, 1.f);

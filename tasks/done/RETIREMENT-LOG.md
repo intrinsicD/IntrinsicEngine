@@ -4513,7 +4513,8 @@ exposure-aware history weighting, reset invalidation, and disocclusion
 fallback reporting, plus a retained `RGBA16_FLOAT` ping-pong
 `ReconstructionHistorySystem` with retire-window coverage. Recipe selection and
 post-chain integration are retired in `GRAPHICS-040C`; vendor children remain
-unopened.
+unopened. `GRAPHICS-131` later retires the unused single-implementation base
+while retaining the concrete reference TAA behavior and data records.
 
 Previously-active
 [`GRAPHICS-040A`](../archive/GRAPHICS-040A-jitter-and-motion-vectors.md) —
@@ -6784,3 +6785,13 @@ prevents the registry name from reappearing. Focused pipeline/reload/renderer
 coverage passed 223/223 and the full default CPU selector passed 4,098/4,098
 with its expected GLFW/LSan skip; fresh configure/build, inventory, layering,
 task/docs, clean-workshop, and whitespace gates pass.
+
+[`GRAPHICS-131`](GRAPHICS-131-concretize-reference-reconstructor.md) — the
+single-implementation `IReconstructor` base retired on 2026-08-06. The
+concrete `ReferenceTAAReconstructor` now owns the same `Apply(...)` contract
+directly; its algorithm body, public data records, renderer call site, and
+history lifecycle are unchanged. A source/test ratchet prevents the base from
+returning before a real second implementation and production selection seam
+exist. Focused reconstruction/TAA/renderer coverage passed 163/163 and the
+full default CPU selector passed 4,099/4,099 with its expected GLFW/LSan skip;
+layering, task/docs, clean-workshop, inventory, and whitespace gates pass.

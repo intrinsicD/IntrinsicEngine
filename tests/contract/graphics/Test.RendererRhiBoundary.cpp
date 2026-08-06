@@ -169,6 +169,25 @@ TEST(RendererRhiBoundary, RetiredPipelineRegistryStaysAbsent)
     }
 }
 
+TEST(RendererRhiBoundary, RetiredReconstructorBaseStaysAbsent)
+{
+    const auto root = RepoRoot();
+    const auto ratchetPath =
+        root / "tests/contract/graphics/Test.RendererRhiBoundary.cpp";
+
+    for (const auto& searchRoot : {root / "src", root / "tests"})
+    {
+        for (const auto& path : FilesUnder(searchRoot))
+        {
+            if (path == ratchetPath)
+                continue;
+
+            EXPECT_EQ(ReadFile(path).find("IReconstructor"), std::string::npos)
+                << path.string();
+        }
+    }
+}
+
 TEST(RendererRhiBoundary, PromotedGraphicsAndRuntimeDoNotImportCuda)
 {
     const std::vector<std::filesystem::path> roots{

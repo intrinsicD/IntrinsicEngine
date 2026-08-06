@@ -805,9 +805,9 @@ Concretely:
   `GpuInstanceDynamic::PrevModel` ABI, which `TransformSyncSystem` already
   maintains. Shader-side MV encoding and reconstructor consumption remain
   `GRAPHICS-040B/C`.
-- GRAPHICS-040B adds the vendor-free reconstruction seam for TAA/external
-  upscalers without importing Vulkan or SDK types into promoted graphics.
-  `IReconstructor::Apply(...)` consumes CPU-public color, depth, motion-vector,
+- GRAPHICS-040B added the reference reconstruction contract without importing
+  Vulkan or SDK types into promoted graphics.
+  `ReferenceTAAReconstructor::Apply(...)` consumes CPU-public color, depth, motion-vector,
   history-color, output, and `ReconstructionHints` views and returns
   `ReconstructionResult` with `Applied`, `DisocclusionPercent`, and a
   fail-closed reason. `ReferenceTAAReconstructor` is the roadmap's only
@@ -816,7 +816,9 @@ Concretely:
   history invalidation, and current-color fallback for disoccluded pixels. The
   retained `ReconstructionHistorySystem` owns the `RGBA16_FLOAT`
   (`R16G16B16A16_SFLOAT`) ping-pong history pair through `RHI::TextureManager`
-  with a `framesInFlight` retire deadline.
+  with a `framesInFlight` retire deadline. GRAPHICS-131 retired the unused
+  single-implementation base; a shared abstraction is deferred until a real
+  second implementation has a present production selection boundary.
 - GRAPHICS-040C adds the explicit recipe AA selector. `FrameRecipeAAOptions::Mode`
   selects exactly one of `NoAA`, `FXAA`, `SMAA`, `TAA`, or
   `ExternalReconstructor`: `NoAA` declares no AA passes, `FXAA` declares only

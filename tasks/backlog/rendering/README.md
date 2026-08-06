@@ -33,9 +33,8 @@ without requiring them to read every file.
   - `GRAPHICS-130` is retired: the production-unused PipelineRegistry module
     and its isolated tests are deleted while PipelineManager and renderer-owned
     pipeline behavior remain.
-  - [`GRAPHICS-131`](../../active/GRAPHICS-131-concretize-reference-reconstructor.md)
-    removes the single-implementation reconstructor base while retaining
-    concrete reference TAA behavior.
+  - `GRAPHICS-131` is retired: the single-implementation reconstructor base is
+    deleted while concrete reference TAA behavior remains unchanged.
   - [`GRAPHICS-132`](GRAPHICS-132-concretize-transient-debug-upload-helper.md),
     [`GRAPHICS-133`](GRAPHICS-133-concretize-visualization-overlay-upload-helper.md),
     and [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) each
@@ -950,10 +949,11 @@ testable; each phase derisks the next.
 - [GRAPHICS-039 — Clustered light binning (done)](../../archive/GRAPHICS-039-clustered-light-binning.md):
   locks froxel-grid cluster build, light-to-cluster assignment, surface-shader
   consumption, and recipe/resource binding contracts. Depends on GRAPHICS-009.
-- [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (done)](../../archive/GRAPHICS-040-taa-and-reconstructor-interface.md):
-  locks sub-pixel jitter, motion-vector buffer, history color buffer, and the
-  vendor-agnostic `IReconstructor` seam (DLSS/FSR/XeSS/MetalFX/NRD plug-in
-  point). Depends on GRAPHICS-013A, GRAPHICS-036.
+- [GRAPHICS-040 — TAA pass and reconstructor/upscaler planning (done)](../../archive/GRAPHICS-040-taa-and-reconstructor-interface.md):
+  locked sub-pixel jitter, motion-vector buffer, history color buffer, and the
+  reference TAA contract. Its speculative vendor-agnostic base is retired by
+  GRAPHICS-131; vendor integration remains future per-SDK work. Depends on
+  GRAPHICS-013A, GRAPHICS-036.
 
 #### Phase 2 — Shader & material modernization
 
@@ -1076,7 +1076,7 @@ Clustered light binning children and the CPU/null TAA recipe path are complete.
 
 TAA + reconstructor seam (GRAPHICS-040):
 - [GRAPHICS-040A (done)](../../archive/GRAPHICS-040A-jitter-and-motion-vectors.md) — camera jitter + motion-vector buffer (`CPUContracted`, 2026-06-05). Depends on GRAPHICS-040 (planning, done), GRAPHICS-013A (done).
-- [GRAPHICS-040B (done)](../../archive/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md) — `IReconstructor` interface + reference TAA (`CPUContracted`, 2026-06-05). Depends on 040A.
+- [GRAPHICS-040B (done)](../../archive/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md) — introduced the original interface plus reference TAA (`CPUContracted`, 2026-06-05); GRAPHICS-131 retires the unused base and retains the concrete reference contract. Depends on 040A.
 - [GRAPHICS-040C (done)](../../archive/GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration (`Operational`, 2026-06-05). Depends on 040B (done), GRAPHICS-013A/075 (done).
 - GRAPHICS-040D (vendor reconstructor backends) — **not opened**: per GRAPHICS-040 decision 5/10 there is one child per vendor, opened only when that vendor SDK is actually integrated.
 
