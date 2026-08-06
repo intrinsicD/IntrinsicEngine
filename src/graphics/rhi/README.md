@@ -12,7 +12,6 @@ This directory contains the `RHI` module/files.
 - `RHI.FrameHandle.cppm`
 - `RHI.Profiler.cppm` / `.cpp`
 - `RHI.QueueAffinity.cppm`
-- `RHI.TimelineSemaphore.cppm`
 
 ## Queue affinity
 
@@ -80,19 +79,15 @@ This directory contains the `RHI` module/files.
   the queue counter's full `2^validBits * timestampPeriod` period, resolution
   fails with `Overflow` and publishes no duration.
 
-## Timeline semaphores
+## Cross-queue timeline submission
 
-- `RHI.TimelineSemaphore.cppm` declares `ITimelineSemaphore`, the backend-neutral
-  signal/wait interface used by compiled cross-queue handoff records.
-- The interface is intentionally minimal: `Signal(QueueAffinity, value)` records
-  work completion on the producing queue, and `Wait(QueueAffinity, value)` gates
-  the consuming queue. It does not expose Vulkan handles, queue-family indices,
-  or backend submission ownership through RHI.
-- The framegraph compiler owns deterministic value assignment and emits
-  CPU-visible signal/wait/edge records. Concrete backend submission maps these
-  records through `FrameQueueSubmitPlanDesc`; Vulkan lowers them to
-  `vkQueueSubmit2` timeline waits/signals without exposing native handles
-  through RHI.
+- The framegraph compiler owns deterministic timeline value assignment and
+  emits CPU-visible signal/wait/edge records. These plain records, not an
+  object-level semaphore interface, are the backend-neutral contract.
+- Concrete submission maps the compiled records through
+  `FrameQueueSubmitPlanDesc`; Vulkan owns the native timeline semaphore and
+  lowers the plan to `vkQueueSubmit2` waits/signals without exposing handles or
+  queue-family indices through RHI.
 
 ## Placed resource memory
 

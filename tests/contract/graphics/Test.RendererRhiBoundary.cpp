@@ -104,6 +104,22 @@ TEST(RendererRhiBoundary, RhiLayerDoesNotImportVulkan)
     }
 }
 
+TEST(RendererRhiBoundary, RetiredTimelineSemaphoreAbstractionStaysAbsent)
+{
+    const auto root = RepoRoot();
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/graphics/rhi/RHI.TimelineSemaphore.cppm"));
+
+    const auto rhiCMake = ReadFile(root / "src/graphics/rhi/CMakeLists.txt");
+    EXPECT_EQ(rhiCMake.find("RHI.TimelineSemaphore"), std::string::npos);
+
+    const auto crossQueueContract =
+        ReadFile(root / "tests/contract/graphics/Test.CrossQueueTimeline.cpp");
+    EXPECT_EQ(crossQueueContract.find("ITimelineSemaphore"), std::string::npos);
+    EXPECT_EQ(crossQueueContract.find("import Extrinsic.RHI.TimelineSemaphore"),
+              std::string::npos);
+}
+
 TEST(RendererRhiBoundary, PromotedGraphicsAndRuntimeDoNotImportCuda)
 {
     const std::vector<std::filesystem::path> roots{
@@ -206,4 +222,3 @@ TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedSymbols)
     for (const auto& symbol : requiredSymbols)
         EXPECT_NE(content.find(symbol), std::string::npos) << symbol;
 }
-

@@ -18,6 +18,15 @@ contracts:
 
 ## Status
 
+- Completed and retired on 2026-08-06. The zero-production-consumer
+  `Extrinsic.RHI.TimelineSemaphore` module and self-referential test-double case
+  are deleted. Compiled cross-queue signal/wait/edge records,
+  `FrameQueueSubmitPlanDesc`, and backend-local Vulkan timelines remain the
+  operational contract. Focused coverage passed 52/52 and the full default CPU
+  selector passed 4,103/4,103 with its expected GLFW/LSan skip. Fresh module
+  configure/build, strict retired-symbol, inventory, clean-workshop, layering,
+  task, docs-sync/link, and whitespace gates pass.
+- Completion commit: this implementation/retirement commit.
 - In progress on `main`: delete the unused object interface while preserving
   compiled submit-plan and Vulkan timeline synchronization behavior.
 
@@ -55,34 +64,34 @@ contracts:
 
 ## Required changes
 
-- [ ] Delete the module interface and its CMake/module-inventory entry.
-- [ ] Delete the direct test whose only purpose is instantiating the unused
+- [x] Delete the module interface and its CMake/module-inventory entry.
+- [x] Delete the direct test whose only purpose is instantiating the unused
       interface; preserve owner-level cross-queue and submit-plan coverage.
-- [ ] Remove current-state docs/parity claims that name the deleted module as
+- [x] Remove current-state docs/parity claims that name the deleted module as
       an operational RHI capability.
-- [ ] Add a structural ratchet proving source/tests do not recreate the module
+- [x] Add a structural ratchet proving source/tests do not recreate the module
       name as a compatibility surface.
 
 ## Tests
 
-- [ ] Focused frame-graph cross-queue and queue-submit contracts pass without
+- [x] Focused frame-graph cross-queue and queue-submit contracts pass without
       importing `RHI.TimelineSemaphore`.
-- [ ] Complete default CPU-supported gate passes.
-- [ ] Strict layering, docs/task, clean-workshop, and inventory gates pass.
+- [x] Complete default CPU-supported gate passes.
+- [x] Strict layering, docs/task, clean-workshop, and inventory gates pass.
 
 ## Docs
 
-- [ ] Update RHI and parity inventories to describe the surviving submit-plan
+- [x] Update RHI and parity inventories to describe the surviving submit-plan
       synchronization contract.
-- [ ] Regenerate module/task/session records.
+- [x] Regenerate module/task/session records.
 
 ## Acceptance criteria
 
-- [ ] No module, CMake entry, direct test, or current-state claim for
+- [x] No module, CMake entry, direct test, or current-state claim for
       `RHI.TimelineSemaphore`/`ITimelineSemaphore` remains.
-- [ ] Real cross-queue behavior stays covered and unchanged.
-- [ ] No replacement abstraction appears.
-- [ ] Independent fixed-surface review accepts the revision-bound deletion.
+- [x] Real cross-queue behavior stays covered and unchanged.
+- [x] No replacement abstraction appears.
+- [x] Independent fixed-surface review accepts the revision-bound deletion.
 
 ## Verification
 

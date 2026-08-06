@@ -6761,3 +6761,15 @@ all current prose agrees on reserved slots `0..5` and first real bindless lease
 claims are removed without executable C++ changes. Graphics-labeled CPU tests
 passed 851/851, and strict marker, comment-only diff, clean-workshop, task,
 docs-sync/link, and whitespace checks passed.
+
+[`GRAPHICS-129`](GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md) — unused
+RHI timeline-semaphore abstraction retired on 2026-08-06. The promoted module
+had zero production implementations and zero production consumers; its only
+implementation was a self-referential contract-test double. The module,
+interface, CMake row, direct test, and stale capability prose are deleted.
+Compiled cross-queue signal/wait/edge records still flow through
+`FrameQueueSubmitPlanDesc` to backend-local Vulkan timeline synchronization.
+Focused coverage passed 52/52 and the full default CPU selector passed
+4,103/4,103 with its expected GLFW/LSan skip; fresh configure/build, strict
+retired-symbol, inventory, clean-workshop, layering, task, docs-sync/link, and
+whitespace gates pass.

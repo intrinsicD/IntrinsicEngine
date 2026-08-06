@@ -9,7 +9,6 @@ target_sources(${target_name}
         RHI.Descriptors.cppm
         RHI.Handles.cppm
         RHI.QueueAffinity.cppm
-        RHI.TimelineSemaphore.cppm
         RHI.Transfer.cppm
         RHI.TransferQueue.cppm
         RHI.TextureUpload.cppm

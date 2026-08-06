@@ -9,35 +9,11 @@ import Extrinsic.Core.Error;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.QueueAffinity;
-import Extrinsic.RHI.TimelineSemaphore;
 
 namespace
 {
     using namespace Extrinsic::Graphics;
     namespace RHI = Extrinsic::RHI;
-
-    struct TimelineCall
-    {
-        RHI::QueueAffinity Queue = RHI::QueueAffinity::Graphics;
-        std::uint64_t Value = 0;
-    };
-
-    class RecordingTimelineSemaphore final : public RHI::ITimelineSemaphore
-    {
-    public:
-        std::vector<TimelineCall> Signals{};
-        std::vector<TimelineCall> Waits{};
-
-        void Signal(const RHI::QueueAffinity queue, const std::uint64_t value) override
-        {
-            Signals.push_back(TimelineCall{.Queue = queue, .Value = value});
-        }
-
-        void Wait(const RHI::QueueAffinity queue, const std::uint64_t value) override
-        {
-            Waits.push_back(TimelineCall{.Queue = queue, .Value = value});
-        }
-    };
 
     [[nodiscard]] std::string TimelineSignature(const CompiledRenderGraph& compiled)
     {
@@ -103,21 +79,6 @@ namespace
         EXPECT_TRUE(compiled.has_value());
         return compiled.has_value() ? std::move(*compiled) : CompiledRenderGraph{};
     }
-}
-
-TEST(GraphicsCrossQueueTimeline, RhiTimelineSemaphoreSurfaceRecordsSignalAndWait)
-{
-    RecordingTimelineSemaphore semaphore;
-
-    semaphore.Signal(RHI::QueueAffinity::Graphics, 7u);
-    semaphore.Wait(RHI::QueueAffinity::AsyncCompute, 7u);
-
-    ASSERT_EQ(semaphore.Signals.size(), 1u);
-    ASSERT_EQ(semaphore.Waits.size(), 1u);
-    EXPECT_EQ(semaphore.Signals[0].Queue, RHI::QueueAffinity::Graphics);
-    EXPECT_EQ(semaphore.Signals[0].Value, 7u);
-    EXPECT_EQ(semaphore.Waits[0].Queue, RHI::QueueAffinity::AsyncCompute);
-    EXPECT_EQ(semaphore.Waits[0].Value, 7u);
 }
 
 TEST(GraphicsCrossQueueTimeline, EmitsSignalAndWaitAtCrossQueueBoundary)

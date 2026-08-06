@@ -378,7 +378,6 @@ into graphics public contracts.
 - `Extrinsic.RHI.Transfer`
 - `Extrinsic.RHI.Profiler`
 - `Extrinsic.RHI.QueueAffinity`
-- `Extrinsic.RHI.TimelineSemaphore`
 - `Extrinsic.RHI.Handles`
 - `Extrinsic.RHI.Descriptors`
 - `Extrinsic.RHI.Types`

@@ -28,8 +28,8 @@ without requiring them to read every file.
   render-pass command recording via the task scheduler on 2026-07-07.
 - The rejected 2026-08-06 `REVIEW-003` baseline opened six Theme F
   right-sizing blockers that must retire before the readiness audit restarts:
-  - Active [`GRAPHICS-129`](../../active/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md)
-    deletes the production-unused TimelineSemaphore module.
+  - `GRAPHICS-129` is retired: the production-unused TimelineSemaphore module
+    is deleted while compiled submit-plan/Vulkan timeline behavior remains.
   - [`GRAPHICS-130`](GRAPHICS-130-retire-unused-rhi-pipeline-registry.md)
     deletes the zero-production-consumer PipelineRegistry module.
   - [`GRAPHICS-131`](GRAPHICS-131-concretize-reference-reconstructor.md)
@@ -71,6 +71,10 @@ or CPU-clock profiler behavior.
 
 ## Retired cross-domain rendering leaves
 
+- [`GRAPHICS-129`](../../done/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md) —
+  retired the zero-production-consumer RHI timeline object interface; focused
+  52/52 and full 4,103/4,103 CPU selectors pass with the expected environment
+  skip, while compiled cross-queue records and Vulkan submission remain.
 - [`GRAPHICS-127`](../../done/GRAPHICS-127-native-gpu-timestamp-profiler.md) —
   retired 2026-07-19 at `Operational` on native Vulkan and `CPUContracted` on
   Null/unsupported hosts. The existing RHI profiler now owns truthful

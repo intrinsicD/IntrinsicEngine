@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "python3 tools/repo/generate_module_inventory.py --root src --out /tmp/graphics129-module-inventory.md && diff -u docs/api/generated/module_inventory.md /tmp/graphics129-module-inventory.md"
+  ],
+  "command_display": "bash -lc 'python3 tools/repo/generate_module_inventory.py --root src --out /tmp/graphics129-module-inventory.md && diff -u docs/api/generated/module_inventory.md /tmp/graphics129-module-inventory.md'",
+  "cwd": ".",
+  "duration_ms": 49,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:39:14Z",
+  "label": "module-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:39:14Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-129/commands/module-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-129/commands/module-inventory.stdout.log",
+  "stdout_sha256": "cd70e6cf72d8e612285fa10f79d8d3eaf9bd5182a1eb3f5abd18cdf491af5287",
+  "task_id": "GRAPHICS-129"
+}

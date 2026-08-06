@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "! rg -n \"import Extrinsic\\\\.RHI\\\\.TimelineSemaphore|class ITimelineSemaphore\" src tests --glob \"!Test.RendererRhiBoundary.cpp\""
+  ],
+  "command_display": "bash -lc '! rg -n \"import Extrinsic\\\\.RHI\\\\.TimelineSemaphore|class ITimelineSemaphore\" src tests --glob \"!Test.RendererRhiBoundary.cpp\"'",
+  "cwd": ".",
+  "duration_ms": 19,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:39:14Z",
+  "label": "retired-symbol-scan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:39:14Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-129/commands/retired-symbol-scan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-129/commands/retired-symbol-scan.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "GRAPHICS-129"
+}
