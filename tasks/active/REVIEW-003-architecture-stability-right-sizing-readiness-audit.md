@@ -52,10 +52,10 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-review003"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T18:48:14Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this audit records whether existing architecture and task contracts are satisfied but does not introduce or change a reusable subsystem, data-domain, publication, or control-surface contract."
@@ -64,6 +64,9 @@ contract_review: "Reviewed the full catalog; this audit records whether existing
 
 ## Status
 
+- In progress on 2026-08-06 from a new clean `main` baseline after
+  RUNTIME-217 evidence sealing. This run discards the rejected baseline and
+  reruns every automated and manual surface before publishing a verdict.
 - Ready to restart from scratch after RUNTIME-217 retirement on 2026-08-06.
   Every static dependency and all nine leaves opened by the rejected baseline
   are retired. No partial evidence from the rejected run is reusable; the next

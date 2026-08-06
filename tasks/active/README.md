@@ -11,8 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- None. `REVIEW-003` is the next eligible task after RUNTIME-217 retirement
-  evidence is sealed.
+- [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
+  in progress on `main` by `codex-review003`; rerun the complete architecture,
+  clean-workshop, drift, agent-output, and right-sizing audit from a fresh
+  clean commit, then obtain independent fixed-surface acceptance.
 
 ## History
 
