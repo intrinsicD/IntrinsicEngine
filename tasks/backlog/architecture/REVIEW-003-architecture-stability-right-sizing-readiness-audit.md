@@ -9,7 +9,14 @@ depends_on:
   - CORE-006
   - CORE-009
   - GRAPHICS-127
+  - GRAPHICS-129
+  - GRAPHICS-130
+  - GRAPHICS-131
+  - GRAPHICS-132
+  - GRAPHICS-133
+  - GRAPHICS-134
   - HARDEN-086
+  - HARDEN-088
   - RUNTIME-139
   - RUNTIME-166
   - RUNTIME-167
@@ -38,15 +45,17 @@ depends_on:
   - RUNTIME-204
   - RUNTIME-205
   - RUNTIME-216
+  - RUNTIME-217
   - PHYSICS-004
   - PROC-027
+  - RORG-031E
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner: "codex-review003"
-branch: "main"
-worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-06T15:00:30Z"
+owner:
+branch:
+worktree:
+claimed_at:
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this audit records whether existing architecture and task contracts are satisfied but does not introduce or change a reusable subsystem, data-domain, publication, or control-surface contract."
@@ -55,6 +64,20 @@ contract_review: "Reviewed the full catalog; this audit records whether existing
 
 ## Status
 
+- Audit stop on 2026-08-06: the clean baseline
+  `fcbb2feeb38e86ba757a991d7448420fb052a4ae` failed the independent
+  agent-output, drift/right-sizing, and architecture/task-map review. The
+  concrete remediation leaves are `GRAPHICS-129` (dead timeline interface),
+  `GRAPHICS-130` (unused pipeline registry), `GRAPHICS-131` (single-
+  implementation reconstructor base), `GRAPHICS-132..134` (one single-owner
+  upload-helper base each), `RUNTIME-217` (single-use Core frame-loop hook
+  family), `HARDEN-088` (retired-owner backend migration markers and stale
+  backend prose), and existing `RORG-031E` (stale geometry child inventory and
+  planning-seed retirement). The same review also found stale Theme F open-set
+  prose in `tasks/backlog/README.md`; `RORG-031E` owns that task-map
+  reconciliation while it retires. Partial audit evidence from this rejected
+  baseline is diagnostic only and must not be reused. The complete audit
+  restarts on a fresh clean commit after all nine leaves retire.
 - Right-sizing re-gate on 2026-08-06: the already-scoped `RUNTIME-216`
   deletion test identifies the Engine-private `RenderExtractionService` as a
   one-owner forwarding facade whose fields can live directly in

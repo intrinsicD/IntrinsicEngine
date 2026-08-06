@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -26,9 +26,18 @@ the authoritative open/unblocked view.
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - unblocked: `BUG-134` — ImGui adapter panel draw-list test fails intermittently (tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md)
+- unblocked: `GRAPHICS-129` — Retire unused RHI timeline-semaphore abstraction (tasks/backlog/rendering/GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md)
+- unblocked: `GRAPHICS-130` — Retire unused RHI pipeline registry (tasks/backlog/rendering/GRAPHICS-130-retire-unused-rhi-pipeline-registry.md)
+- unblocked: `GRAPHICS-131` — Concretize the reference reconstructor (tasks/backlog/rendering/GRAPHICS-131-concretize-reference-reconstructor.md)
+- unblocked: `GRAPHICS-132` — Concretize the transient-debug upload helper (tasks/backlog/rendering/GRAPHICS-132-concretize-transient-debug-upload-helper.md)
+- unblocked: `GRAPHICS-133` — Concretize the visualization-overlay upload helper (tasks/backlog/rendering/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md)
+- unblocked: `GRAPHICS-134` — Concretize the ImGui upload helper (tasks/backlog/rendering/GRAPHICS-134-concretize-imgui-upload-helper.md)
+- unblocked: `HARDEN-088` — Reconcile stale graphics-backend migration prose (tasks/backlog/architecture/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
+- blocked by `GRAPHICS-129`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
+- unblocked: `RUNTIME-217` — Inline single-use Core frame-loop contracts (tasks/backlog/runtime/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 
 ## Theme G — Active bugs

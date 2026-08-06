@@ -11,10 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-- [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
-  in progress on `main` by `codex-review003`; execute the full architecture,
-  clean-workshop, drift, agent-output, and right-sizing audit interval, then
-  obtain independent fixed-surface acceptance.
+- None. `REVIEW-003` returned to the architecture backlog after its rejected
+  2026-08-06 baseline opened concrete remediation dependencies.
 
 ## History
 

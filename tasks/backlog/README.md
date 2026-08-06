@@ -372,12 +372,13 @@ The LOP property-domain pair `RUNTIME-206`/`UI-039` is now fully retired;
 remaining rows keep their named runtime/UI owners.
 
 Open members (kernel-seam priority set first):
-- [`REVIEW-003`](../active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
-  (one-shot post-convergence admission gate; re-gated by the 2026-07-24 runtime
-  surface remediation set).
-- The dependency-ordered
-  [`RUNTIME-192..205` runtime consolidation set](runtime/README.md), whose
-  remaining leaves are RUNTIME-139, RUNTIME-203, and RUNTIME-205.
+- [`REVIEW-003`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+  (one-shot post-convergence admission gate; its rejected 2026-08-06 baseline
+  is blocked by `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and
+  `RORG-031E`).
+- [`RUNTIME-217`](runtime/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md),
+  the remaining concrete Runtime/Core right-sizing leaf found by the rejected
+  audit baseline.
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).
@@ -540,10 +541,11 @@ are preserved in the retirement log.
 - **Issue 445 incubations ⇐ REVIEW-003.** The deferred Theme B/Theme I tasks
   created from the 2026-07-15 literature scan remain blocked until the
   commit-scoped architecture stability and right-sizing audit retires cleanly.
-- **REVIEW-003 ⇐ HARDEN-086.** The retired `GRAPHICS-127` dependency has
-  satisfied the truthful GPU-profiler gate; architecture readiness remains
-  blocked here until duplicated runtime hierarchy walks converge on the
-  promoted checked ECS query contract.
+- **REVIEW-003 ⇐ 2026-08-06 remediation leaves.** Retired `HARDEN-086`,
+  `GRAPHICS-127`, and the earlier runtime consolidation set satisfy their
+  historical gates. The rejected clean baseline now blocks readiness on
+  `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and `RORG-031E`; the audit
+  must restart from scratch after all six retire.
 - **GEOM-061 ⇐ BUG-109.** Grid reduction strategies build only on the repaired
   fail-closed quantization and deterministic cell ordering baseline.
 

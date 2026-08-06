@@ -53,7 +53,10 @@ map.
 - [GEOM-074 — Graph property and adjacency contracts](GEOM-074-graph-property-adjacency-contracts.md)
   (lets graph algorithms consume named properties plus adjacency so equivalent
   mesh primal graphs enter without conversion).
-- [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
+- [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md)
+  is a `REVIEW-003` blocker after its 2026-08-06 deletion test found that the
+  independently maintained task/index graph superseded its stale duplicate
+  child inventory; reconcile the maps and retire the seed.
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
 

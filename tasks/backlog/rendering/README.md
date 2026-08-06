@@ -26,6 +26,20 @@ without requiring them to read every file.
 
 - The 2026-07-03 review R13 follow-up `GRAPHICS-119` retired parallel
   render-pass command recording via the task scheduler on 2026-07-07.
+- The rejected 2026-08-06 `REVIEW-003` baseline opened six Theme F
+  right-sizing blockers that must retire before the readiness audit restarts:
+  - [`GRAPHICS-129`](GRAPHICS-129-retire-unused-rhi-timeline-semaphore.md)
+    deletes the production-unused TimelineSemaphore module.
+  - [`GRAPHICS-130`](GRAPHICS-130-retire-unused-rhi-pipeline-registry.md)
+    deletes the zero-production-consumer PipelineRegistry module.
+  - [`GRAPHICS-131`](GRAPHICS-131-concretize-reference-reconstructor.md)
+    removes the single-implementation reconstructor base while retaining
+    concrete reference TAA behavior.
+  - [`GRAPHICS-132`](GRAPHICS-132-concretize-transient-debug-upload-helper.md),
+    [`GRAPHICS-133`](GRAPHICS-133-concretize-visualization-overlay-upload-helper.md),
+    and [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) each
+    remove one single-owner upload-helper base while retaining its concrete
+    feature-owned helper.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:

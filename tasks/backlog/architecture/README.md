@@ -16,7 +16,7 @@ seams-first migration order. All additive seams (`ARCH-007`..`ARCH-011`), the
 proving extraction (`ARCH-012`), and the post-seam collision sweep (`ARCH-013`)
 are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
 
-- Active [`REVIEW-003`](../../active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
+- Blocked [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   was re-gated on 2026-07-24 after the runtime surface audit opened
   `RUNTIME-191..204` and `PHYSICS-004` as explicit
@@ -28,10 +28,16 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
   RUNTIME-203 and SceneInteraction-owned RUNTIME-205, and added RUNTIME-139's
   speculative-AoS-surface removal as a static prerequisite. A concrete future
   selected-editor finding would return as its own scoped remediation task. The
-  2026-08-06 right-sizing re-gate added RUNTIME-216 because its deletion test
+  first 2026-08-06 right-sizing re-gate added RUNTIME-216 because its deletion test
   identifies the remaining Engine-private render-extraction service as a
-  one-owner forwarding facade; the audit resumes after that task retires on a
+  one-owner forwarding facade. The subsequent clean audit baseline rejected
+  readiness and opened `GRAPHICS-129..134`, `RUNTIME-217`, and `HARDEN-088`,
+  while adding existing `RORG-031E` as the task-map blocker. Partial evidence
+  is discarded; the complete audit resumes only after those leaves retire on a
   fresh commit.
+- [`HARDEN-088`](HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —
+  reconcile retired-owner TODO/temporary markers, descriptor-slot prose, and
+  obsolete future-Vulkan claims without changing backend behavior.
 
 ### Retired seam tasks
 
