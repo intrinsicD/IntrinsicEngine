@@ -11,8 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- No task is currently active. `GRAPHICS-134` is the next eligible
-  `REVIEW-003` remediation.
+- [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) — remove the
+  single-owner ImGui upload-helper base while retaining the concrete
+  Renderer-owned behavior. `REVIEW-003` remains backlogged until its remaining
+  audit remediations retire.
 
 ## History
 

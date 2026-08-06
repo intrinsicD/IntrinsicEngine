@@ -6,15 +6,20 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-graphics134"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T17:16:26Z"
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
 ---
 # GRAPHICS-134 — Concretize the ImGui upload helper
+
+## Status
+
+- In progress on `main`: remove only the unused base and virtual qualifiers;
+  keep the concrete helper implementation and Renderer lifecycle unchanged.
 
 ## Goal
 

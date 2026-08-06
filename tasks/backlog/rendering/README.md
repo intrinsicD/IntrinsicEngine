@@ -39,7 +39,7 @@ without requiring them to read every file.
     Renderer-owned behavior is unchanged.
   - `GRAPHICS-133` is retired: the visualization-overlay helper is concrete
     and its Renderer-owned behavior is unchanged.
-  - [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) removes the
+  - [`GRAPHICS-134`](../../active/GRAPHICS-134-concretize-imgui-upload-helper.md) removes the
     final single-owner upload-helper base while retaining its concrete
     feature-owned helper.
 - The following Theme B incubation leaves are deliberately blocked by the
