@@ -16,7 +16,7 @@ seams-first migration order. All additive seams (`ARCH-007`..`ARCH-011`), the
 proving extraction (`ARCH-012`), and the post-seam collision sweep (`ARCH-013`)
 are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
 
-- [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
+- Active [`REVIEW-003`](../../active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   was re-gated on 2026-07-24 after the runtime surface audit opened
   `RUNTIME-191..204` and `PHYSICS-004` as explicit

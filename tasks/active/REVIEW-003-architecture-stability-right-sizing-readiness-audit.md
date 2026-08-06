@@ -43,10 +43,10 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-review003"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T15:00:30Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this audit records whether existing architecture and task contracts are satisfied but does not introduce or change a reusable subsystem, data-domain, publication, or control-surface contract."
