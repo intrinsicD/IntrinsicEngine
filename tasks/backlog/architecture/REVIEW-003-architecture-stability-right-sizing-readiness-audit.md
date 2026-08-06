@@ -64,6 +64,11 @@ contract_review: "Reviewed the full catalog; this audit records whether existing
 
 ## Status
 
+- Ready to restart from scratch after RUNTIME-217 retirement on 2026-08-06.
+  Every static dependency and all nine leaves opened by the rejected baseline
+  are retired. No partial evidence from the rejected run is reusable; the next
+  audit must bind a fresh clean commit and rerun every automated and manual
+  surface.
 - Audit stop on 2026-08-06: the clean baseline
   `fcbb2feeb38e86ba757a991d7448420fb052a4ae` failed the independent
   agent-output, drift/right-sizing, and architecture/task-map review. The

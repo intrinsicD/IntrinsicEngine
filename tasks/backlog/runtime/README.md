@@ -46,15 +46,18 @@ deleted the two-file, Engine-private `RenderExtractionService` forwarding
 layer after the path-only change was independently reviewed. Extraction
 behavior and the public module surface remain unchanged.
 
-The rejected 2026-08-06 `REVIEW-003` baseline then opened
-[`RUNTIME-217`](../../active/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md):
-delete the six single-use `Core.FrameLoop` hook interfaces and Runtime adapter
-family, preserve the exact ordered Engine lifecycle through owner-level tests,
-and use the already-published concrete AssetWorkflow service for optional
-asset maintenance.
+Retired `RUNTIME-217` then deleted the six single-use `Core.FrameLoop` hook
+interfaces and Runtime adapter family, preserved the exact ordered Engine
+lifecycle through owner-level tests, and retained the already-published
+concrete AssetWorkflow service for optional asset maintenance. This closes the final
+Runtime/Core blocker found by the rejected 2026-08-06 `REVIEW-003` baseline.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-217` — Inline single-use Core frame-loop contracts](../../done/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md)
+  removes the Core hook/contract family and Runtime adapters, keeps the same
+  ordered lifecycle directly in Engine, and preserves optional concrete asset
+  maintenance under owner-level and complete CPU coverage.
 - [`RUNTIME-216` — Inline shallow render-extraction Engine glue](../../done/RUNTIME-216-inline-render-extraction-engine-glue.md)
   stores the cache, pool, and frame index directly in `Engine::Impl`, removes
   the one-owner forwarding class and its two files, and preserves extraction,

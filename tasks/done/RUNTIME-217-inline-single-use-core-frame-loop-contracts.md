@@ -10,7 +10,7 @@ evidence: required
 owner: "codex-runtime217"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-06T17:52:47Z"
+claimed_at: "2026-08-06T18:18:44Z"
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
@@ -19,8 +19,14 @@ contracts:
 
 ## Status
 
-- In progress on `main`: preserve owner-level lifecycle assertions first, then
-  delete the Core hook family and inline its fixed ordering in Runtime Engine.
+- Completed and retired on 2026-08-06. The single-use Core frame-loop module,
+  six hook interfaces, contract records/functions, Runtime adapter structs,
+  and redundant asset-hook service are gone. Runtime Engine directly owns the
+  same platform, operational-transition, renderer, maintenance, and shutdown
+  ordering; the concrete optional AssetWorkflow service retains its lifecycle.
+  Focused owner-level coverage passed 198/198 and the complete default CPU
+  selector passed 4,102/4,102 with its expected GLFW/LSan skip.
+- Completion commit: this implementation/retirement commit.
 
 ## Goal
 
@@ -69,49 +75,49 @@ contracts:
 
 ## Required changes
 
-- [ ] Ratchet all existing platform, render, maintenance, operational
+- [x] Ratchet all existing platform, render, maintenance, operational
       transition, and shutdown order/failure behavior through public Engine or
       owner-level tests before deleting wrappers.
-- [ ] Replace `Execute*Contract(...)` calls with the same ordered direct Engine
+- [x] Replace `Execute*Contract(...)` calls with the same ordered direct Engine
       operations, keeping named phase readability.
-- [ ] Remove Engine adapter structs and eliminate the `Core.FrameLoop` module,
+- [x] Remove Engine adapter structs and eliminate the `Core.FrameLoop` module,
       implementation, `RenderFramePhase`, `RenderFrameResult`,
       `PlatformFrameResult`, CMake entry, imports, and module inventory row.
-- [ ] Rename the existing private `TickAssets()` operation to a narrow public
+- [x] Rename the existing private `TickAssets()` operation to a narrow public
       concrete `AssetWorkflowModule::RunFrameMaintenance()` method, remove the
       redundant `IAssetFrameHooks` service publication/lookup, and call the
       already-published concrete service between transfer collection and
       geometry-residency maintenance; null-service omission must remain valid.
-- [ ] Delete direct wrapper tests only after equivalent owner-level assertions
+- [x] Delete direct wrapper tests only after equivalent owner-level assertions
       cover every branch.
-- [ ] Add structural ratchets against recreating the six names or a replacement
+- [x] Add structural ratchets against recreating the six names or a replacement
       hook aggregate.
 
 ## Tests
 
-- [ ] Focused Engine frame-loop, lifecycle, asset workflow, operational
+- [x] Focused Engine frame-loop, lifecycle, asset workflow, operational
       transition, renderer, transfer, minimized/close, and shutdown contracts
       pass.
-- [ ] Complete default CPU-supported gate passes.
-- [ ] Strict layering, docs/task, clean-workshop, and generated-inventory gates
+- [x] Complete default CPU-supported gate passes.
+- [x] Strict layering, docs/task, clean-workshop, and generated-inventory gates
       pass.
 
 ## Docs
 
-- [ ] Update Core/runtime architecture and parity inventories to put ordered
+- [x] Update Core/runtime architecture and parity inventories to put ordered
       composition solely in Runtime and describe the surviving concrete
       AssetWorkflow maintenance boundary.
-- [ ] Regenerate module inventory and task/session/retirement records.
+- [x] Regenerate module inventory and task/session/retirement records.
 
 ## Acceptance criteria
 
-- [ ] `Extrinsic.Core.FrameLoop`, all six hook interface names, its three
+- [x] `Extrinsic.Core.FrameLoop`, all six hook interface names, its three
       result/phase records, and all Runtime adapter structs are absent.
-- [ ] Engine behavior and ordering remain identical under owner-level tests.
-- [ ] Runtime file count does not increase and no replacement public or private
+- [x] Engine behavior and ordering remain identical under owner-level tests.
+- [x] Runtime file count does not increase and no replacement public or private
       aggregate wrapper appears.
-- [ ] Optional AssetWorkflow omission and lifecycle remain operational.
-- [ ] Independent fixed-surface review accepts the revision-bound deletion.
+- [x] Optional AssetWorkflow omission and lifecycle remain operational.
+- [x] Independent fixed-surface review accepts the revision-bound deletion.
 
 ## Verification
 
@@ -127,6 +133,17 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/workflow_evidence.py validate --root .
 git diff --check
 ```
+
+Executed on 2026-08-06: fresh `ci` configure and the complete
+`IntrinsicTests` aggregate build passed. The focused owner-level selector
+passed 198/198; the default CPU selector passed all 4,102 selected entries with
+only the expected environment-gated GLFW/LSan skip. Live CPU routing reconciled
+26 targets / 4,101 GoogleTest cases / 327 sources after separately retired
+BUG-135 and BUG-136 repaired the two pre-existing routing blockers exposed by
+this verification. The module inventory is current at 382 modules; runtime
+retains exactly 168 files, unchanged from the task-start commit. Strict
+layering, clean-workshop, task, task-state, docs-sync/link, test-layout,
+root-hygiene, workflow-evidence, and whitespace gates passed.
 
 ## Forbidden changes
 

@@ -11,10 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-- [`RUNTIME-217`](RUNTIME-217-inline-single-use-core-frame-loop-contracts.md) —
-  inline the single-use Core frame-loop hook family into its Runtime Engine
-  owner while preserving all lifecycle branches. `REVIEW-003` remains
-  backlogged until this final remediation retires.
+- None. `REVIEW-003` is the next eligible task after RUNTIME-217 retirement
+  evidence is sealed.
 
 ## History
 

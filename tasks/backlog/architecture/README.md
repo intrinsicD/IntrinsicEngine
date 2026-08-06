@@ -16,7 +16,7 @@ seams-first migration order. All additive seams (`ARCH-007`..`ARCH-011`), the
 proving extraction (`ARCH-012`), and the post-seam collision sweep (`ARCH-013`)
 are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
 
-- Blocked [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
+- Ready [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   was re-gated on 2026-07-24 after the runtime surface audit opened
   `RUNTIME-191..204` and `PHYSICS-004` as explicit
@@ -33,8 +33,8 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
   one-owner forwarding facade. The subsequent clean audit baseline rejected
   readiness and opened `GRAPHICS-129..134`, `RUNTIME-217`, and `HARDEN-088`,
   while adding existing `RORG-031E` as the task-map blocker. Partial evidence
-  is discarded; the complete audit resumes only after those leaves retire on a
-  fresh commit.
+  is discarded. All nine leaves are now retired; the complete audit must
+  restart from scratch on a fresh clean commit.
 ### Retired seam tasks
 
 - [`HARDEN-088`](../../done/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —

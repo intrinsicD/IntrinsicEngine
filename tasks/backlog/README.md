@@ -374,11 +374,9 @@ remaining rows keep their named runtime/UI owners.
 Open members (kernel-seam priority set first):
 - [`REVIEW-003`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
   (one-shot post-convergence admission gate; its rejected 2026-08-06 baseline
-  is blocked by `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and
-  `RORG-031E`).
-- [`RUNTIME-217`](../active/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md),
-  the remaining concrete Runtime/Core right-sizing leaf found by the rejected
-  audit baseline.
+  opened `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and `RORG-031E`;
+  all nine leaves are now retired, so the audit must restart from scratch on a
+  fresh clean commit).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).
 - [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md)
@@ -542,9 +540,10 @@ are preserved in the retirement log.
   commit-scoped architecture stability and right-sizing audit retires cleanly.
 - **REVIEW-003 ⇐ 2026-08-06 remediation leaves.** Retired `HARDEN-086`,
   `GRAPHICS-127`, and the earlier runtime consolidation set satisfy their
-  historical gates. The rejected clean baseline now blocks readiness on
-  `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and `RORG-031E`; the audit
-  must restart from scratch after all six retire.
+  historical gates. The rejected clean baseline's nine leaves —
+  `GRAPHICS-129..134`, `RUNTIME-217`, `HARDEN-088`, and `RORG-031E` — are all
+  retired; the audit is eligible to restart from scratch on a fresh clean
+  commit and may not reuse the rejected evidence.
 - **GEOM-061 ⇐ BUG-109.** Grid reduction strategies build only on the repaired
   fail-closed quantization and deterministic cell ordering baseline.
 

@@ -6845,3 +6845,14 @@ standalone benchmark runners, restoring live reconciliation for both the CPU
 and complete aggregates. All 19 hermetic routing regressions pass, and the
 benchmark implementation, CTest registration, labels, aggregate membership,
 and execution policy remain unchanged.
+
+[`RUNTIME-217`](RUNTIME-217-inline-single-use-core-frame-loop-contracts.md) —
+the single-use Core frame-loop contract family retired on 2026-08-06. Runtime
+Engine now directly owns the unchanged platform, operational-transition,
+render, maintenance, and shutdown order; six hook interfaces, their contract
+records/functions, five Runtime adapter families, and the redundant asset-hook
+service are deleted. The concrete optional AssetWorkflow maintenance method
+remains omission-safe. Focused owner-level coverage passed 198/198 and the
+complete default CPU selector passed all 4,102 selected entries with its
+expected GLFW/LSan skip; runtime remains at 168 files and the generated module
+inventory drops to 382 without a replacement abstraction.
