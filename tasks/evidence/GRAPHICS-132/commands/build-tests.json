@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 13848,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T16:43:59Z",
+  "label": "build-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T16:43:45Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-132/commands/build-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-132/commands/build-tests.stdout.log",
+  "stdout_sha256": "134a1c72e304a20f9b8d27a0181a57151e942a97db77c01bf7eb110371aebbbc",
+  "task_id": "GRAPHICS-132"
+}

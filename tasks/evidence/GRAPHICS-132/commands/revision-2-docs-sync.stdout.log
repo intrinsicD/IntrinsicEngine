@@ -1,0 +1,6 @@
+[check_docs_sync] Root: /home/alex/Documents/IntrinsicEngine
+[check_docs_sync] Rules: tools/docs/docs_sync_rules.yaml
+[check_docs_sync] Changed files source: repo scan
+[check_docs_sync] Changed files count: 142154
+[check_docs_sync] Triggered rules: 6
+[check_docs_sync] Docs sync rules satisfied.

@@ -1,0 +1,25 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--quiet",
+    "5697e0013131550c3c3b3aabce4f3fb9d01ed359..HEAD",
+    "--",
+    ".",
+    ":(exclude)src/graphics/renderer/Graphics.Renderer.cpp"
+  ],
+  "command_display": "git diff --quiet 5697e0013131550c3c3b3aabce4f3fb9d01ed359..HEAD -- . ':(exclude)src/graphics/renderer/Graphics.Renderer.cpp'",
+  "cwd": ".",
+  "duration_ms": 2,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T16:51:13Z",
+  "label": "revision-2-scope",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T16:51:13Z",
+  "stderr_path": "tasks/evidence/GRAPHICS-132/commands/revision-2-scope.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GRAPHICS-132/commands/revision-2-scope.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "GRAPHICS-132"
+}

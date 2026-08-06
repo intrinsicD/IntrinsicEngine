@@ -1,0 +1,128 @@
+schema_version: 1
+task_id: GRAPHICS-132
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T16:51:39Z'
+claim_eligible: false
+source:
+  base_ref: 1b49a53e1473ede942d7970de303b2990c059c8d
+  base_revision: 1b49a53e1473ede942d7970de303b2990c059c8d
+  head_revision: afd34b5fe72c7045b09f25374c7a5ef37ecde197
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/graphics/renderer/Graphics.Renderer.cpp
+    sha256: bf71608c3bf34861b74a1e52dbd045f85b949b3d72d4901a7fbc715d91ad5f84
+  - path: src/graphics/renderer/Graphics.Renderer.cppm
+    sha256: 3553a69f8c33005f7db4dab648361bee3466e85660a4a97c36d500ad15cfa01b
+  - path: src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm
+    sha256: 8fa8e439dbb0f87dd46247d658e324842c4a009c477e4d8beec2a5a095da005f
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 95dc2f0c30d6bea8f1ae16a83417677faf9e823ef1928c8b65579f4bbed6e8a8
+  - path: tasks/active/README.md
+    sha256: bc405b17f65ab1b8025b72a50417ddc084a8ec2ac4adfe9861e1fad1a76a224b
+  - path: tasks/backlog/rendering/README.md
+    sha256: 06b0fec37c6c46b7ce8b32c625aee1b6e50cf4da7e020f0f84865b5221b18140
+  - path: tasks/done/GRAPHICS-132-concretize-transient-debug-upload-helper.md
+    sha256: 8f28c046a1134d6c97c37d9d58427c364ee425186cf378513db41014def62aa6
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 1e27aa6eca1f6b9f109b62197c3231e74244103066d345f56b1669b9fed9c248
+  - path: tests/contract/graphics/Test.RendererRhiBoundary.cpp
+    sha256: b1f327766bff4ad674430a03b2094ae4274707bc0d338160a307f929fa2169b3
+  - path: tests/contract/graphics/Test.TransientDebugSurfacePass.cpp
+    sha256: 93a8f3ed703846cabbb49056f876ca2454a8c9a9c7b9b7f3530b7f173203026c
+  content_digest: e5a04ffcb057a67e5e7e96c695c078a15cc1721ecd6fb26682b2f776a80ddf3e
+touched:
+  paths:
+  - src/graphics/renderer/Graphics.Renderer.cpp
+  - src/graphics/renderer/Graphics.Renderer.cppm
+  - src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/rendering/README.md
+  - tasks/done/GRAPHICS-132-concretize-transient-debug-upload-helper.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/graphics/Test.RendererRhiBoundary.cpp
+  - tests/contract/graphics/Test.TransientDebugSurfacePass.cpp
+  layers:
+  - docs
+  - graphics
+  - tests
+  modules:
+  - Extrinsic.Graphics.TransientDebugUploadHelper
+extension_seam: None; TransientDebugUploadHelper is the one present implementation and Renderer owner,
+  so no polymorphic seam remains.
+future_change_plan: Introduce a shared upload-helper boundary only when a real second implementation shares
+  a present production selection and call site.
+acceptance:
+- criterion: '`ITransientDebugUploadHelper` is absent from production, tests, and'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Concrete behavior remains covered and unchanged.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No replacement abstraction appears.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the revision-bound deletion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GRAPHICS-132/commands/build-tests.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/clean-workshop.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/configure-ci.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/diff-check.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/doc-links.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/docs-sync.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/focused-cpu.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/full-cpu.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/helper-body-unchanged.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/layering.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/module-inventory.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/retired-symbol-scan.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/revision-2-diff-check.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/revision-2-docs-sync.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/revision-2-helper-body-unchanged.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/revision-2-scope.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/stale-prose-scan.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/task-policy.json
+- receipt: tasks/evidence/GRAPHICS-132/commands/task-state-links.json
+changed_public_contracts:
+- Removed Graphics::ITransientDebugUploadHelper; TransientDebugUploadHelper retains the same BeginFrame,
+  UploadTriangles, UploadLines, UploadPoints, diagnostics, buffer lifecycle, and Renderer call path.
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GRAPHICS-132-concretize-transient-debug-upload-helper.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks:
+- Opt-in Vulkan execution was not rerun; the helper implementation unit, Renderer calls, RHI/backend code,
+  resources, and shaders are unchanged.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No RHI, Vulkan, shader, buffer algorithm, Renderer call-site, or resource-lifecycle behavior
+    changed; focused and complete CPU contracts cover the removed dispatch layer.
+artifacts:
+- path: tasks/done/GRAPHICS-132-concretize-transient-debug-upload-helper.md
+  sha256: 8f28c046a1134d6c97c37d9d58427c364ee425186cf378513db41014def62aa6
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GRAPHICS-132/handoff.jsonl
+review: tasks/evidence/GRAPHICS-132/reviews.jsonl
