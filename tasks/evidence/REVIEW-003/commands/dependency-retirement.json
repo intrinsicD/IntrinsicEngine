@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; awk '/^depends_on:/{emit=1;next} emit && /^workflow_schema:/{exit} emit && /^  - /{print $2}' tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md | while read -r task_id; do mapfile -t matches < <(rg -l \"^id: ${task_id}$\" tasks/done tasks/archive -g '*.md'); if [ \"${#matches[@]}\" -ne 1 ]; then echo \"${task_id}: expected exactly one retired task, found ${#matches[@]}\"; exit 1; fi; printf '%s\\t%s\\n' \"$task_id\" \"${matches[0]}\"; done"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; awk '\"'\"'/^depends_on:/{emit=1;next} emit && /^workflow_schema:/{exit} emit && /^  - /{print $2}'\"'\"' tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md | while read -r task_id; do mapfile -t matches < <(rg -l \"^id: ${task_id}$\" tasks/done tasks/archive -g '\"'\"'*.md'\"'\"'); if [ \"${#matches[@]}\" -ne 1 ]; then echo \"${task_id}: expected exactly one retired task, found ${#matches[@]}\"; exit 1; fi; printf '\"'\"'%s\\t%s\\n'\"'\"' \"$task_id\" \"${matches[0]}\"; done'",
+  "cwd": ".",
+  "duration_ms": 246,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:50:30Z",
+  "label": "dependency-retirement",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:50:30Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/dependency-retirement.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/dependency-retirement.stdout.log",
+  "stdout_sha256": "40f14035e7f6496aa2454ceedee489462e6633dea9b920c593abea2a92c396c0",
+  "task_id": "REVIEW-003"
+}

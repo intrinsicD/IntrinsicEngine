@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\nrange=d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d\nprintf \"added_comment_lines_by_production_file_top25\\n\"\ngit diff --unified=0 \"$range\" -- \"src/**/*.cpp\" \"src/**/*.cppm\" \"src/**/*.hpp\" \"src/**/*.h\" |\nawk '\n/^\\+\\+\\+ b\\// { file=substr($0,7); next }\n/^\\+[^+]/ {\n  line=substr($0,2)\n  if (line ~ /^[[:space:]]*(\\/\\/\\/|\\/\\/|\\/\\*|\\*)/) print file\n}\n' | sort | uniq -c | sort -nr | sed -n \"1,25p\"\nprintf \"representative_hotspot_comment_lines\\n\"\ngit diff --unified=0 \"$range\" --   src/graphics/renderer/Graphics.Renderer.cpp   src/graphics/renderer/Graphics.Renderer.cppm   src/runtime/Kernel/Runtime.Engine.cpp   src/runtime/Rendering/Runtime.RenderExtraction.cpp   src/runtime/Rendering/Runtime.RenderExtraction.cppm   src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp   src/runtime/Scene/Runtime.SelectionController.cppm   src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm |\nawk '\n/^\\+\\+\\+ b\\// { file=substr($0,7); next }\n/^\\+[^+]/ {\n  line=substr($0,2)\n  if (line ~ /^[[:space:]]*(\\/\\/\\/|\\/\\/|\\/\\*|\\*)/) print file \"\\t\" line\n}\n' | sed -n \"1,220p\"\n"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\nrange=d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d\nprintf \"added_comment_lines_by_production_file_top25\\n\"\ngit diff --unified=0 \"$range\" -- \"src/**/*.cpp\" \"src/**/*.cppm\" \"src/**/*.hpp\" \"src/**/*.h\" |\nawk '\"'\"'\n/^\\+\\+\\+ b\\// { file=substr($0,7); next }\n/^\\+[^+]/ {\n  line=substr($0,2)\n  if (line ~ /^[[:space:]]*(\\/\\/\\/|\\/\\/|\\/\\*|\\*)/) print file\n}\n'\"'\"' | sort | uniq -c | sort -nr | sed -n \"1,25p\"\nprintf \"representative_hotspot_comment_lines\\n\"\ngit diff --unified=0 \"$range\" --   src/graphics/renderer/Graphics.Renderer.cpp   src/graphics/renderer/Graphics.Renderer.cppm   src/runtime/Kernel/Runtime.Engine.cpp   src/runtime/Rendering/Runtime.RenderExtraction.cpp   src/runtime/Rendering/Runtime.RenderExtraction.cppm   src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp   src/runtime/Scene/Runtime.SelectionController.cppm   src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm |\nawk '\"'\"'\n/^\\+\\+\\+ b\\// { file=substr($0,7); next }\n/^\\+[^+]/ {\n  line=substr($0,2)\n  if (line ~ /^[[:space:]]*(\\/\\/\\/|\\/\\/|\\/\\*|\\*)/) print file \"\\t\" line\n}\n'\"'\"' | sed -n \"1,220p\"\n'",
+  "cwd": ".",
+  "duration_ms": 284,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:05:17Z",
+  "label": "agent-window-added-comment-sample",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:05:17Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/agent-window-added-comment-sample.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/agent-window-added-comment-sample.stdout.log",
+  "stdout_sha256": "572b1177f06cd2e3a777d72b45bf6f0b68b26c3cea8496e6f4d30a72d72f2de1",
+  "task_id": "REVIEW-003"
+}

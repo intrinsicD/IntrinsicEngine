@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\nprintf 'added_cppm\\t'; git diff --diff-filter=A --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d -- 'src/**/*.cppm' | wc -l\nprintf 'deleted_cppm\\t'; git diff --diff-filter=D --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d -- 'src/**/*.cppm' | wc -l\nprintf 'surviving_interface_declarations\\n'; rg -n --glob '*.cppm' '\\bclass\\s+I[A-Z][A-Za-z0-9_]*\\b' src | sort\nprintf 'added_role_named_files\\n'; git diff --diff-filter=A --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d -- src | rg '(Service|Bridge|Registry|Queue|Binding|Submission|Adapter)' || true\nprintf 'deleted_role_named_files\\n'; git diff --diff-filter=D --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d -- src | rg '(Service|Bridge|Registry|Queue|Binding|Submission|Adapter)' || true"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\nprintf '\"'\"'added_cppm\\t'\"'\"'; git diff --diff-filter=A --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d -- '\"'\"'src/**/*.cppm'\"'\"' | wc -l\nprintf '\"'\"'deleted_cppm\\t'\"'\"'; git diff --diff-filter=D --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d -- '\"'\"'src/**/*.cppm'\"'\"' | wc -l\nprintf '\"'\"'surviving_interface_declarations\\n'\"'\"'; rg -n --glob '\"'\"'*.cppm'\"'\"' '\"'\"'\\bclass\\s+I[A-Z][A-Za-z0-9_]*\\b'\"'\"' src | sort\nprintf '\"'\"'added_role_named_files\\n'\"'\"'; git diff --diff-filter=A --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d -- src | rg '\"'\"'(Service|Bridge|Registry|Queue|Binding|Submission|Adapter)'\"'\"' || true\nprintf '\"'\"'deleted_role_named_files\\n'\"'\"'; git diff --diff-filter=D --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d -- src | rg '\"'\"'(Service|Bridge|Registry|Queue|Binding|Submission|Adapter)'\"'\"' || true'",
+  "cwd": ".",
+  "duration_ms": 286,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:01:06Z",
+  "label": "agent-window-surface-delta",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:01:06Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/agent-window-surface-delta.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/agent-window-surface-delta.stdout.log",
+  "stdout_sha256": "eba3e0df1991d5a1917cb629ef8aa67df1e855418f99c37a5d0a78ac77006b23",
+  "task_id": "REVIEW-003"
+}

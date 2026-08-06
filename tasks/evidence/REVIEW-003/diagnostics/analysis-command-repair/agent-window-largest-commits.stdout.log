@@ -1,0 +1,40 @@
+536981	536955	26	29	0809cfd7b978503fb81222cadef8f450fc717abd	2026-07-17	Sync backlog and session artifacts
+87827	528	87299	424	797e274cfa62b82b0f7bd7a51b2c01d97dac5a24	2026-07-01	Retire legacy source tree
+35050	18376	16674	55	ba307e6707a0900ee316602cccb0a533e42216d9	2026-07-14	refactor(app): retire runtime-owned sandbox editor UI
+34598	18194	16404	60	d09d689365a342bc1210d352fc721faa5200a430	2026-08-01	RUNTIME-202: localize editor feature ownership
+27587	20091	7496	156	195fa78e4667581dc79a83fbc0a5f2f43d7899d6	2026-07-09	runtime: extract Engine service seams
+23640	13461	10179	110	4ac0b4637640ae2ff7459112ec34570733da35c5	2026-08-01	Retire sandbox runtime facade
+22947	22088	859	122	6443f4bb5a9157380264b6bbede9ed1361f135d3	2026-06-25	Retire rendering and runtime Theme B tasks
+16536	706	15830	47	5f7843c99be6f978b2939b463f48abfb39348c66	2026-07-28	refactor(runtime): retire specialized texture bake paths
+12372	6605	5767	113	bfcd27516c0588f3426040b32dd95b69e95b7e43	2026-06-07	Split promoted module implementation bodies
+11783	11607	176	39	c5977d5ee4cebc440eb5e2dc0ea964c1948d9360	2026-07-31	fix(runtime): discard stale direct-mesh enrichment
+9758	9345	413	104	f4adcea4948f6b9b7c81967c9b8e0709479beb2d	2026-07-30	Enforce repository-native agent workflow evidence
+9639	225	9414	23	bc5be3de6f277dac52522ec69a739bc2f6ec83b5	2026-06-07	Delete legacy editor UI
+9144	9046	98	44	694b651b74771dbe993718968263ead2ac0426de	2026-08-04	UI-039: Restore three-domain panel discovery
+8618	5279	3339	32	57dc576aeeff2b10d20483197d9f1da0ac886780	2026-07-03	Promote fast staged UV atlas default
+8535	7922	613	53	f7c037b80e602acf58ec152f6eee926b303ccd95	2026-07-22	Add GPU property texture baking
+8459	6555	1904	32	f3aacda962ab2385d2d0f85f450dbac266de6372	2026-07-20	runtime: complete operational normal bake workflow
+6972	3107	3865	61	7ceae5e476d40875cf701adad9ca15df9f4d0373	2026-07-28	RUNTIME-193: retire progressive presentation path
+6583	2077	4506	49	8d557bcaf5a24d89ef72f2cdfa0c516dc3b23c46	2026-07-28	RUNTIME-196 Slice C: retire parallel K-Means routes
+6431	6431	0	39	8e30b7c4d6b6936556de5e9f9d9e75b0ee00a619	2026-08-02	HARDEN-087 stage retirement evidence
+6417	3354	3063	87	af8500589d69a45c38cee385faa2018c2a4fa08b	2026-07-23	runtime: replace application callbacks with explicit composition
+6344	6048	296	38	7172bfc70695bc7f5f329bf8074b301440fa3186	2026-06-17	Implement progressive render-data pipeline
+6090	6051	39	30	ed689adc0a92dde49cead904159924ae846b94d9	2026-08-02	HARDEN-087 bind corrected verification evidence
+6065	1883	4182	63	da5e521c7d1de227be6c8c04defe5514a43532c9	2026-07-28	RUNTIME-197: retire public geometry packers
+5938	3201	2737	10	608d5993ecf83cb8226b0f50f58196b46e2e87ad	2026-07-13	ARCH-006: split sandbox method runtime facade
+5521	5182	339	46	d0e173dd12ec8942c29cc04f81df123814063f9f	2026-07-15	feat(graphics): operationalize GPU UV view
+5399	492	4907	48	82902dc96eeb7119df96677b960591d836e9a263	2026-07-27	RUNTIME-194 Slice C: retire duplicate work systems
+5272	5143	129	19	f26e5dccb5b87a57d289d2bcd342fc80325ae560	2026-06-17	Implement geometry property and bake editor controls
+4544	4116	428	59	b985c08e3a78de881b8db7e26180f468db2a5bbd	2026-06-19	Unify geometry availability for visualization lanes
+4520	4358	162	43	fc5128231f1af0e33b1c9edbe34c487fa784f01b	2026-08-05	method: add Vulkan LOP compute backend
+4510	2214	2296	13	11f56bf56cc163b82b69187b046c56bfdd2d19aa	2026-07-13	refactor(app): own sandbox mesh processing panels
+4481	2669	1812	10	c02eb1424d672b0b1ba6f40a5a3a80c13cd183d5	2026-07-19	Runtime: slim render extraction module
+4432	256	4176	54	38f6ab0ee9fe066c4a24892f7f7a96f7de1f3b11	2026-07-25	Retire dormant spatial-debug registry and method-figure export
+4426	3668	758	79	ba395d1e5907740c95814545cce4a225ef63a831	2026-08-04	Add operational runtime physics module
+4289	1515	2774	19	9119b1d7237a2b019f777c15a980970ff6c6e55d	2026-07-31	Make asset import recipes own runtime policy
+4239	2827	1412	38	1d48444b0d069b8972588e60e169a584aefe4f56	2026-07-19	runtime: extract composed scene document module
+4153	657	3496	91	8aa6781b484ff6d880634299dd42535d8ec94853	2026-06-02	Retire minimal debug surface recipe scaffold
+3949	3028	921	51	8c8bb5d2abd67fc93210dafbda96b5b07211fead	2026-07-19	runtime: move scene interaction into module
+3902	3892	10	19	b9f747743f0ba990eece0013e1e231f978e0adf5	2026-07-17	ci: add canonical CPU source coverage
+3899	1952	1947	22	a8aadb8c50977f9464b7a6fc7708ea0c88f6e629	2026-07-28	refactor(runtime): move texture bake results to callers
+3858	3318	540	59	bb9f255ec1e85012b0e299e52c43b8dddb6b25a2	2026-06-28	Migrate geometry property and topology utilities

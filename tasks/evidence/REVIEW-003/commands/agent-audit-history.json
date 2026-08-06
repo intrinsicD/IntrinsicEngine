@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; git log --follow --format='%H%x09%P%x09%ad%x09%s' --date=iso-strict -- docs/reports/2026-05-28-agent-output-audit.md; git log --follow --format='%H%x09%P%x09%ad%x09%s' --date=iso-strict -- docs/reports/2026-06-06-drift-audit.md"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; git log --follow --format='\"'\"'%H%x09%P%x09%ad%x09%s'\"'\"' --date=iso-strict -- docs/reports/2026-05-28-agent-output-audit.md; git log --follow --format='\"'\"'%H%x09%P%x09%ad%x09%s'\"'\"' --date=iso-strict -- docs/reports/2026-06-06-drift-audit.md'",
+  "cwd": ".",
+  "duration_ms": 141,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:50:31Z",
+  "label": "agent-audit-history",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:50:30Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/agent-audit-history.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/agent-audit-history.stdout.log",
+  "stdout_sha256": "a4fe8bd52de8bc21f59e6fd9eb3fa290887c65144ee9d3140b613c9b36d95844",
+  "task_id": "REVIEW-003"
+}

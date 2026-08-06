@@ -1,0 +1,10 @@
+check_ara_claims: OK (36 claims)
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3200
+[check_doc_links] Mode: warning
+[check_doc_links] No broken relative links found.
+Validated 234 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 88
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.

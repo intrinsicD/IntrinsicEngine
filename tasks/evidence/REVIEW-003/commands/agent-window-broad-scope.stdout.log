@@ -1,0 +1,149 @@
+8	fc5128231f1af0e33b1c9edbe34c487fa784f01b	2026-08-05	method: add Vulkan LOP compute backend	benchmarks,docs,tests,methods,tasks,ara,src,assets
+8	cea527e36c9343ffce8797d689cbbc2b08d3cf7c	2026-07-17	build: make backend target graph deterministic	benchmarks,docs,tools,tests,.github,tasks,ara,src
+7	f4adcea4948f6b9b7c81967c9b8e0709479beb2d	2026-07-30	Enforce repository-native agent workflow evidence	benchmarks,docs,tools,tests,.github,tasks,ara
+7	daf62245695360f092d0e03c107e2a5ed97bda8b	2026-06-14	Advance UV rendering and retire dependency fallback	docs,tools,tests,tasks,src,cmake,assets
+7	865a61bc3ac88b648bb9bc9e54df259ffcf99204	2026-07-14	Sweep retired tasks to tasks/archive/, keep IDs authoritative	docs,tools,tests,methods,tasks,ara,src
+7	05f59f8e5796be3505470da92e7796b66402fcfc	2026-08-05	fix: make Auto LOP visibly update imported meshes	docs,tests,methods,tasks,ara,src,assets
+6	e52b5b460171c57addff064e586d8c01badd0536	2026-07-17	ci: reconcile capability-truthful test routing	docs,tests,.github,tasks,ara,cmake
+6	cfac8113f40947b1bb350ae910cff20b1f65730b	2026-07-25	Add ARA claim-ledger validator and claim/evidence protocol	docs,tools,tests,.github,tasks,ara
+6	ca3d66cee7d0a080d1210e607eab3297d892c803	2026-07-02	Retire GEOM-056 KMeans Vulkan backend	benchmarks,docs,tests,tasks,src,assets
+6	c470a056156028b535537663bd15001c361a05c4	2026-07-27	RUNTIME-195 Slice C: retire duplicate readback paths	docs,tests,.github,tasks,ara,src
+6	ba395d1e5907740c95814545cce4a225ef63a831	2026-08-04	Add operational runtime physics module	docs,tools,tests,tasks,ara,src
+6	acb700b59c33c1a8be192380910b783b090e6556	2026-07-27	RUNTIME-195 Slice B1: migrate K-Means result readback	benchmarks,docs,tests,tasks,ara,src
+6	ab0f80720c44ebf1897bce771ec4334ec7a1db1a	2026-07-10	CI-007: harden the persistent ccache pilot	docs,tools,tests,.github,tasks,cmake
+6	a91c85a8486b1b52b729ff82d7a59633e0b5a9b2	2026-06-30	Pin progressive Poisson Vulkan planning seam	docs,tests,methods,tasks,src,assets
+6	a26d27a6b5bc5c85803917c82669812b7c3c1ca1	2026-06-30	Wire progressive Poisson sandbox playground	benchmarks,docs,tests,methods,tasks,src
+6	8d557bcaf5a24d89ef72f2cdfa0c516dc3b23c46	2026-07-28	RUNTIME-196 Slice C: retire parallel K-Means routes	benchmarks,docs,tests,tasks,ara,src
+6	89193bef887bac1d3876b9e8cb29cc43bd9ca9bf	2026-08-01	geometry: strengthen LOP reference evidence contract	benchmarks,tests,methods,tasks,ara,src
+6	843e4fb302f8a1016a09398454ee910942942b0e	2026-06-21	Add mesh normal recompute and renderer sync	docs,tests,tasks,ara,src,assets
+6	797e274cfa62b82b0f7bd7a51b2c01d97dac5a24	2026-07-01	Retire legacy source tree	benchmarks,docs,tools,tests,tasks,src
+6	6443f4bb5a9157380264b6bbede9ed1361f135d3	2026-06-25	Retire rendering and runtime Theme B tasks	docs,tests,tasks,ara,src,assets
+6	61fec5c065fb3b861818f4d29f0837b29e92b8b7	2026-08-06	refactor(runtime): organize sources by ownership	docs,tools,tests,tasks,ara,src
+6	5f7843c99be6f978b2939b463f48abfb39348c66	2026-07-28	refactor(runtime): retire specialized texture bake paths	docs,tests,tasks,ara,src,assets
+6	5e7e4e9129164df89be8cb8a84ee0ecbfdc9dcd4	2026-07-18	ci: route heavy gates by candidate lifecycle	benchmarks,docs,tools,tests,.github,tasks
+6	57dc576aeeff2b10d20483197d9f1da0ac886780	2026-07-03	Promote fast staged UV atlas default	benchmarks,docs,tests,tasks,src,assets
+6	4bf4f67b26c6078411b652c8c20aca9a611dff3a	2026-07-15	methods(geometry): add Boundary First Flattening reference	benchmarks,docs,tests,methods,tasks,src
+6	4ac0b4637640ae2ff7459112ec34570733da35c5	2026-08-01	Retire sandbox runtime facade	docs,tools,tests,tasks,ara,src
+6	440d783d48856d16c28dc4b12c5d6506b4228def	2026-08-03	RUNTIME-208 publish Progressive Poisson vertex domains	docs,tests,methods,tasks,ara,src
+6	3f4d2dba73e2b5bf381db76ccf55586778771eb9	2026-08-03	RUNTIME-208 reject stale production connectivity	docs,tests,methods,tasks,ara,src
+6	3c9290228b363139574a78d4f2100aa5ee3e3261	2026-07-27	RUNTIME-195 Slice B2: migrate Poisson result readback	docs,tests,methods,tasks,ara,src
+6	3849b4f58aca025b3ac440c7d410fb7eee8edbe7	2026-06-16	Implement GEOM-025 UV atlas backend	docs,tools,tests,tasks,src,cmake
+6	35418a48ae589b20be8bb26b118778f2c84b98c7	2026-06-28	Add signed heat reference backend	benchmarks,docs,tests,methods,tasks,src
+6	2b61fa536dac1857e550315a28187cb640579368	2026-07-01	Record METHOD-013 Vulkan compute dispatch seam	docs,tests,methods,tasks,src,assets
+6	2884539fe6c61397ec496e92e0e426dfc3c4aaec	2026-07-06	Fix sandbox frame-pacing Vulkan validation gate	docs,tools,tests,tasks,src,assets
+6	217179e6d9bd12da7346ba35eb7e737f9eff5b48	2026-06-11	Cut INFRA-001 ci preset over to vcpkg	benchmarks,docs,tools,tasks,src,cmake
+6	195fa78e4667581dc79a83fbc0a5f2f43d7899d6	2026-07-09	runtime: extract Engine service seams	docs,tools,tests,tasks,ara,src
+6	15b6008c3411cbaee3c9663bfe7756ad2483f55e	2026-08-03	RUNTIME-206: generalize LOP property domains (Operational)	docs,tools,tests,methods,tasks,src
+6	109af4bdcc05d010d9bd6e5948cfe3dfe9e4b779	2026-07-16	runtime: restore Engine convergence budget	docs,tools,tests,tasks,ara,src
+5	fe88c995809fdf2b245c5a5b807eacf1a6d93295	2026-08-01	Implement edge-aware resampling CPU reference	benchmarks,docs,tests,methods,src
+5	fbc3ae9de9d2da53041f1db59e9a75afd0599f15	2026-07-09	Publish CI gate latency baseline	benchmarks,docs,tools,tests,tasks
+5	f94f7b3052ef3e7ddaa41773fe923003ae1db3ac	2026-06-28	Add triangle mesh surface sampling	benchmarks,docs,tests,tasks,src
+5	f7c037b80e602acf58ec152f6eee926b303ccd95	2026-07-22	Add GPU property texture baking	docs,tests,tasks,src,assets
+5	f614698f4342353fd11f4db58bcb6dba916e3cdc	2026-08-03	Bind GEOM-064 proxy fits to current UV state	docs,tests,tasks,ara,src
+5	f168f15dbf9c116f79dddaf9e36bbcac4c31282b	2026-07-09	Add CI gate timing result contract	benchmarks,docs,tools,tests,tasks
+5	eda47fa3bfb018028618336083e0c724242bf712	2026-06-18	Wire retained line point visualization colors	docs,tests,tasks,src,assets
+5	ea3b403e82545afa63f780c6e6d60304860a39fb	2026-07-16	feat(repo): enforce Runtime.Engine convergence ratchet	docs,tools,tests,.github,tasks
+5	e9cf9e29c19f51fb41d70ec12e3217cc965855cb	2026-08-03	UI-038 integrate Progressive Poisson domain panels	docs,tests,methods,tasks,src
+5	e9bccf1c736cc0d5186b26283af0a9feecddbfc6	2026-06-05	Restore sandbox ImGui visibility	docs,tests,tasks,src,assets
+5	e9935300a2bfc001373de243e124c33d08148c04	2026-06-10	Add XPBD cloth and shell CPU reference backend (METHOD-010)	benchmarks,docs,tests,methods,tasks
+5	e8cbb0443ea57c9e051d9034b68df6406d0297ee	2026-07-28	RUNTIME-197: retire unified geometry residency	docs,tests,tasks,ara,src
+5	e8c3f73e06c17319b93732a89f4a6c02e21216fb	2026-07-15	runtime: add parameterization config and editor facade	docs,tests,methods,tasks,src
+5	e57950367bc99a7e043aa52800bb18e9d58d79c8	2026-06-06	PHYSICS-002: add collision contact contracts	docs,tests,methods,tasks,src
+5	e294c1fc181e6aa70d7673e8d8055975e47b5454	2026-06-26	METHOD-012: implement progressive Poisson-disk CPU reference backend	benchmarks,docs,tests,methods,tasks
+5	defee3703ac6122a51c6b7cc4c6d491d93b9dc17	2026-07-05	Retire frame pacing diagnostics UI task	docs,tools,tests,tasks,src
+5	dd6ecc5e45e8010927b96b123d674e439a86b8ca	2026-06-05	GRAPHICS-039C: Wire clustered lighting into shaders	docs,tests,tasks,src,assets
+5	dd3f36a8a55ca4b2bb7dd87f5f9a4f7e432dfddf	2026-06-30	Record compute parallel primitive commands	docs,tests,tasks,src,assets
+5	dc73e99d7cf41159c0a30fb468ca8508863284dd	2026-07-03	Fix sandbox GPU processing and close handling	docs,tests,tasks,src,assets
+5	dc2806d6847ee3d965a832547b96d92f2331cd42	2026-06-14	Restore surface normal shading	docs,tests,tasks,src,assets
+5	d7c58028f31c06029f4f8383df46501fa4f4c133	2026-08-01	geometry: add LOP and WLOP reference consolidation	benchmarks,docs,tests,methods,src
+5	d34354ca03da16dfb81d4861dd9aec44f866f807	2026-06-04	Add Vulkan HZB conservatism smoke	docs,tests,tasks,src,assets
+5	d09d689365a342bc1210d352fc721faa5200a430	2026-08-01	RUNTIME-202: localize editor feature ownership	docs,tests,tasks,ara,src
+5	cd7bba69160ed971300da3e8b10a3dd5c1623958	2026-08-01	Implement continuous LOP CPU reference	benchmarks,docs,tests,methods,src
+5	cc54e73ac6882873adf7e6dd36824b055bd7621d	2026-06-30	Plan compute parallel primitive dispatches	docs,tests,tasks,src,assets
+5	c8c1473f139ce809e21b15117c8bca6d4692f1e5	2026-06-30	Retire GEOM-017 after CI closure	benchmarks,docs,tests,tasks,src
+5	c80abcef944f1d7d01e01cc0a3f93c3654d88ede	2026-08-04	UI-039: Bind LOP panel to semantic geometry slots	docs,tools,tests,tasks,src
+5	c76acbb0aa775ea33ddf565249cfc58d92642959	2026-08-02	process: close contract enrollment bypasses	docs,tools,tests,tasks,ara
+5	c24315b37b7e4280a04fe9a7c285cc7efcc41ac1	2026-07-09	runtime: extract async work service	docs,tests,tasks,ara,src
+5	c02a7ef3ed39fe74b4107e4be82040b58b67818a	2026-07-01	Record Progressive Poisson GPU upload seam	docs,tests,methods,tasks,src
+5	bc90ed7193512a72d7ed9c7fa539df4cdaf72f5b	2026-07-19	Extract runtime config control module	docs,tools,tests,tasks,src
+5	bc5c7cea0ebf66e4951537adad66ea3c7b3ae367	2026-07-10	Route specialized gates through test aggregates	docs,tools,tests,.github,tasks
+5	bc5be3de6f277dac52522ec69a739bc2f6ec83b5	2026-06-07	Delete legacy editor UI	docs,tools,tests,tasks,src
+5	bbbbf2f7efb964b6e0e3369773f6b8134b6fd742	2026-06-18	Wire retained line width residency	docs,tests,tasks,src,assets
+5	ba56671f195766ee49ec66ceaf1273cbb8e6a533	2026-06-22	Implement RHI buffer transfer helper	docs,tests,tasks,ara,src
+5	b9f747743f0ba990eece0013e1e231f978e0adf5	2026-07-17	ci: add canonical CPU source coverage	docs,tools,tests,.github,ara
+5	b8a99a7dd274a7a593630cf23f02b6b8c84e6a54	2026-06-05	GRAPHICS-039B: Add cluster light assignment contract	docs,tests,tasks,src,assets
+5	b89d582ba54bc383098e7f26f1e5889cef47b25d	2026-06-10	Add particle and mass-spring CPU reference backend (METHOD-009)	benchmarks,docs,tests,methods,tasks
+5	b79f9f7e07a7fbed24127989f2a8f7e2bef60002	2026-06-10	Add SPH particle fluid CPU reference backend (METHOD-011)	benchmarks,docs,tests,methods,tasks
+5	b752e794741a695060bc006b49aaa26b0a144dae	2026-06-18	Add retained line quad topology	docs,tests,tasks,src,assets
+5	b1627536f8e790cdf0a58eb120ea7556c24365ff	2026-06-18	Group GpuEntityConfig domain params	docs,tests,tasks,src,assets
+5	b15f4ee1909e1395ce3b5d4fc34a0a7333dffb82	2026-06-04	Implement HZB build dispatch wiring	docs,tests,tasks,src,assets
+5	ad29ac2862abf1af307247f459b444e78a89fa20	2026-06-18	Fix sandbox line and point colormap rendering	tests,tasks,ara,src,assets
+5	ad223e56ff408baa3b0421142cdd5052ce445478	2026-08-01	RUNTIME-139: retire speculative AoS planning	benchmarks,docs,tests,tasks,src
+5	aadeb62dbad8e369a7146a4248a967203e377e55	2026-08-03	Complete GEOM-064 parameterization optimization kernels	docs,tests,tasks,ara,src
+5	a917fd35b2ad85a154bcc8094c7a02e4f5b32c8d	2026-06-22	GRAPHICS-096 async buffer readback ring	docs,tests,tasks,ara,src
+5	9dd0c49535d70723579b3289d2ef0bcac8bebcb3	2026-06-04	Add camera-transition culling skip	docs,tests,tasks,src,assets
+5	9ae37047399676287dc253a5bb8d23dc2581fcb1	2026-07-10	CI-007: prove module-safe ccache invalidation	docs,tools,tests,.github,tasks
+5	998f0e77c9b8731a15c2519026c1c3b0a390a7fe	2026-07-16	fix(tasks): fail closed on empty validation	docs,tools,tests,.github,tasks
+5	995b938171146889034b06a803fbe07a83a0c1f5	2026-06-10	Add physics solver islands and diagnostics	docs,tests,methods,tasks,src
+5	991a468d2ae14572ff093f9b9194aa9ad0029ef8	2026-06-05	ARCH-001: Define physics layer ownership	docs,tools,tests,tasks,src
+5	982c72ae081cc65ba0f9d2669bf151ec30b69daa	2026-07-23	runtime: finalize exact kernel surface	docs,tools,tests,tasks,src
+5	97d34aba133aed2d07d03d2780e9b1daf937126f	2026-06-02	GRAPHICS-079: add ImGui upload resources	docs,tests,tasks,src,assets
+5	972f41f50c389210afa3ad5b1a38df78b238badc	2026-06-30	Expose progressive Poisson backend fallback contract	docs,tests,methods,tasks,src
+5	966b69270e150e387c032afefe8fb3ce83e549b8	2026-06-30	Publish compaction counts and retire GRAPHICS-108	docs,tests,tasks,src,assets
+5	922ce8776f2667c3297954d1018dd8b2945ef0f4	2026-07-15	fix(geometry): close review gaps and retire GEOM-063	benchmarks,docs,tests,tasks,src
+5	8f1374c6c4e4dcd7dc47f95c68ee46a621bb20bf	2026-06-02	GRAPHICS-079 Slice A: wire default-recipe ImGuiPass executor route	docs,tests,tasks,src,assets
+5	8d598b13d2d1e6679537f63b7a593e2a8e629fcb	2026-07-18	docs(core): record CORE-007 scheduler evidence	benchmarks,docs,tests,tasks,src
+5	8aa6781b484ff6d880634299dd42535d8ec94853	2026-06-02	Retire minimal debug surface recipe scaffold	docs,tests,tasks,src,assets
+5	8a50b725eea65a680b04f48e1d01a9ce81f1be33	2026-07-18	core: reuse compiled task graph plans	benchmarks,docs,tests,tasks,src
+5	847a2790a9f8868ba4bc39d48eb7f1baf469b2d0	2026-06-30	Wire progressive Poisson config control	docs,tests,methods,tasks,src
+5	842de2462c64f8aecc457b032c33aec5aad952ec	2026-07-19	runtime: privatize Sandbox default policies	docs,tests,tasks,ara,src
+5	82902dc96eeb7119df96677b960591d836e9a263	2026-07-27	RUNTIME-194 Slice C: retire duplicate work systems	docs,tests,tasks,ara,src
+5	7ceae5e476d40875cf701adad9ca15df9f4d0373	2026-07-28	RUNTIME-193: retire progressive presentation path	docs,tests,tasks,ara,src
+5	79b907abf51680ad1290d8dc5b3a74cc89e8f36a	2026-07-27	RUNTIME-195 Slice A: contract shared result readback	docs,tests,tasks,ara,src
+5	798f6248ca0fee0e79b27a1c2303bc422fcc30b9	2026-07-09	runtime: extract asset residency service	docs,tests,tasks,ara,src
+5	78c4b152f3ef3e990997b266f2749b5bfd5c6eff	2026-07-09	Instrument compile-heavy CI gates	docs,tools,tests,.github,tasks
+5	7557a69c55b326eb182efe18f51b1115d2f9eb27	2026-07-31	Verify staged asset import workflow cleanup	docs,tests,tasks,ara,src
+5	74e9549ad47b1336b2c73b9d2fd6b6da1a039232	2026-06-25	Add GPU object-space normal texture bake	docs,tests,tasks,src,assets
+5	724a74894bbcfe6affd9bb90bc5028b9b76fca4f	2026-07-16	refactor(runtime): privatize ImGui editor bridge	docs,tools,tests,tasks,src
+5	71b09575e3bdb0dcbd8dd87c7aaae2e15dc2f46c	2026-08-02	HARDEN-087 unify geometry element sources	docs,tests,tasks,ara,src
+5	6f846f2d6433e21f396dde6ca41de6300c2e9f02	2026-08-01	feat(runtime): integrate point-cloud consolidation	docs,tests,methods,tasks,src
+5	6ea1261447532b420284822485837751f67b8511	2026-07-13	UI-034: add scalar property plot widgets	docs,tests,tasks,src,cmake
+5	6df21f6979f5869684c50af302578efe0a456f6c	2026-08-01	feat(app): add point-cloud consolidation panel	docs,tests,methods,tasks,src
+5	6a976f8a3e549d5c5d85d5661a9319a218ec7a2d	2026-08-03	Harden GEOM-064 near-threshold fit validation	docs,tests,tasks,ara,src
+5	69f9b16c4b1be2985eb7047cfefd81ed0ef7811d	2026-06-02	GRAPHICS-079: add ImGui user texture commands	docs,tests,tasks,src,assets
+5	694b651b74771dbe993718968263ead2ac0426de	2026-08-04	UI-039: Restore three-domain panel discovery	docs,tests,tasks,ara,src
+5	6856768a1c65b3ba0915e004416628abeab6fda4	2026-07-17	fix(ci): route benchmark smoke through slow lane (BUG-088)	benchmarks,docs,tests,.github,tasks
+5	5f4b5c22c5dfae686d5ba82aaa480762a2a13b68	2026-06-16	Implement GEOM-018 parameterization diagnostics	benchmarks,docs,tests,tasks,src
+5	594a2acf7111163fa98d5c33c59f348e370a7f7c	2026-06-22	GRAPHICS-098 add GPU transfer facade	docs,tests,tasks,ara,src
+5	58976568887e41ed732306bfd72802543d5c5900	2026-08-02	HARDEN-087 close fixed-surface review findings	docs,tests,tasks,ara,src
+5	548e62b5fd5970d5bf913e12d85ae768ffb3fa15	2026-08-05	fix(runtime): synchronize geometry properties across CPU and GPU	docs,tests,tasks,ara,src
+5	51e905fdb376d02b4b06af4624c0318901d9ff6f	2026-06-06	BUG-015: Stabilize promoted Vulkan sandbox rendering	docs,tests,src,cmake,assets
+5	5135e6b95022fb15b184b5613558e0aa1ce06e90	2026-06-15	Retire runtime bakes and graphics UV task	docs,tests,tasks,ara,src
+5	5095d07ab7888a89933d8e61ad4a50be34a525d1	2026-07-04	Add object-space normal bake dilation	docs,tests,tasks,src,assets
+5	4ea19d402bc5f4c5319d75a5a9bbc3c83a8acae2	2026-08-06	refactor(rhi): retire unused pipeline registry	docs,tools,tests,tasks,src
+5	48615e411a4028a699bbedee824503dcfbafe390	2026-08-03	Harden GEOM-064 reviewed numerical contract	docs,tests,tasks,ara,src
+5	4667ab6c0db45b2667222cb8a110a549b9b117a6	2026-06-04	Add cluster grid build contract	docs,tests,tasks,src,assets
+5	3bd20f2afbcf2958687838aefc6936bf8bd8ecf0	2026-06-01	RUNTIME-090 Slice A: runtime Dear ImGui adapter module	docs,tests,tasks,src,cmake
+5	3694748879a2a7f04e719299acb46eded41831df	2026-07-10	PROC-021: enforce docs and task state in CI	docs,tools,tests,.github,tasks
+5	367c8fc48167eb9d64f1a00290b77f182fc53c35	2026-06-12	Implement generated mesh attribute textures and point impostor depth	docs,tests,tasks,src,assets
+5	31d9d30efdf05928225a4600e34ae6ec19a89695	2026-08-02	docs: right-size runtime backlog architecture	benchmarks,docs,tasks,ara,src
+5	2e6fab6a0566cd5e4ed58d64257247e7c1f89b0d	2026-06-05	METHOD-001: Add rigid body reference backend	benchmarks,docs,tests,methods,tasks
+5	2e522cfa255a0067fc69246230532fbf71784f2c	2026-07-28	RUNTIME-198: retire visualization adapters	docs,tests,tasks,ara,src
+5	2aa2951d3ee6cc5c0c1842835e8b7709aaeefabe	2026-06-22	GRAPHICS-097 async texture readback ring	docs,tests,tasks,ara,src
+5	297e9087be459fd150645e27a45eff88a1413745	2026-07-17	tools: retire non-paying validator gates	docs,tools,tests,.github,tasks
+5	2959d8d142d7b99489ac2b9bb9a69298688699a0	2026-07-02	Add sandbox method backend selectors	docs,tests,methods,tasks,src
+5	291885ec284e1dd3f28d300b1ece542d201d57e5	2026-08-05	fix: reject nonexecuted benchmark claim evidence	benchmarks,docs,tools,tests,tasks
+5	25e3e7c54fbced929855c928731780b31a5fda08	2026-07-16	refactor(runtime): privatize Engine frame-loop helpers	docs,tools,tests,tasks,src
+5	2449cb42cf59e8a1d3e386999a822982702cbd4c	2026-06-04	Add two-phase culling bucket surfaces	docs,tests,tasks,src,assets
+5	220df248076b5e16ff510f7ff7f6b8b49e7846db	2026-07-04	Add segmented float reduction primitive	docs,tests,tasks,src,assets
+5	218fb3176dff993fc482b3a348cea92446f483e7	2026-06-18	Consume retained point size BDA	docs,tests,tasks,src,assets
+5	1dbbb3f018c1a47aa641225f68f971a5472f36d9	2026-08-03	RUNTIME-206: close element-domain review gaps	docs,tests,tasks,ara,src
+5	1db3a56adb0d12e8da5be93e37579753f6fe8cc6	2026-07-01	Add Progressive Poisson GPU parity readback seam	docs,tests,methods,tasks,src
+5	1752ed93dc94fc7767e0142da506285b4975dc35	2026-07-02	Reduce selected editor frame work	docs,tests,tasks,src,assets
+5	1384228f3ed3f6b1fc5949bd3c1dd441f84a0aa0	2026-07-16	refactor(runtime): privatize asset residency service	docs,tests,tasks,ara,src
+5	1098922a321ba51759ab9b489bfbd8c8af05c562	2026-07-17	ci: stage touched-scope pr-fast routing	docs,tools,tests,.github,tasks
+5	0877854105204363bceca7a333715f2598696cbf	2026-08-05	geometry: add automatic support-radius policy	docs,tests,methods,tasks,src
+5	0847ae0fb5281b3acf6e0e8fbf5242a8a1c9a84b	2026-07-19	runtime: extract async work module	docs,tools,tests,tasks,src
+5	06f7c9fafb52dd144c7cc59315442682aa7d8933	2026-06-28	Add point-cloud quality metrics	benchmarks,docs,tests,tasks,src
+5	06680c57fa910977f0217e58f096909543742dd2	2026-08-02	process: enforce reusable contract applicability	docs,tools,tests,tasks,ara
+5	05fda62314b8816e2120199a43c396b2ad6d9ee8	2026-07-19	runtime: finalize editor UI module convergence	docs,tools,tests,tasks,src

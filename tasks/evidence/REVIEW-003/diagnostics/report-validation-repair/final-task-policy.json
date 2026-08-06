@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 721,
+  "exit_code": 1,
+  "finished_at": "2026-08-06T19:17:12Z",
+  "label": "final-task-policy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:17:11Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/final-task-policy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/final-task-policy.stdout.log",
+  "stdout_sha256": "994cea828b93c356b9dc5fb6ce08fa12e0dccedfc697cffee103d5812fd5a3d5",
+  "task_id": "REVIEW-003"
+}

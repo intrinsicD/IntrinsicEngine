@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; python3 tools/repo/check_layering_allowlist_quality.py --root . --strict; drift=0; while read -r task_id; do if rg -l \"^id: ${task_id}$\" tasks/done tasks/archive -g '*.md' >/dev/null; then echo \"DRIFT: allowlist owner ${task_id} is retired\"; drift=1; fi; done < <(awk '/^[[:space:]]+task:/{gsub(/\"/,\"\",$2); print $2}' tools/repo/layering_allowlist.yaml | sort -u); test \"$drift\" -eq 0"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; python3 tools/repo/check_layering_allowlist_quality.py --root . --strict; drift=0; while read -r task_id; do if rg -l \"^id: ${task_id}$\" tasks/done tasks/archive -g '\"'\"'*.md'\"'\"' >/dev/null; then echo \"DRIFT: allowlist owner ${task_id} is retired\"; drift=1; fi; done < <(awk '\"'\"'/^[[:space:]]+task:/{gsub(/\"/,\"\",$2); print $2}'\"'\"' tools/repo/layering_allowlist.yaml | sort -u); test \"$drift\" -eq 0'",
+  "cwd": ".",
+  "duration_ms": 51,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:54:03Z",
+  "label": "allowlist-drift",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:54:03Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/allowlist-drift.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/allowlist-drift.stdout.log",
+  "stdout_sha256": "ab9068db344a5407f333beec10d92f278eb8d84f5d6b0845fb04ca7ed251c059",
+  "task_id": "REVIEW-003"
+}

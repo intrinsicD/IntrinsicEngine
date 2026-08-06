@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_tasks.py",
+    "--root",
+    "tasks",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_tasks.py --root tasks --strict",
+  "cwd": ".",
+  "duration_ms": 780,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:54:03Z",
+  "label": "task-schema",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:54:02Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/task-schema.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/task-schema.stdout.log",
+  "stdout_sha256": "991d720ba6661d78eb34016fb798d21a46d2844d98d116b16bd2d94f36481f8e",
+  "task_id": "REVIEW-003"
+}

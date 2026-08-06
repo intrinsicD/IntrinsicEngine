@@ -1,0 +1,7 @@
+tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md:55:owner: "codex-review003"
+tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md:56:branch: "main"
+tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md:57:worktree: "/home/alex/Documents/IntrinsicEngine"
+tasks/active/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md:58:claimed_at: "2026-08-06T18:48:14Z"
+* main
+LIVE REVIEW-003 owner=codex-review003 branch=main worktree=/home/alex/Documents/IntrinsicEngine paths=['docs/reports', 'docs/reviews', 'tasks/SESSION-BRIEF.md', 'tasks/active', 'tasks/backlog', 'tasks/done']

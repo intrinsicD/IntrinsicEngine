@@ -1,0 +1,31 @@
+bridge_declarations
+none
+adapter_declarations
+src/runtime/ImGui/Runtime.ImGuiAdapter.cppm:26:    struct ImGuiAdapterDiagnostics
+src/runtime/ImGui/Runtime.ImGuiAdapter.cppm:66:    class ImGuiAdapter
+current_renderer_adapter_production_consumers
+src/graphics/renderer/Graphics.Renderer.cpp
+src/runtime/Config/Runtime.RenderRecipeActivation.cpp
+src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+imgui_adapter_production_consumers
+src/runtime/CMakeLists.txt
+src/runtime/Editor/Runtime.EditorUiModule.cpp
+src/runtime/README.md
+adapter_test_consumers
+tests/CMakeLists.txt
+tests/contract/graphics/Test.CurrentRendererContractAdapter.cpp
+tests/contract/graphics/Test.RenderRecipeConfig.cpp
+tests/contract/graphics/Test.RendererFrameLifecycle.cpp
+tests/contract/graphics/Test.SharedRenderRecipeExecution.cpp
+tests/contract/runtime/Test.ImGuiAdapter.cpp
+tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp
+tests/contract/runtime/Test.RuntimeConfigControl.cpp
+tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp
+tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+tests/contract/runtime/Test.SandboxEditorModels.cpp
+tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+tests/contract/runtime/Test.SandboxEditorVisualization.cpp

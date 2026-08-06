@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\nprintf \"scene_document_implementation_and_tests\\n\"\nrg -n \"SceneDocumentModule\" src tests | sed -n \"1,80p\"\nprintf \"render_subsystem_registry_implementation_and_tests\\n\"\nrg -n \"RenderSubsystemRegistry\" src tests | sed -n \"1,100p\"\nprintf \"mesh_as_graph_borrow_implementation_and_tests\\n\"\nrg -n \"BorrowMeshAsGraphReadOnly|MeshAsGraph\" src tests docs/architecture | sed -n \"1,120p\"\nprintf \"frame_recipe_typed_routing_and_tests\\n\"\nrg -n \"FramePassId|RenderCommandRouter\" src/graphics src/runtime tests | sed -n \"1,120p\"\n"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\nprintf \"scene_document_implementation_and_tests\\n\"\nrg -n \"SceneDocumentModule\" src tests | sed -n \"1,80p\"\nprintf \"render_subsystem_registry_implementation_and_tests\\n\"\nrg -n \"RenderSubsystemRegistry\" src tests | sed -n \"1,100p\"\nprintf \"mesh_as_graph_borrow_implementation_and_tests\\n\"\nrg -n \"BorrowMeshAsGraphReadOnly|MeshAsGraph\" src tests docs/architecture | sed -n \"1,120p\"\nprintf \"frame_recipe_typed_routing_and_tests\\n\"\nrg -n \"FramePassId|RenderCommandRouter\" src/graphics src/runtime tests | sed -n \"1,120p\"\n'",
+  "cwd": ".",
+  "duration_ms": 39,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:05:57Z",
+  "label": "drift-doc-claim-sample",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:05:57Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/drift-doc-claim-sample.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/drift-doc-claim-sample.stdout.log",
+  "stdout_sha256": "24551571ec8d395e0b59ab17152687cd2cb0417bb2052c0c4bd23b313c25658f",
+  "task_id": "REVIEW-003"
+}

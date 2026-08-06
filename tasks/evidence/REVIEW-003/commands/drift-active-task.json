@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; find tasks/active -maxdepth 1 -type f -name '*.md' ! -name README.md -print; rg -n '^(owner|branch|worktree|claimed_at):' tasks/active/*.md; git branch --list main; python3 tools/agents/task_claim.py status --root . --fail-on-stale"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; find tasks/active -maxdepth 1 -type f -name '\"'\"'*.md'\"'\"' ! -name README.md -print; rg -n '\"'\"'^(owner|branch|worktree|claimed_at):'\"'\"' tasks/active/*.md; git branch --list main; python3 tools/agents/task_claim.py status --root . --fail-on-stale'",
+  "cwd": ".",
+  "duration_ms": 65,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:55:06Z",
+  "label": "drift-active-task",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:55:06Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/drift-active-task.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/drift-active-task.stdout.log",
+  "stdout_sha256": "c4617c2d591c9e225aa3f48a3dc3d26fe44b04e3458ea4ae09f11da9ed3fdc1f",
+  "task_id": "REVIEW-003"
+}

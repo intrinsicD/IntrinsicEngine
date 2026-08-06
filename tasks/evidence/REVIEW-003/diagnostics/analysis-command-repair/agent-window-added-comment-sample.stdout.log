@@ -1,0 +1,187 @@
+added_comment_lines_by_file_top25
+    479 src/graphics/renderer/Graphics.Renderer.cpp
+    236 tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    173 src/runtime/Kernel/Runtime.Engine.cpp
+    171 src/runtime/Rendering/Runtime.RenderExtraction.cppm
+    151 tests/contract/graphics/Test.RendererFrameLifecycle.cpp
+    142 src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    132 tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp
+    129 src/graphics/renderer/Graphics.Renderer.cppm
+    124 src/runtime/Rendering/Runtime.RenderExtraction.cpp
+    119 src/runtime/Scene/Runtime.SelectionController.cppm
+    118 src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm
+    108 src/geometry/Geometry.DomainViews.cppm
+    106 src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+     99 src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+     94 src/graphics/vulkan/Backends.Vulkan.Device.cpp
+     93 src/runtime/Kernel/Runtime.JobService.cppm
+     92 src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cpp
+     91 tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+     90 tests/contract/runtime/Test.PrimitiveSelectionRefinementWiring.cpp
+     89 src/runtime/Scene/Runtime.StableEntityLookup.cppm
+     88 src/runtime/Kernel/Runtime.CommandBus.cppm
+     82 src/runtime/Rendering/Runtime.RenderWorldPool.cppm
+     80 tests/contract/runtime/Test.RuntimeJobService.cpp
+     79 src/runtime/Gizmos/Runtime.GizmoInteraction.cppm
+     79 src/graphics/renderer/Graphics.FrameRecipe.cppm
+representative_added_comment_lines
+benchmarks/core/Bench.SchedulerHardeningSmoke.hpp	// CORE-007 - scheduler priority and wait-registry smoke benchmark declaration.
+benchmarks/core/Bench.SchedulerHardeningSmoke.hpp	//
+benchmarks/core/Bench.SchedulerHardeningSmoke.hpp	// Measures deterministic synthetic scheduler work through public Core APIs.
+benchmarks/core/Bench.SchedulerHardeningSmoke.hpp	// The priority probe is intentionally capable of emitting a schema-valid
+benchmarks/core/Bench.SchedulerHardeningSmoke.hpp	// failed result so the pre-priority implementation remains a useful baseline.
+benchmarks/core/Bench.SchedulerHardeningSmoke.hpp	#pragma once
+benchmarks/core/Bench.SchedulerHardeningSmoke.hpp	#include <cstdint>
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	// CORE-008 - compiled TaskGraph plan-reuse smoke benchmark declarations.
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	//
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	// The two workloads time the public registration/compile/replay lifecycle for
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	// stable ECS-like and render-prep-like chain shapes. Correctness validation is
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	// performed outside the timed window so the same frozen harness can measure
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	// the full-rebuild baseline and the exact-structure reuse candidate.
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	#pragma once
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	#include <array>
+benchmarks/core/Bench.TaskGraphPlanReuseSmoke.hpp	#include <cstdint>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	// CORE-007 - scheduler priority and wait-registry smoke benchmark.
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include "Bench.SchedulerHardeningSmoke.hpp"
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <algorithm>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <array>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <atomic>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <barrier>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <chrono>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <cstdint>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <string>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <string_view>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <thread>
+benchmarks/core/Bench_SchedulerHardeningSmoke.cpp	#include <vector>
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	// CORE-008 - compiled TaskGraph plan-reuse smoke benchmarks.
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include "Bench.TaskGraphPlanReuseSmoke.hpp"
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include <algorithm>
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include <array>
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include <chrono>
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include <cmath>
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include <cstdint>
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include <span>
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include <string_view>
+benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp	#include <vector>
+benchmarks/geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp	// METHOD-023 — deterministic Boundary First Flattening reference smoke.
+benchmarks/geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp	#include <string_view>
+benchmarks/geometry/Bench.ContinuousLopReferenceSmoke.hpp	// METHOD-017 — CLOP CPU-reference correctness smoke declaration.
+benchmarks/geometry/Bench.ContinuousLopReferenceSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.ContinuousLopReferenceSmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.ContinuousLopReferenceSmoke.hpp	#include <cstdint>
+benchmarks/geometry/Bench.EdgeAwareResamplingReferenceSmoke.hpp	// METHOD-018 — EAR CPU-reference correctness smoke declaration.
+benchmarks/geometry/Bench.EdgeAwareResamplingReferenceSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.EdgeAwareResamplingReferenceSmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.EdgeAwareResamplingReferenceSmoke.hpp	#include <cstdint>
+benchmarks/geometry/Bench.LopFamilyComparisonSmoke.hpp	// METHOD-019 — frozen LOP-family optimized CPU comparison declaration.
+benchmarks/geometry/Bench.LopFamilyComparisonSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.LopFamilyComparisonSmoke.hpp	#include <array>
+benchmarks/geometry/Bench.LopFamilyComparisonSmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.LopFamilyComparisonSmoke.hpp	#include <string>
+benchmarks/geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp	// METHOD-016 — LOP/WLOP CPU-reference correctness smoke declaration.
+benchmarks/geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp	#include <cstdint>
+benchmarks/geometry/Bench.PointCloudFilteringSmoke.hpp	// GEOM-016 — point-cloud filtering/outlier-removal smoke benchmark declaration.
+benchmarks/geometry/Bench.PointCloudFilteringSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.PointCloudFilteringSmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	// METHOD-012 — progressive Poisson-disk CPU reference smoke benchmark declaration.
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	//
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	// Exercises the hermetic geometry.progressive_poisson cpu_reference backend on a
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	// deterministic uniform-cube workload and reports runtime plus blue-noise
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	// quality summaries. The companion manifest lives at
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	// benchmarks/geometry/manifests/progressive_poisson_reference_smoke.yaml; the
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	// runner that emits result JSON lives at
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	// benchmarks/runners/BenchmarkSmokeRunner.cpp.
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	#include <cstdint>
+benchmarks/geometry/Bench.ProgressivePoissonReferenceSmoke.hpp	    // Deterministic on a fixed seed; safe to call from any thread (no shared state).
+benchmarks/geometry/Bench.QualityMetricsSmoke.hpp	// GEOM-036 — quality-metrics smoke benchmark declaration.
+benchmarks/geometry/Bench.QualityMetricsSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.QualityMetricsSmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	// METHOD-002 — signed heat CPU reference smoke benchmark declaration.
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	//
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	// Exercises the repo-native Geometry.SignedHeatMethod cpu_reference backend on a
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	// deterministic flat-grid workload with an oriented square source curve. The
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	// companion manifest lives at
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	// benchmarks/geometry/manifests/signed_heat_reference_smoke.yaml.
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	#include <cstdint>
+benchmarks/geometry/Bench.SignedHeatReferenceSmoke.hpp	    // Deterministic fixed workload; safe to call from any thread with no shared state.
+benchmarks/geometry/Bench.SimplificationQualitySmoke.hpp	// GEOM-014 — deterministic simplification quality smoke declaration.
+benchmarks/geometry/Bench.SimplificationQualitySmoke.hpp	#pragma once
+benchmarks/geometry/Bench.SimplificationQualitySmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.SurfaceSamplingSmoke.hpp	// GEOM-035 — surface sampling smoke benchmark declaration.
+benchmarks/geometry/Bench.SurfaceSamplingSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.SurfaceSamplingSmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.UvAtlasSmoke.hpp	// GEOM-057 — UV atlas fast-staged vs xatlas smoke benchmark declaration.
+benchmarks/geometry/Bench.UvAtlasSmoke.hpp	#pragma once
+benchmarks/geometry/Bench.UvAtlasSmoke.hpp	#include <array>
+benchmarks/geometry/Bench.UvAtlasSmoke.hpp	#include <cstddef>
+benchmarks/geometry/Bench.UvAtlasSmoke.hpp	#include <cstdint>
+benchmarks/geometry/Bench.UvAtlasSmoke.hpp	#include <string>
+benchmarks/geometry/Bench.UvAtlasSmoke.hpp	#include <vector>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	// METHOD-023 — manifest-backed Boundary First Flattening reference smoke.
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include "Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include <algorithm>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include <array>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include <chrono>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include <cmath>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include <cstddef>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include <limits>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include <string_view>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	#include <glm/glm.hpp>
+benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp	            * 1.0e-6;
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	// METHOD-017 — deterministic CLOP CPU-reference correctness smoke.
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include "Bench.ContinuousLopReferenceSmoke.hpp"
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include <algorithm>
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include <chrono>
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include <cmath>
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include <cstddef>
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include <limits>
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include <span>
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include <vector>
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	#include <glm/glm.hpp>
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	        // Claim-grade confirmation fixtures use distinct dimensions, scale,
+benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp	        // and noise sequences from the unit-test screening fixtures.
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	// METHOD-018 — deterministic EAR/anisotropic-WLOP correctness smoke.
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include "Bench.EdgeAwareResamplingReferenceSmoke.hpp"
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <algorithm>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <array>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <chrono>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <cmath>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <cstddef>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <limits>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <span>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <vector>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	#include <glm/glm.hpp>
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	        // Confirmation dimensions, spacing, and noise sequence deliberately
+benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp	        // differ from the unit-test screening fixture.
+benchmarks/geometry/Bench_ExampleSmoke.cpp	#include <vector>
+benchmarks/geometry/Bench_ExampleSmoke.cpp	#include <glm/glm.hpp>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	// RUNTIME-196 - opt-in production ClusteringService Vulkan benchmark runner.
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	//
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	// This runner remains separate from IntrinsicBenchmarkSmoke because it composes
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	// the runtime/Vulkan stack and requires a promoted Vulkan device. It emits one
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	// result JSON for the schema validators under tools/benchmark/.
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <algorithm>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <array>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <chrono>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <cmath>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <cstdint>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <cstdlib>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <filesystem>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <fstream>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <memory>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <optional>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <span>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <sstream>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <string>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <string_view>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <utility>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <vector>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <glm/geometric.hpp>
+benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp	#include <glm/glm.hpp>
+benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp	// METHOD-019 — frozen paired LOP-family optimized CPU comparison.
+benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp	#include "Bench.LopFamilyComparisonSmoke.hpp"

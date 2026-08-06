@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; python3 tools/repo/generate_module_inventory.py --root src --out /tmp/review003-module-inventory.md; diff -u docs/api/generated/module_inventory.md /tmp/review003-module-inventory.md"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; python3 tools/repo/generate_module_inventory.py --root src --out /tmp/review003-module-inventory.md; diff -u docs/api/generated/module_inventory.md /tmp/review003-module-inventory.md'",
+  "cwd": ".",
+  "duration_ms": 80,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:54:03Z",
+  "label": "module-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:54:03Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/module-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/module-inventory.stdout.log",
+  "stdout_sha256": "be32f26aed062141557ba24faf0f482a3ce2f2326faf6a21cac53acb5642e8cb",
+  "task_id": "REVIEW-003"
+}

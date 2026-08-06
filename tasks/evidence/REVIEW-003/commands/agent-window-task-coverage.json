@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\nprintf 'range_total_commits\\t'; git rev-list --count d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d\nprintf 'range_non_merge_commits\\t'; git rev-list --count --no-merges d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d\nprintf 'unique_task_ids_in_subjects\\t'; git log --no-merges --format='%s' d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d | rg -o '[A-Z][A-Z0-9]+-[0-9]+[A-Z]?' | sort -u | wc -l\nprintf 'top_task_ids_in_subjects\\n'; git log --no-merges --format='%s' d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d | rg -o '[A-Z][A-Z0-9]+-[0-9]+[A-Z]?' | sort | uniq -c | sort -nr | sed -n '1,80p'\nprintf 'commits_without_task_id_subject\\t'; git log --no-merges --format='%H%x09%s' d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d | awk '$0 !~ /[A-Z][A-Z0-9]+-[0-9]+[A-Z]?/{n++} END{print n+0}'"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\nprintf '\"'\"'range_total_commits\\t'\"'\"'; git rev-list --count d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d\nprintf '\"'\"'range_non_merge_commits\\t'\"'\"'; git rev-list --count --no-merges d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d\nprintf '\"'\"'unique_task_ids_in_subjects\\t'\"'\"'; git log --no-merges --format='\"'\"'%s'\"'\"' d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d | rg -o '\"'\"'[A-Z][A-Z0-9]+-[0-9]+[A-Z]?'\"'\"' | sort -u | wc -l\nprintf '\"'\"'top_task_ids_in_subjects\\n'\"'\"'; git log --no-merges --format='\"'\"'%s'\"'\"' d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d | rg -o '\"'\"'[A-Z][A-Z0-9]+-[0-9]+[A-Z]?'\"'\"' | sort | uniq -c | sort -nr | sed -n '\"'\"'1,80p'\"'\"'\nprintf '\"'\"'commits_without_task_id_subject\\t'\"'\"'; git log --no-merges --format='\"'\"'%H%x09%s'\"'\"' d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d | awk '\"'\"'$0 !~ /[A-Z][A-Z0-9]+-[0-9]+[A-Z]?/{n++} END{print n+0}'\"'\"''",
+  "cwd": ".",
+  "duration_ms": 73,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:01:07Z",
+  "label": "agent-window-task-coverage",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:01:06Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/agent-window-task-coverage.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/agent-window-task-coverage.stdout.log",
+  "stdout_sha256": "67dc09ea739ab7801fe732b7585ce304785d233d47b4490b2bdbb1caff139d01",
+  "task_id": "REVIEW-003"
+}

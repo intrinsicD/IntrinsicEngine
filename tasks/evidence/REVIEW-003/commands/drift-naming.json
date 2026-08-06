@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; bad=$(git grep -nE 'Render_Graph|Frame_Graph|Task_Graph|Render_World|Frame_Recipe' -- 'docs/**' 'src/**' ':!docs/agent/drift-audit-checklist.md' ':!docs/reports/**' || true); test -z \"$bad\"; printf 'RenderGraph symbol/module files: '; rg -l '\\bRenderGraph\\b' src docs/architecture -g '*.cpp' -g '*.cppm' -g '*.md' | wc -l; printf 'framegraph layer-vocabulary files: '; rg -l '\\bframegraph\\b' src docs/architecture -g '*.cpp' -g '*.cppm' -g '*.md' | wc -l"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; bad=$(git grep -nE '\"'\"'Render_Graph|Frame_Graph|Task_Graph|Render_World|Frame_Recipe'\"'\"' -- '\"'\"'docs/**'\"'\"' '\"'\"'src/**'\"'\"' '\"'\"':!docs/agent/drift-audit-checklist.md'\"'\"' '\"'\"':!docs/reports/**'\"'\"' || true); test -z \"$bad\"; printf '\"'\"'RenderGraph symbol/module files: '\"'\"'; rg -l '\"'\"'\\bRenderGraph\\b'\"'\"' src docs/architecture -g '\"'\"'*.cpp'\"'\"' -g '\"'\"'*.cppm'\"'\"' -g '\"'\"'*.md'\"'\"' | wc -l; printf '\"'\"'framegraph layer-vocabulary files: '\"'\"'; rg -l '\"'\"'\\bframegraph\\b'\"'\"' src docs/architecture -g '\"'\"'*.cpp'\"'\"' -g '\"'\"'*.cppm'\"'\"' -g '\"'\"'*.md'\"'\"' | wc -l'",
+  "cwd": ".",
+  "duration_ms": 31,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:55:06Z",
+  "label": "drift-naming",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:55:06Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/drift-naming.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/drift-naming.stdout.log",
+  "stdout_sha256": "208125267f3f08823d6885419a98842deda9dcbe489de1c56d072b0d5d3ba4b6",
+  "task_id": "REVIEW-003"
+}

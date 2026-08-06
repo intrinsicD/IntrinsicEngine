@@ -1,0 +1,224 @@
+schema_version: 1
+task_id: REVIEW-003
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T19:44:21Z'
+claim_eligible: false
+source:
+  base_ref: 51e7faddad943ab7727e407d008e474ec076566d
+  base_revision: 51e7faddad943ab7727e407d008e474ec076566d
+  head_revision: 8106a7e602b807f3686c9586963884c3e61b0045
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: ara/logic/solution/architecture.md
+    sha256: 507671d56e3552ef72185ac101d1c7166d139cb947bfbf65522a6e8e904b4bd5
+  - path: docs/reports/2026-08-06-agent-output-audit.md
+    sha256: 1e17ffb735e7ea96c10693f695075c2aa99453aa3466d94a0bb93a08e4e04308
+  - path: docs/reports/2026-08-06-architecture-stability-readiness.md
+    sha256: 0c83795e2a946137abb2498e1f61a357e3da852f49192ed34724c537ad80624a
+  - path: docs/reports/2026-08-06-drift-audit.md
+    sha256: 398786a063203df767cbcfef44b183e8186b04a85bea2ec61f724274fad1384f
+  - path: docs/reviews/2026-08-06-clean-workshop-review.md
+    sha256: 9938c020fa1338a21d4b499377aa362d6f70e13b6214105ee28399797b8d503a
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 28a4dddc55b5ffbcbbb0225e8e19b28f3b7f37e2f3b758e53178333681baf74f
+  - path: tasks/active/README.md
+    sha256: 6ac05a2cebcdfb3450b322173fa308d2b4bde4ea193df723b6f432557bde17f9
+  - path: tasks/backlog/README.md
+    sha256: ddd023eb887284d4c37ab8506134ef4c626ab8c6a448a69277a5b85396333b8f
+  - path: tasks/backlog/architecture/README.md
+    sha256: 3bc8e859843a43b9d24df9c666af08df9d9eb7b24a1c088906fad64d52f5158e
+  - path: tasks/backlog/assets/README.md
+    sha256: 5699dcf9621ae14b8b71521ff6049211e61643937eb0a6ab52d01a7ce8762683
+  - path: tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+    sha256: 0c57062b9b11c85692727ab263ed3dce03afd58ea1107766a127fc523ae6ebe5
+  - path: tasks/backlog/geometry/README.md
+    sha256: 7e0aae33c77897e87fc8743a173c5665b7a19663c90fd44817ee68224be8f882
+  - path: tasks/backlog/methods/README.md
+    sha256: ca4350bba0b43e4da69141946b411ee9bcda0a8869fb3ed3a7dfac122b995371
+  - path: tasks/backlog/rendering/README.md
+    sha256: f4ca954205951b28aeed5e771522ae48b5ca86474793d30ce2dfa4483987f890
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: a5fda4dbccca7711efc3c852794daefd606bdf3430ec6ccbfed544a425b5a7e8
+  - path: tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+    sha256: dedb1a55334791079f0370304889143a4793e2d47efb0c04ce2c22fa048be2de
+  content_digest: 3a1fa507e9d2a667c11769420d0c9a5b81f3ff865c54b5063ce6e0147f8a4a96
+touched:
+  paths:
+  - ara/logic/solution/architecture.md
+  - docs/reports/2026-08-06-agent-output-audit.md
+  - docs/reports/2026-08-06-architecture-stability-readiness.md
+  - docs/reports/2026-08-06-drift-audit.md
+  - docs/reviews/2026-08-06-clean-workshop-review.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/architecture/README.md
+  - tasks/backlog/assets/README.md
+  - tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+  - tasks/backlog/geometry/README.md
+  - tasks/backlog/methods/README.md
+  - tasks/backlog/rendering/README.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+  layers:
+  - docs
+  - tasks
+  modules:
+  - REVIEW-003
+extension_seam: Not applicable; REVIEW-003 is an audit-only readiness baseline and introduces no reusable
+  production seam.
+future_change_plan: Repeat the standard architecture, workshop, drift, and agent-output audits on a new
+  exact revision when cadence or a concrete regression warrants it; open scoped remediation tasks for
+  findings.
+acceptance:
+- criterion: Every static dependency and every blocker discovered by this audit is in
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The `ARCH-014` kernel target-state scorecard is fully green on the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Architecture-review, clean-workshop, drift-audit, and agent-output rows
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every right-sizing flag either passes a named keep-list justification or
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No readiness-blocking dead public seam, untracked compatibility shim,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The final readiness report identifies the exact commit and evidence and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The default CPU-supported gate and every command in `## Verification`
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Deferred idea tasks remain machine-blocked by `REVIEW-003` until this
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/REVIEW-003/commands/agent-audit-history.json
+- receipt: tasks/evidence/REVIEW-003/commands/agent-window-added-comment-sample.json
+- receipt: tasks/evidence/REVIEW-003/commands/agent-window-broad-scope.json
+- receipt: tasks/evidence/REVIEW-003/commands/agent-window-classification.json
+- receipt: tasks/evidence/REVIEW-003/commands/agent-window-defensive-check-sample.json
+- receipt: tasks/evidence/REVIEW-003/commands/agent-window-largest-commits.json
+- receipt: tasks/evidence/REVIEW-003/commands/agent-window-production-without-tests.json
+- receipt: tasks/evidence/REVIEW-003/commands/agent-window-surface-delta.json
+- receipt: tasks/evidence/REVIEW-003/commands/agent-window-task-coverage.json
+- receipt: tasks/evidence/REVIEW-003/commands/allowlist-drift.json
+- receipt: tasks/evidence/REVIEW-003/commands/arch014-scorecard.json
+- receipt: tasks/evidence/REVIEW-003/commands/audit-cadence.json
+- receipt: tasks/evidence/REVIEW-003/commands/baseline-identity.json
+- receipt: tasks/evidence/REVIEW-003/commands/build-tests.json
+- receipt: tasks/evidence/REVIEW-003/commands/candidate-structural-gates.json
+- receipt: tasks/evidence/REVIEW-003/commands/clean-workshop.json
+- receipt: tasks/evidence/REVIEW-003/commands/configure-ci.json
+- receipt: tasks/evidence/REVIEW-003/commands/dependency-retirement.json
+- receipt: tasks/evidence/REVIEW-003/commands/doc-links.json
+- receipt: tasks/evidence/REVIEW-003/commands/docs-sync.json
+- receipt: tasks/evidence/REVIEW-003/commands/drift-active-task.json
+- receipt: tasks/evidence/REVIEW-003/commands/drift-anchor-sample.json
+- receipt: tasks/evidence/REVIEW-003/commands/drift-doc-claim-sample.json
+- receipt: tasks/evidence/REVIEW-003/commands/drift-naming.json
+- receipt: tasks/evidence/REVIEW-003/commands/drift-planned-markers.json
+- receipt: tasks/evidence/REVIEW-003/commands/drift-todo-shims.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-audit-cadence.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-layering.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-module-inventory.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-root-hygiene.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-session-brief.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-task-policy.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-task-schema.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-task-state-links.json
+- receipt: tasks/evidence/REVIEW-003/commands/final-test-layout.json
+- receipt: tasks/evidence/REVIEW-003/commands/full-cpu.json
+- receipt: tasks/evidence/REVIEW-003/commands/layering.json
+- receipt: tasks/evidence/REVIEW-003/commands/module-inventory.json
+- receipt: tasks/evidence/REVIEW-003/commands/report-diff-check.json
+- receipt: tasks/evidence/REVIEW-003/commands/report-doc-links.json
+- receipt: tasks/evidence/REVIEW-003/commands/report-docs-sync.json
+- receipt: tasks/evidence/REVIEW-003/commands/review-r2-structural-gates.json
+- receipt: tasks/evidence/REVIEW-003/commands/right-sizing-adapter-and-bridge-sample.json
+- receipt: tasks/evidence/REVIEW-003/commands/right-sizing-surface-counts.json
+- receipt: tasks/evidence/REVIEW-003/commands/root-hygiene.json
+- receipt: tasks/evidence/REVIEW-003/commands/task-policy.json
+- receipt: tasks/evidence/REVIEW-003/commands/task-schema.json
+- receipt: tasks/evidence/REVIEW-003/commands/task-state-links.json
+- receipt: tasks/evidence/REVIEW-003/commands/test-layout.json
+- receipt: tasks/evidence/REVIEW-003/commands/theme-f-open-inventory.json
+changed_public_contracts:
+- No production API or reusable architecture contract changed; the revision adds commit-scoped audit reports
+  and retires REVIEW-003.
+diagnostics_and_previews:
+- All 47 static dependencies resolve to retired tasks; ARCH-014 remains all-green with the exact 12/0/0/5
+  Engine policy.
+- Fresh ci configure, IntrinsicTests build, and the complete default CPU selector pass 4,102/4,102; the
+  headless GlfwLifecycleLsan skip is expected.
+- Architecture, clean-workshop, drift, complete-interval agent-output, Theme F, and 35-surface right-sizing
+  reviews pass; an independent read-only right-sizing audit found no blocker.
+- The final Theme F inventory leaves only nonblocking scoped follow-up work after REVIEW-003 retirement;
+  reports give a concrete rationale for each open item.
+- Independent fixed-surface review revision 1 found one interface-count wording mismatch and two living
+  ARA references to the former task path; revision 2 reconciles both without changing production or test
+  code.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- The verdict is an exact-commit readiness baseline, not a guarantee against later architecture drift.
+- Opt-in GPU/Vulkan and sanitizer variants were not rerun because the candidate changes only reports and
+  task governance; the audited baseline received a fresh complete CPU gate.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No graphics, RHI, Vulkan, shader, resource, command-recording, or device-selection source changed;
+    this audit-only candidate uses the fresh complete CPU baseline plus structural checks.
+- check: asan-ubsan
+  reason: No executable source, allocation, ownership, lifetime, or concurrency behavior changed; sanitizer
+    variants would not add candidate-specific coverage beyond the fresh baseline audit.
+artifacts:
+- path: docs/reports/2026-08-06-architecture-stability-readiness.md
+  sha256: 0c83795e2a946137abb2498e1f61a357e3da852f49192ed34724c537ad80624a
+  kind: file
+- path: docs/reports/2026-08-06-agent-output-audit.md
+  sha256: 1e17ffb735e7ea96c10693f695075c2aa99453aa3466d94a0bb93a08e4e04308
+  kind: file
+- path: docs/reports/2026-08-06-drift-audit.md
+  sha256: 398786a063203df767cbcfef44b183e8186b04a85bea2ec61f724274fad1384f
+  kind: file
+- path: docs/reviews/2026-08-06-clean-workshop-review.md
+  sha256: 9938c020fa1338a21d4b499377aa362d6f70e13b6214105ee28399797b8d503a
+  kind: file
+- path: tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+  sha256: dedb1a55334791079f0370304889143a4793e2d47efb0c04ce2c22fa048be2de
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/REVIEW-003/handoff.jsonl
+review: tasks/evidence/REVIEW-003/reviews.jsonl

@@ -1,0 +1,13 @@
+docs/architecture/ecs.md:47:](geometry-api-style.md#ecs-element-domain-source-contract)
+docs/architecture/geometry-api-style.md:233:](geometry.md#robust-predicates)
+docs/architecture/geometry-api-style.md:237:](geometry.md#intersection-classification-records)
+docs/architecture/method-api-contract.md:95:](geometry-api-style.md#ecs-element-domain-source-contract)
+docs/architecture/rendering-target-architecture.md:1110:](geometry.md#mesh-graph-and-point-cloud-domain-views)
+docs/architecture/rendering-target-architecture.md:1112:](geometry-api-style.md#property-api-contract)
+docs/build-troubleshooting.md:234:](benchmarking/ci-policy.md#warm-configure-failure-guard)
+docs/build-troubleshooting.md:315:](benchmarking/ci-policy.md#compile-hotspot-evidence)
+docs/index.md:70:](build-troubleshooting.md#fast-touched-scope-verification)
+docs/architecture/geometry-api-style.md:58:## ECS element-domain source contract
+docs/build-troubleshooting.md:318:## Fast touched-scope verification
+docs/architecture/geometry.md:1001:## Robust predicates
+docs/architecture/geometry.md:1097:## Intersection classification records

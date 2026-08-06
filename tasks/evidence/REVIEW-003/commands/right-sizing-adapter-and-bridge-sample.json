@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\nprintf \"bridge_declarations\\n\"\nif ! rg -n \"class [A-Za-z0-9_]*Bridge|struct [A-Za-z0-9_]*Bridge\" src --glob \"*.cppm\" --glob \"*.hpp\"; then\n  printf \"none\\n\"\nfi\nprintf \"adapter_declarations\\n\"\nrg -n \"class [A-Za-z0-9_]*Adapter|struct [A-Za-z0-9_]*Adapter\" src --glob \"*.cppm\" --glob \"*.hpp\" || true\nprintf \"current_renderer_adapter_production_consumers\\n\"\nrg -l \"MakeCurrentRenderer|ValidateCurrentRenderer|kCurrentRenderer\" src |\n  rg -v \"Graphics.CurrentRendererContractAdapter.(cppm|cpp)\" | sort\nprintf \"imgui_adapter_production_consumers\\n\"\nrg -l \"\\bImGuiAdapter\\b\" src |\n  rg -v \"Runtime.ImGuiAdapter.(cppm|cpp)\" | sort\nprintf \"adapter_test_consumers\\n\"\nrg -l \"CurrentRendererContractAdapter|\\bImGuiAdapter\\b\" tests | sort\n"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\nprintf \"bridge_declarations\\n\"\nif ! rg -n \"class [A-Za-z0-9_]*Bridge|struct [A-Za-z0-9_]*Bridge\" src --glob \"*.cppm\" --glob \"*.hpp\"; then\n  printf \"none\\n\"\nfi\nprintf \"adapter_declarations\\n\"\nrg -n \"class [A-Za-z0-9_]*Adapter|struct [A-Za-z0-9_]*Adapter\" src --glob \"*.cppm\" --glob \"*.hpp\" || true\nprintf \"current_renderer_adapter_production_consumers\\n\"\nrg -l \"MakeCurrentRenderer|ValidateCurrentRenderer|kCurrentRenderer\" src |\n  rg -v \"Graphics.CurrentRendererContractAdapter.(cppm|cpp)\" | sort\nprintf \"imgui_adapter_production_consumers\\n\"\nrg -l \"\\bImGuiAdapter\\b\" src |\n  rg -v \"Runtime.ImGuiAdapter.(cppm|cpp)\" | sort\nprintf \"adapter_test_consumers\\n\"\nrg -l \"CurrentRendererContractAdapter|\\bImGuiAdapter\\b\" tests | sort\n'",
+  "cwd": ".",
+  "duration_ms": 42,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:09:45Z",
+  "label": "right-sizing-adapter-and-bridge-sample",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:09:45Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/right-sizing-adapter-and-bridge-sample.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/right-sizing-adapter-and-bridge-sample.stdout.log",
+  "stdout_sha256": "db7239717ab347aa5ddb07f83aa43c8de6659b8f49fa31262354965c1a8d3f9f",
+  "task_id": "REVIEW-003"
+}

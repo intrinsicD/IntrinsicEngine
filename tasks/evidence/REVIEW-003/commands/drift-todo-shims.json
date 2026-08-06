@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; if git grep -nE '(TODO|FIXME|XXX|HACK)([^A-Za-z0-9]|$)' -- 'src/**' ':!src/legacy/**'; then exit 1; fi; git grep -niE '\\b(shim|backcompat|temporary)\\b' -- 'src/**' ':!src/legacy/**' || true"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; if git grep -nE '\"'\"'(TODO|FIXME|XXX|HACK)([^A-Za-z0-9]|$)'\"'\"' -- '\"'\"'src/**'\"'\"' '\"'\"':!src/legacy/**'\"'\"'; then exit 1; fi; git grep -niE '\"'\"'\\b(shim|backcompat|temporary)\\b'\"'\"' -- '\"'\"'src/**'\"'\"' '\"'\"':!src/legacy/**'\"'\"' || true'",
+  "cwd": ".",
+  "duration_ms": 41,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:55:06Z",
+  "label": "drift-todo-shims",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:55:06Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/drift-todo-shims.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/drift-todo-shims.stdout.log",
+  "stdout_sha256": "56dd8792ba1142ffe584cb3c65a62a88c32037a465d5424bb4cc121d729f042e",
+  "task_id": "REVIEW-003"
+}

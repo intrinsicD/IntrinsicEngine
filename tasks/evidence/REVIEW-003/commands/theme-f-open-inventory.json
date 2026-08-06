@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; for task_file in $(rg -l '^theme: F$' tasks/active tasks/backlog -g '*.md' | sort); do task_id=$(awk '/^id:/{print $2; exit}' \"$task_file\"); deps=$(awk '/^depends_on:/{line=$0; sub(/^depends_on:[[:space:]]*/,\"\",line); print line; in_deps=1; next} in_deps && /^  - /{printf \"%s \",$2; next} in_deps{in_deps=0}' \"$task_file\" | tr '\\n' ' '); goal=$(awk '/^## Goal/{getline; while($0==\"\"){getline}; sub(/^- /,\"\"); print; exit}' \"$task_file\"); printf '%s\\t%s\\t%s\\t%s\\n' \"$task_id\" \"$task_file\" \"$deps\" \"$goal\"; done"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; for task_file in $(rg -l '\"'\"'^theme: F$'\"'\"' tasks/active tasks/backlog -g '\"'\"'*.md'\"'\"' | sort); do task_id=$(awk '\"'\"'/^id:/{print $2; exit}'\"'\"' \"$task_file\"); deps=$(awk '\"'\"'/^depends_on:/{line=$0; sub(/^depends_on:[[:space:]]*/,\"\",line); print line; in_deps=1; next} in_deps && /^  - /{printf \"%s \",$2; next} in_deps{in_deps=0}'\"'\"' \"$task_file\" | tr '\"'\"'\\n'\"'\"' '\"'\"' '\"'\"'); goal=$(awk '\"'\"'/^## Goal/{getline; while($0==\"\"){getline}; sub(/^- /,\"\"); print; exit}'\"'\"' \"$task_file\"); printf '\"'\"'%s\\t%s\\t%s\\t%s\\n'\"'\"' \"$task_id\" \"$task_file\" \"$deps\" \"$goal\"; done'",
+  "cwd": ".",
+  "duration_ms": 43,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:55:59Z",
+  "label": "theme-f-open-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:55:59Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/theme-f-open-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/theme-f-open-inventory.stdout.log",
+  "stdout_sha256": "3ee60481a93f75f35a41a21fb6468f562351b8a997afb96059aedc00781b2120",
+  "task_id": "REVIEW-003"
+}

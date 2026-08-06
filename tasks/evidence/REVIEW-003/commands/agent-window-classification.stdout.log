@@ -1,0 +1,14 @@
+non_merge_commits	1550
+production_source_commits	663
+test_or_benchmark_commits	782
+docs_commits	1062
+task_commits	1285
+infra_tooling_commits	181
+evidence_commits	201
+production_plus_tests	607
+production_plus_docs	542
+production_plus_docs_plus_tests	505
+production_without_tests_in_same_commit	56
+docs_only	355
+tasks_only	234
+infra_only	8

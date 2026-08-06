@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; git grep -onE '\\]\\([^)]*#[a-z0-9_-]+\\)' -- 'docs/**'; rg -n '^#+ (ECS element-domain source contract|Robust predicates|Intersection classification records|Mesh graph and point cloud domain views|Warm configure failure guard|Compile hotspot evidence|Fast touched-scope verification)' docs/architecture/geometry-api-style.md docs/architecture/geometry.md docs/build-troubleshooting.md docs/index.md"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; git grep -onE '\"'\"'\\]\\([^)]*#[a-z0-9_-]+\\)'\"'\"' -- '\"'\"'docs/**'\"'\"'; rg -n '\"'\"'^#+ (ECS element-domain source contract|Robust predicates|Intersection classification records|Mesh graph and point cloud domain views|Warm configure failure guard|Compile hotspot evidence|Fast touched-scope verification)'\"'\"' docs/architecture/geometry-api-style.md docs/architecture/geometry.md docs/build-troubleshooting.md docs/index.md'",
+  "cwd": ".",
+  "duration_ms": 21,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:55:06Z",
+  "label": "drift-anchor-sample",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:55:06Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/drift-anchor-sample.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/drift-anchor-sample.stdout.log",
+  "stdout_sha256": "dc5f068e60c05a79101d28e4ff4f3537db627c896ce2076898f5e4dc322f8d9a",
+  "task_id": "REVIEW-003"
+}

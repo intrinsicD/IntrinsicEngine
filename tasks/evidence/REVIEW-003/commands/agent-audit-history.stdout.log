@@ -1,0 +1,13 @@
+865a61bc3ac88b648bb9bc9e54df259ffcf99204	07e5f4782379d6cc27b42bd85b20f0eca5b8e2ca	2026-07-14T10:04:21+00:00	Sweep retired tasks to tasks/archive/, keep IDs authoritative
+42b4ce005b0b0868272232e6f340d528f6363097	8b2b78de931b35316d5e92a4807e02156b88b73b	2026-06-29T15:14:21+00:00	Retire GEOM-016 point-cloud filtering contracts
+071342f88e937bcd5cccc60ad9edc754dc2b07f8	39f96880682345fb16fa4909d0beb2710d6f9107	2026-06-28T21:17:01+02:00	Complete sparse direct factorization seam
+a67553649e8641f06d3591915679174407d5667b	62c84817f6b667e4fbcbc982e10ce311be34528b	2026-06-15T11:39:19+02:00	Retire INFRA vcpkg manifest migration
+6a24d676ab4140292d0a3814c1a0343f00e6932d	83d32cb71cb76906ac79a236b74956aa8e754889	2026-06-11T16:54:58+02:00	Start INFRA-001 vcpkg manifest bootstrap
+b7ab258facd6e72759a36a5d5ed66a84093cf63c	214d10248d6c85f9fe42f71d8c9a9403b68a02d5	2026-06-06T10:45:50+00:00	HARDEN-070: Drop dead null guards on reference-initialised helpers
+6df5a76185ed877dd700eff6e8c083bcc44de31f	9303c1dc26bd9a01f543b2537307cf3bd2e70668	2026-06-02T12:03:29+02:00	HARDEN-074: validate inline-code markdown links
+cefb5c9fa796c62f44ee2e325e9edde32ff50023	43de7e79699a7b4ac232f4acb39761ef7e1837c9	2026-05-29T23:17:46+00:00	GEOM-012 Slice E: pin conversion/move/consume policy
+d33c62eebc48de5e8a65c50e057addf25f125c6b	03d0488bbf948ba6add451592a9e9be7bdd65333	2026-05-28T18:34:28+00:00	REVIEW-001 weekly agent-output audit (2026-05-28)
+61fec5c065fb3b861818f4d29f0837b29e92b8b7	d5d86a8cef353dfd7be927edafe839bbeafda761	2026-08-06T00:39:39+02:00	refactor(runtime): organize sources by ownership
+865a61bc3ac88b648bb9bc9e54df259ffcf99204	07e5f4782379d6cc27b42bd85b20f0eca5b8e2ca	2026-07-14T10:04:21+00:00	Sweep retired tasks to tasks/archive/, keep IDs authoritative
+a640da1935e4ea8bc274bc8486bd87258e1c80ff	660eef5f76144720f7f379b42abccf8345faf9e0	2026-06-10T08:46:47+00:00	Resolve untracked TODO and track streaming bridge removal (HARDEN-078)
+7d119eac86bf492afe954ad7b6dcf03e9ac1efa4	b7ab258facd6e72759a36a5d5ed66a84093cf63c	2026-06-06T10:51:47+00:00	REVIEW-002: Install repo-state drift audit + first calibration

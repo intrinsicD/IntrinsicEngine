@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; rg -n 'all-green|12/0/0/5|Runtime Engine|exact' docs/architecture/kernel-target-state.md tasks/done/ARCH-014-kernel-convergence-tracking.md tests/contract/runtime/Test.RuntimeEngineLayering.cpp | head -120"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; rg -n '\"'\"'all-green|12/0/0/5|Runtime Engine|exact'\"'\"' docs/architecture/kernel-target-state.md tasks/done/ARCH-014-kernel-convergence-tracking.md tests/contract/runtime/Test.RuntimeEngineLayering.cpp | head -120'",
+  "cwd": ".",
+  "duration_ms": 16,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:50:30Z",
+  "label": "arch014-scorecard",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:50:30Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/arch014-scorecard.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/arch014-scorecard.stdout.log",
+  "stdout_sha256": "64df393ef926fe0b1b04eca2d73baec7f7a2fb4f065b39a248c0a25da915b5dc",
+  "task_id": "REVIEW-003"
+}

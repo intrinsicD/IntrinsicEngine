@@ -1,0 +1,2 @@
+usage: validate_tasks.py [-h] [--root ROOT] [--strict]
+validate_tasks.py: error: unrecognized arguments: tasks --require-tasks

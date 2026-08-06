@@ -1,0 +1,53 @@
+added_cppm	130
+deleted_cppm	197
+surviving_interface_declarations
+src/core/Core.IOBackend.cppm:56:    class IIOBackend
+src/geometry/Geometry.Registration.cppm:64:    enum class ICPVariant : uint8_t
+src/graphics/renderer/Graphics.Renderer.cppm:458:    export class IRenderer
+src/graphics/rhi/RHI.Bindless.cppm:41:    class IBindlessHeap
+src/graphics/rhi/RHI.CommandContext.cppm:134:    export class ICommandContext
+src/graphics/rhi/RHI.Device.cppm:149:    export class IDevice
+src/graphics/rhi/RHI.Profiler.cppm:177:    class IProfiler
+src/graphics/rhi/RHI.TransferQueue.cppm:101:    class ITransferQueue
+src/platform/Platform.IWindow.cppm:85:    export class IWindow
+src/runtime/Cameras/Runtime.CameraControllers.cppm:38:    export class ICameraController
+src/runtime/Kernel/Runtime.Module.cppm:202:    export class IRuntimeModule
+added_role_named_files
+src/ecs/ECS.Scene.Registry.cpp
+src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cpp
+src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm
+src/graphics/rhi/RHI.QueueAffinity.cppm
+src/runtime/Editor/Runtime.EditorWindowRegistry.cpp
+src/runtime/Editor/Runtime.EditorWindowRegistry.cppm
+src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cpp
+src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cppm
+src/runtime/GeometryIntegration/Runtime.VertexChannelBindings.cppm
+src/runtime/ImGui/Runtime.ImGuiAdapter.cpp
+src/runtime/ImGui/Runtime.ImGuiAdapter.cppm
+src/runtime/Kernel/Runtime.JobService.cpp
+src/runtime/Kernel/Runtime.JobService.cppm
+src/runtime/Kernel/Runtime.ServiceRegistry.cpp
+src/runtime/Kernel/Runtime.ServiceRegistry.cppm
+src/runtime/Kernel/Runtime.WorldRegistry.cpp
+src/runtime/Kernel/Runtime.WorldRegistry.cppm
+deleted_role_named_files
+src/ecs/Components/ECS.Component.SpatialDebugBinding.cppm
+src/graphics/rhi/RHI.PipelineRegistry.cpp
+src/graphics/rhi/RHI.PipelineRegistry.cppm
+src/legacy/Core/Core.FeatureRegistry.cpp
+src/legacy/Core/Core.FeatureRegistry.cppm
+src/legacy/Core/Utils/Utils.LockFreeQueue.cppm
+src/legacy/Graphics/Graphics.IORegistry.cpp
+src/legacy/Graphics/Graphics.IORegistry.cppm
+src/legacy/Graphics/Graphics.MaterialRegistry.cpp
+src/legacy/Graphics/Graphics.MaterialRegistry.cppm
+src/legacy/Graphics/Graphics.ShaderRegistry.cppm
+src/legacy/RHI/RHI.QueueDomain.cpp
+src/legacy/RHI/RHI.QueueDomain.cppm
+src/legacy/Runtime/Runtime.AssetIngestService.cpp
+src/legacy/Runtime/Runtime.AssetIngestService.cppm
+src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cpp
+src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm

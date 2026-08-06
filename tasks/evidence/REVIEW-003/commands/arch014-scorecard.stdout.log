@@ -1,0 +1,38 @@
+tasks/done/ARCH-014-kernel-convergence-tracking.md:15:  scorecard current and stays open until it is all-green.
+tasks/done/ARCH-014-kernel-convergence-tracking.md:43:  exact-v1 snapshot to 42 plain imports, 21 domain imports, 31 distinct public
+tasks/done/ARCH-014-kernel-convergence-tracking.md:46:  exact-v2 snapshot 42 / 20 / 2 / 31 without changing the interface.
+tasks/done/ARCH-014-kernel-convergence-tracking.md:60:  Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
+tasks/done/ARCH-014-kernel-convergence-tracking.md:77:  the living target-state scorecard is all-green, and the exact Engine guard
+tasks/done/ARCH-014-kernel-convergence-tracking.md:78:  is closed at `12/0/0/5` with no temporary debt.
+tasks/done/ARCH-014-kernel-convergence-tracking.md:79:- The 2026-07-18 reconciliation audit measured the exact clean ratchet at
+tasks/done/ARCH-014-kernel-convergence-tracking.md:98:  semantic Engine API, and `RUNTIME-187` completed opaque state plus the exact
+tasks/done/ARCH-014-kernel-convergence-tracking.md:118:      `pr-fast`. This checker is the authoritative metric and requires exact
+tasks/done/ARCH-014-kernel-convergence-tracking.md:135:      import/bake objects, per-boot asset/cache/handoffs, and exact borrowed
+tasks/done/ARCH-014-kernel-convergence-tracking.md:162:- [x] `Runtime.Engine.cppm` contains only the exact accepted kernel imports,
+docs/architecture/kernel-target-state.md:14:  retired on 2026-07-23 after the scorecard became all-green. The exact
+docs/architecture/kernel-target-state.md:71:prefix; the exact v1 classifier intentionally does not rewrite that historical
+docs/architecture/kernel-target-state.md:72:record. After `RUNTIME-178`, the checked 2026-07-16 exact-policy snapshot was
+docs/architecture/kernel-target-state.md:76:`RUNTIME-181`, and `RUNTIME-182` extractions then reduce the current exact
+docs/architecture/kernel-target-state.md:79:reducing the current exact snapshot to 35 plain imports / 13 domain imports /
+docs/architecture/kernel-target-state.md:81:history ownership and facades, reducing the current exact snapshot to 33 plain
+docs/architecture/kernel-target-state.md:84:mesh-view compatibility surface, reducing the current exact snapshot to
+docs/architecture/kernel-target-state.md:90:exact snapshot `12/0/0/5`. The five getters are exact-ratcheted by return type,
+docs/architecture/kernel-target-state.md:115:> substrate prefixes and exact modules are small and enumerable; every plain
+docs/architecture/kernel-target-state.md:124:> The checker treats exact plain-import and re-export sets separately, uses the
+docs/architecture/kernel-target-state.md:133:- [x] `Runtime.Engine.cppm` contains only the exact imports required by its
+docs/architecture/kernel-target-state.md:141:      `Runtime.WorldHandle`, and `Runtime.WorldRegistry`. This is an exact
+docs/architecture/kernel-target-state.md:154:      public `GetX()` whose return exposes a responsibility outside the exact
+docs/architecture/kernel-target-state.md:156:      exact allowed kernel getter names rather than treating all `GetX()` names
+docs/architecture/kernel-target-state.md:158:      exact guard contained 10 kernel getter names; the final exact guard
+docs/architecture/kernel-target-state.md:170:      object; Sandbox session state now receives exact config/world/service
+docs/architecture/kernel-target-state.md:189:      publishes its exact history and owns one validated active-world binding
+docs/architecture/kernel-target-state.md:204:      exact world-bound registry and contributes one typed viewport-input hook.
+docs/architecture/kernel-target-state.md:206:      seed without per-world resurrection; Sandbox owns exactly-once
+docs/architecture/kernel-target-state.md:224:      transactional handles over the exact import pipeline/input registry plus
+docs/architecture/kernel-target-state.md:228:      the exact module set (including separate document and interaction
+docs/architecture/kernel-target-state.md:231:      while exact runtime services remain live. No replacement application
+docs/architecture/kernel-target-state.md:241:- [x] Final exact Engine surface ratchet — `RUNTIME-187`; implementation
+docs/architecture/kernel-target-state.md:242:      state behind PImpl and derive the exact allowed import/getter/type sets
+docs/architecture/kernel-target-state.md:270:   the exact registry's complete state is bound to one handle and reset rather
+docs/architecture/kernel-target-state.md:286:  API migration, and the exact representation/checker ratchet are complete
+docs/architecture/kernel-target-state.md:288:  `12/0/0/5` boundary.

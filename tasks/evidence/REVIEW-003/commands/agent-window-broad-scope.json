@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\ngit log --no-merges --format='@@@%H%x09%ad%x09%s' --date=short --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d |\nawk '\nfunction flush(  n,k,list) {\n  if (!seen) return;\n  n=0; list=\"\";\n  for (k in roots) {n++; list=list (list?\",\":\"\") k}\n  if (n >= 5) printf \"%d\\t%s\\t%s\\t%s\\t%s\\n\", n, hash, date, subject, list;\n}\nfunction clear_roots( k){for(k in roots) delete roots[k]}\n$0 ~ /^@@@/ {flush(); clear_roots(); seen=1; line=substr($0,4); split(line,a,\"\\t\"); hash=a[1]; date=a[2]; subject=a[3]; next}\nNF == 0 {next}\n{split($0,p,\"/\"); root=p[1]; if (root ~ /^(src|tests|docs|tasks|tools|cmake|methods|benchmarks|assets|ara|\\.github)$/) roots[root]=1}\nEND {flush()}' | sort -nr -k1,1"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\ngit log --no-merges --format='\"'\"'@@@%H%x09%ad%x09%s'\"'\"' --date=short --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d |\nawk '\"'\"'\nfunction flush(  n,k,list) {\n  if (!seen) return;\n  n=0; list=\"\";\n  for (k in roots) {n++; list=list (list?\",\":\"\") k}\n  if (n >= 5) printf \"%d\\t%s\\t%s\\t%s\\t%s\\n\", n, hash, date, subject, list;\n}\nfunction clear_roots( k){for(k in roots) delete roots[k]}\n$0 ~ /^@@@/ {flush(); clear_roots(); seen=1; line=substr($0,4); split(line,a,\"\\t\"); hash=a[1]; date=a[2]; subject=a[3]; next}\nNF == 0 {next}\n{split($0,p,\"/\"); root=p[1]; if (root ~ /^(src|tests|docs|tasks|tools|cmake|methods|benchmarks|assets|ara|\\.github)$/) roots[root]=1}\nEND {flush()}'\"'\"' | sort -nr -k1,1'",
+  "cwd": ".",
+  "duration_ms": 329,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:01:06Z",
+  "label": "agent-window-broad-scope",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:01:06Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/agent-window-broad-scope.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/agent-window-broad-scope.stdout.log",
+  "stdout_sha256": "027126cdde4246dd23359495c0fb6cd5ad07ae46ac7a4d25e51bbfcb6a05aaca",
+  "task_id": "REVIEW-003"
+}

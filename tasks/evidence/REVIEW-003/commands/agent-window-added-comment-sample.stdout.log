@@ -1,0 +1,247 @@
+added_comment_lines_by_production_file_top25
+    471 src/graphics/renderer/Graphics.Renderer.cpp
+    165 src/runtime/Rendering/Runtime.RenderExtraction.cppm
+    146 src/runtime/Kernel/Runtime.Engine.cpp
+    127 src/graphics/renderer/Graphics.Renderer.cppm
+    118 src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    115 src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm
+    113 src/runtime/Scene/Runtime.SelectionController.cppm
+    105 src/runtime/Rendering/Runtime.RenderExtraction.cpp
+    104 src/geometry/Geometry.DomainViews.cppm
+     92 src/graphics/vulkan/Backends.Vulkan.Device.cpp
+     91 src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+     84 src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cpp
+     82 src/runtime/Scene/Runtime.StableEntityLookup.cppm
+     81 src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+     79 src/runtime/Rendering/Runtime.RenderWorldPool.cppm
+     78 src/runtime/Kernel/Runtime.JobService.cppm
+     78 src/graphics/renderer/Graphics.FrameRecipe.cppm
+     77 src/geometry/Geometry.HalfedgeMesh.Simplification.cppm
+     74 src/runtime/Kernel/Runtime.CommandBus.cppm
+     73 src/runtime/Gizmos/Runtime.GizmoInteraction.cppm
+     71 src/runtime/Kernel/Runtime.Engine.cppm
+     71 src/graphics/renderer/Graphics.FrameRecipe.cpp
+     63 src/geometry/Geometry.PointCloud.Features.cppm
+     62 src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm
+     60 src/geometry/Geometry.Registration.cpp
+representative_hotspot_comment_lines
+src/graphics/renderer/Graphics.Renderer.cpp	// GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`. The
+src/graphics/renderer/Graphics.Renderer.cpp	// renderer owns a `std::optional<ImGuiPass>` bound to the engine-owned
+src/graphics/renderer/Graphics.Renderer.cpp	// `ImGuiOverlaySystem` handed in via `SetImGuiOverlaySystem`; the overlay
+src/graphics/renderer/Graphics.Renderer.cpp	// system module is already imported transitively through the renderer's
+src/graphics/renderer/Graphics.Renderer.cpp	// public surface, but the pass module is imported explicitly here so the
+src/graphics/renderer/Graphics.Renderer.cpp	// executor can construct and drive the consumer route.
+src/graphics/renderer/Graphics.Renderer.cpp	        // BUG-026 — `Picking.Readback` per-slot layout. Each in-flight frame
+src/graphics/renderer/Graphics.Renderer.cpp	        // slot holds the three single-pixel samples the PickingPass copies at
+src/graphics/renderer/Graphics.Renderer.cpp	        // the pick pixel plus 4 pad bytes for a 16-byte stride:
+src/graphics/renderer/Graphics.Renderer.cpp	        //   +0  EntityId            (R32_UINT;  0 = background sentinel)
+src/graphics/renderer/Graphics.Renderer.cpp	        //   +4  EncodedSelectionId  (R32_UINT;  domain<<28 | payload)
+src/graphics/renderer/Graphics.Renderer.cpp	        //   +8  SceneDepth          (R32_SFLOAT bits; 1.0 = depth clear)
+src/graphics/renderer/Graphics.Renderer.cpp	        //   +12 pad
+src/graphics/renderer/Graphics.Renderer.cpp	        // GRAPHICS-119 Slice C.6: pass callbacks route shared renderer state
+src/graphics/renderer/Graphics.Renderer.cpp	        // through guarded helpers, so accepted parallel command contexts may
+src/graphics/renderer/Graphics.Renderer.cpp	        // record on scheduler workers while serial submit order stays fixed.
+src/graphics/renderer/Graphics.Renderer.cpp	                    *index >= compiled.TextureImported.size() || !compiled.TextureImported[*index])
+src/graphics/renderer/Graphics.Renderer.cpp	                    *index >= compiled.BufferImported.size() || !compiled.BufferImported[*index])
+src/graphics/renderer/Graphics.Renderer.cpp	            // BUG-015: a queue-family ownership transfer (QFOT) is only real when
+src/graphics/renderer/Graphics.Renderer.cpp	            // the device's framegraph queue profile actually schedules the
+src/graphics/renderer/Graphics.Renderer.cpp	            // producer and consumer onto *different* queues. The promoted device
+src/graphics/renderer/Graphics.Renderer.cpp	            // reports a graphics-only profile and demotes every pass onto the
+src/graphics/renderer/Graphics.Renderer.cpp	            // graphics queue, so any compiled release/acquire pair must collapse
+src/graphics/renderer/Graphics.Renderer.cpp	            // to a plain barrier here (IGNORED families). Otherwise single-queue
+src/graphics/renderer/Graphics.Renderer.cpp	            // submission records a QFOT acquire with no matching release
+src/graphics/renderer/Graphics.Renderer.cpp	            // (UNASSIGNED-VkBufferMemoryBarrier-buffer-00004) plus duplicate
+src/graphics/renderer/Graphics.Renderer.cpp	            // release/acquire warnings (-00001/-00003). Resolving against the
+src/graphics/renderer/Graphics.Renderer.cpp	            // profile (not bound Vulkan families) keeps this correct regardless of
+src/graphics/renderer/Graphics.Renderer.cpp	            // backend queue-family wiring.
+src/graphics/renderer/Graphics.Renderer.cpp	            // live manager. The same concrete RHI-backed helper serves Null
+src/graphics/renderer/Graphics.Renderer.cpp	            // and promoted Vulkan devices; CPU contract tests exercise it
+src/graphics/renderer/Graphics.Renderer.cpp	            // against `MockDevice`.
+src/graphics/renderer/Graphics.Renderer.cpp	            // manager. The same concrete RHI-backed helper serves Null
+src/graphics/renderer/Graphics.Renderer.cpp	            // and promoted Vulkan devices; CPU contract tests exercise
+src/graphics/renderer/Graphics.Renderer.cpp	            // it against `MockDevice`.
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-084 — graphics-owned visualization property-buffer
+src/graphics/renderer/Graphics.Renderer.cpp	            // residency. Constructed beside the other upload helpers so
+src/graphics/renderer/Graphics.Renderer.cpp	            // runtime/editor code can submit copied CPU property arrays while
+src/graphics/renderer/Graphics.Renderer.cpp	            // the renderer owns BufferManager leases and publishes BDAs into
+src/graphics/renderer/Graphics.Renderer.cpp	            // visualization packets before validation.
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-079 Slice C — backend-neutral ImGui upload helper.
+src/graphics/renderer/Graphics.Renderer.cpp	            // Mirrors the transient-debug / visualization-overlay helpers:
+src/graphics/renderer/Graphics.Renderer.cpp	            // one growing host-visible vertex buffer and one growing index
+src/graphics/renderer/Graphics.Renderer.cpp	            // buffer owned by the renderer, reset in Shutdown before the
+src/graphics/renderer/Graphics.Renderer.cpp	            // BufferManager is destroyed.
+src/graphics/renderer/Graphics.Renderer.cpp	            // bound and renders a fullscreen overlay into the current present
+src/graphics/renderer/Graphics.Renderer.cpp	            // source. Same publisher-before-first-frame invariant as the
+src/graphics/renderer/Graphics.Renderer.cpp	            // other selection passes above: emplaced here so the operational
+src/graphics/renderer/Graphics.Renderer.cpp	            // publisher can `SetPipeline(...)` on the pass instance before
+src/graphics/renderer/Graphics.Renderer.cpp	            // any executor branch reaches `Execute(...)`. `Execute()` early-
+src/graphics/renderer/Graphics.Renderer.cpp	            // returns when the pipeline handle or `SelectionSystem` is not
+src/graphics/renderer/Graphics.Renderer.cpp	            // initialised, so a missing pipeline yields `SkippedUnavailable`
+src/graphics/renderer/Graphics.Renderer.cpp	            // on the executor taxonomy rather than a silently-recorded no-op.
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-038A/B — retained HZB ping-pong resource + build pass
+src/graphics/renderer/Graphics.Renderer.cpp	            // target. The system owns two renderer-retained textures through
+src/graphics/renderer/Graphics.Renderer.cpp	            // TextureManager; ExecuteFrame allocates/resizes them for the
+src/graphics/renderer/Graphics.Renderer.cpp	            // current viewport before importing `HZB.Current` into the recipe.
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-040C — retained temporal reconstruction history. The
+src/graphics/renderer/Graphics.Renderer.cpp	            // recipe imports the ping-pong images only when TAA/external
+src/graphics/renderer/Graphics.Renderer.cpp	            // reconstruction is selected; allocation is lazy per viewport in
+src/graphics/renderer/Graphics.Renderer.cpp	            // ExecuteFrame(), matching HZB's retained-resource cadence.
+src/graphics/renderer/Graphics.Renderer.cpp	            // above (m_Subsystems.ShadowSystemRegistry()), so the reference is live before the
+src/graphics/renderer/Graphics.Renderer.cpp	            // tonemap pass above: emplace after `m_Subsystems.PostProcessSystemRegistry()` is
+src/graphics/renderer/Graphics.Renderer.cpp	            // pass above: emplace after `m_Subsystems.PostProcessSystemRegistry()` is
+src/graphics/renderer/Graphics.Renderer.cpp	            // `m_Subsystems.PostProcessSystemRegistry()` is initialised and before the
+src/graphics/renderer/Graphics.Renderer.cpp	                    *m_Subsystems.TextureManager(),
+src/graphics/renderer/Graphics.Renderer.cpp	                    *m_Subsystems.SamplerManager());
+src/graphics/renderer/Graphics.Renderer.cpp	                    *m_Subsystems.TextureManager(),
+src/graphics/renderer/Graphics.Renderer.cpp	                    *m_Subsystems.SamplerManager());
+src/graphics/renderer/Graphics.Renderer.cpp	            // before `m_Subsystems.PostProcessSystemRegistry()` is reset below so the optional
+src/graphics/renderer/Graphics.Renderer.cpp	            // passes above; drop before `m_Subsystems.PostProcessSystemRegistry()` is reset
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-079 Slice A — reset the canonical `ImGuiPass` consumer
+src/graphics/renderer/Graphics.Renderer.cpp	            // before teardown so its optional destructor does not observe a
+src/graphics/renderer/Graphics.Renderer.cpp	            // dangling `ImGuiOverlaySystem&`. Keep the borrowed overlay pointer
+src/graphics/renderer/Graphics.Renderer.cpp	            // long enough to release Slice C's manager-backed font-atlas leases
+src/graphics/renderer/Graphics.Renderer.cpp	            // before the managers are reset below.
+src/graphics/renderer/Graphics.Renderer.cpp	            // present pipeline lease before `m_Subsystems.PipelineManager()` is destroyed
+src/graphics/renderer/Graphics.Renderer.cpp	            // below.
+src/graphics/renderer/Graphics.Renderer.cpp	            // before `m_Subsystems.PipelineManager()` is destroyed below).
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-079 Slice A — drop the canonical default-recipe
+src/graphics/renderer/Graphics.Renderer.cpp	            // `Pass.ImGui` pipeline lease alongside the debug-view lease
+src/graphics/renderer/Graphics.Renderer.cpp	            // above; same teardown ordering contract (lease reset before
+src/graphics/renderer/Graphics.Renderer.cpp	            // `m_Subsystems.PipelineManager()` is destroyed below).
+src/graphics/renderer/Graphics.Renderer.cpp	            // `m_Subsystems.PipelineManager()` is destroyed below).
+src/graphics/renderer/Graphics.Renderer.cpp	            // ordering contract (leases reset before `m_Subsystems.PipelineManager()`
+src/graphics/renderer/Graphics.Renderer.cpp	            // `m_Subsystems.PipelineManager()` is torn down below since the lease
+src/graphics/renderer/Graphics.Renderer.cpp	            // contract. The lease must reset before `m_Subsystems.PipelineManager()`
+src/graphics/renderer/Graphics.Renderer.cpp	            // cached pipeline handle so a later `Initialize(device)` starts
+src/graphics/renderer/Graphics.Renderer.cpp	            // from a clean fail-closed state instead of inheriting a stale
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-084 — release property-buffer leases before the
+src/graphics/renderer/Graphics.Renderer.cpp	            // BufferManager is destroyed, matching the upload-helper
+src/graphics/renderer/Graphics.Renderer.cpp	            // lifetime contract above.
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-079 Slice C — release the ImGui helper before the
+src/graphics/renderer/Graphics.Renderer.cpp	            // BufferManager for the same lease-lifetime reason as the other
+src/graphics/renderer/Graphics.Renderer.cpp	            // renderer-owned upload helpers.
+src/graphics/renderer/Graphics.Renderer.cpp	            // slot decodes the `EntityId` word, the `EncodedSelectionId`
+src/graphics/renderer/Graphics.Renderer.cpp	            // word (`GRAPHICS-012Q`), and the `SceneDepth` float sample
+src/graphics/renderer/Graphics.Renderer.cpp	            // (BUG-026) at `slot * kPickingReadbackSlotStride` and is
+src/graphics/renderer/Graphics.Renderer.cpp	            // routed to the `SelectionSystem` via `PublishPickResult`
+src/graphics/renderer/Graphics.Renderer.cpp	            // (live hit) or `PublishNoHit` (zero EntityId, invalidated
+src/graphics/renderer/Graphics.Renderer.cpp	            // request, or read failure).
+src/graphics/renderer/Graphics.Renderer.cpp	                // VulkanDevice has already completed this reused slot's
+src/graphics/renderer/Graphics.Renderer.cpp	                // fence set and retired its query metadata. Resolution here
+src/graphics/renderer/Graphics.Renderer.cpp	                // is exact-keyed and nonblocking; no other frame-path wait is
+src/graphics/renderer/Graphics.Renderer.cpp	                // introduced for profiling.
+src/graphics/renderer/Graphics.Renderer.cpp	        // GRAPHICS-079 Slice A — receive the engine-owned `ImGuiOverlaySystem`
+src/graphics/renderer/Graphics.Renderer.cpp	        // (runtime owns composition). The renderer-owned `ImGuiPass` borrows the
+src/graphics/renderer/Graphics.Renderer.cpp	        // handed-in overlay so `RecordImGuiPass` reads the same submitted frame
+src/graphics/renderer/Graphics.Renderer.cpp	        // the `RUNTIME-090` adapter produced. May be called before or after
+src/graphics/renderer/Graphics.Renderer.cpp	        // `Initialize()`: if the pipeline lease already exists we bind it to the
+src/graphics/renderer/Graphics.Renderer.cpp	        // freshly-constructed pass here; otherwise `InitializeOperationalPassResources`
+src/graphics/renderer/Graphics.Renderer.cpp	        // binds it when the lease is created. `nullptr` detaches the consumer so
+src/graphics/renderer/Graphics.Renderer.cpp	        // the route reports `SkippedUnavailable`.
+src/graphics/renderer/Graphics.Renderer.cpp	            // RUNTIME-089 Slice B — copy the runtime selection snapshot identity
+src/graphics/renderer/Graphics.Renderer.cpp	            // into stable storage; ExtractRenderWorld surfaces it as
+src/graphics/renderer/Graphics.Renderer.cpp	            // RenderWorld::Selection.
+src/graphics/renderer/Graphics.Renderer.cpp	                    // RUNTIME-089 — carry the runtime selection correlation
+src/graphics/renderer/Graphics.Renderer.cpp	                    // token to the picking slot.
+src/graphics/renderer/Graphics.Renderer.cpp	                    // RUNTIME-089 Slice B — identity from the runtime selection
+src/graphics/renderer/Graphics.Renderer.cpp	                    // controller; outline styling keeps SelectionSnapshot's
+src/graphics/renderer/Graphics.Renderer.cpp	                    // recipe defaults.
+src/graphics/renderer/Graphics.Renderer.cpp	                // GRAPHICS-038B — current-frame HZB build target. Invalid on
+src/graphics/renderer/Graphics.Renderer.cpp	                // non-operational devices or allocation failure, which keeps
+src/graphics/renderer/Graphics.Renderer.cpp	                // the recipe from declaring `HZBBuildPass`.
+src/graphics/renderer/Graphics.Renderer.cpp	                // GRAPHICS-039C — renderer-owned clustered-light buffers.
+src/graphics/renderer/Graphics.Renderer.cpp	                // Published to shaders through `GpuSceneTable` BDAs during
+src/graphics/renderer/Graphics.Renderer.cpp	                // `PrepareFrame()` and imported here so the recipe can order
+src/graphics/renderer/Graphics.Renderer.cpp	                // build/assignment before forward/deferred lighting consumes
+src/graphics/renderer/Graphics.Renderer.cpp	                // the header/index pair.
+src/graphics/renderer/Graphics.Renderer.cpp	            // for every pass dispatch.
+src/graphics/renderer/Graphics.Renderer.cpp	                    // GRAPHICS-033E: a failed recipe build cannot satisfy gate 7;
+src/graphics/renderer/Graphics.Renderer.cpp	                    // publish fail-closed so the operational gate sees the latest
+src/graphics/renderer/Graphics.Renderer.cpp	                    // outcome before the next attempt.
+src/graphics/renderer/Graphics.Renderer.cpp	                    // GRAPHICS-033E: a failed compile cannot satisfy gate 7. Publish
+src/graphics/renderer/Graphics.Renderer.cpp	                    // fail-closed exactly once per compile attempt so the operational
+src/graphics/renderer/Graphics.Renderer.cpp	                    // gate cannot oscillate stale-clean while the next attempt rebuilds.
+src/graphics/renderer/Graphics.Renderer.cpp	            // GRAPHICS-033E: run the recipe-aware validation against the
+src/graphics/renderer/Graphics.Renderer.cpp	            // current compiled graph and publish the boolean to the device for
+src/graphics/renderer/Graphics.Renderer.cpp	            // the frame. Cache hits reuse the compile product but still
+src/graphics/renderer/Graphics.Renderer.cpp	            // validate the recipe view and per-frame transient resource
+src/graphics/renderer/Graphics.Renderer.cpp	            // readiness before execution.
+src/graphics/renderer/Graphics.Renderer.cpp	            // deferred resources.
+src/graphics/renderer/Graphics.Renderer.cpp	                            *compiled,
+src/graphics/renderer/Graphics.Renderer.cpp	                                *compiled,
+src/graphics/renderer/Graphics.Renderer.cpp	                                *compiled,
+src/graphics/renderer/Graphics.Renderer.cpp	                        // BUG-016: the ImGui overlay pass declares a framegraph
+src/graphics/renderer/Graphics.Renderer.cpp	                        // read of the present source only so the compiler keeps
+src/graphics/renderer/Graphics.Renderer.cpp	                        // the prior color content as a LOAD attachment; its
+src/graphics/renderer/Graphics.Renderer.cpp	                        // fragment shader samples its own retained font-atlas /
+src/graphics/renderer/Graphics.Renderer.cpp	                        // per-command user textures from dedicated bindless
+src/graphics/renderer/Graphics.Renderer.cpp	                        // leases (real bindless texture leases start after the
+src/graphics/renderer/Graphics.Renderer.cpp	                        // frame-sampled bridge slots 0..5), never the
+src/graphics/renderer/Graphics.Renderer.cpp	                        // shared frame-sampled bridge slot 0. All passes share a
+src/graphics/renderer/Graphics.Renderer.cpp	                        // single bindless descriptor set, so the *last* host-side
+src/graphics/renderer/Graphics.Renderer.cpp	                        // descriptor write to a slot is what every recorded draw
+src/graphics/renderer/Graphics.Renderer.cpp	                        // observes at submit. Binding slot 0 here to the ImGui
+src/graphics/renderer/Graphics.Renderer.cpp	                        // pass's SceneColorLDR read would therefore overwrite the
+src/graphics/renderer/Graphics.Renderer.cpp	                        // postprocess bridge descriptor that the
+src/graphics/renderer/Graphics.Renderer.cpp	                        // earlier-recorded-but-later-executing tonemap
+src/graphics/renderer/Graphics.Renderer.cpp	                        // (`PostProcessPass`) samples, so the tonemap would read
+src/graphics/renderer/Graphics.Renderer.cpp	                        // its own output target instead of SceneColorHDR and
+src/graphics/renderer/Graphics.Renderer.cpp	                        // collapse SceneColorLDR (the present source) to black.
+src/graphics/renderer/Graphics.Renderer.cpp	                        // ImGui owns its descriptors, so skip the generic bridge
+src/graphics/renderer/Graphics.Renderer.cpp	                        // bind for it.
+src/graphics/renderer/Graphics.Renderer.cpp	                    // outside any render pass). The route helper at the bottom
+src/graphics/renderer/Graphics.Renderer.cpp	                    // must not double-end it, so this latch tracks whether
+src/graphics/renderer/Graphics.Renderer.cpp	                    // the picking callback already closed the active pass.
+src/graphics/renderer/Graphics.Renderer.cpp	                        *compiled,
+src/graphics/renderer/Graphics.Renderer.cpp	                    // GRAPHICS-076E / GRAPHICS-077E / GRAPHICS-078E —
+src/graphics/renderer/Graphics.Renderer.cpp	                    // opt-in pixel-readback hooks: copy after the executor's
+src/graphics/renderer/Graphics.Renderer.cpp	                    // final Present transition and restore Present layout
+src/graphics/renderer/Graphics.Renderer.cpp	                    // before the command buffer closes. Pass-scoped hooks are
+src/graphics/renderer/Graphics.Renderer.cpp	                    // additionally gated on their pass recording this frame so
+src/graphics/renderer/Graphics.Renderer.cpp	                    // their counters cannot be confused with the canonical
+src/graphics/renderer/Graphics.Renderer.cpp	                    // surface-readback path.
+src/graphics/renderer/Graphics.Renderer.cpp	                    *compiled,
+src/graphics/renderer/Graphics.Renderer.cpp	                    // Queue-submit and parallel-context vectors are both fully
+src/graphics/renderer/Graphics.Renderer.cpp	                    // materialized here. Open each queue's first primary and
+src/graphics/renderer/Graphics.Renderer.cpp	                    // record its reset/envelope before any worker can record a
+src/graphics/renderer/Graphics.Renderer.cpp	                    // secondary timestamp.
+src/graphics/renderer/Graphics.Renderer.cpp	        // GRAPHICS-071 / BUG-042 — retained point renderables use the
+src/graphics/renderer/Graphics.Renderer.cpp	        // GpuScene BDA-backed `forward/point.vert` + `forward/point.frag`
+src/graphics/renderer/Graphics.Renderer.cpp	        // shader pair. The cull shader emits six vertices per point so sphere
+src/graphics/renderer/Graphics.Renderer.cpp	        // impostors can restore legacy billboard expansion and corrected depth.
+src/graphics/renderer/Graphics.Renderer.cpp	        // RGBA overlay contribution). The recipe's `"SelectionOutlinePass"`
+src/graphics/renderer/Graphics.Renderer.cpp	        // declares `Read(EntityId, ShaderRead) + Read(SceneDepth, DepthRead) +
+src/graphics/renderer/Graphics.Renderer.cpp	        // Read(presentSource, ColorAttachmentRead) +
+src/graphics/renderer/Graphics.Renderer.cpp	        // Write(presentSource, ColorAttachmentWrite)`, so the render pass loads
+src/graphics/renderer/Graphics.Renderer.cpp	        // the current present source as the color target and alpha-blends the
+src/graphics/renderer/Graphics.Renderer.cpp	        // shader's overlay into it. Depth state stays off — the
+src/graphics/renderer/Graphics.Renderer.cpp	        // m_Subsystems.PostProcessSystemRegistry().GetSettings())`, which derives `Exposure` /
+src/graphics/renderer/Graphics.Renderer.cpp	        // GRAPHICS-038B — default-recipe HZB build compute pipeline. It records
+src/graphics/renderer/Graphics.Renderer.cpp	        // outside a render-pass scope under `"HZBBuildPass"` and consumes the
+src/graphics/renderer/Graphics.Renderer.cpp	        // 32-byte `HZBBuildPushConstants` block that selects the target mip and
+src/graphics/renderer/Graphics.Renderer.cpp	        // fallback/single-pass mode. The shader asset contains the subgroup +
+src/graphics/renderer/Graphics.Renderer.cpp	        // shared-memory reduction code; this slice pins the CPU/null command
+src/graphics/renderer/Graphics.Renderer.cpp	        // shape while the storage-image binding and gpu;vulkan conservatism
+src/graphics/renderer/Graphics.Renderer.cpp	        // proof remain `GRAPHICS-038E` scope.
+src/graphics/renderer/Graphics.Renderer.cpp	        // by the backend's pipeline layout).
+src/graphics/renderer/Graphics.Renderer.cpp	        // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
+src/graphics/renderer/Graphics.Renderer.cpp	        // pipeline. Match Dear ImGui's Vulkan backend straight-alpha color
+src/graphics/renderer/Graphics.Renderer.cpp	        // blend (`SrcAlpha`, `OneMinusSrcAlpha`), no depth test/write,
+src/graphics/renderer/Graphics.Renderer.cpp	        // scissor enabled (dynamic), color target pinned to the
+src/graphics/renderer/Graphics.Renderer.cpp	        // `FrameRecipe.PresentSource` format (the swapchain backbuffer format,
+src/graphics/renderer/Graphics.Renderer.cpp	        // since PresentSource aliases the present color resource), and a
+src/graphics/renderer/Graphics.Renderer.cpp	        // dynamic viewport. The push-constant block is the
+src/graphics/renderer/Graphics.Renderer.cpp	        // `ImGuiOverlayPushConstants` (16 bytes) the `ImGuiOverlaySystem`
+src/graphics/renderer/Graphics.Renderer.cpp	        // builds; the real `ImDrawVert` vertex-buffer binding + per-draw-list
+src/graphics/renderer/Graphics.Renderer.cpp	        // scissored draws + bindless user textures are owned by Slice C. Paired
+src/graphics/renderer/Graphics.Renderer.cpp	        // with `assets/shaders/imgui.{vert,frag}`. Held byte-identical between
+src/graphics/renderer/Graphics.Renderer.cpp	        // the initial `Initialize()` and any subsequent
+src/graphics/renderer/Graphics.Renderer.cpp	        // `RebuildOperationalResources()` so the pipeline registry's dedupe
+src/graphics/renderer/Graphics.Renderer.cpp	        // yields a stable device handle.
+src/graphics/renderer/Graphics.Renderer.cpp	            // Dear ImGui emits straight-alpha vertex/texture colors; match
+src/graphics/renderer/Graphics.Renderer.cpp	            // `imgui_impl_vulkan` so transparent font-atlas pixels do not
+src/graphics/renderer/Graphics.Renderer.cpp	            // fill the whole glyph quad.
+src/graphics/renderer/Graphics.Renderer.cpp	        // by the helper into a deterministic placeholder line segment
+src/graphics/renderer/Graphics.Renderer.cpp	        // (two vertices per iso). Actual scalar-field-derived contour
+src/graphics/renderer/Graphics.Renderer.cpp	        // polylines remain future source-BDA work while preserving the
+src/graphics/renderer/Graphics.Renderer.cpp	        // topology + push-constant contract.

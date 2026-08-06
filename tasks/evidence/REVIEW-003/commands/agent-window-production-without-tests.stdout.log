@@ -1,0 +1,56 @@
+afd34b5fe72c7045b09f25374c7a5ef37ecde197	2026-08-06	docs(renderer): correct upload helper ownership prose
+c696921561c01953eac953281abb4165e53b9458	2026-08-06	docs(graphics): reconcile promoted backend state
+e9ef4f34472411b1a7027102aa5218fb46b9d13a	2026-08-05	docs: record METHOD-020 Vulkan parity result
+84c2e827b7f600fd6f97f357d1d12e5ad577f1b8	2026-08-05	method: record METHOD-020 v2 oracle rejection
+f8a722c8246c2ff1bafdf702e28bb41e9a2b4120	2026-08-03	Checkpoint GEOM-064 optimization kernels
+8c5b1ba3839563c5eb361361dfae306cabe1a8b8	2026-08-02	methods: record METHOD-019 negative confirmation
+937fdd94e4d6183c5de2c95d79ea23c75f2798cd	2026-08-01	methods: freeze EAR literature intake
+87fe2b3ee92a4e0669c396ca45b0478832f1d3eb	2026-08-01	methods: freeze Continuous LOP reference contract
+5ae75fdbed5fd7971b32520e0c898e3cff9e03ee	2026-08-01	RUNTIME-202: correct ownership records and retire facade
+061e037c5a770ac8762ae1a190b19b46c262d974	2026-07-29	Retire RUNTIME-201 editor mutation history
+7b2a09b2434cd9c3ada740e347e7d44d757924c5	2026-07-19	tasks: retire RUNTIME-183 asset workflow module
+0c5b0d237856fb89b493e56181c7fed0225b52a2	2026-07-19	runtime: delegate asset workflow ownership
+f315dc9c63bf4d5ea728550b3685f6cdf9809dfd	2026-07-19	runtime: guard optional asset workflow consumers
+1c0bf434211b81aa69f55c0634c1f043d78d1508	2026-07-19	docs: record composed scene document ownership
+ee926992a8133122d2f09b19caa0940ec0699078	2026-07-19	docs: record composed camera ownership
+207e40225b036557c96b1ddf3ab7f493cc76c750	2026-07-18	config(runtime): preserve engine convergence budget
+2c8640a7a1cab405da609ffe8fc58d0e848b95e2	2026-07-18	docs: define application-owned config sections
+54a397e819b6ab71165ed6bdbf0b8422d586ae7e	2026-07-18	perf(core): trim CORE-007 scheduler hot-path cost
+d99dd10d5f9455bd79d7f1ef57b0890a6ec0b5b1	2026-07-15	tasks: retire UI-036 and ImGui blockers
+5d822834267c65ec876f2fbeb8ee15e51574f567	2026-07-13	docs(runtime): retire BUG-075 activation guard
+fd97d4d14e6d541302a8c1851d2719aa523d035f	2026-07-13	CI-007: remove interface evidence marker
+4befbe1ed6e41d85a89d15e824dcc2ef169f6944	2026-07-12	CI-007: exercise hosted interface invalidation
+d03a19ca439be7ccd7ee170d569badb9768f0556	2026-07-10	BUG-076: apply main-thread results after draining readbacks on shutdown
+4347617b292db8f2f1a47340d58b380e774578eb	2026-07-10	BUG-074: retire the pending cache slot on bake submission failure
+fdeb0a6bb7272f548fb0f86cc1f6b189382fc8e2	2026-07-10	BUG-073: gate object-space normal bake readiness FramesInFlight ahead
+c32a7d86f1a062c33ca2bb38b518da1049cb42aa	2026-07-10	BUG-068: rebind scene-borrowing asset subsystems on active-world change
+a1704053cff3e01499ce8f11b2d05ae66e611fb4	2026-07-10	BUG-071: finalize the module schedule after the resolve phase
+3102e60f0864ecdacdef831061ee3ccfdbbcda8c	2026-07-10	BUG-069: register the baseline ECS bundle before module sim-systems
+fbcb67ae9413d09089fbcd01207ddcf0adc22fa6	2026-07-10	BUG-076: drain the derived job registry in AsyncWorkService shutdown
+6619540885f6f93510052c32059a01a150fb8798	2026-07-09	Run frame pacing capture under Xvfb
+dfad54ff17c7a30f1e3344764ad21a4977455307	2026-07-07	Fix Vulkan async queue sharing and Appearance lanes
+6205f7a1c2328865b92deb765d0aacc57504e977	2026-07-07	Own Vulkan parallel command pools
+a2f6dfd720a6e3d08b024d7cc851d776e61af467	2026-07-06	Guard renderer readback issue state
+3fd23f2ca82297d9ad2fab9727d0693924dc27bf	2026-07-06	Share decoded geometry import payloads
+335e05b7a04ededb4a1626c60c7548a75a5189bc	2026-07-01	Extract named ICP stages in Geometry.Registration (GEOM-054)
+0bbdcabd0b21f7a3ecbf664a1bb3e521c83bf20f	2026-06-30	Retire progressive Poisson sandbox playground
+c8910667a4f64c695948d845034beff0cc5328da	2026-06-28	Document frame recipe vocabulary
+bc962c31c80e5cf47f3a892c5be2b53cec8aba28	2026-06-27	GEOM-040 Slice 1: export Geometry::PCA::SymmetricEigen3 (verified)
+a3705467f41adbab8e90358ac41467dfecd3bdb9	2026-06-26	Scaffold progressive Poisson method package; promote first slice to active
+d5c5ad814818d5c87815671bb68151f540d98b8e	2026-06-18	Focus selection after pre-render bounds flush
+96c126f04fab5cba3ca902fb3fbd4e064419d236	2026-06-18	Wire promoted surface visualization colors
+92cc5e55467bc9d76eb59d6e2f093eefd1032ef3	2026-06-15	Retire geometry algorithm queue decision
+fd7291e581fe320a2360c1a041fbc20b24e2af67	2026-06-10	Scale cursor to framebuffer pixels for pick and gizmo input
+a640da1935e4ea8bc274bc8486bd87258e1c80ff	2026-06-10	Resolve untracked TODO and track streaming bridge removal (HARDEN-078)
+a570df94c1b9a4efda4841b95bc58a5735687404	2026-06-07	Delete legacy sandbox app
+5ba47f268db3529366849c69c04a011c0a9a5a55	2026-06-07	Harden sandbox app module surface
+bfcd27516c0588f3426040b32dd95b69e95b7e43	2026-06-07	Split promoted module implementation bodies
+2affad763f86bc03e6d6420f1f358ceb26338550	2026-06-06	ARCH-002: retire physics phenomena roadmap
+5b063c8ccac32fe422168c913db8457b59c198b0	2026-06-06	METHOD-008: Relocate Vector Heat structure example as scaffold
+d18c7aba65d6a8d38f939c594ab3825885d020f9	2026-06-06	HARDEN-073: Anchor ICommandContext vtable with out-of-line key function
+b7ab258facd6e72759a36a5d5ed66a84093cf63c	2026-06-06	HARDEN-070: Drop dead null guards on reference-initialised helpers
+bcbee8b5529bd38f709490c3be01166bbd858d13	2026-06-06	BUG-015: Sync sandbox bug task records
+59c5a3820a7f043bbeda925c344ee544ff25825e	2026-06-04	Move render queue affinity to RHI
+0fff2a1c5571a220bb8d78bccb6118f282f5aeea	2026-06-03	Record asset-backed mesh residency plan
+2a19399a671ee5f942742388cceae34285b751d8	2026-06-02	GRAPHICS-079: retire ImGui pass wiring task
+207fe0588479cbd57a42ea28917b770842a1465a	2026-05-29	BUG-013: close as not-reproducible on clean ci build (stale-BMI artifact)

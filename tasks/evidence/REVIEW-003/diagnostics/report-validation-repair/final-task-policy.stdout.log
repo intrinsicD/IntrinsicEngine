@@ -1,0 +1,6 @@
+[ERROR] tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md: done task must include PR/commit reference placeholder or value.
+Validated 234 task file(s); findings: 1; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 88
+[check_task_maturity_followups] No maturity follow-up findings.
+ERROR: validate_tasks.py strict mode reported task-format violations

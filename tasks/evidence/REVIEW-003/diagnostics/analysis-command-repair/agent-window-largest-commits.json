@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\ngit log --no-merges --format='@@@%H%x09%ad%x09%s' --date=short --numstat d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d |\nawk '\nfunction flush() {if (seen) printf \"%d\\t%d\\t%d\\t%d\\t%s\\t%s\\t%s\\n\", add+del, add, del, files, hash, date, subject}\n$0 ~ /^@@@/ {flush(); seen=1; line=substr($0,4); split(line,a,\"\\t\"); hash=a[1]; date=a[2]; subject=a[3]; for(i=4;i<=length(a);i++) subject=subject \"\\t\" a[i]; add=del=files=0; next}\n$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ {add+=$1; del+=$2; files++}\nEND {flush()}' | sort -nr -k1,1 | head -40"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\ngit log --no-merges --format='\"'\"'@@@%H%x09%ad%x09%s'\"'\"' --date=short --numstat d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d |\nawk '\"'\"'\nfunction flush() {if (seen) printf \"%d\\t%d\\t%d\\t%d\\t%s\\t%s\\t%s\\n\", add+del, add, del, files, hash, date, subject}\n$0 ~ /^@@@/ {flush(); seen=1; line=substr($0,4); split(line,a,\"\\t\"); hash=a[1]; date=a[2]; subject=a[3]; for(i=4;i<=length(a);i++) subject=subject \"\\t\" a[i]; add=del=files=0; next}\n$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ {add+=$1; del+=$2; files++}\nEND {flush()}'\"'\"' | sort -nr -k1,1 | head -40'",
+  "cwd": ".",
+  "duration_ms": 3309,
+  "exit_code": 141,
+  "finished_at": "2026-08-06T19:00:21Z",
+  "label": "agent-window-largest-commits",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:00:17Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/agent-window-largest-commits.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/agent-window-largest-commits.stdout.log",
+  "stdout_sha256": "8fc94abc9ca29833b611c2da0f2514872e3af97e00bf93358e861666c7c04400",
+  "task_id": "REVIEW-003"
+}

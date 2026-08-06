@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_audit_cadence.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_audit_cadence.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 21,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:14:47Z",
+  "label": "audit-cadence",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:14:47Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/audit-cadence.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/audit-cadence.stdout.log",
+  "stdout_sha256": "dd25879317bba6b27f8db98f5c8b007e8081856241e50f01e28296a228c61f92",
+  "task_id": "REVIEW-003"
+}

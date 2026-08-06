@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail; git grep -n '(planned)' -- 'docs/**' 'src/**'; rg -n '^# Verification evidence architecture \\(planned\\)|^Status: `roadmap`|CI-012' docs/architecture/verification-evidence-architecture.md docs/architecture/index.md tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md | head -80"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail; git grep -n '\"'\"'(planned)'\"'\"' -- '\"'\"'docs/**'\"'\"' '\"'\"'src/**'\"'\"'; rg -n '\"'\"'^# Verification evidence architecture \\(planned\\)|^Status: `roadmap`|CI-012'\"'\"' docs/architecture/verification-evidence-architecture.md docs/architecture/index.md tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md | head -80'",
+  "cwd": ".",
+  "duration_ms": 24,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T18:55:06Z",
+  "label": "drift-planned-markers",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T18:55:06Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/drift-planned-markers.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/drift-planned-markers.stdout.log",
+  "stdout_sha256": "45b121fdd72eb6d81b44b12c98b65351ac2996d3032911cfde2ae0f188fcd995",
+  "task_id": "REVIEW-003"
+}

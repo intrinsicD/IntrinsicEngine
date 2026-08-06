@@ -1,0 +1,307 @@
+scene_document_implementation_and_tests
+tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp:38:import Extrinsic.Runtime.SceneDocumentModule;
+tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp:704:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/integration/runtime/Test.SandboxAppComposition.cpp:44:import Extrinsic.Runtime.SceneDocumentModule;
+tests/integration/runtime/Test.SandboxAppComposition.cpp:321:        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/integration/runtime/Test.SandboxEditorPresentation.cpp:44:import Extrinsic.Runtime.SceneDocumentModule;
+tests/integration/runtime/Test.SandboxEditorPresentation.cpp:1050:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/integration/runtime/Test.SandboxEditorPresentation.cpp:1100:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp:67:import Extrinsic.Runtime.SceneDocumentModule;
+tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp:224:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp:462:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+src/app/Sandbox/main.cpp:30:import Extrinsic.Runtime.SceneDocumentModule;
+src/app/Sandbox/main.cpp:449:    engine.EmplaceModule<Extrinsic::Runtime::SceneDocumentModule>();
+tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:116:import Extrinsic.Runtime.SceneDocumentModule;
+tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:869:        Extrinsic::Runtime::SceneDocumentModule>();
+tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:920:    enginePtr->EmplaceModule<Extrinsic::Runtime::SceneDocumentModule>();
+src/app/Sandbox/README.md:7:module (including separate `SceneDocumentModule` and
+src/app/Sandbox/README.md:56:Sandbox also composes the optional `Runtime::SceneDocumentModule`. The
+src/app/Sandbox/README.md:66:Omitting `SceneDocumentModule` leaves Engine and the active world operational
+src/app/Sandbox/README.md:304:`SceneDocumentModule`, and `SceneInteractionModule`, followed by
+src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp:82:import Extrinsic.Runtime.SceneDocumentModule;
+src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp:29:import Extrinsic.Runtime.SceneDocumentModule;
+src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp:387:        SceneDocumentModule* const sceneDocuments = m_Services->Find<SceneDocumentModule>();
+src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm:62:import Extrinsic.Runtime.SceneDocumentModule;
+src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp:26:import Extrinsic.Runtime.SceneDocumentModule;
+src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp:958:            SceneDocumentModule* const sceneDocuments  = services.Find<SceneDocumentModule>();
+src/runtime/README.md:54:| `Extrinsic.Runtime.SceneDocumentModule` | Optional app-composed document owner from `RUNTIME-172`. The concrete `final IRuntimeModule` publishes itself and its exact owned `EditorCommandHistory`, binds document path/event/sequence/history to one validated active `{WorldHandle, Scene::Registry*, binding epoch}`, and resets that complete durable state instead of retaining a per-world map. It preserves synchronous save/load/new/close, and queues snapshot saves and temporary-registry loads on the kernel-owned `JobService` (`RUNTIME-194` Slice B3; the optional `StreamingExecutor` dependency is retired). Every completion captures weak operation state plus module generation, binding epoch, world, and registry identity. That captured binding is re-checked through `JobDesc::ValidateBeforeApply` immediately before the drain would commit, so a stale result is discarded rather than applied; a queued operation that terminates without publishing — cancelled, discarded as stale, or dropped — reconciles through `JobDesc::FinalizeUnpublishedOnMainThread`, which publishes the terminal failure event exactly once when the captured binding still holds. New/load/close snapshot strong-handle participants in deterministic name/registration order, run every `BeforeReplace` callback while the outgoing registry is live, replace, run every `AfterReplace` callback against the rebound registry, then reset history. Parse failure invokes no participant and mutates no document state. Shutdown invalidates generation/epoch and cancels owned tasks before reverse module teardown; omission leaves Engine and the active world operational while document/history services are unavailable. |
+src/runtime/README.md:56:| `Extrinsic.Runtime.AssetWorkflowModule` | Optional app-composed global asset and import owner (`RUNTIME-183`, consolidated by `RUNTIME-200`). It is the sole published import service and exports one `AssetImportRecipe` plus typed copied results for the ordered route → decode → CPU materialize → ECS author → postprocess → GPU residency → complete stages. Its PImpl keeps the private executor alive across Engine reinitialize; each boot recreates `AssetService`, `GpuAssetCache`, the cache listener, and private geometry/model/texture decode, materialization, and residency helpers. It publishes exactly `AssetService`, `AssetWorkflowModule`, and `GpuAssetCache`; Runtime Engine optionally finds the concrete module and invokes `RunFrameMaintenance()` between transfer collection and geometry-residency maintenance. Queued work runs through world-scoped `JobService`; only the bounded main-thread gate may publish assets, author ECS, bind residency, select/focus, or dirty document history, after validating the copied `{WorldHandle, Registry*, binding generation, cancellation generation}` identity. Direct imports emit the same seven-stage trace. When `TextureBakeModule` is composed, the workflow borrows its canonical `TextureBakeService` and reconciles ready `PropertyTextureBakeOutputs` into `GeometryPresentationRuntimeState` plus one atomic material snapshot per entity, preserving unrelated channels. Resolution requires the exact `SceneDocumentModule` and `EditorCommandHistory`, with optional selection and camera services, and registers one strong document-replacement participant. Shutdown announcement cancels imports and detaches provider borrows before application/provider teardown. Omission leaves generic Engine/render/world/transfer/async and render-extraction geometry retirement operational, with asset services absent and platform drops ignored. |
+src/runtime/README.md:124:the exact composed `SceneDocumentModule::QueueSceneSaveToPath(...)` service,
+src/runtime/README.md:128:`SceneDocumentModule::QueueSceneLoadFromPath(...)`, parse into a temporary
+src/runtime/README.md:130:`SceneDocumentModule::GetLastSceneFileEvent()` after the main-thread scene
+src/runtime/README.md:141:`SceneDocumentModule::SaveSceneToPath(...)` / `LoadSceneFromPath(...)` calls
+src/runtime/README.md:1002:`SceneDocumentModule` parses a load into a temporary registry first; only a
+src/runtime/README.md:1048:on away/back. `SceneDocumentModule` independently validates before document
+src/runtime/README.md:1128:   already-published `SceneDocumentModule` and exact `EditorCommandHistory`,
+src/runtime/README.md:1474:`SceneDocumentModule` clears/swaps the raw registry, then reconnects and calls
+tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp:95:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp:715:        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp:4930:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.GraphGeometryExtraction.cpp:28:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.GraphGeometryExtraction.cpp:55:            Extrinsic::Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp:90:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp:234:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp:341:        firstEngine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp:373:        secondEngine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SceneInteractionModule.cpp:40:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.SceneInteractionModule.cpp:182:                    Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SceneInteractionModule.cpp:349:        std::unique_ptr<Runtime::SceneDocumentModule>
+tests/contract/runtime/Test.SceneInteractionModule.cpp:1161:        std::make_unique<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SelectionStableLookupComposition.cpp:36:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.SelectionStableLookupComposition.cpp:364:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SelectionStableLookupComposition.cpp:377:        engine.Services().Find<Runtime::SceneDocumentModule>()->SaveSceneToPath(sceneFile.Path.string());
+tests/contract/runtime/Test.SelectionStableLookupComposition.cpp:379:    ASSERT_TRUE(engine.Services().Find<Runtime::SceneDocumentModule>()->NewSceneDocument().has_value());
+tests/contract/runtime/Test.SelectionStableLookupComposition.cpp:386:        engine.Services().Find<Runtime::SceneDocumentModule>()->LoadSceneFromPath(sceneFile.Path.string());
+tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:72:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:992:        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.AssetImportFormatCoverage.cpp:1566:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp:85:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp:98:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp:992:        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp:1848:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp:1885:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp:86:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp:26:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp:54:            Extrinsic::Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.ClusteringModule.cpp:33:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.ClusteringModule.cpp:741:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp:9:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp:45:        Extrinsic::Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp:73:        Extrinsic::Runtime::SceneDocumentModule>();
+src/runtime/CMakeLists.txt:52:        Scene/Runtime.SceneDocumentModule.cppm
+src/runtime/CMakeLists.txt:154:        Scene/Runtime.SceneDocumentModule.cpp
+tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp:36:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp:274:        closingEngine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp:311:    completedEngine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.SandboxEditorVisualization.cpp:75:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.SandboxEditorVisualization.cpp:1051:    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+tests/contract/runtime/Test.GizmoInteractionEngineWiring.cpp:23:import Extrinsic.Runtime.SceneDocumentModule;
+tests/contract/runtime/Test.GizmoInteractionEngineWiring.cpp:109:        Extrinsic::Runtime::SceneDocumentModule>();
+tests/CMakeLists.txt:283:        Test.SceneDocumentModule.cpp
+src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp:85:import Extrinsic.Runtime.SceneDocumentModule;
+render_subsystem_registry_implementation_and_tests
+tests/contract/graphics/Test.RenderPrepPipeline.cpp:10:import Extrinsic.Graphics.RenderSubsystemRegistry;
+tests/contract/graphics/Test.RenderPrepPipeline.cpp:63:        RenderSubsystemRegistry Registry{};
+src/graphics/renderer/CMakeLists.txt:18:        Graphics.RenderSubsystemRegistry.cppm
+src/graphics/renderer/CMakeLists.txt:60:        Graphics.RenderSubsystemRegistry.cpp
+src/graphics/renderer/Graphics.Renderer.cppm:50:export import Extrinsic.Graphics.RenderSubsystemRegistry;
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm:8:export module Extrinsic.Graphics.RenderSubsystemRegistry;
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm:65:    export struct RenderSubsystemRegistryDiagnostics
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm:76:    export struct RenderSubsystemRegistryInitOptions
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm:81:    export class RenderSubsystemRegistry final
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm:85:                        const RenderSubsystemRegistryInitOptions& options = {});
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm:91:        [[nodiscard]] RenderSubsystemRegistryDiagnostics GetDiagnostics() const;
+src/graphics/renderer/README.md:19:- `Extrinsic.Graphics.RenderSubsystemRegistry`
+src/graphics/renderer/README.md:449:- `Graphics.RenderSubsystemRegistry` owns the renderer core manager/subsystem
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:6:import Extrinsic.Graphics.RenderSubsystemRegistry;
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:76:TEST(RenderSubsystemRegistry, InitializesAndShutsDownInDeterministicOrder)
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:79:    RenderSubsystemRegistry registry;
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:82:    RenderSubsystemRegistryDiagnostics diagnostics = registry.GetDiagnostics();
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:98:TEST(RenderSubsystemRegistry, ShutdownIsSafeAfterPartialInitialization)
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:101:    RenderSubsystemRegistry registry;
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:103:    registry.Initialize(device, RenderSubsystemRegistryInitOptions{
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:107:    RenderSubsystemRegistryDiagnostics diagnostics = registry.GetDiagnostics();
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:120:TEST(RenderSubsystemRegistry, RebuildOperationalResourcesFailsClosedWhenRequiredSubsystemsAreMissing)
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:123:    RenderSubsystemRegistry registry;
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:126:    RenderSubsystemRegistryDiagnostics diagnostics = registry.GetDiagnostics();
+tests/contract/graphics/Test.RenderSubsystemRegistry.cpp:130:    registry.Initialize(device, RenderSubsystemRegistryInitOptions{
+tests/CMakeLists.txt:934:    Test.RenderSubsystemRegistry.cpp
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:8:module Extrinsic.Graphics.RenderSubsystemRegistry;
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:42:    void RenderSubsystemRegistry::Initialize(RHI::IDevice& device,
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:43:                                             const RenderSubsystemRegistryInitOptions& options)
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:143:    void RenderSubsystemRegistry::ShutdownSystems()
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:224:    void RenderSubsystemRegistry::ResetStorage()
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:249:    void RenderSubsystemRegistry::Shutdown()
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:255:    bool RenderSubsystemRegistry::RebuildOperationalResources(RHI::IDevice& device)
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:298:    RenderSubsystemRegistryDiagnostics RenderSubsystemRegistry::GetDiagnostics() const
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:300:        RenderSubsystemRegistryDiagnostics diagnostics{};
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:322:    std::optional<RHI::BufferManager>& RenderSubsystemRegistry::BufferManager() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:327:    const std::optional<RHI::BufferManager>& RenderSubsystemRegistry::BufferManager() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:332:    std::optional<RHI::SamplerManager>& RenderSubsystemRegistry::SamplerManager() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:337:    const std::optional<RHI::SamplerManager>& RenderSubsystemRegistry::SamplerManager() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:342:    std::optional<RHI::TextureManager>& RenderSubsystemRegistry::TextureManager() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:347:    const std::optional<RHI::TextureManager>& RenderSubsystemRegistry::TextureManager() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:352:    std::optional<RHI::PipelineManager>& RenderSubsystemRegistry::PipelineManager() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:357:    const std::optional<RHI::PipelineManager>& RenderSubsystemRegistry::PipelineManager() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:362:    std::optional<GpuWorld>& RenderSubsystemRegistry::GpuWorldSystem() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:367:    const std::optional<GpuWorld>& RenderSubsystemRegistry::GpuWorldSystem() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:372:    std::optional<MaterialSystem>& RenderSubsystemRegistry::MaterialSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:377:    const std::optional<MaterialSystem>& RenderSubsystemRegistry::MaterialSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:382:    std::optional<ColormapSystem>& RenderSubsystemRegistry::ColormapSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:387:    const std::optional<ColormapSystem>& RenderSubsystemRegistry::ColormapSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:393:    RenderSubsystemRegistry::VisualizationSyncSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:399:    RenderSubsystemRegistry::VisualizationSyncSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:404:    std::optional<CullingSystem>& RenderSubsystemRegistry::CullingSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:409:    const std::optional<CullingSystem>& RenderSubsystemRegistry::CullingSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:414:    std::optional<TransformSyncSystem>& RenderSubsystemRegistry::TransformSyncSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:420:    RenderSubsystemRegistry::TransformSyncSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:425:    std::optional<LightSystem>& RenderSubsystemRegistry::LightSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:430:    const std::optional<LightSystem>& RenderSubsystemRegistry::LightSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:435:    std::optional<SelectionSystem>& RenderSubsystemRegistry::SelectionSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:440:    const std::optional<SelectionSystem>& RenderSubsystemRegistry::SelectionSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:445:    std::optional<ForwardSystem>& RenderSubsystemRegistry::ForwardSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:450:    const std::optional<ForwardSystem>& RenderSubsystemRegistry::ForwardSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:455:    std::optional<DeferredSystem>& RenderSubsystemRegistry::DeferredSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:460:    const std::optional<DeferredSystem>& RenderSubsystemRegistry::DeferredSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:465:    std::optional<PostProcessSystem>& RenderSubsystemRegistry::PostProcessSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:471:    RenderSubsystemRegistry::PostProcessSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:476:    std::optional<ShadowSystem>& RenderSubsystemRegistry::ShadowSystemRegistry() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:481:    const std::optional<ShadowSystem>& RenderSubsystemRegistry::ShadowSystemRegistry() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:486:    std::optional<UvView>& RenderSubsystemRegistry::UvViewSystem() noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:491:    const std::optional<UvView>& RenderSubsystemRegistry::UvViewSystem() const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:496:    bool RenderSubsystemRegistry::IsPresent(const RenderSubsystemStage stage) const noexcept
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:523:    void RenderSubsystemRegistry::RecordInitialize(const RenderSubsystemStage stage)
+src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp:536:    void RenderSubsystemRegistry::RecordShutdownIfPresent(const RenderSubsystemStage stage)
+src/graphics/renderer/Graphics.Renderer.cpp:118:import Extrinsic.Graphics.RenderSubsystemRegistry;
+src/graphics/renderer/Graphics.Renderer.cpp:1960:                const RenderSubsystemRegistryDiagnostics diagnostics = m_Subsystems.GetDiagnostics();
+src/graphics/renderer/Graphics.Renderer.cpp:10641:        RenderSubsystemRegistry             m_Subsystems;
+mesh_as_graph_borrow_implementation_and_tests
+docs/architecture/geometry.md:801:- `Geometry::DomainViews::BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh&) -> Graph::Graph`
+docs/architecture/geometry.md:894:(`BorrowMeshAsGraphReadOnly`, `BorrowMeshAsCloud`, `BorrowGraphAsCloud`) — reads
+src/geometry/Geometry.DomainViews.cpp:7:    Graph::Graph BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh& mesh)
+src/geometry/Geometry.DomainViews.cpp:50:    // makes the internal const_cast inside `BorrowMeshAsGraphReadOnly`
+src/geometry/Geometry.DomainViews.cpp:53:        : m_Graph(BorrowMeshAsGraphReadOnly(mesh))
+src/geometry/Geometry.DomainViews.cppm:52:    [[nodiscard]] Graph::Graph BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh& mesh);
+src/geometry/Geometry.DomainViews.cppm:89:    // `HalfedgeMesh::Mesh::CreateView` and `BorrowMeshAsGraphReadOnly`. A
+src/geometry/Geometry.DomainViews.cppm:175:    // `BorrowMeshAsGraphReadOnly` borrow (see that factory for the
+src/geometry/Geometry.DomainViews.cppm:183:    // use the mutable `BorrowMeshAsGraphReadOnly` borrow instead.
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:39:using Geometry::DomainViews::BorrowMeshAsGraphReadOnly;
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:55:TEST(SubmeshViewDomainBorrows, MeshAsGraphSharesVertexAndConnectivityPropertyStorage)
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:68:    Geometry::Graph::Graph view = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:84:TEST(SubmeshViewDomainBorrows, MeshAsGraphDoesNotAllocateCompatibilityCopyProperties)
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:87:    Geometry::Graph::Graph view = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:99:TEST(SubmeshViewDomainBorrows, MeshAsGraphSharesSizesAndIgnoresFaceState)
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:106:    Geometry::Graph::Graph view = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:126:    Geometry::Graph::Graph view = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:144:    Geometry::Graph::Graph view = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:161:    Geometry::Graph::Graph view = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp:829:        Geometry::Graph::Graph borrow = BorrowMeshAsGraphReadOnly(mesh); // shares mesh storage
+tests/unit/geometry/Test_ShortestPath.cpp:24:// `Geometry::DomainViews::BorrowMeshAsGraphReadOnly`. ShortestPath only reads
+tests/unit/geometry/Test_ShortestPath.cpp:27:using Geometry::DomainViews::BorrowMeshAsGraphReadOnly;
+tests/unit/geometry/Test_ShortestPath.cpp:316:    Geometry::Graph::Graph graph = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test_ShortestPath.cpp:340:    Geometry::Graph::Graph graph = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test_ShortestPath.cpp:358:    Geometry::Graph::Graph graph = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test_ShortestPath.cpp:367:    Geometry::Graph::Graph graph = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test_ShortestPath.cpp:389:    Geometry::Graph::Graph graph = BorrowMeshAsGraphReadOnly(mesh);
+tests/unit/geometry/Test_ShortestPath.cpp:459:    Geometry::Graph::Graph graph = BorrowMeshAsGraphReadOnly(mesh);
+frame_recipe_typed_routing_and_tests
+tests/CMakeLists.txt:930:    Test.RenderCommandRouter.cpp
+src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:527:                FramePassId Id{};
+src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:551:            FramePassId duplicateId{};
+src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1721:        std::vector<FramePassId> passIds(passCount);
+src/graphics/framegraph/README.md:28:`FramePassId`/`FrameResourceId` values to recipe-owned passes and resources; the
+src/graphics/framegraph/Graphics.RenderGraph.cpp:985:    Core::Result RenderGraph::SetPassId(const PassRef ref, const FramePassId id)
+src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm:19:    export struct FramePassId
+src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm:29:    export [[nodiscard]] constexpr bool operator==(const FramePassId lhs,
+src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm:30:                                                   const FramePassId rhs) noexcept
+src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm:35:    export [[nodiscard]] constexpr bool operator!=(const FramePassId lhs,
+src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm:36:                                                   const FramePassId rhs) noexcept
+src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm:96:        FramePassId Id{};
+src/graphics/framegraph/Graphics.RenderGraph.cppm:65:        [[nodiscard]] Core::Result SetPassId(PassRef ref, FramePassId id);
+src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm:205:        std::vector<FramePassId> PassIds{};
+src/graphics/renderer/Graphics.RenderCommandRouter.cppm:9:export module Extrinsic.Graphics.RenderCommandRouter;
+src/graphics/renderer/Graphics.RenderCommandRouter.cppm:28:        FramePassId PassId{};
+src/graphics/renderer/Graphics.RenderCommandRouter.cppm:32:    export class RenderCommandRouter final
+src/graphics/renderer/Graphics.RenderCommandRouter.cppm:40:        void Register(FramePassId passId, Recorder recorder);
+src/graphics/renderer/Graphics.RenderCommandRouter.cppm:44:        [[nodiscard]] bool HasRoute(FramePassId passId) const noexcept;
+src/graphics/renderer/Graphics.RenderCommandRouter.cppm:50:            FramePassId PassId{};
+src/graphics/renderer/Graphics.FrameRecipe.cppm:120:    export [[nodiscard]] constexpr FramePassId ToFramePassId(const FrameRecipePassKind kind) noexcept
+src/graphics/renderer/Graphics.FrameRecipe.cppm:122:        return FramePassId{static_cast<std::uint32_t>(kind) + 1u};
+src/graphics/renderer/Graphics.FrameRecipe.cppm:221:    export [[nodiscard]] std::string_view FrameRecipePassIdName(FramePassId id) noexcept;
+src/graphics/renderer/Graphics.FrameRecipe.cppm:398:        FramePassId Id{ToFramePassId(FrameRecipePassKind::Culling)};
+src/graphics/renderer/Graphics.FrameRecipe.cppm:428:        FramePassId PassId{};
+src/graphics/renderer/Graphics.FrameRecipe.cppm:446:        FramePassId PassId{};
+src/graphics/renderer/Graphics.FrameRecipe.cppm:448:        FramePassId AnchorPassId{};
+src/graphics/renderer/Graphics.FrameRecipe.cppm:454:        FramePassId Id{};
+src/graphics/renderer/Graphics.FrameRecipe.cppm:535:        FramePassId id);
+src/graphics/renderer/Graphics.FrameRecipe.cppm:542:        FramePassId id);
+tests/contract/runtime/Test.SandboxEditorModels.cpp:699:            .Id = Graphics::FramePassId{11u},
+tests/contract/runtime/Test.SandboxEditorModels.cpp:705:            .Id = Graphics::FramePassId{},
+tests/contract/runtime/Test.SandboxEditorModels.cpp:733:                .Id = Graphics::FramePassId{11u},
+src/graphics/renderer/Graphics.RenderCommandRouter.cpp:7:module Extrinsic.Graphics.RenderCommandRouter;
+src/graphics/renderer/Graphics.RenderCommandRouter.cpp:19:    void RenderCommandRouter::Clear()
+src/graphics/renderer/Graphics.RenderCommandRouter.cpp:24:    void RenderCommandRouter::Register(const FramePassId passId, Recorder recorder)
+src/graphics/renderer/Graphics.RenderCommandRouter.cpp:46:    bool RenderCommandRouter::Dispatch(const RenderCommandRoute& route,
+src/graphics/renderer/Graphics.RenderCommandRouter.cpp:66:    bool RenderCommandRouter::HasRoute(const FramePassId passId) const noexcept
+src/graphics/renderer/Graphics.RenderCommandRouter.cpp:83:    std::size_t RenderCommandRouter::RouteCount() const noexcept
+src/graphics/renderer/Graphics.FrameRecipe.cpp:57:                .Id = ToFramePassId(kind),
+src/graphics/renderer/Graphics.FrameRecipe.cpp:97:                .Id = ToFramePassId(kind),
+src/graphics/renderer/Graphics.FrameRecipe.cpp:413:    std::string_view FrameRecipePassIdName(const FramePassId id) noexcept
+src/graphics/renderer/Graphics.FrameRecipe.cpp:818:        const FramePassId id)
+src/graphics/renderer/Graphics.FrameRecipe.cpp:863:            const FramePassId id,
+src/graphics/renderer/Graphics.FrameRecipe.cpp:901:        [[nodiscard]] bool ContainsContributionPassId(const std::vector<FramePassId>& ids,
+src/graphics/renderer/Graphics.FrameRecipe.cpp:902:                                                      const FramePassId id) noexcept
+src/graphics/renderer/Graphics.FrameRecipe.cpp:904:            for (const FramePassId candidate : ids)
+src/graphics/renderer/Graphics.FrameRecipe.cpp:917:                                       const FramePassId passId,
+src/graphics/renderer/Graphics.FrameRecipe.cpp:919:                                       const FramePassId anchorPassId = {})
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1036:        const FramePassId presentPassId = ToFramePassId(FrameRecipePassKind::Present);
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1049:                .Id = ToFramePassId(FrameRecipePassKind::VisualizationOverlay),
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1055:                        ? ToFramePassId(FrameRecipePassKind::TransientDebugSurface)
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1056:                        : ToFramePassId(FrameRecipePassKind::Point),
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1071:                .Id = ToFramePassId(FrameRecipePassKind::SelectionOutline),
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1092:                .Id = ToFramePassId(FrameRecipePassKind::DebugView),
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1111:                .Id = ToFramePassId(FrameRecipePassKind::ImGui),
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1131:        std::vector<FramePassId> seenEnabledIds{};
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1243:        const FramePassId id)
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1854:        auto addRecipePassWithId = [&graph](const FramePassId id,
+src/graphics/renderer/Graphics.FrameRecipe.cpp:1868:            return addRecipePassWithId(ToFramePassId(kind), std::move(name), setup, sideEffect);
+src/graphics/renderer/CMakeLists.txt:14:        Graphics.RenderCommandRouter.cppm
+src/graphics/renderer/CMakeLists.txt:56:        Graphics.RenderCommandRouter.cpp
+src/graphics/renderer/README.md:17:- `Extrinsic.Graphics.RenderCommandRouter`
+src/graphics/renderer/README.md:53:typed `FramePassId` / `FrameResourceId` declarations, an enabled feature gate,
+src/graphics/renderer/README.md:158:`(FramePassId, name)` identity. Only command-recorded rows with an available
+src/graphics/renderer/README.md:444:- `Graphics.RenderCommandRouter` owns the renderer command-recording dispatch
+src/graphics/renderer/README.md:445:  seam. The renderer registers command recorders by `FramePassId`, command
+src/graphics/renderer/README.md:446:  status records carry both `FramePassId` and the debug label, and unknown typed
+src/graphics/renderer/Graphics.Renderer.cppm:48:export import Extrinsic.Graphics.RenderCommandRouter;
+src/graphics/renderer/Graphics.Renderer.cppm:140:        FramePassId Id{};
+src/graphics/renderer/Graphics.Renderer.cppm:240:        FramePassId Id{};
+tests/contract/graphics/Test.RenderCommandRouter.cpp:7:import Extrinsic.Graphics.RenderCommandRouter;
+tests/contract/graphics/Test.RenderCommandRouter.cpp:19:TEST(RenderCommandRouter, DispatchUsesTypedPassIdNotDebugName)
+tests/contract/graphics/Test.RenderCommandRouter.cpp:22:    RenderCommandRouter router;
+tests/contract/graphics/Test.RenderCommandRouter.cpp:26:    router.Register(ToFramePassId(FrameRecipePassKind::Surface),
+tests/contract/graphics/Test.RenderCommandRouter.cpp:34:    EXPECT_TRUE(router.HasRoute(ToFramePassId(FrameRecipePassKind::Surface)));
+tests/contract/graphics/Test.RenderCommandRouter.cpp:37:                                    .PassId = ToFramePassId(FrameRecipePassKind::Surface),
+tests/contract/graphics/Test.RenderCommandRouter.cpp:48:                                     .PassId = ToFramePassId(FrameRecipePassKind::Present),
+tests/contract/graphics/Test.RenderCommandRouter.cpp:57:TEST(RenderCommandRouter, UnknownRoutesExposeSkippedUnavailableFallback)
+tests/contract/graphics/Test.RenderCommandRouter.cpp:60:    RenderCommandRouter router;
+tests/contract/graphics/Test.RenderCommandRouter.cpp:63:                                     .PassId = FramePassId{9999u},
+tests/contract/graphics/Test.RenderCommandRouter.cpp:73:TEST(RenderCommandRouter, DuplicateRegistrationReplacesRecorder)
+tests/contract/graphics/Test.RenderCommandRouter.cpp:76:    RenderCommandRouter router;
+tests/contract/graphics/Test.RenderCommandRouter.cpp:79:    const FramePassId passId = ToFramePassId(FrameRecipePassKind::DepthPrepass);
+src/graphics/renderer/Graphics.Renderer.cpp:117:import Extrinsic.Graphics.RenderCommandRouter;
+src/graphics/renderer/Graphics.Renderer.cpp:164:            FramePassId Id{};
+src/graphics/renderer/Graphics.Renderer.cpp:170:            FramePassId AnchorPassId{};
+src/graphics/renderer/Graphics.Renderer.cpp:510:            const FramePassId passId) noexcept
+src/graphics/renderer/Graphics.Renderer.cpp:512:            return passId == ToFramePassId(FrameRecipePassKind::Present)
+src/graphics/renderer/Graphics.Renderer.cpp:1652:            FramePassId Id{};
+src/graphics/renderer/Graphics.Renderer.cpp:3588:                    const FramePassId passId = passIndex < compiled->PassIds.size()
+src/graphics/renderer/Graphics.Renderer.cpp:3590:                        : FramePassId{};
+src/graphics/renderer/Graphics.Renderer.cpp:3617:                        if (passId == ToFramePassId(FrameRecipePassKind::SelectionOutline))
+src/graphics/renderer/Graphics.Renderer.cpp:3623:                        if (passId == ToFramePassId(FrameRecipePassKind::DebugView) &&
+src/graphics/renderer/Graphics.Renderer.cpp:3657:                            passId != ToFramePassId(FrameRecipePassKind::ImGui);
+src/graphics/renderer/Graphics.Renderer.cpp:3843:                        CommandRecordPassRecorded(ToFramePassId(FrameRecipePassKind::TransientDebugSurface));
+src/graphics/renderer/Graphics.Renderer.cpp:3845:                        CommandRecordPassRecorded(ToFramePassId(FrameRecipePassKind::VisualizationOverlay));
+src/graphics/renderer/Graphics.Renderer.cpp:9249:        [[nodiscard]] bool CommandRecordPassRecorded(const FramePassId passId)
+src/graphics/renderer/Graphics.Renderer.cpp:9262:                                           const FramePassId passId,
+src/graphics/renderer/Graphics.Renderer.cpp:10653:        RenderCommandRouter                  m_CommandRouter;
+src/graphics/renderer/Graphics.Renderer.cpp:11392:            return ToFramePassId(kind);
+tests/contract/graphics/Test.RendererFrameLifecycle.cpp:1004:              Extrinsic::Graphics::ToFramePassId(Extrinsic::Graphics::FrameRecipePassKind::Culling));
+tests/contract/graphics/Test.RendererFrameLifecycle.cpp:1010:              Extrinsic::Graphics::ToFramePassId(Extrinsic::Graphics::FrameRecipePassKind::DepthPrepass));
+tests/contract/graphics/Test.RendererFrameLifecycle.cpp:1025:              Extrinsic::Graphics::ToFramePassId(Extrinsic::Graphics::FrameRecipePassKind::Surface));
+tests/contract/graphics/Test.RendererFrameLifecycle.cpp:1050:              Extrinsic::Graphics::ToFramePassId(Extrinsic::Graphics::FrameRecipePassKind::Present));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:395:    EXPECT_EQ(FrameRecipePassIdName(ToFramePassId(FrameRecipePassKind::UvView)), std::string_view{"UvViewPass"});
+tests/contract/graphics/Test.FrameRecipeContract.cpp:569:        FindFrameRecipePassIndexById(recipe, ToFramePassId(FrameRecipePassKind::Surface));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:571:    EXPECT_EQ(recipe.Passes[*surfaceRecipeIndex].Id, ToFramePassId(FrameRecipePassKind::Surface));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:575:        FindCompiledPassIndexForRecipeId(recipe, *compiled, ToFramePassId(FrameRecipePassKind::Surface));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:579:    EXPECT_EQ(compiled->PassIds[*surfaceIndex], ToFramePassId(FrameRecipePassKind::Surface));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:583:        FindCompiledPassIndexForRecipeId(recipe, *compiled, ToFramePassId(FrameRecipePassKind::Present));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:587:    EXPECT_EQ(compiled->PassIds[*presentIndex], ToFramePassId(FrameRecipePassKind::Present));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:614:    ASSERT_TRUE(graph.SetPassId(renamedSurface, ToFramePassId(FrameRecipePassKind::Surface)).has_value());
+tests/contract/graphics/Test.FrameRecipeContract.cpp:620:        FindCompiledPassIndexForRecipeId(recipe, *compiled, ToFramePassId(FrameRecipePassKind::Surface));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:624:    EXPECT_EQ(compiled->PassIds[*surfaceIndex], ToFramePassId(FrameRecipePassKind::Surface));
+tests/contract/graphics/Test.FrameRecipeContract.cpp:706:    ASSERT_TRUE(graph.SetPassId(first, FramePassId{77u}).has_value());
+tests/contract/graphics/Test.FrameRecipeContract.cpp:707:    ASSERT_TRUE(graph.SetPassId(duplicate, FramePassId{77u}).has_value());
+tests/contract/graphics/Test.FrameRecipeContract.cpp:726:    ASSERT_TRUE(graph.SetPassId(firstLateGroup, FramePassId{101u}).has_value());
+tests/contract/graphics/Test.FrameRecipeContract.cpp:727:    ASSERT_TRUE(graph.SetPassId(firstEarlyGroup, FramePassId{202u}).has_value());
+tests/contract/graphics/Test.FrameRecipeContract.cpp:728:    ASSERT_TRUE(graph.SetPassId(duplicateEarlyGroup, FramePassId{202u}).has_value());

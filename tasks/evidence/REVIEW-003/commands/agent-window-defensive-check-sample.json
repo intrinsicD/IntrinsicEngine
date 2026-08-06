@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\nrange=d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d\nprintf \"added_guard_lines_by_production_file_top30\\n\"\ngit diff --unified=0 \"$range\" -- \"src/**/*.cpp\" \"src/**/*.cppm\" \"src/**/*.hpp\" \"src/**/*.h\" |\nawk '\n/^\\+\\+\\+ b\\// { file=substr($0,7); next }\n/^\\+[^+]/ {\n  line=substr($0,2)\n  if (line ~ /(^|[[:space:]])if[[:space:]]*\\(/ &&\n      line ~ /(!|nullptr|empty\\(|IsValid|Invalid|Has[A-Z]|IsOperational|IsFinite|Error)/) print file\n}\n' | sort | uniq -c | sort -nr | sed -n \"1,30p\"\nprintf \"representative_added_guard_lines\\n\"\ngit diff --unified=1 \"$range\" -- \"src/**/*.cpp\" \"src/**/*.cppm\" |\nawk '\n/^\\+\\+\\+ b\\// { file=substr($0,7); next }\n/^\\+[^+]/ {\n  line=substr($0,2)\n  if (line ~ /(^|[[:space:]])if[[:space:]]*\\(/ &&\n      line ~ /(!|nullptr|empty\\(|IsValid|Invalid|Has[A-Z]|IsOperational|IsFinite|Error)/) print file \"\\t\" line\n}\n' | sed -n \"1,220p\"\n"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\nrange=d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d\nprintf \"added_guard_lines_by_production_file_top30\\n\"\ngit diff --unified=0 \"$range\" -- \"src/**/*.cpp\" \"src/**/*.cppm\" \"src/**/*.hpp\" \"src/**/*.h\" |\nawk '\"'\"'\n/^\\+\\+\\+ b\\// { file=substr($0,7); next }\n/^\\+[^+]/ {\n  line=substr($0,2)\n  if (line ~ /(^|[[:space:]])if[[:space:]]*\\(/ &&\n      line ~ /(!|nullptr|empty\\(|IsValid|Invalid|Has[A-Z]|IsOperational|IsFinite|Error)/) print file\n}\n'\"'\"' | sort | uniq -c | sort -nr | sed -n \"1,30p\"\nprintf \"representative_added_guard_lines\\n\"\ngit diff --unified=1 \"$range\" -- \"src/**/*.cpp\" \"src/**/*.cppm\" |\nawk '\"'\"'\n/^\\+\\+\\+ b\\// { file=substr($0,7); next }\n/^\\+[^+]/ {\n  line=substr($0,2)\n  if (line ~ /(^|[[:space:]])if[[:space:]]*\\(/ &&\n      line ~ /(!|nullptr|empty\\(|IsValid|Invalid|Has[A-Z]|IsOperational|IsFinite|Error)/) print file \"\\t\" line\n}\n'\"'\"' | sed -n \"1,220p\"\n'",
+  "cwd": ".",
+  "duration_ms": 574,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:05:56Z",
+  "label": "agent-window-defensive-check-sample",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:05:56Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/agent-window-defensive-check-sample.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/agent-window-defensive-check-sample.stdout.log",
+  "stdout_sha256": "5dfa338ce61d7a4dfd793b9ca8d5135ba5b9a8aad2c1f027c385ef581288b431",
+  "task_id": "REVIEW-003"
+}

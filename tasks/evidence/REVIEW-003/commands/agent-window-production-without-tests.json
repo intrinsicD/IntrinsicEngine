@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "\nset -euo pipefail\ngit log --no-merges --format=\"@@@%H%x09%ad%x09%s\" --date=short --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d |\nawk '\nfunction flush() {\n  if (seen && prod && !tests) print header\n}\nfunction reset() {prod=tests=0}\nBEGIN {reset()}\n$0 ~ /^@@@/ {flush(); seen=1; header=substr($0,4); reset(); next}\nNF == 0 {next}\n$0 ~ /^(src|methods)\\// {prod=1}\n$0 ~ /^(tests|benchmarks)\\// {tests=1}\nEND {flush()}\n'\n"
+  ],
+  "command_display": "bash -lc '\nset -euo pipefail\ngit log --no-merges --format=\"@@@%H%x09%ad%x09%s\" --date=short --name-only d33c62eebc48de5e8a65c50e057addf25f125c6b..51e7faddad943ab7727e407d008e474ec076566d |\nawk '\"'\"'\nfunction flush() {\n  if (seen && prod && !tests) print header\n}\nfunction reset() {prod=tests=0}\nBEGIN {reset()}\n$0 ~ /^@@@/ {flush(); seen=1; header=substr($0,4); reset(); next}\nNF == 0 {next}\n$0 ~ /^(src|methods)\\// {prod=1}\n$0 ~ /^(tests|benchmarks)\\// {tests=1}\nEND {flush()}\n'\"'\"'\n'",
+  "cwd": ".",
+  "duration_ms": 321,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:05:57Z",
+  "label": "agent-window-production-without-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:05:56Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/agent-window-production-without-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/agent-window-production-without-tests.stdout.log",
+  "stdout_sha256": "6b07ed4fe0d54534b1389bef5e71a9d8a75019ddefcc4bf33467f1a3a7d125e5",
+  "task_id": "REVIEW-003"
+}

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "python3 tools/repo/generate_module_inventory.py --root src --out /tmp/review003-final-module-inventory.md && diff -u docs/api/generated/module_inventory.md /tmp/review003-final-module-inventory.md"
+  ],
+  "command_display": "bash -lc 'python3 tools/repo/generate_module_inventory.py --root src --out /tmp/review003-final-module-inventory.md && diff -u docs/api/generated/module_inventory.md /tmp/review003-final-module-inventory.md'",
+  "cwd": ".",
+  "duration_ms": 52,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T19:17:53Z",
+  "label": "final-module-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T19:17:52Z",
+  "stderr_path": "tasks/evidence/REVIEW-003/commands/final-module-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/REVIEW-003/commands/final-module-inventory.stdout.log",
+  "stdout_sha256": "c0e36ab92865f3b63c5439ab0ff9328489f93b7e5fc48180e107a71826c50942",
+  "task_id": "REVIEW-003"
+}

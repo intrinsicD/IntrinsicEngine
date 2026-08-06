@@ -1,0 +1,8 @@
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3201
+[check_doc_links] Mode: strict
+[check_doc_links] Broken relative links:
+  - docs/reports/2026-08-06-agent-output-audit.md -> ../../tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+  - docs/reports/2026-08-06-drift-audit.md -> ../../tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md
+[check_doc_links] Action: update moved paths or convert to canonical links.
+[check_doc_links] STRICT MODE: failing.

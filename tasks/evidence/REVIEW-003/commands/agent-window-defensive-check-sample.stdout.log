@@ -1,0 +1,252 @@
+added_guard_lines_by_production_file_top30
+    372 src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    214 src/graphics/renderer/Graphics.Renderer.cpp
+    165 src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+    153 src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    153 src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+    149 src/runtime/Scene/Runtime.SceneSerialization.cpp
+    149 src/geometry/Geometry.PointCloud.Consolidation.cpp
+    128 src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+    112 src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+    112 src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cpp
+    104 src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+     97 src/graphics/vulkan/Backends.Vulkan.Device.cpp
+     93 src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+     89 src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+     83 src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
+     79 src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+     78 src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp
+     75 src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+     71 src/graphics/renderer/Graphics.RenderRecipeConfig.cpp
+     67 src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+     65 src/runtime/Rendering/Runtime.RenderExtraction.cpp
+     64 src/geometry/Geometry.Parameterization.Optimize.cpp
+     62 src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+     61 src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+     58 src/physics/Physics.World.cpp
+     58 src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+     56 src/geometry/Geometry.Parameterization.Bff.cpp
+     55 src/runtime/Scene/Runtime.SceneDocumentModule.cpp
+     55 src/geometry/Geometry.UvAtlas.cpp
+     53 src/runtime/Kernel/Runtime.JobService.cpp
+representative_added_guard_lines
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (model.HasSelectedEntity) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (catalog.Rows.empty()) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (row.Preview.HasValue) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (catalog.BindingTargets.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (catalog.VertexChannelTargets.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (!commandsAvailable)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (ImGui::Selectable("Default", !target.HasBinding) &&
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	        if (!option.Compatible)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	        if (!option.Compatible) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (!commandsAvailable)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (target.HasBinding && !target.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (bound.Rows.empty()) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (!row.Property.Name.empty()) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      } else if (row.TextureAsset.IsValid() || row.AuthoredTexture.IsValid() ||
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (!row.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      else if (!row.DisabledReason.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (!job.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!lastResult.has_value()) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!result.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!model.Uv.LastFailure.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!model.Uv.UvRegenerationAvailable)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canRegenerateUvs)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canRegenerateUvs)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (bakeableIndices.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (ImGui::BeginCombo("Bake source", selectedSource != nullptr
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	        if (selectedSource == nullptr)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (!compatible)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (!compatible)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	        if (selectedSource == nullptr)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if ((additionalConsumerMask & bit) != 0u)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (!selected)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (selected && !compatible) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (!compatible)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (!compatible)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canBake)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canBake) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (!model.DisabledReason.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (model.BakedTextures.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (!record.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (context != nullptr && renameTarget == record.OutputName &&
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (context != nullptr && ImGui::SmallButton("Remove")) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	      if (context != nullptr && consumersChanged) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!mutationDiagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!DomainWindowReady(model))
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (hints.HasRenderEdges) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (hints.HasUniformEdgeWidth)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (hints.HasNamedEdgeWidth)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (hints.HasRenderPoints) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (hints.HasUniformPointSize)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (hints.HasNamedPointSize)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!ImGui::Combo("Surface domain", &current, kItems, 2))
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!ImGui::Combo("Edge domain", &current, kItems, 2))
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!ImGui::Combo("Point type", &current, kItems, 3))
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!model.RenderHints.HasRenderEdges)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (model.RenderHints.HasUniformEdgeWidth) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (model.RenderHints.HasRenderSurface) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!model.RenderHints.HasRenderPoints)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (model.RenderHints.HasUniformPointSize) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (properties.empty()) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canEditVisualization)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (property.VectorFieldCandidate && !wroteButton) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canEditVisualization)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!visualization.HasConfig || visualization.Source != kUniformColorSource) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!visualization.HasConfig || visualization.Source != kScalarFieldSource) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!visualization.ScalarAutoRange) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canEditRenderHints)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canEditRenderHints)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (visualization.Visualization.HasConfig) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canEditVisualization)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!canEditVisualization)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!primitive.HasPrimitive) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (primitive.HasFaceId)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (primitive.HasEdgeId)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (primitive.HasVertexId)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (primitive.HasPointId)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (result.HasHitPosition) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!lastResult.has_value()) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!result.Message.empty())
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!processing.PointCloudOutlierRemovalAvailable) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (outlierState == nullptr || outlierState->LastResult == nullptr ||
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (ImGui::Selectable("Radius##PointCloudOutlierRemoval", !statistical))
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	    if (!statistical)
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!DomainWindowReady(model) || !processing.HasSelectedEntity) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (Shell != nullptr) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (CachedModelFrame != frame) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  if (!model.has_value()) {
+src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp	  } else if (context.ModelBuildStats != nullptr) {
+src/app/Sandbox/Editor/Sandbox.EditorController.cpp	            if (!Shell.IsAttached())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	        if (disabledReason.empty() || !ImGui::IsItemHovered(hoverFlags))
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!row.ProgressDeterminate)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!clearAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!clearAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!model.ClearCompletedDisabledReason.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (model.Rows.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (row.DiagnosticText.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!cancelAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!cancelAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (!row.CancelDisabledReason.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (entry.MenuPath != path)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (ImGui::MenuItem(entry.Title.c_str(), nullptr, &open))
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!RegisteredMenuPathStartsWith(entry, path) ||
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!ImGui::BeginMenu(child.c_str()))
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!ImGui::BeginMenu(DebugNameForEditorDomainWindowKind(kind)))
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (windowRegistry != nullptr && registeredEntries != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!ImGui::BeginMenu("View"))
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (windowRegistry != nullptr && registeredEntries != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!ImGui::BeginMainMenuBar())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (windowRegistry != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (windowRegistry != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (bound.Rows.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!row.Property.Name.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    else if (row.TextureAsset.IsValid() ||
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!row.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    else if (!row.DisabledReason.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!job.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!lastResult.has_value())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!result.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.Uv.LastFailure.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.Uv.UvRegenerationAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!canRegenerateUvs)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!canRegenerateUvs)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (bakeableIndices.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (selectedSource == nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!compatible)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!compatible)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (selectedSource == nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if ((additionalConsumerMask & bit) != 0u)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!selected)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (selected && !compatible)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!compatible)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!compatible)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!canBake)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!canBake)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!model.DisabledReason.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (model.BakedTextures.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!record.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (context != nullptr &&
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (context != nullptr && ImGui::SmallButton("Remove"))
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (context != nullptr && consumersChanged)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!mutationDiagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (properties.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!canEditVisualization)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (property.VectorFieldCandidate && !wroteButton)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!canEditVisualization)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!visualization.HasConfig ||
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!visualization.HasConfig ||
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!visualization.ScalarAutoRange)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.Available)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (draftBuffer != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (state != nullptr &&
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (state != nullptr &&
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!commandsAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.CanValidate)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.CanValidate)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.CanPreview)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.CanPreview)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.CanActivate)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.CanActivate)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.CanCancel)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!model.CanCancel)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	            if (!commandsAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (model.Artifacts.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (!publishAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (!publishAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (!applyAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (!applyAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (frame.Hierarchy.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (clicked && context != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!frame.Inspector.HasEntity)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (inspector.Transform.HasLocalTransform)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (context != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (inspector.Transform.HasWorldTransform)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (inspector.RenderHints.HasRenderSurface)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (inspector.RenderHints.HasRenderEdges)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (inspector.RenderHints.HasUniformEdgeWidth)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (inspector.RenderHints.HasNamedEdgeWidth)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (inspector.RenderHints.HasRenderPoints)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (inspector.RenderHints.HasUniformPointSize)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                        if (inspector.RenderHints.HasNamedPointSize)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (presentation.Composition.HasChildren)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!presentation.Slots.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                            if (!slot.Diagnostic.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                            if (context != nullptr &&
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                            if (context != nullptr &&
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                                        if (!option.Compatible)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                                        if (!option.Compatible)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!presentation.Jobs.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (frame.Selection.HasHovered)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (frame.Selection.HasHoveredEntity)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (frame.Selection.Primitive.HasPrimitive)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (frame.Selection.Primitive.HasFaceId)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (frame.Selection.Primitive.HasEdgeId)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (frame.Selection.Primitive.HasVertexId)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (frame.Selection.Primitive.HasPointId)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (primitive.HasHitPosition)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!historyControlsAvailable || !frame.Document.CanUndo)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!historyControlsAvailable || !frame.Document.CanUndo)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!historyControlsAvailable || !frame.Document.CanRedo)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!historyControlsAvailable || !frame.Document.CanRedo)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!frame.Document.UndoLabel.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!frame.Document.RedoLabel.empty())
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!frame.SceneFile.LifecycleEnabled ||
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!frame.SceneFile.LifecycleEnabled ||
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!sceneControlsAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (scenePathBuffer != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!sceneControlsAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (result != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (importPathBuffer != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (importPayloadKind != nullptr)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!payloadHintAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                            if (!option.Enabled)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                            if (!option.Enabled)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                    if (!payloadHintAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!importAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (!importAvailable)
+src/app/Sandbox/Editor/Sandbox.EditorShell.cpp	                if (result != nullptr)

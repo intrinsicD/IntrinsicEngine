@@ -1,0 +1,16 @@
+kind	name	production_implementations	non_definition_source_files	test_reference_files
+interface	IIOBackend	1	6	2
+interface	IRenderer	1	20	28
+interface	IBindlessHeap	3	8	2
+interface	ICommandContext	4	91	30
+interface	IDevice	2	80	30
+interface	IProfiler	2	6	4
+interface	ITransferQueue	3	17	17
+interface	IWindow	2	14	17
+interface	ICameraController	4	6	10
+interface	IRuntimeModule	12	14	9
+surface	AssetRegistry	1	6	2
+surface	AssetService	1	12	11
+surface	CallbackRegistry	1	2	1
+surface	EngineConfigSectionRegistry	1	3	5
+surface	LockFreeQueue	1	1	1
