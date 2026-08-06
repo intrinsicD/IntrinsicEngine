@@ -35,7 +35,7 @@ without requiring them to read every file.
     pipeline behavior remain.
   - `GRAPHICS-131` is retired: the single-implementation reconstructor base is
     deleted while concrete reference TAA behavior remains unchanged.
-  - [`GRAPHICS-132`](GRAPHICS-132-concretize-transient-debug-upload-helper.md),
+  - [`GRAPHICS-132`](../../active/GRAPHICS-132-concretize-transient-debug-upload-helper.md),
     [`GRAPHICS-133`](GRAPHICS-133-concretize-visualization-overlay-upload-helper.md),
     and [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) each
     remove one single-owner upload-helper base while retaining its concrete

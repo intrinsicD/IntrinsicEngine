@@ -11,8 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- None. `REVIEW-003` remains in the architecture backlog while its remaining
-  concrete remediation dependencies retire.
+- [`GRAPHICS-132`](GRAPHICS-132-concretize-transient-debug-upload-helper.md) —
+  remove the single-owner transient-debug upload-helper base while retaining
+  the concrete Renderer-owned behavior. `REVIEW-003` remains backlogged until
+  its remaining audit remediations retire.
 
 ## History
 
