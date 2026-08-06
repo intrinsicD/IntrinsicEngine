@@ -8,7 +8,7 @@ evidence: required
 owner: "codex-root"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-05T12:33:20Z"
+claimed_at: "2026-08-06T07:03:34Z"
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
@@ -142,7 +142,7 @@ contracts:
       retirement in geometry/runtime/graphics architecture docs.
 - [x] Refresh the contract catalog, task indexes/session brief, and module
       inventory if required.
-- [ ] Bind the high-risk completion report and durable handoff to the final
+- [x] Bind the high-risk completion report and durable handoff to the final
       implementation revision, then obtain an accepted independent fixed-surface
       review before retirement.
 
@@ -164,6 +164,9 @@ contracts:
 
 ## Completion status
 
+- Completed on 2026-08-06 at `CPUContracted` for the backend-neutral property
+  boundary and `Operational` for the reviewed promoted-Vulkan path.
+- Implementation commit: `548e62b5fd5970d5bf913e12d85ae768ffb3fa15`.
 - The implementation, CPU/full, ASan, UBSan, structural, and
   validation-enabled promoted-Vulkan gates are complete. The final Vulkan
   receipt covers the staging overwrite smoke plus LOP parity and child-mesh
@@ -172,9 +175,13 @@ contracts:
   the first exposed missing destination overwrite ordering, and the second
   exposed invalid queue/present setup in the new smoke harness. The final
   receipt passes after both defects were corrected.
-- Retirement remains pending only the profile-required independent
-  fixed-surface review. The implementation driver cannot self-accept that
-  record.
+- Independent reviewer `runtime214-independent-review` accepted the fixed
+  implementation surface and content digest
+  `46c5c181b236fb8317dc4ef81b07ba1a1fbd11caac1dd81d080493abeae28253`
+  after fresh CPU and sanitizer-enabled Vulkan builds, 8/8 focused CPU
+  contracts, and the exact 3/3 validation-enabled Vulkan proofs. The retained
+  nonblocking observation is recorded in
+  `tasks/evidence/RUNTIME-214/reviews.jsonl`.
 
 ## Verification
 

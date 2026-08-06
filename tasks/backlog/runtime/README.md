@@ -49,6 +49,11 @@ production owners while preserving public behavior first.
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-214` — Universal geometry-property CPU/GPU coherence](../../done/RUNTIME-214-universal-geometry-property-coherence.md)
+  makes canonical mutable-property revisions drive mesh, graph, point-cloud,
+  and visualization extraction without method-specific renderer calls. The
+  reviewed promoted-Vulkan path uses shared staging-first uploads and publishes
+  terminal results back to canonical CPU properties before reporting applied.
 - [`RUNTIME-206` — LOP family element-domain source integration](../../done/RUNTIME-206-lop-element-domain-source-integration.md)
   makes the existing LOP/WLOP/CLOP/EAR runtime operation accept named finite
   `vec3` properties on every resolved element domain, preserves richer

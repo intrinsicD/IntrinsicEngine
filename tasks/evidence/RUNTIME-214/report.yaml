@@ -1,16 +1,16 @@
 schema_version: 1
 task_id: RUNTIME-214
 workflow_profile: high-risk
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-05T15:19:22Z'
+generated_at: '2026-08-06T06:44:24Z'
 claim_eligible: false
 source:
   base_ref: fd95199abcbc85e78e8e46d350ba5f724f04c898
   base_revision: fd95199abcbc85e78e8e46d350ba5f724f04c898
   head_revision: 548e62b5fd5970d5bf913e12d85ae768ffb3fa15
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
+  branch: ''
+  worktree: /tmp/intrinsic-runtime214-seal.yoT3GL
   dirty: false
   surface:
   - path: ara/staging/observations.yaml
@@ -216,8 +216,7 @@ docs_sync:
   canonical_docs_changed: true
   skill_mirrors_checked: false
 residual_risks:
-- Retained mutable borrows require an explicit MarkModified after writes made beyond an observed boundary;
-  high-risk retirement still requires independent fixed-surface acceptance.
+- Retained mutable borrows require an explicit MarkModified after writes made beyond an observed boundary.
 skipped_checks: []
 artifacts:
 - path: docs/architecture/property-coherence.md

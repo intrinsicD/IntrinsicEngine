@@ -1062,9 +1062,9 @@
   Vulkan suite passes a repeated staged-overwrite readback plus ordinary LOP
   and isotropic-WLOP terminal publication-to-rendering workflows with zero
   validation errors.
-- **Status**: supported — exact revision and tested CPU/Vulkan host surface;
-  independent RUNTIME-214 high-risk acceptance remains pending, and no
-  performance, visual-quality, or cross-device claim is made
+- **Status**: supported — exact revision and independently accepted tested
+  CPU/Vulkan host surface; no performance, visual-quality, or cross-device
+  claim is made
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: On revision `548e62b5`, any labeled direct-mutation
@@ -1085,7 +1085,9 @@
   tasks/evidence/RUNTIME-214/commands/ci-final-cpu-tests.json,
   tasks/evidence/RUNTIME-214/commands/ci-asan-tests.json,
   tasks/evidence/RUNTIME-214/commands/ci-ubsan-tests.json,
-  tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.json]
+  tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.json,
+  tasks/evidence/RUNTIME-214/report.yaml,
+  tasks/evidence/RUNTIME-214/reviews.jsonl]
 - **Dependencies**: [C30, C34, C35]
 - **Tags**: geometry, runtime, rendering, property revisions, Vulkan, staging,
   LOP, coherence, bounded result

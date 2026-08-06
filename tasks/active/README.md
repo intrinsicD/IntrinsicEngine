@@ -13,9 +13,9 @@ Each active task should include:
 
 - [`RUNTIME-215` — Organize runtime sources by cohesive ownership](RUNTIME-215-organize-runtime-source-layout.md)
   has completed implementation and runtime-scoped verification under
-  `codex-root` on `main`. Its next step is standard evidence sealing after the
-  unrelated repository-global `BUG-133` task-state finding and active
-  `RUNTIME-214` review-evidence finding are cleared.
+  `codex-root` on `main`. Its prerequisite repository-global task-state and
+  high-risk review-evidence findings are cleared; its next step is standard
+  completion-report sealing and retirement.
 
 ## History
 

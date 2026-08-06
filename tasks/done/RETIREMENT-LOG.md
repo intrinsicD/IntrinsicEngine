@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-214`](RUNTIME-214-universal-geometry-property-coherence.md) —
+canonical mutable-property revisions now drive resident mesh, graph,
+point-cloud, primitive-view, and CPU-backed visualization updates without
+method-specific renderer calls. CPU methods publish through the canonical
+property boundary; promoted-Vulkan geometry methods use the shared
+staging-first transfer path, remain GPU-local internally, and publish one
+terminal result before reporting applied. Existing runtime extraction,
+`GpuWorld`, transfer, and residency owners remain authoritative; no parallel
+residency service or backend type escaped its layer.
+
+The fixed revision `548e62b5` passed 4,103 CPU, 2,683 ASan, and 2,683 UBSan
+tests plus the validation-enabled staging overwrite, LOP/WLOP parity, and
+child-mesh publication workflows. Independent fixed-surface review reran a
+fresh CPU build, 8/8 focused contracts, a fresh sanitizer-enabled Vulkan build,
+and the exact 3/3 Vulkan proofs, then accepted the report with no blocking
+finding. The review records one nonblocking opportunity for an additional
+direct-mutation/no-tag primitive-view regression; no performance, visual
+quality, cross-device, or dedicated-transfer-queue claim is made.
+
 [`BUG-133`](BUG-133-method-backlog-retired-link-outside-history.md) — live
 LOP-family guidance now cites retired `METHOD-020` as lifecycle-safe non-link
 prose while retaining its bounded result-report link. The strict repository
