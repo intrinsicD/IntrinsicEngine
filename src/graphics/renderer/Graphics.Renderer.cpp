@@ -1735,10 +1735,9 @@ namespace Extrinsic::Graphics
             // lease a single growing host-visible vertex buffer; reset
             // in `Shutdown()` before the BufferManager so the helper's
             // internal `BufferLease` destructor observes a live
-            // manager. The default in-renderer implementation is
-            // CPU-functional against `MockDevice` for the contract
-            // gate; the Vulkan-tuned concrete implementation lands
-            // with GRAPHICS-078 Slice D.
+            // manager. The same concrete RHI-backed helper serves Null
+            // and promoted Vulkan devices; CPU contract tests exercise
+            // it against `MockDevice`.
             m_VisualizationOverlayUploadHelper =
                 std::make_unique<VisualizationOverlayUploadHelper>(device, *m_Subsystems.BufferManager());
             // GRAPHICS-084 — graphics-owned visualization property-buffer
@@ -10914,17 +10913,11 @@ namespace Extrinsic::Graphics
         // `BufferManager`; reset in `Shutdown()` before the `BufferManager` so
         // the helper's internal lease destructor observes a live manager.
         std::unique_ptr<TransientDebugUploadHelper> m_TransientDebugUploadHelper;
-        // GRAPHICS-078 Slice B — backend-local visualization-overlay
-        // upload helper. Same lifetime contract as the transient-
-        // debug helper above: held as
-        // `unique_ptr<IVisualizationOverlayUploadHelper>` so future
-        // source-BDA expansion can replace placeholder endpoint
-        // generation without disturbing the renderer-side wiring.
-        // Constructed in `Initialize(device)` against the live `BufferManager`;
-        // reset in `Shutdown()` before the `BufferManager` so the
-        // helper's internal lease destructor observes a live
-        // manager.
-        std::unique_ptr<IVisualizationOverlayUploadHelper> m_VisualizationOverlayUploadHelper;
+        // GRAPHICS-078 Slice B — renderer-owned visualization-overlay upload
+        // helper. Constructed in `Initialize(device)` against the live
+        // `BufferManager`; reset in `Shutdown()` before the `BufferManager` so
+        // the helper's internal lease destructor observes a live manager.
+        std::unique_ptr<VisualizationOverlayUploadHelper> m_VisualizationOverlayUploadHelper;
         std::unique_ptr<VisualizationPropertyBufferResidency> m_VisualizationPropertyBufferResidency;
         // GRAPHICS-079 Slice C — renderer-owned ImGui transient upload helper,
         // reset before BufferManager teardown.

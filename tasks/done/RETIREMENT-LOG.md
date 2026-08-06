@@ -6806,3 +6806,15 @@ second implementation and production selection seam exist. Focused
 transient-debug/renderer coverage passed 161/161 and the full default CPU
 selector passed 4,100/4,100 with its expected GLFW/LSan skip; layering,
 task/docs, clean-workshop, inventory, and whitespace gates pass.
+
+[`GRAPHICS-133`](GRAPHICS-133-concretize-visualization-overlay-upload-helper.md)
+— the single-owner `IVisualizationOverlayUploadHelper` base retired on
+2026-08-06. Renderer now owns the existing concrete
+`VisualizationOverlayUploadHelper` directly; its implementation unit, per-lane
+upload algorithms, frame-slot partitioning, buffer-recycling behavior, call
+sequence, and teardown order are unchanged. A source/test ratchet prevents the
+speculative base from returning before a real second implementation and
+production selection seam exist. Focused visualization-overlay/renderer
+coverage passed 161/161 and the full default CPU selector passed 4,101/4,101
+with its expected GLFW/LSan skip; layering, task/docs, clean-workshop,
+inventory, and whitespace gates pass.

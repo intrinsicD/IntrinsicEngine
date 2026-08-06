@@ -61,9 +61,8 @@ export import Extrinsic.Graphics.TransientDebugUploadHelper;
 // `RenderGraphFrameStats::VisualizationOverlayUpload` (e.g. contract
 // tests, editor diagnostics) reach the
 // `VisualizationOverlayUploadDiagnostics` struct without separately
-// importing this internal renderer module. The helper interfaces
-// themselves (`IVisualizationOverlayUploadHelper`,
-// `VisualizationVectorFieldUploadResult`) ride along for the same
+// importing this internal renderer module. The helper result records (for
+// example `VisualizationVectorFieldUploadResult`) ride along for the same
 // consumers but are not part of the renderer's narrow public API. The
 // `VisualizationOverlayPass` class is also re-exported so contract
 // tests that name the pass type (e.g. for push-constant size checks)

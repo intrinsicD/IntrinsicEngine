@@ -38,10 +38,10 @@ import Extrinsic.RHI.Handles;
 // itself through RHI or renderer module surfaces (only the
 // `IRenderer`-internal `Pass.VisualizationOverlay` consumes the upload
 // result), and must not route through the retained line/point cull
-// buckets. The interface is declared in the renderer module so the
-// abstract type is reachable from CPU contract tests; the default
-// concrete implementation here is CPU-functional through
-// `BufferManager` + `IDevice::WriteBuffer(...)`. GRAPHICS-078E adds
+// buckets. The concrete helper is declared in the renderer module so CPU
+// contract tests can exercise its buffer-partitioning contract directly. It
+// is functional through `BufferManager` + `IDevice::WriteBuffer(...)`.
+// GRAPHICS-078E adds
 // deterministic fixture positions for pixel-readback parity; source-BDA
 // expansion into actual per-glyph / per-isoline world-space endpoints remains
 // future method-specific work.
@@ -106,36 +106,7 @@ export namespace Extrinsic::Graphics
         bool              Overflow{false};
     };
 
-    class IVisualizationOverlayUploadHelper
-    {
-    public:
-        virtual ~IVisualizationOverlayUploadHelper() = default;
-
-        IVisualizationOverlayUploadHelper(const IVisualizationOverlayUploadHelper&)            = delete;
-        IVisualizationOverlayUploadHelper& operator=(const IVisualizationOverlayUploadHelper&) = delete;
-
-        virtual void BeginFrame(std::uint32_t frameIndex,
-                                std::uint32_t framesInFlight) = 0;
-
-        [[nodiscard]] virtual VisualizationVectorFieldUploadResult UploadVectorFields(
-            std::span<const VectorFieldOverlayPacket> vectorFields) = 0;
-
-        // GRAPHICS-078 Slice C — isoline-lane upload. Same per-lane
-        // buffer-lease + geometric-growth shape as the vector-field
-        // lane. Returns `Uploaded = false` when the lane has no
-        // packets, the device is non-operational, or no manager is
-        // attached; `Overflow = true` when the requested vertex count
-        // exceeds the per-lane cap or buffer creation fails.
-        [[nodiscard]] virtual VisualizationIsolineUploadResult UploadIsolines(
-            std::span<const IsolineOverlayPacket> isolines) = 0;
-
-        [[nodiscard]] virtual std::uint64_t GetBufferAllocationCount() const noexcept = 0;
-
-    protected:
-        IVisualizationOverlayUploadHelper() = default;
-    };
-
-    // Default in-renderer implementation. Pairs `RHI::BufferManager` with
+    // Renderer-owned upload helper. Pairs `RHI::BufferManager` with
     // the device's `WriteBuffer(...)` path: per frame the helper resets
     // its bookkeeping, the renderer calls `UploadVectorFields(...)`
     // once per draw stream, the helper ensures the per-lane host-
@@ -164,22 +135,22 @@ export namespace Extrinsic::Graphics
     // (the renderer owns both and resets the helper before the manager in
     // `Shutdown()`). The `Upload*` methods therefore only guard the device's
     // operational state and the empty-input case, not the member pointers.
-    class VisualizationOverlayUploadHelper final : public IVisualizationOverlayUploadHelper
+    class VisualizationOverlayUploadHelper
     {
     public:
         VisualizationOverlayUploadHelper(RHI::IDevice& device, RHI::BufferManager& bufferManager);
-        ~VisualizationOverlayUploadHelper() override;
+        ~VisualizationOverlayUploadHelper();
 
         void BeginFrame(std::uint32_t frameIndex,
-                        std::uint32_t framesInFlight) override;
+                        std::uint32_t framesInFlight);
 
         [[nodiscard]] VisualizationVectorFieldUploadResult UploadVectorFields(
-            std::span<const VectorFieldOverlayPacket> vectorFields) override;
+            std::span<const VectorFieldOverlayPacket> vectorFields);
 
         [[nodiscard]] VisualizationIsolineUploadResult UploadIsolines(
-            std::span<const IsolineOverlayPacket> isolines) override;
+            std::span<const IsolineOverlayPacket> isolines);
 
-        [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept override
+        [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept
         {
             return m_BufferAllocationCount;
         }

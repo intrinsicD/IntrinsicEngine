@@ -18,8 +18,13 @@ contracts:
 
 ## Status
 
-- In progress on `main`: remove only the unused base and virtual qualifiers;
-  keep the concrete helper implementation and Renderer lifecycle unchanged.
+- Completed and retired on 2026-08-06. The unused
+  `IVisualizationOverlayUploadHelper` base and virtual dispatch are gone; the
+  concrete helper implementation unit, Renderer call sequence, per-lane
+  buffers, upload behavior, and teardown order are unchanged. Focused
+  visualization-overlay/renderer coverage passed 161/161 and the complete
+  default CPU selector passed 4,101/4,101 with its expected GLFW/LSan skip.
+- Completion commit: this implementation/retirement commit.
 
 ## Goal
 
@@ -49,26 +54,26 @@ contracts:
 
 ## Required changes
 
-- [ ] Remove the interface and concrete inheritance.
-- [ ] Preserve concrete initialization, per-lane upload/reset/release, and
+- [x] Remove the interface and concrete inheritance.
+- [x] Preserve concrete initialization, per-lane upload/reset/release, and
       teardown order under Renderer ownership.
-- [ ] Update focused source-contract tests/docs and add an absence ratchet.
+- [x] Update focused source-contract tests/docs and add an absence ratchet.
 
 ## Tests
 
-- [ ] Focused visualization-overlay and renderer lifecycle contracts pass.
-- [ ] Complete default CPU-supported gate plus strict structural/docs gates
+- [x] Focused visualization-overlay and renderer lifecycle contracts pass.
+- [x] Complete default CPU-supported gate plus strict structural/docs gates
       pass.
 
 ## Docs
 
-- [ ] Update renderer/canonical graphics prose and task/session records.
+- [x] Update renderer/canonical graphics prose and task/session records.
 
 ## Acceptance criteria
 
-- [ ] The interface name is absent; concrete behavior stays covered.
-- [ ] No other helper family or replacement abstraction changes.
-- [ ] Independent fixed-surface review accepts the revision-bound deletion.
+- [x] The interface name is absent; concrete behavior stays covered.
+- [x] No other helper family or replacement abstraction changes.
+- [x] Independent fixed-surface review accepts the revision-bound deletion.
 
 ## Verification
 

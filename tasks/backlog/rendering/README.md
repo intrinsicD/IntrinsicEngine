@@ -37,10 +37,11 @@ without requiring them to read every file.
     deleted while concrete reference TAA behavior remains unchanged.
   - `GRAPHICS-132` is retired: the transient-debug helper is concrete and its
     Renderer-owned behavior is unchanged.
-  - [`GRAPHICS-133`](../../active/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md)
-    and [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) each
-    remove one remaining single-owner upload-helper base while retaining its
-    concrete feature-owned helper.
+  - `GRAPHICS-133` is retired: the visualization-overlay helper is concrete
+    and its Renderer-owned behavior is unchanged.
+  - [`GRAPHICS-134`](GRAPHICS-134-concretize-imgui-upload-helper.md) removes the
+    final single-owner upload-helper base while retaining its concrete
+    feature-owned helper.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:
@@ -72,6 +73,10 @@ or CPU-clock profiler behavior.
 
 ## Retired cross-domain rendering leaves
 
+- [`GRAPHICS-133`](../../done/GRAPHICS-133-concretize-visualization-overlay-upload-helper.md) —
+  retired the unused visualization-overlay upload-helper base while preserving
+  the concrete implementation and Renderer lifecycle; focused 161/161 and
+  full 4,101/4,101 CPU selectors pass with the expected environment skip.
 - [`GRAPHICS-132`](../../done/GRAPHICS-132-concretize-transient-debug-upload-helper.md) —
   retired the unused transient-debug upload-helper base while preserving the
   concrete implementation and Renderer lifecycle; focused 161/161 and full
