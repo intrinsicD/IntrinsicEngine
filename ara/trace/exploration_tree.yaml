@@ -9195,3 +9195,119 @@ tree:
       task, workflow, ARA, documentation, layering, test-layout, root-hygiene,
       and clean-workshop gates passed. tasks/active now contains no task files.
     status: resolved
+  - id: N392
+    type: decision
+    title: "Complete REVIEW-003 only after every blocker"
+    provenance: user
+    timestamp: "2026-08-06T21:51+02:00"
+    also_depends_on: [N389, N391]
+    choice: >
+      Continue REVIEW-003 from the architecture backlog, execute any remaining
+      blocking tasks first in dependency order, finish the complete audit only
+      after those blockers retire, preserve independent fixed-surface review,
+      and commit and push the resulting main history.
+    alternatives:
+      - "Declare readiness while a static or audit-discovered blocker remains open."
+      - "Absorb blocker fixes into the one-shot audit task."
+      - "Self-accept the high-risk completion surface."
+    evidence:
+      - "User direction: continue REVIEW-003; do blocking tasks first if it is not fully unblocked, then finish it."
+      - "User authorization: independent review sub-agents are authorized."
+      - "tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md"
+    status: resolved
+  - id: N393
+    type: dead_end
+    title: "Reject the first REVIEW-003 readiness baseline"
+    provenance: ai-executed
+    timestamp: "2026-08-06T21:51+02:00"
+    also_depends_on: [N392]
+    hypothesis: >
+      Clean commit fcbb2feeb38e86ba757a991d7448420fb052a4ae is ready
+      to serve as the final architecture-stability baseline.
+    failure_mode: >
+      Independent agent-output, drift/right-sizing, and architecture/task-map
+      review found nine concrete remediation leaves: GRAPHICS-129 through 134,
+      HARDEN-088, RORG-031E, and RUNTIME-217. The partial baseline therefore
+      could not support readiness and its audit evidence was rejected.
+    lesson: >
+      A one-shot readiness audit must stop at the first real blocker, retire
+      every fix under separately scoped tasks, and restart all automated and
+      manual rows on a fresh clean commit rather than reusing partial evidence.
+    evidence:
+      - "commit 9b388e94"
+      - "tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md"
+      - "tasks/evidence/REVIEW-003/handoff.jsonl"
+    status: resolved
+  - id: N394
+    type: experiment
+    title: "Retire the REVIEW-003 remediation chain"
+    provenance: ai-executed
+    timestamp: "2026-08-06T21:51+02:00"
+    also_depends_on: [N392, N393]
+    evidence:
+      - "commit 644d3bd8: RUNTIME-216 evidence seal"
+      - "commits 5ae7cfc9, f714dcf9, 2f1c4e5e, 8fe77654, b896ae7d, 327b562e, 301d8b2f, e067e9f7"
+      - "commit bce99592: RUNTIME-217 evidence seal"
+      - "tasks/evidence/RUNTIME-217/report.yaml"
+      - "tasks/evidence/BUG-135/report.yaml"
+      - "tasks/evidence/BUG-136/report.yaml"
+    result: >
+      RUNTIME-216 and all nine audit-discovered remediation leaves retired in
+      bounded dependency order. RUNTIME-217 then removed the single-use Core
+      frame-loop hook family; verification exposed the pre-existing BUG-135
+      CTest producer classification and BUG-136 affected-case baseline defects,
+      which retired before RUNTIME-217 received revision-2 independent
+      acceptance. No remediation was hidden inside REVIEW-003.
+    status: resolved
+  - id: N395
+    type: dead_end
+    title: "Reject REVIEW-003 candidate revision 1 as documentation-incomplete"
+    provenance: ai-executed
+    timestamp: "2026-08-06T21:51+02:00"
+    also_depends_on: [N394]
+    hypothesis: >
+      Candidate bcae2e17 and digest 7b69d99d fully and consistently record the
+      accepted baseline and are ready for evidence sealing.
+    failure_mode: >
+      Independent fixed-surface review found that agent-output Row 3 counted
+      nine multi-production interfaces although the table proved eight, and
+      two living ARA architecture entries still cited REVIEW-003's former
+      backlog path.
+    lesson: >
+      Separate production and test implementation counts, and update living
+      evidence references when tasks retire while leaving historical trace
+      records immutable. Preserve the rejected review and command-repair
+      receipts rather than rewriting the trail.
+    evidence:
+      - "tasks/evidence/REVIEW-003/reviews.jsonl: sequence 1"
+      - "tasks/evidence/REVIEW-003/diagnostics/review-r2-command-repair/README.md"
+      - "commit 8106a7e6"
+    status: resolved
+  - id: N396
+    type: experiment
+    title: "Accept and seal the REVIEW-003 readiness baseline"
+    provenance: ai-executed
+    timestamp: "2026-08-06T21:51+02:00"
+    also_depends_on: [N394, N395]
+    evidence:
+      - "commit 51e7faddad943ab7727e407d008e474ec076566d"
+      - "docs/reports/2026-08-06-architecture-stability-readiness.md"
+      - "docs/reports/2026-08-06-agent-output-audit.md"
+      - "docs/reports/2026-08-06-drift-audit.md"
+      - "docs/reviews/2026-08-06-clean-workshop-review.md"
+      - "tasks/evidence/REVIEW-003/report.yaml"
+      - "tasks/evidence/REVIEW-003/reviews.jsonl: sequence 2"
+      - "commit 7359da97"
+    result: >
+      The fresh clean baseline retired all 47 dependencies, retained the exact
+      all-green ARCH-014 12/0/0/5 Engine scorecard, passed Clang 23 configure
+      and IntrinsicTests build, and passed all 4,102 default CPU entries with
+      the expected headless GLFW/LeakSanitizer skip. Architecture,
+      clean-workshop, drift, complete-interval agent-output, Theme F, and all
+      35 right-sizing surface rows passed. Independent revision-2 review
+      accepted exact revision 8106a7e6 and digest 3a1fa507 with no finding;
+      evidence sealed at 7359da97 and main was pushed without a merge commit
+      because origin/main had not diverged. The result is commit-scoped and
+      makes no fresh GPU/Vulkan, sanitizer, performance, or permanent-stability
+      claim.
+    status: resolved

@@ -260,8 +260,8 @@ sessions:
     open_threads: 5
   - id: "2026-08-06_001"
     date: "2026-08-06"
-    summary: "Retired every active task in dependency order after independent property-coherence acceptance and clean fixed-surface runtime-layout evidence."
-    turn_count: 2
-    events_count: 5
+    summary: "Retired every active task and every REVIEW-003 remediation leaf, then sealed and pushed the fresh architecture-readiness baseline after revision-2 independent acceptance."
+    turn_count: 3
+    events_count: 10
     claims_touched: [C36]
-    open_threads: 1
+    open_threads: 0

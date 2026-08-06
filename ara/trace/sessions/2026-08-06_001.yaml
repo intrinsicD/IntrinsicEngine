@@ -2,9 +2,9 @@ session:
   id: "2026-08-06_001"
   date: "2026-08-06"
   started: "2026-08-06T00:40+02:00"
-  last_turn: "2026-08-06T09:12+02:00"
-  turn_count: 2
-  summary: "Retired every active task in dependency order after independent property-coherence acceptance and clean fixed-surface runtime-layout evidence."
+  last_turn: "2026-08-06T21:51+02:00"
+  turn_count: 3
+  summary: "Retired every active task and every REVIEW-003 remediation leaf, then sealed and pushed the fresh architecture-readiness baseline after revision-2 independent acceptance."
 
 events_logged:
   - turn: 1
@@ -37,6 +37,36 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Repaired BUG-133, sealed and retired RUNTIME-214/RUNTIME-215, and passed final repository-global gates with no active tasks."
+  - turn: 3
+    type: decision
+    id: "N392"
+    routing: direct
+    provenance: user
+    summary: "Required REVIEW-003 blockers to retire first and preserved independent review before completion and push."
+  - turn: 3
+    type: dead_end
+    id: "N393"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected baseline fcbb2fee after three audits exposed nine scoped remediation leaves."
+  - turn: 3
+    type: experiment
+    id: "N394"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-216, all nine audit leaves, and the two verification blockers discovered by RUNTIME-217."
+  - turn: 3
+    type: dead_end
+    id: "N395"
+    routing: direct
+    provenance: ai-executed
+    summary: "Independent review rejected REVIEW-003 revision 1 on one interface-count mismatch and two stale living ARA paths."
+  - turn: 3
+    type: experiment
+    id: "N396"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed the fresh 4,102-entry readiness audit, gained revision-2 independent acceptance, sealed evidence, and pushed main."
 
 ai_actions:
   - turn: 1
@@ -73,6 +103,32 @@ ai_actions:
       - "tasks/active/README.md"
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/SESSION-BRIEF.md"
+  - turn: 3
+    action: "Completed RUNTIME-216, rejected the first REVIEW-003 baseline, and retired its nine independently identified remediation leaves plus BUG-135/BUG-136 before accepting RUNTIME-217."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/"
+      - "src/graphics/"
+      - "tests/"
+      - "docs/"
+      - "tasks/"
+      - "tasks/evidence/"
+  - turn: 3
+    action: "Reran REVIEW-003 from clean commit 51e7fadd, published four dated reports, verified 4,102 CPU entries and strict repository gates, and inventoried all 47 dependencies, nine audit rows, Theme F tasks, and 35 right-sizing surfaces."
+    provenance: ai-executed
+    files_changed:
+      - "docs/reports/2026-08-06-architecture-stability-readiness.md"
+      - "docs/reports/2026-08-06-agent-output-audit.md"
+      - "docs/reports/2026-08-06-drift-audit.md"
+      - "docs/reviews/2026-08-06-clean-workshop-review.md"
+      - "tasks/done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md"
+  - turn: 3
+    action: "Recorded the independent revision request, corrected its count and living evidence-path findings, obtained revision-2 acceptance, validated and sealed the high-risk bundle, released the task claim, and pushed main through 7359da97."
+    provenance: ai-executed
+    files_changed:
+      - "ara/logic/solution/architecture.md"
+      - "docs/reports/2026-08-06-agent-output-audit.md"
+      - "tasks/evidence/REVIEW-003/"
 
 claims_touched:
   - id: C36
@@ -92,9 +148,15 @@ key_context:
     excerpt: "RUNTIME-214's independent reviewer returned verdict accepted with no blocking finding after fresh CPU and Vulkan reruns."
   - turn: 2
     excerpt: "RUNTIME-215's fixed report excludes the prerequisite BUG-133 and RUNTIME-214 retirement bookkeeping from its mechanical source surface."
+  - turn: 3
+    excerpt: "The first REVIEW-003 baseline was rejected and no partial evidence was reused after nine independent audit findings became scoped remediation tasks."
+  - turn: 3
+    excerpt: "The fresh baseline passed all 4,102 default CPU entries; fresh GPU/Vulkan and sanitizer variants were explicitly outside this report-only candidate."
+  - turn: 3
+    excerpt: "Independent REVIEW-003 revision 1 requested two documentation corrections; the same reviewer accepted exact revision 8106a7e6 and digest 3a1fa507 after both were repaired."
+  - turn: 3
+    excerpt: "Local main was eight commits ahead and zero behind origin/main, so no merge commit was necessary; the push advanced origin/main to evidence seal 7359da97."
 
-open_threads:
-  - "RUNTIME-216 owns the separately reviewed semantic deletion of the private RenderExtractionService forwarding seam."
+open_threads: []
 
-ai_suggestions_pending:
-  - "Implement RUNTIME-216 only as its separately reviewed semantic deletion slice; do not fold it back into the completed mechanical layout task."
+ai_suggestions_pending: []
