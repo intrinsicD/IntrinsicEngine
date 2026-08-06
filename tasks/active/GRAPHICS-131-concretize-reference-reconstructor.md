@@ -6,15 +6,20 @@ depends_on:
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-graphics131"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-06T16:15:21Z"
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
 ---
 # GRAPHICS-131 — Concretize the reference reconstructor
+
+## Status
+
+- In progress on `main`: remove the unused base while leaving the concrete
+  reference TAA implementation and its algorithm body unchanged.
 
 ## Goal
 

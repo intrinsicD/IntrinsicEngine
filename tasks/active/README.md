@@ -11,8 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- None. `REVIEW-003` remains in the architecture backlog while its remaining
-  concrete remediation dependencies retire.
+- [`GRAPHICS-131`](GRAPHICS-131-concretize-reference-reconstructor.md) —
+  remove the single-implementation reconstructor base while retaining the
+  concrete reference TAA contract. `REVIEW-003` remains in the architecture
+  backlog until its remaining audit remediations retire.
 
 ## History
 

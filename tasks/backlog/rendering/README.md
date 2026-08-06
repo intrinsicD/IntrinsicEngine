@@ -33,7 +33,7 @@ without requiring them to read every file.
   - `GRAPHICS-130` is retired: the production-unused PipelineRegistry module
     and its isolated tests are deleted while PipelineManager and renderer-owned
     pipeline behavior remain.
-  - [`GRAPHICS-131`](GRAPHICS-131-concretize-reference-reconstructor.md)
+  - [`GRAPHICS-131`](../../active/GRAPHICS-131-concretize-reference-reconstructor.md)
     removes the single-implementation reconstructor base while retaining
     concrete reference TAA behavior.
   - [`GRAPHICS-132`](GRAPHICS-132-concretize-transient-debug-upload-helper.md),
