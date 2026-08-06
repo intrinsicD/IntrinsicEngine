@@ -1,0 +1,153 @@
+schema_version: 1
+task_id: GRAPHICS-130
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T16:13:43Z'
+claim_eligible: false
+source:
+  base_ref: 4c5e7db101687112efa4734623eb9338d253ff88
+  base_revision: 4c5e7db101687112efa4734623eb9338d253ff88
+  head_revision: 20fb516032a35cb2e9cc637dd70356e9a1c808b7
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: docs/api/generated/module_inventory.md
+    sha256: d7f60aea1033a0b52e7f03ff63311649967abb043247134b98d8d1aa044a91e1
+  - path: docs/architecture/graphics.md
+    sha256: 91f59066dd6032cf5c07aca9398c91c246b45f965615e0849c8f859e74e2ed93
+  - path: docs/migration/nonlegacy-parity-matrix.md
+    sha256: e75f76786ed695ae91a7aa3d9bb837efd88fd95350fd2cc46c3817b17754ebbd
+  - path: src/graphics/rhi/CMakeLists.txt
+    sha256: 6aafdcf491a4ad54994510fa714271156a44de3e9958d6072c10e79a4e982bf9
+  - path: src/graphics/rhi/README.md
+    sha256: 3151af41d6723bdbcb075cc562153278be8eeb69e990b4897a8bdcfd569c98b4
+  - path: src/graphics/rhi/RHI.PipelineRegistry.cpp
+    sha256: null
+  - path: src/graphics/rhi/RHI.PipelineRegistry.cppm
+    sha256: null
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 2b4a66e01be072cff4c3112c5139188b6320859ea9ecabef697f91e80a8415cc
+  - path: tasks/active/README.md
+    sha256: c9475ed3c532c7897327ac13648dcca18721c6027a8883dab305966e1af66685
+  - path: tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md
+    sha256: 36d7e1a2bc94025030c16ae22480c82d81ad70c93b5a62348315621d356ddea5
+  - path: tasks/backlog/rendering/README.md
+    sha256: a6b8f7ef6394639e2096a9f19a40af9beaec6c550d0376edeabfa497447516ef
+  - path: tasks/done/GRAPHICS-130-retire-unused-rhi-pipeline-registry.md
+    sha256: 086749eeb6000d823c09d895991fc0b7d252121fdccfd880cac3ec30c3add981
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: ae801e19396f5a7b5669546bff99e4c85a46c90e15e04a40640896dee92173e6
+  - path: tests/CMakeLists.txt
+    sha256: 782752d4969ba4dab26303dcf37cfd5f01886694de0fd1cbf78441bc8eccf202
+  - path: tests/contract/graphics/Test.RendererRhiBoundary.cpp
+    sha256: f9134a5eef149fd4efc83a2a79214f5d4ebf6dbb90c4f0effe1f8971f5f3b3ad
+  - path: tests/unit/graphics/Test.RHI.PipelineRegistry.cpp
+    sha256: null
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 03a79aeee5b7ceb61ccc203c5de4ec19023d2bcc0baa7df2cc8909bc88c77b5b
+  - path: tools/agents/workflow_legacy_tasks.json
+    sha256: f8b1e3852213b7b0598a63c319484b59aad0469f963617f710a325bd94c32745
+  content_digest: 03a574bc6d5d0dccf00bfc76fd49b111a675852563dfbf7aa633a6194faeeeca
+touched:
+  paths:
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/graphics.md
+  - docs/migration/nonlegacy-parity-matrix.md
+  - src/graphics/rhi/CMakeLists.txt
+  - src/graphics/rhi/README.md
+  - src/graphics/rhi/RHI.PipelineRegistry.cpp
+  - src/graphics/rhi/RHI.PipelineRegistry.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md
+  - tasks/backlog/rendering/README.md
+  - tasks/done/GRAPHICS-130-retire-unused-rhi-pipeline-registry.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/CMakeLists.txt
+  - tests/contract/graphics/Test.RendererRhiBoundary.cpp
+  - tests/unit/graphics/Test.RHI.PipelineRegistry.cpp
+  - tools/agents/contract_legacy_tasks.json
+  - tools/agents/workflow_legacy_tasks.json
+  layers:
+  - docs
+  - graphics
+  - tests
+  - tooling
+  modules:
+  - Extrinsic.RHI.PipelineRegistry
+extension_seam: None; the unused shared cache is deleted while the concrete PipelineManager remains the
+  sole promoted pipeline lifecycle owner.
+future_change_plan: Introduce shared shader-identity/generation caching only when two present production
+  pipeline owners need one live invalidation workflow.
+acceptance:
+- criterion: No `RHI.PipelineRegistry` module, implementation, CMake entry, isolated
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: PipelineManager/renderer behavior stays covered and unchanged.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No replacement abstraction appears.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the revision-bound deletion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GRAPHICS-130/commands/build-tests.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/clean-workshop.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/configure-ci-fresh.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/diff-check-r2.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/diff-check.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/doc-links-r2.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/doc-links.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/docs-sync-r2.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/docs-sync.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/focused-cpu.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/full-cpu.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/layering.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/module-inventory.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/retired-symbol-scan.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/task-policy-r2.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/task-policy.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/task-state-links-r2.json
+- receipt: tasks/evidence/GRAPHICS-130/commands/task-state-links.json
+changed_public_contracts:
+- Removed unused Extrinsic.RHI.PipelineRegistry/PipelineKey cache surface; retained PipelineManager create,
+  recompile, commit, lease, and diagnostic contracts.
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/GRAPHICS-130-retire-unused-rhi-pipeline-registry.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks:
+- Vulkan pipeline execution is unchanged and was not re-run; fresh module build, 223 focused CPU contracts,
+  and the complete CPU gate cover the surviving backend-neutral lifecycle.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No Vulkan implementation, shader, descriptor, or renderer pipeline behavior changed; the deleted
+    cache had zero production consumers and opt-in backend execution remains scoped to PipelineManager/device
+    paths.
+artifacts:
+- path: tasks/done/GRAPHICS-130-retire-unused-rhi-pipeline-registry.md
+  sha256: 086749eeb6000d823c09d895991fc0b7d252121fdccfd880cac3ec30c3add981
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GRAPHICS-130/handoff.jsonl
+review: tasks/evidence/GRAPHICS-130/reviews.jsonl
