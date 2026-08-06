@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "! rg -n \"TODO\\\\(GRAPHICS-018\\\\)|temporary.*(sampled|framegraph|Vulkan)|future Extrinsic.Backends.Vulkan|future Vulkan|slot 4 upward|slots >= 4|0\\\\.\\\\.3 and allocates\" src/graphics/vulkan src/graphics/renderer/Backends/Null src/graphics/renderer/README.md"
+  ],
+  "command_display": "bash -lc '! rg -n \"TODO\\\\(GRAPHICS-018\\\\)|temporary.*(sampled|framegraph|Vulkan)|future Extrinsic.Backends.Vulkan|future Vulkan|slot 4 upward|slots >= 4|0\\\\.\\\\.3 and allocates\" src/graphics/vulkan src/graphics/renderer/Backends/Null src/graphics/renderer/README.md'",
+  "cwd": ".",
+  "duration_ms": 21,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:32:32Z",
+  "label": "stale-marker-scan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:32:31Z",
+  "stderr_path": "tasks/evidence/HARDEN-088/commands/stale-marker-scan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-088/commands/stale-marker-scan.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "HARDEN-088"
+}

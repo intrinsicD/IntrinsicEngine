@@ -6751,3 +6751,13 @@ confirms concrete method gates in consuming task front matter, corrects stale
 root Theme F prose, and leaves the geometry category index plus generated
 session brief as the sole live maps. No code, algorithm, dependency edge, or
 replacement umbrella was introduced.
+
+[`HARDEN-088`](HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —
+graphics-backend migration prose reconciled and retired on 2026-08-06. The
+load-bearing Vulkan frame-sampled descriptor path is now described as current
+backend-local policy rather than a temporary bridge owned by retired tasks;
+all current prose agrees on reserved slots `0..5` and first real bindless lease
+`6`. The retired `GRAPHICS-018` TODO and Null's obsolete future-Vulkan/TODO
+claims are removed without executable C++ changes. Graphics-labeled CPU tests
+passed 851/851, and strict marker, comment-only diff, clean-workshop, task,
+docs-sync/link, and whitespace checks passed.

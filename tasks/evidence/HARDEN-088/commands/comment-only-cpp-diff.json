@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "git diff -U0 -- \"*.cpp\" \"*.cppm\" | awk '/^[+-]/ && !/^(---|\\+\\+\\+)/ { line=substr($0,2); sub(/^[[:space:]]*/,\"\",line); if (line != \"\" && line !~ /^\\/\\//) bad=1 } END { exit bad }'"
+  ],
+  "command_display": "bash -lc 'git diff -U0 -- \"*.cpp\" \"*.cppm\" | awk '\"'\"'/^[+-]/ && !/^(---|\\+\\+\\+)/ { line=substr($0,2); sub(/^[[:space:]]*/,\"\",line); if (line != \"\" && line !~ /^\\/\\//) bad=1 } END { exit bad }'\"'\"''",
+  "cwd": ".",
+  "duration_ms": 19,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:32:32Z",
+  "label": "comment-only-cpp-diff",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:32:32Z",
+  "stderr_path": "tasks/evidence/HARDEN-088/commands/comment-only-cpp-diff.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-088/commands/comment-only-cpp-diff.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "HARDEN-088"
+}

@@ -2186,12 +2186,12 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         m_TransferQueue->m_Buffers = &m_Buffers;
         m_TransferQueue->m_Images = &m_Images;
 
-        // GRAPHICS-076E — backend-owned sampler for the temporary
-        // sampled-framegraph descriptor slot used by postprocess/present
-        // shaders. The command context updates set 0 / binding 0 / element 0
-        // to the texture most recently transitioned to ShaderReadOnly; this
-        // sampler supplies stable sampling state for those transient
-        // framegraph textures without widening the public RHI API.
+        // Backend-owned sampler for the reserved frame-sampled descriptor
+        // range used by fullscreen and bake shaders. The command context
+        // publishes renderer-selected ShaderReadOnly textures into set 0 /
+        // binding 0 / elements 0..5; this sampler supplies stable sampling
+        // state for those framegraph textures without exposing Vulkan state
+        // through the RHI API.
         if (!m_DefaultSamplerHandle.IsValid())
         {
             m_DefaultSamplerHandle = CreateSampler(RHI::SamplerDesc{

@@ -20,6 +20,14 @@ contract_review: "Reviewed the full catalog; this task reconciles comments and c
 
 ## Status
 
+- Completed and retired on 2026-08-06. Promoted backend comments and READMEs
+  now describe the reserved frame-sampled descriptor range as current
+  backend-local policy, consistently reserve slots `0..5`, and start real
+  bindless leases at `6`. The stale retired-task TODO/temporary ownership and
+  obsolete future-Vulkan Null prose are gone. A machine check proves every C++
+  diff line is comment-only; graphics-labeled CPU coverage passed 851/851 and
+  strict clean-workshop, task, docs-sync/link, and marker scans pass.
+- Completion commit: this retirement commit.
 - In progress on `main`: correct the identified Vulkan/Null current-state
   comments and READMEs without modifying executable C++.
 
@@ -67,38 +75,38 @@ contract_review: "Reviewed the full catalog; this task reconciles comments and c
 
 ## Required changes
 
-- [ ] Replace the retired `GRAPHICS-018` TODO with factual current-state API
+- [x] Replace the retired `GRAPHICS-018` TODO with factual current-state API
       documentation or remove it when the declarations are self-explanatory.
-- [ ] Rewrite the `GRAPHICS-076E/076F` temporary-bridge comments as current
+- [x] Rewrite the `GRAPHICS-076E/076F` temporary-bridge comments as current
       Vulkan descriptor-binding invariants without a retired removal owner.
-- [ ] Make every slot-range statement agree on reserved elements `0..5` and
+- [x] Make every slot-range statement agree on reserved elements `0..5` and
       first real bindless lease `6`.
-- [ ] Rewrite the Null backend module and README as a current deterministic
+- [x] Rewrite the Null backend module and README as a current deterministic
       backend fixture; remove the nonexistent TODO/future-Vulkan claim.
-- [ ] Scan the touched backend surfaces for another stale migration-status
+- [x] Scan the touched backend surfaces for another stale migration-status
       marker before closing.
 
 ## Tests
 
-- [ ] Existing graphics contract tests pass; no behavior-specific test is
+- [x] Existing graphics contract tests pass; no behavior-specific test is
       added for prose-only corrections.
-- [ ] Strict docs, layering, task, and clean-workshop checks pass.
+- [x] Strict docs, layering, task, and clean-workshop checks pass.
 
 ## Docs
 
-- [ ] Synchronize `src/graphics/vulkan/README.md`, the Null backend README, and
+- [x] Synchronize `src/graphics/vulkan/README.md`, the Null backend README, and
       any canonical graphics prose touched by the corrected current state.
-- [ ] Refresh task/session/retirement records.
+- [x] Refresh task/session/retirement records.
 
 ## Acceptance criteria
 
-- [ ] No promoted graphics source or current-state backend README calls the
+- [x] No promoted graphics source or current-state backend README calls the
       retained frame-sampled path temporary or assigns it to a retired removal
       owner.
-- [ ] No promoted backend TODO names retired `GRAPHICS-018` work.
-- [ ] Null and Vulkan current-state descriptions match the existing tree and
+- [x] No promoted backend TODO names retired `GRAPHICS-018` work.
+- [x] Null and Vulkan current-state descriptions match the existing tree and
       descriptor constants.
-- [ ] `git diff` contains no executable C++ change.
+- [x] `git diff` contains no executable C++ change.
 
 ## Verification
 

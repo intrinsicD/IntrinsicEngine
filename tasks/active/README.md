@@ -11,12 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-- [`HARDEN-088`](HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —
-  in progress on `main` by `codex-harden088`; reconcile stale promoted-backend
-  migration claims without changing behavior.
-
-`REVIEW-003` remains in the architecture backlog after its rejected 2026-08-06
-baseline opened concrete remediation dependencies.
+- None. `REVIEW-003` remains in the architecture backlog after its rejected
+  2026-08-06 baseline opened concrete remediation dependencies.
 
 ## History
 

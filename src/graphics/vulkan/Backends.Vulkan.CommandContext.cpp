@@ -144,12 +144,12 @@ void VulkanCommandContext::UpdateFrameSampledDescriptor(RHI::TextureHandle textu
         return;
     }
 
-    // GRAPHICS-076E/076F — temporary promoted-Vulkan sampled-present bridge.
-    // The canonical postprocess/present shaders currently read their single
-    // framegraph input from set 0 / binding 0 / a renderer-selected element.
-    // Slot 0 preserves the older postprocess bridge. Slots 1 and 2 are
-    // reserved by the renderer for DebugView and Present so they do not race by
-    // rewriting the same descriptor element before one command-buffer submit.
+    // Backend-local publication for renderer-selected framegraph inputs. The
+    // canonical fullscreen and bake shaders read set 0 / binding 0 at one of
+    // the reserved elements 0..5. Distinct per-pass elements are required
+    // because all draws share one descriptor set and one submitted command
+    // buffer: rewriting one element would change what every recorded draw at
+    // that element observes when the command buffer executes.
     VkDescriptorImageInfo info{};
     info.imageView = image->View;
     info.sampler = sampler->Sampler;

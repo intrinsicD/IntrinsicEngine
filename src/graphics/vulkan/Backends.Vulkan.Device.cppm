@@ -77,11 +77,6 @@ namespace Extrinsic::Backends::Vulkan
         void SetPresentMode(RHI::PresentMode mode) override;
         [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }
 
-        // TODO(GRAPHICS-018): complete operational bring-up helper surfaces:
-        // swapchain acquire/present/recreation diagnostics, global pipeline
-        // layout/default sampler creation, memory type/depth format/
-        // format-support queries, and bindless/transfer reconciliation.
-
         [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle& frame) const override;
 
         [[nodiscard]] RHI::ICommandContext& GetGraphicsContext(uint32_t frameIndex) override;

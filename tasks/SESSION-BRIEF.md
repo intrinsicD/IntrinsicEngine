@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `HARDEN-088` — Reconcile stale graphics-backend migration prose (tasks/active/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md)
+- none
 
 ## Theme B — Rendering modernization
 

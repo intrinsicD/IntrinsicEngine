@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-L",
+    "graphics",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -L graphics -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 15421,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:32:31Z",
+  "label": "graphics-cpu-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:32:16Z",
+  "stderr_path": "tasks/evidence/HARDEN-088/commands/graphics-cpu-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-088/commands/graphics-cpu-tests.stdout.log",
+  "stdout_sha256": "a706ce6fc223ec6797b31131ba17e74a21eba115776cf60db97265e13ce7d9ca",
+  "task_id": "HARDEN-088"
+}

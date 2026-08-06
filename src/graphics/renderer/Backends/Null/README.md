@@ -16,11 +16,10 @@ memory or enforce alias overlap hazards; render-graph planning owns lifetime
 safety, renderer allocation owns the opt-in placed allocation and fallback
 lanes, and the Vulkan backend owns real GPU placed binding.
 
-The file preserves `TODO:` markers that indicate where a real Vulkan /
-VMA / swapchain wiring would live. When a real Vulkan backend is added
-it should live in a sibling `../Vulkan/` directory as `Extrinsic.Backends.Vulkan`
-rather than editing this file in place — keeping the null backend as a
-stable fixture for tests and integration scaffolding.
+The Null implementation stays intentionally GPU-free and deterministic. The
+promoted `Extrinsic.Backends.Vulkan` implementation lives separately under
+`src/graphics/vulkan/`; native device, VMA, queue, and swapchain behavior does
+not belong in this fixture.
 
 ## Contents
 

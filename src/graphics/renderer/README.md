@@ -1486,7 +1486,7 @@ Concretely:
   `UploadPendingFontAtlas()` and before `ImGuiPass::Execute(...)`, so a
   freshly allocated atlas slot is visible to the shader in the same frame. The
   promoted Vulkan backend reserves framegraph sampled-texture descriptor slots
-  0..3 and allocates real bindless textures from slot 4 upward, so the font
+  0..5 and allocates real bindless textures from slot 6 upward, so the font
   atlas slot cannot be overwritten by DebugView/Present/SelectionOutline
   descriptor updates.
   `GRAPHICS-110` extends the same frame-slot upload-storage model to the

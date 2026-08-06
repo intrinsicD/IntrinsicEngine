@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicGraphicsContractTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicGraphicsContractTests",
+  "cwd": ".",
+  "duration_ms": 8914,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T15:32:16Z",
+  "label": "graphics-contract-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T15:32:07Z",
+  "stderr_path": "tasks/evidence/HARDEN-088/commands/graphics-contract-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-088/commands/graphics-contract-build.stdout.log",
+  "stdout_sha256": "ce01f19571fa6b35d22393edd62cb9cdee7e3c45ae0669a57ef9c8162825fb53",
+  "task_id": "HARDEN-088"
+}

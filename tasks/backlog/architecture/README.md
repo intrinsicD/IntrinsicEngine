@@ -35,12 +35,12 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
   while adding existing `RORG-031E` as the task-map blocker. Partial evidence
   is discarded; the complete audit resumes only after those leaves retire on a
   fresh commit.
-- Active [`HARDEN-088`](../../active/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —
-  reconcile retired-owner TODO/temporary markers, descriptor-slot prose, and
-  obsolete future-Vulkan claims without changing backend behavior.
-
 ### Retired seam tasks
 
+- [`HARDEN-088`](../../done/HARDEN-088-reconcile-stale-graphics-backend-migration-prose.md) —
+  retired-owner TODO/temporary markers and obsolete future-Vulkan claims are
+  gone without behavior changes; slots `0..5` are documented consistently and
+  real leases start at `6`.
 - [`ARCH-014`](../../done/ARCH-014-kernel-convergence-tracking.md) — retired
   umbrella north-star: the
   [kernel target-state](../../../docs/architecture/kernel-target-state.md)

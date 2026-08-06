@@ -481,12 +481,13 @@ available through the Vulkan 1.2/1.3 feature chain.
   pair, soft-skipped passes report structured `RenderGraphCommandPassStats`
   entries, recorded barriers translate through `vkCmdPipelineBarrier2`, and
   buffer/texture sharing mode handles graphics/transfer queue-family separation.
-  The temporary framegraph sampled-texture bridge writes postprocess sampled
+  The backend-local framegraph sampled-texture binding writes postprocess sampled
   inputs to bindless descriptor slot 0, default `Pass.DebugView`'s selected
   texture to slot 1, canonical `Pass.Present`'s `FrameRecipe.PresentSource`
-  to slot 2, and `SelectionOutlinePass`'s `EntityId` texture to slot 3 via
+  to slot 2, `SelectionOutlinePass`'s `EntityId` texture to slot 3, and the
+  object-space normal-bake dilation output/scratch pair to slots 4/5 via
   `VulkanCommandContext::BindFrameSampledTextureAt(...)`. The Vulkan bindless
-  allocator starts real texture leases at slot 4 so retained textures such as
+  allocator starts real texture leases at slot 6 so retained textures such as
   the ImGui font atlas cannot be overwritten by those framegraph bridge updates.
   The split slots keep debug-view, present, and selection-outline fullscreen
   draws from racing on one mutable descriptor element inside the same submitted
@@ -503,7 +504,7 @@ available through the Vulkan 1.2/1.3 feature chain.
   for the whole frame and the earlier-executing tonemap (`PostProcessPass`) would
   sample its own black output instead of `SceneColorHDR`. For the same reason
   the `ImGuiPass` — which samples only its own retained font-atlas/user-texture
-  leases (slots >= 4) — does not bind the shared bridge slot 0.
+  leases (slots >= 6) — does not bind the shared bridge slot 0.
   GRAPHICS-079 Slice C does not add a Vulkan-specific ImGui upload helper:
   the promoted path follows the existing transient-debug / visualization-overlay
   precedent and keeps the concrete helper renderer-owned
