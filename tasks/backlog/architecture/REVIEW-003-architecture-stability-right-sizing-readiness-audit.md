@@ -37,6 +37,7 @@ depends_on:
   - RUNTIME-203
   - RUNTIME-204
   - RUNTIME-205
+  - RUNTIME-216
   - PHYSICS-004
   - PROC-027
 workflow_schema: 1
@@ -46,11 +47,20 @@ owner:
 branch:
 worktree:
 claimed_at:
+contract_schema: 1
+contracts: []
+contract_review: "Reviewed the full catalog; this audit records whether existing architecture and task contracts are satisfied but does not introduce or change a reusable subsystem, data-domain, publication, or control-surface contract."
 ---
 # REVIEW-003 — Architecture stability and right-sizing readiness audit
 
 ## Status
 
+- Right-sizing re-gate on 2026-08-06: the already-scoped `RUNTIME-216`
+  deletion test identifies the Engine-private `RenderExtractionService` as a
+  one-owner forwarding facade whose fields can live directly in
+  `Engine::Impl`. Because this audit must not accept a known pure-forwarding
+  wrapper or absorb its fix, `RUNTIME-216` is now a static prerequisite. The
+  audit resumes on a fresh commit after that task retires.
 - Runtime backlog coherence re-gate on 2026-08-01: completed RUNTIME-202 makes
   the remaining helper cleanup owner boundaries concrete. RUNTIME-203 now owns
   only Engine composition helpers; new RUNTIME-205 owns SceneInteraction

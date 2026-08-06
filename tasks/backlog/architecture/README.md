@@ -27,7 +27,11 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
   unsupported RUNTIME-138 umbrella, split helper cleanup into Engine-owned
   RUNTIME-203 and SceneInteraction-owned RUNTIME-205, and added RUNTIME-139's
   speculative-AoS-surface removal as a static prerequisite. A concrete future
-  selected-editor finding would return as its own scoped remediation task.
+  selected-editor finding would return as its own scoped remediation task. The
+  2026-08-06 right-sizing re-gate added RUNTIME-216 because its deletion test
+  identifies the remaining Engine-private render-extraction service as a
+  one-owner forwarding facade; the audit resumes after that task retires on a
+  fresh commit.
 
 ### Retired seam tasks
 

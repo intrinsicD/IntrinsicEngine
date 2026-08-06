@@ -1,5 +1,6 @@
 {
   "consumed": {
+    "backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md": "621777a9662872931260c2920eec9132b6fabdcb33e0e6bf466499ef7660c797",
     "backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md": "46a2655c95708d21258bab08cb439b85b9ec13d91cbed7cad6c42e4a23d8f285",
     "backlog/geometry/GEOM-058-gaussian-mixture-em-anderson-acceleration.md": "20eee030a2e27ec49c8a963690c1f57bc4dcddecaa98b8d25f3f47b372d63069",
     "backlog/geometry/GEOM-062-point-set-projection-weighting-kernels.md": "7b0def9dc7308a13e3fe9a45bd5e50df1580b4192148c7be1ad7af5fce7bd08a",
@@ -36,7 +37,6 @@
   "schema_version": 1,
   "source_revision": "577b45837d47e731f4495c8ab4ea1570bdc63911",
   "tasks": {
-    "backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md": "621777a9662872931260c2920eec9132b6fabdcb33e0e6bf466499ef7660c797",
     "backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md": "6d07ff34135a77297323bd3ce7f098c568c02dd41da4d6e8b2047b9a8f9f198e",
     "backlog/assets/ASSETIO-010-async-model-companion-preflight.md": "db7669d3eedc1608ff56422c9ebfe465f7bf0c399b190ad6359265b2219763d6",
     "backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md": "70532d82578fe7bc87475593a674965d03ca40b39ba7c3764b9588b6db4838b7",
