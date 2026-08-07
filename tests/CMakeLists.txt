@@ -468,6 +468,7 @@ set(_geometry_test_files
     Test_HalfedgeMeshPropertyAccess.cpp
     Test_HalfedgeMeshTopology.cpp
     Test.MeshTopologyUtilities.cpp
+    Test.CornerTexcoords.cpp
     Test_Validation.cpp
     Test_Curvature.cpp
     Test.CurvatureTensor.cpp

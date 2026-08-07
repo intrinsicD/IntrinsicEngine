@@ -19,12 +19,67 @@ export namespace Geometry::MeshUtils
     // Canonical property name for per-vertex texture coordinates across all
     // geometry modules (subdivision, remeshing, mesh conversion, etc.).
     inline constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
+
+    // BUG-137 — canonical property name for per-corner texture coordinates.
+    //
+    // A UV seam needs two or more distinct UVs at one vertex. Storing UVs only
+    // per vertex forces a seam to be expressed as duplicated *topology*, which
+    // is what destroyed imported mesh connectivity. The corner domain carries
+    // the seam instead, so the mesh keeps its manifold connectivity and the
+    // duplication happens once, at GPU upload.
+    //
+    // Convention: a corner UV is indexed by halfedge and belongs to that
+    // halfedge's *target* vertex, i.e. `mesh.ToVertex(h)`. This matches the
+    // PMP/OpenMesh convention and the `f v/vt/vn` corner ordering used by OBJ.
+    inline constexpr const char* kHalfedgeTexcoordPropertyName = "h:texcoord";
     inline constexpr const char* kFaceAreaPropertyName = "f:area";
     inline constexpr const char* kFaceAreaVectorPropertyName = "f:area_vector";
     inline constexpr const char* kFaceCentroidPropertyName = "f:centroid";
     inline constexpr const char* kBarycentricVertexAreaPropertyName = "v:barycentric_area";
     inline constexpr const char* kFaceScalarGradientPropertyName = "f:scalar_gradient";
     inline constexpr const char* kVertexPcaPropertyName = "v:pca";
+
+    // BUG-137 — which element domain currently owns this mesh's texture
+    // coordinates. Corner UVs win over vertex UVs so a mesh can be migrated
+    // incrementally without a flag day.
+    enum class TexcoordDomain : std::uint8_t
+    {
+        None = 0u,
+        Vertex = 1u,
+        Halfedge = 2u,
+    };
+
+    /// Resolve which domain owns this mesh's UVs.
+    /// `Halfedge` when a correctly sized `h:texcoord` exists, otherwise
+    /// `Vertex` when a correctly sized `v:texcoord` exists, otherwise `None`.
+    /// A property whose size does not match its domain is ignored rather than
+    /// trusted, so a stale buffer cannot be read out of range.
+    [[nodiscard]] TexcoordDomain ResolveTexcoordDomain(
+        const HalfedgeMesh::Mesh& mesh) noexcept;
+
+    /// Read the UV for one corner, following the resolution order above.
+    /// Falls back to the target vertex's UV when only vertex UVs exist.
+    /// Returns false when the mesh has no usable UVs or the halfedge is
+    /// invalid/deleted; `outUv` is untouched in that case.
+    [[nodiscard]] bool TryGetCornerTexcoord(
+        const HalfedgeMesh::Mesh& mesh,
+        HalfedgeHandle h,
+        glm::vec2& outUv);
+
+    /// True when two corners incident to the same vertex carry different UVs,
+    /// i.e. the mesh has at least one UV seam that a per-vertex attribute
+    /// buffer cannot represent. Always false when UVs are vertex-owned.
+    /// `epsilon` is compared per component.
+    [[nodiscard]] bool HasTexcoordSeams(
+        const HalfedgeMesh::Mesh& mesh,
+        float epsilon = 0.0f);
+
+    /// Count the GPU vertices an indexed upload needs for this mesh, i.e. the
+    /// number of distinct (vertex, UV) pairs. Equals `VertexCount()` when the
+    /// mesh has no seams. Slice B uses this to size vertex buffers.
+    [[nodiscard]] std::size_t CountTexcoordSplitVertices(
+        const HalfedgeMesh::Mesh& mesh,
+        float epsilon = 0.0f);
 
     struct TriangleFaceView
     {
