@@ -20,15 +20,24 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `GEOM-066`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - unblocked: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
+- unblocked: `GRAPHICS-135` — RenderPrepFrame dominates frame time with a per-frame task-graph rebuild (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
+- unblocked: `ASSETIO-012` — Two hand-maintained format capability tables have already drifted (tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md)
 - unblocked: `BUG-134` — ImGui adapter panel draw-list test fails intermittently (tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
+- unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
+- unblocked: `UI-046` — Sandbox cannot export geometry at all (tasks/backlog/ui/UI-046-sandbox-geometry-export.md)
+- unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
+- unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
+- unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
+- unblocked: `UI-050` — Vector-field properties cannot be visualized (tasks/backlog/ui/UI-050-vector-field-property-visualization.md)
+- unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 
 ## Theme G — Active bugs
 
@@ -40,6 +49,13 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-110` — Implicit smoothing applies boundary pins after rather than during solve (tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot (tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md)
+- unblocked: `BUG-137` — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh (tasks/backlog/bugs/BUG-137-direct-mesh-import-atlas-replaces-topology.md)
+- unblocked: `BUG-138` — Async mesh geometry jobs never execute and stay Pending forever (tasks/backlog/bugs/BUG-138-async-mesh-geometry-jobs-never-execute.md)
+- unblocked: `BUG-139` — ImGui receives no key events, so every editor text field is append-only (tasks/backlog/bugs/BUG-139-imgui-adapter-drops-key-events.md)
+- unblocked: `BUG-140` — Mesh denoise reports Applied/Success after moving zero vertices (tasks/backlog/bugs/BUG-140-mesh-denoise-reports-success-after-zero-movement.md)
+- unblocked: `BUG-141` — Editor geometry-processing diagnostics are mislabeled, duplicated, unscoped, and unactionable (tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md)
+- unblocked: `BUG-142` — AssetIO queue shows 0% progress on a completed import row (tasks/backlog/bugs/BUG-142-assetio-queue-terminal-row-zero-progress.md)
+- unblocked: `BUG-143` — Corner-UV `gpu;vulkan` smoke exceeds the 30 s cohort timeout (tasks/backlog/bugs/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md)
 
 ## Theme H — Agentic workflow hardening
 

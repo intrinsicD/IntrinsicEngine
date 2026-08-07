@@ -168,6 +168,16 @@ Asset routing, decoding, materialization, texture-upload requests, and default
 import recipe policy remain runtime/asset owned; the sandbox app only requests
 the workflow.
 
+Mesh import preserves the source topology. A closed manifold file materializes
+as an entity with the same vertex, edge, halfedge, and face counts and no
+boundary; generated UV-atlas seams are published as `h:texcoord` on the corner
+domain rather than by splitting the mesh, and the per-vertex duplication an
+indexed GPU vertex buffer needs happens at upload. The enrichment diagnostic on
+the imported entity, and the matching `Direct mesh enrichment applied` log line,
+report the resolved counts, which element domain owns the UVs, the atlas
+provenance and backend, and how many vertices the GPU upload duplicates, so that
+duplication is never silent. See `BUG-137`.
+
 `File / Import` is a linear path -> payload-hint -> import workflow. The path
 field remains editable whenever the window is bound, while the runtime scene snapshot
 independently reports whether the payload chooser and import command are ready.

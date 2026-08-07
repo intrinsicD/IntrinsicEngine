@@ -127,8 +127,17 @@ namespace Extrinsic::Runtime
             snapshot.Position = PropertyRevisionOf(properties, kPosition);
             if (meshDefaults)
             {
-                snapshot.Texcoord =
-                    PropertyRevisionOf(properties, "v:texcoord");
+                // BUG-137 — track whichever domain owns the UVs. A corner-UV
+                // mesh has no `v:texcoord`, so watching only the vertex channel
+                // left every seam-mesh UV edit invisible to the reupload plan.
+                const std::optional<std::uint64_t> cornerRevision =
+                    view.HalfedgeSource != nullptr
+                        ? view.HalfedgeSource->Properties.FindPropertyRevision(
+                              "h:texcoord")
+                        : std::nullopt;
+                snapshot.Texcoord = cornerRevision.has_value()
+                    ? *cornerRevision
+                    : PropertyRevisionOf(properties, "v:texcoord");
             }
 
             if (bindings != nullptr)

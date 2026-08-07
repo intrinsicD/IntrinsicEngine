@@ -81,6 +81,15 @@ is retired; see
 (`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the
 runtime derived-job graph.
 
+The 2026-08-07 Sandbox UI workflow pass added
+[`rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md`](rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md):
+a frame-pacing capture with only the reference triangle in the scene shows
+`render_prepare_micros` flat at ~69 ms per frame (~92% of frame time), and
+`RenderPrepPipeline::Run()` rebuilds a nine-pass `Core::Dag::TaskGraph` every
+frame in which every pass is `MainThreadOnly, AllowParallel = false`. The task
+requires the controlled A/B before any change, because the captured numbers come
+from a Debug + ASan/UBSan build and are not a performance claim.
+
 The research-control-surface recipe/config seam (see Theme H `PROC-010` for the
 proposed framing) opens new Theme B leaves that close the gap where an activated
 `RenderRecipeConfig` preview cannot yet reach the live frame. The fail-closed
@@ -378,6 +387,23 @@ Open members (kernel-seam priority set first):
   (blocked by `BUG-096` and facade retirement; expensive readiness derivations
   are feature-owned only when concretely required).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
+
+The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` driven end-to-end through
+the promoted Vulkan build) opened the capability-gap set below alongside
+`BUG-137..142` in Theme G. `UI-051` covers only the remaining domain windows;
+the method panels stay owned by `RUNTIME-209/211/212/213` and
+`UI-040/041/043/044/045`, and disabled-reason tooltips stay owned by `UI-037`.
+- [`runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md`](runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
+  (no light is authored anywhere, so every shading path collapses to ambient).
+- [`ui/UI-046-sandbox-geometry-export.md`](ui/UI-046-sandbox-geometry-export.md)
+  (the geometry IO writers are unreachable from the app).
+- [`ui/UI-047-file-chooser-for-import-and-scene-paths.md`](ui/UI-047-file-chooser-for-import-and-scene-paths.md)
+  (blocked in practice by `BUG-139`).
+- [`ui/UI-048-first-run-workspace-and-layout-persistence.md`](ui/UI-048-first-run-workspace-and-layout-persistence.md).
+- [`ui/UI-049-editor-panel-sizing-and-readability.md`](ui/UI-049-editor-panel-sizing-and-readability.md).
+- [`ui/UI-050-vector-field-property-visualization.md`](ui/UI-050-vector-field-property-visualization.md).
+- [`ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md`](ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md).
+- [`assets/ASSETIO-012-single-source-format-capability-table.md`](assets/ASSETIO-012-single-source-format-capability-table.md).
 
 ### Theme G — Active bugs
 

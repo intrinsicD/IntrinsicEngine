@@ -928,3 +928,59 @@ TEST(RuntimeSceneSerialization, LegacyMeshSurfaceDomainLoadsAsUnknown)
     EXPECT_EQ(roundTripped->Presentations.front().Slots.front().Property.Domain,
               Runtime::GeometryElementDomain::Unknown);
 }
+
+// BUG-137 — a seam-carrying mesh keeps its UVs on the corner domain and has no
+// `v:texcoord` at all. Saving only the vertex channel dropped them silently on
+// round-trip, so the scene reloaded without its parameterization.
+TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesCornerDomainTexcoords)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    auto& raw = source.Raw();
+
+    // Replace the vertex-domain UVs with corner-domain UVs carrying a seam:
+    // the two corners targeting vertex 0 hold different values.
+    auto& vertices = raw.get<GS::Vertices>(mesh);
+    auto vertexTexcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
+    vertices.Properties.Remove(vertexTexcoords);
+    ASSERT_FALSE(vertices.Properties.Exists("v:texcoord"));
+
+    auto& halfedges = raw.get<GS::Halfedges>(mesh);
+    const std::vector<glm::vec2> cornerUvs{
+        {0.00f, 0.00f}, {1.00f, 0.00f}, {0.00f, 1.00f},
+        {0.50f, 0.50f}, {0.25f, 0.75f}, {0.75f, 0.25f},
+    };
+    halfedges.Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.0f})
+        .Vector() = cornerUvs;
+
+    MemoryIOBackend backend;
+    auto saved = Runtime::SaveSceneDocument(source, "scene.json", backend);
+    ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
+
+    const nlohmann::json parsed =
+        nlohmann::json::parse(backend.Text("scene.json"));
+    ASSERT_TRUE(
+        parsed["entities"][0]["geometrySources"]["halfedges"]["texcoords"].is_array());
+    EXPECT_EQ(
+        parsed["entities"][0]["geometrySources"]["halfedges"]["texcoords"].size(),
+        cornerUvs.size());
+    EXPECT_FALSE(
+        parsed["entities"][0]["geometrySources"]["vertices"].contains("texcoords"));
+
+    ECS::Scene::Registry loaded;
+    auto loadedResult = Runtime::LoadSceneDocument(loaded, "scene.json", backend);
+    ASSERT_TRUE(loadedResult.has_value()) << static_cast<int>(loadedResult.error());
+
+    const ECS::EntityHandle loadedMesh = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(loadedMesh, ECS::InvalidEntityHandle);
+    const auto& loadedHalfedges = loaded.Raw().get<GS::Halfedges>(loadedMesh);
+    const auto reloaded =
+        loadedHalfedges.Properties.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(reloaded.IsValid());
+    ASSERT_EQ(reloaded.Vector().size(), cornerUvs.size());
+    for (std::size_t i = 0; i < cornerUvs.size(); ++i)
+    {
+        EXPECT_FLOAT_EQ(reloaded.Vector()[i].x, cornerUvs[i].x) << "corner " << i;
+        EXPECT_FLOAT_EQ(reloaded.Vector()[i].y, cornerUvs[i].y) << "corner " << i;
+    }
+}

@@ -168,6 +168,35 @@ and graphics consume these tokens according to the canonical
 [geometry property CPU/GPU coherence contract](property-coherence.md); geometry
 itself remains GPU-agnostic.
 
+## Texture coordinates are corner-domain capable
+
+Texture coordinates are not a vertex-only channel. A UV seam requires two or
+more distinct UVs at one vertex, so a mesh that carries seams stores them as
+`h:texcoord` on the halfedge/corner domain; `v:texcoord` remains correct — and
+is what import publishes — only for meshes with no seam. This is the
+representation OBJ already uses natively (`f v/vt/vn`); the vertex-domain
+assumption was the lossy one.
+
+The canonical resolution order is **corner over vertex**, so meshes migrate
+incrementally rather than through a flag day:
+
+1. a correctly sized `h:texcoord` wins;
+2. otherwise a correctly sized `v:texcoord` applies;
+3. otherwise the mesh has no UVs.
+
+A property whose size does not match its domain is ignored rather than trusted,
+so a stale buffer can never be read out of range.
+`Geometry::MeshUtils::ResolveTexcoordDomain`, `TryGetCornerTexcoord`,
+`HasTexcoordSeams`, and `CountTexcoordSplitVertices` implement this order and
+are the only supported way to read a mesh's UVs. Do not write a new method,
+exporter, or binding that reads `v:texcoord` directly.
+
+The seam is a **UV fact, not a topology fact**. Publishing UVs must never change
+element-domain cardinality: a closed manifold stays a closed manifold with the
+same vertex/edge/halfedge counts, and the duplication an indexed GPU vertex
+buffer needs happens once at upload, where one GPU vertex is emitted per
+distinct `(vertex, UV)` pair. See `BUG-137`.
+
 ## Naming and count terminology
 
 - Prefer `PascalCase` for public functions and methods, matching the dominant

@@ -163,7 +163,7 @@ namespace Extrinsic::Runtime
             {
                 ++diagnostics->GeneratedUvAtlasPrimitives;
             }
-            diagnostics->UvAtlasSeamSplitVertices += uvDiagnostics.SeamSplitVertexCount;
+            diagnostics->UvAtlasGpuSplitVertices += uvDiagnostics.GpuSplitVertexCount;
             diagnostics->LastUvAtlasChartCount = uvDiagnostics.ChartCount;
             diagnostics->LastUvAtlasWidth = uvDiagnostics.AtlasWidth;
             diagnostics->LastUvAtlasHeight = uvDiagnostics.AtlasHeight;

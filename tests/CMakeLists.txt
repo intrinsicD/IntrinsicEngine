@@ -247,6 +247,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
         Test.MeshGeometryExtraction.cpp
+        Test.CornerTexcoordUpload.cpp
         Test.MeshPrimitiveViewExtraction.cpp
         Test.ProgressivePoissonGpuBackend.cpp
         Test.RenderArtifactPublication.cpp
@@ -468,6 +469,7 @@ set(_geometry_test_files
     Test_HalfedgeMeshPropertyAccess.cpp
     Test_HalfedgeMeshTopology.cpp
     Test.MeshTopologyUtilities.cpp
+    Test.CornerTexcoords.cpp
     Test_Validation.cpp
     Test_Curvature.cpp
     Test.CurvatureTensor.cpp

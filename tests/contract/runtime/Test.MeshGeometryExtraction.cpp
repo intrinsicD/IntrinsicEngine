@@ -114,6 +114,53 @@ namespace
         p.Vector() = faceHe;
     }
 
+    void SetCornerTexcoords(gs::Halfedges& h, const std::vector<glm::vec2>& uvs)
+    {
+        auto uv = h.Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2(0.0f));
+        uv.Vector() = uvs;
+    }
+
+    // BUG-137 Slice B — two triangles sharing edge (v0, v2). v0 and v2 each
+    // have two interior corners, so they are the only vertices whose corner
+    // UVs can disagree and force a GPU-side split.
+    //
+    //   v3 ---- v2      f0 ring = [v1, v2, v0]
+    //   |     / |       f1 ring = [v2, v3, v0]
+    //   |   /   |
+    //   v0 ---- v1
+    void AttachSharedEdgeQuadMeshSources(Registry& scene, EntityHandle entity)
+    {
+        auto& raw = scene.Raw();
+        auto& vertices = raw.emplace<gs::Vertices>(entity);
+        SetPositions(vertices, {
+            {0.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {1.0f, 1.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        });
+        auto& edges = raw.emplace<gs::Edges>(entity);
+        (void)edges;
+        auto& halfedges = raw.emplace<gs::Halfedges>(entity);
+        SetHalfedges(halfedges,
+                     /*toVertex*/ {1u, 2u, 0u, 2u, 3u, 0u},
+                     /*next*/     {1u, 2u, 0u, 4u, 5u, 3u},
+                     /*face*/     {0u, 0u, 0u, 1u, 1u, 1u});
+        auto& faces = raw.emplace<gs::Faces>(entity);
+        SetFaces(faces, {0u, 3u});
+    }
+
+    EntityHandle MakeQuadMeshRenderable(Registry& scene)
+    {
+        namespace E = Extrinsic::ECS::Components;
+        namespace G = Extrinsic::Graphics::Components;
+        const EntityHandle entity = scene.Create();
+        auto& raw = scene.Raw();
+        raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        raw.emplace<G::RenderSurface>(entity);
+        AttachSharedEdgeQuadMeshSources(scene, entity);
+        return entity;
+    }
+
     // Attach a single-triangle mesh `GeometrySources` (Vertices+Halfedges+Faces)
     // to `entity` so `BuildConstView` resolves `Domain::Mesh`. Halfedge wiring
     // mirrors `Test.MeshGeometryPacker.cpp::BuildSingleTriangle` so the packer
@@ -1532,6 +1579,85 @@ TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDi
                                   /*baseFrame=*/800u,
                                   framesInFlight);
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// BUG-137 Slice B — corner-domain UVs are de-indexed into the GPU vertex
+// buffer; the authoritative ECS mesh keeps its own vertex count either way.
+TEST(MeshGeometryExtraction, UniformCornerTexcoordsUploadWithoutSplittingVertices)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle entity = MakeQuadMeshRenderable(scene);
+    auto& halfedges = scene.Raw().get<gs::Halfedges>(entity);
+    SetCornerTexcoords(halfedges, std::vector<glm::vec2>(6u, glm::vec2{0.25f, 0.5f}));
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    // No `v:texcoord` is authored on this entity at all, so a zero
+    // missing-texcoord count proves the corner property satisfied the contract.
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
+
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        view->MeshGeometry, residency));
+
+    // Every corner agrees, so no vertex needs duplicating.
+    EXPECT_EQ(residency.VertexCount, 4u);
+    EXPECT_EQ(residency.SurfaceIndexCount, 6u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshGeometryExtraction, DisagreeingCornerTexcoordsSplitOnlyTheSeamVertexAtUpload)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle entity = MakeQuadMeshRenderable(scene);
+    auto& halfedges = scene.Raw().get<gs::Halfedges>(entity);
+    std::vector<glm::vec2> uvs(6u, glm::vec2{0.25f, 0.5f});
+    // Halfedge 3 is face 1's corner at v2; v2's other corner is halfedge 1.
+    // Giving them different UVs makes v2 a seam vertex.
+    uvs[3u] = glm::vec2{0.9f, 0.1f};
+    SetCornerTexcoords(halfedges, uvs);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
+    EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 0u);
+
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        view->MeshGeometry, residency));
+
+    // One extra GPU vertex: 4 source vertices + 1 seam duplicate of v2.
+    EXPECT_EQ(residency.VertexCount, 5u);
+    EXPECT_EQ(residency.SurfaceIndexCount, 6u);
+
+    // The ECS mesh is untouched — the whole point of BUG-137.
+    EXPECT_EQ(scene.Raw().get<gs::Vertices>(entity).Properties.Size(), 4u);
+    EXPECT_EQ(halfedges.Properties.Size(), 6u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

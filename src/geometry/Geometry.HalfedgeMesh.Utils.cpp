@@ -392,6 +392,151 @@ namespace Geometry::MeshUtils
         return cotSum / 2.0;
     }
 
+    // ---------------------------------------------------------------------
+    // BUG-137 — texture-coordinate element-domain resolution.
+    // ---------------------------------------------------------------------
+
+    TexcoordDomain ResolveTexcoordDomain(const HalfedgeMesh::Mesh& mesh) noexcept
+    {
+        const ConstPropertySet halfedges = mesh.HalfedgeProperties();
+        if (const auto corner = halfedges.Get<glm::vec2>(kHalfedgeTexcoordPropertyName);
+            corner && corner.Size() == mesh.HalfedgesSize())
+        {
+            return TexcoordDomain::Halfedge;
+        }
+
+        const ConstPropertySet vertices = mesh.VertexProperties();
+        if (const auto perVertex = vertices.Get<glm::vec2>(kVertexTexcoordPropertyName);
+            perVertex && perVertex.Size() == mesh.VerticesSize())
+        {
+            return TexcoordDomain::Vertex;
+        }
+
+        return TexcoordDomain::None;
+    }
+
+    bool TryGetCornerTexcoord(const HalfedgeMesh::Mesh& mesh,
+                              const HalfedgeHandle h,
+                              glm::vec2& outUv)
+    {
+        if (!mesh.IsValid(h) || mesh.IsDeleted(h))
+            return false;
+
+        switch (ResolveTexcoordDomain(mesh))
+        {
+        case TexcoordDomain::Halfedge:
+        {
+            const auto corner =
+                mesh.HalfedgeProperties().Get<glm::vec2>(kHalfedgeTexcoordPropertyName);
+            outUv = corner.Vector()[h.Index];
+            return true;
+        }
+        case TexcoordDomain::Vertex:
+        {
+            const VertexHandle v = mesh.ToVertex(h);
+            if (!mesh.IsValid(v))
+                return false;
+            const auto perVertex =
+                mesh.VertexProperties().Get<glm::vec2>(kVertexTexcoordPropertyName);
+            outUv = perVertex.Vector()[v.Index];
+            return true;
+        }
+        case TexcoordDomain::None:
+        default:
+            return false;
+        }
+    }
+
+    namespace
+    {
+        // Shared corner walk for the two seam queries below. Invokes
+        // `onCorner(vertexIndex, uv)` for every live corner, in halfedge order.
+        template <typename Fn>
+        bool ForEachLiveCornerTexcoord(const HalfedgeMesh::Mesh& mesh, Fn&& onCorner)
+        {
+            if (ResolveTexcoordDomain(mesh) != TexcoordDomain::Halfedge)
+                return false;
+
+            const auto corner =
+                mesh.HalfedgeProperties().Get<glm::vec2>(kHalfedgeTexcoordPropertyName);
+            const std::vector<glm::vec2>& uvs = corner.Vector();
+
+            const std::size_t halfedgeCount = mesh.HalfedgesSize();
+            for (std::size_t hi = 0u; hi < halfedgeCount; ++hi)
+            {
+                const HalfedgeHandle h{static_cast<std::uint32_t>(hi)};
+                if (mesh.IsDeleted(h))
+                    continue;
+
+                const VertexHandle v = mesh.ToVertex(h);
+                if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                    continue;
+
+                onCorner(static_cast<std::size_t>(v.Index), uvs[hi]);
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool TexcoordsDiffer(const glm::vec2 a,
+                                           const glm::vec2 b,
+                                           const float epsilon) noexcept
+        {
+            return std::abs(a.x - b.x) > epsilon || std::abs(a.y - b.y) > epsilon;
+        }
+    } // namespace
+
+    bool HasTexcoordSeams(const HalfedgeMesh::Mesh& mesh, const float epsilon)
+    {
+        std::unordered_map<std::size_t, glm::vec2> firstSeen{};
+        bool seamFound = false;
+
+        const bool cornerOwned = ForEachLiveCornerTexcoord(
+            mesh,
+            [&](const std::size_t vertexIndex, const glm::vec2 uv)
+            {
+                if (seamFound)
+                    return;
+                const auto [it, inserted] = firstSeen.try_emplace(vertexIndex, uv);
+                if (!inserted && TexcoordsDiffer(it->second, uv, epsilon))
+                    seamFound = true;
+            });
+
+        return cornerOwned && seamFound;
+    }
+
+    std::size_t CountTexcoordSplitVertices(const HalfedgeMesh::Mesh& mesh,
+                                           const float epsilon)
+    {
+        std::unordered_map<std::size_t, std::vector<glm::vec2>> perVertexUvs{};
+
+        const bool cornerOwned = ForEachLiveCornerTexcoord(
+            mesh,
+            [&](const std::size_t vertexIndex, const glm::vec2 uv)
+            {
+                std::vector<glm::vec2>& seen = perVertexUvs[vertexIndex];
+                for (const glm::vec2 existing : seen)
+                {
+                    if (!TexcoordsDiffer(existing, uv, epsilon))
+                        return;
+                }
+                seen.push_back(uv);
+            });
+
+        if (!cornerOwned)
+            return mesh.VertexCount();
+
+        std::size_t total = 0u;
+        for (const auto& [vertexIndex, uvs] : perVertexUvs)
+        {
+            (void)vertexIndex;
+            total += uvs.size();
+        }
+
+        // Vertices with no live incident corner still occupy a slot.
+        const std::size_t vertexCount = mesh.VertexCount();
+        return total >= vertexCount ? total : vertexCount;
+    }
+
     HalfedgeProperty<double> ClampedHalfedgeCotan(HalfedgeMesh::Mesh& mesh, double maxMagnitude)
     {
         HalfedgeProperty<double> cot(mesh.HalfedgeProperties().GetOrAdd<double>("h:clamped_cotan", 0.0));

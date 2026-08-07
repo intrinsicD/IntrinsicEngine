@@ -617,6 +617,63 @@ namespace Extrinsic::Runtime
             enrichment->Diagnostic = std::move(diagnostic);
         }
 
+        [[nodiscard]] const char* DescribeUvProvenance(
+            const RuntimeMeshResolvedUvProvenance provenance) noexcept
+        {
+            switch (provenance)
+            {
+            case RuntimeMeshResolvedUvProvenance::AuthoredPreserved:
+                return "authored";
+            case RuntimeMeshResolvedUvProvenance::GeneratedAtlas:
+                return "generated-atlas";
+            case RuntimeMeshResolvedUvProvenance::None:
+                break;
+            }
+            return "none";
+        }
+
+        // BUG-137 — the enrichment diagnostic is the only place a user sees
+        // what import actually produced, so it names the preserved topology and
+        // where the UV seam duplication landed instead of just "successfully".
+        [[nodiscard]] std::string DescribeDirectMeshEnrichment(
+            const RuntimeMeshMaterializationDiagnostics& diagnostics)
+        {
+            std::string message =
+                "Direct mesh enrichment applied successfully: "
+                + std::to_string(diagnostics.ResolvedVertexCount)
+                + " vertices, "
+                + std::to_string(diagnostics.ResolvedFaceCount)
+                + " faces.";
+            if (diagnostics.TexcoordsOnCornerDomain)
+            {
+                message += " UVs are per-corner ("
+                    + std::string{DescribeUvProvenance(
+                        diagnostics.TexcoordProvenance)}
+                    + "); GPU upload duplicates "
+                    + std::to_string(diagnostics.GpuSplitVertexCount)
+                    + " vertices at the seams.";
+            }
+            else if (diagnostics.ResolvedTexcoordsValid)
+            {
+                message += " UVs are per-vertex ("
+                    + std::string{DescribeUvProvenance(
+                        diagnostics.TexcoordProvenance)}
+                    + "); no UV seams.";
+            }
+            else
+            {
+                message += " No usable texture coordinates were resolved.";
+            }
+            if (diagnostics.UnmappedCornerCount != 0u)
+            {
+                message += " "
+                    + std::to_string(diagnostics.UnmappedCornerCount)
+                    + " corners inherited a neighbouring UV because the atlas "
+                      "dropped their face.";
+            }
+            return message;
+        }
+
         // The deferred post-process only carries its outcome forward in the
         // shared state record its callbacks capture; the envelope proves the
         // worker body ran, since an empty envelope is a dropped job.
@@ -933,6 +990,9 @@ namespace Extrinsic::Runtime
                             }
 
                             auto& raw = scene->Raw();
+                            const RuntimeMeshMaterializationDiagnostics&
+                                meshDiagnostics =
+                                    state->Materialized->Diagnostics;
                             Geometry::HalfedgeMesh::Mesh mesh =
                                 std::move(state->Materialized->Mesh);
                             ECS::Components::GeometrySources::PopulateFromMesh(
@@ -945,7 +1005,27 @@ namespace Extrinsic::Runtime
                                 state->Entity,
                                 state->Job,
                                 JobState::Published,
-                                "Direct mesh enrichment applied successfully.");
+                                DescribeDirectMeshEnrichment(meshDiagnostics));
+                            // BUG-137 — the import preserves source topology,
+                            // so any vertex duplication now happens at GPU
+                            // upload. Report it rather than computing it and
+                            // dropping it on the floor.
+                            Core::Log::Info(
+                                "[Runtime] Direct mesh enrichment applied: path='{}' vertices={} (source {}) faces={} (source polygons {}) uv-domain={} uv-provenance={} atlas-backend='{}' gpu-split-vertices={}",
+                                state->Path,
+                                meshDiagnostics.ResolvedVertexCount,
+                                meshDiagnostics.SourceVertexCount,
+                                meshDiagnostics.ResolvedFaceCount,
+                                meshDiagnostics.SourceFaceCount,
+                                meshDiagnostics.TexcoordsOnCornerDomain
+                                    ? "corner"
+                                    : (meshDiagnostics.ResolvedTexcoordsValid
+                                           ? "vertex"
+                                           : "none"),
+                                DescribeUvProvenance(
+                                    meshDiagnostics.TexcoordProvenance),
+                                meshDiagnostics.AtlasBackendName,
+                                meshDiagnostics.GpuSplitVertexCount);
 
                             if (textureBake != nullptr)
                             {

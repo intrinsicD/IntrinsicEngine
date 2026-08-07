@@ -702,6 +702,33 @@ namespace Extrinsic::Runtime
                 return diagnostics;
             }
 
+            // BUG-137 Slice B — corner-domain UVs satisfy this contract too.
+            // `h:texcoord` (MeshUtils::kHalfedgeTexcoordPropertyName) is the
+            // canonical seam-carrying representation; when it is present and
+            // correctly sized, the per-vertex property is not required and its
+            // absence is not a fallback.
+            if (view.HalfedgeSource != nullptr)
+            {
+                const auto cornerTexcoords =
+                    view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord");
+                const auto toVertex =
+                    view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                        PropertyNames::kHalfedgeToVertex);
+                if (cornerTexcoords && toVertex &&
+                    cornerTexcoords.Vector().size() == toVertex.Vector().size())
+                {
+                    for (const glm::vec2 uv : cornerTexcoords.Vector())
+                    {
+                        if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                        {
+                            diagnostics.NonFinite = true;
+                            return diagnostics;
+                        }
+                    }
+                    return diagnostics;
+                }
+            }
+
             const auto texcoords =
                 view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
             if (!texcoords || texcoords.Vector().size() != vertexCount)

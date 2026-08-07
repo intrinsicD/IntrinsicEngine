@@ -11,6 +11,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -19,6 +20,7 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -651,6 +653,154 @@ namespace
         return out.str();
     }
 
+    [[nodiscard]] std::filesystem::path RepoRoot()
+    {
+        return std::filesystem::path(__FILE__)
+            .parent_path()
+            .parent_path()
+            .parent_path()
+            .parent_path();
+    }
+
+    // BUG-137 — a closed genus-0 manifold: 8 vertices, 18 edges, 12 triangles,
+    // Euler characteristic 2, no boundary. A UV atlas cannot flatten it without
+    // cutting, so it is the smallest fixture that forces a seam.
+    [[nodiscard]] std::string ClosedCubeObjText()
+    {
+        return
+            "v 0 0 0\n"
+            "v 1 0 0\n"
+            "v 1 1 0\n"
+            "v 0 1 0\n"
+            "v 0 0 1\n"
+            "v 1 0 1\n"
+            "v 1 1 1\n"
+            "v 0 1 1\n"
+            "f 1 4 3\n"
+            "f 1 3 2\n"
+            "f 5 6 7\n"
+            "f 5 7 8\n"
+            "f 1 2 6\n"
+            "f 1 6 5\n"
+            "f 2 3 7\n"
+            "f 2 7 6\n"
+            "f 3 4 8\n"
+            "f 3 8 7\n"
+            "f 4 1 5\n"
+            "f 4 5 8\n";
+    }
+
+    struct MeshTopologyCounts
+    {
+        std::size_t Vertices{0};
+        std::size_t Edges{0};
+        std::size_t Halfedges{0};
+        std::size_t Faces{0};
+        std::size_t BoundaryHalfedges{0};
+    };
+
+    [[nodiscard]] MeshTopologyCounts ReadMeshTopologyCounts(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        MeshTopologyCounts counts{};
+        auto& raw = registry.Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        EXPECT_TRUE(view.Valid());
+        EXPECT_EQ(view.ActiveDomain, GS::Domain::Mesh);
+        if (!view.Valid() || view.ActiveDomain != GS::Domain::Mesh)
+        {
+            return counts;
+        }
+
+        counts.Vertices = view.VerticesAlive();
+        counts.Edges = view.EdgesAlive();
+        counts.Halfedges = view.HalfedgesTotal();
+        counts.Faces = view.FacesAlive();
+
+        EXPECT_NE(view.HalfedgeSource, nullptr);
+        if (view.HalfedgeSource == nullptr)
+        {
+            return counts;
+        }
+        const auto halfedgeFaces =
+            view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                GS::PropertyNames::kHalfedgeFace);
+        EXPECT_TRUE(halfedgeFaces.IsValid());
+        if (!halfedgeFaces.IsValid())
+        {
+            return counts;
+        }
+        constexpr std::uint32_t invalidIndex =
+            std::numeric_limits<std::uint32_t>::max();
+        for (const std::uint32_t face : halfedgeFaces.Vector())
+        {
+            if (face == invalidIndex)
+            {
+                ++counts.BoundaryHalfedges;
+            }
+        }
+        return counts;
+    }
+
+    void ExpectMeshCornerTexcoordsFinite(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        auto& raw = registry.Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        ASSERT_TRUE(view.Valid());
+        ASSERT_EQ(view.ActiveDomain, GS::Domain::Mesh);
+        ASSERT_NE(view.HalfedgeSource, nullptr);
+
+        const auto texcoords =
+            view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord");
+        ASSERT_TRUE(texcoords.IsValid());
+        ASSERT_EQ(texcoords.Vector().size(), view.HalfedgesTotal());
+        for (const glm::vec2 texcoord : texcoords.Vector())
+        {
+            EXPECT_TRUE(std::isfinite(texcoord.x));
+            EXPECT_TRUE(std::isfinite(texcoord.y));
+        }
+    }
+
+    // The seam must actually be present, otherwise "topology preserved" would
+    // pass trivially on a mesh the atlas never needed to cut.
+    [[nodiscard]] bool MeshHasCornerTexcoordSeam(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        auto& raw = registry.Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        if (!view.Valid() || view.HalfedgeSource == nullptr)
+        {
+            return false;
+        }
+        const auto texcoords =
+            view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord");
+        const auto toVertex =
+            view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                GS::PropertyNames::kHalfedgeToVertex);
+        if (!texcoords.IsValid() || !toVertex.IsValid() ||
+            texcoords.Vector().size() != toVertex.Vector().size())
+        {
+            return false;
+        }
+
+        std::unordered_map<std::uint32_t, glm::vec2> firstSeen{};
+        for (std::size_t i = 0u; i < texcoords.Vector().size(); ++i)
+        {
+            const auto [it, inserted] =
+                firstSeen.try_emplace(toVertex.Vector()[i],
+                                      texcoords.Vector()[i]);
+            if (!inserted && it->second != texcoords.Vector()[i])
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     template <class T>
     void AppendScalar(std::vector<std::byte>& out, const T value)
     {
@@ -905,6 +1055,24 @@ namespace
             view.VertexSource->Properties.Exists(propertyName);
     }
 
+    [[nodiscard]] bool MeshHasHalfedgeProperty(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity,
+        const std::string_view propertyName)
+    {
+        if (!engine.Worlds().Get(engine.ActiveWorld())->IsValid(entity))
+        {
+            return false;
+        }
+
+        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        return view.Valid() &&
+            view.ActiveDomain == GS::Domain::Mesh &&
+            view.HalfedgeSource != nullptr &&
+            view.HalfedgeSource->Properties.Exists(propertyName);
+    }
+
     struct ComposedNormalBakeProbe
     {
         Runtime::TextureBakeService* Service{nullptr};
@@ -925,7 +1093,11 @@ namespace
         const ECS::EntityHandle entity,
         const ComposedNormalBakeProbe& probe)
     {
-        return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
+        // BUG-137 — resolved UVs may land on either element domain, so
+        // readiness follows the canonical corner-over-vertex resolution order
+        // rather than assuming `v:texcoord`.
+        return (MeshHasVertexProperty(engine, entity, "v:texcoord") ||
+                MeshHasHalfedgeProperty(engine, entity, "h:texcoord")) &&
             MeshHasVertexProperty(engine, entity, "v:normal") &&
             probe.Service != nullptr &&
             probe.Service->Stats().BakeRequestsRejected > 0u;
@@ -1325,6 +1497,328 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
         });
     ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
         engine, *meshEntity, bakeProbe);
+
+    engine.Shutdown();
+}
+
+// BUG-137 — import used to publish the UV atlas *output* mesh as the entity
+// mesh, so a closed manifold arrived as a chart-split soup with every vertex on
+// a boundary. The seam now lives on the corner domain and the topology survives.
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesClosedManifoldTopology)
+{
+    TempAssetFile meshFile("bug137_closed_cube.obj", ClosedCubeObjText());
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
+            },
+            4096u));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
+
+    auto imported =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    meshEntity = FindFirstEntityWithDomain(
+        *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
+
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const MeshTopologyCounts counts =
+        ReadMeshTopologyCounts(scene, *meshEntity);
+    EXPECT_EQ(counts.Vertices, 8u);
+    EXPECT_EQ(counts.Edges, 18u);
+    EXPECT_EQ(counts.Halfedges, 36u);
+    EXPECT_EQ(counts.Faces, 12u);
+    EXPECT_EQ(counts.BoundaryHalfedges, 0u);
+    EXPECT_EQ(
+        static_cast<std::int64_t>(counts.Vertices) -
+            static_cast<std::int64_t>(counts.Edges) +
+            static_cast<std::int64_t>(counts.Faces),
+        2);
+
+    // UVs are resolved, finite, and carried without changing cardinality.
+    ExpectMeshCornerTexcoordsFinite(scene, *meshEntity);
+    EXPECT_TRUE(MeshHasCornerTexcoordSeam(scene, *meshEntity));
+    ExpectMeshLacksVertexProperty(scene, *meshEntity, "v:texcoord");
+
+    engine.Shutdown();
+}
+
+// BUG-137 acceptance — the asset the bug was reported against. It is a closed
+// genus-2 manifold (Euler characteristic -2) that import used to publish as
+// 21464 vertices / 21745 edges with every vertex on a boundary.
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportOfSculptFixturePreservesItsManifold)
+{
+    const std::filesystem::path fixture = RepoRoot() / "tests/data/sculpt.obj";
+    ASSERT_TRUE(std::filesystem::exists(fixture)) << fixture.string();
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
+            },
+            4096u));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
+
+    auto imported =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = fixture.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    meshEntity = FindFirstEntityWithDomain(
+        *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
+
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const MeshTopologyCounts counts =
+        ReadMeshTopologyCounts(scene, *meshEntity);
+    EXPECT_EQ(counts.Vertices, 3669u);
+    EXPECT_EQ(counts.Edges, 11013u);
+    EXPECT_EQ(counts.Halfedges, 22026u);
+    EXPECT_EQ(counts.Faces, 7342u);
+    EXPECT_EQ(counts.BoundaryHalfedges, 0u);
+    EXPECT_EQ(
+        static_cast<std::int64_t>(counts.Vertices) -
+            static_cast<std::int64_t>(counts.Edges) +
+            static_cast<std::int64_t>(counts.Faces),
+        -2);
+
+    ExpectMeshCornerTexcoordsFinite(scene, *meshEntity);
+    EXPECT_TRUE(MeshHasCornerTexcoordSeam(scene, *meshEntity));
+    ExpectMeshLacksVertexProperty(scene, *meshEntity, "v:texcoord");
+
+    engine.Shutdown();
+}
+
+// BUG-137 slice D — an OBJ that authors per-corner UVs must keep them. The
+// reader no longer splits positions to represent the seam, so the atlas must
+// not re-parameterize the file either.
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesAuthoredCornerUvs)
+{
+    // A quad split into two triangles; vertex 1 carries (0,0) in the first
+    // triangle and (0.5,0.5) in the second — a seam a per-vertex channel
+    // cannot express.
+    TempAssetFile meshFile(
+        "bug137_authored_corner_uvs.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 1 1 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 1 1\n"
+        "vt 0 1\n"
+        "vt 0.5 0.5\n"
+        "f 1/1 2/2 3/3\n"
+        "f 1/5 3/3 4/4\n");
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
+            },
+            4096u));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
+
+    auto imported =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    meshEntity = FindFirstEntityWithDomain(
+        *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
+
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const MeshTopologyCounts counts =
+        ReadMeshTopologyCounts(scene, *meshEntity);
+    EXPECT_EQ(counts.Vertices, 4u) << "The authored UV seam must not split the mesh.";
+    EXPECT_EQ(counts.Faces, 2u);
+
+    ExpectMeshCornerTexcoordsFinite(scene, *meshEntity);
+    EXPECT_TRUE(MeshHasCornerTexcoordSeam(scene, *meshEntity));
+
+    // The authored UVs themselves must survive, not merely "some" UVs: every
+    // corner UV present in the file must appear on the entity.
+    auto& raw = scene.Raw();
+    const GS::ConstSourceView view = GS::BuildConstView(raw, *meshEntity);
+    ASSERT_NE(view.HalfedgeSource, nullptr);
+    const auto cornerUvs =
+        view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(cornerUvs.IsValid());
+    for (const glm::vec2 authored : {glm::vec2{0.0f, 0.0f},
+                                     glm::vec2{1.0f, 0.0f},
+                                     glm::vec2{1.0f, 1.0f},
+                                     glm::vec2{0.0f, 1.0f},
+                                     glm::vec2{0.5f, 0.5f}})
+    {
+        EXPECT_NE(std::ranges::find(cornerUvs.Vector(), authored),
+                  cornerUvs.Vector().end())
+            << "authored uv (" << authored.x << "," << authored.y
+            << ") was not preserved; the atlas likely re-parameterized the mesh.";
+    }
+
+    engine.Shutdown();
+}
+
+// BUG-137 — a non-manifold source cannot become a halfedge mesh, so import
+// rebuilds it as a per-corner renderable soup. Atlas UVs must still land on it:
+// there every corner already owns a vertex, so they stay vertex-domain.
+TEST(RuntimeAssetImportFormatCoverage, NonManifoldObjImportStillResolvesVertexUvs)
+{
+    // Three triangles share edge (1,2), so that edge has three incident faces.
+    TempAssetFile meshFile(
+        "bug137_non_manifold_fan.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "v 0 -1 0\n"
+        "v 0 0 1\n"
+        "f 1 2 3\n"
+        "f 1 2 4\n"
+        "f 1 2 5\n");
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
+            },
+            4096u));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
+
+    auto imported =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    meshEntity = FindFirstEntityWithDomain(
+        *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
+
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const MeshTopologyCounts counts =
+        ReadMeshTopologyCounts(scene, *meshEntity);
+    EXPECT_EQ(counts.Faces, 3u);
+    EXPECT_EQ(counts.Vertices, 9u);
+    ExpectMeshVertexTexcoordsFinite(scene, *meshEntity);
+
+    engine.Shutdown();
+}
+
+// The seam-free case must not pay for the corner domain: a planar grid still
+// resolves ordinary per-vertex UVs, which is what every unmigrated consumer
+// still reads.
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportKeepsVertexUvsWhenTheAtlasNeedsNoSeam)
+{
+    TempAssetFile meshFile("bug137_planar_grid.obj", GridObjText(2u));
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
+            },
+            4096u));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
+
+    auto imported =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    meshEntity = FindFirstEntityWithDomain(
+        *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
+
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const MeshTopologyCounts counts =
+        ReadMeshTopologyCounts(scene, *meshEntity);
+    EXPECT_EQ(counts.Vertices, 9u);
+    EXPECT_EQ(counts.Faces, 8u);
+    ExpectMeshVertexTexcoordsFinite(scene, *meshEntity);
+    EXPECT_FALSE(MeshHasCornerTexcoordSeam(scene, *meshEntity));
 
     engine.Shutdown();
 }

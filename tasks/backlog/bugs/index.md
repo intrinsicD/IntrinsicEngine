@@ -5,6 +5,39 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
+promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
+of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
+
+- [`BUG-142` — AssetIO queue shows 0% progress on a completed import row](BUG-142-assetio-queue-terminal-row-zero-progress.md):
+  a successful import row reports stage `Completed` and elapsed `0.29 s` while
+  its progress cell renders a highlighted `0%`. Make the snapshot distinguish
+  absent progress information from zero progress, and keep terminal rows
+  self-consistent.
+- [`BUG-141` — Editor geometry-processing diagnostics are mislabeled, duplicated, unscoped, and unactionable](BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md):
+  a normally queued job is reported as `GeometryProcessingFailed`, each event is
+  emitted twice, the entries then appear in every unrelated mesh domain window
+  and never expire, and parameterization rejections give no cause. Classify,
+  de-duplicate, scope, and expire them, and name the rejection reason.
+- [`BUG-140` — Mesh denoise reports Applied/Success after moving zero vertices](BUG-140-mesh-denoise-reports-success-after-zero-movement.md):
+  denoise reports `Applied` / `Success` / `Written: 21464 / 21464` with
+  `moved: 0` and all 21464 vertices pinned as boundary. Status must derive from
+  a changed count, not a written count, and say why nothing moved.
+- [`BUG-139` — ImGui receives no key events, so every editor text field is append-only](BUG-139-imgui-adapter-drops-key-events.md):
+  `ImGuiAdapter::PumpEvents()` deliberately drops `Platform::KeyEvent` and there
+  is no `io.AddKeyEvent` anywhere, so Backspace, arrows, Enter and every Ctrl
+  shortcut are dead in all editor fields; the five `ImGui_ImplGlfw_*Callback`
+  forwards that would have supplied them are unreachable because the upstream
+  backend is never initialized.
+- [`BUG-138` — Async mesh geometry jobs never execute and stay Pending forever](BUG-138-async-mesh-geometry-jobs-never-execute.md):
+  simplify, subdivide and remesh each queue a CPU job that never completes
+  (observed > 90 s) while all worker threads sit idle, permanently disabling
+  their editor actions. Synchronous operations on the same selection still run.
+- [`BUG-137` — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh](BUG-137-direct-mesh-import-atlas-replaces-topology.md):
+  importing a closed manifold OBJ (3669 V / 11013 E / 7342 F, every edge
+  2-manifold) materializes 21464 vertices, 21745 edges and 21464 boundary
+  vertices, because the entity mesh is built from `atlas.OutputMesh`. The split
+  is already computed as `SeamSplitVertexCount` and never surfaced.
 - [`BUG-134` — ImGui adapter panel draw-list test fails intermittently](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
   one default CPU run reported the panel draw-list contract as its sole
   failure, followed by ten passing isolated repetitions and a clean 4,103-case
