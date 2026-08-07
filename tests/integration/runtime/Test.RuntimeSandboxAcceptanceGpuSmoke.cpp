@@ -1179,6 +1179,45 @@ struct GpuInstanceConfigReadback
     return {};
 }
 
+// BUG-137 — the corner-UV upload path is only provable by reading the geometry
+// record the entity actually resolved to: the ECS vertex count and the GPU
+// vertex count are deliberately different once a mesh carries UV seams.
+struct GpuGeometryRecordReadback
+{
+    bool Found{false};
+    Extrinsic::RHI::GpuGeometryRecord Record{};
+};
+
+[[nodiscard]] GpuGeometryRecordReadback ReadSurfaceGeometryRecordByEntityId(
+    Extrinsic::RHI::IDevice& device,
+    Extrinsic::Graphics::IRenderer& renderer,
+    const std::uint32_t entityId)
+{
+    const GpuInstanceConfigReadback instance = ReadVisibleInstanceConfigByEntityId(
+        device, renderer, entityId, Extrinsic::RHI::GpuRender_Surface);
+    if (!instance.Found)
+    {
+        return {};
+    }
+
+    auto& gpuWorld = renderer.GetGpuWorld();
+    const std::uint32_t slot = instance.Instance.GeometrySlot;
+    if (slot == Extrinsic::RHI::GpuInstanceStatic::InvalidGeometrySlot ||
+        slot >= gpuWorld.GetGeometryCapacity() ||
+        !gpuWorld.GetGeometryRecordBuffer().IsValid())
+    {
+        return {};
+    }
+
+    GpuGeometryRecordReadback result{};
+    result.Found = true;
+    device.ReadBuffer(gpuWorld.GetGeometryRecordBuffer(),
+                      &result.Record,
+                      sizeof(result.Record),
+                      static_cast<std::uint64_t>(slot) * sizeof(result.Record));
+    return result;
+}
+
 [[nodiscard]] GpuSceneInputSummary SummarizeGpuSceneInputs(
     Extrinsic::RHI::IDevice& device,
     Extrinsic::Graphics::IRenderer& renderer)
@@ -6992,5 +7031,218 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << run.Before.OperationalGateFailure << " -> "
         << run.After.OperationalGateFailure;
 
+    engine.Shutdown();
+}
+
+// BUG-137 slice B — `Operational` proof for the corner-UV upload path.
+//
+// A closed cube cannot be UV-unwrapped without a cut, so import publishes its
+// atlas UVs on the corner domain and leaves the mesh a closed manifold. The
+// renderer must resolve that by de-indexing at upload: one GPU vertex per
+// distinct (vertex, UV) pair, positions/normals carried across the split, and
+// the index buffer still addressing all 12 triangles. A CPU contract test
+// cannot prove this — the split is a convention shared between the plan builder
+// and the real vertex-buffer layout, exactly the class of defect BUG-026's
+// post-mortem says only a backend smoke catches.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface)
+{
+    // The enrichment job that publishes the atlas UVs is deferred, so this
+    // smoke needs more than the default 4-frame budget.
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(
+        std::make_unique<ExitAfterFramesApp>(96u, false));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    // Move the reference triangle aside so the center pixel can only come from
+    // the imported cube.
+    SetEntityPosition(*engine.Worlds().Get(engine.ActiveWorld()),
+                      FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle"),
+                      glm::vec3{6.0f, 0.0f, 0.0f});
+
+    TempObjFile obj{
+        "intrinsic_bug137_seam_cube",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 1 1 0\n"
+        "v 0 1 0\n"
+        "v 0 0 1\n"
+        "v 1 0 1\n"
+        "v 1 1 1\n"
+        "v 0 1 1\n"
+        "f 1 4 3\n"
+        "f 1 3 2\n"
+        "f 5 6 7\n"
+        "f 5 7 8\n"
+        "f 1 2 6\n"
+        "f 1 6 5\n"
+        "f 2 3 7\n"
+        "f 2 7 6\n"
+        "f 3 4 8\n"
+        "f 3 8 7\n"
+        "f 4 1 5\n"
+        "f 4 5 8\n",
+    };
+
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
+        Extrinsic::Runtime::RuntimeAssetImportRequest{
+            .Path = obj.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+
+    const EntityHandle cube =
+        FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), obj.Path.filename().string());
+    ASSERT_NE(cube, Extrinsic::ECS::InvalidEntityHandle);
+
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
+    auto& visualization = raw.get<G::VisualizationConfig>(cube);
+    visualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    visualization.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.Bug137SeamCube.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan for seam-split corner-UV readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    // ---- The ECS mesh kept its topology -------------------------------------
+    const gs::ConstSourceView view = gs::BuildConstView(raw, cube);
+    ASSERT_TRUE(view.Valid());
+    ASSERT_EQ(view.ActiveDomain, gs::Domain::Mesh);
+    EXPECT_EQ(view.VerticesAlive(), 8u);
+    EXPECT_EQ(view.EdgesAlive(), 18u);
+    EXPECT_EQ(view.HalfedgesTotal(), 36u);
+    EXPECT_EQ(view.FacesAlive(), 12u);
+
+    ASSERT_NE(view.HalfedgeSource, nullptr);
+    const auto cornerUvs =
+        view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(cornerUvs.IsValid())
+        << "The imported cube did not publish corner-domain UVs; the deferred "
+           "enrichment job may not have completed within the frame budget.";
+    ASSERT_EQ(cornerUvs.Vector().size(), 36u);
+    ASSERT_NE(view.VertexSource, nullptr);
+    EXPECT_FALSE(view.VertexSource->Properties.Exists("v:texcoord"))
+        << "Corner UVs must be the single authority once a seam exists.";
+
+    // ---- The GPU upload de-indexed them -------------------------------------
+    const std::uint32_t cubeRenderId =
+        Extrinsic::Runtime::SelectionController::ToStableEntityId(cube);
+    const GpuGeometryRecordReadback geometry =
+        ReadSurfaceGeometryRecordByEntityId(device, renderer, cubeRenderId);
+    ASSERT_TRUE(geometry.Found)
+        << "The imported cube did not emit a visible surface instance with a "
+           "valid geometry record; render id "
+        << cubeRenderId << ".";
+
+    EXPECT_EQ(geometry.Record.VertexCount, 24u)
+        << "The vertex buffer was not de-indexed to one vertex per distinct "
+           "(vertex, UV) pair. The cube's atlas produces 16 seam duplicates on "
+           "top of its 8 mesh vertices; got "
+        << geometry.Record.VertexCount << ".";
+    EXPECT_EQ(geometry.Record.SurfaceIndexCount, 36u)
+        << "The index buffer no longer addresses all 12 cube triangles after "
+           "the seam split.";
+    EXPECT_NE(geometry.Record.VertexBufferBDA, 0u);
+    EXPECT_NE(geometry.Record.TexcoordBufferBDA, 0u)
+        << "A corner-UV mesh must still publish a texcoord channel BDA.";
+    EXPECT_NE(geometry.Record.NormalBufferBDA, 0u)
+        << "Normals must be carried across the seam split.";
+
+    // ---- And the frame actually drew it -------------------------------------
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
+    EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u);
+    EXPECT_EQ(ex.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(ex.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(ex.MeshGeometryMissingPositions, 0u);
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "DepthPrepass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u);
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const std::uint32_t centerX = static_cast<std::uint32_t>(extent.Width / 2);
+    const std::uint32_t centerY = static_cast<std::uint32_t>(extent.Height / 2);
+    const RgbaPixel center =
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, centerX, centerY);
+    const std::array<RgbaPixel, 3> backgroundSamples{{
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 15) / 16),
+                  static_cast<std::uint32_t>(extent.Height / 16)),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>(extent.Width / 16),
+                  static_cast<std::uint32_t>((extent.Height * 15) / 16)),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 15) / 16),
+                  static_cast<std::uint32_t>((extent.Height * 15) / 16)),
+    }};
+
+    int nearestBackgroundDistance = RgbDistance(center, backgroundSamples[0]);
+    for (const RgbaPixel sample : backgroundSamples)
+    {
+        nearestBackgroundDistance = std::min(nearestBackgroundDistance, RgbDistance(center, sample));
+    }
+    EXPECT_GT(nearestBackgroundDistance, 48)
+        << "The de-indexed seam-split cube did not contribute a distinguishable "
+           "center pixel; a broken split would drop or corrupt its geometry. "
+        << "center=(" << static_cast<int>(center.R) << "," << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ") extent=" << extent.Width << "x" << extent.Height
+        << " gpu vertices=" << geometry.Record.VertexCount
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback counters changed while uploading a corner-UV mesh.";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
 }
