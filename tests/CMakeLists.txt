@@ -247,6 +247,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
         Test.MeshGeometryExtraction.cpp
+        Test.CornerTexcoordUpload.cpp
         Test.MeshPrimitiveViewExtraction.cpp
         Test.ProgressivePoissonGpuBackend.cpp
         Test.RenderArtifactPublication.cpp

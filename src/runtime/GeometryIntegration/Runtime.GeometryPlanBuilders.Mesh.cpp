@@ -8,6 +8,7 @@ module;
 #include <optional>
 #include <span>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -114,11 +115,13 @@ namespace Extrinsic::Runtime
         }
 
         std::vector<std::uint32_t> triangleToFace;
+        std::vector<std::uint32_t> cornerHalfedges;
         const MeshSurfaceTopologyStatus topology =
-            BuildMeshSurfaceTriangleTopology(
+            BuildMeshSurfaceTriangleCornerTopology(
                 view,
                 outBuffer.SurfaceIndices,
-                triangleToFace);
+                triangleToFace,
+                cornerHalfedges);
         if (topology != MeshSurfaceTopologyStatus::Success)
         {
             switch (topology)
@@ -267,16 +270,110 @@ namespace Extrinsic::Runtime
         };
         resolveColors();
 
-        outBuffer.VertexBytes.resize(sizeof(MeshVertex) * vertexCount);
+        // BUG-137 Slice B — de-index corner-domain UVs.
+        //
+        // The GPU path is an indexed mesh with one UV per vertex, while a UV
+        // atlas needs two or more UVs at a seam vertex. When the entity carries
+        // corner UVs (`h:texcoord`, the canonical
+        // `MeshUtils::kHalfedgeTexcoordPropertyName`), the duplication happens
+        // here — once, into the GPU vertex buffer — instead of being baked into
+        // the authoritative mesh topology. Meshes without corner UVs keep the
+        // original per-vertex path byte for byte.
+        std::vector<glm::vec3> splitPositions;
+        std::size_t gpuVertexCount = vertexCount;
+        std::span<const glm::vec3> positionSpan{positions.data(), positions.size()};
+
+        const auto cornerUvProperty =
+            view.HalfedgeSource != nullptr
+                ? view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord")
+                : Geometry::ConstProperty<glm::vec2>{};
+        const bool cornerUvsUsable =
+            static_cast<bool>(cornerUvProperty) &&
+            !cornerHalfedges.empty() &&
+            cornerHalfedges.size() == outBuffer.SurfaceIndices.size();
+
+        if (cornerUvsUsable)
+        {
+            const std::vector<glm::vec2>& cornerUvs = cornerUvProperty.Vector();
+            const bool hasColors = !outBuffer.PackedColors.empty();
+
+            // Per source vertex, the distinct UVs seen so far and the GPU
+            // vertex each one was assigned. Seam vertices carry a handful of
+            // entries, so a short linear scan beats hashing the pair.
+            std::unordered_map<std::uint32_t, std::vector<std::pair<glm::vec2, std::uint32_t>>>
+                emitted;
+            emitted.reserve(vertexCount);
+
+            std::vector<glm::vec3> newNormals;
+            std::vector<glm::vec2> newTexcoords;
+            std::vector<std::uint32_t> newColors;
+            splitPositions.reserve(vertexCount);
+            newNormals.reserve(vertexCount);
+            newTexcoords.reserve(vertexCount);
+            if (hasColors)
+                newColors.reserve(vertexCount);
+
+            for (std::size_t corner = 0u; corner < outBuffer.SurfaceIndices.size(); ++corner)
+            {
+                const std::uint32_t sourceVertex = outBuffer.SurfaceIndices[corner];
+                if (sourceVertex >= vertexCount)
+                {
+                    return Failure(MeshPackStatus::InvalidTopology, outBuffer);
+                }
+
+                const std::uint32_t halfedge = cornerHalfedges[corner];
+                glm::vec2 uv = halfedge < cornerUvs.size()
+                    ? cornerUvs[halfedge]
+                    : texcoords[sourceVertex];
+                if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                {
+                    uv = glm::vec2{0.0f, 0.0f};
+                }
+
+                std::vector<std::pair<glm::vec2, std::uint32_t>>& seen =
+                    emitted[sourceVertex];
+                std::uint32_t gpuIndex = std::numeric_limits<std::uint32_t>::max();
+                for (const auto& [existingUv, existingIndex] : seen)
+                {
+                    if (existingUv.x == uv.x && existingUv.y == uv.y)
+                    {
+                        gpuIndex = existingIndex;
+                        break;
+                    }
+                }
+
+                if (gpuIndex == std::numeric_limits<std::uint32_t>::max())
+                {
+                    gpuIndex = static_cast<std::uint32_t>(splitPositions.size());
+                    splitPositions.push_back(positions[sourceVertex]);
+                    newNormals.push_back(normals[sourceVertex]);
+                    newTexcoords.push_back(uv);
+                    if (hasColors)
+                        newColors.push_back(outBuffer.PackedColors[sourceVertex]);
+                    seen.emplace_back(uv, gpuIndex);
+                }
+
+                outBuffer.SurfaceIndices[corner] = gpuIndex;
+            }
+
+            normals = std::move(newNormals);
+            texcoords = std::move(newTexcoords);
+            if (hasColors)
+                outBuffer.PackedColors = std::move(newColors);
+            positionSpan = std::span<const glm::vec3>{splitPositions};
+            gpuVertexCount = splitPositions.size();
+        }
+
+        outBuffer.VertexBytes.resize(sizeof(MeshVertex) * gpuVertexCount);
         auto* vData = reinterpret_cast<MeshVertex*>(outBuffer.VertexBytes.data());
 
         constexpr float kInf = std::numeric_limits<float>::infinity();
         glm::vec3 minP{+kInf, +kInf, +kInf};
         glm::vec3 maxP{-kInf, -kInf, -kInf};
 
-        for (std::size_t i = 0; i < vertexCount; ++i)
+        for (std::size_t i = 0; i < gpuVertexCount; ++i)
         {
-            const glm::vec3 p = positions[i];
+            const glm::vec3 p = positionSpan[i];
             if (!IsFinite(p))
             {
                 return Failure(MeshPackStatus::NonFinitePosition, outBuffer);
@@ -288,11 +385,11 @@ namespace Extrinsic::Runtime
             maxP = glm::max(maxP, p);
         }
 
-        outBuffer.Channels.SetVertexCount(vertexCountU32);
+        outBuffer.Channels.SetVertexCount(static_cast<std::uint32_t>(gpuVertexCount));
         SetChannelVec3(
             outBuffer.Channels,
             VertexChannel::Position,
-            std::span<const glm::vec3>{positions.data(), positions.size()});
+            positionSpan);
         SetChannelVec2(
             outBuffer.Channels,
             VertexChannel::Texcoord,
@@ -323,7 +420,7 @@ namespace Extrinsic::Runtime
         desc.PackedVertexColors = std::span<const std::uint32_t>{outBuffer.PackedColors};
         desc.SurfaceIndices = std::span<const std::uint32_t>{outBuffer.SurfaceIndices};
         desc.LineIndices = {};
-        desc.VertexCount = static_cast<std::uint32_t>(vertexCount);
+        desc.VertexCount = static_cast<std::uint32_t>(gpuVertexCount);
 
         const glm::vec3 center = 0.5f * (minP + maxP);
         const float radius = 0.5f * glm::length(maxP - minP);

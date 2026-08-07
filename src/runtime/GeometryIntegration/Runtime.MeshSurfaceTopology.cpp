@@ -34,9 +34,12 @@ namespace Extrinsic::Runtime
             const std::uint32_t faceCount,
             const std::uint32_t vertexCount,
             const std::size_t faceIndex,
-            std::vector<std::uint32_t>& outRing)
+            std::vector<std::uint32_t>& outRing,
+            std::vector<std::uint32_t>* outRingHalfedges = nullptr)
         {
             outRing.clear();
+            if (outRingHalfedges != nullptr)
+                outRingHalfedges->clear();
             const std::size_t halfedgeCount = toVertex.size();
             const std::uint32_t first = faceHalfedge[faceIndex];
             if (first == kInvalidIndex)
@@ -64,6 +67,8 @@ namespace Extrinsic::Runtime
                 if (target >= vertexCount)
                     return FaceRingOutcome::Invalid;
                 outRing.push_back(target);
+                if (outRingHalfedges != nullptr)
+                    outRingHalfedges->push_back(halfedge);
 
                 const std::uint32_t next = nextHalfedge[halfedge];
                 if (next == first)
@@ -81,13 +86,16 @@ namespace Extrinsic::Runtime
         [[nodiscard]] MeshSurfaceTopologyStatus BuildTopology(
             const ECS::Components::GeometrySources::ConstSourceView& view,
             std::vector<std::uint32_t>* outSurfaceIndices,
-            std::vector<std::uint32_t>* outTriangleToFace)
+            std::vector<std::uint32_t>* outTriangleToFace,
+            std::vector<std::uint32_t>* outCornerHalfedges = nullptr)
         {
             using namespace ECS::Components::GeometrySources;
             if (outSurfaceIndices != nullptr)
                 outSurfaceIndices->clear();
             if (outTriangleToFace != nullptr)
                 outTriangleToFace->clear();
+            if (outCornerHalfedges != nullptr)
+                outCornerHalfedges->clear();
 
             const auto fail = [&](const MeshSurfaceTopologyStatus status)
             {
@@ -95,6 +103,8 @@ namespace Extrinsic::Runtime
                     outSurfaceIndices->clear();
                 if (outTriangleToFace != nullptr)
                     outTriangleToFace->clear();
+                if (outCornerHalfedges != nullptr)
+                    outCornerHalfedges->clear();
                 return status;
             };
 
@@ -146,6 +156,8 @@ namespace Extrinsic::Runtime
 
             std::vector<std::uint32_t> ring;
             ring.reserve(8u);
+            std::vector<std::uint32_t> ringHalfedges;
+            ringHalfedges.reserve(8u);
             std::size_t triangleCount = 0u;
             for (std::size_t faceIndex = 0u;
                  faceIndex < faceCount;
@@ -159,7 +171,8 @@ namespace Extrinsic::Runtime
                     static_cast<std::uint32_t>(faceCount),
                     vertexCount,
                     faceIndex,
-                    ring);
+                    ring,
+                    outCornerHalfedges != nullptr ? &ringHalfedges : nullptr);
                 if (outcome == FaceRingOutcome::Invalid)
                     return fail(MeshSurfaceTopologyStatus::InvalidTopology);
                 if (outcome == FaceRingOutcome::Skip)
@@ -174,6 +187,17 @@ namespace Extrinsic::Runtime
                         outSurfaceIndices->insert(
                             outSurfaceIndices->end(),
                             {ring[0u], ring[ringIndex], ring[ringIndex + 1u]});
+                    }
+                    if (outCornerHalfedges != nullptr)
+                    {
+                        // Parallel to the fan emitted above, so corner `i` of
+                        // the triangle list resolves to the halfedge whose
+                        // target is that corner's vertex.
+                        outCornerHalfedges->insert(
+                            outCornerHalfedges->end(),
+                            {ringHalfedges[0u],
+                             ringHalfedges[ringIndex],
+                             ringHalfedges[ringIndex + 1u]});
                     }
                     if (outTriangleToFace != nullptr)
                     {
@@ -228,5 +252,15 @@ namespace Extrinsic::Runtime
         std::vector<std::uint32_t>& outTriangleToFace)
     {
         return BuildTopology(view, &outSurfaceIndices, &outTriangleToFace);
+    }
+
+    MeshSurfaceTopologyStatus BuildMeshSurfaceTriangleCornerTopology(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        std::vector<std::uint32_t>& outSurfaceIndices,
+        std::vector<std::uint32_t>& outTriangleToFace,
+        std::vector<std::uint32_t>& outCornerHalfedges)
+    {
+        return BuildTopology(
+            view, &outSurfaceIndices, &outTriangleToFace, &outCornerHalfedges);
     }
 }
