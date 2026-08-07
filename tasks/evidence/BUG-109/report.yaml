@@ -1,0 +1,115 @@
+schema_version: 1
+task_id: BUG-109
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-07T23:12:43Z'
+claim_eligible: false
+source:
+  base_ref: 959a7892fb0d6239055668d8ffd220c1b62c396e
+  base_revision: 959a7892fb0d6239055668d8ffd220c1b62c396e
+  head_revision: f6591db831893d594601da506973c52eba3898e1
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/geometry/Geometry.PointCloud.Utils.cpp
+    sha256: 71397388c7e274ce632d3180cea8a79f57d1c849f4d058af4fe339d5ade3c4d6
+  - path: src/geometry/Geometry.PointCloud.Utils.cppm
+    sha256: c8785f786afa1e9098d4049253e09eb0daab5f624d8c425e6f64e1d2b5baa6ac
+  - path: tasks/SESSION-BRIEF.md
+    sha256: f980640c4e6896b91197dc64c12197bee88e2df290b3812a9e581f70537c8b80
+  - path: tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 4719056261549127435ab447267dcdc1ff568f82a03e764bd724a101702ad1bb
+  - path: tasks/done/BUG-109-voxel-downsample-invalid-input-ordering.md
+    sha256: dd7cc9f7133583ddd4e12360c9bf3edfc1abdb065b2f734a4736d5112236e0c7
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 0f545c1e7e232d4108dd95e14c786e589e49f14a16dfdb9bee8d7e72cd04211b
+  - path: tests/unit/geometry/Test_PointCloud.cpp
+    sha256: c43d4323848d183d5cc47f04bb4fd91b1e004f163a4096498c3232c10bfe7902
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 87f96546746a293442cb0f88f95038b8d99ff536c09bab1be95ea66a294e4cc8
+  content_digest: 701a338a61392dacd2494a7cd44e76b459751dc936634c60af27749eb32a9fe8
+touched:
+  paths:
+  - src/geometry/Geometry.PointCloud.Utils.cpp
+  - src/geometry/Geometry.PointCloud.Utils.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-109-voxel-downsample-invalid-input-ordering.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/unit/geometry/Test_PointCloud.cpp
+  - tools/agents/contract_legacy_tasks.json
+  layers:
+  - geometry
+  modules:
+  - Geometry.PointCloud.Utils
+extension_seam: One free function plus a local validation lambda; GEOM-061 adds reduction strategies on
+  top of this contract without a new abstraction.
+future_change_plan: GEOM-061 owns first/last/closest/medoid/seeded-random cell reduction and must preserve
+  this fail-closed quantization contract and lexicographic order.
+acceptance:
+- criterion: No non-finite or out-of-range value reaches floating-to-integral cell conversion.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Invalid input returns no result and cannot expose partially reduced data.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Valid output order is independent of unordered-container iteration order.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Existing valid centroid and attribute results remain unchanged apart from their newly stable
+    ordering.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-109/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-109/commands/focused-downsample-regressions.json
+- receipt: tasks/evidence/BUG-109/commands/structural-gates-r2.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- Fails closed with std::nullopt for empty clouds, non-finite or non-positive voxel size, non-finite positions,
+  and cell coordinates outside the int key range; no partial result is published.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-109-voxel-downsample-invalid-input-ordering.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- The int cell key still bounds the representable coordinate range; sufficiently extreme finite inputs
+  are rejected rather than supported. That is the documented contract, not a silent clamp.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No graphics, RHI, shader, backend, or byte-layout behavior changed; this is a CPU geometry free
+    function.
+- check: benchmark
+  reason: No performance claim is made; the added sort is over occupied cells only and the task is a correctness
+    fix.
+artifacts:
+- path: src/geometry/Geometry.PointCloud.Utils.cpp
+  sha256: 71397388c7e274ce632d3180cea8a79f57d1c849f4d058af4fe339d5ade3c4d6
+  kind: file
+- path: src/geometry/Geometry.PointCloud.Utils.cppm
+  sha256: c8785f786afa1e9098d4049253e09eb0daab5f624d8c425e6f64e1d2b5baa6ac
+  kind: file
+- path: tests/unit/geometry/Test_PointCloud.cpp
+  sha256: c43d4323848d183d5cc47f04bb4fd91b1e004f163a4096498c3232c10bfe7902
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
