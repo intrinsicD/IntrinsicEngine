@@ -1,22 +1,22 @@
 schema_version: 1
 task_id: PROC-032
 workflow_profile: high-risk
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-06T23:03:57Z'
+generated_at: '2026-08-07T19:07:27Z'
 claim_eligible: false
 source:
-  base_ref: origin/main
-  base_revision: ae0ca976530197451e43a37511300f16ec944f37
-  head_revision: ae0ca976530197451e43a37511300f16ec944f37
+  base_ref: 5c47aaefb33142621fcce7b64112159eec38a106
+  base_revision: 5c47aaefb33142621fcce7b64112159eec38a106
+  head_revision: 5c640ae144fa5068baa0a129a279d4668a9f94f1
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: .github/workflows/ci-docs.yml
     sha256: 2d4487d242ce962e1358232b47ad9473dfd10b669bf0a68d60bb09cb86d4e7de
   - path: AGENTS.md
-    sha256: d55f71cc5bc79ed56b8fa11246d8a6fa028ec17bca61839db9d402a47a413b9b
+    sha256: a205b962984375c0f5ca84d897a232e19bf102e1e0a21657bbb8e343e1972fde
   - path: ara/logic/solution/architecture.md
     sha256: 42bb77576f9538bd19da2a632d9743b5b5c355b2afe6098c482c860a9b2e6689
   - path: ara/logic/solution/constraints.md
@@ -34,50 +34,58 @@ source:
   - path: docs/agent/how-this-repo-is-built.md
     sha256: f7549f84b6b5e1c6330cbed28d6509a3d9beae7e98024f39d13f616327a1b122
   - path: docs/agent/prompt/prompt.md
-    sha256: 6124612c7f7f686f66b84900bc372878c1663369a8c01bc8b60d74eac8939de8
+    sha256: c8daba06cff1fc9672c6bdd67e4e73779b6967bd1c73974f5320d7655a6c99ae
   - path: docs/agent/review-checklist.md
-    sha256: 3ffd81b595e4c6d12bc50ea92bb957431304f872810d5b157e288dbaee12ff85
+    sha256: 22ecdfecdf9adabfbbd2ea030a11eda2db48e16b42e7a1790efef584d1f0f585
   - path: docs/agent/task-format.md
-    sha256: f1760f2e8ea044f0bfec2ab1ceffd9afcc2676359d22cca25459d22662da23be
+    sha256: f721f2eb4122e848591c996610c77d66d6c52ed59d0421257166b880772b3866
   - path: docs/agent/workflow-evidence.md
-    sha256: 2a06575cc249d83d761d2b1ca678b66b67b0fc555fb57f2c49fb809397d6a43b
+    sha256: 3473ae70b29fc7732ced6daf43605a4178127bf4aedda31b250f9546a539a0d2
   - path: docs/architecture/contract-catalog.yaml
     sha256: 5c5558b63dd86bc8c9876c9bc677f25e6f1abaff9bc9c35db0d5036cd938a86e
   - path: docs/architecture/index.md
     sha256: 945339889d8e59cc33373bb1e631dd4a04eca6b88de40aee3b5c878a2cef6779
   - path: tasks/SESSION-BRIEF.md
-    sha256: 3a9d83a7d7c79fd7bf1906e42b0d9af16d4b7fcd5c54fe88f5a756e534514625
-  - path: tasks/active/PROC-032-repository-native-agent-work-graph.md
-    sha256: 7f9cb931fc15e295af5750377a66e544bc3189d31db66c7a9012cd3a79eafa90
+    sha256: 1a681d994eeae719ab9f614425e45b55ededcf516b66c2ce94ef6e71f7124bc2
   - path: tasks/active/README.md
-    sha256: 590b33424e49a7b6f1809f67e72f5ada6a4f355d42e69e8c9d8ae1d906e68a27
+    sha256: 21086954992e59188d218ea0846e82b5f40f61219e116e842695ba98b0b82a5b
   - path: tasks/backlog/README.md
-    sha256: 1e6721cda2e8ca2877b0e5704af5a8bf6fd8bb8af656c56ea48611e426f57e95
+    sha256: b7a55891d10c90a0a2d854bd3013a77c2d990037883e904dc72ef3764b296719
+  - path: tasks/backlog/bugs/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md
+    sha256: c94b6db9c85039cbe2b25ea40528f594621a9759f9efe50953a7af2911d811d4
+  - path: tasks/backlog/bugs/index.md
+    sha256: c129eac43e13bfb2ac57f65779983c098f3953fa22fa3609d68b9f6f1de2ca71
   - path: tasks/backlog/process/README.md
-    sha256: 24c7e3d02488dcbd6dd0e957036cd9daff9fea6e2ce96d931cb88f58787067cc
+    sha256: a2bd82004b961cd3240b51ea981464711dedf23373be881abe712bf6c92a56bb
+  - path: tasks/done/PROC-032-repository-native-agent-work-graph.md
+    sha256: 4d6b48d88bd0a834c6d50aec31967ebcf4ba8bddb99bbda57876692b9b9c1312
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: feba22e26b280bc3d3a603f51b81fd94a1407a08246be2208cacd792b576fd9a
   - path: tests/regression/tooling/Test.AgentWorkGraph.py
-    sha256: 204ba86196e8300576b1f2e00d5456a75c6c478c4decc5b9cf6e0a97d3fe6fdf
+    sha256: f9504db7dcd0982ab0a22232e8bbe44ae0e13bc0394954ce76960a5a4164e794
   - path: tools/agents/README.md
-    sha256: 9cbc116648e1ef1f28fe1a44c8bf99452f6edbabe4b64ed11b6b5c40f4a22e0f
+    sha256: 4b1c1de7f5cde8833c41ac51cab32d4266d0f207b1555cf09affcbd941218059
   - path: tools/agents/agent_work_graph.py
-    sha256: 04b641db627b49d76aa09e271a73002a7dcafacda75b26a4c9e645d4ee8bcb0b
+    sha256: ee2d02fe3deb4214030d2df04e629d12f5464f1371ea38c36d53941c58e988f2
   - path: tools/agents/skills/intrinsicengine-core/SKILL.md
     sha256: 1d5d04bc968fcde4dd952413d0e3b1976ac1f70c9a2a29e8f54c3fd95a2245e4
   - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
-    sha256: 6124612c7f7f686f66b84900bc372878c1663369a8c01bc8b60d74eac8939de8
+    sha256: c8daba06cff1fc9672c6bdd67e4e73779b6967bd1c73974f5320d7655a6c99ae
   - path: tools/agents/skills/intrinsicengine-review/SKILL.md
     sha256: b1a3892a57601a92c0f608b934be927515bc64ccefd73cdad68598c82b48a230
   - path: tools/agents/skills/intrinsicengine-review/references/review-checklist.md
-    sha256: e0eead2275be796447a6b0ac20601059a7848995042371967e595ecb272228b4
+    sha256: 8d35d4d94aa7b369f975ef01f4740645deff4b8f2341d7bf768e8c12768841da
   - path: tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
     sha256: 74253826b0734593ca0bad75b580a25c1aaea15cdb3f20cdfb66e991a08bfff1
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
-    sha256: 203712a55c8aed5cd4bc4bfc797df3b50510458f8a9ba72f82e4f830da9ef83e
+    sha256: 8a9b40f295417f128f6f84169c5879d7832212606f11b6956f1c171f191d301c
   - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
-    sha256: 2a06575cc249d83d761d2b1ca678b66b67b0fc555fb57f2c49fb809397d6a43b
+    sha256: 3473ae70b29fc7732ced6daf43605a4178127bf4aedda31b250f9546a539a0d2
+  - path: tools/agents/task_claim.py
+    sha256: 34a2bbc91442a57341a3c206b0f8e88b471c883f852900444f52cc438e9838b6
   - path: tools/agents/work_graphs/review-diamond.v1.json
     sha256: 9ec505ac0f313769d60cfe133eb2b1195ca627183dcb5adc7579fe02683c719c
-  content_digest: d5179877cbe7753af2aecbe45f0f2bffcfa00be09fdacb5841977e73c55a2687
+  content_digest: 6f65a98b2ee43e5e884de13667b87a63ca644d0d284a43e2fd126dbcf7578e05
 touched:
   paths:
   - .github/workflows/ci-docs.yml
@@ -97,10 +105,13 @@ touched:
   - docs/architecture/contract-catalog.yaml
   - docs/architecture/index.md
   - tasks/SESSION-BRIEF.md
-  - tasks/active/PROC-032-repository-native-agent-work-graph.md
   - tasks/active/README.md
   - tasks/backlog/README.md
+  - tasks/backlog/bugs/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md
+  - tasks/backlog/bugs/index.md
   - tasks/backlog/process/README.md
+  - tasks/done/PROC-032-repository-native-agent-work-graph.md
+  - tasks/done/RETIREMENT-LOG.md
   - tests/regression/tooling/Test.AgentWorkGraph.py
   - tools/agents/README.md
   - tools/agents/agent_work_graph.py
@@ -111,6 +122,7 @@ touched:
   - tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
   - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
   - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  - tools/agents/task_claim.py
   - tools/agents/work_graphs/review-diamond.v1.json
   layers:
   - agent-workflow
@@ -118,8 +130,9 @@ touched:
   - tools.agents.agent_work_graph
 extension_seam: Schema-v1 checked-in recipe plus one short-lived CLI; additional topology remains data,
   not an engine or service dependency.
-future_change_plan: CI-012, CI-013, and PROC-031 retain verifier-plan and receipt integration; O137 requires
-  a matched pilot before any executor or orchestration framework.
+future_change_plan: A framework or resident service is reconsidered only after a measured task corpus
+  proves plain-file checkpoint, replay, or human-gate operation inadequate, under a separate high-risk
+  task naming its present consumers.
 acceptance:
 - criterion: A claimed non-micro task can start the default graph and expose exactly
   task_checked: true
@@ -163,49 +176,47 @@ commands:
 - receipt: tasks/evidence/PROC-032/commands/final-surface-integrity.json
 - receipt: tasks/evidence/PROC-032/commands/focused-workflow-regressions.json
 - receipt: tasks/evidence/PROC-032/commands/post-handoff-doc-integrity.json
+- receipt: tasks/evidence/PROC-032/commands/r2-focused-workflow-regressions.json
+- receipt: tasks/evidence/PROC-032/commands/r2-structural-policy.json
 - receipt: tasks/evidence/PROC-032/commands/structural-policy.json
 changed_public_contracts:
 - repo.agent-work-graph
 diagnostics_and_previews:
-- Git-common-dir work-graph show/list output and hash-chained event history expose live state without
-  becoming completion authority.
+- Actionable diagnostics for absent/stale/mismatched claims, invalid recipes, unauthorized writers, writer-as-independent-reviewer,
+  illegal transitions, retry-budget exhaustion, recipe drift, stale review/final source bindings, and
+  invalid task IDs.
 benchmark_or_parity_evidence: []
 docs_sync:
-  task_file: tasks/active/PROC-032-repository-native-agent-work-graph.md
+  task_file: tasks/done/PROC-032-repository-native-agent-work-graph.md
   session_brief_present: true
   canonical_docs_changed: true
   skill_mirrors_checked: true
 residual_risks:
-- Independent high-risk fixed-surface acceptance is still pending; the task and graph must remain active
-  until a non-driver review is appended.
-- Actor labels are cooperative routing metadata rather than authentication.
-- A process failure between event append and projection replacement is detected as an event-count mismatch
-  but has no automatic replay repair in schema v1.
-- No matched single-agent quality, latency, human-time, or model-cost baseline has been run, so no efficiency
-  claim is made.
+- The mtime-based stale-lock breaker can steal a live lock from a writer holding it past 30 s; routed
+  to BUG-144 and not reachable through a reviewed workflow today.
+- Actor labels remain cooperative routing metadata, not authentication; durable independent review stays
+  the real high-risk acceptance authority.
+- No matched single-agent defect-recall, false-positive, human-time, latency, or model-cost baseline was
+  run, so no efficiency claim is made.
 skipped_checks:
 - check: gpu-vulkan
-  reason: No engine, graphics, RHI, shader, Vulkan, or runtime source changed.
-- check: sanitizers
-  reason: No C++ ownership, memory-lifetime, allocator, or concurrency implementation changed; Python
-    regressions and the complete CPU gate are the relevant executable proofs.
-- check: benchmark
-  reason: No performance, cost, latency, or defect-recall improvement claim is made.
+  reason: No engine source, backend, shader, RHI, or byte-layout changed; this task touches tools/agents,
+    its regressions, and docs only.
+- check: build-and-ctest
+  reason: No C++ source, CMake input, module surface, or compiled test is in the surface; the focused
+    Python regressions and strict structural gates are the strongest relevant evidence.
 artifacts:
 - path: tools/agents/agent_work_graph.py
-  sha256: 04b641db627b49d76aa09e271a73002a7dcafacda75b26a4c9e645d4ee8bcb0b
+  sha256: ee2d02fe3deb4214030d2df04e629d12f5464f1371ea38c36d53941c58e988f2
   kind: file
 - path: tools/agents/work_graphs/review-diamond.v1.json
   sha256: 9ec505ac0f313769d60cfe133eb2b1195ca627183dcb5adc7579fe02683c719c
   kind: file
 - path: tests/regression/tooling/Test.AgentWorkGraph.py
-  sha256: 204ba86196e8300576b1f2e00d5456a75c6c478c4decc5b9cf6e0a97d3fe6fdf
+  sha256: f9504db7dcd0982ab0a22232e8bbe44ae0e13bc0394954ce76960a5a4164e794
   kind: file
 - path: docs/agent/workflow-evidence.md
-  sha256: 2a06575cc249d83d761d2b1ca678b66b67b0fc555fb57f2c49fb809397d6a43b
-  kind: file
-- path: tasks/active/PROC-032-repository-native-agent-work-graph.md
-  sha256: 7f9cb931fc15e295af5750377a66e544bc3189d31db66c7a9012cd3a79eafa90
+  sha256: 3473ae70b29fc7732ced6daf43605a4178127bf4aedda31b250f9546a539a0d2
   kind: file
 self_review:
   completed: true
