@@ -110,3 +110,112 @@ TEST(Sparse, ShiftedConjugateGradientUsesDiagonalMassTerm)
     EXPECT_NEAR(x[1], 1.25, 1.0e-10);
 }
 
+
+// --- BUG-110: Dirichlet-fixed variant of the shifted CG solve ---
+
+namespace
+{
+    // 3x3 chain stiffness with unit mass; used for the fixed-variable tests.
+    Geometry::Sparse::SparseMatrix MakeChainStiffness()
+    {
+        Geometry::Sparse::SparseBuilder builder(3, 3);
+        builder.Add(0, 0, 1.0);
+        builder.Add(0, 1, -1.0);
+        builder.Add(1, 0, -1.0);
+        builder.Add(1, 1, 2.0);
+        builder.Add(1, 2, -1.0);
+        builder.Add(2, 1, -1.0);
+        builder.Add(2, 2, 1.0);
+        return builder.Build().Matrix;
+    }
+
+    Geometry::Sparse::DiagonalMatrix MakeUnitMass(std::size_t n)
+    {
+        Geometry::Sparse::DiagonalMatrix mass;
+        mass.Size = n;
+        mass.Diagonal.assign(n, 1.0);
+        return mass;
+    }
+}
+
+TEST(Sparse, ShiftedFixedConjugateGradientSolvesReducedSystem)
+{
+    const Geometry::Sparse::SparseMatrix stiffness = MakeChainStiffness();
+    const Geometry::Sparse::DiagonalMatrix mass = MakeUnitMass(3);
+
+    // Fix the two endpoints; the single free unknown must satisfy
+    // (1 + 2) x1 = b1 - (-1)*x0 - (-1)*x2  =>  3 x1 = 1 + 5 + 9 = 15.
+    const std::array<double, 3> b{0.0, 1.0, 0.0};
+    const std::array<std::size_t, 2> fixedIndices{0, 2};
+    const std::array<double, 2> fixedValues{5.0, 9.0};
+    std::array<double, 3> x{0.0, 0.0, 0.0};
+
+    const Geometry::Sparse::CGResult result = Geometry::Sparse::SolveCGShiftedFixed(
+        mass, 1.0, stiffness, 1.0, b, fixedIndices, fixedValues, x);
+
+    EXPECT_TRUE(result.Converged);
+    EXPECT_EQ(x[0], 5.0);
+    EXPECT_EQ(x[2], 9.0);
+    EXPECT_NEAR(x[1], 5.0, 1.0e-10);
+}
+
+TEST(Sparse, ShiftedFixedConjugateGradientWithNoFixedIndicesMatchesUnconstrained)
+{
+    const Geometry::Sparse::SparseMatrix stiffness = MakeChainStiffness();
+    const Geometry::Sparse::DiagonalMatrix mass = MakeUnitMass(3);
+    const std::array<double, 3> b{1.0, 2.0, 3.0};
+
+    std::array<double, 3> unconstrained{0.0, 0.0, 0.0};
+    const Geometry::Sparse::CGResult a = Geometry::Sparse::SolveCGShifted(
+        mass, 1.0, stiffness, 1.0, b, unconstrained);
+
+    std::array<double, 3> viaFixed{0.0, 0.0, 0.0};
+    const Geometry::Sparse::CGResult c = Geometry::Sparse::SolveCGShiftedFixed(
+        mass, 1.0, stiffness, 1.0, b, {}, {}, viaFixed);
+
+    EXPECT_TRUE(a.Converged);
+    EXPECT_TRUE(c.Converged);
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        EXPECT_EQ(unconstrained[i], viaFixed[i]) << "i=" << i;
+    }
+}
+
+TEST(Sparse, ShiftedFixedConjugateGradientRejectsMalformedConstraints)
+{
+    const Geometry::Sparse::SparseMatrix stiffness = MakeChainStiffness();
+    const Geometry::Sparse::DiagonalMatrix mass = MakeUnitMass(3);
+    const std::array<double, 3> b{0.0, 1.0, 0.0};
+    const std::array<double, 3> sentinel{-1.0, -2.0, -3.0};
+
+    struct Case
+    {
+        const char* Name;
+        std::vector<std::size_t> Indices;
+        std::vector<double> Values;
+    };
+
+    const std::vector<Case> cases{
+        {"out of range", {3}, {1.0}},
+        {"duplicate index", {1, 1}, {1.0, 2.0}},
+        {"length mismatch", {0, 1}, {1.0}},
+        {"non-finite value", {0}, {std::numeric_limits<double>::quiet_NaN()}},
+        {"infinite value", {0}, {std::numeric_limits<double>::infinity()}},
+    };
+
+    for (const Case& testCase : cases)
+    {
+        SCOPED_TRACE(testCase.Name);
+        std::array<double, 3> x = sentinel;
+        const Geometry::Sparse::CGResult result = Geometry::Sparse::SolveCGShiftedFixed(
+            mass, 1.0, stiffness, 1.0, b, testCase.Indices, testCase.Values, x);
+
+        EXPECT_FALSE(result.Converged);
+        EXPECT_EQ(result.Reason, Geometry::Sparse::CGConvergenceReason::InvalidInput);
+        // The caller's buffer must be untouched — no partial write.
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            EXPECT_EQ(x[i], sentinel[i]) << "i=" << i;
+        }
+    }
+}

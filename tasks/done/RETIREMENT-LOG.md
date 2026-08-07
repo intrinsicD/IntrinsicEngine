@@ -6993,3 +6993,45 @@ deterministic fail-closed baseline that `GEOM-061` already assumed, unblocking
 it. The task self-hosted the standard review diamond, including one genuine
 write-lane reopen when consuming its own contract-baseline entry changed the
 frozen surface.
+
+[`BUG-110`](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md) — implicit
+smoothing's post-solve boundary reset retired on 2026-08-08 at `CPUContracted`,
+its declared target, with no `Operational` follow-up owed. `ImplicitLaplacian`
+solved the all-free backward-Euler system over every vertex and then overwrote
+the boundary entries of the returned vector. The boundary looked preserved, but
+the interior had already been solved against the boundary's own unconstrained
+values, so an open patch never satisfied the Dirichlet problem it reported.
+
+One narrow `Geometry::Sparse::SolveCGShiftedFixed` now sits beside the existing
+`SolveCGShifted` seam, with the established `Geometry::DEC` forwarding wrapper
+mirrored. It assembles the same shifted operator, folds each fixed column's
+coupling into the free right-hand side, and replaces each fixed row and column
+with identity. That keeps the operator symmetric positive definite — the result
+is block-diagonal `[C_ff, 0; 0, I]` and `C_ff` is a principal submatrix of an
+SPD matrix — so plain CG still applies and its convergence diagnostics keep
+their meaning. Seeding the fixed entries makes their residual rows exactly zero
+and those rows are now decoupled, so CG never moves them and boundary
+coordinates come back bit-exact. Index range, index uniqueness, index/value
+length agreement, and value finiteness are all checked before any write to the
+caller's buffer, so a malformed constraint set returns `InvalidInput` with the
+output untouched and the mesh unmutated. No constraint interface, solver
+factory, or KKT machinery was introduced.
+
+`ImplicitLaplacian` collects live boundary vertices once per iteration and
+supplies per-axis fixed values; the reset loop is gone and `PreserveBoundary=false`
+still calls the unchanged path. Deleted and isolated vertices are explicitly
+never constrained, because they carry no mass or Laplacian coupling and are
+skipped on write-back, so pinning them would perturb the unconstrained system
+for no observable gain.
+
+The load-bearing regression assembles the reduced Dirichlet system by hand from
+the DEC operators and solves it with an independent dense Gaussian elimination,
+then requires every interior coordinate to match; a companion reproduces the old
+solve-then-overwrite result inline and requires the interior to differ from it.
+Both fail against the unfixed source. Five more cover exact boundary
+preservation across five iterations, `PreserveBoundary=false` finiteness at a
+1e6 timestep, the reduced solve directly, empty-fixed-set equivalence to
+`SolveCGShifted`, and all five malformed-constraint cases. 76/76 `Smoothing` and
+`Sparse` cases pass, the default CPU gate passes 4138/4138 with its expected
+GLFW/LeakSanitizer skip, and the generated module inventory is unchanged at 382
+modules because only free functions were added to existing modules.

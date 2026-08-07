@@ -701,6 +701,19 @@ namespace Geometry::DEC
         return Geometry::Sparse::SolveCGShifted(M, alpha, A, beta, b, x, params);
     }
 
+    CGResult SolveCGShiftedFixed(
+        const DiagonalMatrix& M, double alpha,
+        const SparseMatrix& A, double beta,
+        std::span<const double> b,
+        std::span<const std::size_t> fixedIndices,
+        std::span<const double> fixedValues,
+        std::span<double> x,
+        const CGParams& params)
+    {
+        return Geometry::Sparse::SolveCGShiftedFixed(
+            M, alpha, A, beta, b, fixedIndices, fixedValues, x, params);
+    }
+
     // -------------------------------------------------------------------------
     // BuildLaplacianCache
     // -------------------------------------------------------------------------

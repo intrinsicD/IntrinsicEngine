@@ -1305,4 +1305,99 @@ namespace Geometry::Sparse
         }
         return SolveCG(combined.Matrix, b, x, params);
     }
+
+    CGResult SolveCGShiftedFixed(
+        const DiagonalMatrix& M, double alpha,
+        const SparseMatrix& A, double beta,
+        std::span<const double> b,
+        std::span<const std::size_t> fixedIndices,
+        std::span<const double> fixedValues,
+        std::span<double> x,
+        const CGParams& params)
+    {
+        CGResult result;
+        if (M.Size != A.Rows || M.Diagonal.size() < M.Size || A.Rows != A.Cols
+            || b.size() < A.Rows || x.size() < A.Rows || !ValidateCsr(A)
+            || !IsFiniteSpan(M.Diagonal) || !IsFiniteSpan(b) || !IsFiniteSpan(x))
+        {
+            result.Reason = CGConvergenceReason::InvalidInput;
+            return result;
+        }
+        if (fixedIndices.size() != fixedValues.size() || !IsFiniteSpan(fixedValues))
+        {
+            result.Reason = CGConvergenceReason::InvalidInput;
+            return result;
+        }
+
+        // Reject out-of-range and repeated indices before touching `x`, so a
+        // malformed constraint set cannot leave a caller's buffer half-written.
+        std::vector<bool> isFixed(A.Rows, false);
+        for (const std::size_t index : fixedIndices)
+        {
+            if (index >= A.Rows || isFixed[index])
+            {
+                result.Reason = CGConvergenceReason::InvalidInput;
+                return result;
+            }
+            isFixed[index] = true;
+        }
+
+        if (fixedIndices.empty())
+        {
+            return SolveCGShifted(M, alpha, A, beta, b, x, params);
+        }
+
+        std::vector<double> fixedByRow(A.Rows, 0.0);
+        for (std::size_t k = 0; k < fixedIndices.size(); ++k)
+        {
+            fixedByRow[fixedIndices[k]] = fixedValues[k];
+        }
+
+        // Assemble C = alpha*M + beta*A, dropping every entry that touches a
+        // fixed row or column and accumulating the dropped column coupling
+        // C_fc x_c into the free right-hand side.
+        std::vector<double> reducedRhs(b.begin(), b.begin() + static_cast<std::ptrdiff_t>(A.Rows));
+        SparseBuilder builder(A.Rows, A.Cols);
+        builder.Reserve(A.NonZeros() + M.Size);
+        for (std::size_t row = 0; row < A.Rows; ++row)
+        {
+            if (isFixed[row])
+            {
+                builder.Add(row, row, 1.0);
+                reducedRhs[row] = fixedByRow[row];
+                continue;
+            }
+            if (alpha != 0.0)
+            {
+                builder.Add(row, row, alpha * M.Diagonal[row]);
+            }
+            for (std::size_t k = A.RowOffsets[row]; k < A.RowOffsets[row + 1]; ++k)
+            {
+                const std::size_t col = A.ColIndices[k];
+                const double value = beta * A.Values[k];
+                if (isFixed[col])
+                {
+                    reducedRhs[row] -= value * fixedByRow[col];
+                }
+                else
+                {
+                    builder.Add(row, col, value);
+                }
+            }
+        }
+        const SparseBuildResult combined = builder.Build(0.0);
+        if (!combined.Valid || !IsFiniteSpan(reducedRhs))
+        {
+            result.Reason = CGConvergenceReason::InvalidInput;
+            return result;
+        }
+
+        // Seeding the fixed entries makes their residual rows exactly zero, and
+        // those rows and columns are now decoupled, so CG never moves them.
+        for (const std::size_t index : fixedIndices)
+        {
+            x[index] = fixedByRow[index];
+        }
+        return SolveCG(combined.Matrix, reducedRhs, x, params);
+    }
 }

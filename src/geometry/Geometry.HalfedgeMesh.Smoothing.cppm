@@ -158,7 +158,16 @@ export namespace Geometry::Smoothing
         // If 0, auto-selects dt = h² where h is the mean edge length.
         double TimeStep{0.0};
 
-        // If true, boundary vertices are pinned to their original positions.
+        // If true, boundary vertices are Dirichlet-fixed at their positions at
+        // the start of the iteration. The constraint is applied *inside* each
+        // axis solve, via DEC::SolveCGShiftedFixed: the fixed unknowns are
+        // eliminated and their matrix coupling is folded into the free
+        // right-hand side, so the interior solves the true reduced system
+        // rather than an all-free system whose boundary is overwritten
+        // afterwards. Boundary coordinates come back exactly unchanged.
+        //
+        // Deleted and isolated vertices are never constrained: they carry no
+        // mass or Laplacian coupling and are skipped on write-back.
         bool PreserveBoundary{true};
 
         // CG solver tolerance

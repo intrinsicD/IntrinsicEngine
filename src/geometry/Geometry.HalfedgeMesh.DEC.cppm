@@ -290,6 +290,18 @@ export namespace Geometry::DEC
         std::span<double> x,
         const CGParams& params = {});
 
+    // Same shifted system with Dirichlet unknowns eliminated inside the solve:
+    // solves the reduced system on the free indices and returns the fixed
+    // entries exactly as given. See Geometry::Sparse::SolveCGShiftedFixed.
+    [[nodiscard]] CGResult SolveCGShiftedFixed(
+        const DiagonalMatrix& M, double alpha,
+        const SparseMatrix& A, double beta,
+        std::span<const double> b,
+        std::span<const std::size_t> fixedIndices,
+        std::span<const double> fixedValues,
+        std::span<double> x,
+        const CGParams& params = {});
+
     // -------------------------------------------------------------------------
     // LaplacianCache — lazy-computed derived matrices for spectral workflows
     // -------------------------------------------------------------------------

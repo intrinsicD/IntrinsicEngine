@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "\nctest --test-dir build/ci --output-on-failure -R \"Smoothing|Sparse\" --timeout 120\n"
+  ],
+  "command_display": "/bin/bash -o pipefail -c '\nctest --test-dir build/ci --output-on-failure -R \"Smoothing|Sparse\" --timeout 120\n'",
+  "cwd": ".",
+  "duration_ms": 827,
+  "exit_code": 0,
+  "finished_at": "2026-08-07T23:50:03Z",
+  "label": "focused-smoothing-sparse",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-07T23:50:02Z",
+  "stderr_path": "tasks/evidence/BUG-110/commands/focused-smoothing-sparse.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-110/commands/focused-smoothing-sparse.stdout.log",
+  "stdout_sha256": "a8704128367955d81f37bfc88254118cd7951e60b04804169fbdd1059b237404",
+  "task_id": "BUG-110"
+}

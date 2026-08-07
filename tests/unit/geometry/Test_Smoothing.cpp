@@ -1006,3 +1006,294 @@ TEST(Smoothing, DenoiseBilateralPreservesBoundary)
         EXPECT_EQ(after.z, pos.z);
     }
 }
+
+// --- BUG-110: boundary Dirichlet conditions applied during the solve ---
+
+namespace
+{
+    // Open grid patch: (n+1)x(n+1) vertices, two triangles per cell. The
+    // interior vertices are free, the outer ring is boundary.
+    Geometry::HalfedgeMesh::Mesh MakeOpenGridPatch(int n, float bump)
+    {
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const int side = n + 1;
+        for (int j = 0; j < side; ++j)
+        {
+            for (int i = 0; i < side; ++i)
+            {
+                const float x = static_cast<float>(i);
+                const float y = static_cast<float>(j);
+                // Give interior vertices a deterministic out-of-plane offset so
+                // the smoothing problem is not trivially already-solved.
+                const bool interior = (i > 0 && i < n && j > 0 && j < n);
+                const float z = interior ? bump * static_cast<float>((i * 7 + j * 13) % 5 + 1) : 0.0f;
+                mesh.AddVertex(glm::vec3(x, y, z));
+            }
+        }
+        auto vh = [side](int i, int j) {
+            return Geometry::VertexHandle{
+                static_cast<Geometry::PropertyIndex>(j * side + i)};
+        };
+        for (int j = 0; j < n; ++j)
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                mesh.AddTriangle(vh(i, j), vh(i + 1, j), vh(i + 1, j + 1));
+                mesh.AddTriangle(vh(i, j), vh(i + 1, j + 1), vh(i, j + 1));
+            }
+        }
+        return mesh;
+    }
+
+    // Dense Gaussian elimination with partial pivoting. Small systems only.
+    std::vector<double> SolveDense(std::vector<std::vector<double>> a, std::vector<double> b)
+    {
+        const std::size_t n = b.size();
+        for (std::size_t col = 0; col < n; ++col)
+        {
+            std::size_t pivot = col;
+            for (std::size_t row = col + 1; row < n; ++row)
+            {
+                if (std::abs(a[row][col]) > std::abs(a[pivot][col])) pivot = row;
+            }
+            std::swap(a[col], a[pivot]);
+            std::swap(b[col], b[pivot]);
+            const double d = a[col][col];
+            for (std::size_t row = col + 1; row < n; ++row)
+            {
+                const double f = a[row][col] / d;
+                if (f == 0.0) continue;
+                for (std::size_t k = col; k < n; ++k) a[row][k] -= f * a[col][k];
+                b[row] -= f * b[col];
+            }
+        }
+        std::vector<double> x(n, 0.0);
+        for (std::size_t ri = n; ri-- > 0;)
+        {
+            double s = b[ri];
+            for (std::size_t k = ri + 1; k < n; ++k) s -= a[ri][k] * x[k];
+            x[ri] = s / a[ri][ri];
+        }
+        return x;
+    }
+}
+
+// Independently assembles the reduced Dirichlet system for one backward-Euler
+// step and compares every interior coordinate against it.
+TEST(Smoothing, ImplicitPreservedBoundaryMatchesReducedSystemOracle)
+{
+    constexpr int kN = 4;
+    constexpr double kLambda = 1.0;
+    constexpr double kTimeStep = 0.25;
+
+    auto mesh = MakeOpenGridPatch(kN, 0.2f);
+    const std::size_t nV = mesh.VerticesSize();
+
+    // Snapshot the pre-solve state and build the same operators the solver uses
+    // on its first (and only) iteration.
+    std::vector<glm::vec3> before(nV);
+    for (std::size_t i = 0; i < nV; ++i)
+        before[i] = mesh.Position(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
+
+    const Geometry::DEC::DECOperators ops = Geometry::DEC::BuildOperators(mesh);
+    ASSERT_TRUE(ops.IsValid());
+    const double beta = kLambda * kTimeStep;
+
+    std::vector<std::size_t> freeIdx;
+    std::vector<bool> isFixed(nV, false);
+    for (std::size_t i = 0; i < nV; ++i)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(v) || mesh.IsIsolated(v)) continue;
+        if (mesh.IsBoundary(v)) isFixed[i] = true;
+        else freeIdx.push_back(i);
+    }
+    ASSERT_GT(freeIdx.size(), 0u);
+
+    std::vector<std::size_t> slotOf(nV, 0);
+    for (std::size_t s = 0; s < freeIdx.size(); ++s) slotOf[freeIdx[s]] = s;
+
+    // Reduced operator C_ff and the C_fc x_c coupling, assembled by hand.
+    const std::size_t m = freeIdx.size();
+    std::vector<std::vector<double>> cff(m, std::vector<double>(m, 0.0));
+    for (std::size_t s = 0; s < m; ++s)
+    {
+        const std::size_t row = freeIdx[s];
+        cff[s][s] += ops.Hodge0.Diagonal[row];
+        for (std::size_t k = ops.Laplacian.RowOffsets[row]; k < ops.Laplacian.RowOffsets[row + 1]; ++k)
+        {
+            const std::size_t col = ops.Laplacian.ColIndices[k];
+            if (isFixed[col]) continue;
+            cff[s][slotOf[col]] += beta * ops.Laplacian.Values[k];
+        }
+    }
+
+    auto oracleAxis = [&](int axis) {
+        std::vector<double> rhs(m, 0.0);
+        for (std::size_t s = 0; s < m; ++s)
+        {
+            const std::size_t row = freeIdx[s];
+            rhs[s] = ops.Hodge0.Diagonal[row] * static_cast<double>(before[row][axis]);
+            for (std::size_t k = ops.Laplacian.RowOffsets[row]; k < ops.Laplacian.RowOffsets[row + 1]; ++k)
+            {
+                const std::size_t col = ops.Laplacian.ColIndices[k];
+                if (!isFixed[col]) continue;
+                rhs[s] -= beta * ops.Laplacian.Values[k] * static_cast<double>(before[col][axis]);
+            }
+        }
+        return SolveDense(cff, rhs);
+    };
+
+    const std::vector<double> ox = oracleAxis(0);
+    const std::vector<double> oy = oracleAxis(1);
+    const std::vector<double> oz = oracleAxis(2);
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 1;
+    params.Lambda = kLambda;
+    params.TimeStep = kTimeStep;
+    params.PreserveBoundary = true;
+    params.SolverTolerance = 1e-12;
+    params.MaxSolverIterations = 5000;
+
+    const auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    for (std::size_t s = 0; s < m; ++s)
+    {
+        const auto v = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(freeIdx[s])};
+        const glm::vec3 got = mesh.Position(v);
+        EXPECT_NEAR(static_cast<double>(got.x), ox[s], 1e-5) << "free slot " << s;
+        EXPECT_NEAR(static_cast<double>(got.y), oy[s], 1e-5) << "free slot " << s;
+        EXPECT_NEAR(static_cast<double>(got.z), oz[s], 1e-5) << "free slot " << s;
+    }
+
+    // Boundary must be untouched, exactly.
+    for (std::size_t i = 0; i < nV; ++i)
+    {
+        if (!isFixed[i]) continue;
+        const glm::vec3 got = mesh.Position(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
+        EXPECT_EQ(got, before[i]) << "boundary vertex " << i;
+    }
+}
+
+// The reduced system is genuinely different from solving all-free and then
+// overwriting the boundary. Reproduces that old result explicitly and requires
+// the interior to differ.
+TEST(Smoothing, ImplicitPreservedBoundaryDiffersFromSolveThenOverwrite)
+{
+    constexpr int kN = 4;
+    constexpr double kLambda = 1.0;
+    constexpr double kTimeStep = 0.25;
+
+    auto mesh = MakeOpenGridPatch(kN, 0.2f);
+    const std::size_t nV = mesh.VerticesSize();
+
+    std::vector<glm::vec3> before(nV);
+    for (std::size_t i = 0; i < nV; ++i)
+        before[i] = mesh.Position(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
+
+    const Geometry::DEC::DECOperators ops = Geometry::DEC::BuildOperators(mesh);
+    ASSERT_TRUE(ops.IsValid());
+    const double beta = kLambda * kTimeStep;
+
+    // Old behaviour: unconstrained solve over every vertex, boundary reset after.
+    Geometry::DEC::CGParams cg;
+    cg.MaxIterations = 5000;
+    cg.Tolerance = 1e-12;
+
+    auto legacyAxis = [&](int axis) {
+        std::vector<double> rhs(nV, 0.0), x(nV, 0.0);
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            rhs[i] = ops.Hodge0.Diagonal[i] * static_cast<double>(before[i][axis]);
+            x[i] = static_cast<double>(before[i][axis]);
+        }
+        const auto r = Geometry::DEC::SolveCGShifted(
+            ops.Hodge0, 1.0, ops.Laplacian, beta, rhs, x, cg);
+        EXPECT_TRUE(r.Converged);
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+            if (mesh.IsDeleted(v) || mesh.IsIsolated(v)) continue;
+            if (mesh.IsBoundary(v)) x[i] = static_cast<double>(before[i][axis]);
+        }
+        return x;
+    };
+    const std::vector<double> legacyZ = legacyAxis(2);
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 1;
+    params.Lambda = kLambda;
+    params.TimeStep = kTimeStep;
+    params.PreserveBoundary = true;
+    params.SolverTolerance = 1e-12;
+    params.MaxSolverIterations = 5000;
+
+    const auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    double maxInteriorDelta = 0.0;
+    for (std::size_t i = 0; i < nV; ++i)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(v) || mesh.IsIsolated(v) || mesh.IsBoundary(v)) continue;
+        maxInteriorDelta = std::max(
+            maxInteriorDelta,
+            std::abs(static_cast<double>(mesh.Position(v).z) - legacyZ[i]));
+    }
+    EXPECT_GT(maxInteriorDelta, 1e-4)
+        << "in-solve Dirichlet elimination must not coincide with solve-then-overwrite";
+}
+
+TEST(Smoothing, ImplicitPreservedBoundaryIsExactAcrossIterations)
+{
+    auto mesh = MakeOpenGridPatch(4, 0.3f);
+    const std::size_t nV = mesh.VerticesSize();
+
+    std::vector<std::pair<std::size_t, glm::vec3>> boundary;
+    for (std::size_t i = 0; i < nV; ++i)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsBoundary(v)) boundary.emplace_back(i, mesh.Position(v));
+    }
+    ASSERT_FALSE(boundary.empty());
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 5;
+    params.Lambda = 2.0;
+    params.TimeStep = 0.5;
+    params.PreserveBoundary = true;
+
+    const auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    for (const auto& [i, pos] : boundary)
+    {
+        const glm::vec3 got = mesh.Position(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
+        EXPECT_EQ(got, pos) << "boundary vertex " << i << " moved";
+    }
+}
+
+TEST(Smoothing, ImplicitUnpreservedBoundaryStaysFiniteForLargeTimeSteps)
+{
+    auto mesh = MakeOpenGridPatch(4, 0.3f);
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 2;
+    params.Lambda = 1.0;
+    params.TimeStep = 1.0e6;
+    params.PreserveBoundary = false;
+
+    const auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(v) || mesh.IsIsolated(v)) continue;
+        const glm::vec3 p = mesh.Position(v);
+        EXPECT_TRUE(std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z))
+            << "vertex " << i;
+    }
+}

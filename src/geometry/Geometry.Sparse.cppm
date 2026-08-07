@@ -283,4 +283,30 @@ export namespace Geometry::Sparse
         std::span<const double> b,
         std::span<double> x,
         const CGParams& params = {});
+
+    // Same shifted system as SolveCGShifted, but with a set of Dirichlet
+    // (fixed) unknowns eliminated inside the solve rather than overwritten
+    // afterwards.
+    //
+    // For C = alpha*M + beta*A and the partition into free (f) and fixed (c)
+    // indices, this solves C_ff x_f = b_f - C_fc x_c and returns x_c exactly as
+    // given. The elimination is done in place: each fixed row and column is
+    // replaced by identity after its coupling is folded into the free
+    // right-hand side, so the operator stays symmetric positive definite
+    // whenever C is — the result is block-diagonal [C_ff, 0; 0, I], and C_ff is
+    // a principal submatrix of an SPD matrix. Plain CG therefore still applies
+    // and its returned diagnostics keep their usual meaning.
+    //
+    // `fixedIndices` and `fixedValues` must have equal length. Fails with
+    // CGConvergenceReason::InvalidInput, without writing to `x`, when an index
+    // is out of range, an index is repeated, or a fixed value is not finite.
+    // Passing no fixed indices is equivalent to SolveCGShifted.
+    [[nodiscard]] CGResult SolveCGShiftedFixed(
+        const DiagonalMatrix& M, double alpha,
+        const SparseMatrix& A, double beta,
+        std::span<const double> b,
+        std::span<const std::size_t> fixedIndices,
+        std::span<const double> fixedValues,
+        std::span<double> x,
+        const CGParams& params = {});
 }

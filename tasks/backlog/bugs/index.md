@@ -71,10 +71,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   libX11 input-method allocation despite proving process-static
   `glfwTerminate()` ran once; compare the live XIM environment and teardown
   path with the retired `BUG-082` evidence without weakening leak detection.
-- [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
-  `PreserveBoundary` currently solves an all-free shifted system and only then
-  overwrites boundary entries, so interior vertices do not satisfy the claimed
-  Dirichlet problem; impose fixed variables during the solve.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
@@ -90,6 +86,18 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-08: [`BUG-110` — Implicit smoothing applies boundary pins after
+  rather than during
+  solve](../../done/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md).
+  Boundary vertices are now Dirichlet-eliminated inside each axis solve via a
+  new narrow `Geometry::Sparse::SolveCGShiftedFixed`, which folds the fixed
+  columns into the free right-hand side and replaces fixed rows/columns with
+  identity — keeping the operator SPD — instead of solving all-free and
+  overwriting afterwards. An independent hand-assembled reduced-system oracle
+  pins every interior coordinate, and a companion regression requires the result
+  to differ from the old solve-then-overwrite. Both fail against the unfixed
+  source; the CPU gate passes 4138/4138.
 
 - Closed 2026-08-08: [`BUG-109` — Voxel downsampling invalid-input and
   deterministic-cell

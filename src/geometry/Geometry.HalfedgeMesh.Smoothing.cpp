@@ -498,6 +498,25 @@ namespace Geometry::Smoothing
             std::size_t maxCGIter = 0;
             bool allConverged = true;
 
+            // Boundary vertices are Dirichlet unknowns, eliminated inside each
+            // axis solve rather than overwritten afterwards. Deleted and
+            // isolated vertices are deliberately not constrained: they carry no
+            // mass or Laplacian coupling, their old coordinate is 0, and they
+            // are skipped on write-back, so pinning them would change the
+            // PreserveBoundary=false system for no observable gain.
+            std::vector<std::size_t> fixedIndices;
+            if (params.PreserveBoundary)
+            {
+                for (std::size_t i = 0; i < nV; ++i)
+                {
+                    VertexHandle vh{static_cast<PropertyIndex>(i)};
+                    if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
+                    if (mesh.IsBoundary(vh))
+                        fixedIndices.push_back(i);
+                }
+            }
+            std::vector<double> fixedValues(fixedIndices.size(), 0.0);
+
             auto solveAxis = [&](const std::vector<double>& oldCoord) {
                 // RHS = M * x_old
                 for (std::size_t i = 0; i < nV; ++i)
@@ -507,27 +526,29 @@ namespace Geometry::Smoothing
                 for (std::size_t i = 0; i < nV; ++i)
                     xNew[i] = oldCoord[i];
 
-                auto cgResult = DEC::SolveCGShifted(
-                    ops.Hodge0, 1.0,
-                    ops.Laplacian, beta,
-                    rhs, xNew, cgParams);
+                DEC::CGResult cgResult;
+                if (fixedIndices.empty())
+                {
+                    cgResult = DEC::SolveCGShifted(
+                        ops.Hodge0, 1.0,
+                        ops.Laplacian, beta,
+                        rhs, xNew, cgParams);
+                }
+                else
+                {
+                    for (std::size_t k = 0; k < fixedIndices.size(); ++k)
+                        fixedValues[k] = oldCoord[fixedIndices[k]];
+
+                    cgResult = DEC::SolveCGShiftedFixed(
+                        ops.Hodge0, 1.0,
+                        ops.Laplacian, beta,
+                        rhs, fixedIndices, fixedValues, xNew, cgParams);
+                }
 
                 if (cgResult.Iterations > maxCGIter)
                     maxCGIter = cgResult.Iterations;
                 if (!cgResult.Converged)
                     allConverged = false;
-
-                // Pin boundary vertices
-                if (params.PreserveBoundary)
-                {
-                    for (std::size_t i = 0; i < nV; ++i)
-                    {
-                        VertexHandle vh{static_cast<PropertyIndex>(i)};
-                        if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-                        if (mesh.IsBoundary(vh))
-                            xNew[i] = oldCoord[i];
-                    }
-                }
 
                 return xNew;
             };

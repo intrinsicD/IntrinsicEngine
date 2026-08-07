@@ -1,0 +1,162 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1515: DEC_SparseMatrix.MultiplyTransposeConsistent
+ 1/76 Test #1515: DEC_SparseMatrix.MultiplyTransposeConsistent .................................   Passed    0.00 sec
+      Start 2181: SparseGrid.EmptyGridHasNoBlocks
+ 2/76 Test #2181: SparseGrid.EmptyGridHasNoBlocks ..............................................   Passed    0.00 sec
+      Start 2182: SparseGrid.TouchVertexAllocatesBlock
+ 3/76 Test #2182: SparseGrid.TouchVertexAllocatesBlock .........................................   Passed    0.00 sec
+      Start 2183: SparseGrid.VertexIndexReturnsNulloptForUnallocated
+ 4/76 Test #2183: SparseGrid.VertexIndexReturnsNulloptForUnallocated ...........................   Passed    0.00 sec
+      Start 2184: SparseGrid.VertexIndexAfterTouch
+ 5/76 Test #2184: SparseGrid.VertexIndexAfterTouch .............................................   Passed    0.00 sec
+      Start 2185: SparseGrid.SameBlockForNearbyVertices
+ 6/76 Test #2185: SparseGrid.SameBlockForNearbyVertices ........................................   Passed    0.00 sec
+      Start 2186: SparseGrid.IsAllocated
+ 7/76 Test #2186: SparseGrid.IsAllocated .......................................................   Passed    0.00 sec
+      Start 2187: SparseGrid.ScalarFieldWriteRead
+ 8/76 Test #2187: SparseGrid.ScalarFieldWriteRead ..............................................   Passed    0.01 sec
+      Start 2188: SparseGrid.MultipleProperties
+ 9/76 Test #2188: SparseGrid.MultipleProperties ................................................   Passed    0.00 sec
+      Start 2189: SparseGrid.ForEachBlock
+10/76 Test #2189: SparseGrid.ForEachBlock ......................................................   Passed    0.00 sec
+      Start 2190: SparseGrid.ForEachAllocatedVertex
+11/76 Test #2190: SparseGrid.ForEachAllocatedVertex ............................................   Passed    0.00 sec
+      Start 2191: SparseGrid.Reset
+12/76 Test #2191: SparseGrid.Reset .............................................................   Passed    0.00 sec
+      Start 2192: SparseGrid.MemoryEfficiency
+13/76 Test #2192: SparseGrid.MemoryEfficiency ..................................................   Passed    0.17 sec
+      Start 2193: SparseGrid.IntraBlockLocalityConsecutiveIndices
+14/76 Test #2193: SparseGrid.IntraBlockLocalityConsecutiveIndices ..............................   Passed    0.00 sec
+      Start 2352: Smoothing.UniformLaplacianReducesRoughness
+15/76 Test #2352: Smoothing.UniformLaplacianReducesRoughness ...................................   Passed    0.01 sec
+      Start 2353: Smoothing.UniformLaplacianCausesShrinkage
+16/76 Test #2353: Smoothing.UniformLaplacianCausesShrinkage ....................................   Passed    0.01 sec
+      Start 2354: Smoothing.UniformLaplacianReturnsNulloptForEmptyMesh
+17/76 Test #2354: Smoothing.UniformLaplacianReturnsNulloptForEmptyMesh .........................   Passed    0.00 sec
+      Start 2355: Smoothing.UniformLaplacianReturnsNulloptForZeroIterations
+18/76 Test #2355: Smoothing.UniformLaplacianReturnsNulloptForZeroIterations ....................   Passed    0.00 sec
+      Start 2356: Smoothing.CotanLaplacianConverges
+19/76 Test #2356: Smoothing.CotanLaplacianConverges ............................................   Passed    0.01 sec
+      Start 2357: Smoothing.TaubinPreservesVolume
+20/76 Test #2357: Smoothing.TaubinPreservesVolume ..............................................   Passed    0.01 sec
+      Start 2358: Smoothing.TaubinReturnsNulloptForEmptyMesh
+21/76 Test #2358: Smoothing.TaubinReturnsNulloptForEmptyMesh ...................................   Passed    0.00 sec
+      Start 2359: Smoothing.ImplicitLaplacianConverges
+22/76 Test #2359: Smoothing.ImplicitLaplacianConverges .........................................   Passed    0.01 sec
+      Start 2360: Smoothing.ImplicitLaplacianReturnsNulloptForEmptyMesh
+23/76 Test #2360: Smoothing.ImplicitLaplacianReturnsNulloptForEmptyMesh ........................   Passed    0.00 sec
+      Start 2361: Smoothing.SmoothingPreservesTopology
+24/76 Test #2361: Smoothing.SmoothingPreservesTopology .........................................   Passed    0.00 sec
+      Start 2362: Smoothing.UniformPreservesBoundary
+25/76 Test #2362: Smoothing.UniformPreservesBoundary ...........................................   Passed    0.00 sec
+      Start 2363: Smoothing.CotanReducesEdgeLengthVariance
+26/76 Test #2363: Smoothing.CotanReducesEdgeLengthVariance .....................................   Passed    0.00 sec
+      Start 2364: Smoothing.TaubinFlatMeshStaysFlat
+27/76 Test #2364: Smoothing.TaubinFlatMeshStaysFlat ............................................   Passed    0.00 sec
+      Start 2365: Smoothing.ImplicitFlatMeshStaysFlat
+28/76 Test #2365: Smoothing.ImplicitFlatMeshStaysFlat ..........................................   Passed    0.00 sec
+      Start 2366: Smoothing.ImplicitReducesNoise
+29/76 Test #2366: Smoothing.ImplicitReducesNoise ...............................................   Passed    0.00 sec
+      Start 2367: Smoothing.ImplicitPreservesBoundary
+30/76 Test #2367: Smoothing.ImplicitPreservesBoundary ..........................................   Passed    0.00 sec
+      Start 2368: Smoothing.ImplicitUnconditionallyStable
+31/76 Test #2368: Smoothing.ImplicitUnconditionallyStable ......................................   Passed    0.00 sec
+      Start 2369: Smoothing.ImplicitMultipleIterationsSmootherThanOne
+32/76 Test #2369: Smoothing.ImplicitMultipleIterationsSmootherThanOne ..........................   Passed    0.00 sec
+      Start 2370: Smoothing.FilterFaceNormalsFlatMeshIsIdentity
+33/76 Test #2370: Smoothing.FilterFaceNormalsFlatMeshIsIdentity ................................   Passed    0.00 sec
+      Start 2371: Smoothing.FilterFaceNormalsCleanMeshNearIdentity
+34/76 Test #2371: Smoothing.FilterFaceNormalsCleanMeshNearIdentity .............................   Passed    0.01 sec
+      Start 2372: Smoothing.FilterFaceNormalsIsDeterministic
+35/76 Test #2372: Smoothing.FilterFaceNormalsIsDeterministic ...................................   Passed    0.02 sec
+      Start 2373: Smoothing.FilterFaceNormalsFailsClosedOnEmptyMesh
+36/76 Test #2373: Smoothing.FilterFaceNormalsFailsClosedOnEmptyMesh ............................   Passed    0.00 sec
+      Start 2374: Smoothing.FilterFaceNormalsFailsClosedOnNonFiniteSigma
+37/76 Test #2374: Smoothing.FilterFaceNormalsFailsClosedOnNonFiniteSigma .......................   Passed    0.01 sec
+      Start 2375: Smoothing.DenoiseBilateralCleanMeshNearIdentity
+38/76 Test #2375: Smoothing.DenoiseBilateralCleanMeshNearIdentity ..............................   Passed    0.02 sec
+      Start 2376: Smoothing.DenoiseBilateralReducesNoise
+39/76 Test #2376: Smoothing.DenoiseBilateralReducesNoise .......................................   Passed    0.02 sec
+      Start 2377: Smoothing.DenoiseBilateralPreservesFeatureBetterThanUniform
+40/76 Test #2377: Smoothing.DenoiseBilateralPreservesFeatureBetterThanUniform ..................   Passed    0.05 sec
+      Start 2378: Smoothing.DenoiseBilateralIsDeterministic
+41/76 Test #2378: Smoothing.DenoiseBilateralIsDeterministic ....................................   Passed    0.03 sec
+      Start 2379: Smoothing.DenoiseBilateralFailsClosedOnEmptyMesh
+42/76 Test #2379: Smoothing.DenoiseBilateralFailsClosedOnEmptyMesh .............................   Passed    0.00 sec
+      Start 2380: Smoothing.DenoiseBilateralFailsClosedOnNonManifoldInput
+43/76 Test #2380: Smoothing.DenoiseBilateralFailsClosedOnNonManifoldInput ......................   Passed    0.00 sec
+      Start 2381: Smoothing.DenoiseBilateralFailsClosedOnDegenerateGeometry
+44/76 Test #2381: Smoothing.DenoiseBilateralFailsClosedOnDegenerateGeometry ....................   Passed    0.00 sec
+      Start 2382: Smoothing.DenoiseBilateralFailsClosedOnNonFiniteInput
+45/76 Test #2382: Smoothing.DenoiseBilateralFailsClosedOnNonFiniteInput ........................   Passed    0.00 sec
+      Start 2383: Smoothing.DenoiseBilateralFailsClosedOnNonFiniteSigma
+46/76 Test #2383: Smoothing.DenoiseBilateralFailsClosedOnNonFiniteSigma ........................   Passed    0.01 sec
+      Start 2384: Smoothing.DenoiseBilateralExtremeCoordinatesStayFinite
+47/76 Test #2384: Smoothing.DenoiseBilateralExtremeCoordinatesStayFinite .......................   Passed    0.01 sec
+      Start 2385: Smoothing.DenoiseBilateralPreservesBoundary
+48/76 Test #2385: Smoothing.DenoiseBilateralPreservesBoundary ..................................   Passed    0.01 sec
+      Start 2386: Smoothing.ImplicitPreservedBoundaryMatchesReducedSystemOracle
+49/76 Test #2386: Smoothing.ImplicitPreservedBoundaryMatchesReducedSystemOracle ................   Passed    0.00 sec
+      Start 2387: Smoothing.ImplicitPreservedBoundaryDiffersFromSolveThenOverwrite
+50/76 Test #2387: Smoothing.ImplicitPreservedBoundaryDiffersFromSolveThenOverwrite .............   Passed    0.00 sec
+      Start 2388: Smoothing.ImplicitPreservedBoundaryIsExactAcrossIterations
+51/76 Test #2388: Smoothing.ImplicitPreservedBoundaryIsExactAcrossIterations ...................   Passed    0.01 sec
+      Start 2389: Smoothing.ImplicitUnpreservedBoundaryStaysFiniteForLargeTimeSteps
+52/76 Test #2389: Smoothing.ImplicitUnpreservedBoundaryStaysFiniteForLargeTimeSteps ............   Passed    0.00 sec
+      Start 2437: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded
+53/76 Test #2437: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded ...............   Passed    0.01 sec
+      Start 2468: PointCloudKernels.DensityDistinguishesDenseClusterFromSparseTail
+54/76 Test #2468: PointCloudKernels.DensityDistinguishesDenseClusterFromSparseTail .............   Passed    0.00 sec
+      Start 2598: LinearAlgebra.RobustPCARecoversLowRankPlusSparseMatrix
+55/76 Test #2598: LinearAlgebra.RobustPCARecoversLowRankPlusSparseMatrix .......................   Passed    0.02 sec
+      Start 2601: Sparse.BuilderSortsMergesDropsAndMultiplies
+56/76 Test #2601: Sparse.BuilderSortsMergesDropsAndMultiplies ..................................   Passed    0.00 sec
+      Start 2602: Sparse.DiagnosticsClassifyLaplacianLikeMatrix
+57/76 Test #2602: Sparse.DiagnosticsClassifyLaplacianLikeMatrix ................................   Passed    0.00 sec
+      Start 2603: Sparse.ConjugateGradientReportsConvergenceAndBreakdown
+58/76 Test #2603: Sparse.ConjugateGradientReportsConvergenceAndBreakdown .......................   Passed    0.00 sec
+      Start 2604: Sparse.ShiftedConjugateGradientUsesDiagonalMassTerm
+59/76 Test #2604: Sparse.ShiftedConjugateGradientUsesDiagonalMassTerm ..........................   Passed    0.00 sec
+      Start 2605: Sparse.ShiftedFixedConjugateGradientSolvesReducedSystem
+60/76 Test #2605: Sparse.ShiftedFixedConjugateGradientSolvesReducedSystem ......................   Passed    0.00 sec
+      Start 2606: Sparse.ShiftedFixedConjugateGradientWithNoFixedIndicesMatchesUnconstrained
+61/76 Test #2606: Sparse.ShiftedFixedConjugateGradientWithNoFixedIndicesMatchesUnconstrained ...   Passed    0.00 sec
+      Start 2607: Sparse.ShiftedFixedConjugateGradientRejectsMalformedConstraints
+62/76 Test #2607: Sparse.ShiftedFixedConjugateGradientRejectsMalformedConstraints ..............   Passed    0.00 sec
+      Start 2608: SparseFactorization.LDLTSolvesOneDimensionalPoissonSystem
+63/76 Test #2608: SparseFactorization.LDLTSolvesOneDimensionalPoissonSystem ....................   Passed    0.00 sec
+      Start 2609: SparseFactorization.LLTSolvesTriangleFanMassPlusLaplacianShape
+64/76 Test #2609: SparseFactorization.LLTSolvesTriangleFanMassPlusLaplacianShape ...............   Passed    0.00 sec
+      Start 2610: SparseFactorization.LDLTAndLLTClassifyIndefiniteAndSingularSystems
+65/76 Test #2610: SparseFactorization.LDLTAndLLTClassifyIndefiniteAndSingularSystems ...........   Passed    0.00 sec
+      Start 2611: SparseFactorization.MultiRhsSolveMatchesKnownSolutions
+66/76 Test #2611: SparseFactorization.MultiRhsSolveMatchesKnownSolutions .......................   Passed    0.00 sec
+      Start 2612: SparseFactorization.SolveInPlaceReusesRhsStorage
+67/76 Test #2612: SparseFactorization.SolveInPlaceReusesRhsStorage .............................   Passed    0.00 sec
+      Start 2613: SparseFactorization.RejectsInvalidInputAndDimensionMismatches
+68/76 Test #2613: SparseFactorization.RejectsInvalidInputAndDimensionMismatches ................   Passed    0.00 sec
+      Start 2614: SparseFactorization.FactorOnceSolveManyIsBitStable
+69/76 Test #2614: SparseFactorization.FactorOnceSolveManyIsBitStable ...........................   Passed    0.00 sec
+      Start 2615: SparseNonsymmetric.BiCGSTABSolvesAdvectionDiffusionSystem
+70/76 Test #2615: SparseNonsymmetric.BiCGSTABSolvesAdvectionDiffusionSystem ....................   Passed    0.00 sec
+      Start 2616: SparseNonsymmetric.BiCGSTABMatchesCGOnSPDSystem
+71/76 Test #2616: SparseNonsymmetric.BiCGSTABMatchesCGOnSPDSystem ..............................   Passed    0.00 sec
+      Start 2617: SparseNonsymmetric.SingularSystemReportsFailureWithoutMutatingOutput
+72/76 Test #2617: SparseNonsymmetric.SingularSystemReportsFailureWithoutMutatingOutput .........   Passed    0.00 sec
+      Start 2618: SparseNonsymmetric.RejectsInvalidInputs
+73/76 Test #2618: SparseNonsymmetric.RejectsInvalidInputs ......................................   Passed    0.00 sec
+      Start 2619: SparseNonsymmetric.MultiRhsSolveMatchesKnownSolutions
+74/76 Test #2619: SparseNonsymmetric.MultiRhsSolveMatchesKnownSolutions ........................   Passed    0.00 sec
+      Start 2620: SparseNonsymmetric.PreconditionersAgreeWithinTolerance
+75/76 Test #2620: SparseNonsymmetric.PreconditionersAgreeWithinTolerance .......................   Passed    0.00 sec
+      Start 2621: SparseNonsymmetric.IdenticalInputsAreBitStable
+76/76 Test #2621: SparseNonsymmetric.IdenticalInputsAreBitStable ...............................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 76
+
+Label Time Summary:
+geometry    =   0.67 sec*proc (76 tests)
+unit        =   0.67 sec*proc (76 tests)
+
+Total Test time (real) =   0.82 sec
