@@ -137,17 +137,26 @@ side is ready before the producing side changes.
       resolution policy in `geometry`.
 - [x] Slice B — de-index corner UVs when building GPU vertex buffers; keep the
       per-vertex path intact when no corner UVs exist.
-- [ ] Slice C — stop building the entity halfedge mesh from `atlas.OutputMesh`;
+- [x] Slice C — stop building the entity halfedge mesh from `atlas.OutputMesh`;
       preserve source vertex/edge/halfedge cardinality and manifoldness.
-- [ ] Slice C — publish atlas UVs on the corner domain rather than mutating
+- [x] Slice C — publish atlas UVs on the corner domain rather than mutating
       element-domain cardinality.
-- [ ] Slice C — verify the atlas-failure fallback path
+- [x] Slice C — verify the atlas-failure fallback path
       (`ResolvedTexcoordsValid == false`) preserves the same topology guarantee.
-- [ ] Slice C — report the GPU-side vertex duplication count and the resolved
+      Both branches now share one `ConvertResolvedMeshToHalfedge(entityMesh, …)`
+      call built from the source mesh, so the guarantee is structural rather
+      than duplicated per branch; `atlas.OutputMesh` is no longer used to build
+      topology anywhere.
+- [x] Slice C — report the GPU-side vertex duplication count and the resolved
       atlas provenance/backend in the import result, replacing the currently
       computed-but-never-surfaced `SeamSplitVertexCount`, so duplication remains
       visible where it now legitimately happens.
 - [ ] Slice D — migrate the remaining vertex-domain `v:texcoord` consumers.
+- [ ] Slice D — `Runtime.TextureBakeModule` reads vertex-domain `v:texcoord`
+      only, so the generated-normal bake now fails closed with a diagnostic on a
+      seam-carrying mesh instead of baking against a lossy per-vertex
+      approximation. This is a deliberate Slice C consequence: the bake is loud,
+      not silent, and Slice D migrates it to the resolution order.
 
 ## Tests
 - [x] Slice A — unit coverage for corner-domain UV storage and the
@@ -157,39 +166,54 @@ side is ready before the producing side changes.
       (`Test.MeshGeometryExtraction` split cases + `Test.CornerTexcoordUpload`).
 - [ ] Slice B — `gpu;vulkan` readback smoke asserting a seam-split UV mesh still
       renders its texture correctly.
-- [ ] Slice C — geometry/runtime contract test that materializes a checked-in
-      closed manifold fixture and asserts vertex/edge/halfedge/face counts equal
-      the source, boundary-edge count is zero, and Euler characteristic is
-      preserved.
-- [ ] Slice C — test asserting UVs are resolved and finite on that same import
-      without element-domain cardinality change.
-- [ ] Slice C — test asserting the atlas-failure fallback also preserves
-      topology.
+- [x] Slice C — runtime contract test that materializes a closed manifold
+      fixture and asserts vertex/edge/halfedge/face counts equal the source,
+      boundary-halfedge count is zero, and Euler characteristic is preserved
+      (`Test.AssetImportFormatCoverage`,
+      `DirectObjImportPreservesClosedManifoldTopology` on a generated cube and
+      `DirectObjImportOfSculptFixturePreservesItsManifold` on
+      `tests/data/sculpt.obj`, which asserts the reported 3669/11013/22026/7342
+      and χ = −2).
+- [x] Slice C — test asserting UVs are resolved and finite on that same import
+      without element-domain cardinality change (same two tests: `h:texcoord`
+      sized to the halfedge count, all finite, a real seam present, and no
+      `v:texcoord`). `DirectObjImportKeepsVertexUvsWhenTheAtlasNeedsNoSeam`
+      pins the seam-free case to the unchanged vertex domain.
+- [x] Slice C — test asserting the non-manifold renderable fallback still
+      resolves UVs after the change
+      (`NonManifoldObjImportStillResolvesVertexUvs`). The `!atlasUsable` branch
+      itself is not reachable through the public import path: every input the
+      atlas rejects as degenerate is already rejected earlier by MeshSoup
+      validation (`ValidationSeverity::Error`), whose degeneracy tolerance is
+      the looser of the two. It is covered structurally instead — see the
+      corresponding `## Required changes` entry.
 - [ ] Slice D — OBJ round-trip test asserting per-corner UVs survive read →
       write → read.
 - [ ] Default CPU gate stays green after every slice.
 
 ## Docs
-- [ ] Record the corner-domain UV decision and the corner-over-vertex resolution
-      order in `docs/architecture/property-coherence.md` (or the owning geometry
-      doc).
-- [ ] Document the canonical UV element domain in
+- [x] Record the corner-domain UV decision and the corner-over-vertex resolution
+      order in `docs/architecture/property-coherence.md` (rendering-consumer
+      section) and `docs/architecture/geometry-api-style.md`.
+- [x] Document the canonical UV element domain in
       `docs/architecture/geometry-api-style.md` so future methods do not
       re-assume vertex-domain UVs.
-- [ ] Record the import topology guarantee in `src/app/Sandbox/README.md` or the
-      asset-workflow runtime doc, whichever owns import materialization prose.
+- [x] Record the import topology guarantee in `src/app/Sandbox/README.md`.
 
 ## Acceptance criteria
-- [ ] Importing `tests/data/sculpt.obj` yields 3669 vertices, 11013 edges,
+- [x] Importing `tests/data/sculpt.obj` yields 3669 vertices, 11013 edges,
       22026 halfedges, 7342 faces, and zero boundary vertices.
-- [ ] UVs are present and finite after that import, on the corner domain, with
+- [x] UVs are present and finite after that import, on the corner domain, with
       no element-domain cardinality change.
 - [ ] A textured mesh still renders correctly, with the seam split occurring at
-      GPU upload rather than in the ECS mesh.
-- [ ] GPU-side vertex duplication is reported in the import result, never
-      silent.
-- [ ] No dual authoritative mesh identity is introduced.
-- [ ] No layering violation; `geometry` still owns the atlas method and
+      GPU upload rather than in the ECS mesh. Slice B proved the split through
+      the public extraction path on CPU; the `gpu;vulkan` readback smoke that
+      closes `Operational` is still open.
+- [x] GPU-side vertex duplication is reported in the import result, never
+      silent. `sculpt.obj` reports `gpu-split-vertices=17795`, the same count
+      the old `SeamSplitVertexCount` computed and discarded.
+- [x] No dual authoritative mesh identity is introduced.
+- [x] No layering violation; `geometry` still owns the atlas method and
       `runtime` still owns composition.
 
 ## Verification

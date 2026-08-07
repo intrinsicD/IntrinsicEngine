@@ -17,6 +17,7 @@ module;
 module Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 
 import Extrinsic.Core.Error;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.Mesh.Conversion;
 import Geometry.MeshSoup;
 import Geometry.Properties;
@@ -27,6 +28,8 @@ namespace {
 constexpr const char *kPositionProperty = "v:point";
 constexpr const char *kNormalProperty = "v:normal";
 constexpr const char *kTexcoordProperty = "v:texcoord";
+constexpr const char *kCornerTexcoordProperty =
+    Geometry::MeshUtils::kHalfedgeTexcoordPropertyName;
 constexpr const char *kFaceVerticesProperty = "f:vertices";
 constexpr const char *kSourceVertexProperty = "v:source_vertex";
 constexpr const char *kSourceFaceProperty = "f:source_face";
@@ -238,18 +241,30 @@ ResolveVertexNormals(const Geometry::MeshIO::MeshIOResult &meshPayload,
          std::isfinite(value.z);
 }
 
-[[nodiscard]] bool HasValidTexcoords(const Geometry::HalfedgeMesh::Mesh &mesh) {
-  const auto texcoords =
-      mesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty);
-  if (!texcoords || texcoords.Vector().size() != mesh.VerticesSize()) {
-    return false;
-  }
-  for (const glm::vec2 texcoord : texcoords.Vector()) {
-    if (!IsFinite(texcoord)) {
+[[nodiscard]] bool AllFinite(const std::vector<glm::vec2> &values) noexcept {
+  for (const glm::vec2 value : values) {
+    if (!IsFinite(value)) {
       return false;
     }
   }
   return true;
+}
+
+// BUG-137 — UVs may be owned by the corner domain now, so validity follows the
+// canonical resolution order instead of assuming `v:texcoord`.
+[[nodiscard]] bool HasValidTexcoords(const Geometry::HalfedgeMesh::Mesh &mesh) {
+  switch (Geometry::MeshUtils::ResolveTexcoordDomain(mesh)) {
+  case Geometry::MeshUtils::TexcoordDomain::Halfedge:
+    return AllFinite(mesh.HalfedgeProperties()
+                         .Get<glm::vec2>(kCornerTexcoordProperty)
+                         .Vector());
+  case Geometry::MeshUtils::TexcoordDomain::Vertex:
+    return AllFinite(
+        mesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty).Vector());
+  case Geometry::MeshUtils::TexcoordDomain::None:
+  default:
+    return false;
+  }
 }
 
 [[nodiscard]] bool
@@ -408,32 +423,248 @@ MakeRuntimeDiagnostics(const Geometry::UvAtlas::UvAtlasResult &atlas,
   diagnostics.AuthoredTexcoordsRejected =
       authoredStatus != Geometry::UvAtlas::UvAtlasStatus::Success &&
       authoredStatus != Geometry::UvAtlas::UvAtlasStatus::MissingAuthoredUvs;
+  // The atlas output is only the UV carrier now; whether the *entity* mesh has
+  // usable UVs is decided after publication, so the resolved counts below are
+  // filled in by the caller from the materialized mesh.
   diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(atlas.OutputMesh);
   diagnostics.SourceVertexCount = sourceVertexCount;
   diagnostics.SourceFaceCount = sourceFaceCount;
-  diagnostics.ResolvedVertexCount = atlas.OutputMesh.VertexCount();
-  diagnostics.ResolvedFaceCount = atlas.OutputMesh.FaceCount();
-  diagnostics.SeamSplitVertexCount =
-      diagnostics.ResolvedVertexCount > sourceVertexCount
-          ? diagnostics.ResolvedVertexCount - sourceVertexCount
-          : 0u;
   diagnostics.ChartCount = atlas.Diagnostics.ChartCount;
   diagnostics.AtlasWidth = atlas.Diagnostics.AtlasWidth;
   diagnostics.AtlasHeight = atlas.Diagnostics.AtlasHeight;
+  diagnostics.AtlasBackendName = atlas.Diagnostics.BackendName;
   return diagnostics;
 }
 
-[[nodiscard]] std::vector<std::uint32_t> MapOutputFacesToOriginalFaces(
-    const std::span<const std::uint32_t> sourceFaceForOutputFace,
-    const std::span<const std::uint32_t> originalFaceForTriangle) {
-  std::vector<std::uint32_t> originalFaces(sourceFaceForOutputFace.size(), 0u);
-  for (std::size_t i = 0u; i < sourceFaceForOutputFace.size(); ++i) {
-    const std::uint32_t triangleFace = sourceFaceForOutputFace[i];
-    originalFaces[i] = triangleFace < originalFaceForTriangle.size()
-                           ? originalFaceForTriangle[triangleFace]
-                           : triangleFace;
+// BUG-137 — the atlas output carries one vertex per (chart, source vertex)
+// pair. Pull its UVs back onto the *source* corners so the seam can be stored
+// as a UV fact instead of being baked into the entity mesh's topology.
+struct AtlasCornerTexcoords {
+  // Three entries per source triangle, in that triangle's corner order.
+  std::vector<glm::vec2> CornerUvs{};
+  // One representative UV per source vertex; only meaningful when `HasSeam` is
+  // false, where it is also the exact per-vertex answer.
+  std::vector<glm::vec2> VertexUvs{};
+  std::size_t UnmappedCornerCount{0};
+  bool HasSeam{false};
+};
+
+[[nodiscard]] std::optional<AtlasCornerTexcoords>
+GatherAtlasCornerTexcoords(const Geometry::UvAtlas::UvAtlasResult &atlas,
+                           const Geometry::MeshSoup::IndexedMesh &sourceMesh) {
+  const auto outputUvs =
+      atlas.OutputMesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty);
+  if (!outputUvs ||
+      outputUvs.Vector().size() != atlas.OutputMesh.VertexCount()) {
+    return std::nullopt;
   }
-  return originalFaces;
+
+  const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces =
+      sourceMesh.Faces();
+  const std::span<const Geometry::MeshSoup::PolygonFace> outputFaces =
+      atlas.OutputMesh.Faces();
+  if (atlas.SourceFaceForOutputFace.size() != outputFaces.size()) {
+    return std::nullopt;
+  }
+
+  AtlasCornerTexcoords corners{};
+  corners.CornerUvs.assign(sourceFaces.size() * 3u, glm::vec2{0.0f});
+  std::vector<std::uint8_t> cornerAssigned(sourceFaces.size() * 3u, 0u);
+
+  for (std::size_t outputFace = 0u; outputFace < outputFaces.size();
+       ++outputFace) {
+    const std::uint32_t sourceFace = atlas.SourceFaceForOutputFace[outputFace];
+    if (sourceFace >= sourceFaces.size()) {
+      return std::nullopt;
+    }
+
+    const std::vector<std::uint32_t> &outputIndices =
+        outputFaces[outputFace].Indices;
+    const std::vector<std::uint32_t> &sourceIndices =
+        sourceFaces[sourceFace].Indices;
+    if (outputIndices.size() != 3u || sourceIndices.size() != 3u) {
+      return std::nullopt;
+    }
+
+    for (std::size_t k = 0u; k < 3u; ++k) {
+      const std::uint32_t outputVertex = outputIndices[k];
+      if (outputVertex >= atlas.SourceVertexForOutputVertex.size()) {
+        return std::nullopt;
+      }
+      const std::uint32_t sourceVertex =
+          atlas.SourceVertexForOutputVertex[outputVertex];
+
+      // Chart splitting preserves winding, so corner k normally maps to corner
+      // k; the search only covers a backend that rotated the triangle.
+      std::size_t slot = 3u;
+      if (sourceIndices[k] == sourceVertex) {
+        slot = k;
+      } else {
+        for (std::size_t candidate = 0u; candidate < 3u; ++candidate) {
+          if (sourceIndices[candidate] == sourceVertex) {
+            slot = candidate;
+            break;
+          }
+        }
+      }
+      if (slot >= 3u) {
+        return std::nullopt;
+      }
+
+      const std::size_t corner = sourceFace * 3u + slot;
+      corners.CornerUvs[corner] = outputUvs.Vector()[outputVertex];
+      cornerAssigned[corner] = 1u;
+    }
+  }
+
+  corners.VertexUvs.assign(sourceMesh.VertexCount(), glm::vec2{0.0f});
+  std::vector<std::uint8_t> vertexAssigned(sourceMesh.VertexCount(), 0u);
+  for (std::size_t face = 0u; face < sourceFaces.size(); ++face) {
+    const std::vector<std::uint32_t> &indices = sourceFaces[face].Indices;
+    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
+      const std::size_t corner = face * 3u + k;
+      if (cornerAssigned[corner] == 0u) {
+        continue;
+      }
+      const std::uint32_t vertex = indices[k];
+      if (vertex >= corners.VertexUvs.size()) {
+        return std::nullopt;
+      }
+      if (vertexAssigned[vertex] == 0u) {
+        corners.VertexUvs[vertex] = corners.CornerUvs[corner];
+        vertexAssigned[vertex] = 1u;
+      } else if (corners.VertexUvs[vertex] != corners.CornerUvs[corner]) {
+        corners.HasSeam = true;
+      }
+    }
+  }
+
+  // A face the atlas dropped leaves its corners without a UV. Inherit a
+  // sibling corner at the same vertex so the buffer stays finite and no new
+  // (vertex, UV) pair — and therefore no phantom seam — is invented.
+  for (std::size_t face = 0u; face < sourceFaces.size(); ++face) {
+    const std::vector<std::uint32_t> &indices = sourceFaces[face].Indices;
+    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
+      const std::size_t corner = face * 3u + k;
+      if (cornerAssigned[corner] != 0u) {
+        continue;
+      }
+      ++corners.UnmappedCornerCount;
+      const std::uint32_t vertex = indices[k];
+      if (vertex < corners.VertexUvs.size() && vertexAssigned[vertex] != 0u) {
+        corners.CornerUvs[corner] = corners.VertexUvs[vertex];
+      }
+    }
+  }
+
+  return corners;
+}
+
+// Writes `h:texcoord` for every halfedge of `mesh`, whose faces and vertices
+// are index-identical to `sourceMesh`. Boundary halfedges carry no corner of
+// their own, so they repeat a UV already present at their target vertex rather
+// than a default that would read as an extra seam.
+[[nodiscard]] bool
+PublishCornerTexcoords(Geometry::HalfedgeMesh::Mesh &mesh,
+                       const Geometry::MeshSoup::IndexedMesh &sourceMesh,
+                       const AtlasCornerTexcoords &corners) {
+  const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces =
+      sourceMesh.Faces();
+  if (mesh.FacesSize() != sourceFaces.size() ||
+      mesh.VerticesSize() != sourceMesh.VertexCount()) {
+    return false;
+  }
+
+  std::vector<glm::vec2> values(mesh.HalfedgesSize(), glm::vec2{0.0f});
+  std::vector<std::uint8_t> written(mesh.HalfedgesSize(), 0u);
+  std::vector<glm::vec2> uvForVertex(mesh.VerticesSize(), glm::vec2{0.0f});
+  std::vector<std::uint8_t> vertexHasUv(mesh.VerticesSize(), 0u);
+
+  for (std::size_t faceIndex = 0u; faceIndex < mesh.FacesSize(); ++faceIndex) {
+    const Geometry::FaceHandle face{
+        static_cast<Geometry::PropertyIndex>(faceIndex)};
+    if (mesh.IsDeleted(face)) {
+      continue;
+    }
+
+    const std::vector<std::uint32_t> &indices = sourceFaces[faceIndex].Indices;
+    for (const Geometry::HalfedgeHandle halfedge :
+         mesh.HalfedgesAroundFace(face)) {
+      const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
+      std::size_t slot = indices.size();
+      for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
+        if (indices[k] == vertex.Index) {
+          slot = k;
+          break;
+        }
+      }
+      if (slot >= 3u) {
+        return false;
+      }
+
+      const glm::vec2 uv = corners.CornerUvs[faceIndex * 3u + slot];
+      values[halfedge.Index] = uv;
+      written[halfedge.Index] = 1u;
+      uvForVertex[vertex.Index] = uv;
+      vertexHasUv[vertex.Index] = 1u;
+    }
+  }
+
+  for (std::size_t index = 0u; index < values.size(); ++index) {
+    if (written[index] != 0u) {
+      continue;
+    }
+    const Geometry::HalfedgeHandle halfedge{
+        static_cast<Geometry::PropertyIndex>(index)};
+    if (mesh.IsDeleted(halfedge)) {
+      continue;
+    }
+    const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
+    if (mesh.IsValid(vertex) && vertexHasUv[vertex.Index] != 0u) {
+      values[index] = uvForVertex[vertex.Index];
+    }
+  }
+
+  auto property = mesh.HalfedgeProperties().GetOrAdd<glm::vec2>(
+      std::string{kCornerTexcoordProperty}, glm::vec2{0.0f});
+  if (property.Vector().size() != values.size()) {
+    return false;
+  }
+  property.Vector() = std::move(values);
+
+  // Leave exactly one authority behind: a stale authored `v:texcoord` copied
+  // from the payload would otherwise disagree with the corner UVs.
+  if (auto stale = mesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty)) {
+    mesh.VertexProperties().Remove(stale);
+  }
+  return true;
+}
+
+void PublishVertexTexcoords(Geometry::HalfedgeMesh::Mesh &mesh,
+                            const std::vector<glm::vec2> &uvPerVertex) {
+  if (mesh.VerticesSize() != uvPerVertex.size()) {
+    return;
+  }
+  auto property = mesh.VertexProperties().GetOrAdd<glm::vec2>(
+      std::string{kTexcoordProperty}, glm::vec2{0.0f});
+  property.Vector() = uvPerVertex;
+}
+
+[[nodiscard]] std::size_t
+CountGpuSplitVertices(const Geometry::HalfedgeMesh::Mesh &mesh) {
+  const std::size_t uploaded =
+      Geometry::MeshUtils::CountTexcoordSplitVertices(mesh);
+  const std::size_t vertices = mesh.VertexCount();
+  return uploaded > vertices ? uploaded - vertices : 0u;
+}
+
+[[nodiscard]] std::vector<std::uint32_t>
+MakeIdentityXrefs(const std::size_t count) {
+  std::vector<std::uint32_t> xrefs(count, 0u);
+  for (std::size_t i = 0u; i < count; ++i) {
+    xrefs[i] = static_cast<std::uint32_t>(i);
+  }
+  return xrefs;
 }
 
 [[nodiscard]] std::optional<Geometry::HalfedgeMesh::Mesh>
@@ -486,7 +717,15 @@ BuildDisconnectedRenderableMesh(
   return mesh;
 }
 
-[[nodiscard]] Core::Expected<Geometry::HalfedgeMesh::Mesh>
+struct ResolvedHalfedgeMesh {
+  Geometry::HalfedgeMesh::Mesh Mesh{};
+  // True when the input could not form a halfedge mesh and was rebuilt as a
+  // per-corner soup. Such a mesh no longer shares vertex indices with its
+  // input, so corner-indexed data cannot be mapped onto it.
+  bool UsedDisconnectedFallback{false};
+};
+
+[[nodiscard]] Core::Expected<ResolvedHalfedgeMesh>
 ConvertResolvedMeshToHalfedge(
     const Geometry::MeshSoup::IndexedMesh &resolved,
     const std::span<const std::uint32_t> sourceVertexForOutputVertex,
@@ -501,11 +740,13 @@ ConvertResolvedMeshToHalfedge(
               BuildDisconnectedRenderableMesh(
                   resolved, sourceVertexForOutputVertex,
                   originalFaceForOutputFace, normals)) {
-        return std::move(*fallback);
+        return ResolvedHalfedgeMesh{
+            .Mesh = std::move(*fallback),
+            .UsedDisconnectedFallback = true,
+        };
       }
     }
-    return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-        Core::ErrorCode::InvalidFormat);
+    return Core::Err<ResolvedHalfedgeMesh>(Core::ErrorCode::InvalidFormat);
   }
 
   CopySupportedVertexProperties(resolved.VertexProperties(), converted.Mesh,
@@ -514,7 +755,10 @@ ConvertResolvedMeshToHalfedge(
                              sourceVertexForOutputVertex);
   WriteSourceVertexXrefs(converted.Mesh, sourceVertexForOutputVertex);
   WriteSourceFaceXrefs(converted.Mesh, originalFaceForOutputFace);
-  return std::move(converted.Mesh);
+  return ResolvedHalfedgeMesh{
+      .Mesh = std::move(converted.Mesh),
+      .UsedDisconnectedFallback = false,
+  };
 }
 
 } // namespace
@@ -566,36 +810,43 @@ BuildRuntimeHalfedgeMeshMaterialization(
       MakeRuntimeDiagnostics(atlas, authoredValidation.Status,
                              positions.Vector().size(), faces.Vector().size());
 
-  if (!atlas.Succeeded() || !diagnostics.ResolvedTexcoordsValid) {
-    if (options.UvResolution.FailurePolicy ==
-        RuntimeMeshUvFailurePolicy::Required) {
-      return Core::Err<RuntimeMeshMaterializationResult>(
-          Core::ErrorCode::AssetInvalidData);
-    }
+  // BUG-137 — the entity mesh is always built from the source topology. A UV
+  // seam is a UV fact, not a topology fact: publishing the atlas *output* mesh
+  // here is what replaced a closed manifold import with a chart-split soup.
+  // The seam now lives on the corner domain and is de-indexed at GPU upload.
+  const std::vector<std::uint32_t> identityVertexXrefs =
+      MakeIdentityXrefs(source->Mesh.VertexCount());
+  Geometry::MeshSoup::IndexedMesh entityMesh = source->Mesh;
+  static_cast<void>(Geometry::UvAtlas::CopySourceVertexPropertiesByXref(
+      Geometry::ConstPropertySet(meshPayload.Vertices), identityVertexXrefs,
+      entityMesh.VertexProperties()));
 
-    Geometry::MeshSoup::IndexedMesh optionalOutput = source->Mesh;
-    std::vector<std::uint32_t> identityVertexXrefs(optionalOutput.VertexCount(),
-                                                   0u);
-    for (std::size_t i = 0u; i < identityVertexXrefs.size(); ++i) {
-      identityVertexXrefs[i] = static_cast<std::uint32_t>(i);
-    }
-    static_cast<void>(Geometry::UvAtlas::CopySourceVertexPropertiesByXref(
-        Geometry::ConstPropertySet(meshPayload.Vertices), identityVertexXrefs,
-        optionalOutput.VertexProperties()));
+  const bool atlasUsable =
+      atlas.Succeeded() && diagnostics.ResolvedTexcoordsValid;
+  if (!atlasUsable && options.UvResolution.FailurePolicy ==
+                          RuntimeMeshUvFailurePolicy::Required) {
+    return Core::Err<RuntimeMeshMaterializationResult>(
+        Core::ErrorCode::AssetInvalidData);
+  }
 
-    auto mesh = ConvertResolvedMeshToHalfedge(
-        optionalOutput, identityVertexXrefs, source->OriginalFaceForTriangle,
-        normals, options.AllowDisconnectedRenderableFallback);
-    if (!mesh.has_value()) {
-      return Core::Err<RuntimeMeshMaterializationResult>(mesh.error());
-    }
+  auto resolved = ConvertResolvedMeshToHalfedge(
+      entityMesh, identityVertexXrefs, source->OriginalFaceForTriangle, normals,
+      options.AllowDisconnectedRenderableFallback);
+  if (!resolved.has_value()) {
+    return Core::Err<RuntimeMeshMaterializationResult>(resolved.error());
+  }
 
+  Geometry::HalfedgeMesh::Mesh &mesh = resolved->Mesh;
+  diagnostics.ResolvedVertexCount = mesh.VerticesSize();
+  diagnostics.ResolvedFaceCount = mesh.FacesSize();
+
+  if (!atlasUsable) {
+    // The atlas-failure path keeps the same topology guarantee; it simply has
+    // no UVs to publish beyond whatever the payload authored.
     diagnostics.TexcoordProvenance = RuntimeMeshResolvedUvProvenance::None;
-    diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(*mesh);
-    diagnostics.ResolvedVertexCount = mesh->VerticesSize();
-    diagnostics.ResolvedFaceCount = mesh->FacesSize();
+    diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(mesh);
     return RuntimeMeshMaterializationResult{
-        .Mesh = std::move(*mesh),
+        .Mesh = std::move(mesh),
         .Diagnostics = diagnostics,
     };
   }
@@ -607,23 +858,29 @@ BuildRuntimeHalfedgeMeshMaterialization(
         Core::ErrorCode::AssetInvalidData);
   }
 
-  const std::vector<std::uint32_t> originalFaceForOutputFace =
-      MapOutputFacesToOriginalFaces(atlas.SourceFaceForOutputFace,
-                                    source->OriginalFaceForTriangle);
-  auto mesh = ConvertResolvedMeshToHalfedge(
-      atlas.OutputMesh, atlas.SourceVertexForOutputVertex,
-      originalFaceForOutputFace, normals,
-      options.AllowDisconnectedRenderableFallback);
-  if (!mesh.has_value()) {
-    return Core::Err<RuntimeMeshMaterializationResult>(mesh.error());
+  const std::optional<AtlasCornerTexcoords> corners =
+      GatherAtlasCornerTexcoords(atlas, source->Mesh);
+  if (corners.has_value()) {
+    diagnostics.UnmappedCornerCount = corners->UnmappedCornerCount;
+    if (resolved->UsedDisconnectedFallback) {
+      // The fallback already emits one vertex per corner, so the corner UVs
+      // *are* per-vertex UVs there and need no seam encoding.
+      PublishVertexTexcoords(mesh, corners->CornerUvs);
+    } else if (corners->HasSeam) {
+      diagnostics.TexcoordsOnCornerDomain =
+          PublishCornerTexcoords(mesh, source->Mesh, *corners);
+      if (!diagnostics.TexcoordsOnCornerDomain) {
+        PublishVertexTexcoords(mesh, corners->VertexUvs);
+      }
+    } else {
+      PublishVertexTexcoords(mesh, corners->VertexUvs);
+    }
   }
-  diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(*mesh);
-  diagnostics.ResolvedVertexCount = mesh->VerticesSize();
-  diagnostics.ResolvedFaceCount = mesh->FacesSize();
-  diagnostics.SeamSplitVertexCount =
-      diagnostics.ResolvedVertexCount > diagnostics.SourceVertexCount
-          ? diagnostics.ResolvedVertexCount - diagnostics.SourceVertexCount
-          : 0u;
+
+  diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(mesh);
+  diagnostics.GpuSplitVertexCount = diagnostics.TexcoordsOnCornerDomain
+                                        ? CountGpuSplitVertices(mesh)
+                                        : 0u;
   if (!diagnostics.ResolvedTexcoordsValid &&
       options.UvResolution.FailurePolicy ==
           RuntimeMeshUvFailurePolicy::Required) {
@@ -632,7 +889,7 @@ BuildRuntimeHalfedgeMeshMaterialization(
   }
 
   return RuntimeMeshMaterializationResult{
-      .Mesh = std::move(*mesh),
+      .Mesh = std::move(mesh),
       .Diagnostics = diagnostics,
   };
 }
@@ -659,20 +916,21 @@ BuildRuntimeHalfedgeMeshGeometryOnly(
     return Core::Err<Geometry::HalfedgeMesh::Mesh>(source.error());
   }
 
-  std::vector<std::uint32_t> identityVertexXrefs(source->Mesh.VertexCount(),
-                                                 0u);
-  for (std::size_t i = 0u; i < identityVertexXrefs.size(); ++i) {
-    identityVertexXrefs[i] = static_cast<std::uint32_t>(i);
-  }
+  const std::vector<std::uint32_t> identityVertexXrefs =
+      MakeIdentityXrefs(source->Mesh.VertexCount());
 
   static_cast<void>(Geometry::UvAtlas::CopySourceVertexPropertiesByXref(
       Geometry::ConstPropertySet(meshPayload.Vertices), identityVertexXrefs,
       source->Mesh.VertexProperties()));
 
-  return ConvertResolvedMeshToHalfedge(
+  auto resolved = ConvertResolvedMeshToHalfedge(
       source->Mesh, identityVertexXrefs, source->OriginalFaceForTriangle,
       ResolveVertexNormals(meshPayload, positions.Vector(), faces.Vector()),
       options.AllowDisconnectedRenderableFallback);
+  if (!resolved.has_value()) {
+    return Core::Err<Geometry::HalfedgeMesh::Mesh>(resolved.error());
+  }
+  return std::move(resolved->Mesh);
 }
 
 Core::Expected<Geometry::HalfedgeMesh::Mesh>

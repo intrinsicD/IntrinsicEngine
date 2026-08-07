@@ -56,7 +56,10 @@ lane. Its private sidecar remembers only the revisions and counts used by that
 lane:
 
 - mesh, graph, and point-cloud positions;
-- resolved texcoord, normal, and color channel properties;
+- resolved texcoord, normal, and color channel properties, where "resolved
+  texcoord" follows the canonical corner-over-vertex order defined in
+  [geometry API style](geometry-api-style.md#texture-coordinates-are-corner-domain-capable):
+  `h:texcoord` when present, otherwise `v:texcoord`;
 - exact topology properties consumed by the corresponding plan builder;
 - vertex-channel binding generation; and
 - mesh edge/vertex primitive-view inputs.
@@ -66,6 +69,11 @@ are the correctness source: position-only changes request the existing partial
 position update, resolved attribute changes request their channel, and count or
 topology changes request full replacement. The sidecar acknowledges revisions
 only after successful reconciliation, so a failed upload is retried.
+
+A mesh whose UVs are corner-owned is uploaded by emitting one GPU vertex per
+distinct `(vertex, UV)` pair, carrying positions, normals, and packed colors
+across the split. The ECS mesh is never split to satisfy the vertex buffer; the
+duplication belongs to the upload, not to the authoritative geometry.
 
 CPU-backed visualization recipes use the resolved property's revision as their
 buffer dirty stamp. The graphics residency cache therefore reuses unchanged
