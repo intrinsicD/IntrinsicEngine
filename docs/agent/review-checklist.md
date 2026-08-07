@@ -11,6 +11,11 @@ Use this checklist before commit and PR creation.
       metadata mirrors a live Git-common-dir claim.
 - [ ] Parallel writers used separate worktrees; explicit path claims do not
       overlap.
+- [ ] A claimed non-micro task has a live repository work graph; its current
+      node and queued notes are visible, its exact claim generation and
+      writer-frozen review digest still match, any completed final binding
+      matches the current surface, and graph status is not cited as a
+      substitute for task evidence or independent review.
 - [ ] The task declares every applicable ID from
       `docs/architecture/contract-catalog.yaml`, considering owning and
       consuming layers, data/publication domains, and config/agent/runtime/UI

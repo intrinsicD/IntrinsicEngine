@@ -9,6 +9,15 @@ contracts:
     proofs:
       - tools/agents/validate_tasks.py
       - tests/regression/tooling/Test.ValidateTasks.py
+  repo.agent-work-graph:
+    owner: agent-workflow
+    source: docs/agent/workflow-evidence.md
+    applies_when:
+      - The checked-in agent work-graph schema, topology recipe, state lifecycle, or CLI transitions are changed.
+      - Agent execution ordering, write permissions, independent-review separation, retry budgets, or terminal source binding are changed.
+    proofs:
+      - tools/agents/agent_work_graph.py
+      - tests/regression/tooling/Test.AgentWorkGraph.py
   geometry.element-domain-sources:
     owner: ecs-geometry-runtime
     source: docs/architecture/geometry-api-style.md

@@ -32,6 +32,9 @@ sections below summarise what to verify.
 - Change maps to exactly one task (unless batching is explicitly allowed).
 - Owning subsystem/layer is identified.
 - **Mechanical moves and semantic edits are not mixed** in the same commit.
+- A claimed non-micro task's live work graph exposes current/ready work and is
+  not stale at closure; its status is never treated as a command receipt or
+  independent-review acceptance.
 
 ### Maturity and closure
 

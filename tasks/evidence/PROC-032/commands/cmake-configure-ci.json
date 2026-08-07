@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 3365,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T22:46:34Z",
+  "label": "cmake-configure-ci",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T22:46:31Z",
+  "stderr_path": "tasks/evidence/PROC-032/commands/cmake-configure-ci.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-032/commands/cmake-configure-ci.stdout.log",
+  "stdout_sha256": "f8964ddec2163e4398d6ee6f359e5bb5f08ac812b738ec07332f6e98db179f00",
+  "task_id": "PROC-032"
+}

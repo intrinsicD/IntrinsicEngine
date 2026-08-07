@@ -7635,7 +7635,7 @@ tree:
       ordered plan, then records later conversational ideas or constraints at
       the correct execution point while supporting one or more concurrent
       agents alongside the generated repository session brief.
-    status: open
+    status: resolved
   - id: N321
     type: experiment
     title: "Audit current cross-worktree agent observability"
@@ -9310,4 +9310,140 @@ tree:
       because origin/main had not diverged. The result is commit-scoped and
       makes no fresh GPU/Vulkan, sanitizer, performance, or permanent-stability
       claim.
+    status: resolved
+  - id: N397
+    type: question
+    title: "Integrate agent graphs and graph engineering into IntrinsicEngine"
+    provenance: user
+    timestamp: "2026-08-07T00:01+02:00"
+    also_depends_on: [N320]
+    description: >
+      Analyze Greg Isenberg's graph-engineering presentation, especially the
+      distinction between knowledge graphs and agent graphs, and determine how
+      its workflow topology, state, verification, and human-gate ideas should
+      integrate with IntrinsicEngine.
+    status: resolved
+  - id: N398
+    type: experiment
+    title: "Compare graph-engineering patterns with repository graph authorities"
+    provenance: ai-executed
+    timestamp: "2026-08-07T00:01+02:00"
+    also_depends_on: [N320, N397]
+    evidence:
+      - "https://www.youtube.com/watch?v=JWhICz1QR8M"
+      - "Official Anthropic agent workflow guidance"
+      - "Official LangGraph persistence documentation"
+      - "Official AutoGen GraphFlow documentation"
+      - "python3 tools/repo/build_knowledge_graph.py --out /tmp/intrinsic-engine-knowledge-graph.json"
+      - "docs/agent/how-this-repo-is-built.md"
+      - "docs/agent/workflow-evidence.md"
+      - "docs/architecture/verification-evidence-architecture.md"
+      - "docs/architecture/task-graphs.md"
+      - "tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md"
+      - "tasks/backlog/process/CI-013-unified-verifier-profiles-and-receipts.md"
+      - "tasks/backlog/process/PROC-031-agent-verification-receipts.md"
+    result: >
+      The rebuilt discovery graph contains 490 nodes and 2,835 links, including
+      382 code modules and 2,355 import edges, with zero detected layering
+      violations. Repository inspection found distinct existing knowledge,
+      task-dependency, workflow-evidence, planned verification-evidence, and
+      production execution graphs. Most graph-engineering controls already
+      exist; the missing bounded surface is an explainable per-task action
+      graph that composes those authorities without replacing them. No engine,
+      task, policy, or production source was changed by the analysis.
+    status: resolved
+  - id: N399
+    type: experiment
+    title: "Exercise the co-scientist agent loop offline"
+    provenance: ai-executed
+    timestamp: "2026-08-07T00:01+02:00"
+    also_depends_on: [N397, N398]
+    evidence:
+      - "cd research/coscientist && python3 -m coscientist.run --goal examples/demo.json --workdir /tmp/intrinsic-coscientist-analysis"
+      - "research/coscientist/README.md"
+      - "research/coscientist/contract.md"
+      - "research/coscientist/coscientist/orchestrator.py"
+    result: >
+      The deterministic offline loop completed: evaluated valid candidates
+      received fitness, invalid candidates failed their correctness gate with
+      no fitness, and the synchronous generate-run-reflect-tournament-evolve
+      structure remained auditable. The final round then evolved two new
+      candidates after the last evaluation pass, leaving them with gate and
+      fitness unset in the emitted leaderboard. This is a terminal-state
+      contract finding, not a production-engine capability or performance
+      result; no repository file was changed by the smoke.
+    status: resolved
+  - id: N400
+    type: decision
+    title: "Adopt the bounded repository-native agent work graph"
+    provenance: user
+    timestamp: "2026-08-07T00:55+02:00"
+    also_depends_on: [N320, N397, N398]
+    choice: >
+      Build the analyzed agent-graph direction into the engine's repository
+      workflow as one checked-in review-diamond recipe and one small CLI over
+      Git-common-dir live state, while preserving existing task, claim,
+      verification, review, experiment, discovery, and production-graph
+      authorities.
+    alternatives:
+      - "Add an external orchestration framework, daemon, database, or model launcher."
+      - "Reuse Core TaskGraph, RenderGraph, or runtime streaming graphs for agent control flow."
+      - "Merge the planned unified verifier and agent executor into this first slice."
+    evidence:
+      - "User direction: please build this into the engine agentic workflow."
+      - "tasks/active/PROC-032-repository-native-agent-work-graph.md"
+      - "O134"
+      - "O135"
+      - "O136"
+    status: resolved
+  - id: N401
+    type: dead_end
+    title: "Reject owner-bound live state without claim-handoff recovery"
+    provenance: ai-executed
+    timestamp: "2026-08-07T00:55+02:00"
+    also_depends_on: [N400]
+    hypothesis: >
+      A one-run-per-task state record bound to the starting claim owner is
+      sufficient because unfinished work can continue through ordinary node
+      transitions.
+    failure_mode: >
+      The first architecture review showed that release or recovery under a
+      replacement claim owner made the unfinished graph stale, while the
+      existing state prevented a second start. An abandoned running node could
+      therefore strand the task precisely when cross-session recovery was
+      needed.
+    lesson: >
+      Recovery must be an explicit, auditable transition: rebind only to the
+      current live claim, preserve completed work and attempt counts, reset
+      abandoned running work and descendants, and fail an exhausted abandoned
+      node so the new owner can dispose the blocked run.
+    evidence:
+      - "tools/agents/agent_work_graph.py"
+      - "tests/regression/tooling/Test.AgentWorkGraph.py"
+      - "Git-common-dir PROC-032 event history: blocked findings join, reopen, and second review cycle"
+    status: resolved
+  - id: N402
+    type: experiment
+    title: "Implement and self-host the repository-native review diamond"
+    provenance: ai-executed
+    timestamp: "2026-08-07T00:55+02:00"
+    also_depends_on: [N398, N400, N401]
+    evidence:
+      - "tools/agents/agent_work_graph.py"
+      - "tools/agents/work_graphs/review-diamond.v1.json"
+      - "tests/regression/tooling/Test.AgentWorkGraph.py"
+      - "tasks/evidence/PROC-032/commands/focused-workflow-regressions.json"
+      - "tasks/evidence/PROC-032/commands/structural-policy.json"
+      - "tasks/evidence/PROC-032/commands/build-intrinsic-tests.json"
+      - "tasks/evidence/PROC-032/commands/ctest-cpu.json"
+    result: >
+      The CLI validated and executed the ten-node recipe on PROC-032 itself,
+      recorded a real blocking architecture finding, reopened the sole write
+      lane, and completed a second driver review join. Fourteen isolated graph
+      regressions, eight task-claim regressions, twenty-eight workflow-evidence
+      regressions, strict task/docs/ARA/root policy, Clang 23 configure and
+      IntrinsicTests build, and all 4,102 selected CPU tests passed; one
+      environment-gated GLFW/LeakSanitizer case skipped itself. The live graph
+      is intentionally ready at its high-risk independent-review node, not
+      falsely terminal.
     status: resolved

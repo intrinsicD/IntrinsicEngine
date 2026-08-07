@@ -37,6 +37,9 @@ Status labels:
 - [Compute parallel primitives](compute-parallel-primitives.md) (`canonical`)
 - [Module rules](module-rules.md) (`canonical`)
 - [Test strategy](test-strategy.md) (`canonical`)
+- [Agent workflow evidence and live work graph](../agent/workflow-evidence.md)
+  (`canonical`) — task claims, cumulative evidence profiles, the repository-
+  native review diamond, live Git-common-dir state, and authority boundaries.
 - [Method API contract](method-api-contract.md) (`canonical`)
 - [Contract catalog](contract-catalog.yaml) (`canonical`) — stable routing IDs,
   owners, applicability triggers, and proof paths for reusable repository and

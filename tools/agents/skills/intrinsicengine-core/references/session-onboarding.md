@@ -74,6 +74,28 @@ surfaces. Diagnose with `status`, release with the owning label, and recover
 only an expired claim with an actor and reason. Labels are cooperative routing
 metadata, not authentication. See `docs/agent/workflow-evidence.md`.
 
+**Live work graph.** After claiming a non-micro task, start the checked-in
+review diamond before substantive implementation, then keep its current node
+and later conversational constraints visible:
+
+```bash
+python3 tools/agents/agent_work_graph.py start \
+  --task-id <TASK-ID> --owner <label> \
+  --recipe tools/agents/work_graphs/review-diamond.v1.json
+python3 tools/agents/agent_work_graph.py show --task-id <TASK-ID>
+```
+
+Use `begin`/`finish` for explicit transitions, `note` to bind a new idea,
+constraint, finding, or decision to the node that owns it, and `reopen` after a
+blocking join or a source change past the writer-frozen review digest. After
+any claim release/recovery/reacquisition, use `resume --owner
+<live-claim-owner> --reason <why>` even when the owner label is unchanged; this
+rebinds the exact claim generation while preserving completed nodes and
+invalidating abandoned running work. The graph is Git-common-dir live state,
+not a second task list or completion receipt; it cannot grant ownership, lower
+the profile, or replace verification/review/experiment custody. See
+`docs/agent/workflow-evidence.md` §"Live agent work graph".
+
 # Implement the smallest robust slice
 
 The layering, coding, change-scope, testing, and docs-sync rules are owned by `/AGENTS.md` §2, §5, §7, and §9 — including the mechanical-vs-semantic split, one-task patch scoping, `.cppm` interface/implementation placement, no-new-features-during-reorganization, test category labels, and module-inventory regeneration. Apply them from the contract; this prompt deliberately does not restate them.

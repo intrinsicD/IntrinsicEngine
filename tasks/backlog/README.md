@@ -422,12 +422,14 @@ instead names the research/method implementation theme created by the retired
 Their generated evidence, fixed-surface review, experiment custody, and
 contract-discovery rules remain the foundation for new process work.
 
-The planned verification redesign is now the open Theme H program. Its
+The planned verification redesign and active repository-native work-graph
+slice are now the open Theme H program. Its
 authoritative architecture, quality/admission rules, migration sequence, and
 dependency DAG live in
 [`verification-evidence-architecture.md`](../../docs/architecture/verification-evidence-architecture.md),
-with the twelve open `CI-012..020`, `BUILD-005..006`, and `PROC-031` members
-indexed under [`process/`](process/README.md). The program keeps current gates
+with the twelve open `CI-012..020`, `BUILD-005..006`, and `PROC-031` members,
+plus active `PROC-032`, indexed under [`process/`](process/README.md). The
+program keeps current gates
 authoritative through shadow admission, chooses any C++23-module build backend
 through a claim-grade bake-off, and forbids legacy policy deletion until the
 final `CI-020` cutover gate.

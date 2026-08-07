@@ -576,3 +576,66 @@
   tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md,
   src/runtime]
 - **From staging**: O133
+
+## A37: Task-Bearing Agents Expose a Revisible Live Work Graph
+- **Decision**: Every claimed non-micro task has an observable repository work
+  graph with stable node IDs, explicit current and ready states, bounded
+  attempts, and node-addressed later decisions, findings, ideas, or
+  constraints. The graph is an operator-visible execution projection; the
+  tracked task remains the durable scope and dependency authority.
+- **Provenance**: user
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N320, N400, N402,
+  AGENTS.md,
+  docs/agent/workflow-evidence.md,
+  tools/agents/agent_work_graph.py,
+  tasks/active/PROC-032-repository-native-agent-work-graph.md]
+- **From staging**: O89
+
+## A38: Live Work-Graph State Is Git-Common and Recoverable
+- **Decision**: Checked-in JSON owns work-graph topology, while one atomic
+  current-state JSON projection and a hash-chained JSONL event history live in
+  the Git common directory. This keeps sibling worktrees observable without a
+  committed multi-writer status file. Explicit `resume` rebinds an unfinished
+  run to a recovered live claim, preserves completed nodes and attempt counts,
+  and invalidates abandoned running work plus descendants.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N320, N321, N400, N401, N402,
+  tools/agents/task_claim.py,
+  tools/agents/agent_work_graph.py,
+  tools/agents/work_graphs/review-diamond.v1.json,
+  tests/regression/tooling/Test.AgentWorkGraph.py]
+- **From staging**: O90
+
+## A39: Agent Routing Composes Existing Graph Authorities
+- **Decision**: The repository-native agent work graph routes actions without
+  merging authorities. Task files own scope and dependencies; the discovery
+  knowledge graph remains read-only; the contract catalog owns reusable
+  obligations; workflow evidence and independent review own completion proof;
+  and Core TaskGraph, RenderGraph, and streaming graphs remain production
+  engine mechanisms rather than agent orchestration infrastructure.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N397, N398, N400, N402,
+  docs/agent/workflow-evidence.md,
+  docs/architecture/contract-catalog.yaml,
+  docs/architecture/task-graphs.md,
+  tools/agents/agent_work_graph.py]
+- **From staging**: O134
+
+## A40: The Default Agent Topology Is a Review Diamond
+- **Decision**: The default work recipe has one claimed write-capable
+  implementer, a frozen surface, parallel read-only architecture,
+  verification, and documentation/evidence lanes, a findings join with a
+  bounded repair loop, a profile-gated independent-review node, and one final
+  exact-surface binding. Concurrent writers continue to require separate
+  claimed branches and worktrees.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N397, N398, N400, N401, N402,
+  tools/agents/work_graphs/review-diamond.v1.json,
+  tools/agents/agent_work_graph.py,
+  tests/regression/tooling/Test.AgentWorkGraph.py,
+  tasks/evidence/PROC-032/commands/focused-workflow-regressions.json]
+- **From staging**: O135

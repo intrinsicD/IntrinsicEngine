@@ -1,0 +1,111 @@
+Validated 235 task file(s); findings: 0; mode: strict.
+Validated 235 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 89
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+Workflow evidence findings:
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (GPU/Vulkan execution was not run because stale overwrite, lifetime, and editor readiness are backend-neutral CPU/runtime contracts.)
+ [WARNING] skipped_checks[0]: explicitly skipped: cxx-build (No engine source, module, CMake, or compiled test changed; the complete Python custody/workflow suites and strict repository validators are the strongest relevant gates.)
+ [WARNING] skipped_checks[0]: explicitly skipped: build-and-ctest (No C++ production, test-registration, build, shader, or runtime source changed; the Python validator regression and strict structural gates are the relevant executable proof)
+ [WARNING] skipped_checks[0]: explicitly skipped: full-cpu (The changed C++ surface is an opt-in gpu;vulkan benchmark runner; focused ci-vulkan build/passed/unavailable paths plus complete Python custody suites are the strongest relevant gates. METHOD-020 already retained the full 4091-case CPU receipt.)
+ [WARNING] skipped_checks[0]: explicitly skipped: full-cpu (Python workflow tooling, policy prose, and Python regressions changed no C++ or runtime surface; the complete 36-case custody suite is the strongest relevant behavioral gate.)
+ [WARNING] skipped_checks[0]: explicitly skipped: compiled-test-execution (No C++ source, test body, module, CMake input, label, target, or registration changed; the freshly built registry plus hermetic and both live reconciliation modes are the direct owning gates.)
+ [WARNING] skipped_checks[0]: explicitly skipped: compiled-test-execution (No C++ source, test body, module, CMake input, label, target, or registration changed; the fresh built registry plus hermetic and both live reconciliation modes are the direct owning gates.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (CPU-reference geometry numerics add no RHI, shader, device, or runtime behavior)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (Pure CPU geometry numerics add no device, RHI, shader, or runtime behavior)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (Pure CPU geometry numerics change with no RHI, shader, device, runtime, or Vulkan behavior; METHOD-026 owns any future GPU backend.)
+ [WARNING] skipped_checks[0]: explicitly skipped: benchmark (GEOM-075 makes no quality or performance claim for the default policy; METHOD-020 owns backend benchmarks and method-specific tuning requires a separate declared baseline.)
+ [WARNING] skipped_checks[1]: explicitly skipped: gpu-vulkan (This task resolves backend-independent world-unit policy only; METHOD-020 owns Vulkan execution and parity.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No Vulkan implementation or submission code changed; the deleted module had zero production consumers and existing opt-in backend evidence remains scoped to the retained submit-plan path.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No Vulkan implementation, shader, descriptor, or renderer pipeline behavior changed; the deleted cache had zero production consumers and opt-in backend execution remains scoped to PipelineManager/device paths.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No RHI, Vulkan, shader, history-resource, renderer call-site, or algorithm behavior changed; focused and complete CPU contracts cover the removed dispatch layer.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No RHI, Vulkan, shader, buffer algorithm, Renderer call-site, or resource-lifecycle behavior changed; focused and complete CPU contracts cover the removed dispatch layer.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No RHI, Vulkan, shader, buffer algorithm, Renderer call-site, or resource-lifecycle behavior changed; focused and complete CPU contracts cover the removed dispatch layer.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No RHI, Vulkan, shader, buffer algorithm, Renderer call-site, or resource-lifecycle behavior changed; focused and complete CPU contracts cover the removed dispatch layer.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No graphics/RHI/backend/shader/byte-layout behavior changed; CPU, ASan, and UBSan cover the shared ECS/runtime path and the GPU smoke fixture materializes the same sources)
+ [WARNING] skipped_checks[0]: explicitly skipped: promoted-vulkan (Not run for METHOD-019 because the task is CPU-only and adopted no GPU or runtime/UI backend path.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No GPU or Vulkan physics backend is introduced; Operational is scoped to the real CPU/Null Engine::Run path)
+ [WARNING] skipped_checks[1]: explicitly skipped: benchmark (No performance claim is made)
+ [WARNING] skipped_checks[0]: explicitly skipped: C++ build and CTest (No engine source, CMake input, module surface, dependency edge, or compiled test changed; focused Python tooling, live graph generation, real Mermaid rendering, and strict structural gates are the strongest relevant subset.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No engine source, backend, shader, RHI, runtime behavior, or byte layout changed; the full CPU gate and strict workflow/tooling checks are the relevant evidence)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No graphics, RHI, Vulkan, shader, resource, command-recording, or device-selection source changed; this audit-only candidate uses the fresh complete CPU baseline plus structural checks.)
+ [WARNING] skipped_checks[1]: explicitly skipped: asan-ubsan (No executable source, allocation, ownership, lifetime, or concurrency behavior changed; sanitizer variants would not add candidate-specific coverage beyond the fresh baseline audit.)
+ [WARNING] skipped_checks[0]: explicitly skipped: build-and-ctest (No engine source, CMake input, module surface, or compiled test changed; exact inventory probes and strict task/docs validators are the strongest relevant gates.)
+ [WARNING] skipped_checks[0]: explicitly skipped: build_and_ctest (No production, test, build, or shader source changed; structural and documentation gates are the strongest relevant checks)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (Cleanup does not change the implemented byte layout, shader inputs, or promoted backend)
+ [WARNING] skipped_checks[0]: explicitly skipped: optimized-or-gpu-method-backend (Explicit task non-goal: METHOD-019 and METHOD-020 own evidence-gated optimized CPU and Vulkan implementations; RUNTIME-175 intentionally exposes no placeholder selector or fallback telemetry.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No Vulkan backend behavior, RHI contract, shader, or promoted-device composition changed.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No backend or command-recording behavior changed; this slice only moved the existing renderer-hook lifecycle into its sole production owner)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No graphics/RHI/backend/shader/byte-layout behavior changed; CPU and sanitizer owner-level tests cover the relocated runtime policy)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No shader, RHI, Vulkan backend, byte-layout, or GPU execution behavior changed; full CPU plus isolated ASan/UBSan gates exercise the shared runtime/property/history path.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No shader, RHI, Vulkan backend, byte-layout, or compute-execution behavior changed; requested GPU execution deliberately follows the tested CPU-reference fallback path and METHOD-014 retains parity ownership.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No graphics/RHI/backend/shader/byte-layout behavior changed; focused runtime and full CPU owner-level execution cover the shared composition path.)
+ [WARNING] skipped_checks[0]: explicitly skipped: gpu-vulkan (No RHI, Vulkan backend, shader, resource, command-recording, or device-selection behavior changed; focused and complete CPU owner-level execution covers the relocated composition.)
+ [WARNING] skipped_checks[1]: explicitly skipped: asan-ubsan (No allocation, pointer ownership, asynchronous lifetime, container, or backend lifetime changed; direct operations are byte-for-byte the former adapter bodies and complete CPU lifecycle coverage is green.)
+ [WARNING] skipped_checks[0]: explicitly skipped: pointer-driven-vulkan-panel (GNOME ScreenSaver reported active and intercepted synthetic desktop input; bypassing the user lock was out of scope, while the promoted executable build/launch and 40-case canonical app suite passed.)
+ [WARNING] skipped_checks[0]: explicitly skipped: GPU/Vulkan execution (UI-038 changes app registration and copied CPU readiness only; METHOD-014 owns operational Vulkan compute/parity.)
+ [WARNING] skipped_checks[1]: explicitly skipped: Sanitizer variants (The public-model field and ImGui registration change selected 4006 CPU cases, passed 4005, and explicitly skipped the environment-gated GLFW/LeakSanitizer case; no ownership, allocator, or backend lifetime changed.)
+ [WARNING] skipped_checks[2]: explicitly skipped: Sandbox screenshots (The repository has no checked-in Sandbox screenshot corpus; the real headless ImGui integration test renders all three windows.)
+ [WARNING] skipped_checks[0]: explicitly skipped: sanitizers (No ownership, allocator, asynchronous lifetime, or backend lifetime changed; the full CPU selector and focused runtime/editor integration suite are the strongest relevant checks)
+ [WARNING] skipped_checks[1]: explicitly skipped: gpu-vulkan (UI-039 changes CPU/Null discovery and runtime routing only; METHOD-020 owns LOP-family Vulkan backend and parity evidence)
+ [WARNING] skipped_checks[2]: explicitly skipped: benchmark (No performance claim is made)
+ [WARNING] skipped_checks[3]: explicitly skipped: sandbox-screenshot (The repository has no checked-in Sandbox screenshot corpus; source-backed panel contracts and headless integration tests are the durable UI evidence)
+Workflow evidence validation: 0 error(s), 46 warning(s).
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 871
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+tasks/SESSION-BRIEF.md is up to date.
+Skill mirror sync complete. mode=check files=18 surfaces=3.
+check_ara_claims: OK (36 claims)
+[check_docs_sync] Root: /home/alex/Documents/IntrinsicEngine
+[check_docs_sync] Rules: tools/docs/docs_sync_rules.yaml
+[check_docs_sync] Changed files source: --files
+[check_docs_sync] Changed files count: 42
+[check_docs_sync] Triggered rules: 2
+[check_docs_sync] Docs sync rules satisfied.
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3206
+[check_doc_links] Mode: warning
+[check_doc_links] No broken relative links found.
+[check_root_hygiene] Root: /home/alex/Documents/IntrinsicEngine
+[check_root_hygiene] Root markdown files:
+  - AGENTS.md: allowed
+  - CLAUDE.md: allowed
+  - README.md: allowed
+[check_root_hygiene] Root allowlist: /home/alex/Documents/IntrinsicEngine/tools/repo/root_allowlist.yaml
+[check_root_hygiene] Allowed repository entries present:
+  - .claude/
+  - .codex/
+  - .github/
+  - .gitignore
+  - .mcp.json
+  - AGENTS.md
+  - CLAUDE.md
+  - CMakeLists.txt
+  - CMakePresets.json
+  - README.md
+  - ara/
+  - assets/
+  - benchmarks/
+  - cmake/
+  - docs/
+  - lsan.supp
+  - methods/
+  - research/
+  - src/
+  - tasks/
+  - tests/
+  - tools/
+  - vcpkg-configuration.json
+  - vcpkg.json
+[check_root_hygiene] Ignored named local entries:
+  - .idea/
+  - .ruff_cache/
+  - build/
+  - cmake-build-debug/
+  - experimental/
+  - external/
+  - imgui.ini
+[check_root_hygiene] Root entries match repository-owned policy.

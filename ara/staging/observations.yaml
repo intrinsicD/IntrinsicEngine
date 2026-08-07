@@ -1389,13 +1389,13 @@ observations:
       agents and coexists with tasks/SESSION-BRIEF.md.
     potential_type: architecture
     bound_to: [N320]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
-    stale: true
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A37"
+    crystallized_via: artifact-commitment
+    stale: false
   - id: O90
     timestamp: "2026-08-01T15:21+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >
       Preserve tasks/SESSION-BRIEF.md as the deterministic committed view of
       the merged task DAG; represent live execution in one per-owner plan
@@ -1410,10 +1410,10 @@ observations:
       cross-worktree coordination primitive needed for a small extension.
     potential_type: architecture
     bound_to: [N320, N321]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
-    stale: true
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A38"
+    crystallized_via: verbal-affirmation
+    stale: false
   - id: O91
     timestamp: "2026-08-02T00:53+02:00"
     provenance: user-revised
@@ -2337,4 +2337,106 @@ observations:
     promoted: true
     promoted_to: "logic/solution/architecture.md:A36"
     crystallized_via: verbal-affirmation
+    stale: false
+  - id: O134
+    timestamp: "2026-08-07T00:01+02:00"
+    provenance: user-revised
+    content: >
+      IntrinsicEngine's agent work graph should extend the repository-native
+      workflow model without merging its authorities: versioned work recipes
+      and per-owner live state route actions, while the task DAG owns scope,
+      the knowledge graph supplies read-only discovery, the contract catalog
+      owns reusable obligations, and the verification evidence graph owns
+      deterministic plans and receipts. Runtime TaskGraph, RenderGraph, and
+      streaming graphs remain production-engine mechanisms rather than agent
+      orchestration infrastructure.
+    context: >
+      The graph-engineering video was compared with A17, A27, the open N320
+      agent-plan question, the graphify discovery artifact, task dependencies,
+      verification-evidence roadmap, workflow profiles, and production graph
+      ownership documentation.
+    potential_type: architecture
+    bound_to: [N320, N321, N397, N398]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A39"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O135
+    timestamp: "2026-08-07T00:01+02:00"
+    provenance: user-revised
+    content: >
+      The first useful IntrinsicEngine agent topology is a bounded review
+      diamond: one claimed write-capable implementer produces a stable diff;
+      read-only architecture, verification, and documentation/evidence checks
+      fan out; a deterministic join returns blocking findings through a
+      budgeted repair loop or emits a revision-bound receipt; independent or
+      human approval remains profile-dependent. Concurrent writers continue
+      to require separate claimed worktrees.
+    context: >
+      The video's planner-worker-checker-merger pattern was right-sized against
+      the repository's one-writer rule, cumulative workflow profiles,
+      independent fixed-surface review, and planned unified verifier.
+    potential_type: architecture
+    bound_to: [N397, N398]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A40"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O136
+    timestamp: "2026-08-07T00:01+02:00"
+    provenance: user-revised
+    content: >
+      Agent-graph state should be artifact- and revision-bound and record node
+      role, input/output digests, tool permissions, retry and cost budgets,
+      stop reason, verifier receipt, and review disposition. Deterministic
+      validators retain veto authority; agents cannot lower workflow profiles,
+      broaden permissions, or reach terminal success with unevaluated output.
+    context: >
+      Repository workflow evidence already binds final surfaces and command
+      receipts. The co-scientist offline smoke also showed why terminal-state
+      semantics matter: its last evolution creates candidates that have not
+      passed the evaluator before the final leaderboard is emitted.
+    potential_type: constraint
+    bound_to: [N397, N398, N399]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K32"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O137
+    timestamp: "2026-08-07T00:01+02:00"
+    provenance: ai-suggested
+    content: >
+      Pilot an agent work graph manually on frozen historical diffs and compare
+      defect recall, false positives, human review time, latency, and model cost
+      against a single-agent baseline before implementing an executor. Prefer
+      the repository's existing YAML, JSON, JSONL, and small-CLI approach;
+      adopt a framework only if measured checkpoint, resume, or human-gate
+      requirements exceed the plain-file design.
+    context: >
+      The video recommends drawing and repeating a graph before automation;
+      Anthropic's primary guidance and IntrinsicEngine's right-sizing contract
+      independently favor the simplest measured workflow.
+    potential_type: heuristic
+    bound_to: [N397, N398]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O138
+    timestamp: "2026-08-07T00:01+02:00"
+    provenance: ai-suggested
+    content: >
+      The video's graph-engineering taxonomy and workflow patterns are useful,
+      but its title's tenfold-improvement implication is not supported inside
+      the presentation by a controlled baseline, task corpus, quality metric,
+      cost accounting, or reproducible benchmark.
+    context: >
+      Exact captions and chapter content were reviewed together with primary
+      orchestration documentation; the presentation supplies examples and
+      design advice rather than comparative experimental evidence.
+    potential_type: claim
+    bound_to: [N398]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
     stale: false

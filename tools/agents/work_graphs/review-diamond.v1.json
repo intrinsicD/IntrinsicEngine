@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "graph_id": "intrinsic.review-diamond.v1",
+  "title": "IntrinsicEngine task review diamond",
+  "description": "One claimed writer, parallel read-only checks, a findings join, profile-gated independent review, and exact final-surface binding.",
+  "nodes": [
+    {
+      "id": "context",
+      "title": "Assemble deterministic task context",
+      "kind": "deterministic",
+      "permission": "read",
+      "requires": [],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": false
+    },
+    {
+      "id": "plan",
+      "title": "Plan the smallest contract-complete slice",
+      "kind": "agent",
+      "permission": "read",
+      "requires": ["context"],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": false
+    },
+    {
+      "id": "implement",
+      "title": "Implement through the claimed writer",
+      "kind": "agent",
+      "permission": "write",
+      "requires": ["plan"],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": false
+    },
+    {
+      "id": "freeze_diff",
+      "title": "Freeze the review surface",
+      "kind": "deterministic",
+      "permission": "read",
+      "requires": ["implement"],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": false
+    },
+    {
+      "id": "architecture_review",
+      "title": "Review architecture and ownership",
+      "kind": "agent",
+      "permission": "read",
+      "requires": ["freeze_diff"],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": false
+    },
+    {
+      "id": "verification",
+      "title": "Run deterministic verification",
+      "kind": "deterministic",
+      "permission": "read",
+      "requires": ["freeze_diff"],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": false
+    },
+    {
+      "id": "docs_evidence_review",
+      "title": "Review docs, task, and evidence synchronization",
+      "kind": "agent",
+      "permission": "read",
+      "requires": ["freeze_diff"],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": false
+    },
+    {
+      "id": "findings_join",
+      "title": "Join findings and decide repair or closure",
+      "kind": "join",
+      "permission": "read",
+      "requires": ["architecture_review", "verification", "docs_evidence_review"],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": false
+    },
+    {
+      "id": "independent_review",
+      "title": "Apply the profile-required independent gate",
+      "kind": "gate",
+      "permission": "read",
+      "requires": ["findings_join"],
+      "minimum_profile": "high-risk",
+      "max_attempts": 4,
+      "independent": true,
+      "binds_surface": false
+    },
+    {
+      "id": "finalize",
+      "title": "Bind the exact final source surface",
+      "kind": "deterministic",
+      "permission": "read",
+      "requires": ["independent_review"],
+      "minimum_profile": "standard",
+      "max_attempts": 4,
+      "independent": false,
+      "binds_surface": true
+    }
+  ]
+}

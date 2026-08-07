@@ -217,12 +217,16 @@ Every task execution should follow:
 2. Identify owning subsystem and layer (see `intrinsicengine-core` for layering).
 3. If the change is non-trivial, run a grilling alignment pass (see above).
 4. Write or update task file from `tasks/templates/`.
-5. Implement the smallest useful patch.
-6. Add or update tests with correct labels.
-7. Add or update docs; record an ADR only if the three-condition rule applies.
-8. Run verification (focused targets first, then broaden).
-9. Update generated inventories if module surfaces changed.
-10. Self-review against the review checklist (see `intrinsicengine-review`).
+5. Claim the task and, for non-micro work, start or resume
+   `tools/agents/agent_work_graph.py` with the checked-in review-diamond
+   recipe. Keep later ideas and constraints attached to their owning graph
+   nodes; graph state is live observability, not completion evidence.
+6. Implement the smallest useful patch.
+7. Add or update tests with correct labels.
+8. Add or update docs; record an ADR only if the three-condition rule applies.
+9. Run verification (focused targets first, then broaden).
+10. Update generated inventories if module surfaces changed.
+11. Self-review against the review checklist (see `intrinsicengine-review`).
 
 ## Validation tools
 

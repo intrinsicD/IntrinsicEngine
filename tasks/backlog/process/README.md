@@ -15,6 +15,12 @@ map.
 
 ## Tasks
 
+Active workflow implementation:
+
+- [`PROC-032 — Repository-native agent work graph`](../../active/PROC-032-repository-native-agent-work-graph.md)
+  adds inspectable per-task action topology and Git-common-dir live state while
+  preserving the task, claim, verifier, review, and experiment authorities.
+
 The verification redesign is bound by the
 [`verification-evidence-architecture.md`](../../../docs/architecture/verification-evidence-architecture.md)
 roadmap. That document is the authoritative dependency and admission map; this

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\npython3 tools/agents/validate_tasks.py --root tasks --strict\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/agents/workflow_evidence.py validate --root .\npython3 tools/agents/check_task_state_links.py --root . --strict\npython3 tools/agents/generate_session_brief.py --check\npython3 tools/agents/sync_skills.py --check\npython3 tools/agents/check_ara_claims.py --root . --strict\nmapfile -t changed_files < <({ git diff --name-only origin/main --; git ls-files --others --exclude-standard; } | sort -u)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/repo/check_root_hygiene.py --root . --strict\ngit diff --check"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\npython3 tools/agents/validate_tasks.py --root tasks --strict\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/agents/workflow_evidence.py validate --root .\npython3 tools/agents/check_task_state_links.py --root . --strict\npython3 tools/agents/generate_session_brief.py --check\npython3 tools/agents/sync_skills.py --check\npython3 tools/agents/check_ara_claims.py --root . --strict\nmapfile -t changed_files < <({ git diff --name-only origin/main --; git ls-files --others --exclude-standard; } | sort -u)\npython3 tools/docs/check_docs_sync.py --root . --files \"${changed_files[@]}\" --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/repo/check_root_hygiene.py --root . --strict\ngit diff --check'",
+  "cwd": ".",
+  "duration_ms": 11252,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T22:50:58Z",
+  "label": "structural-policy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T22:50:47Z",
+  "stderr_path": "tasks/evidence/PROC-032/commands/structural-policy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-032/commands/structural-policy.stdout.log",
+  "stdout_sha256": "bd3a38f67ddcffe5cb435d848541e7c5b56d43d0bba7cb528aeab4494554c21d",
+  "task_id": "PROC-032"
+}

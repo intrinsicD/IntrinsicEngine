@@ -39,12 +39,15 @@ jobs:
           python3 tools/agents/workflow_evidence.py validate --root .
           python3 tools/agents/experiment_custody.py validate --root .
 
-      - name: Validate task validator regressions
+      - name: Validate task and agent-work-graph regressions
         run: |
+          python3 tools/agents/agent_work_graph.py validate-recipe \
+            --recipe tools/agents/work_graphs/review-diamond.v1.json
           python3 tests/regression/tooling/Test.ValidateTasks.py
           python3 tests/regression/tooling/Test.WorkflowEvidence.py
           python3 tests/regression/tooling/Test.ExperimentCustody.py
           python3 tests/regression/tooling/Test.TaskClaim.py
+          python3 tests/regression/tooling/Test.AgentWorkGraph.py
 
       - name: Validate root hygiene policy regressions
         run: |

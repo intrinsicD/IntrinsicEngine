@@ -1,0 +1,159 @@
+session:
+  id: "2026-08-07_001"
+  date: "2026-08-07"
+  started: "2026-08-07T00:01+02:00"
+  last_turn: "2026-08-07T00:55+02:00"
+  turn_count: 2
+  summary: "Analyzed graph engineering, then implemented and self-hosted a bounded repository-native review diamond through a real repair cycle and full CPU verification."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: "N397"
+    routing: direct
+    provenance: user
+    summary: "Asked how agent graphs and graph engineering should integrate with IntrinsicEngine."
+  - turn: 1
+    type: experiment
+    id: "N398"
+    routing: direct
+    provenance: ai-executed
+    summary: "Compared the exact presentation and primary orchestration sources with repository graph authorities and rebuilt the 490-node discovery graph."
+  - turn: 1
+    type: experiment
+    id: "N399"
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran the offline co-scientist loop and found two final evolved candidates emitted before evaluation."
+  - turn: 1
+    type: observation
+    id: "O134"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Keep agent action routing separate from knowledge, task, verification, and production execution graph authorities."
+  - turn: 1
+    type: observation
+    id: "O135"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Begin with a one-writer, read-only-reviewer diamond and profile-dependent approval gate."
+  - turn: 1
+    type: observation
+    id: "O136"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Bind agent-node state to revisions, permissions, budgets, receipts, dispositions, and explicit terminal semantics."
+  - turn: 1
+    type: observation
+    id: "O137"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Measure a manual frozen-diff pilot before adding an executor or orchestration framework."
+  - turn: 1
+    type: observation
+    id: "O138"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Treat the presentation's tenfold implication as unverified because it supplies no controlled benchmark."
+  - turn: 2
+    type: decision
+    id: "N400"
+    routing: direct
+    provenance: user
+    summary: "Adopted the bounded repository-native agent work graph for the engine workflow."
+  - turn: 2
+    type: dead_end
+    id: "N401"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected owner-bound unfinished state without an explicit recovered-claim resume path."
+  - turn: 2
+    type: experiment
+    id: "N402"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and self-hosted the ten-node review diamond; all focused, structural, build, and 4,102 selected CPU tests passed."
+  - turn: 2
+    type: observation
+    id: "O89"
+    routing: crystallized
+    provenance: user
+    summary: "Crystallized observable, revisable per-task work graphs to A37 through artifact commitment."
+  - turn: 2
+    type: observation
+    id: "O90"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized Git-common-dir live state and explicit claim-handoff recovery to A38 through affirmation."
+  - turn: 2
+    type: observation
+    id: "O134"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized separation of agent routing from task, evidence, discovery, and production graph authorities to A39."
+  - turn: 2
+    type: observation
+    id: "O135"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the one-writer review-diamond topology to A40."
+  - turn: 2
+    type: observation
+    id: "O136"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized fail-closed profile, permission, attempt, review, and terminal-state limits to K32."
+
+ai_actions:
+  - turn: 1
+    action: "Fetched and reviewed exact video captions and primary Anthropic, LangGraph, AutoGen, and GPTSwarm sources; inspected repository workflow, graph, task, verification, and co-scientist surfaces."
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 1
+    action: "Rebuilt the discovery knowledge graph into /tmp and ran the co-scientist deterministic offline smoke in /tmp; neither command changed engine source."
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 2
+    action: "Created and claimed high-risk task PROC-032; implemented the schema-v1 work-graph CLI, checked-in review diamond, CI routing, regression suite, canonical contract, workflow docs, and generated skill mirrors."
+    provenance: ai-executed
+    files_changed:
+      - "tools/agents/agent_work_graph.py"
+      - "tools/agents/work_graphs/review-diamond.v1.json"
+      - "tests/regression/tooling/Test.AgentWorkGraph.py"
+      - "docs/agent/workflow-evidence.md"
+      - "tasks/active/PROC-032-repository-native-agent-work-graph.md"
+  - turn: 2
+    action: "Ran the new graph on its own task, routed a claim-recovery defect through a blocked join and repair loop, then recorded green focused, structural, Clang 23 build, and 4,102-case CPU receipts."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/evidence/PROC-032/"
+      - "ara/"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The video defines a knowledge graph as relationships among information and an agent graph as the route by which planner, workers, checker, merger, and human move work."
+  - turn: 1
+    excerpt: "IntrinsicEngine already separates discovery, task dependencies, workflow evidence, planned verification evidence, and production execution graphs."
+  - turn: 1
+    excerpt: "The recommended missing layer is a bounded repository-side action graph, not a C++ engine subsystem or a new external workflow authority."
+  - turn: 2
+    excerpt: "The user explicitly directed: please build this into the engine agentic workflow."
+  - turn: 2
+    excerpt: "The implementation is one short-lived Python CLI, one strict JSON recipe, atomic common-dir state, and a hash-chained event log; it launches no model or shell action."
+  - turn: 2
+    excerpt: "PROC-032 is driver-complete and deliberately stopped at the high-risk independent-review node."
+
+open_threads:
+  - "PROC-032 still requires a durable independent fixed-surface review before its graph can finalize and the task can retire."
+  - "The review-diamond implementation has no matched single-agent defect-recall, latency, human-time, or cost baseline; O137 remains staged."
+  - "CI-012, CI-013, and PROC-031 still own deterministic verification-plan and agent-receipt integration."
+  - "The co-scientist final-round evolution and terminal leaderboard semantics remain unfixed."
+
+ai_suggestions_pending:
+  - "Measure the review diamond against a frozen single-agent baseline before adding an executor or orchestration framework."
+  - "Obtain independent fixed-surface acceptance for PROC-032 without self-accepting the high-risk gate."
+  - "Land CI-012 and CI-013 as the deterministic verification backbone before binding agent automation through PROC-031."

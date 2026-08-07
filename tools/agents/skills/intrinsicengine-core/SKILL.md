@@ -28,6 +28,12 @@ Read in this order, only as deep as the touched scope requires:
    for theme priorities, rationale, and the promotion checklist.
 5. The specialist procedure for your touched scope (see "Routing" below).
 
+For a claimed non-micro task, start or resume
+`tools/agents/agent_work_graph.py` with the checked-in review-diamond recipe
+before substantive implementation. Its Git-common-dir state exposes the
+current/ready nodes and node-addressed notes; it never replaces the task,
+claim, verification receipt, independent review, or experiment custody.
+
 Then inspect repo state before choosing work:
 
 ```bash

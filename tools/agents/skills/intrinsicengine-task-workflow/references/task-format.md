@@ -156,6 +156,33 @@ the profile when a trigger applies. The method template defaults to
 `claim-grade` because its lifecycle is designed to support scientific
 correctness/parity evidence.
 
+## Live work graph for claimed tasks
+
+After acquiring a claim for an enrolled non-micro task, start or resume the
+default repository work graph:
+
+```bash
+python3 tools/agents/agent_work_graph.py start \
+  --task-id <TASK-ID> \
+  --owner <claim-owner> \
+  --recipe tools/agents/work_graphs/review-diamond.v1.json
+```
+
+When an unfinished claim is released, recovered, or reacquired, use the
+tool's explicit `resume` command even when the replacement keeps the same
+owner label/worktree. It rebinds the exact claim generation, preserves
+completed nodes and attempt history, and invalidates abandoned running work
+and its descendants.
+
+Use `show` to expose the current/ready nodes, `note` to attach later ideas or
+constraints to the step where they must be honored, and `reopen` to invalidate
+the write node's descendants after blocking review findings or any source
+change past the writer-frozen review digest. Micro tasks are exempt. The live
+graph never grants a claim, changes task dependencies, lowers the workflow
+profile, or satisfies completion evidence; those authorities remain in the
+task front-matter, claim ledger, and profile-specific evidence described in
+[`workflow-evidence.md`](../../../../../docs/agent/workflow-evidence.md).
+
 ## Micro tasks
 
 Seed from [`tasks/templates/task-micro.md`](../../../../../tasks/templates/task-micro.md)

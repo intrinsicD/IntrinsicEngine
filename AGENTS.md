@@ -412,12 +412,20 @@ Every task execution should follow this sequence:
     - New/changed tasks enroll in workflow schema v1. Use one writer per
       worktree and acquire the Git-common-dir task claim before substantive
       edits; parallel coding uses separate branches/worktrees.
-4. Implement the smallest useful patch.
-5. Add or update tests.
-6. Add or update docs.
-7. Run verification.
-8. Update generated inventories.
-9. Self-review against PR checklist.
+4. For every claimed non-micro task, start or resume the schema-v1
+   repository work graph with `tools/agents/agent_work_graph.py` and the
+   checked-in review-diamond recipe. Keep its current node and later
+   ideas/constraints visible through the CLI while work proceeds. This live
+   Git-common-dir state binds the exact claim generation and writer-frozen
+   review surface, but remains observability and control flow only: it never
+   replaces the task, claim, verification receipt, fixed-surface review, or
+   experiment custody, and it cannot lower the task profile.
+5. Implement the smallest useful patch.
+6. Add or update tests.
+7. Add or update docs.
+8. Run verification.
+9. Update generated inventories.
+10. Self-review against PR checklist.
 
 Before retiring an enrolled task, validate its generated completion report.
 `high-risk` and higher profiles additionally require a durable handoff and an

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\npython3 -m ruff check tools/agents/agent_work_graph.py tests/regression/tooling/Test.AgentWorkGraph.py\npython3 -m ruff format --check tools/agents/agent_work_graph.py tests/regression/tooling/Test.AgentWorkGraph.py\npython3 -m py_compile tools/agents/agent_work_graph.py tests/regression/tooling/Test.AgentWorkGraph.py\npython3 tools/agents/agent_work_graph.py validate-recipe --recipe tools/agents/work_graphs/review-diamond.v1.json\npython3 tests/regression/tooling/Test.AgentWorkGraph.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\npython3 -m ruff check tools/agents/agent_work_graph.py tests/regression/tooling/Test.AgentWorkGraph.py\npython3 -m ruff format --check tools/agents/agent_work_graph.py tests/regression/tooling/Test.AgentWorkGraph.py\npython3 -m py_compile tools/agents/agent_work_graph.py tests/regression/tooling/Test.AgentWorkGraph.py\npython3 tools/agents/agent_work_graph.py validate-recipe --recipe tools/agents/work_graphs/review-diamond.v1.json\npython3 tests/regression/tooling/Test.AgentWorkGraph.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py'",
+  "cwd": ".",
+  "duration_ms": 26082,
+  "exit_code": 0,
+  "finished_at": "2026-08-06T22:50:10Z",
+  "label": "focused-workflow-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-06T22:49:44Z",
+  "stderr_path": "tasks/evidence/PROC-032/commands/focused-workflow-regressions.stderr.log",
+  "stderr_sha256": "f7a7f2d0adc8e383980e7e8fb38825180c570ba18a31fc282aff9d7ede0b207e",
+  "stdout_path": "tasks/evidence/PROC-032/commands/focused-workflow-regressions.stdout.log",
+  "stdout_sha256": "becb7fdf10dd204edf4eb7aba108ec724c760caa06e13cfac251f81628b933e8",
+  "task_id": "PROC-032"
+}

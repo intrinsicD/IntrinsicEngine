@@ -24,10 +24,13 @@ research, defect, or review finding
        generated unblocked task view
                 |
                 v
+       claimed task + live work graph
+                |
+                v
       active, reviewable implementation
                 |
                 v
-       focused tests + structural gates
+       focused tests + review join
                 |
                 v
        completed task + retirement log
@@ -58,6 +61,15 @@ New or changed tasks also select the cumulative `micro`, `standard`,
 generated command/report evidence, fixed-surface review, and experiment
 custody in proportion to that profile. Untouched pre-policy task hashes remain
 grandfathered; historical tasks are not rewritten.
+
+Claimed non-micro work also has a live
+[agent work graph](workflow-evidence.md#live-agent-work-graph). Its checked-in
+recipe exposes one write lane, parallel read-only review lanes, a findings
+join, bounded reopen, and profile-gated independent review. Current state and
+its hash-chained event log live in the Git common directory so sibling
+worktrees can inspect progress without creating a committed multi-writer
+status file. The graph is operational telemetry, not task, verification, or
+review authority.
 
 ## Convergence Instead of a Flat Queue
 
@@ -109,7 +121,7 @@ monolithic linter:
 
 | Validator family | What it protects | Entry points |
 | --- | --- | --- |
-| Task and agent policy | Task shape, unique IDs, dependency resolution, lifecycle links, maturity follow-ups, generated session state, task evidence/experiment custody, concurrent claims, and skill mirrors. | [`tools/agents/`](../../tools/agents/README.md) |
+| Task and agent policy | Task shape, unique IDs, dependency resolution, lifecycle links, maturity follow-ups, generated session state, live work-graph topology/transitions, task evidence/experiment custody, concurrent claims, and skill mirrors. | [`tools/agents/`](../../tools/agents/README.md) |
 | Documentation | Relative-link integrity and changed-file documentation synchronization. | [`tools/docs/`](../../tools/docs/README.md) |
 | Repository structure | Layer imports and CMake edges, root hygiene, test layout, allowlist quality, and module inventory. | [`tools/repo/`](../../tools/repo/README.md) |
 | Methods and benchmarks | Method manifests, benchmark manifests, result schemas, and comparable evidence identities. | [Method workflow](method-workflow.md) and [benchmark workflow](benchmark-workflow.md) |

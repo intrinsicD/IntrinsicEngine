@@ -10,6 +10,7 @@ import re
 import socket
 import sys
 import time
+import uuid
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -150,6 +151,12 @@ def _validate_record(record: dict[str, Any], path: Path) -> None:
         raise ClaimError(f"{path}: unsupported claim schema")
     if not isinstance(record.get("paths"), list):
         raise ClaimError(f"{path}: paths must be a list")
+    generation = record.get("generation")
+    if generation is not None and (
+        not isinstance(generation, str)
+        or not re.fullmatch(r"[0-9a-f]{32}", generation)
+    ):
+        raise ClaimError(f"{path}: invalid claim generation")
 
 
 def _archive_claim(
@@ -270,6 +277,7 @@ def acquire(args: argparse.Namespace) -> int:
         "lease_seconds": args.lease_seconds,
         "paths": paths,
         "host": socket.gethostname(),
+        "generation": uuid.uuid4().hex,
     }
     root = _claim_root(repo_root)
     claim_path = root / f"{args.task_id}.json"

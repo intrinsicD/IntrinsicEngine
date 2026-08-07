@@ -1,0 +1,217 @@
+schema_version: 1
+task_id: PROC-032
+workflow_profile: high-risk
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-06T23:03:57Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: ae0ca976530197451e43a37511300f16ec944f37
+  head_revision: ae0ca976530197451e43a37511300f16ec944f37
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: .github/workflows/ci-docs.yml
+    sha256: 2d4487d242ce962e1358232b47ad9473dfd10b669bf0a68d60bb09cb86d4e7de
+  - path: AGENTS.md
+    sha256: d55f71cc5bc79ed56b8fa11246d8a6fa028ec17bca61839db9d402a47a413b9b
+  - path: ara/logic/solution/architecture.md
+    sha256: 42bb77576f9538bd19da2a632d9743b5b5c355b2afe6098c482c860a9b2e6689
+  - path: ara/logic/solution/constraints.md
+    sha256: 2476d663dd35ec0679585612357e45a58ac53c0bcd9301ce0e9dd89dd30c228c
+  - path: ara/staging/observations.yaml
+    sha256: d5aad51ef174ebab0868052926f4c6d18db90defb26ad02e714b63c9d48bfe70
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 4f6554d9fe127cfe4610b5e762d04004c85d7b1ba480c7021a6927aa11444c74
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: 4361f317b5f3e985708d74265d42e2435174b4f55356501d7add5d5d61c8e78f
+  - path: ara/trace/sessions/2026-08-07_001.yaml
+    sha256: 8446029640769a959e460c098e7fc35de7c407cdbeaaef9d6d1b670da0acb391
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: d1d5065e9e8f01d0cc33201c6d4a4ad807f21415aa28fa81897a9729479a083b
+  - path: docs/agent/how-this-repo-is-built.md
+    sha256: f7549f84b6b5e1c6330cbed28d6509a3d9beae7e98024f39d13f616327a1b122
+  - path: docs/agent/prompt/prompt.md
+    sha256: 6124612c7f7f686f66b84900bc372878c1663369a8c01bc8b60d74eac8939de8
+  - path: docs/agent/review-checklist.md
+    sha256: 3ffd81b595e4c6d12bc50ea92bb957431304f872810d5b157e288dbaee12ff85
+  - path: docs/agent/task-format.md
+    sha256: f1760f2e8ea044f0bfec2ab1ceffd9afcc2676359d22cca25459d22662da23be
+  - path: docs/agent/workflow-evidence.md
+    sha256: 2a06575cc249d83d761d2b1ca678b66b67b0fc555fb57f2c49fb809397d6a43b
+  - path: docs/architecture/contract-catalog.yaml
+    sha256: 5c5558b63dd86bc8c9876c9bc677f25e6f1abaff9bc9c35db0d5036cd938a86e
+  - path: docs/architecture/index.md
+    sha256: 945339889d8e59cc33373bb1e631dd4a04eca6b88de40aee3b5c878a2cef6779
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 3a9d83a7d7c79fd7bf1906e42b0d9af16d4b7fcd5c54fe88f5a756e534514625
+  - path: tasks/active/PROC-032-repository-native-agent-work-graph.md
+    sha256: 7f9cb931fc15e295af5750377a66e544bc3189d31db66c7a9012cd3a79eafa90
+  - path: tasks/active/README.md
+    sha256: 590b33424e49a7b6f1809f67e72f5ada6a4f355d42e69e8c9d8ae1d906e68a27
+  - path: tasks/backlog/README.md
+    sha256: 1e6721cda2e8ca2877b0e5704af5a8bf6fd8bb8af656c56ea48611e426f57e95
+  - path: tasks/backlog/process/README.md
+    sha256: 24c7e3d02488dcbd6dd0e957036cd9daff9fea6e2ce96d931cb88f58787067cc
+  - path: tests/regression/tooling/Test.AgentWorkGraph.py
+    sha256: 204ba86196e8300576b1f2e00d5456a75c6c478c4decc5b9cf6e0a97d3fe6fdf
+  - path: tools/agents/README.md
+    sha256: 9cbc116648e1ef1f28fe1a44c8bf99452f6edbabe4b64ed11b6b5c40f4a22e0f
+  - path: tools/agents/agent_work_graph.py
+    sha256: 04b641db627b49d76aa09e271a73002a7dcafacda75b26a4c9e645d4ee8bcb0b
+  - path: tools/agents/skills/intrinsicengine-core/SKILL.md
+    sha256: 1d5d04bc968fcde4dd952413d0e3b1976ac1f70c9a2a29e8f54c3fd95a2245e4
+  - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+    sha256: 6124612c7f7f686f66b84900bc372878c1663369a8c01bc8b60d74eac8939de8
+  - path: tools/agents/skills/intrinsicengine-review/SKILL.md
+    sha256: b1a3892a57601a92c0f608b934be927515bc64ccefd73cdad68598c82b48a230
+  - path: tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+    sha256: e0eead2275be796447a6b0ac20601059a7848995042371967e595ecb272228b4
+  - path: tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
+    sha256: 74253826b0734593ca0bad75b580a25c1aaea15cdb3f20cdfb66e991a08bfff1
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+    sha256: 203712a55c8aed5cd4bc4bfc797df3b50510458f8a9ba72f82e4f830da9ef83e
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 2a06575cc249d83d761d2b1ca678b66b67b0fc555fb57f2c49fb809397d6a43b
+  - path: tools/agents/work_graphs/review-diamond.v1.json
+    sha256: 9ec505ac0f313769d60cfe133eb2b1195ca627183dcb5adc7579fe02683c719c
+  content_digest: d5179877cbe7753af2aecbe45f0f2bffcfa00be09fdacb5841977e73c55a2687
+touched:
+  paths:
+  - .github/workflows/ci-docs.yml
+  - AGENTS.md
+  - ara/logic/solution/architecture.md
+  - ara/logic/solution/constraints.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-07_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/agent/how-this-repo-is-built.md
+  - docs/agent/prompt/prompt.md
+  - docs/agent/review-checklist.md
+  - docs/agent/task-format.md
+  - docs/agent/workflow-evidence.md
+  - docs/architecture/contract-catalog.yaml
+  - docs/architecture/index.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/PROC-032-repository-native-agent-work-graph.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/process/README.md
+  - tests/regression/tooling/Test.AgentWorkGraph.py
+  - tools/agents/README.md
+  - tools/agents/agent_work_graph.py
+  - tools/agents/skills/intrinsicengine-core/SKILL.md
+  - tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+  - tools/agents/skills/intrinsicengine-review/SKILL.md
+  - tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+  - tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  - tools/agents/work_graphs/review-diamond.v1.json
+  layers:
+  - agent-workflow
+  modules:
+  - tools.agents.agent_work_graph
+extension_seam: Schema-v1 checked-in recipe plus one short-lived CLI; additional topology remains data,
+  not an engine or service dependency.
+future_change_plan: CI-012, CI-013, and PROC-031 retain verifier-plan and receipt integration; O137 requires
+  a matched pilot before any executor or orchestration framework.
+acceptance:
+- criterion: A claimed non-micro task can start the default graph and expose exactly
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The tool rejects absent/stale/mismatched claims, invalid recipes,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A recovered replacement claim can explicitly resume an unfinished run,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A blocked findings join can reopen the single write lane, invalidate its
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Later ideas, constraints, findings, and decisions can be attached to the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The completed graph is observability and control-flow evidence only; all
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Strict structural validators and focused workflow regressions pass on
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/PROC-032/commands/build-intrinsic-tests.json
+- receipt: tasks/evidence/PROC-032/commands/cmake-configure-ci.json
+- receipt: tasks/evidence/PROC-032/commands/ctest-cpu.json
+- receipt: tasks/evidence/PROC-032/commands/final-surface-integrity.json
+- receipt: tasks/evidence/PROC-032/commands/focused-workflow-regressions.json
+- receipt: tasks/evidence/PROC-032/commands/post-handoff-doc-integrity.json
+- receipt: tasks/evidence/PROC-032/commands/structural-policy.json
+changed_public_contracts:
+- repo.agent-work-graph
+diagnostics_and_previews:
+- Git-common-dir work-graph show/list output and hash-chained event history expose live state without
+  becoming completion authority.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/active/PROC-032-repository-native-agent-work-graph.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Independent high-risk fixed-surface acceptance is still pending; the task and graph must remain active
+  until a non-driver review is appended.
+- Actor labels are cooperative routing metadata rather than authentication.
+- A process failure between event append and projection replacement is detected as an event-count mismatch
+  but has no automatic replay repair in schema v1.
+- No matched single-agent quality, latency, human-time, or model-cost baseline has been run, so no efficiency
+  claim is made.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No engine, graphics, RHI, shader, Vulkan, or runtime source changed.
+- check: sanitizers
+  reason: No C++ ownership, memory-lifetime, allocator, or concurrency implementation changed; Python
+    regressions and the complete CPU gate are the relevant executable proofs.
+- check: benchmark
+  reason: No performance, cost, latency, or defect-recall improvement claim is made.
+artifacts:
+- path: tools/agents/agent_work_graph.py
+  sha256: 04b641db627b49d76aa09e271a73002a7dcafacda75b26a4c9e645d4ee8bcb0b
+  kind: file
+- path: tools/agents/work_graphs/review-diamond.v1.json
+  sha256: 9ec505ac0f313769d60cfe133eb2b1195ca627183dcb5adc7579fe02683c719c
+  kind: file
+- path: tests/regression/tooling/Test.AgentWorkGraph.py
+  sha256: 204ba86196e8300576b1f2e00d5456a75c6c478c4decc5b9cf6e0a97d3fe6fdf
+  kind: file
+- path: docs/agent/workflow-evidence.md
+  sha256: 2a06575cc249d83d761d2b1ca678b66b67b0fc555fb57f2c49fb809397d6a43b
+  kind: file
+- path: tasks/active/PROC-032-repository-native-agent-work-graph.md
+  sha256: 7f9cb931fc15e295af5750377a66e544bc3189d31db66c7a9012cd3a79eafa90
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/PROC-032/handoff.jsonl
+review: tasks/evidence/PROC-032/reviews.jsonl

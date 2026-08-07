@@ -436,3 +436,21 @@
   tasks/backlog/runtime/RUNTIME-216-inline-render-extraction-engine-glue.md,
   src/runtime/CMakeLists.txt]
 - **From staging**: O58
+
+## K32: Agent Work Graphs Cannot Override Workflow Authorities
+- **Constraint**: Agent-node transitions are bound to a live claim, task
+  profile, checked-in recipe digest, bounded attempt count, and exact final
+  changed-surface digest. A caller cannot lower the profile, grant itself a
+  write lane, satisfy an independent node as the task owner, mutate terminal
+  success or abort, or use graph status in place of command receipts,
+  fixed-surface review, task retirement, or experiment custody. Deterministic
+  validators retain veto authority.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N397, N398, N400, N401, N402,
+  docs/agent/workflow-evidence.md,
+  docs/architecture/contract-catalog.yaml,
+  tools/agents/agent_work_graph.py,
+  tests/regression/tooling/Test.AgentWorkGraph.py,
+  tasks/evidence/PROC-032/commands/structural-policy.json]
+- **From staging**: O136

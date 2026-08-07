@@ -61,7 +61,128 @@ descendant. Paths are optional because isolated tasks normally need only the
 task claim. Claims expire after their bounded lease; a stale claim is
 diagnosed and must be explicitly recovered with an actor and reason. Release
 and recovery records move to retained history rather than disappearing.
-Cooperative owner labels are routing metadata, not authentication.
+Every acquisition carries a unique generation value so a release/reacquire is
+distinguishable even when owner, branch, worktree, and wall-clock second are
+unchanged. Cooperative owner labels are routing metadata, not authentication.
+
+## Live agent work graph
+
+Every claimed non-micro task uses the repository-native work graph after the
+task claim is acquired. The graph makes the current action, ready parallel
+checks, blocking findings, bounded repair loop, and profile-gated review step
+visible to the operator and to sibling worktrees. It is deliberately a live
+projection rather than another durable task backlog.
+
+Start the checked-in review diamond with the same owner label as the live task
+claim:
+
+```bash
+python3 tools/agents/agent_work_graph.py start \
+  --task-id PROC-999 \
+  --owner agent-label \
+  --recipe tools/agents/work_graphs/review-diamond.v1.json \
+  --base-ref origin/main
+
+python3 tools/agents/agent_work_graph.py show --task-id PROC-999
+```
+
+If an unfinished task claim is released, recovered, or reacquired, the live
+claim holder explicitly resumes the existing run instead of starting a second
+history. This is required even when the replacement uses the same owner label
+and worktree:
+
+```bash
+python3 tools/agents/agent_work_graph.py resume \
+  --task-id PROC-999 --owner replacement-label \
+  --reason "Continue after recovered claim"
+```
+
+Resume preserves succeeded nodes and attempt counts, rebinds the exact claim
+generation plus owner, branch, and worktree, and invalidates any abandoned
+running node plus its descendants. It rejects recipe/profile drift, terminal
+runs, and stale replacement claims. An abandoned running node that already
+spent its retry budget becomes `failed`, leaving the rebound owner a visible
+blocked run that can be aborted instead of an unrecoverable stale record.
+
+The schema-v1 recipe is strict JSON. It declares stable node IDs, dependency
+edges, node kind, read/write permission, minimum workflow profile, attempt
+budget, independent-actor requirement, and exactly one final source-binding
+node. Validation requires an acyclic graph, makes every node lead to that final
+node, rejects parallel write-capable nodes, and requires at least one writer
+plus the final binder to remain active for every supported non-micro profile.
+The default graph contains:
+
+```text
+context -> plan -> implement -> freeze_diff
+                                  |-> architecture_review --|
+                                  |-> verification ---------|-> findings_join
+                                  |-> docs_evidence_review --|        |
+                                                                     v
+                           profile-gated independent_review -> finalize
+```
+
+Nodes above the task's profile become `profile_skipped`, but skipping a node
+does not bypass its prerequisites. A standard task therefore reaches
+`finalize` only after the full standard review join, while a high-risk task
+also requires the independent node.
+
+Use explicit transitions; the tool never launches a model or shell command:
+
+```bash
+python3 tools/agents/agent_work_graph.py begin \
+  --task-id PROC-999 --node implement --actor agent-label
+python3 tools/agents/agent_work_graph.py finish \
+  --task-id PROC-999 --node implement --actor agent-label \
+  --outcome succeeded --note "Implementation and focused tests complete."
+```
+
+Only the live claim owner may enter a write-capable node. An `independent`
+node rejects that owner label; labels remain cooperative routing metadata, so
+the durable high-risk `reviews.jsonl` record still supplies the actual
+fixed-surface acceptance gate. A node may finish as `succeeded`, `failed`, or
+`blocked`. Successful writer completion freezes the current non-evidence
+source digest. Every downstream begin/finish and final binding rejects a later
+source change; the changed surface can proceed only by reopening the write
+lane, which clears the frozen digest, invalidates every descendant, and
+retains prior attempts in the append-only event history:
+
+```bash
+python3 tools/agents/agent_work_graph.py reopen \
+  --task-id PROC-999 --node implement --actor agent-label \
+  --reason "Address blocking review findings"
+```
+
+Later conversational input is attached to the node where it must be honored,
+without mutating graph topology:
+
+```bash
+python3 tools/agents/agent_work_graph.py note \
+  --task-id PROC-999 --node verification --actor operator \
+  --kind constraint --text "Retain the sanitizer reproduction."
+```
+
+Current state is one atomic JSON record under
+`<git-common-dir>/intrinsic-agent-work-graphs/v1/`; its sibling JSONL log is
+append-only and hash-chained. Both bind the task ID, claim owner, branch,
+worktree, exact claim-record generation, task profile, checked-in recipe
+digest, base revision, writer-frozen review digest, and node events. `show` and
+`list` take the same projection lock as transitions, so they cannot observe
+the normal event-append/state-replace window. `finalize` records the exact
+already-reviewed non-evidence changed-surface digest; it cannot absorb a later
+source edit. Subsequent source/task/docs changes make the completed graph
+visibly `stale`. Success and abort are immutable terminal states and retain
+both files. They remain inspectable after the task claim is released; active
+runs still require their exact bound live claim for normal status and
+transitions, or an explicit `resume` against a replacement generation.
+
+This state is not checked in and is not completion evidence. CI validates the
+recipe, CLI, and regression contract, not a developer's live common-directory
+record. Task scope remains in `tasks/`, ownership remains in `task_claim.py`,
+command and completion evidence remain in `workflow_evidence.py`, independent
+review remains in `reviews.jsonl`, and claim-grade/protected state remains in
+`experiment_custody.py`. `CI-012`, `CI-013`, and `PROC-031` separately own the
+planned verification graph and receipt binding; work-graph nodes must not
+pretend those planned receipts already exist.
 
 ## Completion evidence
 

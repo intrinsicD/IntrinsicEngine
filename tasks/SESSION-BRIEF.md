@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `PROC-032` — Repository-native agent work graph (tasks/active/PROC-032-repository-native-agent-work-graph.md)
 
 ## Theme B — Rendering modernization
 
