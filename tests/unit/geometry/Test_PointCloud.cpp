@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <numbers>
 #include <vector>
 
@@ -323,6 +324,140 @@ TEST(PointCloud_Downsample, OutputCloudIsValid)
     auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->Downsampled.IsValid());
+}
+
+TEST(PointCloud_Downsample, NonFiniteVoxelSizeReturnsNullopt)
+{
+    auto cloud = MakeSphereCloud(64);
+    Geometry::PointCloud::DownsampleParams params;
+
+    for (const float size : {std::numeric_limits<float>::quiet_NaN(),
+                             std::numeric_limits<float>::infinity(),
+                             -std::numeric_limits<float>::infinity()})
+    {
+        params.VoxelSize = size;
+        EXPECT_FALSE(Geometry::PointCloud::VoxelDownsample(cloud, params).has_value());
+    }
+}
+
+TEST(PointCloud_Downsample, NonFinitePositionReturnsNulloptWithoutPartialResult)
+{
+    Geometry::PointCloud::DownsampleParams params;
+    params.VoxelSize = 0.5f;
+
+    for (const float bad : {std::numeric_limits<float>::quiet_NaN(),
+                            std::numeric_limits<float>::infinity(),
+                            -std::numeric_limits<float>::infinity()})
+    {
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            Geometry::PointCloud::Cloud cloud;
+            cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+            cloud.AddPoint(glm::vec3(1.0f, 1.0f, 1.0f));
+            glm::vec3 poisoned(2.0f, 2.0f, 2.0f);
+            poisoned[axis] = bad;
+            cloud.AddPoint(poisoned);
+
+            const auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
+            EXPECT_FALSE(result.has_value()) << "axis=" << axis;
+        }
+    }
+}
+
+TEST(PointCloud_Downsample, CoordinateBeyondCellKeyRangeReturnsNullopt)
+{
+    Geometry::PointCloud::DownsampleParams params;
+    params.VoxelSize = 1.0e-6f;
+
+    Geometry::PointCloud::Cloud cloud;
+    cloud.AddPoint(glm::vec3(0.0f));
+    // Finite, but /voxel overflows well past the int cell-key range.
+    cloud.AddPoint(glm::vec3(1.0e30f, 0.0f, 0.0f));
+
+    EXPECT_FALSE(Geometry::PointCloud::VoxelDownsample(cloud, params).has_value());
+}
+
+TEST(PointCloud_Downsample, FloorSemanticsPinNegativeCoordinateCells)
+{
+    Geometry::PointCloud::DownsampleParams params;
+    params.VoxelSize = 1.0f;
+    params.PreserveNormals = false;
+    params.PreserveColors = false;
+    params.PreserveRadii = false;
+
+    Geometry::PointCloud::Cloud cloud;
+    // -1.0 floors to cell -1, -0.5 floors to cell -1, and 0.0 floors to cell 0,
+    // so the two negatives must share a cell and the origin must not join them.
+    cloud.AddPoint(glm::vec3(-1.0f, 0.0f, 0.0f));
+    cloud.AddPoint(glm::vec3(-0.5f, 0.0f, 0.0f));
+    cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+
+    const auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->ReducedCount, 2u);
+
+    const auto positions = result->Downsampled.Positions();
+    EXPECT_NEAR(positions[0].x, -0.75f, 1.0e-6f);
+    EXPECT_NEAR(positions[1].x, 0.0f, 1.0e-6f);
+}
+
+TEST(PointCloud_Downsample, EmitsCellsInLexicographicOrderAndIsRepeatable)
+{
+    Geometry::PointCloud::DownsampleParams params;
+    params.VoxelSize = 1.0f;
+    params.PreserveNormals = false;
+    params.PreserveColors = false;
+    params.PreserveRadii = false;
+
+    // Added in deliberately scrambled order; one point per cell so each centroid
+    // is its own point and the expected output order is exactly the sorted keys.
+    const std::vector<glm::vec3> scrambled = {
+        glm::vec3(2.5f, 0.5f, 0.5f),
+        glm::vec3(0.5f, 1.5f, 0.5f),
+        glm::vec3(0.5f, 0.5f, 3.5f),
+        glm::vec3(-1.5f, 0.5f, 0.5f),
+        glm::vec3(0.5f, 0.5f, 0.5f),
+        glm::vec3(0.5f, 1.5f, -2.5f),
+    };
+
+    Geometry::PointCloud::Cloud cloud;
+    for (const glm::vec3& p : scrambled)
+    {
+        cloud.AddPoint(p);
+    }
+
+    const auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->ReducedCount, scrambled.size());
+
+    // Ascending by cell x, then y, then z.
+    const std::vector<glm::vec3> expected = {
+        glm::vec3(-1.5f, 0.5f, 0.5f),   // cell (-2, 0, 0)
+        glm::vec3(0.5f, 0.5f, 0.5f),    // cell ( 0, 0, 0)
+        glm::vec3(0.5f, 0.5f, 3.5f),    // cell ( 0, 0, 3)
+        glm::vec3(0.5f, 1.5f, -2.5f),   // cell ( 0, 1,-3)
+        glm::vec3(0.5f, 1.5f, 0.5f),    // cell ( 0, 1, 0)
+        glm::vec3(2.5f, 0.5f, 0.5f),    // cell ( 2, 0, 0)
+    };
+
+    const auto positions = result->Downsampled.Positions();
+    ASSERT_EQ(positions.size(), expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i)
+    {
+        EXPECT_NEAR(positions[i].x, expected[i].x, 1.0e-6f) << "i=" << i;
+        EXPECT_NEAR(positions[i].y, expected[i].y, 1.0e-6f) << "i=" << i;
+        EXPECT_NEAR(positions[i].z, expected[i].z, 1.0e-6f) << "i=" << i;
+    }
+
+    // Byte-stable across repeated calls on the same input.
+    const auto again = Geometry::PointCloud::VoxelDownsample(cloud, params);
+    ASSERT_TRUE(again.has_value());
+    const auto repeated = again->Downsampled.Positions();
+    ASSERT_EQ(repeated.size(), positions.size());
+    for (std::size_t i = 0; i < positions.size(); ++i)
+    {
+        EXPECT_EQ(positions[i], repeated[i]) << "i=" << i;
+    }
 }
 
 // =============================================================================

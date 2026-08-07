@@ -75,10 +75,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed
   Dirichlet problem; impose fixed variables during the solve.
-- [`BUG-109` — Voxel downsampling invalid-input and deterministic-cell ordering](BUG-109-voxel-downsample-invalid-input-ordering.md):
-  non-finite/out-of-range quantization can reach unsafe integral conversion and
-  unordered-map iteration determines output order; fail closed and sort cell
-  keys before publishing. This is the prerequisite for `GEOM-061`.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
@@ -94,6 +90,16 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-08: [`BUG-109` — Voxel downsampling invalid-input and
+  deterministic-cell
+  ordering](../../done/BUG-109-voxel-downsample-invalid-input-ordering.md).
+  `VoxelSize` now requires a finite positive value — the old `<= 0` guard let
+  NaN through — and every position component is validated and range-checked in
+  `double` before the `int` cell cast, returning `nullopt` before any partial
+  result exists. Occupied cells are emitted in ascending lexicographic key
+  order instead of hash order. Five regressions fail against the unfixed
+  source; the CPU gate passes 4131/4131. This unblocks `GEOM-061`.
 
 - Closed 2026-08-07: [`BUG-108` — Fibonacci sphere sampling small-count and
   endpoint safety](../../done/BUG-108-fibonacci-sphere-small-count-endpoints.md).

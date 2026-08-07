@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "\nset -e\nctest --test-dir build/ci --output-on-failure -R \"PointCloud_Downsample\" --timeout 120\n"
+  ],
+  "command_display": "/bin/bash -o pipefail -c '\nset -e\nctest --test-dir build/ci --output-on-failure -R \"PointCloud_Downsample\" --timeout 120\n'",
+  "cwd": ".",
+  "duration_ms": 202,
+  "exit_code": 0,
+  "finished_at": "2026-08-07T23:00:05Z",
+  "label": "focused-downsample-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-07T23:00:05Z",
+  "stderr_path": "tasks/evidence/BUG-109/commands/focused-downsample-regressions.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-109/commands/focused-downsample-regressions.stdout.log",
+  "stdout_sha256": "8c9545706446bf81bf61b6e25fd138c75163beb1b5cd01aee2caaa7aab76079c",
+  "task_id": "BUG-109"
+}

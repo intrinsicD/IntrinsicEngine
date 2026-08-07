@@ -202,10 +202,32 @@ namespace Geometry::PointCloud
         if (cloud.IsEmpty())
             return std::nullopt;
 
-        if (params.VoxelSize <= 0.0f)
+        if (!std::isfinite(params.VoxelSize) || params.VoxelSize <= 0.0f)
             return std::nullopt;
 
         const float invVoxel = 1.0f / params.VoxelSize;
+
+        // Keeps the original float floor expression bit-for-bit so cell
+        // assignment for valid input is unchanged, then rejects anything the
+        // int conversion could not represent. The range check widens to double
+        // because (float)INT_MAX rounds up to 2^31 and would admit a value one
+        // past the representable maximum.
+        const auto tryCellCoordinate = [invVoxel](float value, int& out) noexcept
+        {
+            if (!std::isfinite(value))
+                return false;
+            const float scaled = std::floor(value * invVoxel);
+            if (!std::isfinite(scaled))
+                return false;
+            const double widened = static_cast<double>(scaled);
+            if (widened < static_cast<double>(std::numeric_limits<int>::min())
+                || widened > static_cast<double>(std::numeric_limits<int>::max()))
+            {
+                return false;
+            }
+            out = static_cast<int>(scaled);
+            return true;
+        };
 
         struct CellHash
         {
@@ -250,10 +272,13 @@ namespace Geometry::PointCloud
         for (std::size_t i = 0; i < cloud.VerticesSize(); ++i)
         {
             const glm::vec3& p = positions[i];
-            const glm::ivec3 cell(
-                static_cast<int>(std::floor(p.x * invVoxel)),
-                static_cast<int>(std::floor(p.y * invVoxel)),
-                static_cast<int>(std::floor(p.z * invVoxel)));
+            glm::ivec3 cell{0};
+            if (!tryCellCoordinate(p.x, cell.x)
+                || !tryCellCoordinate(p.y, cell.y)
+                || !tryCellCoordinate(p.z, cell.z))
+            {
+                return std::nullopt;
+            }
 
             auto& acc = cells[cell];
             acc.PositionSum += p;
@@ -275,8 +300,27 @@ namespace Geometry::PointCloud
         if (doColors)  out.EnableColors();
         if (doRadii)   out.EnableRadii();
 
+        // Emission order is ascending lexicographic (x, then y, then z) over the
+        // occupied cell keys. Accumulation above already ran in input order, so
+        // only the order points are appended in depends on this sort, not the
+        // sums themselves.
+        std::vector<glm::ivec3> orderedCells;
+        orderedCells.reserve(cells.size());
         for (const auto& [cell, acc] : cells)
         {
+            orderedCells.push_back(cell);
+        }
+        std::sort(orderedCells.begin(), orderedCells.end(),
+                  [](const glm::ivec3& a, const glm::ivec3& b) noexcept
+                  {
+                      if (a.x != b.x) return a.x < b.x;
+                      if (a.y != b.y) return a.y < b.y;
+                      return a.z < b.z;
+                  });
+
+        for (const glm::ivec3& cell : orderedCells)
+        {
+            const CellAccum& acc = cells.at(cell);
             const float invCount = 1.0f / static_cast<float>(acc.Count);
             const VertexHandle ph = out.AddPoint(acc.PositionSum * invCount);
 

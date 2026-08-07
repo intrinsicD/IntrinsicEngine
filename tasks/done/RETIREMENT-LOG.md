@@ -6960,3 +6960,36 @@ and one on the origin-point assertion, reproducing the reported symptom.
 `IntrinsicGeometryTests` builds clean, the five `SphereSampling` cases pass, the
 default CPU gate passes 4126/4126 with its expected GLFW/LeakSanitizer skip, and
 the layering and test-layout gates report zero findings.
+
+[`BUG-109`](BUG-109-voxel-downsample-invalid-input-ordering.md) — voxel
+downsampling invalid-input and deterministic-cell ordering retired on
+2026-08-08 at `CPUContracted`, its declared target, with no `Operational`
+follow-up owed. `VoxelDownsample` guarded only `VoxelSize <= 0.0f`, which NaN
+passes, so `1.0f / NaN` poisoned every coordinate before conversion; positions
+were never checked for finiteness; and `static_cast<int>(std::floor(...))` had
+no range check, so a large finite coordinate could exceed the cell key. Output
+was emitted by iterating a `std::unordered_map`, so otherwise identical runs
+need not return the same ordering.
+
+`VoxelSize` now requires a finite, strictly positive value. A local
+`tryCellCoordinate` validates each component, keeping the original float floor
+expression bit-for-bit so cell assignment for valid input is unchanged,
+rejecting a non-finite result, and range-checking in `double` before the `int`
+cast. Widening matters there: `(float)INT_MAX` rounds up to 2^31 and a float
+comparison would admit one value past the representable maximum. Any
+unrepresentable point returns `std::nullopt` from inside the accumulation loop,
+which runs before the result is constructed, so no partial result is
+observable, and invalid coordinates are never clamped into a cell. Occupied
+cell keys are then sorted ascending by x, then y, then z before emission, while
+accumulation still runs in input order so the sums are untouched.
+
+Five regressions cover non-finite voxel sizes, non-finite positions on each
+axis, a finite coordinate that overflows the cell key, floor semantics across a
+negative cell boundary, and exact lexicographic order with repeat stability.
+All five fail against the unfixed source. 12/12 `PointCloud_Downsample` cases
+pass, the default CPU gate passes 4131/4131 with its expected GLFW/LeakSanitizer
+skip, and layering and test-layout report zero findings. This restores the
+deterministic fail-closed baseline that `GEOM-061` already assumed, unblocking
+it. The task self-hosted the standard review diamond, including one genuine
+write-lane reopen when consuming its own contract-baseline entry changed the
+frozen surface.

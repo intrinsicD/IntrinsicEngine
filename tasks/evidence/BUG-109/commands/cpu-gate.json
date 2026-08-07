@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "\nctest --test-dir build/ci --output-on-failure -LE \"gpu|vulkan|slow|flaky-quarantine\" --timeout 120\n"
+  ],
+  "command_display": "/bin/bash -o pipefail -c '\nctest --test-dir build/ci --output-on-failure -LE \"gpu|vulkan|slow|flaky-quarantine\" --timeout 120\n'",
+  "cwd": ".",
+  "duration_ms": 58815,
+  "exit_code": 0,
+  "finished_at": "2026-08-07T23:01:04Z",
+  "label": "cpu-gate",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-07T23:00:05Z",
+  "stderr_path": "tasks/evidence/BUG-109/commands/cpu-gate.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-109/commands/cpu-gate.stdout.log",
+  "stdout_sha256": "ad05f3a4aa2a9d4dd0a54ad9d69e26754f9102c651b73b5a54076e848f86cec1",
+  "task_id": "BUG-109"
+}

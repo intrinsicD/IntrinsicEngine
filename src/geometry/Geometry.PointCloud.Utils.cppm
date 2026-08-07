@@ -119,7 +119,18 @@ export namespace Geometry::PointCloud
         float       ReductionRatio{0.0f};  // ReducedCount / OriginalCount.
     };
 
-    // Returns nullopt if cloud is empty or VoxelSize <= 0.
+    // Fails closed, returning nullopt without publishing any partial result,
+    // when the cloud is empty, when VoxelSize is not finite and strictly
+    // positive, or when any point cannot be quantized safely — that is, a
+    // non-finite position component, or a floored scaled coordinate outside the
+    // range of the `int` cell key. Invalid coordinates are never clamped into a
+    // cell.
+    //
+    // On success, reduced points are emitted in ascending lexicographic order of
+    // their cell key: by x first, then y, then z. That order is independent of
+    // hash-container iteration, so repeated calls and different builds return
+    // byte-identical results. Accumulation within a cell still runs in input
+    // order.
     [[nodiscard]] std::optional<DownsampleResult> VoxelDownsample(
         const Cloud& cloud,
         const DownsampleParams& params = {});
