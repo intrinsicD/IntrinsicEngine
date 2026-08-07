@@ -150,6 +150,29 @@ namespace Geometry::MeshIO
             return result;
         }
 
+        // BUG-137 — corner-domain payload convention.
+        //
+        // `MeshIOResult::Halfedges` is indexed by *flattened face corner*: the
+        // corners of `f:vertices[0]` occupy slots `[0, faces[0].size())`, the
+        // corners of `f:vertices[1]` follow, and so on. This is the only
+        // ordering a polygon soup can offer before topology exists, and it is
+        // what a consumer reconstructs by walking `f:vertices` in the same
+        // order. It matches OBJ's own `f v/vt/vn` corner ordering.
+        void PopulateCornerTexcoords(MeshIOResult& result,
+                                     std::span<const glm::vec2> cornerTexcoords)
+        {
+            if (cornerTexcoords.empty())
+            {
+                return;
+            }
+            result.Halfedges.Resize(cornerTexcoords.size());
+            auto property = result.Halfedges.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2(0.0f));
+            for (std::size_t i = 0; i < cornerTexcoords.size(); ++i)
+            {
+                property[i] = cornerTexcoords[i];
+            }
+        }
+
         void PopulateResult(MeshIOResult& result,
                             std::span<const glm::vec3> vertices,
                             std::span<const std::vector<std::uint32_t>> faces,
@@ -1425,10 +1448,40 @@ namespace Geometry::MeshIO
 
         if (hasFaceNormals || hasFaceTexcoords)
         {
+            // BUG-137 — `f v/vt/vn` is a per-corner encoding. Splitting a vertex
+            // because two of its corners name different `vt` entries turns a UV
+            // seam into a topology cut, which is exactly the defect this task
+            // removes downstream. Detect that case and carry the UVs on the
+            // corner domain instead; only per-corner *normals* still split,
+            // because vertex-domain normals remain the engine's contract.
+            bool hasTexcoordSeam = false;
+            if (hasFaceTexcoords)
+            {
+                std::unordered_map<std::uint32_t, int> firstTexcoordForPosition;
+                for (const auto& sourceFace : faceVertices)
+                {
+                    for (const OBJFaceVertex& sourceVertex : sourceFace)
+                    {
+                        const auto [it, inserted] = firstTexcoordForPosition.try_emplace(
+                            sourceVertex.Position, sourceVertex.Texcoord);
+                        if (!inserted && it->second != sourceVertex.Texcoord)
+                        {
+                            hasTexcoordSeam = true;
+                            break;
+                        }
+                    }
+                    if (hasTexcoordSeam)
+                    {
+                        break;
+                    }
+                }
+            }
+
             const bool hasLockstepColors = colors.size() == vertices.size();
             std::vector<glm::vec3> remappedVertices;
             std::vector<glm::vec3> remappedNormals;
             std::vector<glm::vec2> remappedTexcoords;
+            std::vector<glm::vec2> cornerTexcoords;
             std::vector<glm::vec4> remappedColors;
             std::vector<std::vector<std::uint32_t>> remappedFaces;
             std::unordered_map<OBJFaceVertexKey, std::uint32_t, OBJFaceVertexKeyHash> remap;
@@ -1453,9 +1506,17 @@ namespace Geometry::MeshIO
                 face.reserve(sourceFace.size());
                 for (const OBJFaceVertex& sourceVertex : sourceFace)
                 {
+                    const glm::vec2 uv = sourceVertex.Texcoord >= 0
+                        ? texcoords[static_cast<std::size_t>(sourceVertex.Texcoord)]
+                        : glm::vec2(0.0f);
+                    if (hasFaceTexcoords)
+                    {
+                        cornerTexcoords.push_back(uv);
+                    }
+
                     const OBJFaceVertexKey key{
                         sourceVertex.Position,
-                        hasFaceTexcoords ? sourceVertex.Texcoord : -1,
+                        (hasFaceTexcoords && !hasTexcoordSeam) ? sourceVertex.Texcoord : -1,
                         hasFaceNormals ? sourceVertex.Normal : -1,
                     };
                     auto [it, inserted] = remap.try_emplace(key, static_cast<std::uint32_t>(remappedVertices.size()));
@@ -1470,9 +1531,7 @@ namespace Geometry::MeshIO
                         }
                         if (hasFaceTexcoords)
                         {
-                            remappedTexcoords.push_back(sourceVertex.Texcoord >= 0
-                                                            ? texcoords[static_cast<std::size_t>(sourceVertex.Texcoord)]
-                                                            : glm::vec2(0.0f));
+                            remappedTexcoords.push_back(uv);
                         }
                         if (hasLockstepColors)
                         {
@@ -1491,7 +1550,11 @@ namespace Geometry::MeshIO
                            hasLockstepColors && remappedColors.size() == remappedVertices.size()
                                ? std::span<const glm::vec4>(remappedColors)
                                : std::span<const glm::vec4>{});
-            if (hasFaceTexcoords && remappedTexcoords.size() == remappedVertices.size())
+            if (hasFaceTexcoords && hasTexcoordSeam)
+            {
+                PopulateCornerTexcoords(result, cornerTexcoords);
+            }
+            else if (hasFaceTexcoords && remappedTexcoords.size() == remappedVertices.size())
             {
                 auto texcoordProperty =
                     result.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
@@ -1987,8 +2050,25 @@ namespace Geometry::MeshIO
             return MeshIOWriteStatus::FileWriteError;
         }
 
+        // BUG-137 — OBJ stores UVs per corner natively, so a corner-domain
+        // `h:texcoord` round-trips without loss. It wins over `v:texcoord`,
+        // matching the canonical resolution order.
+        std::size_t cornerCount = 0;
+        for (const auto& face : faces)
+        {
+            cornerCount += face.size();
+        }
+        const auto cornerTexcoordsView = mesh.Halfedges.Get<glm::vec2>("h:texcoord");
+        const bool hasCornerTexcoords =
+            cornerTexcoordsView.IsValid() && cornerTexcoordsView.Vector().size() == cornerCount;
+        if (hasCornerTexcoords && !AllFinite(cornerTexcoordsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+
         const auto texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord");
-        const bool hasTexcoords = texcoordsView.IsValid() && texcoordsView.Vector().size() == positions.size();
+        const bool hasTexcoords = !hasCornerTexcoords && texcoordsView.IsValid() &&
+            texcoordsView.Vector().size() == positions.size();
         if (hasTexcoords && !AllFinite(texcoordsView.Vector()))
         {
             return MeshIOWriteStatus::FileWriteError;
@@ -2041,7 +2121,21 @@ namespace Geometry::MeshIO
             stream.put('\n');
         }
 
-        if (hasTexcoords)
+        if (hasCornerTexcoords)
+        {
+            for (const auto& uv : cornerTexcoordsView.Vector())
+            {
+                const int written = std::snprintf(buffer, sizeof(buffer), "vt %.6f %.6f\n",
+                                                  static_cast<double>(uv.x),
+                                                  static_cast<double>(uv.y));
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+        }
+        else if (hasTexcoords)
         {
             for (const auto& uv : texcoordsView.Vector())
             {
@@ -2072,22 +2166,27 @@ namespace Geometry::MeshIO
             }
         }
 
+        // Corner UVs are emitted in flattened face-corner order, so the `vt`
+        // reference is a running corner counter rather than the vertex index.
+        unsigned long long cornerCursor = 0ULL;
         for (const auto& face : faces)
         {
             stream.put('f');
             for (const auto index : face)
             {
                 const auto oneBased = static_cast<unsigned long long>(index) + 1ULL;
+                const unsigned long long uvOneBased =
+                    hasCornerTexcoords ? ++cornerCursor : oneBased;
                 int written = 0;
-                if (hasTexcoords && hasNormals)
+                if ((hasTexcoords || hasCornerTexcoords) && hasNormals)
                 {
                     written = std::snprintf(buffer, sizeof(buffer), " %llu/%llu/%llu",
-                                            oneBased, oneBased, oneBased);
+                                            oneBased, uvOneBased, oneBased);
                 }
-                else if (hasTexcoords)
+                else if (hasTexcoords || hasCornerTexcoords)
                 {
                     written = std::snprintf(buffer, sizeof(buffer), " %llu/%llu",
-                                            oneBased, oneBased);
+                                            oneBased, uvOneBased);
                 }
                 else if (hasNormals)
                 {

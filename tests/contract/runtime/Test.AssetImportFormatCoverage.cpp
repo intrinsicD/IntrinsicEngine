@@ -1625,6 +1625,93 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportOfSculptFixturePreservesIt
     engine.Shutdown();
 }
 
+// BUG-137 slice D — an OBJ that authors per-corner UVs must keep them. The
+// reader no longer splits positions to represent the seam, so the atlas must
+// not re-parameterize the file either.
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesAuthoredCornerUvs)
+{
+    // A quad split into two triangles; vertex 1 carries (0,0) in the first
+    // triangle and (0.5,0.5) in the second — a seam a per-vertex channel
+    // cannot express.
+    TempAssetFile meshFile(
+        "bug137_authored_corner_uvs.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 1 1 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 1 1\n"
+        "vt 0 1\n"
+        "vt 0.5 0.5\n"
+        "f 1/1 2/2 3/3\n"
+        "f 1/5 3/3 4/4\n");
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
+            },
+            4096u));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
+
+    auto imported =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    meshEntity = FindFirstEntityWithDomain(
+        *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
+
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const MeshTopologyCounts counts =
+        ReadMeshTopologyCounts(scene, *meshEntity);
+    EXPECT_EQ(counts.Vertices, 4u) << "The authored UV seam must not split the mesh.";
+    EXPECT_EQ(counts.Faces, 2u);
+
+    ExpectMeshCornerTexcoordsFinite(scene, *meshEntity);
+    EXPECT_TRUE(MeshHasCornerTexcoordSeam(scene, *meshEntity));
+
+    // The authored UVs themselves must survive, not merely "some" UVs: every
+    // corner UV present in the file must appear on the entity.
+    auto& raw = scene.Raw();
+    const GS::ConstSourceView view = GS::BuildConstView(raw, *meshEntity);
+    ASSERT_NE(view.HalfedgeSource, nullptr);
+    const auto cornerUvs =
+        view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(cornerUvs.IsValid());
+    for (const glm::vec2 authored : {glm::vec2{0.0f, 0.0f},
+                                     glm::vec2{1.0f, 0.0f},
+                                     glm::vec2{1.0f, 1.0f},
+                                     glm::vec2{0.0f, 1.0f},
+                                     glm::vec2{0.5f, 0.5f}})
+    {
+        EXPECT_NE(std::ranges::find(cornerUvs.Vector(), authored),
+                  cornerUvs.Vector().end())
+            << "authored uv (" << authored.x << "," << authored.y
+            << ") was not preserved; the atlas likely re-parameterized the mesh.";
+    }
+
+    engine.Shutdown();
+}
+
 // BUG-137 — a non-manifold source cannot become a halfedge mesh, so import
 // rebuilds it as a per-corner renderable soup. Atlas UVs must still land on it:
 // there every corner already owns a vertex, so they stay vertex-domain.

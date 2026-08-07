@@ -751,7 +751,11 @@ TEST(GeometryIO_MeshIO, LoadOBJVertexColorAlphaSurvivesFaceAttributeRemap)
     EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 0.75f));
 }
 
-TEST(GeometryIO_MeshIO, LoadsOBJFaceTexcoordIndicesDuplicateSharedPositions)
+// BUG-137 — this case previously asserted that a shared position carrying two
+// different `vt` indices was *duplicated* into two vertices, turning a UV seam
+// into a topology cut. The seam is a UV fact: positions stay shared and the two
+// UVs live on the corner domain.
+TEST(GeometryIO_MeshIO, LoadsOBJFaceTexcoordSeamOnCornersWithoutDuplicatingPositions)
 {
     TempFile file(".obj",
                   "v 0 0 0\n"
@@ -768,26 +772,109 @@ TEST(GeometryIO_MeshIO, LoadsOBJFaceTexcoordIndicesDuplicateSharedPositions)
 
     const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->Vertices.Size(), 5u);
+    EXPECT_EQ(result->Vertices.Size(), 4u);
     EXPECT_EQ(result->Faces.Size(), 2u);
 
     auto positions = result->Vertices.Get<glm::vec3>("v:point");
     ASSERT_TRUE(positions.IsValid());
-    ASSERT_EQ(positions.Vector().size(), 5u);
+    ASSERT_EQ(positions.Vector().size(), 4u);
     EXPECT_EQ(positions[0], glm::vec3(0.0f, 0.0f, 0.0f));
-    EXPECT_EQ(positions[3], glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(positions[3], glm::vec3(0.0f, 1.0f, 0.0f));
 
-    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
-    ASSERT_TRUE(texcoords.IsValid());
-    ASSERT_EQ(texcoords.Vector().size(), 5u);
-    EXPECT_EQ(texcoords[0], glm::vec2(0.0f, 0.0f));
-    EXPECT_EQ(texcoords[3], glm::vec2(0.5f, 0.5f));
+    // Vertex 0 is the seam vertex: (0,0) in the first face, (0.5,0.5) in the
+    // second. A per-vertex channel cannot represent that, so there is none.
+    EXPECT_FALSE(result->Vertices.Exists("v:texcoord"));
+
+    auto cornerTexcoords = result->Halfedges.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(cornerTexcoords.IsValid());
+    ASSERT_EQ(cornerTexcoords.Vector().size(), 6u);
+    EXPECT_EQ(cornerTexcoords[0], glm::vec2(0.0f, 0.0f));
+    EXPECT_EQ(cornerTexcoords[1], glm::vec2(1.0f, 0.0f));
+    EXPECT_EQ(cornerTexcoords[2], glm::vec2(1.0f, 1.0f));
+    EXPECT_EQ(cornerTexcoords[3], glm::vec2(0.5f, 0.5f));
+    EXPECT_EQ(cornerTexcoords[4], glm::vec2(1.0f, 1.0f));
+    EXPECT_EQ(cornerTexcoords[5], glm::vec2(0.0f, 1.0f));
 
     auto faceVertices = result->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
     ASSERT_TRUE(faceVertices.IsValid());
     ASSERT_EQ(faceVertices.Vector().size(), 2u);
     EXPECT_EQ(faceVertices[0], (std::vector<std::uint32_t>{0u, 1u, 2u}));
-    EXPECT_EQ(faceVertices[1], (std::vector<std::uint32_t>{3u, 2u, 4u}));
+    EXPECT_EQ(faceVertices[1], (std::vector<std::uint32_t>{0u, 2u, 3u}));
+}
+
+// BUG-137 — the round-trip the corner domain exists to make possible.
+TEST(GeometryIO_MeshIO, ObjCornerTexcoordsSurviveWriteAndReload)
+{
+    TempFile source(".obj",
+                    "v 0 0 0\n"
+                    "v 1 0 0\n"
+                    "v 1 1 0\n"
+                    "v 0 1 0\n"
+                    "vt 0 0\n"
+                    "vt 1 0\n"
+                    "vt 1 1\n"
+                    "vt 0 1\n"
+                    "vt 0.5 0.5\n"
+                    "f 1/1 2/2 3/3\n"
+                    "f 1/5 3/3 4/4\n");
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(source.Path);
+    ASSERT_TRUE(loaded.has_value());
+    auto originalCorners = loaded->Halfedges.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(originalCorners.IsValid());
+    ASSERT_EQ(originalCorners.Vector().size(), 6u);
+
+    TempFile destination(".obj", "");
+    ASSERT_EQ(Geometry::MeshIO::WriteOBJ(destination.Path, *loaded),
+              Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const auto reloaded = Geometry::MeshIO::LoadOBJ(destination.Path);
+    ASSERT_TRUE(reloaded.has_value());
+    EXPECT_EQ(reloaded->Vertices.Size(), 4u);
+    EXPECT_EQ(reloaded->Faces.Size(), 2u);
+    EXPECT_FALSE(reloaded->Vertices.Exists("v:texcoord"));
+
+    auto reloadedCorners = reloaded->Halfedges.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(reloadedCorners.IsValid());
+    ASSERT_EQ(reloadedCorners.Vector().size(), originalCorners.Vector().size());
+    for (std::size_t i = 0; i < originalCorners.Vector().size(); ++i)
+    {
+        EXPECT_NEAR(reloadedCorners[i].x, originalCorners[i].x, 1.0e-6f) << "corner " << i;
+        EXPECT_NEAR(reloadedCorners[i].y, originalCorners[i].y, 1.0e-6f) << "corner " << i;
+    }
+
+    auto reloadedFaces = reloaded->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(reloadedFaces.IsValid());
+    EXPECT_EQ(reloadedFaces[0], (std::vector<std::uint32_t>{0u, 1u, 2u}));
+    EXPECT_EQ(reloadedFaces[1], (std::vector<std::uint32_t>{0u, 2u, 3u}));
+}
+
+// A seam-free OBJ must keep costing one UV per vertex; the corner domain is
+// only paid for when a seam actually exists.
+TEST(GeometryIO_MeshIO, ObjWithoutTexcoordSeamStaysVertexDomain)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 1 1 0\n"
+                  "v 0 1 0\n"
+                  "vt 0 0\n"
+                  "vt 1 0\n"
+                  "vt 1 1\n"
+                  "vt 0 1\n"
+                  "f 1/1 2/2 3/3\n"
+                  "f 1/1 3/3 4/4\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Vertices.Size(), 4u);
+    EXPECT_FALSE(result->Halfedges.Exists("h:texcoord"));
+
+    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords.IsValid());
+    ASSERT_EQ(texcoords.Vector().size(), 4u);
+    EXPECT_EQ(texcoords[0], glm::vec2(0.0f, 0.0f));
+    EXPECT_EQ(texcoords[3], glm::vec2(0.0f, 1.0f));
 }
 
 TEST(GeometryIO_MeshIO, LoadsOBJFaceNormalIndicesWithoutLockstepNormals)

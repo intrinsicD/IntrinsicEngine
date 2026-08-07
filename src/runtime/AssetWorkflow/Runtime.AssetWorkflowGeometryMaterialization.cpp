@@ -449,6 +449,56 @@ struct AtlasCornerTexcoords {
   bool HasSeam{false};
 };
 
+// Derives the per-vertex representative UVs, the seam flag, and the fill for
+// corners no source supplied. Shared by the atlas and authored gatherers.
+[[nodiscard]] bool FinalizeCornerTexcoords(
+    AtlasCornerTexcoords &corners,
+    const std::vector<std::uint8_t> &cornerAssigned,
+    const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+    const std::size_t vertexCount) {
+  corners.VertexUvs.assign(vertexCount, glm::vec2{0.0f});
+  std::vector<std::uint8_t> vertexAssigned(vertexCount, 0u);
+
+  for (std::size_t face = 0u; face < sourceFaces.size(); ++face) {
+    const std::vector<std::uint32_t> &indices = sourceFaces[face].Indices;
+    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
+      const std::size_t corner = face * 3u + k;
+      if (cornerAssigned[corner] == 0u) {
+        continue;
+      }
+      const std::uint32_t vertex = indices[k];
+      if (vertex >= corners.VertexUvs.size()) {
+        return false;
+      }
+      if (vertexAssigned[vertex] == 0u) {
+        corners.VertexUvs[vertex] = corners.CornerUvs[corner];
+        vertexAssigned[vertex] = 1u;
+      } else if (corners.VertexUvs[vertex] != corners.CornerUvs[corner]) {
+        corners.HasSeam = true;
+      }
+    }
+  }
+
+  // A face the atlas dropped leaves its corners without a UV. Inherit a
+  // sibling corner at the same vertex so the buffer stays finite and no new
+  // (vertex, UV) pair — and therefore no phantom seam — is invented.
+  for (std::size_t face = 0u; face < sourceFaces.size(); ++face) {
+    const std::vector<std::uint32_t> &indices = sourceFaces[face].Indices;
+    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
+      const std::size_t corner = face * 3u + k;
+      if (cornerAssigned[corner] != 0u) {
+        continue;
+      }
+      ++corners.UnmappedCornerCount;
+      const std::uint32_t vertex = indices[k];
+      if (vertex < corners.VertexUvs.size() && vertexAssigned[vertex] != 0u) {
+        corners.CornerUvs[corner] = corners.VertexUvs[vertex];
+      }
+    }
+  }
+  return true;
+}
+
 [[nodiscard]] std::optional<AtlasCornerTexcoords>
 GatherAtlasCornerTexcoords(const Geometry::UvAtlas::UvAtlasResult &atlas,
                            const Geometry::MeshSoup::IndexedMesh &sourceMesh) {
@@ -517,46 +567,71 @@ GatherAtlasCornerTexcoords(const Geometry::UvAtlas::UvAtlasResult &atlas,
     }
   }
 
-  corners.VertexUvs.assign(sourceMesh.VertexCount(), glm::vec2{0.0f});
-  std::vector<std::uint8_t> vertexAssigned(sourceMesh.VertexCount(), 0u);
-  for (std::size_t face = 0u; face < sourceFaces.size(); ++face) {
-    const std::vector<std::uint32_t> &indices = sourceFaces[face].Indices;
-    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
-      const std::size_t corner = face * 3u + k;
-      if (cornerAssigned[corner] == 0u) {
-        continue;
-      }
-      const std::uint32_t vertex = indices[k];
-      if (vertex >= corners.VertexUvs.size()) {
+  if (!FinalizeCornerTexcoords(corners, cornerAssigned, sourceFaces,
+                               sourceMesh.VertexCount())) {
+    return std::nullopt;
+  }
+  return corners;
+}
+
+// BUG-137 — OBJ stores UVs per corner natively, so a payload that already
+// carries authored corner UVs must be preserved rather than re-atlased. The
+// payload corner index is flattened over the *polygon* face list, while the
+// entity mesh is built from the fan triangulation of those polygons; this
+// walks the same fan order `BuildTriangulatedSourceMesh` uses.
+[[nodiscard]] std::optional<AtlasCornerTexcoords> GatherAuthoredCornerTexcoords(
+    const Geometry::MeshIO::MeshIOResult &meshPayload,
+    const std::vector<std::vector<std::uint32_t>> &polygons,
+    const Geometry::MeshSoup::IndexedMesh &sourceMesh) {
+  const auto authored =
+      meshPayload.Halfedges.Get<glm::vec2>(kCornerTexcoordProperty);
+  if (!authored) {
+    return std::nullopt;
+  }
+  const std::vector<glm::vec2> &values = authored.Vector();
+
+  std::size_t expectedCorners = 0u;
+  for (const std::vector<std::uint32_t> &polygon : polygons) {
+    expectedCorners += polygon.size();
+  }
+  if (values.size() != expectedCorners || values.empty()) {
+    return std::nullopt;
+  }
+  if (!AllFinite(values)) {
+    return std::nullopt;
+  }
+
+  const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces =
+      sourceMesh.Faces();
+  AtlasCornerTexcoords corners{};
+  corners.CornerUvs.assign(sourceFaces.size() * 3u, glm::vec2{0.0f});
+  std::vector<std::uint8_t> cornerAssigned(sourceFaces.size() * 3u, 0u);
+
+  std::size_t base = 0u;
+  std::size_t triangle = 0u;
+  for (const std::vector<std::uint32_t> &polygon : polygons) {
+    for (std::size_t i = 1u; i + 1u < polygon.size(); ++i) {
+      if (triangle >= sourceFaces.size()) {
         return std::nullopt;
       }
-      if (vertexAssigned[vertex] == 0u) {
-        corners.VertexUvs[vertex] = corners.CornerUvs[corner];
-        vertexAssigned[vertex] = 1u;
-      } else if (corners.VertexUvs[vertex] != corners.CornerUvs[corner]) {
-        corners.HasSeam = true;
-      }
+      corners.CornerUvs[triangle * 3u + 0u] = values[base];
+      corners.CornerUvs[triangle * 3u + 1u] = values[base + i];
+      corners.CornerUvs[triangle * 3u + 2u] = values[base + i + 1u];
+      cornerAssigned[triangle * 3u + 0u] = 1u;
+      cornerAssigned[triangle * 3u + 1u] = 1u;
+      cornerAssigned[triangle * 3u + 2u] = 1u;
+      ++triangle;
     }
+    base += polygon.size();
+  }
+  if (triangle != sourceFaces.size()) {
+    return std::nullopt;
   }
 
-  // A face the atlas dropped leaves its corners without a UV. Inherit a
-  // sibling corner at the same vertex so the buffer stays finite and no new
-  // (vertex, UV) pair — and therefore no phantom seam — is invented.
-  for (std::size_t face = 0u; face < sourceFaces.size(); ++face) {
-    const std::vector<std::uint32_t> &indices = sourceFaces[face].Indices;
-    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
-      const std::size_t corner = face * 3u + k;
-      if (cornerAssigned[corner] != 0u) {
-        continue;
-      }
-      ++corners.UnmappedCornerCount;
-      const std::uint32_t vertex = indices[k];
-      if (vertex < corners.VertexUvs.size() && vertexAssigned[vertex] != 0u) {
-        corners.CornerUvs[corner] = corners.VertexUvs[vertex];
-      }
-    }
+  if (!FinalizeCornerTexcoords(corners, cornerAssigned, sourceFaces,
+                               sourceMesh.VertexCount())) {
+    return std::nullopt;
   }
-
   return corners;
 }
 
@@ -793,22 +868,45 @@ BuildRuntimeHalfedgeMeshMaterialization(
   std::vector<glm::vec3> normals =
       ResolveVertexNormals(meshPayload, positions.Vector(), faces.Vector());
 
-  const Geometry::UvAtlas::UvAtlasInput input{
-      .Positions = positions.Vector(),
-      .Faces = source->Mesh.Faces(),
-      .AuthoredTexcoords = AuthoredTexcoordSpan(meshPayload),
-      .VertexProperties = Geometry::ConstPropertySet(meshPayload.Vertices),
-      .HasVertexProperties = true,
-  };
-  const Geometry::UvAtlas::UvAtlasDiagnostics authoredValidation =
-      Geometry::UvAtlas::ValidateAuthoredUvs(input);
-  Geometry::UvAtlas::UvAtlasResult atlas = Geometry::UvAtlas::ResolveUvAtlas(
-      input, MakeUvAtlasOptions(options.UvResolution),
-      options.UvResolution.Backend);
+  // BUG-137 — authored per-corner UVs (OBJ's native encoding) are preserved
+  // as-is. Re-atlasing them would discard the file's own parameterization, and
+  // they cannot be validated as vertex-domain UVs because a seam vertex has
+  // more than one.
+  const bool preferAuthored = options.UvResolution.PreserveValidAuthoredUvs &&
+                              !options.UvResolution.ForceRegenerate;
+  const std::optional<AtlasCornerTexcoords> authoredCorners =
+      preferAuthored ? GatherAuthoredCornerTexcoords(
+                           meshPayload, faces.Vector(), source->Mesh)
+                     : std::nullopt;
 
-  RuntimeMeshMaterializationDiagnostics diagnostics =
-      MakeRuntimeDiagnostics(atlas, authoredValidation.Status,
-                             positions.Vector().size(), faces.Vector().size());
+  Geometry::UvAtlas::UvAtlasResult atlas{};
+  RuntimeMeshMaterializationDiagnostics diagnostics{};
+  if (authoredCorners.has_value()) {
+    diagnostics.TexcoordProvenance =
+        RuntimeMeshResolvedUvProvenance::AuthoredPreserved;
+    diagnostics.UvAtlasStatus = Geometry::UvAtlas::UvAtlasStatus::Success;
+    diagnostics.AuthoredTexcoordsValid = true;
+    diagnostics.ResolvedTexcoordsValid = true;
+    diagnostics.SourceVertexCount = positions.Vector().size();
+    diagnostics.SourceFaceCount = faces.Vector().size();
+    diagnostics.AtlasBackendName = "authored-corners";
+  } else {
+    const Geometry::UvAtlas::UvAtlasInput input{
+        .Positions = positions.Vector(),
+        .Faces = source->Mesh.Faces(),
+        .AuthoredTexcoords = AuthoredTexcoordSpan(meshPayload),
+        .VertexProperties = Geometry::ConstPropertySet(meshPayload.Vertices),
+        .HasVertexProperties = true,
+    };
+    const Geometry::UvAtlas::UvAtlasDiagnostics authoredValidation =
+        Geometry::UvAtlas::ValidateAuthoredUvs(input);
+    atlas = Geometry::UvAtlas::ResolveUvAtlas(
+        input, MakeUvAtlasOptions(options.UvResolution),
+        options.UvResolution.Backend);
+    diagnostics =
+        MakeRuntimeDiagnostics(atlas, authoredValidation.Status,
+                               positions.Vector().size(), faces.Vector().size());
+  }
 
   // BUG-137 — the entity mesh is always built from the source topology. A UV
   // seam is a UV fact, not a topology fact: publishing the atlas *output* mesh
@@ -821,8 +919,9 @@ BuildRuntimeHalfedgeMeshMaterialization(
       Geometry::ConstPropertySet(meshPayload.Vertices), identityVertexXrefs,
       entityMesh.VertexProperties()));
 
-  const bool atlasUsable =
-      atlas.Succeeded() && diagnostics.ResolvedTexcoordsValid;
+  const bool atlasUsable = authoredCorners.has_value() ||
+                           (atlas.Succeeded() &&
+                            diagnostics.ResolvedTexcoordsValid);
   if (!atlasUsable && options.UvResolution.FailurePolicy ==
                           RuntimeMeshUvFailurePolicy::Required) {
     return Core::Err<RuntimeMeshMaterializationResult>(
@@ -851,15 +950,18 @@ BuildRuntimeHalfedgeMeshMaterialization(
     };
   }
 
-  if (atlas.SourceVertexForOutputVertex.size() !=
-          atlas.OutputMesh.VertexCount() ||
-      atlas.SourceFaceForOutputFace.size() != atlas.OutputMesh.FaceCount()) {
+  if (!authoredCorners.has_value() &&
+      (atlas.SourceVertexForOutputVertex.size() !=
+           atlas.OutputMesh.VertexCount() ||
+       atlas.SourceFaceForOutputFace.size() != atlas.OutputMesh.FaceCount())) {
     return Core::Err<RuntimeMeshMaterializationResult>(
         Core::ErrorCode::AssetInvalidData);
   }
 
   const std::optional<AtlasCornerTexcoords> corners =
-      GatherAtlasCornerTexcoords(atlas, source->Mesh);
+      authoredCorners.has_value()
+          ? authoredCorners
+          : GatherAtlasCornerTexcoords(atlas, source->Mesh);
   if (corners.has_value()) {
     diagnostics.UnmappedCornerCount = corners->UnmappedCornerCount;
     if (resolved->UsedDisconnectedFallback) {
