@@ -16,6 +16,34 @@ contracts:
 ---
 # PROC-032 — Repository-native agent work graph
 
+## Status
+
+- Completed and retired on 2026-08-07. `tools/agents/agent_work_graph.py`,
+  the checked-in ten-node `intrinsic.review-diamond.v1` recipe, the
+  Git-common-dir run state and hash-chained event trace, the
+  `repo.agent-work-graph` contract, and twenty isolated regressions are in
+  place, with `ci-docs` executing the recipe validator and the regression
+  suite.
+- Independent review revision 1 returned `revision-requested` with four
+  blockers and one robustness finding. Revision 2 resolves all five on the
+  final surface: `validate_recipe_data` now requires a standard-active
+  write-capable node and a standard-active final surface binder; the live
+  claim binding compares an exact per-acquire claim-record digest alongside
+  owner/branch/worktree on `show`, every transition, and `abort`; the review
+  surface is frozen when the write lane finishes and every downstream
+  transition fails closed until that lane is reopened; `show`/`list`
+  serialize their snapshot under the graph lock; and CLI task IDs are
+  validated before any Git-common-dir path is resolved.
+- The graph remains observability and control-flow evidence only. Task,
+  claim, verification, independent-review, and experiment-custody authorities
+  are unchanged, and `CI-012`, `CI-013`, and `PROC-031` retain the planned
+  verifier-receipt integration.
+- Follow-up [`BUG-144`](../backlog/bugs/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md)
+  owns the stale-lock-breaker and `task_claim` path-validation residuals found
+  while auditing this task's final surface; neither is reachable through a
+  reviewed workflow today.
+- Completion commit: this retirement commit.
+
 ## Goal
 
 - Add an operational, repository-native agent work graph that makes one

@@ -11,11 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`PROC-032 — Repository-native agent work graph`](PROC-032-repository-native-agent-work-graph.md)
-  — driver implementation, verification, and handoff complete; owner
-  `Codex-AgentGraph`; branch `main`; the default graph exercised a blocking
-  review/reopen cycle and is now waiting at the required independent high-risk
-  review node. It must not finalize or retire before that acceptance.
+No tasks are currently active.
 
 ## History
 

@@ -15,12 +15,6 @@ map.
 
 ## Tasks
 
-Active workflow implementation:
-
-- [`PROC-032 — Repository-native agent work graph`](../../active/PROC-032-repository-native-agent-work-graph.md)
-  adds inspectable per-task action topology and Git-common-dir live state while
-  preserving the task, claim, verifier, review, and experiment authorities.
-
 The verification redesign is bound by the
 [`verification-evidence-architecture.md`](../../../docs/architecture/verification-evidence-architecture.md)
 roadmap. That document is the authoritative dependency and admission map; this
@@ -53,6 +47,11 @@ index lists its open implementation tasks without duplicating the design.
 
 ## Retired
 
+- [PROC-032 — Repository-native agent work graph](../../done/PROC-032-repository-native-agent-work-graph.md):
+  added inspectable per-task action topology, Git-common-dir run state, and a
+  hash-chained event trace while preserving the task, claim, verifier, review,
+  and experiment authorities. Follow-up `BUG-144` owns the lock-breaker and
+  claim-path-validation residuals.
 - [PROC-030 — Contract applicability and method-integration workflow](../../done/PROC-030-contract-applicability-and-method-integration.md):
   added prospective reusable-contract discovery/declarations, complete method
   integration matrices, strict validation, and bounded ECS/runtime/UI refactor

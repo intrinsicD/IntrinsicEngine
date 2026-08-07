@@ -9,6 +9,11 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
+- [`BUG-144` — Work-graph stale-lock breaker can steal a live lock](BUG-144-work-graph-lock-breaker-and-claim-path-validation.md):
+  the `agent_work_graph.py` directory mutex breaks any lock whose `mkdir` mtime
+  is older than 30 s, so a writer legitimately hashing a large surface loses its
+  lock and then removes its successor's. Make lock ownership verifiable, and
+  validate task IDs in the remaining `task_claim.py` path-building commands.
 - [`BUG-142` — AssetIO queue shows 0% progress on a completed import row](BUG-142-assetio-queue-terminal-row-zero-progress.md):
   a successful import row reports stage `Completed` and elapsed `0.29 s` while
   its progress cell renders a highlighted `0%`. Make the snapshot distinguish

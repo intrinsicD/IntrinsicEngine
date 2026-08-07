@@ -6867,3 +6867,43 @@ remains omission-safe. Focused owner-level coverage passed 198/198 and the
 complete default CPU selector passed all 4,102 selected entries with its
 expected GLFW/LSan skip; runtime remains at 168 files and the generated module
 inventory drops to 382 without a replacement abstraction.
+
+[`PROC-032`](PROC-032-repository-native-agent-work-graph.md) — the
+repository-native agent work graph retired on 2026-08-07. A claimed non-micro
+task now starts the checked-in ten-node `intrinsic.review-diamond.v1` recipe
+and can see exactly which nodes are ready, running, blocked, profile-skipped,
+or complete, backed by atomic Git-common-dir run state and an append-only
+hash-chained event trace bound to task, owner, branch, worktree, recipe digest,
+profile, and source surface. The graph is observability and control flow only:
+task, claim, verification, independent-review, and experiment-custody
+authorities are unchanged, and `CI-012`, `CI-013`, and `PROC-031` keep the
+planned verifier-receipt integration.
+
+The task self-hosted its own review diamond, including a genuine blocking
+cycle. Independent review revision 1 returned `revision-requested` with four
+blockers and one robustness finding; revision 2 resolves all five on the final
+surface. `validate_recipe_data` now rejects a recipe whose only write-capable
+node or sole final surface binder is inactive at the `standard` profile, with
+the run-start check repeated against the real task profile. The live-claim
+binding compares an exact per-acquire claim-record digest — `claimed_at` alone
+is second-resolution and not unique — alongside owner, branch, and worktree on
+`show`, every transition, and `abort`, so a same-label release/reacquire in
+either the same or a sibling worktree now demands an explicit resume. The
+review surface is frozen when the write lane finishes rather than at finalize,
+and every downstream `begin`/`finish` fails closed until that lane is reopened,
+with the terminal binder additionally requiring equality against the
+writer-frozen digest. `show` and `list` serialize their snapshot under the
+graph lock, so the append-to-replace window is no longer observable. CLI task
+IDs are validated before any Git-common-dir path is resolved, at `main()` and
+again at all three path-construction sites.
+
+Twenty isolated temporary-Git-worktree regressions pass, `ci-docs` executes
+both the recipe validator and the suite, and the strict task, docs-sync,
+doc-link, ARA-claim, skill-mirror, root-hygiene, and workflow-evidence gates are
+green on the retirement surface. Follow-up
+[`BUG-144`](../backlog/bugs/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md)
+owns two residuals found while auditing that final surface: the lock's
+mtime-based stale breaker can steal a live lock from a slow writer, and
+`task_claim.py` `release`/`recover` build claim paths without the `TASK_ID_RE`
+validation `acquire` applies. Neither is reachable through a reviewed workflow
+today.
