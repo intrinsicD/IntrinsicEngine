@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "\nset -e\npython3 tools/agents/agent_work_graph.py validate-recipe --recipe tools/agents/work_graphs/review-diamond.v1.json\npython3 tests/regression/tooling/Test.AgentWorkGraph.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py\n"
+  ],
+  "command_display": "/bin/bash -o pipefail -c '\nset -e\npython3 tools/agents/agent_work_graph.py validate-recipe --recipe tools/agents/work_graphs/review-diamond.v1.json\npython3 tests/regression/tooling/Test.AgentWorkGraph.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py\n'",
+  "cwd": ".",
+  "duration_ms": 25147,
+  "exit_code": 0,
+  "finished_at": "2026-08-07T19:02:00Z",
+  "label": "r2-focused-workflow-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-07T19:01:35Z",
+  "stderr_path": "tasks/evidence/PROC-032/commands/r2-focused-workflow-regressions.stderr.log",
+  "stderr_sha256": "785f7e285f45165f073b09a77f5d0395e241e2bc6f50c72a81d59adf95911519",
+  "stdout_path": "tasks/evidence/PROC-032/commands/r2-focused-workflow-regressions.stdout.log",
+  "stdout_sha256": "52c6bbc9d0db615d5736b9fbc53c1e5e4201630ff9d3a8414d3251174528ab5b",
+  "task_id": "PROC-032"
+}
