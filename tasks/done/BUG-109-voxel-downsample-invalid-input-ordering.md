@@ -45,6 +45,14 @@ contract_review: "Reviewed the full catalog; this repair makes one geometry poin
   test-layout gates report zero findings.
 - This unblocks `GEOM-061`, which assumed this deterministic fail-closed
   baseline.
+- Evidence note: a `structural-gates` receipt was first recorded mid-flight,
+  before this task's own stale `contract_legacy_tasks.json` baseline entry was
+  consumed, so `validate_tasks.py --strict` failed in it. That was a recording
+  error — a pre-fix probe should carry `--optional`, as `RUNTIME-139` and
+  `BUG-129` do — not a real gate failure. The receipt was removed and replaced
+  by `structural-gates-r2`, which runs the same set green on the final surface.
+  The removed receipt remains in history at commit `6bf613f2`, and the
+  write-lane reopen that prompted it is recorded in the work-graph event trace.
 - Completion commit: this retirement commit.
 
 ## Goal
