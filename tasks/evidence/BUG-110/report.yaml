@@ -1,0 +1,140 @@
+schema_version: 1
+task_id: BUG-110
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-07T23:55:15Z'
+claim_eligible: false
+source:
+  base_ref: 659d3e5578b127300c9cb2a1294e1da66f2bc7f2
+  base_revision: 659d3e5578b127300c9cb2a1294e1da66f2bc7f2
+  head_revision: 484443495023068ed81ddc736276c4fcfea19f17
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/geometry/Geometry.HalfedgeMesh.DEC.cpp
+    sha256: 9a116a2c0cae7b303f04efaa36aca7c51b31167cf719e96b6619b41f777d6b82
+  - path: src/geometry/Geometry.HalfedgeMesh.DEC.cppm
+    sha256: 06fa420b741704c02fb1bc19c29ce12716b9d2dea1f4889299679a775b5a8b99
+  - path: src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp
+    sha256: a58eeefe049fa9051545cefb14e77d06f56113d18133b188c6843d16bfb18f7a
+  - path: src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm
+    sha256: 786c0329c368f44974f3d4fc54919a087011af39fc0f68f0747a24be6bee2093
+  - path: src/geometry/Geometry.Sparse.cpp
+    sha256: 4821810dabbde5a8e4d59c8700e8b702c925709ea3984d28fd47bc26f8dcd8e6
+  - path: src/geometry/Geometry.Sparse.cppm
+    sha256: 708318df8c56adeee141b77b345ed484a1c7b07f61507141abf3eefa03006fd4
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b70818dd428e1f891342ca3de6803860901d01427cd1a55a728f80599a4020c9
+  - path: tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: b149148d715e92ee3377b6b9400f3a848288afb522cfb3619f2a0a98c1787790
+  - path: tasks/done/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md
+    sha256: 2d193fb5a1736c1169ff2a3b7055bab25009fc483182001f8b91b005aa08496c
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 5d5e64b0e0439ef3fd475db685e803fbecddf5afc039844e4bb5ec7f41646faa
+  - path: tests/unit/geometry/Test.Sparse.cpp
+    sha256: aa4d8a38ce15fc922d50b1e75a969ebd421d8c68afc3d254417363fc2314b71b
+  - path: tests/unit/geometry/Test_Smoothing.cpp
+    sha256: d6a6a36546e7287db3cd2c84f182ed7b1b6c8bd3ccc51986e42be8e7ea515a88
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: fc33c358b5c5a8bb04f8a0b14fb4d0babe9ac2a6da9295b62733455bdf8e27db
+  content_digest: f11aebecdb6877fca674baa230ea0f6db48e28aeec903debef2a7b5cd2aea9a5
+touched:
+  paths:
+  - src/geometry/Geometry.HalfedgeMesh.DEC.cpp
+  - src/geometry/Geometry.HalfedgeMesh.DEC.cppm
+  - src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm
+  - src/geometry/Geometry.Sparse.cpp
+  - src/geometry/Geometry.Sparse.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/unit/geometry/Test.Sparse.cpp
+  - tests/unit/geometry/Test_Smoothing.cpp
+  - tools/agents/contract_legacy_tasks.json
+  layers:
+  - geometry
+  modules:
+  - Geometry.Smoothing
+  - Geometry.Sparse
+extension_seam: One free function beside the existing SolveCGShifted seam plus the established DEC forwarding
+  wrapper; no constraint interface, solver factory, or KKT machinery.
+future_change_plan: A general equality-constraint or saddle-point solver is reconsidered only when a second
+  caller needs constraints this fixed-index elimination cannot express.
+acceptance:
+- criterion: Preserved-boundary interior values match the independent reduced system within solver tolerance.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The previous post-solve overwrite loop is gone.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Invalid constraints fail closed before mesh mutation.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The complete existing smoothing suite remains green.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-110/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-110/commands/focused-smoothing-sparse.json
+- receipt: tasks/evidence/BUG-110/commands/structural-gates.json
+changed_public_contracts:
+- Geometry::Sparse::SolveCGShiftedFixed and Geometry::DEC::SolveCGShiftedFixed are new exported free functions;
+  ImplicitSmoothingParams::PreserveBoundary semantics are now in-solve Dirichlet elimination.
+diagnostics_and_previews:
+- SolveCGShiftedFixed returns CGConvergenceReason::InvalidInput without writing to the output for out-of-range
+  indices, repeated indices, index/value length mismatch, and non-finite fixed values; CG convergence
+  diagnostics are otherwise unchanged.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- The elimination assumes the unconstrained shifted operator is SPD, which is the documented precondition
+  of SolveCGShifted; a caller violating it gets the same undefined convergence behavior as before.
+- PreserveBoundary=true results now legitimately differ from previous releases on open meshes, because
+  the previous interior values were solved against unconstrained boundary values.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No graphics, RHI, shader, backend, or byte-layout behavior changed; this is a CPU geometry solve.
+- check: benchmark
+  reason: No performance claim is made; the reduced system is the same size as before and this is a correctness
+    fix.
+artifacts:
+- path: src/geometry/Geometry.Sparse.cpp
+  sha256: 4821810dabbde5a8e4d59c8700e8b702c925709ea3984d28fd47bc26f8dcd8e6
+  kind: file
+- path: src/geometry/Geometry.Sparse.cppm
+  sha256: 708318df8c56adeee141b77b345ed484a1c7b07f61507141abf3eefa03006fd4
+  kind: file
+- path: src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp
+  sha256: a58eeefe049fa9051545cefb14e77d06f56113d18133b188c6843d16bfb18f7a
+  kind: file
+- path: tests/unit/geometry/Test_Smoothing.cpp
+  sha256: d6a6a36546e7287db3cd2c84f182ed7b1b6c8bd3ccc51986e42be8e7ea515a88
+  kind: file
+- path: tests/unit/geometry/Test.Sparse.cpp
+  sha256: aa4d8a38ce15fc922d50b1e75a969ebd421d8c68afc3d254417363fc2314b71b
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
