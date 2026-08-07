@@ -63,27 +63,6 @@ namespace Geometry::Sampling
     }
 
 
-    std::vector<glm::vec3> SampleSurfaceUniform(const Sphere& sphere, size_t num_samples)
-    {
-        std::vector<glm::vec3> points(num_samples);
-        double phi = std::numbers::pi_v<double> * (3.0 - std::sqrt(5.0)); // Golden angle in radians
-        double radius = sphere.Radius;
-
-        for (size_t i = 0; i < num_samples; ++i)
-        {
-            double y = 1 - (i / double(num_samples - 1)) * 2; // y goes from 1 to -1
-            double radius_at_y = std::sqrt(1 - y * y); // Radius at this y level
-            double theta = phi * i; // Golden angle increment
-
-            points[i] = {
-                sphere.Center.x + radius_at_y * std::cos(theta) * radius,
-                sphere.Center.y + radius_at_y * std::sin(theta) * radius,
-                sphere.Center.z + y * radius
-            };
-        }
-        return points;
-    }
-
     //http://extremelearning.com.au/evenly-distributing-points-on-a-sphere/
     //Thou et. al. - 2024 - https://arxiv.org/pdf/2410.12007v1
     //Alvaro Gonzalez - 2009 - https://arxiv.org/pdf/0912.4540
@@ -92,11 +71,32 @@ namespace Geometry::Sampling
                                                          FibonacciLattice type = FLTHIRD)
     {
         //http://extremelearning.com.au/evenly-distributing-points-on-a-sphere/
+        const glm::vec3 north = glm::vec3(0, 0, 1) * sphere.Radius + sphere.Center;
+        const glm::vec3 south = glm::vec3(0, 0, -1) * sphere.Radius + sphere.Center;
+
+        // Shared small-count contract for every lattice: the poles are the only
+        // placements that stay well defined once the lattice has fewer interior
+        // slots than its formula needs. Resolving them first also keeps every
+        // index and divisor below away from zero and from unsigned underflow.
+        if (num_samples == 0)
+        {
+            return {};
+        }
+        if (num_samples == 1)
+        {
+            return {north};
+        }
+        if (num_samples == 2)
+        {
+            return {north, south};
+        }
+
         std::vector<glm::vec3> points(num_samples);
 
         double golden_ratio = (1.0 + std::sqrt(5.0)) / 2.0;
         double TWOPI = 2 * std::numbers::pi_v<double>;
         double epsilon = 0.36;
+        bool explicit_poles = false;
         size_t start_index = 0;
         size_t end_index = num_samples;
         double offset = 0.0;
@@ -126,6 +126,7 @@ namespace Geometry::Sampling
             {
                 offset = 3.5;
                 sample_count_offset = 2 * offset;
+                explicit_poles = true;
                 start_index = 1;
                 end_index = num_samples - 1;
                 break;
@@ -134,23 +135,21 @@ namespace Geometry::Sampling
             {
                 offset = epsilon;
                 sample_count_offset = 2 * offset - 1;
+                explicit_poles = true;
                 start_index = 1;
                 end_index = num_samples - 1;
                 break;
             }
         }
 
-        if (type == FLTHIRD || type == FLOFFSET)
-        {
-            points[start_index] = glm::vec3(0, 0, 1) * sphere.Radius + sphere.Center;
-        }
         for (size_t i = start_index; i < end_index; ++i)
         {
             points[i] = helper::LatticePoint(i, num_samples, golden_ratio, TWOPI, offset, sample_count_offset, sphere);
         }
-        if (type == FLTHIRD || type == FLOFFSET)
+        if (explicit_poles)
         {
-            points[end_index] = glm::vec3(0, 0, -1) * sphere.Radius + sphere.Center;
+            points.front() = north;
+            points.back() = south;
         }
         return points;
     }

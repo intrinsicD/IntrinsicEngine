@@ -6932,3 +6932,31 @@ the wrong payload field, weakening the `pull_request` emptiness guard, dropping
 `--diff-mode` or `--strict`, and removing a policy regression script each fail
 the test. `ci-docs.yml` was restored unchanged after every probe and its
 behavior is untouched.
+
+[`BUG-108`](BUG-108-fibonacci-sphere-small-count-endpoints.md) — Fibonacci
+sphere-sampling small-count and endpoint safety retired on 2026-08-07 at
+`CPUContracted`, its declared target, with no `Operational` follow-up owed.
+`SampleSurfaceFibonacciLattice` now resolves one shared small-count contract
+before computing any index or divisor: `0` returns empty, `1` returns the north
+pole, and `2` returns north then south, for every `FibonacciLattice` value.
+Resolving those first is what removes the undefined behaviour — the old code
+derived `end_index = num_samples - 1` for `FLTHIRD`/`FLOFFSET`, which wrapped
+to `SIZE_MAX` at zero samples and wrote past the end at one.
+
+For three or more samples the two explicit-pole variants now write the north
+pole to index `0` and the south pole to index `n - 1`. Previously the north
+pole went to index `1` and was immediately overwritten by the fill loop, so
+index `0` stayed default-initialized and a non-origin sphere emitted an
+off-sphere point at the origin. Interior lattice points receive the same `i`
+values as before, so distributions above two samples are unchanged apart from
+that repaired endpoint. The unused, unexported `SampleSurfaceUniform` helper,
+which divided by `num_samples - 1`, is removed after confirming its only
+occurrence in the tree was its own definition.
+
+Three regressions cover every enum value — small counts, larger counts with the
+endpoint contract, and a degenerate zero-radius sphere — each run twice and
+asserted equal. Against the unfixed source all three fail, two with SEGFAULT
+and one on the origin-point assertion, reproducing the reported symptom.
+`IntrinsicGeometryTests` builds clean, the five `SphereSampling` cases pass, the
+default CPU gate passes 4126/4126 with its expected GLFW/LeakSanitizer skip, and
+the layering and test-layout gates report zero findings.

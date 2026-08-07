@@ -79,10 +79,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   non-finite/out-of-range quantization can reach unsafe integral conversion and
   unordered-map iteration determines output order; fail closed and sort cell
   keys before publishing. This is the prerequisite for `GEOM-061`.
-- [`BUG-108` — Fibonacci sphere sampling small-count and endpoint safety](BUG-108-fibonacci-sphere-small-count-endpoints.md):
-  the explicit-pole variants overwrite the north pole, leave element zero
-  defaulted, and underflow/write out of bounds for small counts; define and
-  regress the common `0`/`1`/`2` contract.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
@@ -98,6 +94,15 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-07: [`BUG-108` — Fibonacci sphere sampling small-count and
+  endpoint safety](../../done/BUG-108-fibonacci-sphere-small-count-endpoints.md).
+  Every lattice now resolves the shared `0`/`1`/`2` contract before computing
+  any index or divisor, which removes the `num_samples - 1` underflow, and the
+  explicit-pole variants write the poles to indices `0` and `n - 1` instead of
+  leaving element zero defaulted at the origin. The unused `SampleSurfaceUniform`
+  helper is gone. Three regressions over every enum value fail against the
+  unfixed source; the default CPU gate passes 4126/4126.
 
 - Closed 2026-08-07: [`BUG-119` — Test.CheckTaskStateLinks asserts an inline
   SHA expression the docs-sync step no longer

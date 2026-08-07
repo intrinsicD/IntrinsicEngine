@@ -25,6 +25,20 @@ export namespace Geometry::Sampling
         FLOFFSET    // Use a small epsilon (~0.36) to fine‐tune pole spacing.
     };
 
+    // Returns exactly `numPoints` points, each on `sphere`, for any valid sphere
+    // (finite center, finite non-negative radius). The result is deterministic:
+    // equal arguments always yield equal output.
+    //
+    // Small counts share one contract across every lattice value, because below
+    // three samples there are not enough interior slots for the lattice formula:
+    //   0 -> empty
+    //   1 -> the north pole
+    //   2 -> the north pole then the south pole
+    //
+    // For three or more samples, FLTHIRD and FLOFFSET place the north pole at
+    // index 0 and the south pole at index `numPoints - 1`, and fill only the
+    // interior indices from the lattice formula. The remaining lattices fill
+    // every index from the formula.
     [[nodiscard]] std::vector<glm::vec3> SampleSurfaceFibonacciLattice(const Sphere& sphere,
                                                                        std::uint32_t numPoints,
                                                                        FibonacciLattice lattice);
