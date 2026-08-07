@@ -31,6 +31,12 @@ def run_checker(root: Path) -> subprocess.CompletedProcess[str]:
 
 class CheckTaskStateLinksTests(unittest.TestCase):
     def test_ci_docs_enforces_task_state_and_docs_sync_strictly(self) -> None:
+        """The docs-sync step must route a real diff range per event.
+
+        The event-payload SHAs reach the script through step-level ``env``
+        rather than inline ``${{ }}`` expressions in the ``run`` body, so the
+        binding and its use are asserted separately.
+        """
         payload = yaml.safe_load(CI_DOCS_WORKFLOW.read_text(encoding="utf-8"))
         steps = payload["jobs"]["docs-validation"]["steps"]
         by_name = {step["name"]: step for step in steps}
@@ -43,20 +49,62 @@ class CheckTaskStateLinksTests(unittest.TestCase):
             by_name["Validate task state links (strict mode)"]["run"],
             "python3 tools/agents/check_task_state_links.py --root . --strict",
         )
-        docs_sync = by_name["Validate documentation synchronization (strict mode)"][
-            "run"
-        ]
-        self.assertIn("github.event.pull_request.base.sha", docs_sync)
+        docs_sync_step = by_name["Validate documentation synchronization (strict mode)"]
+        docs_sync_env = docs_sync_step.get("env", {})
+        docs_sync = docs_sync_step["run"]
+
+        expected_env = {
+            "EVENT_NAME": "${{ github.event_name }}",
+            "PR_BASE_SHA": "${{ github.event.pull_request.base.sha }}",
+            "PR_HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+            "MERGE_GROUP_BASE_SHA": "${{ github.event.merge_group.base_sha }}",
+            "MERGE_GROUP_HEAD_SHA": "${{ github.event.merge_group.head_sha }}",
+        }
+        self.assertEqual(
+            {name: docs_sync_env.get(name) for name in expected_env},
+            expected_env,
+        )
+
+        for event, base_var, head_var in (
+            ("pull_request", "PR_BASE_SHA", "PR_HEAD_SHA"),
+            ("merge_group", "MERGE_GROUP_BASE_SHA", "MERGE_GROUP_HEAD_SHA"),
+        ):
+            with self.subTest(event=event):
+                self.assertIn(f"  {event})", docs_sync)
+                self.assertIn(
+                    f'[[ -n "${base_var}" && -n "${head_var}" ]] ||', docs_sync
+                )
+                self.assertIn(f'base_ref="${base_var}"', docs_sync)
+                self.assertIn(f'head_ref="${head_var}"', docs_sync)
+
         self.assertIn("tools/docs/check_docs_sync.py", docs_sync)
         self.assertIn("--diff-mode", docs_sync)
         self.assertIn('--base-ref "$base_ref"', docs_sync)
+        self.assertIn('--head-ref "$head_ref"', docs_sync)
         self.assertIn("--strict", docs_sync)
 
-        policy_test = by_name["Validate structural CI policy regressions"]["run"]
+        policy_lines = [
+            line.strip()
+            for line in by_name["Validate structural CI policy regressions"][
+                "run"
+            ].splitlines()
+            if line.strip()
+        ]
+        for line in policy_lines:
+            with self.subTest(line=line):
+                self.assertTrue(line.startswith("python3 "), line)
+        policy_scripts = [line[len("python3 ") :] for line in policy_lines]
         self.assertEqual(
-            policy_test,
-            "python3 tests/regression/tooling/Test.CheckTaskStateLinks.py",
+            policy_scripts,
+            [
+                "tests/regression/tooling/Test.CheckTaskStateLinks.py",
+                "tests/regression/tooling/Test.CheckKernelConvergence.py",
+                "tests/regression/tooling/Test.CheckAraClaims.py",
+            ],
         )
+        for script in policy_scripts:
+            with self.subTest(script=script):
+                self.assertTrue((REPO_ROOT / script).is_file(), script)
 
     def test_link_to_wrong_lifecycle_directory_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

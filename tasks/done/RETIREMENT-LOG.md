@@ -6907,3 +6907,28 @@ mtime-based stale breaker can steal a live lock from a slow writer, and
 `task_claim.py` `release`/`recover` build claim paths without the `TASK_ID_RE`
 validation `acquire` applies. Neither is reachable through a reviewed workflow
 today.
+
+[`BUG-119`](BUG-119-check-task-state-links-docs-sync-env-assertion.md) — the
+stale docs-sync SHA assertion retired on 2026-08-07. `ci-docs.yml` moved its
+event-payload SHAs from inline `${{ }}` expressions in the docs-sync `run:`
+body into step-level `env:`, but `Test.CheckTaskStateLinks` still grepped the
+`run:` body for `github.event.pull_request.base.sha`, so the test failed on a
+clean checkout while the routing it guarded was correct. The test now reads the
+`env:` mapping and the `run:` body separately: it pins all five bindings by
+name and value, and asserts that each of `pull_request` and `merge_group`
+verifies both SHAs are non-empty before assigning them and that
+`check_docs_sync.py` is invoked with `--diff-mode`, both refs, and `--strict`.
+
+Fixing that surfaced a second stale literal of the same class in the same test
+method — `Validate structural CI policy regressions` had grown from one script
+to three while the test asserted equality against the single-script string.
+The step's script list is now parsed and pinned, each entry must be a `python3`
+invocation, and every listed script must exist on disk. The task could not
+close green without it, so it was fixed here rather than deferred.
+
+Seven mutation probes confirm the new assertions still bite: removing the
+`PR_BASE_SHA` or `MERGE_GROUP_BASE_SHA` binding, repointing `PR_HEAD_SHA` at
+the wrong payload field, weakening the `pull_request` emptiness guard, dropping
+`--diff-mode` or `--strict`, and removing a policy regression script each fail
+the test. `ci-docs.yml` was restored unchanged after every probe and its
+behavior is untouched.

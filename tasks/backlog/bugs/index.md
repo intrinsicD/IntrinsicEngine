@@ -66,10 +66,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   assignment for `glm::vec<3,float>` is first required in a TU that reaches the type through
   `Extrinsic.RHI.Types`. Breaks the build of `Test.CameraModule.cpp`, so `full-cpu`, `ci-asan`,
   and `ci-ubsan` never reach their test phase. Cold cache, so not a stale-BMI artifact.
-- [`BUG-119` — Test.CheckTaskStateLinks asserts an inline SHA expression the docs-sync step no longer uses](BUG-119-check-task-state-links-docs-sync-env-assertion.md):
-  the test greps the docs-sync `run:` body for `github.event.pull_request.base.sha`,
-  but the workflow now binds base/head through step-level `env:`. The routing is
-  correct and fails closed; assert the `env:` binding instead of the literal.
 - [`BUG-118` — GLFW X11 input-method LeakSanitizer recurrence](BUG-118-glfw-x11-input-method-lsan-recurrence.md):
   the standalone lifetime contract again retains the unsuppressed 408-byte
   libX11 input-method allocation despite proving process-static
@@ -102,6 +98,17 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-07: [`BUG-119` — Test.CheckTaskStateLinks asserts an inline
+  SHA expression the docs-sync step no longer
+  uses](../../done/BUG-119-check-task-state-links-docs-sync-env-assertion.md).
+  The test now pins the docs-sync step's five event-payload `env:` bindings and
+  asserts each event branch guards both SHAs before assigning them, instead of
+  grepping the `run:` body for an expression that moved into `env:`. A second
+  stale literal in the same test — the structural-policy step had grown from
+  one script to three — is fixed the same way. Seven mutation probes confirm
+  the assertions still fail on genuinely broken routing; `ci-docs.yml` is
+  unchanged.
 
 - Closed 2026-08-06: [`BUG-135` — LOP benchmark lacks manual CTest
   classification](../../done/BUG-135-lop-benchmark-missing-manual-ctest-classification.md).

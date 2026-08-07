@@ -126,7 +126,6 @@ the authoritative open/unblocked view.
 
 ## Unthemed
 
-- unblocked: `BUG-119` — Test.CheckTaskStateLinks asserts an inline SHA expression the docs-sync step no longer uses (tasks/backlog/bugs/BUG-119-check-task-state-links-docs-sync-env-assertion.md)
 - unblocked: `BUG-121` — GLM anonymous-union copy-assignment fails to compile through a C++23 module boundary (tasks/backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md)
 - unblocked: `BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state (tasks/backlog/bugs/BUG-122-runtime-asset-asan-test-lifetimes.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
