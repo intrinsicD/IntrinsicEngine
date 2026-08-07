@@ -1918,22 +1918,38 @@ namespace {
             if (view.VertexSource == nullptr)
                 return model;
 
-            const auto texcoords =
+            // BUG-137 — UVs follow the canonical corner-over-vertex resolution
+            // order. A seam-carrying mesh has no `v:texcoord`, and reporting it
+            // as "no resolved texcoord property" disabled the UV view for
+            // exactly the meshes an atlas produces.
+            const auto cornerTexcoords =
+                view.HalfedgeSource != nullptr
+                    ? view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord")
+                    : Geometry::ConstProperty<glm::vec2>{};
+            const bool cornerOwned = cornerTexcoords.IsValid() &&
+                cornerTexcoords.Vector().size() == view.HalfedgesTotal();
+
+            const auto vertexTexcoords =
                 view.VertexSource->Properties.Get<glm::vec2>(
                     model.TexcoordPropertyName);
+            const auto& texcoords = cornerOwned ? cornerTexcoords : vertexTexcoords;
             model.HasTexcoords = texcoords.IsValid();
             if (model.HasTexcoords)
             {
                 model.TexcoordCount = texcoords.Vector().size();
-                model.TexcoordCountMatchesVertices =
-                    model.TexcoordCount == model.VertexCount;
-                model.Provenance = "geometry property";
+                model.TexcoordCountMatchesVertices = cornerOwned
+                    ? model.TexcoordCount == view.HalfedgesTotal()
+                    : model.TexcoordCount == model.VertexCount;
+                model.Provenance = cornerOwned
+                    ? "geometry property (corner domain)"
+                    : "geometry property";
                 model.CheckerPreviewAvailable =
                     model.TexcoordCountMatchesVertices;
                 if (!model.TexcoordCountMatchesVertices)
                 {
-                    model.LastFailure =
-                        "texcoord count does not match mesh vertex count";
+                    model.LastFailure = cornerOwned
+                        ? "corner texcoord count does not match mesh halfedge count"
+                        : "texcoord count does not match mesh vertex count";
                 }
                 else
                 {

@@ -1,8 +1,12 @@
 module;
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <span>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -262,5 +266,88 @@ namespace Extrinsic::Runtime
     {
         return BuildTopology(
             view, &outSurfaceIndices, &outTriangleToFace, &outCornerHalfedges);
+    }
+
+    bool BuildMeshCornerTexcoordSplit(
+        const std::span<const glm::vec2> cornerTexcoords,
+        const std::span<const std::uint32_t> cornerHalfedges,
+        const std::span<const glm::vec2> fallbackVertexTexcoords,
+        const std::size_t vertexCount,
+        std::vector<std::uint32_t>& surfaceIndices,
+        MeshCornerTexcoordSplit& outSplit)
+    {
+        outSplit.SourceVertexForSlot.clear();
+        outSplit.TexcoordForSlot.clear();
+
+        if (cornerHalfedges.size() != surfaceIndices.size() ||
+            surfaceIndices.empty() ||
+            cornerTexcoords.empty())
+        {
+            return false;
+        }
+
+        for (const std::uint32_t vertex : surfaceIndices)
+        {
+            if (vertex >= vertexCount)
+            {
+                return false;
+            }
+        }
+
+        // Per source vertex, the distinct UVs seen so far and the slot each one
+        // was assigned. Seam vertices carry a handful of entries, so a short
+        // linear scan beats hashing the pair.
+        std::unordered_map<std::uint32_t, std::vector<std::pair<glm::vec2, std::uint32_t>>>
+            emitted;
+        emitted.reserve(vertexCount);
+
+        std::vector<std::uint32_t> remappedIndices;
+        remappedIndices.reserve(surfaceIndices.size());
+        outSplit.SourceVertexForSlot.reserve(vertexCount);
+        outSplit.TexcoordForSlot.reserve(vertexCount);
+
+        for (std::size_t corner = 0u; corner < surfaceIndices.size(); ++corner)
+        {
+            const std::uint32_t sourceVertex = surfaceIndices[corner];
+            const std::uint32_t halfedge = cornerHalfedges[corner];
+
+            glm::vec2 uv{0.0f, 0.0f};
+            if (halfedge < cornerTexcoords.size())
+            {
+                uv = cornerTexcoords[halfedge];
+            }
+            else if (sourceVertex < fallbackVertexTexcoords.size())
+            {
+                uv = fallbackVertexTexcoords[sourceVertex];
+            }
+            if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+            {
+                uv = glm::vec2{0.0f, 0.0f};
+            }
+
+            std::vector<std::pair<glm::vec2, std::uint32_t>>& seen = emitted[sourceVertex];
+            std::uint32_t slot = kInvalidIndex;
+            for (const auto& [existingUv, existingSlot] : seen)
+            {
+                if (existingUv.x == uv.x && existingUv.y == uv.y)
+                {
+                    slot = existingSlot;
+                    break;
+                }
+            }
+
+            if (slot == kInvalidIndex)
+            {
+                slot = static_cast<std::uint32_t>(outSplit.SourceVertexForSlot.size());
+                outSplit.SourceVertexForSlot.push_back(sourceVertex);
+                outSplit.TexcoordForSlot.push_back(uv);
+                seen.emplace_back(uv, slot);
+            }
+
+            remappedIndices.push_back(slot);
+        }
+
+        surfaceIndices = std::move(remappedIndices);
+        return true;
     }
 }

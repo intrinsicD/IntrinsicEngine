@@ -55,6 +55,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-140` — Mesh denoise reports Applied/Success after moving zero vertices (tasks/backlog/bugs/BUG-140-mesh-denoise-reports-success-after-zero-movement.md)
 - unblocked: `BUG-141` — Editor geometry-processing diagnostics are mislabeled, duplicated, unscoped, and unactionable (tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md)
 - unblocked: `BUG-142` — AssetIO queue shows 0% progress on a completed import row (tasks/backlog/bugs/BUG-142-assetio-queue-terminal-row-zero-progress.md)
+- unblocked: `BUG-143` — Corner-UV `gpu;vulkan` smoke exceeds the 30 s cohort timeout (tasks/backlog/bugs/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md)
 
 ## Theme H — Agentic workflow hardening
 

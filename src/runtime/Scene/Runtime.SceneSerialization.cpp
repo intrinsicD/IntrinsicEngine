@@ -1546,6 +1546,14 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            // BUG-137 — a seam-carrying mesh keeps its UVs on the corner
+            // domain and has no `v:texcoord` at all, so saving only the vertex
+            // channel silently dropped them on round-trip.
+            if (!AddVec2Property(out, "texcoords", halfedges.Properties,
+                                 "h:texcoord", false))
+            {
+                return false;
+            }
             geometry["halfedges"] = std::move(out);
             return true;
         }
@@ -1887,10 +1895,21 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
+            const std::size_t halfedgeCount = toVertex.size();
             GS::Halfedges halfedges{};
             WriteUIntProperty(halfedges.Properties, PN::kHalfedgeToVertex, std::move(toVertex));
             WriteUIntProperty(halfedges.Properties, PN::kHalfedgeNext, std::move(next));
             WriteUIntProperty(halfedges.Properties, PN::kHalfedgeFace, std::move(face));
+            if (value.contains("texcoords"))
+            {
+                std::vector<glm::vec2> texcoords;
+                if (!TryReadVec2Array(value["texcoords"], texcoords) ||
+                    texcoords.size() != halfedgeCount)
+                {
+                    return false;
+                }
+                WriteVec2Property(halfedges.Properties, "h:texcoord", std::move(texcoords));
+            }
             raw.emplace_or_replace<GS::Halfedges>(entity, std::move(halfedges));
             return true;
         }

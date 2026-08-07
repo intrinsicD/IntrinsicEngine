@@ -294,70 +294,39 @@ namespace Extrinsic::Runtime
 
         if (cornerUvsUsable)
         {
-            const std::vector<glm::vec2>& cornerUvs = cornerUvProperty.Vector();
-            const bool hasColors = !outBuffer.PackedColors.empty();
-
-            // Per source vertex, the distinct UVs seen so far and the GPU
-            // vertex each one was assigned. Seam vertices carry a handful of
-            // entries, so a short linear scan beats hashing the pair.
-            std::unordered_map<std::uint32_t, std::vector<std::pair<glm::vec2, std::uint32_t>>>
-                emitted;
-            emitted.reserve(vertexCount);
-
-            std::vector<glm::vec3> newNormals;
-            std::vector<glm::vec2> newTexcoords;
-            std::vector<std::uint32_t> newColors;
-            splitPositions.reserve(vertexCount);
-            newNormals.reserve(vertexCount);
-            newTexcoords.reserve(vertexCount);
-            if (hasColors)
-                newColors.reserve(vertexCount);
-
-            for (std::size_t corner = 0u; corner < outBuffer.SurfaceIndices.size(); ++corner)
+            // The split table itself lives in Runtime.MeshSurfaceTopology so
+            // that property-texture bake produces an identical one; the two
+            // cross-check through GPU residency.
+            MeshCornerTexcoordSplit split{};
+            if (!BuildMeshCornerTexcoordSplit(
+                    cornerUvProperty.Vector(),
+                    cornerHalfedges,
+                    texcoords,
+                    vertexCount,
+                    outBuffer.SurfaceIndices,
+                    split))
             {
-                const std::uint32_t sourceVertex = outBuffer.SurfaceIndices[corner];
-                if (sourceVertex >= vertexCount)
-                {
-                    return Failure(MeshPackStatus::InvalidTopology, outBuffer);
-                }
+                return Failure(MeshPackStatus::InvalidTopology, outBuffer);
+            }
 
-                const std::uint32_t halfedge = cornerHalfedges[corner];
-                glm::vec2 uv = halfedge < cornerUvs.size()
-                    ? cornerUvs[halfedge]
-                    : texcoords[sourceVertex];
-                if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
-                {
-                    uv = glm::vec2{0.0f, 0.0f};
-                }
+            const bool hasColors = !outBuffer.PackedColors.empty();
+            std::vector<glm::vec3> newNormals;
+            std::vector<std::uint32_t> newColors;
+            splitPositions.reserve(split.SourceVertexForSlot.size());
+            newNormals.reserve(split.SourceVertexForSlot.size());
+            if (hasColors)
+                newColors.reserve(split.SourceVertexForSlot.size());
 
-                std::vector<std::pair<glm::vec2, std::uint32_t>>& seen =
-                    emitted[sourceVertex];
-                std::uint32_t gpuIndex = std::numeric_limits<std::uint32_t>::max();
-                for (const auto& [existingUv, existingIndex] : seen)
-                {
-                    if (existingUv.x == uv.x && existingUv.y == uv.y)
-                    {
-                        gpuIndex = existingIndex;
-                        break;
-                    }
-                }
-
-                if (gpuIndex == std::numeric_limits<std::uint32_t>::max())
-                {
-                    gpuIndex = static_cast<std::uint32_t>(splitPositions.size());
-                    splitPositions.push_back(positions[sourceVertex]);
-                    newNormals.push_back(normals[sourceVertex]);
-                    newTexcoords.push_back(uv);
-                    if (hasColors)
-                        newColors.push_back(outBuffer.PackedColors[sourceVertex]);
-                    seen.emplace_back(uv, gpuIndex);
-                }
-
-                outBuffer.SurfaceIndices[corner] = gpuIndex;
+            for (const std::uint32_t sourceVertex : split.SourceVertexForSlot)
+            {
+                splitPositions.push_back(positions[sourceVertex]);
+                newNormals.push_back(normals[sourceVertex]);
+                if (hasColors)
+                    newColors.push_back(outBuffer.PackedColors[sourceVertex]);
             }
 
             normals = std::move(newNormals);
-            texcoords = std::move(newTexcoords);
+            texcoords = std::move(split.TexcoordForSlot);
             if (hasColors)
                 outBuffer.PackedColors = std::move(newColors);
             positionSpan = std::span<const glm::vec3>{splitPositions};

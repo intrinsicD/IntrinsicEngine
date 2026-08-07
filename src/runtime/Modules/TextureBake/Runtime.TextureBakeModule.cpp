@@ -853,19 +853,34 @@ namespace Extrinsic::Runtime
                     "texture bake requires complete mesh topology");
             }
 
+            // BUG-137 — UVs follow the canonical corner-over-vertex resolution
+            // order. A seam-carrying mesh has no per-vertex channel at all, so
+            // requiring one here rejected exactly the meshes an atlas produces.
             const Geometry::ConstPropertySet vertexProperties{
                 view.VertexSource->Properties};
+            const Geometry::ConstPropertySet halfedgeProperties{
+                view.HalfedgeSource->Properties};
+            const auto cornerTexcoords =
+                halfedgeProperties.Get<glm::vec2>("h:texcoord");
+            const bool useCornerTexcoords = cornerTexcoords.IsValid() &&
+                cornerTexcoords.Vector().size() ==
+                    view.HalfedgeSource->Properties.Size();
+
             const auto texcoords = vertexProperties.Get<glm::vec2>(
                 request.Texcoords.Name);
-            if (!texcoords.IsValid() ||
-                texcoords.Vector().size() !=
-                    view.VertexSource->Properties.Size())
+            if (!useCornerTexcoords &&
+                (!texcoords.IsValid() ||
+                 texcoords.Vector().size() !=
+                     view.VertexSource->Properties.Size()))
             {
                 return PrepareFailure(
                     PropertyTextureBakeStatus::MissingTexcoords,
-                    "texture bake requires one vec2 atlas coordinate per vertex");
+                    "texture bake requires one vec2 atlas coordinate per vertex "
+                    "or per corner");
             }
-            for (const glm::vec2 uv : texcoords.Vector())
+            const std::vector<glm::vec2>& resolvedTexcoords =
+                useCornerTexcoords ? cornerTexcoords.Vector() : texcoords.Vector();
+            for (const glm::vec2 uv : resolvedTexcoords)
             {
                 if (!Finite(uv))
                 {
@@ -893,7 +908,6 @@ namespace Extrinsic::Runtime
                     PropertyTextureBakeStatus::CommandFailed,
                     "texture bake output name must not be empty");
             }
-            prepared.Texcoords = texcoords.Vector();
             prepared.SourceGeneration =
                 request.ExpectedSourceGeneration;
 
@@ -958,10 +972,13 @@ namespace Extrinsic::Runtime
             }
 
             std::vector<std::uint32_t> triangleToFace{};
-            const MeshSurfaceTopologyStatus topology = BuildMeshSurfaceTriangleTopology(
-                view,
-                prepared.SurfaceIndices,
-                triangleToFace);
+            std::vector<std::uint32_t> cornerHalfedges{};
+            const MeshSurfaceTopologyStatus topology =
+                BuildMeshSurfaceTriangleCornerTopology(
+                    view,
+                    prepared.SurfaceIndices,
+                    triangleToFace,
+                    cornerHalfedges);
             if (topology != MeshSurfaceTopologyStatus::Success ||
                 prepared.SurfaceIndices.empty() ||
                 (prepared.SurfaceIndices.size() % 3u) != 0u)
@@ -970,27 +987,48 @@ namespace Extrinsic::Runtime
                     PropertyTextureBakeStatus::BakeFailed,
                     DebugNameForMeshSurfaceTopologyStatus(topology));
             }
-            prepared.SurfaceIndexFingerprint =
-                FingerprintIndices(prepared.SurfaceIndices);
+
+            // Resolve the UV each triangle corner actually carries. For a
+            // corner-domain mesh that is a halfedge lookup; for a vertex-domain
+            // mesh it is the corner's target vertex, which reproduces the
+            // previous behaviour exactly.
+            std::vector<glm::vec2> cornerUvForIndex(
+                prepared.SurfaceIndices.size(), glm::vec2{0.0f});
+            for (std::size_t index = 0u;
+                 index < prepared.SurfaceIndices.size();
+                 ++index)
+            {
+                const std::uint32_t vertex = prepared.SurfaceIndices[index];
+                if (useCornerTexcoords)
+                {
+                    const std::uint32_t halfedge = cornerHalfedges[index];
+                    if (halfedge >= resolvedTexcoords.size())
+                    {
+                        return PrepareFailure(
+                            PropertyTextureBakeStatus::BakeFailed,
+                            "texture bake topology references an invalid corner");
+                    }
+                    cornerUvForIndex[index] = resolvedTexcoords[halfedge];
+                }
+                else
+                {
+                    if (vertex >= resolvedTexcoords.size())
+                    {
+                        return PrepareFailure(
+                            PropertyTextureBakeStatus::BakeFailed,
+                            "texture bake topology references an invalid vertex");
+                    }
+                    cornerUvForIndex[index] = resolvedTexcoords[vertex];
+                }
+            }
 
             for (std::size_t index = 0u;
                  index < prepared.SurfaceIndices.size();
                  index += 3u)
             {
-                const std::uint32_t a = prepared.SurfaceIndices[index + 0u];
-                const std::uint32_t b = prepared.SurfaceIndices[index + 1u];
-                const std::uint32_t c = prepared.SurfaceIndices[index + 2u];
-                if (a >= texcoords.Vector().size() ||
-                    b >= texcoords.Vector().size() ||
-                    c >= texcoords.Vector().size())
-                {
-                    return PrepareFailure(
-                        PropertyTextureBakeStatus::BakeFailed,
-                        "texture bake topology references an invalid vertex");
-                }
                 const float area = std::abs(Cross2(
-                    texcoords.Vector()[b] - texcoords.Vector()[a],
-                    texcoords.Vector()[c] - texcoords.Vector()[a]));
+                    cornerUvForIndex[index + 1u] - cornerUvForIndex[index + 0u],
+                    cornerUvForIndex[index + 2u] - cornerUvForIndex[index + 0u]));
                 if (area <= kUvAreaEpsilon)
                 {
                     return PrepareFailure(
@@ -1094,6 +1132,54 @@ namespace Extrinsic::Runtime
                     PropertyTextureBakeStatus::UnsupportedSourceDomain,
                     "texture bake supports mesh vertex, edge, and face properties");
             }
+
+            // BUG-137 — de-index corner UVs into the bake's own vertex table.
+            // This runs *after* the domain expansions above, which read
+            // `SurfaceIndices` as mesh-vertex ids to resolve edge endpoints and
+            // face rows. It uses the same shared split as renderer upload, so
+            // the bake's vertex count, index count, and index fingerprint match
+            // the GPU residency it is cross-checked against.
+            if (useCornerTexcoords)
+            {
+                MeshCornerTexcoordSplit split{};
+                if (!BuildMeshCornerTexcoordSplit(
+                        resolvedTexcoords,
+                        cornerHalfedges,
+                        texcoords.IsValid() ? std::span<const glm::vec2>{texcoords.Vector()}
+                                            : std::span<const glm::vec2>{},
+                        view.VertexSource->Properties.Size(),
+                        prepared.SurfaceIndices,
+                        split))
+                {
+                    return PrepareFailure(
+                        PropertyTextureBakeStatus::BakeFailed,
+                        "texture bake could not de-index corner texture coordinates");
+                }
+
+                if (prepared.Domain == Graphics::PropertyTextureBakeDomain::Vertex)
+                {
+                    std::vector<glm::vec4> splitValues{};
+                    splitValues.reserve(split.SourceVertexForSlot.size());
+                    for (const std::uint32_t sourceVertex : split.SourceVertexForSlot)
+                    {
+                        if (sourceVertex >= prepared.Values.size())
+                        {
+                            return PrepareFailure(
+                                PropertyTextureBakeStatus::MismatchedPropertyCount,
+                                "texture bake corner split exceeds the property buffer");
+                        }
+                        splitValues.push_back(prepared.Values[sourceVertex]);
+                    }
+                    prepared.Values = std::move(splitValues);
+                }
+                prepared.Texcoords = std::move(split.TexcoordForSlot);
+            }
+            else
+            {
+                prepared.Texcoords = resolvedTexcoords;
+            }
+            prepared.SurfaceIndexFingerprint =
+                FingerprintIndices(prepared.SurfaceIndices);
 
             switch (prepared.ValueKind)
             {

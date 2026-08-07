@@ -151,12 +151,29 @@ side is ready before the producing side changes.
       atlas provenance/backend in the import result, replacing the currently
       computed-but-never-surfaced `SeamSplitVertexCount`, so duplication remains
       visible where it now legitimately happens.
-- [ ] Slice D — migrate the remaining vertex-domain `v:texcoord` consumers.
-- [ ] Slice D — `Runtime.TextureBakeModule` reads vertex-domain `v:texcoord`
-      only, so the generated-normal bake now fails closed with a diagnostic on a
-      seam-carrying mesh instead of baking against a lossy per-vertex
-      approximation. This is a deliberate Slice C consequence: the bake is loud,
-      not silent, and Slice D migrates it to the resolution order.
+- [x] Slice D — OBJ read/write preserves authored per-corner UVs; the reader no
+      longer splits positions to represent a `vt` seam, and materialization
+      consumes payload corner UVs instead of re-atlasing them.
+- [x] Slice D — `Runtime.TextureBakeModule` resolves UVs by the canonical
+      corner-over-vertex order and de-indexes corner UVs into its own vertex
+      table, clearing the `MissingTexcoords` failure slice C introduced. The
+      split table moved to `Runtime.MeshSurfaceTopology`
+      (`BuildMeshCornerTexcoordSplit`) and is shared with renderer upload,
+      because the two cross-check each other through GPU residency (vertex
+      count, index count, index fingerprint) and a second independently written
+      split would silently disagree.
+- [x] Slice D — scene save/load round-trips `h:texcoord` on the halfedge
+      domain; previously a seam mesh reloaded with no parameterization at all.
+- [x] Slice D — the UV-view readiness model and the render-extraction reupload
+      revision both follow the resolution order, so a corner-UV mesh is neither
+      reported as "no resolved texcoord property" nor left stale on the GPU
+      after a UV edit.
+- [ ] Slice D — remaining vertex-domain consumers, none of which lose data
+      today: `Runtime.ParameterizationOperations` preflight wording,
+      `Runtime.VisualizationRecipes` CPU-recipe dirty-stamp fallback,
+      `Runtime.EditorWorkspaceSnapshots.Models` reserved-name filters, and
+      `Geometry.HalfedgeMesh.Simplification` FA-QEM seam cost (which can now
+      read the seam directly rather than inferring it from boundary vertices).
 
 ## Tests
 - [x] Slice A — unit coverage for corner-domain UV storage and the
@@ -165,7 +182,10 @@ side is ready before the producing side changes.
       the expected split GPU vertex count while the ECS mesh is unchanged
       (`Test.MeshGeometryExtraction` split cases + `Test.CornerTexcoordUpload`).
 - [ ] Slice B — `gpu;vulkan` readback smoke asserting a seam-split UV mesh still
-      renders its texture correctly.
+      renders. Written and green on hardware (NVIDIA GeForce RTX 4090, driver
+      580.159.04) as commit `e1416f08`, then reverted: its wall clock varies
+      between 13 s and 34 s and it times out against the cohort's 30 s budget.
+      `BUG-143` owns the diagnosis and the restore.
 - [x] Slice C — runtime contract test that materializes a closed manifold
       fixture and asserts vertex/edge/halfedge/face counts equal the source,
       boundary-halfedge count is zero, and Euler characteristic is preserved
@@ -187,8 +207,13 @@ side is ready before the producing side changes.
       validation (`ValidationSeverity::Error`), whose degeneracy tolerance is
       the looser of the two. It is covered structurally instead — see the
       corresponding `## Required changes` entry.
-- [ ] Slice D — OBJ round-trip test asserting per-corner UVs survive read →
-      write → read.
+- [x] Slice D — OBJ round-trip test asserting per-corner UVs survive read →
+      write → read (`Test.GeometryIO`,
+      `ObjCornerTexcoordsSurviveWriteAndReload`), plus
+      `LoadsOBJFaceTexcoordSeamOnCornersWithoutDuplicatingPositions` and
+      `ObjWithoutTexcoordSeamStaysVertexDomain` pinning both sides of the
+      policy, and `DirectObjImportPreservesAuthoredCornerUvs` /
+      `SaveLoadRoundTripPreservesCornerDomainTexcoords` at the runtime level.
 - [ ] Default CPU gate stays green after every slice.
 
 ## Docs
@@ -206,9 +231,9 @@ side is ready before the producing side changes.
 - [x] UVs are present and finite after that import, on the corner domain, with
       no element-domain cardinality change.
 - [ ] A textured mesh still renders correctly, with the seam split occurring at
-      GPU upload rather than in the ECS mesh. Slice B proved the split through
-      the public extraction path on CPU; the `gpu;vulkan` readback smoke that
-      closes `Operational` is still open.
+      GPU upload rather than in the ECS mesh. Observed green once on hardware
+      before the smoke was reverted for timing out; `BUG-143` owns restoring it,
+      so this stays open and the upload path remains `CPUContracted`.
 - [x] GPU-side vertex duplication is reported in the import result, never
       silent. `sculpt.obj` reports `gpu-split-vertices=17795`, the same count
       the old `SeamSplitVertexCount` computed and discarded.
@@ -241,6 +266,7 @@ python3 tools/repo/check_layering.py --root src --strict
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere
   else.
-- Slices A and C close `Scaffolded → CPUContracted`. Slice B closes
-  `Operational` for the upload path via the `gpu;vulkan` readback smoke that
-  proves a seam-split textured mesh still renders correctly.
+- Slices A, C, and D close `Scaffolded → CPUContracted`. Slice B's
+  `Operational` close is deferred to `BUG-143`, which owns the readback smoke
+  that proves a seam-split textured mesh still renders correctly; until that
+  lands the upload path is `CPUContracted` only.
