@@ -1,0 +1,46 @@
+  Monitor is Off
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3425: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+1/1 Test #3425: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface ...   Passed    6.79 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =   6.79 sec*proc (1 test)
+graphics       =   6.79 sec*proc (1 test)
+integration    =   6.79 sec*proc (1 test)
+runtime        =   6.79 sec*proc (1 test)
+vulkan         =   6.79 sec*proc (1 test)
+
+Total Test time (real) =   6.93 sec
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3425: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+1/1 Test #3425: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface ...   Passed    6.77 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =   6.77 sec*proc (1 test)
+graphics       =   6.77 sec*proc (1 test)
+integration    =   6.77 sec*proc (1 test)
+runtime        =   6.77 sec*proc (1 test)
+vulkan         =   6.77 sec*proc (1 test)
+
+Total Test time (real) =   6.91 sec
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3425: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+1/1 Test #3425: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface ...   Passed    6.79 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =   6.79 sec*proc (1 test)
+graphics       =   6.79 sec*proc (1 test)
+integration    =   6.79 sec*proc (1 test)
+runtime        =   6.79 sec*proc (1 test)
+vulkan         =   6.79 sec*proc (1 test)
+
+Total Test time (real) =   6.93 sec

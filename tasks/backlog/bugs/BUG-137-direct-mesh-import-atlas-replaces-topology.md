@@ -181,11 +181,15 @@ side is ready before the producing side changes.
 - [x] Slice B — contract test asserting a mesh with differing corner UVs uploads
       the expected split GPU vertex count while the ECS mesh is unchanged
       (`Test.MeshGeometryExtraction` split cases + `Test.CornerTexcoordUpload`).
-- [ ] Slice B — `gpu;vulkan` readback smoke asserting a seam-split UV mesh still
-      renders. Written and green on hardware (NVIDIA GeForce RTX 4090, driver
-      580.159.04) as commit `e1416f08`, then reverted: its wall clock varies
-      between 13 s and 34 s and it times out against the cohort's 30 s budget.
-      `BUG-143` owns the diagnosis and the restore.
+- [x] Slice B — `gpu;vulkan` readback smoke asserting a seam-split UV mesh still
+      renders. Written as `e1416f08`, reverted for straddling the cohort's 30 s
+      budget, and restored by `BUG-143` with its assertions intact.
+      `BUG-143` found the variance was `vkQueuePresentKHR` throttling to ~1 Hz
+      whenever the display is not being scanned out, and replaced the smoke's
+      fixed 96-frame budget with a readiness predicate bounded by the wall
+      clock. It now runs 3.7 s with the display awake and 6.8 s with it
+      DPMS-off, inside the full `-L gpu -L vulkan` gate on an RTX 3050
+      (driver 590.48.01).
 - [x] Slice C — runtime contract test that materializes a closed manifold
       fixture and asserts vertex/edge/halfedge/face counts equal the source,
       boundary-halfedge count is zero, and Euler characteristic is preserved
@@ -230,10 +234,12 @@ side is ready before the producing side changes.
       22026 halfedges, 7342 faces, and zero boundary vertices.
 - [x] UVs are present and finite after that import, on the corner domain, with
       no element-domain cardinality change.
-- [ ] A textured mesh still renders correctly, with the seam split occurring at
-      GPU upload rather than in the ECS mesh. Observed green once on hardware
-      before the smoke was reverted for timing out; `BUG-143` owns restoring it,
-      so this stays open and the upload path remains `CPUContracted`.
+- [x] A textured mesh still renders correctly, with the seam split occurring at
+      GPU upload rather than in the ECS mesh. Proven by the restored
+      `SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface` readback
+      smoke, cited in `BUG-143`: the ECS mesh stays 8 V / 18 E / 36 H / 12 F
+      with corner UVs while the GPU record reports 24 vertices and 36 surface
+      indices, and the center pixel differs from three background corners.
 - [x] GPU-side vertex duplication is reported in the import result, never
       silent. `sculpt.obj` reports `gpu-split-vertices=17795`, the same count
       the old `SeamSplitVertexCount` computed and discarded.
@@ -266,7 +272,7 @@ python3 tools/repo/check_layering.py --root src --strict
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere
   else.
-- Slices A, C, and D close `Scaffolded → CPUContracted`. Slice B's
-  `Operational` close is deferred to `BUG-143`, which owns the readback smoke
-  that proves a seam-split textured mesh still renders correctly; until that
-  lands the upload path is `CPUContracted` only.
+- Slices A, C, and D close `Scaffolded → CPUContracted`. Slice B closes
+  `Operational`: `BUG-143` restored the readback smoke that proves a seam-split
+  textured mesh still renders correctly, and cited an in-budget full
+  `-L gpu -L vulkan` gate run for it.

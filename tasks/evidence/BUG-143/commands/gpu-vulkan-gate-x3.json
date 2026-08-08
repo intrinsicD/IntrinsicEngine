@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e; for i in 1 2 3; do echo \"=== gate run $i ===\"; ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan; done"
+  ],
+  "command_display": "bash -c 'set -e; for i in 1 2 3; do echo \"=== gate run $i ===\"; ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan; done'",
+  "cwd": ".",
+  "duration_ms": 1628610,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T11:09:27Z",
+  "label": "gpu-vulkan-gate-x3",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-08T10:42:18Z",
+  "stderr_path": "tasks/evidence/BUG-143/commands/gpu-vulkan-gate-x3.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-143/commands/gpu-vulkan-gate-x3.stdout.log",
+  "stdout_sha256": "46df544b9d88d5765c627ce0d14aa4c6c63f4cb4f23ff682634f627e6a44a8d4",
+  "task_id": "BUG-143"
+}

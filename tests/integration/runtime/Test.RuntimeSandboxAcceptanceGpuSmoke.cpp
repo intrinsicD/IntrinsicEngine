@@ -28,6 +28,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -231,6 +232,110 @@ private:
     Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     std::uint32_t m_TargetFrames{1u};
     std::uint32_t m_Frames{0u};
+    bool m_AttachEditor{true};
+};
+
+// A frame count is not a time budget. Present pacing belongs to the display
+// stack, not to this process: with the surface visible on a 60 Hz output a
+// frame costs single-digit milliseconds, but when the X11 display is DPMS-off,
+// occluded, or otherwise not being scanned out, `vkQueuePresentKHR` blocks for
+// roughly a second and the same loop runs ~60x slower (BUG-143). A smoke that
+// spins a fixed number of frames to wait for a deferred job therefore has a
+// wall time the host owns, which straddled the 30 s cohort budget.
+//
+// So stop on the condition the test actually needs, bounded by the wall clock.
+// `settleFrames` are rendered after the predicate first holds, so the readback
+// observes a frame that already contains the awaited state. Exhausting the
+// frame cap or the budget still exits cleanly, leaving the test's own
+// assertions to report what never arrived.
+class ExitWhenReadyApp final : public Intrinsic::Tests::RuntimeTestModule
+{
+public:
+    using ReadyPredicate = std::function<bool(Engine&)>;
+
+    ExitWhenReadyApp(
+        ReadyPredicate ready,
+        const std::uint32_t settleFrames,
+        const std::uint32_t maxFrames,
+        const std::chrono::steady_clock::duration budget,
+        const bool attachEditor = true)
+        : m_Ready(std::move(ready))
+        , m_SettleFrames(settleFrames)
+        , m_MaxFrames(maxFrames)
+        , m_Budget(budget)
+        , m_AttachEditor(attachEditor)
+    {
+    }
+
+    void Resolve() override
+    {
+        m_Started = std::chrono::steady_clock::now();
+        auto& engine = Kernel();
+        if (m_AttachEditor)
+            m_EditorUi.Attach(engine.Worlds(), engine.Services());
+    }
+
+    void Frame(double, double) override
+    {
+        auto& engine = Kernel();
+        ++m_Frames;
+
+        if (!m_ReadyObserved && m_Ready && m_Ready(engine))
+        {
+            m_ReadyObserved = true;
+            m_ReadyFrame = m_Frames;
+        }
+        if (m_ReadyObserved)
+            ++m_FramesSinceReady;
+
+        const bool settled =
+            m_ReadyObserved && m_FramesSinceReady >= m_SettleFrames;
+        m_FrameCapExhausted = m_Frames >= m_MaxFrames;
+        m_BudgetExhausted =
+            (std::chrono::steady_clock::now() - m_Started) >= m_Budget;
+
+        if (settled || m_FrameCapExhausted || m_BudgetExhausted)
+            engine.RequestExit();
+    }
+
+    void Shutdown() override
+    {
+        if (m_AttachEditor)
+            m_EditorUi.Detach();
+    }
+
+    [[nodiscard]] bool ReadyObserved() const noexcept { return m_ReadyObserved; }
+    [[nodiscard]] std::uint32_t Frames() const noexcept { return m_Frames; }
+    [[nodiscard]] std::uint32_t ReadyFrame() const noexcept { return m_ReadyFrame; }
+    [[nodiscard]] bool FrameCapExhausted() const noexcept { return m_FrameCapExhausted; }
+    [[nodiscard]] bool BudgetExhausted() const noexcept { return m_BudgetExhausted; }
+
+    [[nodiscard]] std::string ExitSummary() const
+    {
+        std::string summary = "frames=" + std::to_string(m_Frames);
+        summary += m_ReadyObserved
+            ? " ready-at-frame=" + std::to_string(m_ReadyFrame)
+            : std::string{" ready=never"};
+        if (m_FrameCapExhausted)
+            summary += " frame-cap-exhausted=" + std::to_string(m_MaxFrames);
+        if (m_BudgetExhausted)
+            summary += " wall-clock-budget-exhausted";
+        return summary;
+    }
+
+private:
+    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
+    ReadyPredicate m_Ready{};
+    std::uint32_t m_SettleFrames{1u};
+    std::uint32_t m_MaxFrames{1u};
+    std::chrono::steady_clock::duration m_Budget{};
+    std::chrono::steady_clock::time_point m_Started{};
+    std::uint32_t m_Frames{0u};
+    std::uint32_t m_FramesSinceReady{0u};
+    std::uint32_t m_ReadyFrame{0u};
+    bool m_ReadyObserved{false};
+    bool m_FrameCapExhausted{false};
+    bool m_BudgetExhausted{false};
     bool m_AttachEditor{true};
 };
 
@@ -1239,6 +1344,45 @@ struct GpuInstanceConfigReadback
     }
 
     return {};
+}
+
+// BUG-137 — the corner-UV upload path is only provable by reading the geometry
+// record the entity actually resolved to: the ECS vertex count and the GPU
+// vertex count are deliberately different once a mesh carries UV seams.
+struct GpuGeometryRecordReadback
+{
+    bool Found{false};
+    Extrinsic::RHI::GpuGeometryRecord Record{};
+};
+
+[[nodiscard]] GpuGeometryRecordReadback ReadSurfaceGeometryRecordByEntityId(
+    Extrinsic::RHI::IDevice& device,
+    Extrinsic::Graphics::IRenderer& renderer,
+    const std::uint32_t entityId)
+{
+    const GpuInstanceConfigReadback instance = ReadVisibleInstanceConfigByEntityId(
+        device, renderer, entityId, Extrinsic::RHI::GpuRender_Surface);
+    if (!instance.Found)
+    {
+        return {};
+    }
+
+    auto& gpuWorld = renderer.GetGpuWorld();
+    const std::uint32_t slot = instance.Instance.GeometrySlot;
+    if (slot == Extrinsic::RHI::GpuInstanceStatic::InvalidGeometrySlot ||
+        slot >= gpuWorld.GetGeometryCapacity() ||
+        !gpuWorld.GetGeometryRecordBuffer().IsValid())
+    {
+        return {};
+    }
+
+    GpuGeometryRecordReadback result{};
+    result.Found = true;
+    device.ReadBuffer(gpuWorld.GetGeometryRecordBuffer(),
+                      &result.Record,
+                      sizeof(result.Record),
+                      static_cast<std::uint64_t>(slot) * sizeof(result.Record));
+    return result;
 }
 
 [[nodiscard]] GpuSceneInputSummary SummarizeGpuSceneInputs(
@@ -7054,5 +7198,243 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << run.Before.OperationalGateFailure << " -> "
         << run.After.OperationalGateFailure;
 
+    engine.Shutdown();
+}
+
+// BUG-137 slice B — `Operational` proof for the corner-UV upload path.
+//
+// A closed cube cannot be UV-unwrapped without a cut, so import publishes its
+// atlas UVs on the corner domain and leaves the mesh a closed manifold. The
+// renderer must resolve that by de-indexing at upload: one GPU vertex per
+// distinct (vertex, UV) pair, positions/normals carried across the split, and
+// the index buffer still addressing all 12 triangles. A CPU contract test
+// cannot prove this — the split is a convention shared between the plan builder
+// and the real vertex-buffer layout, exactly the class of defect BUG-026's
+// post-mortem says only a backend smoke catches.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface)
+{
+    TempObjFile obj{
+        "intrinsic_bug137_seam_cube",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 1 1 0\n"
+        "v 0 1 0\n"
+        "v 0 0 1\n"
+        "v 1 0 1\n"
+        "v 1 1 1\n"
+        "v 0 1 1\n"
+        "f 1 4 3\n"
+        "f 1 3 2\n"
+        "f 5 6 7\n"
+        "f 5 7 8\n"
+        "f 1 2 6\n"
+        "f 1 6 5\n"
+        "f 2 3 7\n"
+        "f 2 7 6\n"
+        "f 3 4 8\n"
+        "f 3 8 7\n"
+        "f 4 1 5\n"
+        "f 4 5 8\n",
+    };
+
+    // The atlas UVs arrive from a deferred enrichment job, so the loop must run
+    // until they are published rather than for a fixed count of frames whose
+    // duration the display stack owns (see ExitWhenReadyApp).
+    const std::string cubeName = obj.Path.filename().string();
+    auto readyApp = std::make_unique<ExitWhenReadyApp>(
+        [cubeName](Engine& kernel)
+        {
+            Registry* const world = kernel.Worlds().Get(kernel.ActiveWorld());
+            if (world == nullptr)
+                return false;
+            const EntityHandle entity = FindEntityByName(*world, cubeName);
+            if (entity == Extrinsic::ECS::InvalidEntityHandle)
+                return false;
+            const gs::ConstSourceView candidate =
+                gs::BuildConstView(world->Raw(), entity);
+            if (!candidate.Valid() || candidate.HalfedgeSource == nullptr)
+                return false;
+            return candidate.HalfedgeSource->Properties
+                .Get<glm::vec2>("h:texcoord")
+                .IsValid();
+        },
+        /*settleFrames=*/4u,
+        /*maxFrames=*/96u,
+        /*budget=*/std::chrono::seconds{15},
+        /*attachEditor=*/false);
+    ExitWhenReadyApp& readyProbe = *readyApp;
+
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(readyApp));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    // Move the reference triangle aside so the center pixel can only come from
+    // the imported cube.
+    SetEntityPosition(*engine.Worlds().Get(engine.ActiveWorld()),
+                      FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle"),
+                      glm::vec3{6.0f, 0.0f, 0.0f});
+
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath(
+        Extrinsic::Runtime::RuntimeAssetImportRequest{
+            .Path = obj.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+
+    const EntityHandle cube =
+        FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), obj.Path.filename().string());
+    ASSERT_NE(cube, Extrinsic::ECS::InvalidEntityHandle);
+
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
+    auto& visualization = raw.get<G::VisualizationConfig>(cube);
+    visualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    visualization.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.Bug137SeamCube.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan for seam-split corner-UV readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    // ---- The ECS mesh kept its topology -------------------------------------
+    const gs::ConstSourceView view = gs::BuildConstView(raw, cube);
+    ASSERT_TRUE(view.Valid());
+    ASSERT_EQ(view.ActiveDomain, gs::Domain::Mesh);
+    EXPECT_EQ(view.VerticesAlive(), 8u);
+    EXPECT_EQ(view.EdgesAlive(), 18u);
+    EXPECT_EQ(view.HalfedgesTotal(), 36u);
+    EXPECT_EQ(view.FacesAlive(), 12u);
+
+    ASSERT_NE(view.HalfedgeSource, nullptr);
+    const auto cornerUvs =
+        view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(cornerUvs.IsValid())
+        << "The imported cube did not publish corner-domain UVs; the deferred "
+           "enrichment job did not complete before the loop stopped. "
+        << readyProbe.ExitSummary();
+    ASSERT_EQ(cornerUvs.Vector().size(), 36u);
+    ASSERT_NE(view.VertexSource, nullptr);
+    EXPECT_FALSE(view.VertexSource->Properties.Exists("v:texcoord"))
+        << "Corner UVs must be the single authority once a seam exists.";
+
+    // ---- The GPU upload de-indexed them -------------------------------------
+    const std::uint32_t cubeRenderId =
+        Extrinsic::Runtime::SelectionController::ToStableEntityId(cube);
+    const GpuGeometryRecordReadback geometry =
+        ReadSurfaceGeometryRecordByEntityId(device, renderer, cubeRenderId);
+    ASSERT_TRUE(geometry.Found)
+        << "The imported cube did not emit a visible surface instance with a "
+           "valid geometry record; render id "
+        << cubeRenderId << ".";
+
+    EXPECT_EQ(geometry.Record.VertexCount, 24u)
+        << "The vertex buffer was not de-indexed to one vertex per distinct "
+           "(vertex, UV) pair. The cube's atlas produces 16 seam duplicates on "
+           "top of its 8 mesh vertices; got "
+        << geometry.Record.VertexCount << ".";
+    EXPECT_EQ(geometry.Record.SurfaceIndexCount, 36u)
+        << "The index buffer no longer addresses all 12 cube triangles after "
+           "the seam split.";
+    EXPECT_NE(geometry.Record.VertexBufferBDA, 0u);
+    EXPECT_NE(geometry.Record.TexcoordBufferBDA, 0u)
+        << "A corner-UV mesh must still publish a texcoord channel BDA.";
+    EXPECT_NE(geometry.Record.NormalBufferBDA, 0u)
+        << "Normals must be carried across the seam split.";
+
+    // ---- And the frame actually drew it -------------------------------------
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
+    EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u);
+    EXPECT_EQ(ex.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(ex.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(ex.MeshGeometryMissingPositions, 0u);
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "DepthPrepass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u);
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const std::uint32_t centerX = static_cast<std::uint32_t>(extent.Width / 2);
+    const std::uint32_t centerY = static_cast<std::uint32_t>(extent.Height / 2);
+    const RgbaPixel center =
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, centerX, centerY);
+    const std::array<RgbaPixel, 3> backgroundSamples{{
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 15) / 16),
+                  static_cast<std::uint32_t>(extent.Height / 16)),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>(extent.Width / 16),
+                  static_cast<std::uint32_t>((extent.Height * 15) / 16)),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 15) / 16),
+                  static_cast<std::uint32_t>((extent.Height * 15) / 16)),
+    }};
+
+    int nearestBackgroundDistance = RgbDistance(center, backgroundSamples[0]);
+    for (const RgbaPixel sample : backgroundSamples)
+    {
+        nearestBackgroundDistance = std::min(nearestBackgroundDistance, RgbDistance(center, sample));
+    }
+    EXPECT_GT(nearestBackgroundDistance, 48)
+        << "The de-indexed seam-split cube did not contribute a distinguishable "
+           "center pixel; a broken split would drop or corrupt its geometry. "
+        << "center=(" << static_cast<int>(center.R) << "," << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ") extent=" << extent.Width << "x" << extent.Height
+        << " gpu vertices=" << geometry.Record.VertexCount
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback counters changed while uploading a corner-UV mesh.";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
 }

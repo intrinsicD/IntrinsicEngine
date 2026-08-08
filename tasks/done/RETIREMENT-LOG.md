@@ -8,6 +8,41 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-143`](BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md) — the
+corner-UV seam-split readback smoke is restored and back inside the cohort's
+30 s budget. Its 13 s ↔ 34 s wall-clock variance was never in the test's own
+work: `vkQueuePresentKHR` blocks for roughly 0.9 s per frame whenever the X11
+display is not being scanned out. The engine's own `--frame-pacing-report`
+capture, same binary and session with only the display power state changed,
+measures 1000 ms frames and 897 ms presents with the monitor DPMS-off against
+103 ms frames and ~0 ms presents with it on; the residual 100 ms is the
+swapchain acquire, pinning a throttled frame at almost exactly 1 Hz. Standalone
+runs of the unfixed 96-frame smoke measured 97.78 s ± 0.02 s across nine
+consecutive runs on this host. Deferred-job wake latency, first-use pipeline
+compilation, the ctest environment and working directory, and GL vsync
+overrides were each ruled out with a recorded measurement.
+
+The fix is that a frame count is not a time budget: frame duration belongs to
+the display stack, so the smoke now stops on the condition it actually waits
+for. `ExitWhenReadyApp` takes a readiness predicate — corner `h:texcoord`
+published on the imported cube — renders four settle frames after it first
+holds so the readback observes a frame carrying the awaited state, and bounds
+the loop with both a 96-frame cap and a 15 s wall-clock budget; exhausting
+either exits cleanly and the existing assertion reports the probe's exit
+summary rather than dying on a ctest timeout with no diagnosis.
+
+Every assertion from `e1416f08` is restored verbatim and none was weakened,
+relabelled, or removed, and no production code changed. On an RTX 3050 (driver
+590.48.01) under the combined ASan+UBSan `ci-vulkan` preset the smoke runs
+3.7 s with the display awake and 6.8 s with it DPMS-off; three consecutive full
+`-L gpu -L vulkan` gates passed 54/54 each, and the default CPU gate passed
+4142/4142 with its expected environment-gated GLFW/LSan skip. `BUG-137` slice B
+closes `Operational` on that citation. The rule was added to
+`intrinsicengine-gpu-smoke-authoring`. Recorded residual: the same throttle
+applies to every other smoke in the cohort, which survive it only because they
+run four frames; a cohort-wide headroom review under a throttled display was
+not in scope.
+
 [`BUG-124`](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md) —
 the geometry-presentation GPU smoke expected an unsupported presentation slot
 that its fixture no longer produced, holding the full promoted-Vulkan gate at

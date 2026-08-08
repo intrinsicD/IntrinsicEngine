@@ -47,6 +47,19 @@ this pattern instead of re-deriving it.
 - **Bounded frames.** Run a small bounded frame count and account for
   pipeline latency — e.g. `BUG-024B` runs 8 frames to cover the pre-render
   transform flush plus swapchain latency before sampling.
+- **A frame count is not a time budget** (`BUG-143`). Present pacing belongs to
+  the display stack: with the surface being scanned out a frame costs
+  milliseconds, but when the X11 display is DPMS-off or the surface is
+  occluded, `vkQueuePresentKHR` blocks for ~1 s and the identical loop runs
+  ~60x slower. A smoke that spins frames to wait for deferred work therefore
+  has a wall time the host owns, and will straddle the 30 s cohort timeout
+  depending on whether someone's screen happens to be awake. Wait on the
+  **condition** instead, bounded by the wall clock: `ExitWhenReadyApp` in
+  `Test.RuntimeSandboxAcceptanceGpuSmoke.cpp` takes a readiness predicate,
+  a few settle frames rendered after it first holds, plus a frame cap and a
+  `std::chrono` budget so exhaustion exits cleanly and the test's own
+  assertions report what never arrived. Keep fixed counts only for pipeline
+  latency, which is genuinely measured in frames.
 - **Drive the real path.** State changes go through the promoted UI/editor
   command path (e.g. `EditorCommandHistory`), never by writing
   `Transform::WorldMatrix`, GPU instance buffers, or readback bytes directly

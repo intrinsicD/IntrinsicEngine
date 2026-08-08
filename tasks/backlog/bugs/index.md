@@ -73,6 +73,19 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-08-08: [`BUG-143` — Corner-UV `gpu;vulkan` smoke exceeds the 30 s
+  cohort
+  timeout](../../done/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md).
+  The 13 s ↔ 34 s variance was `vkQueuePresentKHR` blocking ~0.9 s per frame
+  whenever the display is not being scanned out: the engine's own frame-pacing
+  capture measures 1000 ms frames with the monitor DPMS-off against 103 ms with
+  it on, from the same binary in the same session. A frame count is therefore
+  not a time budget, so the smoke now waits on the readiness condition it
+  actually needs — corner UVs published — bounded by a frame cap and a
+  wall-clock budget. Every assertion from `e1416f08` is restored verbatim; the
+  smoke runs 3.7 s awake and 6.8 s throttled, and `BUG-137` slice B closes
+  `Operational`.
+
 - Closed 2026-08-08: [`BUG-124` — Geometry-presentation GPU smoke expects a
   retired unsupported
   slot](../../done/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md).

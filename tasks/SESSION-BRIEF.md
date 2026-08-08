@@ -49,7 +49,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-138` — Async mesh geometry jobs never execute and stay Pending forever (tasks/backlog/bugs/BUG-138-async-mesh-geometry-jobs-never-execute.md)
 - unblocked: `BUG-139` — ImGui receives no key events, so every editor text field is append-only (tasks/backlog/bugs/BUG-139-imgui-adapter-drops-key-events.md)
 - unblocked: `BUG-141` — Editor geometry-processing diagnostics are mislabeled, duplicated, unscoped, and unactionable (tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md)
-- unblocked: `BUG-143` — Corner-UV `gpu;vulkan` smoke exceeds the 30 s cohort timeout (tasks/backlog/bugs/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md)
 - unblocked: `BUG-145` — Editor geometry operations report Applied from written counts (tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md)
 
 ## Theme H — Agentic workflow hardening

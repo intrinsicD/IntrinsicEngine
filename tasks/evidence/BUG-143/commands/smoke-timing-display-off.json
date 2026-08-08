@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e; xset -display :1 q | grep -i \"monitor is\" | head -1; for i in 1 2 3; do ctest --test-dir build/ci-vulkan --output-on-failure -R \"SeamSplitCornerUv\" -L gpu -L vulkan; done"
+  ],
+  "command_display": "bash -c 'set -e; xset -display :1 q | grep -i \"monitor is\" | head -1; for i in 1 2 3; do ctest --test-dir build/ci-vulkan --output-on-failure -R \"SeamSplitCornerUv\" -L gpu -L vulkan; done'",
+  "cwd": ".",
+  "duration_ms": 20786,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T11:01:02Z",
+  "label": "smoke-timing-display-off",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-08-08T11:00:42Z",
+  "stderr_path": "tasks/evidence/BUG-143/commands/smoke-timing-display-off.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-143/commands/smoke-timing-display-off.stdout.log",
+  "stdout_sha256": "4d1ababe39865e98024ea4bb28ed1427801e264455cc60d00edc6867e402457b",
+  "task_id": "BUG-143"
+}
