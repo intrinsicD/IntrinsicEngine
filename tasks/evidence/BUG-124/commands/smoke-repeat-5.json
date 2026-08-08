@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^RuntimeSandboxAcceptanceGpuSmoke\\.GeometryPresentationReachesOperationalFrame$",
+    "--repeat",
+    "until-fail:5",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R '^RuntimeSandboxAcceptanceGpuSmoke\\.GeometryPresentationReachesOperationalFrame$' --repeat until-fail:5 --timeout 120",
+  "cwd": ".",
+  "duration_ms": 16838,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T09:40:28Z",
+  "label": "smoke-repeat-5",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-08T09:40:11Z",
+  "stderr_path": "tasks/evidence/BUG-124/commands/smoke-repeat-5.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-124/commands/smoke-repeat-5.stdout.log",
+  "stdout_sha256": "60fc1b1545f5f301a21f4838576d6d91325bb5f9052c0b948d1fe90333bf38d3",
+  "task_id": "BUG-124"
+}

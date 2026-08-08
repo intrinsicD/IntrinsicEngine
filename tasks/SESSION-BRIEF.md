@@ -45,7 +45,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
-- unblocked: `BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot (tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md)
 - unblocked: `BUG-137` — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh (tasks/backlog/bugs/BUG-137-direct-mesh-import-atlas-replaces-topology.md)
 - unblocked: `BUG-138` — Async mesh geometry jobs never execute and stay Pending forever (tasks/backlog/bugs/BUG-138-async-mesh-geometry-jobs-never-execute.md)
 - unblocked: `BUG-139` — ImGui receives no key events, so every editor text field is append-only (tasks/backlog/bugs/BUG-139-imgui-adapter-drops-key-events.md)

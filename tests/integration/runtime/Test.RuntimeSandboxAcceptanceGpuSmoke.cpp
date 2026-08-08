@@ -645,6 +645,19 @@ void SeedAcceptanceScene(Registry& scene)
         .ValueKind = Geometry::PropertyValueKind::Float,
     };
 
+    // The one surface combination the backend still cannot consume: a
+    // property buffer feeding a non-scalar-field material slot. Scalar fields
+    // became backend-resident in RUNTIME-198, so displacement is what keeps
+    // the unsupported lane covered here.
+    RT::GeometryPresentationSlotRecipe displacement{};
+    displacement.Semantic = RT::GeometryPresentationSlotSemantic::Displacement;
+    displacement.SourceKind = RT::GeometryPresentationSourceKind::PropertyBuffer;
+    displacement.Property = RT::GeometryPropertyRef{
+        .Domain = RT::GeometryElementDomain::MeshVertex,
+        .Name = "v:displacement",
+        .ValueKind = Geometry::PropertyValueKind::Float,
+    };
+
     return GeometryPresentationFixture{
         .Recipe = RT::GeometryPresentationRecipe{
             .Shape = RT::GeometryPresentationShape::Mesh,
@@ -658,7 +671,13 @@ void SeedAcceptanceScene(Registry& scene)
                 RT::GeometryPresentationBindingRecipe{
                     .Key = "mesh.surface",
                     .Kind = RT::GeometryPresentationKind::SurfaceMaterial,
-                    .Slots = {albedo, normal, roughness, metallic, faceScalar},
+                    .Slots =
+                        {albedo,
+                         normal,
+                         roughness,
+                         metallic,
+                         faceScalar,
+                         displacement},
                 },
             },
         },
@@ -736,6 +755,8 @@ void SeedAcceptanceScene(Registry& scene)
          glm::vec3{0.0f, 0.0f, 1.0f}};
     vertices.Properties.GetOrAdd<float>("v:metallic", 0.0f).Vector() =
         {0.0f, 0.0f, 0.0f};
+    vertices.Properties.GetOrAdd<float>("v:displacement", 0.0f).Vector() =
+        {0.0f, 0.25f, 0.5f};
     auto& faces = raw.get<gs::Faces>(mesh);
     faces.Properties.GetOrAdd<float>("f:heat", 0.0f).Vector() = {0.5f};
     const GeometryPresentationFixture presentation =
@@ -778,6 +799,47 @@ void MarkGeometryPresentationMeshNormalReady(
     normal->Readiness = RT::GeometryPresentationReadiness::Ready;
     normal->GeneratedTexture = Assets::AssetId{501u, 1u};
     ++normal->OutputGeneration;
+}
+
+[[nodiscard]] const RT::GeometryPresentationSlotSnapshot* FindPresentationSlot(
+    const RT::GeometryPresentationSnapshot& snapshot,
+    const std::string_view presentationKey,
+    const RT::GeometryPresentationSlotSemantic semantic) noexcept
+{
+    for (const RT::GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
+    {
+        if (slot.PresentationKey == presentationKey && slot.Semantic == semantic)
+        {
+            return &slot;
+        }
+    }
+    return nullptr;
+}
+
+// Assert the unsupported lane through the slot that is meant to be
+// unsupported. A bare counter cannot tell "the contract retired this
+// combination" apart from "the fixture stopped declaring one" — the failure
+// mode that produced BUG-124.
+void ExpectSurfaceDisplacementUnsupported(
+    const RT::GeometryPresentationSnapshot& snapshot,
+    const std::string_view stage)
+{
+    const RT::GeometryPresentationSlotSnapshot* const displacement =
+        FindPresentationSlot(
+            snapshot,
+            "mesh.surface",
+            RT::GeometryPresentationSlotSemantic::Displacement);
+    ASSERT_NE(displacement, nullptr)
+        << "The " << stage
+        << " mesh presentation no longer declares the property-buffer "
+           "displacement slot that carries unsupported-path coverage.";
+    EXPECT_TRUE(displacement->Unsupported)
+        << "A property-buffer displacement slot on a surface material is not "
+           "backend-resident and must be reported unsupported ("
+        << stage << " snapshot). readiness="
+        << RT::ToString(displacement->Readiness)
+        << " diagnostic=\"" << displacement->Diagnostic << "\"";
+    EXPECT_GE(snapshot.Stats.UnsupportedSlotCount, 1u);
 }
 
 // --- Pass-status helpers (local to this fixture) ---
@@ -1729,7 +1791,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, GeometryPresentationReachesOperationalFra
     EXPECT_GE(initialMesh.Stats.DefaultSlotCount, 1u);
     EXPECT_GE(initialMesh.Stats.PendingSlotCount, 1u);
     EXPECT_GE(initialMesh.Stats.FailedSlotCount, 1u);
-    EXPECT_GE(initialMesh.Stats.UnsupportedSlotCount, 1u);
+    ExpectSurfaceDisplacementUnsupported(initialMesh, "initial");
     EXPECT_GE(initialMesh.Stats.PreviousOutputRetainedCount, 1u);
 
     MarkGeometryPresentationMeshNormalReady(scene, mesh);
@@ -1746,7 +1808,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, GeometryPresentationReachesOperationalFra
                                                 readyMeshState);
     EXPECT_GE(readyMesh.Stats.ReadyTextureSlotCount, 2u);
     EXPECT_EQ(readyMesh.Stats.PendingSlotCount, 0u);
-    EXPECT_GE(readyMesh.Stats.UnsupportedSlotCount, 1u);
+    ExpectSurfaceDisplacementUnsupported(readyMesh, "normal-ready");
     EXPECT_GE(readyMesh.Stats.PreviousOutputRetainedCount, 1u);
 
     const gs::ConstSourceView graphView = gs::BuildConstView(scene.Raw(), graph);

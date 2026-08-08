@@ -1,0 +1,67 @@
+[check_layering] Scan root: /home/alex/Documents/IntrinsicEngine/src
+[check_layering] Files scanned: 746
+[check_layering] References scanned: 7173 import/include, 85 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+test layout check complete. findings=0 mode=strict
+Validated 253 task file(s); findings: 0; mode: strict.
+Validated 253 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 98
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 889
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 98
+[check_task_maturity_followups] No maturity follow-up findings.
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3236
+[check_doc_links] Mode: warning
+[check_doc_links] Broken relative links:
+  - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md -> ../../tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
+[check_doc_links] Action: update moved paths or convert to canonical links.
+[check_doc_links] WARNING MODE: non-fatal.
+[check_root_hygiene] Root: /home/alex/Documents/IntrinsicEngine
+[check_root_hygiene] Root markdown files:
+  - AGENTS.md: allowed
+  - CLAUDE.md: allowed
+  - README.md: allowed
+[check_root_hygiene] Root allowlist: /home/alex/Documents/IntrinsicEngine/tools/repo/root_allowlist.yaml
+[check_root_hygiene] Allowed repository entries present:
+  - .claude/
+  - .codex/
+  - .github/
+  - .gitignore
+  - .mcp.json
+  - AGENTS.md
+  - CLAUDE.md
+  - CMakeLists.txt
+  - CMakePresets.json
+  - README.md
+  - ara/
+  - assets/
+  - benchmarks/
+  - cmake/
+  - docs/
+  - lsan.supp
+  - methods/
+  - research/
+  - src/
+  - tasks/
+  - tests/
+  - tools/
+  - vcpkg-configuration.json
+  - vcpkg.json
+[check_root_hygiene] Ignored named local entries:
+  - .idea/
+  - .ruff_cache/
+  - build/
+  - cmake-build-debug/
+  - experimental/
+  - external/
+  - imgui.ini
+[check_root_hygiene] Root entries match repository-owned policy.

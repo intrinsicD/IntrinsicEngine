@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 120",
+  "cwd": ".",
+  "duration_ms": 337859,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T09:39:21Z",
+  "label": "gpu-vulkan-gate",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-08T09:33:43Z",
+  "stderr_path": "tasks/evidence/BUG-124/commands/gpu-vulkan-gate.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-124/commands/gpu-vulkan-gate.stdout.log",
+  "stdout_sha256": "0876a7a602e7eef1d05bd49c993107fcf30c6409b53ee774de425c1971779391",
+  "task_id": "BUG-124"
+}

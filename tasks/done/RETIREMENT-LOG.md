@@ -8,6 +8,31 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-124`](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md) —
+the geometry-presentation GPU smoke expected an unsupported presentation slot
+that its fixture no longer produced, holding the full promoted-Vulkan gate at
+47/48. The counter was stale but the contract was not: `RUNTIME-198`
+(`6171fad6`) narrowed the unsupported rule from "any property-buffer slot on a
+surface material" to "any such slot whose semantic is not `ScalarField`",
+because scalar fields became backend-resident, and the fixture's only
+property-buffer surface slot was the `f:heat` scalar field.
+
+A surface material fed by a property buffer through a non-scalar-field
+semantic remains unsupported today, and this smoke is its only coverage
+anywhere in the tree, so the fixture now declares a `Displacement` slot backed
+by a seeded `v:displacement` vertex property. The two bare `>= 1` counter
+assertions became `ExpectSurfaceDisplacementUnsupported`, which finds that
+named slot and reports its semantic, readiness, and diagnostic on failure — a
+counter alone cannot tell a retired contract apart from a fixture that stopped
+declaring one, which is what let this sit. `Displacement` projects to no
+visualization recipe, so no lane, upload, or pack behaviour moved, and the
+extraction-side unsupported counter assertion is no longer vacuous.
+
+No production code changed and no label, timeout, or assertion was weakened.
+The smoke passed five consecutive repetitions and the full `-L gpu -L vulkan`
+intersection passed 53/53 on an RTX 3050 (driver 590.48.01) under the combined
+ASan+UBSan `ci-vulkan` preset. This makes no new performance or parity claim.
+
 [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
 architecture stability and right-sizing readiness retired on 2026-08-06 at
 clean `main` commit `51e7fadd`. All 47 static dependencies and every blocker

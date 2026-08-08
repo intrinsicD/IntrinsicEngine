@@ -1,0 +1,23 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame
+    Test #3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame ...   Passed    2.88 sec
+    Start 3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame
+    Test #3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame ...   Passed    2.76 sec
+    Start 3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame
+    Test #3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame ...   Passed    2.85 sec
+    Start 3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame
+    Test #3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame ...   Passed    2.83 sec
+    Start 3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame
+1/1 Test #3408: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame ...   Passed    5.38 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =   5.38 sec*proc (1 test)
+graphics       =   5.38 sec*proc (1 test)
+integration    =   5.38 sec*proc (1 test)
+runtime        =   5.38 sec*proc (1 test)
+vulkan         =   5.38 sec*proc (1 test)
+
+Total Test time (real) =  16.83 sec

@@ -40,11 +40,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   full rerun. Preserve the next failed assertion, establish a deterministic
   cause, and fix the owning test or adapter surface without quarantine,
   retries, or weakened coverage.
-- [`BUG-124` — Geometry-presentation GPU smoke expects a retired unsupported slot](BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md):
-  the full promoted-Vulkan gate passes 47/48 cases, but the presentation smoke
-  expects an unsupported slot from a fixture whose current combinations all
-  resolve without that flag; align the fixture and counter contract without
-  deleting meaningful unsupported-path coverage or weakening the gate.
 - [`BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state](BUG-122-runtime-asset-asan-test-lifetimes.md):
   one shutdown test lets a queued hook retain loop-local synchronization state,
   while three progressive model-scene tests retain pointers into temporary
@@ -77,6 +72,18 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-08: [`BUG-124` — Geometry-presentation GPU smoke expects a
+  retired unsupported
+  slot](../../done/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md).
+  The unsupported-slot contract was not retired; `RUNTIME-198` narrowed it so
+  that scalar fields became backend-resident, which left the fixture's only
+  property-buffer surface slot (`f:heat`) supported. A property-buffer
+  `Displacement` slot — still unsupported today, and covered nowhere else in
+  the tree — now carries that coverage, and the assertion names the slot
+  instead of counting, so a future narrowing fails with its semantic,
+  readiness, and diagnostic. No production code changed; the full `gpu;vulkan`
+  gate passes 53/53.
 
 - Closed 2026-08-08: [`BUG-142` — AssetIO queue shows 0% progress on a completed
   import row](../../done/BUG-142-assetio-queue-terminal-row-zero-progress.md).
