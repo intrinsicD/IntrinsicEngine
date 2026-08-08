@@ -1811,6 +1811,39 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return message;
         }
 
+        // A run that writes every slot but moves nothing is not a success. The
+        // written count is slot-derived, so it stays non-zero whenever the
+        // kernel ran at all and cannot distinguish the two.
+        [[nodiscard]] std::string BuildMeshDenoiseNoChangeMessage(
+            const EditorMeshDenoiseResult& result)
+        {
+            const std::size_t live =
+                result.VertexSlotCount - result.SkippedDeletedVertexCount;
+            std::string message = "Mesh denoise moved no vertices; the mesh is unchanged";
+            if (result.PinnedBoundaryVertexCount >= live && live > 0u)
+            {
+                message += " because all ";
+                message += std::to_string(result.PinnedBoundaryVertexCount);
+                message += " vertices are pinned as boundary, leaving nothing to smooth";
+            }
+            else if (result.PinnedBoundaryVertexCount > 0u)
+            {
+                message += " (pinned boundary vertices: ";
+                message += std::to_string(result.PinnedBoundaryVertexCount);
+                message += " of ";
+                message += std::to_string(live);
+                message += ")";
+            }
+            else
+            {
+                message += "; no vertex had an interior neighborhood that changed it";
+            }
+            message += ". Written=";
+            message += std::to_string(result.WrittenCount);
+            message += ", moved=0.";
+            return message;
+        }
+
         struct MeshCurvatureSourceResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
@@ -5358,7 +5391,9 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     ++movedPublishedVertices;
             }
             result.MovedVertexCount = movedPublishedVertices;
-            result.Status = EditorCommandStatus::Applied;
+            result.Status = movedPublishedVertices == 0u
+                ? EditorCommandStatus::NoChange
+                : EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             state->DenoiseAfterPositions = std::move(afterPositions);
             return JobResultEnvelope::Make<EditorJobResult>(
@@ -5647,6 +5682,15 @@ struct EditorJobResult { std::string Diagnostic{}; };
             {
                 PublishMeshDenoiseResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            if (result.MovedVertexCount == 0u)
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                result.Error = Core::ErrorCode::Success;
+                result.Message = BuildMeshDenoiseNoChangeMessage(result);
+                PublishMeshDenoiseResultSink(context, result);
+                return Core::Ok();
             }
 
             const EditorCommandStatus commitStatus =
@@ -8120,6 +8164,16 @@ ApplyEditorMeshDenoiseCommand(
                 ++movedPublishedVertices;
         }
         result.MovedVertexCount = movedPublishedVertices;
+
+        if (movedPublishedVertices == 0u)
+        {
+            // Nothing changed, so there is nothing to commit; publishing an
+            // identity edit would also leave a useless undo entry.
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshDenoiseNoChangeMessage(result);
+            return result;
+        }
 
         const EditorCommandStatus commitStatus =
             CommitMeshDenoisePositions(

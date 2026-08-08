@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "\nctest --test-dir build/ci --output-on-failure -R \"MeshDenoise\" --timeout 120\n"
+  ],
+  "command_display": "/bin/bash -o pipefail -c '\nctest --test-dir build/ci --output-on-failure -R \"MeshDenoise\" --timeout 120\n'",
+  "cwd": ".",
+  "duration_ms": 187,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T00:51:06Z",
+  "label": "denoise-contract-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-08T00:51:06Z",
+  "stderr_path": "tasks/evidence/BUG-140/commands/denoise-contract-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-140/commands/denoise-contract-tests.stdout.log",
+  "stdout_sha256": "49bca2f01f8bf96220763060d8f55b17c217dd4e21984e610c9762aa68a22a85",
+  "task_id": "BUG-140"
+}

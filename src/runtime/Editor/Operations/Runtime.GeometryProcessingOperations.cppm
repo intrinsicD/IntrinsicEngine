@@ -385,9 +385,26 @@ export namespace Extrinsic::Runtime
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
+        // Applied means the mesh actually changed. A run that writes every slot
+        // but moves no vertex reports NoChange, because WrittenCount is
+        // slot-derived and stays non-zero whenever the kernel ran at all.
         [[nodiscard]] bool Succeeded() const noexcept
         {
             return Status == EditorCommandStatus::Applied;
+        }
+
+        // Share of live vertices held fixed as boundary, in [0, 1]. Surfaced
+        // alongside the absolute count because the count alone does not say
+        // whether the run had anything left to smooth. Derived, not stored.
+        [[nodiscard]] double PinnedBoundaryRatio() const noexcept
+        {
+            const std::size_t live = VertexSlotCount - SkippedDeletedVertexCount;
+            if (live == 0u)
+            {
+                return 0.0;
+            }
+            return static_cast<double>(PinnedBoundaryVertexCount) /
+                   static_cast<double>(live);
         }
     };
 

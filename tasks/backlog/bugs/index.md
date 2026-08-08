@@ -19,10 +19,11 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   emitted twice, the entries then appear in every unrelated mesh domain window
   and never expire, and parameterization rejections give no cause. Classify,
   de-duplicate, scope, and expire them, and name the rejection reason.
-- [`BUG-140` — Mesh denoise reports Applied/Success after moving zero vertices](BUG-140-mesh-denoise-reports-success-after-zero-movement.md):
-  denoise reports `Applied` / `Success` / `Written: 21464 / 21464` with
-  `moved: 0` and all 21464 vertices pinned as boundary. Status must derive from
-  a changed count, not a written count, and say why nothing moved.
+- [`BUG-145` — Editor geometry operations report Applied from written counts](BUG-145-editor-operations-report-applied-from-written-counts.md):
+  the `BUG-140` audit found the same written-count-implies-success shape in
+  vertex normals, curvature, remesh/subdivide/simplify, outlier removal, and UV
+  regeneration — 22 sites in all. Derive each terminal status from a changed
+  quantity and report `NoChange` with a reason.
 - [`BUG-139` — ImGui receives no key events, so every editor text field is append-only](BUG-139-imgui-adapter-drops-key-events.md):
   `ImGuiAdapter::PumpEvents()` deliberately drops `Platform::KeyEvent` and there
   is no `io.AddKeyEvent` anywhere, so Backspace, arrows, Enter and every Ctrl
@@ -81,6 +82,16 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-08: [`BUG-140` — Mesh denoise reports Applied/Success after
+  moving zero
+  vertices](../../done/BUG-140-mesh-denoise-reports-success-after-zero-movement.md).
+  Both denoise paths now derive the terminal status from the moved count rather
+  than the slot-derived written count: zero moved reports `NoChange` with a
+  message naming the pinned count, and returns before the history commit so a
+  no-op leaves no undo entry. The panel reports the pinned ratio and keeps
+  showing diagnostics for `NoChange`. Sibling operations sharing the defect are
+  audited in that task and spun out as `BUG-145`.
 
 - Closed 2026-08-08: [`BUG-144` — Work-graph stale-lock breaker can steal a live
   lock](../../done/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md).

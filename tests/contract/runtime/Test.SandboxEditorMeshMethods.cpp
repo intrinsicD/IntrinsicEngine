@@ -359,6 +359,20 @@ void AddDenoiseTetraMeshSource(ECS::Scene::Registry& registry,
         registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
     }
 
+// Single open triangle: every vertex lies on the boundary, so a denoise run
+// with PreserveBoundary pins all of them and can move nothing.
+void AddDenoiseAllBoundaryMeshSource(ECS::Scene::Registry& registry,
+                                   const ECS::EntityHandle entity)
+    {
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const Geometry::VertexHandle a = mesh.AddVertex(glm::vec3{0.0f, 0.0f, 0.0f});
+        const Geometry::VertexHandle b = mesh.AddVertex(glm::vec3{1.0f, 0.0f, 0.0f});
+        const Geometry::VertexHandle c = mesh.AddVertex(glm::vec3{0.0f, 1.0f, 0.35f});
+        mesh.AddTriangle(a, b, c);
+        GS::PopulateFromMesh(registry.Raw(), entity, mesh);
+        registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
+    }
+
 void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
                                   const ECS::EntityHandle entity)
     {
@@ -850,6 +864,90 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
     EXPECT_TRUE(model.Processing.LastMeshDenoiseResult->Succeeded());
     EXPECT_EQ(model.Processing.LastMeshDenoiseResult->WrittenCount, 4u);
 }
+TEST(SandboxEditorUi, MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PinnedDenoiseMesh");
+    AddDenoiseAllBoundaryMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const std::vector<glm::vec3> original = MeshVertexPositions(registry, mesh);
+    ASSERT_EQ(original.size(), 3u);
+
+    const Runtime::EditorMeshDenoiseResult result =
+        Runtime::ApplyEditorMeshDenoiseCommand(
+            context,
+            Runtime::EditorMeshDenoiseCommand{
+                .StableEntityId = stableId,
+                .NormalIterations = 2u,
+                .VertexIterations = 3u,
+                .SigmaSpatial = 0.0,
+                .SigmaRange = 0.0,
+                .PreserveBoundary = true,
+            });
+
+    // The kernel ran and wrote every slot, but nothing moved.
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::NoChange);
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Error, Core::ErrorCode::Success);
+    EXPECT_EQ(result.DenoiseStatus, Smooth::DenoiseStatus::Success);
+    EXPECT_EQ(result.MovedVertexCount, 0u);
+    EXPECT_EQ(result.WrittenCount, original.size());
+    EXPECT_EQ(result.PinnedBoundaryVertexCount, original.size());
+    EXPECT_DOUBLE_EQ(result.PinnedBoundaryRatio(), 1.0);
+
+    // It says why, naming the pinned vertices.
+    EXPECT_NE(result.Message.find("moved no vertices"), std::string::npos)
+        << result.Message;
+    EXPECT_NE(result.Message.find("pinned as boundary"), std::string::npos)
+        << result.Message;
+
+    // Nothing was published and no undo entry was created.
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), original);
+    EXPECT_FALSE(history.IsDirty());
+    EXPECT_EQ(history.UndoCount(), 0u);
+}
+
+TEST(SandboxEditorUi, MeshDenoisePinnedRatioIsReportedForPartiallyPinnedRuns)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "RatioDenoiseMesh");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const Runtime::EditorMeshDenoiseResult result =
+        Runtime::ApplyEditorMeshDenoiseCommand(
+            context,
+            Runtime::EditorMeshDenoiseCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .NormalIterations = 2u,
+                .VertexIterations = 3u,
+                .SigmaSpatial = 0.0,
+                .SigmaRange = 0.0,
+                .PreserveBoundary = true,
+            });
+
+    // A closed tetrahedron pins nothing, so a normal run still reports Applied
+    // with a non-zero moved count and a zero pinned ratio.
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_GT(result.MovedVertexCount, 0u);
+    EXPECT_EQ(result.PinnedBoundaryVertexCount, 0u);
+    EXPECT_DOUBLE_EQ(result.PinnedBoundaryRatio(), 0.0);
+    EXPECT_TRUE(history.IsDirty());
+}
+
 TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
 {
     ECS::Scene::Registry registry;

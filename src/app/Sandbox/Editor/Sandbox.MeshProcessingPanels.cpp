@@ -697,7 +697,12 @@ namespace Extrinsic::Sandbox::Editor
             "Geometry status: %s",
             IndexedName(result->DenoiseStatus, kDenoiseStatusNames));
         ImGui::Text("Stage: %s", MeshDenoiseStageName(result->Stage));
-        if (result->Succeeded())
+        // NoChange means the kernel ran and moved nothing, so its diagnostics
+        // are exactly what explains why — keep showing them.
+        const bool kernelRan =
+            result->Succeeded() ||
+            result->Status == Runtime::EditorCommandStatus::NoChange;
+        if (kernelRan)
         {
             ImGui::Text(
                 "Written: %zu / %zu  moved: %zu  deleted: %zu",
@@ -713,8 +718,9 @@ namespace Extrinsic::Sandbox::Editor
                 result->NonFiniteFaceCount,
                 result->SkippedDeletedFaceCount);
             ImGui::Text(
-                "Pinned boundary vertices: %zu",
-                result->PinnedBoundaryVertexCount);
+                "Pinned boundary vertices: %zu (%.1f%%)",
+                result->PinnedBoundaryVertexCount,
+                result->PinnedBoundaryRatio() * 100.0);
             ImGui::Text(
                 "Sigma used: spatial=%.6f  range=%.6f",
                 result->SigmaSpatialUsed, result->SigmaRangeUsed);

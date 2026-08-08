@@ -7075,3 +7075,42 @@ task-claim, and the workflow-evidence regressions pass along with the recipe
 validator and the strict structural set. `docs/agent/workflow-evidence.md`
 documents the new lock contract and its diagnostics, and the generated skill
 mirrors are re-synced.
+
+[`BUG-140`](BUG-140-mesh-denoise-reports-success-after-zero-movement.md) — mesh
+denoise reporting success after moving nothing retired on 2026-08-08. Both
+denoise paths computed `MovedVertexCount` against the published positions and
+then set `Applied` unconditionally. `WrittenCount` is slot-derived, so it stays
+non-zero whenever the kernel runs at all and can never distinguish "smoothed the
+mesh" from "did nothing"; on an imported `sculpt.obj` the panel read
+`Applied` / `Success` / `Written: 21464 / 21464` with `moved: 0` and every
+vertex pinned as boundary.
+
+Both paths now gate on the moved count they already computed. Zero moved reports
+`EditorCommandStatus::NoChange` with a message naming the pinned count and, when
+every live vertex is pinned, saying so outright. `NoChange` already existed on
+the shared enum and is already produced by `ToEditorCommandStatus`, so no enum
+change was needed. The synchronous path returns before
+`CommitMeshDenoisePositions` and the job path before its own commit, so a no-op
+no longer publishes an identity edit or leaves a useless undo entry. A derived
+`PinnedBoundaryRatio()` accessor was added rather than a stored field, and the
+panel prints `Pinned boundary vertices: N (P%)`. That panel's detail block was
+gated on `Succeeded()`, which would have hidden exactly the diagnostics that
+explain a no-op, so it now renders for `NoChange` too.
+
+Two contract tests were added: an all-boundary single-triangle mesh asserting
+`NoChange`, `moved == 0`, a pinned ratio of 1.0, the explanatory message,
+unchanged positions, and no history entry; and a closed tetrahedron still
+reporting `Applied` with a non-zero moved count. Against the unfixed source the
+first fails with `Succeeded()` true and `history.IsDirty()` true — the reported
+symptom plus the no-op undo entry. 6/6 `MeshDenoise` cases pass and the default
+CPU gate passes 4140/4140 with its expected GLFW/LeakSanitizer skip.
+
+The task's required audit of sibling operations found the same
+written-count-implies-success shape at 22 further sites: mesh, graph and
+point-cloud vertex normals; curvature; remesh, subdivide and simplify — simplify
+computes a `CollapseCount` and does not consult it; point-cloud outlier removal,
+whose `RejectedIndices` may be empty while the status is `Applied`; and UV
+regeneration. The full per-site inventory is recorded in the retired task and
+spun out as [`BUG-145`](../backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md)
+rather than widening this fix. ICP registration is the counter-example already
+mapping history state through `ToEditorCommandStatus`.
