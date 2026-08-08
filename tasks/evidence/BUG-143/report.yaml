@@ -1,0 +1,97 @@
+schema_version: 1
+task_id: BUG-143
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-08T11:27:12Z'
+claim_eligible: false
+source:
+  base_ref: 55bd031a
+  base_revision: 55bd031a2d39849f70712b394831a80094ec2ec8
+  head_revision: d358b1afe2df7ced3b5ec8e0d7cf92e1d0b5fa94
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 0b1a530df1fb3bb7675fc8e8037f33a8480fbfab8341b7025c2c44863fac5b8a
+  - path: tasks/backlog/bugs/BUG-137-direct-mesh-import-atlas-replaces-topology.md
+    sha256: a7636baac5c1aa86f132cb25ea3f03a8d13c0e6b42f3f232d7f1f335ee35e3f2
+  - path: tasks/backlog/bugs/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 7945f2bea83ac4c80fc1121da86103e694de759932401ac3cbbaab05a055c948
+  - path: tasks/done/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md
+    sha256: ce442e998d7207183a84b59869d3a04e12de5b9fe28a0bdecd0242782f13fc47
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: e67ce60c8b9914863e892c779821d2dcbfd97fc8213b8684a9622f93992d66a8
+  - path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    sha256: 53ed9a77da368bb99d9a152f77a40fa45c085ddb2911f53609e9ed228f62dc3f
+  - path: tools/agents/skills/intrinsicengine-gpu-smoke-authoring/SKILL.md
+    sha256: 6f8e47129003a91d6ebb8b5f4d40bf3fd22738a934ccc72eaa1edf2fc49ce1df
+  content_digest: 37ca4f59bffca62a78d7a3d8f6739857cd553c6fb36197e1a5f18260876e002a
+touched:
+  paths:
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-137-direct-mesh-import-atlas-replaces-topology.md
+  - tasks/backlog/bugs/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+  - tools/agents/skills/intrinsicengine-gpu-smoke-authoring/SKILL.md
+  layers:
+  - tests
+  modules: []
+extension_seam: ExitWhenReadyApp is a test-local module in the smoke fixture's anonymous namespace; ExitAfterFramesApp
+  stays for the fixed-latency cases.
+future_change_plan: Smokes that wait on deferred work adopt the same predicate-plus-wall-clock shape;
+  fixed frame counts stay only where the wait is genuinely measured in frames.
+acceptance:
+- criterion: '`BUG-137` slice B closes `Operational` with a cited, in-budget gate run.'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No readback assertion was weakened to get there.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The `gpu;vulkan` gate has no new timeout or flake.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-143/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-143/commands/gpu-vulkan-gate-x3.json
+- receipt: tasks/evidence/BUG-143/commands/smoke-timing-display-off.json
+- receipt: tasks/evidence/BUG-143/commands/structural-gates.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- ExitWhenReadyApp::ExitSummary reports frames, ready-at-frame, and which bound was exhausted on failure.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks: []
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/BUG-143/artifacts/frame-pacing-display-off.json
+  sha256: 01306b4f76bab3315107411861a28557d2e5bd0b3c11a761719d0788695611df
+  kind: file
+- path: tasks/evidence/BUG-143/artifacts/frame-pacing-display-on.json
+  sha256: 27b564a6e177406cce461f2ab05af05f2326236051d7bb1021175f69a545f2b2
+  kind: file
+- path: tasks/evidence/BUG-143/artifacts/README.md
+  sha256: 8e0cd1b0b1ab3ddb855fb990c09732e3bde5fff35c79de111e27cbce0e3a7dde
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
