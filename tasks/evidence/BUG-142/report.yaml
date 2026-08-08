@@ -1,0 +1,106 @@
+schema_version: 1
+task_id: BUG-142
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-08T01:29:02Z'
+claim_eligible: false
+source:
+  base_ref: 0c71b3850cb9bcf42e1b884f9d7bca147e410eda
+  base_revision: 0c71b3850cb9bcf42e1b884f9d7bca147e410eda
+  head_revision: d39b787defca5439c2d64df90b23f2e21ffa28c1
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/app/Sandbox/README.md
+    sha256: 5509a6fc609c592cdd4b97c3855a3313c15249f08126343dd7183dcbbf1cb0c9
+  - path: src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cpp
+    sha256: 9fead86e9858aac8b4bacb65dfd2e4b633aea6a61464fd40124a001960a8cfb5
+  - path: src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cppm
+    sha256: bd3c358025c5cc37175d49c88c1e64d5ef8d8a66f0ac3fc12c0195283617bd8b
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 9d50d2fe4a2075c21aa77d6d50536315a5ed7a8e1323fe5411af3c86630bd68e
+  - path: tasks/backlog/bugs/BUG-142-assetio-queue-terminal-row-zero-progress.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: b3eab29ad1c4734ca310fb9eeec006c54e9c33fbdc3bd230773ac224bf6f290f
+  - path: tasks/done/BUG-142-assetio-queue-terminal-row-zero-progress.md
+    sha256: 2524be0ca3e75b97a699a2b248fa4efe21f0283b7a90171762dd6177b09c0f2c
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: b8e08b6a702a7b71b79a74d8b0dcb25bdc666cdff25ce71aced3bdead1723005
+  - path: tests/contract/runtime/Test.AssetIngestStateMachine.cpp
+    sha256: adcdbdc6b06b0c35309242a1174140536198690de0eb8e4416ede6a3777d32d7
+  content_digest: 98d827f3937b9e672b344de14c890976e057f2c685597686053ff60216c61a06
+touched:
+  paths:
+  - src/app/Sandbox/README.md
+  - src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-142-assetio-queue-terminal-row-zero-progress.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-142-assetio-queue-terminal-row-zero-progress.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.AssetIngestStateMachine.cpp
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.AssetIngestStateMachine
+extension_seam: Two stage-mapping functions changed; the repository-wide (ProgressDeterminate, NormalizedProgress)
+  progress idiom is unchanged and no second representation was introduced.
+future_change_plan: If a decoder ever reports real fractional progress, it populates NormalizedProgress
+  and flips ProgressDeterminate; no schema change is needed.
+acceptance:
+- criterion: A completed import never displays `0%`.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Indeterminate progress is representable and distinct from zero.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-142/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-142/commands/queue-contract-tests.json
+- receipt: tasks/evidence/BUG-142/commands/structural-gates.json
+changed_public_contracts:
+- 'RuntimeAssetImportQueueEntry progress semantics: indeterminate rows now carry 0.0 and Failed/Cancelled
+  are indeterminate rather than 1.0.'
+diagnostics_and_previews:
+- A row is indeterminate exactly when no progress information exists; the panel then labels it by StageText
+  instead of drawing a fraction. Determinate 0.0 means Queued.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-142-assetio-queue-terminal-row-zero-progress.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- The reported Completed-shows-0% symptom was not reproduced and its trigger is unidentified; this change
+  fixes two adjacent real defects but may not be what the original screenshot showed.
+- One earlier CPU-gate run reported a single failure that did not recur across three subsequent full runs
+  and was not identifiable from the summary; most likely the open BUG-134 intermittent.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No graphics, RHI, shader, backend, or byte-layout behavior changed; this is a CPU queue projection.
+- check: benchmark
+  reason: No performance claim is made; two switch statements changed.
+artifacts:
+- path: src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cpp
+  sha256: 9fead86e9858aac8b4bacb65dfd2e4b633aea6a61464fd40124a001960a8cfb5
+  kind: file
+- path: src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cppm
+  sha256: bd3c358025c5cc37175d49c88c1e64d5ef8d8a66f0ac3fc12c0195283617bd8b
+  kind: file
+- path: tests/contract/runtime/Test.AssetIngestStateMachine.cpp
+  sha256: adcdbdc6b06b0c35309242a1174140536198690de0eb8e4416ede6a3777d32d7
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
