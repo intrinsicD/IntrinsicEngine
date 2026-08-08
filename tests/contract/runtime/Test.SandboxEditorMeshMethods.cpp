@@ -1022,11 +1022,11 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    bool completedSinkCalled = false;
+    std::optional<Runtime::EditorMeshDenoiseResult> completedResult{};
     context.MethodResultSinks.MeshDenoise =
-        [&completedSinkCalled](Runtime::EditorMeshDenoiseResult)
+        [&completedResult](Runtime::EditorMeshDenoiseResult result)
         {
-            completedSinkCalled = true;
+            completedResult = std::move(result);
         };
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "StaleDenoiseMesh");
@@ -1062,7 +1062,11 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
+    // BUG-138: the refusal is now reported instead of silent. It is still a
+    // refusal, so the assertions below still require zero mutation.
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_FALSE(completedResult->Succeeded());
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
 }
 
@@ -1883,11 +1887,11 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    bool completedSinkCalled = false;
+    std::optional<Runtime::EditorMeshCurvatureResult> completedResult{};
     context.MethodResultSinks.MeshCurvature =
-        [&completedSinkCalled](Runtime::EditorMeshCurvatureResult)
+        [&completedResult](Runtime::EditorMeshCurvatureResult result)
         {
-            completedSinkCalled = true;
+            completedResult = std::move(result);
         };
 
     const ECS::EntityHandle mesh =
@@ -1925,7 +1929,11 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
+    // BUG-138: the refusal is now reported instead of silent. It is still a
+    // refusal, so the assertions below still require zero mutation.
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_FALSE(completedResult->Succeeded());
     currentMean = properties.Get<double>(PN::kMeanCurvature);
     ASSERT_TRUE(currentMean.IsValid());
     for (const double value : currentMean.Vector())
@@ -2420,11 +2428,11 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    bool completedSinkCalled = false;
+    std::optional<Runtime::EditorMeshSubdivideResult> completedResult{};
     context.MethodResultSinks.MeshSubdivide =
-        [&completedSinkCalled](Runtime::EditorMeshSubdivideResult)
+        [&completedResult](Runtime::EditorMeshSubdivideResult result)
         {
-            completedSinkCalled = true;
+            completedResult = std::move(result);
         };
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "StaleSubdivide");
@@ -2458,7 +2466,11 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
+    // BUG-138: the refusal is now reported instead of silent. It is still a
+    // refusal, so the assertions below still require zero mutation.
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_FALSE(completedResult->Succeeded());
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
     ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh),
                                 stalePositions);
@@ -2472,11 +2484,11 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply)
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    bool completedSinkCalled = false;
+    std::optional<Runtime::EditorMeshSubdivideResult> completedResult{};
     context.MethodResultSinks.MeshSubdivide =
-        [&completedSinkCalled](Runtime::EditorMeshSubdivideResult)
+        [&completedResult](Runtime::EditorMeshSubdivideResult result)
         {
-            completedSinkCalled = true;
+            completedResult = std::move(result);
         };
 
     const ECS::EntityHandle mesh =
@@ -2511,7 +2523,11 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply)
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
+    // BUG-138: the refusal is now reported instead of silent. It is still a
+    // refusal, so the assertions below still require zero mutation.
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_FALSE(completedResult->Succeeded());
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
     EXPECT_EQ(
         registry.Raw()
@@ -2674,6 +2690,161 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces,
               completedResult->OutputFaceCount);
 }
+// BUG-138: a queued mesh job that terminates without publishing must still
+// deliver one terminal result. Before this, the discard was silent: the panel
+// kept the "…CPU job queued" text it was handed at submit time, so an
+// operation that had already been refused was indistinguishable from one still
+// running, forever.
+TEST(SandboxEditorUi, MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    std::optional<Runtime::EditorMeshSimplifyResult> completedResult{};
+    context.MethodResultSinks.MeshSimplify =
+        [&completedResult](Runtime::EditorMeshSimplifyResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "StaleSimplify");
+    AddIcosahedronMeshSource(registry, mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::EditorMeshSimplifyResult queued =
+        Runtime::ApplyEditorMeshSimplifyCommand(
+            context,
+            Runtime::EditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
+                .TargetFaces = 12u,
+                .PreserveBoundary = false,
+            });
+    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
+
+    // Move the mesh out from under the in-flight job, exactly as a user edit
+    // between click and completion would. The apply gate must refuse it.
+    {
+        auto positions = registry.Raw()
+                             .get<GS::Vertices>(mesh)
+                             .Properties.Get<glm::vec3>(PN::kPosition);
+        ASSERT_TRUE(positions.IsValid());
+        ASSERT_FALSE(positions.Vector().empty());
+        positions.Vector()[0] += glm::vec3{0.5f, 0.25f, 0.125f};
+    }
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(Runtime::IsActiveEditorJobState(done.Entries[0].State));
+
+    ASSERT_TRUE(completedResult.has_value())
+        << "A stale-discarded mesh job published nothing, so the editor is "
+           "still showing its submit-time Pending message.";
+    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_FALSE(completedResult->Succeeded());
+    EXPECT_NE(completedResult->Message.find("did not apply"), std::string::npos)
+        << completedResult->Message;
+    EXPECT_NE(completedResult->Message.find("mesh changed"), std::string::npos)
+        << completedResult->Message;
+
+    // Refusal is not mutation: the mesh keeps the topology the user edited.
+    EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces, before.Faces);
+    EXPECT_FALSE(history.IsDirty());
+}
+
+// The other two topology operations share `MakeMeshCpuJobDesc`, so they share
+// the defect and the fix; pin both so a future divergence is visible.
+TEST(SandboxEditorUi, MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    std::optional<Runtime::EditorMeshRemeshResult> remeshResult{};
+    std::optional<Runtime::EditorMeshSubdivideResult> subdivideResult{};
+    context.MethodResultSinks.MeshRemesh =
+        [&remeshResult](Runtime::EditorMeshRemeshResult result)
+        { remeshResult = std::move(result); };
+    context.MethodResultSinks.MeshSubdivide =
+        [&subdivideResult](Runtime::EditorMeshSubdivideResult result)
+        { subdivideResult = std::move(result); };
+
+    const auto stale = [&registry](const ECS::EntityHandle entity)
+    {
+        auto positions = registry.Raw()
+                             .get<GS::Vertices>(entity)
+                             .Properties.Get<glm::vec3>(PN::kPosition);
+        ASSERT_TRUE(positions.IsValid());
+        ASSERT_FALSE(positions.Vector().empty());
+        positions.Vector()[0] += glm::vec3{0.5f, 0.25f, 0.125f};
+    };
+
+    const ECS::EntityHandle remeshMesh = MakeSelectable(registry, "StaleRemesh");
+    AddIcosahedronMeshSource(registry, remeshMesh);
+    const ECS::EntityHandle subdivideMesh =
+        MakeSelectable(registry, "StaleSubdivide");
+    AddIcosahedronMeshSource(registry, subdivideMesh);
+
+    ASSERT_EQ(Runtime::ApplyEditorMeshRemeshCommand(
+                  context,
+                  Runtime::EditorMeshRemeshCommand{
+                      .StableEntityId =
+                          Runtime::SelectionController::ToStableEntityId(remeshMesh),
+                      .Mode = Runtime::EditorMeshRemeshMode::Uniform,
+                      .SizingLaw =
+                          Runtime::EditorMeshRemeshSizingLaw::MeanCurvature,
+                      .Iterations = 1u,
+                      .TargetEdgeLength = 0.35,
+                      .PreserveBoundary = false,
+                      .ProjectToSurface = true,
+                  })
+                  .Status,
+              Runtime::EditorCommandStatus::Pending);
+    ASSERT_EQ(Runtime::ApplyEditorMeshSubdivideCommand(
+                  context,
+                  Runtime::EditorMeshSubdivideCommand{
+                      .StableEntityId =
+                          Runtime::SelectionController::ToStableEntityId(
+                              subdivideMesh),
+                      .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
+                      .Iterations = 1u,
+                      .PreserveLoopFeatureEdges = true,
+                  })
+                  .Status,
+              Runtime::EditorCommandStatus::Pending);
+
+    stale(remeshMesh);
+    stale(subdivideMesh);
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    for (const Runtime::EditorJobRecord& entry : jobs.Snapshot().Entries)
+    {
+        EXPECT_EQ(entry.State, Runtime::JobState::StaleDiscarded) << entry.Name;
+        EXPECT_FALSE(Runtime::IsActiveEditorJobState(entry.State)) << entry.Name;
+    }
+
+    ASSERT_TRUE(remeshResult.has_value());
+    EXPECT_EQ(remeshResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_NE(remeshResult->Message.find("did not apply"), std::string::npos)
+        << remeshResult->Message;
+    ASSERT_TRUE(subdivideResult.has_value());
+    EXPECT_EQ(subdivideResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_NE(subdivideResult->Message.find("did not apply"), std::string::npos)
+        << subdivideResult->Message;
+    EXPECT_FALSE(history.IsDirty());
+}
+
 TEST(SandboxEditorUi, MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel)
 {
     ECS::Scene::Registry registry;

@@ -5087,7 +5087,39 @@ struct EditorJobResult { std::string Diagnostic{}; };
             EditorMeshRemeshResult RemeshResult{};
             EditorMeshSubdivideResult SubdivideResult{};
             EditorMeshSimplifyResult SimplifyResult{};
+            // Last answer this job's `ValidateBeforeApply` gave the drain.
+            // `FinalizeUnpublishedOnMainThread` takes no arguments, so the
+            // reason a completion was refused has to be recorded where it was
+            // decided; without it an unpublished job can only say "did not
+            // apply". `Current` means the gate never rejected the result, so
+            // the job ended for another reason — cancellation, or a publisher
+            // that refused the envelope.
+            JobApplyValidation LastApplyValidation{
+                JobApplyValidation::Current};
         };
+
+        [[nodiscard]] std::string_view MeshCpuJobUnpublishedReason(
+            const JobApplyValidation validation) noexcept
+        {
+            switch (validation)
+            {
+            case JobApplyValidation::Cancelled:
+                return "the job was cancelled before its result could be "
+                       "applied";
+            case JobApplyValidation::StaleWorld:
+                return "the world it was submitted against is no longer "
+                       "active";
+            case JobApplyValidation::StaleGeneration:
+                return "the mesh changed after the job was queued, so the "
+                       "result no longer matches the geometry it was computed "
+                       "from";
+            case JobApplyValidation::MissingTarget:
+                return "the target entity no longer exists";
+            case JobApplyValidation::Current:
+                break;
+            }
+            return "it terminated without publishing a result";
+        }
 
         [[nodiscard]] JobApplyValidation ValidateMeshCpuJobApply(
             const EditorGeometryProcessingContext& context,
@@ -5887,6 +5919,85 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
 
+        // A mesh CPU job that reaches a terminal state without publishing —
+        // cancelled, discarded as stale, or dropped — owes the editor exactly
+        // one terminal result. Without this the panel keeps the "…CPU job
+        // queued" text it was given at submit time and the operation reads as
+        // permanently `Pending`, which is indistinguishable from a job that
+        // genuinely never ran (BUG-138). Every other queued runtime owner
+        // (scene documents, asset import, clustering, point-cloud
+        // consolidation) already reconciles through this hook.
+        void FinalizeUnpublishedMeshCpuJob(
+            const EditorGeometryProcessingContext& context,
+            EditorMeshCpuJobState& job)
+        {
+            const JobApplyValidation validation = job.LastApplyValidation;
+            const EditorCommandStatus status =
+                validation == JobApplyValidation::MissingTarget ||
+                        validation == JobApplyValidation::StaleGeneration ||
+                        validation == JobApplyValidation::StaleWorld
+                    ? EditorCommandStatus::StaleEntity
+                    : EditorCommandStatus::GeometryProcessingFailed;
+            const Core::ErrorCode error =
+                status == EditorCommandStatus::StaleEntity
+                    ? Core::ErrorCode::InvalidState
+                    : Core::ErrorCode::Unknown;
+
+            std::string message{MeshCpuJobName(job.Kind)};
+            message += " did not apply: ";
+            message += MeshCpuJobUnpublishedReason(validation);
+            message += ".";
+
+            switch (job.Kind)
+            {
+            case EditorMeshCpuJobKind::Curvature:
+            {
+                EditorMeshCurvatureResult result = job.CurvatureResult;
+                result.Status = status;
+                result.Error = error;
+                result.Message = std::move(message);
+                PublishMeshCurvatureResultSink(context, std::move(result));
+                return;
+            }
+            case EditorMeshCpuJobKind::Denoise:
+            {
+                EditorMeshDenoiseResult result = job.DenoiseResult;
+                result.Status = status;
+                result.Error = error;
+                result.Message = std::move(message);
+                PublishMeshDenoiseResultSink(context, std::move(result));
+                return;
+            }
+            case EditorMeshCpuJobKind::Remesh:
+            {
+                EditorMeshRemeshResult result = job.RemeshResult;
+                result.Status = status;
+                result.Error = error;
+                result.Message = std::move(message);
+                PublishMeshRemeshResultSink(context, std::move(result));
+                return;
+            }
+            case EditorMeshCpuJobKind::Subdivide:
+            {
+                EditorMeshSubdivideResult result = job.SubdivideResult;
+                result.Status = status;
+                result.Error = error;
+                result.Message = std::move(message);
+                PublishMeshSubdivideResultSink(context, std::move(result));
+                return;
+            }
+            case EditorMeshCpuJobKind::Simplify:
+            {
+                EditorMeshSimplifyResult result = job.SimplifyResult;
+                result.Status = status;
+                result.Error = error;
+                result.Message = std::move(message);
+                PublishMeshSimplifyResultSink(context, std::move(result));
+                return;
+            }
+            }
+        }
+
         // The retired key carried `SourcePropertyGeneration`; the dedup guard
         // never compared it, and the staleness it stood for is re-checked by
         // `ValidateMeshCpuJobApply` immediately before the apply.
@@ -5927,7 +6038,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 .ValidateBeforeApply =
                     [context, state]()
                     {
-                        return ValidateMeshCpuJobApply(context, *state);
+                        const JobApplyValidation validation =
+                            ValidateMeshCpuJobApply(context, *state);
+                        state->LastApplyValidation = validation;
+                        return validation;
                     },
                 .PublishCompletion =
                     [context, state](KernelEventBus&,
@@ -5936,6 +6050,11 @@ struct EditorJobResult { std::string Diagnostic{}; };
                         if (result.TryGet<EditorJobResult>() == nullptr)
                             return false;
                         return PublishMeshCpuJob(context, *state).has_value();
+                    },
+                .FinalizeUnpublishedOnMainThread =
+                    [context, state]()
+                    {
+                        FinalizeUnpublishedMeshCpuJob(context, *state);
                     },
             };
         }

@@ -5,15 +5,88 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "claude-bug138"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-08T11:29:22Z"
 contract_schema: 1
 contracts:
   - geometry.element-domain-sources
 ---
 # BUG-138 — Async mesh geometry jobs never execute and stay Pending forever
+
+## Progress — slice A landed 2026-08-08 (task stays open)
+
+### What the triage evidence actually shows
+
+Two of the reported observations do not survive checking, and saying so
+narrows the search:
+
+- **"No worker is executing the job" is not established by the CPU reading.**
+  `~95%` on the main thread is what `ExtrinsicSandbox` always shows: the frame
+  loop spins flat out whenever the display is being scanned out. It is not
+  evidence of a stall. (`BUG-143` measured the same loop at 1 Hz when the
+  display is DPMS-off, which is how much the host's state moves this number.)
+- **The submit → dispatch → worker → drain → publish path is not broken.**
+  `SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply`
+  already drives a real `JobService` through the real
+  `ApplyEditorMeshSimplifyCommand` and asserts `Published` plus a reduced face
+  count, and it passes. Whatever fails in the live session is not generic
+  dispatch.
+
+### The defect this slice fixes
+
+`MakeMeshCpuJobDesc` set `Work`, `ValidateBeforeApply`, and
+`PublishCompletion`, but **not** `FinalizeUnpublishedOnMainThread`. Every
+other queued runtime owner sets it — scene documents, asset import, clustering,
+point-cloud consolidation — because `JobService` runs exactly one of
+`PublishCompletion` or that finalizer per job, and the three non-publishing
+terminal states (`Cancelled`, `Dropped`, `StaleDiscarded`) take the finalizer
+path.
+
+So a mesh CPU job that was refused told the editor **nothing at all**. The
+panel kept the "`Mesh simplify CPU job queued (job 4:1).`" string it was handed
+at submit time and displayed it forever. That is precisely the reported
+symptom, and it is indistinguishable — from the UI — from a job that never ran.
+It also means the live session could not report *why* the operation was
+refused, which is why the original triage had nothing to go on.
+
+Three of the four required changes are now met:
+
+- The job records the apply gate's verdict in its shared state, and the
+  finalizer publishes one terminal result on that kind's result sink with an
+  actionable reason: mesh changed after queueing, entity gone, world retired,
+  or terminated without publishing.
+- `IsActiveEditorJobState` is false for every terminal state, so the owning
+  action re-enables; the new tests assert that directly.
+- Remesh, subdivide, and simplify share `MakeMeshCpuJobDesc`, so all five mesh
+  CPU kinds are covered by one fix.
+
+`SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending`
+fails against the unfixed source with exactly the reported symptom ("A
+stale-discarded mesh job published nothing, so the editor is still showing its
+submit-time Pending message"), so it discriminates the two behaviours rather
+than describing one.
+
+### What is still open
+
+The **cause of the refusal in the live session is not yet identified**, and
+this slice does not claim it. Reproducing it needs a live `Engine::Run()`
+session driving the real `EditorWorkspaceSession` against an imported mesh; the
+existing contract harness deliberately does not cover session-level attachment
+epochs and world scoping. The leading hypothesis, untested, is that the three
+topology kinds fail `ValidateMeshCpuJobApply`'s extra
+`SameMeshTopologyState(view, job.BeforeMesh)` check — or its geometry metadata
+signature — on an imported mesh, while curvature and denoise, which skip that
+check, publish normally.
+
+With this slice landed, the live session now *names* that reason in the panel
+instead of showing `Pending`, which is the cheapest way to finish the
+diagnosis. Re-run the reported repro and read the message.
+
+Still owed for closure: the identified cause, the fix that makes the three
+operations complete, and the `Operational` evidence from a live session that
+the task's Maturity section requires.
 
 ## Goal
 - Make queued mesh simplify, subdivide, and remesh jobs actually execute,
@@ -61,26 +134,33 @@ contracts:
 - [ ] Instrument or inspect the `JobService` drain counters
       (`LastDrainParked`, `LastDrainStaleDiscarded`,
       `LastDrainFinalizedUnpublished`, `CompletedJobs`) for a queued mesh
-      simplify job to establish where the job stalls.
+      simplify job to establish where the job stalls. Slice A made the refusal
+      reason visible in the panel instead; the live counter reading is still
+      owed.
 - [ ] Fix the dispatch/completion break so the job runs on a worker and its
       result is published to the entity.
-- [ ] Ensure a job that cannot be dispatched fails closed with a distinct,
-      actionable diagnostic instead of remaining `Pending` forever.
-- [ ] Ensure the owning editor action re-enables on terminal job state
-      (success, failure, or cancellation).
+- [x] Ensure a job that cannot be dispatched fails closed with a distinct,
+      actionable diagnostic instead of remaining `Pending` forever. Slice A:
+      `FinalizeUnpublishedOnMainThread` publishes one terminal result naming
+      the apply gate's verdict.
+- [x] Ensure the owning editor action re-enables on terminal job state
+      (success, failure, or cancellation). Asserted through
+      `IsActiveEditorJobState` on the discarded records.
 
 ## Tests
 - [ ] Add a runtime contract test that submits a mesh simplify job through the
       editor operation surface, drains frames, and asserts the job reaches a
       terminal state and publishes the expected face count.
-- [ ] Add equivalent coverage for subdivide and remesh.
-- [ ] Add a test asserting the action's disabled state clears on terminal job
+- [x] Add equivalent coverage for subdivide and remesh
+      (`MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults`).
+- [x] Add a test asserting the action's disabled state clears on terminal job
       state.
-- [ ] Default CPU gate stays green.
+- [x] Default CPU gate stays green (slice A).
 
 ## Docs
-- [ ] Record the queued-job lifecycle expectation (submit → dispatch → drain →
-      publish → re-enable) in the owning runtime doc.
+- [x] Record the queued-job lifecycle expectation (submit → dispatch → drain →
+      publish → re-enable) in the owning runtime doc
+      (`src/runtime/README.md`, `Extrinsic.Runtime.GeometryProcessingOperations`).
 
 ## Acceptance criteria
 - [ ] Simplify, subdivide, and remesh complete and change the selected mesh in

@@ -1,0 +1,129 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  389: RuntimeAsyncWorkModule.PublishesBorrowedJobServiceAndCanReinitialize
+ 1/59 Test  #389: RuntimeAsyncWorkModule.PublishesBorrowedJobServiceAndCanReinitialize .............................   Passed    0.00 sec
+      Start  392: RuntimeAsyncWorkModule.ShutdownCancelsParkedJobServiceSurvivor
+ 2/59 Test  #392: RuntimeAsyncWorkModule.ShutdownCancelsParkedJobServiceSurvivor ...................................   Passed    0.01 sec
+      Start  716: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService
+ 3/59 Test  #716: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService ...............................   Passed    0.00 sec
+      Start  720: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface
+ 4/59 Test  #720: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface ................................   Passed    0.00 sec
+      Start  794: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate
+ 5/59 Test  #794: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate .......................................   Passed    0.01 sec
+      Start  795: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState
+ 6/59 Test  #795: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState ...........................   Passed    0.01 sec
+      Start  796: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters
+ 7/59 Test  #796: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters .................................   Passed    0.00 sec
+      Start  797: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder
+ 8/59 Test  #797: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder .................................   Passed    0.00 sec
+      Start  798: RuntimeJobService.CancelBeforeStartPreventsWork
+ 9/59 Test  #798: RuntimeJobService.CancelBeforeStartPreventsWork ..................................................   Passed    0.01 sec
+      Start  799: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion
+10/59 Test  #799: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion ....................................   Passed    0.01 sec
+      Start  800: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication
+11/59 Test  #800: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication ...............................   Passed    0.01 sec
+      Start  801: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope
+12/59 Test  #801: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope ......................................   Passed    0.02 sec
+      Start  802: RuntimeJobService.ReapCompletedRemovesTerminalRecords
+13/59 Test  #802: RuntimeJobService.ReapCompletedRemovesTerminalRecords ............................................   Passed    0.01 sec
+      Start  803: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread
+14/59 Test  #803: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread ...........................   Passed    0.04 sec
+      Start  804: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes
+15/59 Test  #804: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes .................................   Passed    0.02 sec
+      Start  805: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish
+16/59 Test  #805: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish .................................   Passed    0.01 sec
+      Start  806: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving
+17/59 Test  #806: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving ..................................   Passed    0.02 sec
+      Start  807: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking
+18/59 Test  #807: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking .................................   Passed    0.01 sec
+      Start  808: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate
+19/59 Test  #808: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate .................................   Passed    0.01 sec
+      Start  809: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce
+20/59 Test  #809: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce ..............................   Passed    0.01 sec
+      Start  810: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread
+21/59 Test  #810: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread ............................   Passed    0.02 sec
+      Start  811: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion
+22/59 Test  #811: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion ................   Passed    0.01 sec
+      Start  812: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+23/59 Test  #812: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ......................   Passed    0.01 sec
+      Start  813: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce
+24/59 Test  #813: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce ....................................   Passed    0.01 sec
+      Start  814: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak
+25/59 Test  #814: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak .................................   Passed    0.01 sec
+      Start  815: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain
+26/59 Test  #815: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain ..................................   Passed    0.01 sec
+      Start  816: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer
+27/59 Test  #816: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer ...................................   Passed    0.01 sec
+      Start  817: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder
+28/59 Test  #817: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder ..................................   Passed    0.01 sec
+      Start  818: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge
+29/59 Test  #818: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge .......................................   Passed    0.01 sec
+      Start  849: RuntimeJobServiceEngineWiring.RunFrameAppliesSubmittedJob
+30/59 Test  #849: RuntimeJobServiceEngineWiring.RunFrameAppliesSubmittedJob ........................................   Passed    0.04 sec
+      Start  927: SandboxEditorUi.GeometryProcessingSupportedDomainsMatchPromotedEditorContract
+31/59 Test  #927: SandboxEditorUi.GeometryProcessingSupportedDomainsMatchPromotedEditorContract ....................   Passed    0.00 sec
+      Start  991: SandboxEditorUi.MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo
+32/59 Test  #991: SandboxEditorUi.MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo ..........................   Passed    0.00 sec
+      Start  992: SandboxEditorUi.MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned
+33/59 Test  #992: SandboxEditorUi.MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned ................................   Passed    0.00 sec
+      Start  993: SandboxEditorUi.MeshDenoisePinnedRatioIsReportedForPartiallyPinnedRuns
+34/59 Test  #993: SandboxEditorUi.MeshDenoisePinnedRatioIsReportedForPartiallyPinnedRuns ...........................   Passed    0.00 sec
+      Start  994: SandboxEditorUi.MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply
+35/59 Test  #994: SandboxEditorUi.MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply ............................   Passed    0.01 sec
+      Start  995: SandboxEditorUi.MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply
+36/59 Test  #995: SandboxEditorUi.MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply ................................   Passed    0.01 sec
+      Start 1003: SandboxEditorUi.MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+37/59 Test #1003: SandboxEditorUi.MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel ...............   Passed    0.00 sec
+      Start 1004: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo
+38/59 Test #1004: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo ..............   Passed    0.00 sec
+      Start 1005: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply
+39/59 Test #1005: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply ..........................   Passed    0.01 sec
+      Start 1006: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply
+40/59 Test #1006: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply ........................   Passed    0.01 sec
+      Start 1007: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable
+41/59 Test #1007: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable ...............   Passed    0.00 sec
+      Start 1008: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts
+42/59 Test #1008: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts .....................   Passed    0.00 sec
+      Start 1009: SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo
+43/59 Test #1009: SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo .............................   Passed    0.01 sec
+      Start 1010: SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply
+44/59 Test #1010: SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply .............................   Passed    0.02 sec
+      Start 1011: SandboxEditorUi.MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo
+45/59 Test #1011: SandboxEditorUi.MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo ...........   Passed    0.01 sec
+      Start 1012: SandboxEditorUi.MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply
+46/59 Test #1012: SandboxEditorUi.MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply ..........................   Passed    0.02 sec
+      Start 1013: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply
+47/59 Test #1013: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply ..............................   Passed    0.01 sec
+      Start 1014: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply
+48/59 Test #1014: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply ..........................   Passed    0.01 sec
+      Start 1015: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo
+49/59 Test #1015: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo ...........................   Passed    0.01 sec
+      Start 1016: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply
+50/59 Test #1016: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply ...........................   Passed    0.02 sec
+      Start 1017: SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending
+51/59 Test #1017: SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending .............   Passed    0.02 sec
+      Start 1018: SandboxEditorUi.MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults
+52/59 Test #1018: SandboxEditorUi.MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults .........................   Passed    0.02 sec
+      Start 1019: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+53/59 Test #1019: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel ..............   Passed    0.00 sec
+      Start 1020: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent
+54/59 Test #1020: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent .................................   Passed    0.01 sec
+      Start 1021: SandboxEditorUi.MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels
+55/59 Test #1021: SandboxEditorUi.MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels ...   Passed    0.00 sec
+      Start 1022: SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings
+56/59 Test #1022: SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings ................   Passed    0.00 sec
+      Start 1023: SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply
+57/59 Test #1023: SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply ......................   Passed    0.01 sec
+      Start 1033: SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets
+58/59 Test #1033: SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets .............................   Passed    0.00 sec
+      Start 1216: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+59/59 Test #1216: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus .....................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 59
+
+Label Time Summary:
+contract       =   1.25 sec*proc (58 tests)
+integration    =   0.00 sec*proc (1 test)
+runtime        =   1.25 sec*proc (59 tests)
+
+Total Test time (real) =   0.88 sec
