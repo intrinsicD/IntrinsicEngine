@@ -1,0 +1,82 @@
+schema_version: 1
+task_id: BUG-124
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-08T09:54:54Z'
+claim_eligible: false
+source:
+  base_ref: bd6eb3163410cf09beb1d64c77d7519841d3bef5
+  base_revision: bd6eb3163410cf09beb1d64c77d7519841d3bef5
+  head_revision: 3e200f18e11f7c56e3290ddb8526fb60ced5dcb1
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 84c47bc4b6817cdecc0904e6661735ac0bafa205388d159161171423ffc7f0ce
+  - path: tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 33177710131740b8e8fa0dba3b3c76256b41c904f1200f8974a2c16a72181bb2
+  - path: tasks/done/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
+    sha256: 275ef28cebc2cbc3e324e3b4854c4dbf424d8322a397d21ef0a7f6471da93153
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 12d3769595ed34ff1ac1ca503568a5d67f35334f97423eba39811b532874e4c8
+  - path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    sha256: 9f927e4d21dcb9b39ebfb5c59722c9e184bd9af8eeddf427fde7233c8933ae57
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: ccbd253ddb25a95b207a8e42bcc5f1c576974fe3064fb7a8cfecbfab33d8ac0d
+  content_digest: d9bb77f49c05923f2f76386bb30ec9b1cd260fd3294c6e62945431c514d97b1f
+touched:
+  paths:
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+  - tools/agents/contract_legacy_tasks.json
+  layers:
+  - tests
+  modules: []
+extension_seam: Test fixture only; the unsupported rule stays owned by BuildGeometryPresentationSnapshot.
+future_change_plan: If the backend gains property-buffer displacement, move the coverage to the next still-unsupported
+  semantic and update the named-slot helper; do not fall back to a bare counter.
+acceptance:
+- criterion: The smoke asserts a real current geometry-presentation contract rather
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No GPU/Vulkan label, timeout, or assertion is weakened to hide the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The fix introduces no layering violation.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-124/commands/gpu-vulkan-gate.json
+- receipt: tasks/evidence/BUG-124/commands/smoke-repeat-5.json
+- receipt: tasks/evidence/BUG-124/commands/structural-gates-final.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-124-geometry-presentation-gpu-smoke-stale-unsupported-slot.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: false
+residual_risks: []
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
