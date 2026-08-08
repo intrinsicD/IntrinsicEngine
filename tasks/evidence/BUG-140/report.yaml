@@ -1,0 +1,116 @@
+schema_version: 1
+task_id: BUG-140
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-08T00:54:31Z'
+claim_eligible: false
+source:
+  base_ref: 5da417bfa35a69131c93ba791629eb2e9f298204
+  base_revision: 5da417bfa35a69131c93ba791629eb2e9f298204
+  head_revision: e64bf6a8379ba1d162dc09efaf478566eb7385eb
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: ffebe5b6070296230e6d5bd9e38ac1068034cad8a05e92a10913ed9254e2f747
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: d4e55d7cc9a50caa99645cd36078cb5c894cd4e42fcf47285d11ecb42e664e74
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: 7b3987c29fd4d6b36970dce053112b2ce9830de2b5228caeba39ddbd35b26ca1
+  - path: tasks/SESSION-BRIEF.md
+    sha256: a3ec1fec16042047f23b4da89f64807642e3e87f1df879d351a613b016b2fe5d
+  - path: tasks/backlog/bugs/BUG-140-mesh-denoise-reports-success-after-zero-movement.md
+    sha256: null
+  - path: tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md
+    sha256: 78d09c1371b15a1375f4c4a6c076b52e787a4a237715812e5886f0539b1be17e
+  - path: tasks/backlog/bugs/index.md
+    sha256: da2f9a40ed87715a242d5058af4a50a935527899e9f9b65485cd7d40270bbc4b
+  - path: tasks/done/BUG-140-mesh-denoise-reports-success-after-zero-movement.md
+    sha256: d9d7d3cd123e24b5295310b5350f1483f4357cbf27be923ac0963b4bc6d0a45b
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 67b5317559d78c034f3b1d999ab0d1508d969fab3aa97be5b21da8881c0063af
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: cc89c33303f21cc3e07bfe2a395dbb64ef1991b6f8b85318c273c9ed6cf09170
+  content_digest: de046b1ef1723787ac707ef164bd048114701ac8cb5c21dda1fdba23bb221b7f
+touched:
+  paths:
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-140-mesh-denoise-reports-success-after-zero-movement.md
+  - tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-140-mesh-denoise-reports-success-after-zero-movement.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  layers:
+  - app
+  - runtime
+  modules:
+  - Runtime.GeometryProcessingOperations
+extension_seam: One status gate plus a derived accessor on the existing result; BUG-145 applies the same
+  pattern per-operation without a shared framework.
+future_change_plan: BUG-145 owns the remaining 22 audited sites; a shared changed-count abstraction is
+  only reconsidered if that task shows the per-operation gates genuinely converge.
+acceptance:
+- criterion: A denoise run that moves zero vertices never reports `Applied`/`Success`.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The result explains why nothing moved.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The audit of sibling operations is recorded in this task.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-140/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-140/commands/denoise-contract-tests.json
+- receipt: tasks/evidence/BUG-140/commands/structural-gates.json
+changed_public_contracts:
+- EditorMeshDenoiseResult gains PinnedBoundaryRatio(); a zero-move denoise now reports NoChange instead
+  of Applied and creates no undo-history entry.
+diagnostics_and_previews:
+- A zero-move run reports NoChange with a message naming the pinned count, stating explicitly when every
+  live vertex is pinned; the panel keeps rendering denoise diagnostics for NoChange and shows the pinned
+  ratio.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-140-mesh-denoise-reports-success-after-zero-movement.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- Callers that treated any non-failure denoise result as success now see NoChange for a genuine no-op;
+  that is the intended behavior change and the reason the task exists.
+- The 22 sibling sites found by the audit still report Applied from written counts until BUG-145 lands.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No graphics, RHI, shader, backend, or byte-layout behavior changed; this is CPU editor status
+    reporting.
+- check: benchmark
+  reason: No performance claim is made; the gate is a comparison on an already-computed count.
+artifacts:
+- path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  sha256: d4e55d7cc9a50caa99645cd36078cb5c894cd4e42fcf47285d11ecb42e664e74
+  kind: file
+- path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  sha256: 7b3987c29fd4d6b36970dce053112b2ce9830de2b5228caeba39ddbd35b26ca1
+  kind: file
+- path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  sha256: cc89c33303f21cc3e07bfe2a395dbb64ef1991b6f8b85318c273c9ed6cf09170
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
