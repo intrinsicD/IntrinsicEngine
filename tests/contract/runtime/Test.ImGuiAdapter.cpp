@@ -10,9 +10,11 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <limits>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -749,6 +751,164 @@ TEST(ImGuiAdapter, PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScali
         EXPECT_EQ(diag.DisplayWidth, 1600u);
         EXPECT_EQ(diag.DisplayHeight, 1200u);
     }
+}
+
+// BUG-139: the pump dropped `Platform::KeyEvent` entirely, so every editor
+// text field was append-only — printable characters arrived through
+// `CharEvent`, but Backspace, the arrows, Enter and every Ctrl chord did not
+// exist as far as ImGui was concerned.
+TEST(ImGuiAdapter, PumpedKeyEventsReachImGuiIoWithModifierChords)
+{
+    FakeWindow         window(400, 300);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+
+    // Ctrl (left) held, then V, then release both — the paste chord.
+    window.QueueEvent(Plat::KeyEvent{341, true});  // LeftControl
+    window.QueueEvent(Plat::KeyEvent{86, true});   // V
+    adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
+    EXPECT_TRUE(ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
+    EXPECT_TRUE(ImGui::IsKeyDown(ImGuiKey_V));
+    EXPECT_TRUE(ImGui::GetIO().KeyCtrl)
+        << "The chord modifier must be submitted alongside the modifier key, "
+           "or Ctrl+V never reads as a shortcut.";
+    adapter.EndFrame();
+
+    window.QueueEvent(Plat::KeyEvent{86, false});
+    window.QueueEvent(Plat::KeyEvent{341, false});
+    adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
+    EXPECT_FALSE(ImGui::IsKeyDown(ImGuiKey_V));
+    EXPECT_FALSE(ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
+    EXPECT_FALSE(ImGui::GetIO().KeyCtrl);
+    adapter.EndFrame();
+
+    // Releasing one side of a modifier must not clear the other side's hold.
+    // The press and the release are separate frames because ImGui's trickling
+    // input queue deliberately holds a same-frame down/up for one frame so a
+    // fast tap is not lost.
+    window.QueueEvent(Plat::KeyEvent{340, true}); // LeftShift
+    window.QueueEvent(Plat::KeyEvent{344, true}); // RightShift
+    adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
+    EXPECT_TRUE(ImGui::GetIO().KeyShift);
+    adapter.EndFrame();
+
+    window.QueueEvent(Plat::KeyEvent{340, false}); // release left only
+    adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
+    EXPECT_FALSE(ImGui::IsKeyDown(ImGuiKey_LeftShift));
+    EXPECT_TRUE(ImGui::IsKeyDown(ImGuiKey_RightShift));
+    EXPECT_TRUE(ImGui::GetIO().KeyShift)
+        << "Releasing one side of a modifier cleared a chord the other side "
+           "is still holding.";
+    adapter.EndFrame();
+
+    window.QueueEvent(Plat::KeyEvent{344, false});
+    adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
+    EXPECT_FALSE(ImGui::GetIO().KeyShift);
+    adapter.EndFrame();
+
+    // The editing keys the bug report named all map to real ImGui keys.
+    for (const auto& [code, expected] : std::vector<std::pair<int, ImGuiKey>>{
+             {259, ImGuiKey_Backspace},
+             {261, ImGuiKey_Delete},
+             {263, ImGuiKey_LeftArrow},
+             {262, ImGuiKey_RightArrow},
+             {268, ImGuiKey_Home},
+             {269, ImGuiKey_End},
+             {257, ImGuiKey_Enter},
+             {258, ImGuiKey_Tab},
+             {256, ImGuiKey_Escape},
+         })
+    {
+        window.QueueEvent(Plat::KeyEvent{code, true});
+        adapter.BeginFrame(kFrameDelta);
+        adapter.BuildEditorFrame();
+        EXPECT_TRUE(ImGui::IsKeyDown(expected)) << "key code " << code;
+        adapter.EndFrame();
+
+        window.QueueEvent(Plat::KeyEvent{code, false});
+        adapter.BeginFrame(kFrameDelta);
+        adapter.BuildEditorFrame();
+        EXPECT_FALSE(ImGui::IsKeyDown(expected)) << "key code " << code;
+        adapter.EndFrame();
+    }
+}
+
+// The end the user actually cares about: a field with text in it gets shorter
+// when Backspace is pressed. Nothing below reaches into ImGui state directly —
+// it types through the same pump the window uses.
+TEST(ImGuiAdapter, BackspaceShortensSeededInputTextAndCapturesKeyboard)
+{
+    FakeWindow         window(400, 300);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+
+    std::string buffer(64, '\0');
+    std::snprintf(buffer.data(), buffer.size(), "%s", "mesh.obj");
+    // Focus once. Re-focusing every frame would re-select the whole field, and
+    // Backspace would then delete the selection rather than one character —
+    // which would pass this test for the wrong reason.
+    bool focusRequested = false;
+    adapter.SetEditorCallback(
+        [&buffer, &focusRequested]
+        {
+            ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+            ImGui::SetNextWindowSize(ImVec2(300.0f, 100.0f));
+            ImGui::Begin("BUG-139 Field");
+            if (!focusRequested)
+            {
+                ImGui::SetKeyboardFocusHere();
+                focusRequested = true;
+            }
+            ImGui::InputText("path", buffer.data(), buffer.size());
+            ImGui::End();
+        });
+
+    // Warm-up frames so the window exists and the field takes focus.
+    for (int frame = 0; frame < 3; ++frame)
+    {
+        adapter.BeginFrame(kFrameDelta);
+        adapter.BuildEditorFrame();
+        adapter.EndFrame();
+    }
+    ASSERT_STREQ(buffer.c_str(), "mesh.obj");
+    EXPECT_TRUE(adapter.CaptureSnapshot().CapturedKeyboard)
+        << "An active InputText must report keyboard capture, or editor typing "
+           "leaks into engine input actions.";
+
+    // ImGui selects the whole field on focus, so collapse the selection to the
+    // caret first. That also proves End reaches the widget, not just Backspace.
+    const auto tap = [&window, &adapter](const int keyCode)
+    {
+        window.QueueEvent(Plat::KeyEvent{keyCode, true});
+        adapter.BeginFrame(kFrameDelta);
+        adapter.BuildEditorFrame();
+        adapter.EndFrame();
+        window.QueueEvent(Plat::KeyEvent{keyCode, false});
+        adapter.BeginFrame(kFrameDelta);
+        adapter.BuildEditorFrame();
+        adapter.EndFrame();
+    };
+
+    tap(269); // End
+    EXPECT_STREQ(buffer.c_str(), "mesh.obj")
+        << "End must move the caret, not edit the field.";
+
+    tap(259); // Backspace
+    EXPECT_STREQ(buffer.c_str(), "mesh.ob")
+        << "Backspace did not reach the focused InputText.";
+
+    tap(259);
+    EXPECT_STREQ(buffer.c_str(), "mesh.o")
+        << "A second Backspace must delete one more character.";
 }
 
 TEST(ImGuiAdapter, SnapshotsCaptureStateOncePerCompletedEditorFrame)

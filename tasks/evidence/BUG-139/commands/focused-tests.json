@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "ImGuiAdapter|EditorInputCapture|SandboxEditor",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'ImGuiAdapter|EditorInputCapture|SandboxEditor' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 4761,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T12:38:06Z",
+  "label": "focused-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-08T12:38:01Z",
+  "stderr_path": "tasks/evidence/BUG-139/commands/focused-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-139/commands/focused-tests.stdout.log",
+  "stdout_sha256": "c05dba300f51d0e03b9b0644cf2a94d9d503fa1cd62e34dcbc0cbfbf9a122412",
+  "task_id": "BUG-139"
+}

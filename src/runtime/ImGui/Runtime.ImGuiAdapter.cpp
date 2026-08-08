@@ -34,6 +34,123 @@ namespace Extrinsic::Runtime
         constexpr const char* kBundledFontAsset = "fonts/Roboto-Medium.ttf";
         constexpr float kBaseFontSizePixels = 16.0f;
 
+        // `Platform::KeyEvent::KeyCode` is the platform's key-code space, which
+        // `Extrinsic::Platform::Input::Key` already pins to GLFW's numbering
+        // (65 = A, 256 = Escape, 341 = LeftControl). Mapping it here keeps the
+        // dependency numeric: the runtime adapter needs no GLFW header, and a
+        // non-GLFW backend that emits the same codes works unchanged.
+        //
+        // Key repeat is deliberately not forwarded. The GLFW backend filters
+        // `GLFW_REPEAT` before emitting, and ImGui synthesises repeat itself
+        // from how long a key has been held (`ImGuiIO::KeyRepeatDelay` /
+        // `KeyRepeatRate`), which is what `InputText` reads. Forwarding OS
+        // repeats on top would double them.
+        [[nodiscard]] constexpr ImGuiKey ToImGuiKey(const int keyCode) noexcept
+        {
+            if (keyCode >= 65 && keyCode <= 90) // A..Z
+                return static_cast<ImGuiKey>(ImGuiKey_A + (keyCode - 65));
+            if (keyCode >= 48 && keyCode <= 57) // 0..9 (top row)
+                return static_cast<ImGuiKey>(ImGuiKey_0 + (keyCode - 48));
+            if (keyCode >= 290 && keyCode <= 301) // F1..F12
+                return static_cast<ImGuiKey>(ImGuiKey_F1 + (keyCode - 290));
+            if (keyCode >= 320 && keyCode <= 329) // Keypad 0..9
+                return static_cast<ImGuiKey>(ImGuiKey_Keypad0 + (keyCode - 320));
+
+            switch (keyCode)
+            {
+            case 32: return ImGuiKey_Space;
+            case 39: return ImGuiKey_Apostrophe;
+            case 44: return ImGuiKey_Comma;
+            case 45: return ImGuiKey_Minus;
+            case 46: return ImGuiKey_Period;
+            case 47: return ImGuiKey_Slash;
+            case 59: return ImGuiKey_Semicolon;
+            case 61: return ImGuiKey_Equal;
+            case 91: return ImGuiKey_LeftBracket;
+            case 92: return ImGuiKey_Backslash;
+            case 93: return ImGuiKey_RightBracket;
+            case 96: return ImGuiKey_GraveAccent;
+            case 256: return ImGuiKey_Escape;
+            case 257: return ImGuiKey_Enter;
+            case 258: return ImGuiKey_Tab;
+            case 259: return ImGuiKey_Backspace;
+            case 260: return ImGuiKey_Insert;
+            case 261: return ImGuiKey_Delete;
+            case 262: return ImGuiKey_RightArrow;
+            case 263: return ImGuiKey_LeftArrow;
+            case 264: return ImGuiKey_DownArrow;
+            case 265: return ImGuiKey_UpArrow;
+            case 266: return ImGuiKey_PageUp;
+            case 267: return ImGuiKey_PageDown;
+            case 268: return ImGuiKey_Home;
+            case 269: return ImGuiKey_End;
+            case 280: return ImGuiKey_CapsLock;
+            case 281: return ImGuiKey_ScrollLock;
+            case 282: return ImGuiKey_NumLock;
+            case 283: return ImGuiKey_PrintScreen;
+            case 284: return ImGuiKey_Pause;
+            case 330: return ImGuiKey_KeypadDecimal;
+            case 331: return ImGuiKey_KeypadDivide;
+            case 332: return ImGuiKey_KeypadMultiply;
+            case 333: return ImGuiKey_KeypadSubtract;
+            case 334: return ImGuiKey_KeypadAdd;
+            case 335: return ImGuiKey_KeypadEnter;
+            case 336: return ImGuiKey_KeypadEqual;
+            case 340: return ImGuiKey_LeftShift;
+            case 341: return ImGuiKey_LeftCtrl;
+            case 342: return ImGuiKey_LeftAlt;
+            case 343: return ImGuiKey_LeftSuper;
+            case 344: return ImGuiKey_RightShift;
+            case 345: return ImGuiKey_RightCtrl;
+            case 346: return ImGuiKey_RightAlt;
+            case 347: return ImGuiKey_RightSuper;
+            case 348: return ImGuiKey_Menu;
+            default: break;
+            }
+            return ImGuiKey_None;
+        }
+
+        // Index into `m_ModifierSidesDown`: modifier pair in
+        // shift/ctrl/alt/super order, low bit selecting left(0)/right(1). Only
+        // meaningful for the eight modifier key codes.
+        [[nodiscard]] constexpr std::size_t ModifierSideIndex(
+            const int keyCode) noexcept
+        {
+            const std::size_t pair =
+                keyCode >= 344
+                    ? static_cast<std::size_t>(keyCode - 344)
+                    : static_cast<std::size_t>(keyCode - 340);
+            const std::size_t side = keyCode >= 344 ? 1u : 0u;
+            return (pair * 2u) + side;
+        }
+
+        // ImGui wants the chord modifiers as their own events, and
+        // `Platform::KeyEvent` carries no modifier mask, so derive them from
+        // the left/right modifier keys' own press/release events. Anything a
+        // shortcut reads (`ImGuiMod_Ctrl | ImGuiKey_V`) is then correct without
+        // widening the platform event.
+        [[nodiscard]] constexpr ImGuiKey ModifierChordForKey(
+            const int keyCode) noexcept
+        {
+            switch (keyCode)
+            {
+            case 340:
+            case 344:
+                return ImGuiMod_Shift;
+            case 341:
+            case 345:
+                return ImGuiMod_Ctrl;
+            case 342:
+            case 346:
+                return ImGuiMod_Alt;
+            case 343:
+            case 347:
+                return ImGuiMod_Super;
+            default: break;
+            }
+            return ImGuiKey_None;
+        }
+
         // Apply the window's logical size and HiDPI scale onto ImGui IO. ImGui
         // expects `DisplaySize` in window coordinates and `DisplayFramebufferScale`
         // as framebuffer-pixels-per-window-unit, so the overlay frame can report
@@ -346,7 +463,7 @@ namespace Extrinsic::Runtime
         {
             ++m_Diagnostics.PumpedEventCount;
             std::visit(
-                [&io](const auto& e)
+                [&io, this](const auto& e)
                 {
                     using T = std::decay_t<decltype(e)>;
                     if constexpr (std::is_same_v<T, Platform::CursorEvent>)
@@ -366,6 +483,28 @@ namespace Extrinsic::Runtime
                     {
                         io.AddInputCharacter(e.Character);
                     }
+                    else if constexpr (std::is_same_v<T, Platform::KeyEvent>)
+                    {
+                        const ImGuiKey key = ToImGuiKey(e.KeyCode);
+                        if (key == ImGuiKey_None)
+                            return;
+
+                        // Submit the modifier chord before the key itself, so a
+                        // Ctrl+V arriving in one pump is already a chord when
+                        // ImGui reads the V.
+                        if (const ImGuiKey chord = ModifierChordForKey(e.KeyCode);
+                            chord != ImGuiKey_None)
+                        {
+                            const std::size_t side =
+                                ModifierSideIndex(e.KeyCode);
+                            m_ModifierSidesDown[side] = e.IsPressed;
+                            io.AddKeyEvent(
+                                chord,
+                                m_ModifierSidesDown[side & ~std::size_t{1}] ||
+                                    m_ModifierSidesDown[side | std::size_t{1}]);
+                        }
+                        io.AddKeyEvent(key, e.IsPressed);
+                    }
                     // WindowResizeEvent is intentionally NOT written into
                     // io.DisplaySize. Display metrics are refreshed every frame
                     // from the authoritative window port (logical
@@ -377,11 +516,8 @@ namespace Extrinsic::Runtime
                     // the resize and content-scale callbacks), so writing it into
                     // io.DisplaySize would double-scale the overlay frame on
                     // HiDPI displays (DisplaySize * DisplayFramebufferScale).
-                    // WindowCloseEvent / KeyEvent / WindowDropEvent are likewise
-                    // counted as pumped but not translated: GLFW key-code ->
-                    // ImGuiKey mapping is owned by the editor input-binding slice
-                    // (Slice A non-goal), and close/drop have no ImGui IO
-                    // equivalent.
+                    // WindowCloseEvent / WindowDropEvent are counted as pumped
+                    // but not translated: neither has an ImGui IO equivalent.
                 },
                 event);
         }

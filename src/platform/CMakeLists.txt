@@ -49,7 +49,10 @@ if(_intrinsic_platform_backend STREQUAL "Glfw")
                 backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp
         )
         target_compile_definitions(${target_name} PRIVATE INTRINSIC_PLATFORM_BACKEND_GLFW=1)
-        target_link_libraries(${target_name} PUBLIC glfw imgui_lib)
+        # BUG-139 removed the unreachable ImGui_ImplGlfw_* forwards, so the
+        # platform backend no longer names ImGui at all. Key events reach ImGui
+        # through the runtime adapter's own pump.
+        target_link_libraries(${target_name} PUBLIC glfw)
 else()
         target_compile_definitions(${target_name} PRIVATE INTRINSIC_PLATFORM_BACKEND_NULL=1)
 endif()

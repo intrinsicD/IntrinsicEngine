@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -142,6 +143,12 @@ export namespace Extrinsic::Runtime
         std::string                   m_ClipboardScratch{}; // backing store for ImGui clipboard reads
         Graphics::ImGuiOverlayFontAtlas m_FontAtlasCache{};
         std::uint64_t                 m_FontAtlasRevision{0u};
+        // Which side of each modifier is currently held, in the order
+        // shift/ctrl/alt/super x left/right. `Platform::KeyEvent` carries no
+        // modifier mask, so the chord state ImGui shortcuts read is derived
+        // from these; releasing one side must not clear a modifier the other
+        // side is still holding.
+        std::array<bool, 8>           m_ModifierSidesDown{};
         bool                          m_FrameStarted{false};
         bool                          m_EditorVisible{true};
     };

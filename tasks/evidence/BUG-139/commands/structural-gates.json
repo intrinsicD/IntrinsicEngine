@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e; python3 tools/repo/check_layering.py --root src --strict; python3 tools/repo/check_test_layout.py --root . --strict; python3 tools/agents/validate_tasks.py --root tasks --strict; python3 tools/agents/check_task_policy.py --root . --strict; python3 tools/agents/check_task_state_links.py --root . --strict; python3 tools/docs/check_doc_links.py --root .; python3 tools/repo/check_root_hygiene.py --root . --strict"
+  ],
+  "command_display": "bash -c 'set -e; python3 tools/repo/check_layering.py --root src --strict; python3 tools/repo/check_test_layout.py --root . --strict; python3 tools/agents/validate_tasks.py --root tasks --strict; python3 tools/agents/check_task_policy.py --root . --strict; python3 tools/agents/check_task_state_links.py --root . --strict; python3 tools/docs/check_doc_links.py --root .; python3 tools/repo/check_root_hygiene.py --root . --strict'",
+  "cwd": ".",
+  "duration_ms": 3088,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T12:38:09Z",
+  "label": "structural-gates",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-08T12:38:06Z",
+  "stderr_path": "tasks/evidence/BUG-139/commands/structural-gates.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-139/commands/structural-gates.stdout.log",
+  "stdout_sha256": "aa494556ac2d3715b5faab5e5c631a5bf76aacef9beff29e8c9d1680517d8a50",
+  "task_id": "BUG-139"
+}

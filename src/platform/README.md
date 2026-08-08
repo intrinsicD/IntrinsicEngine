@@ -99,7 +99,14 @@ data-only payloads:
 - `WindowResizeEvent` carries framebuffer-pixel width/height and drives
   resize/minimize state (`0x0` is minimized for Null and GLFW).
 - `KeyEvent`, `MouseButtonEvent`, `ScrollEvent`, and `CursorEvent` update the
-  per-frame `Platform.Input::Context` state owned by the window port.
+  per-frame `Platform.Input::Context` state owned by the window port. The same
+  events are drained by `Runtime.ImGuiAdapter`, which is the only consumer that
+  translates them into ImGui IO; the platform layer names no ImGui type and
+  forwards to no ImGui platform backend (`BUG-139` removed the unreachable
+  `ImGui_ImplGlfw_*` forwards, which were guarded on a backend that is never
+  initialized). `KeyEvent::KeyCode` is GLFW's key numbering, the same space
+  `Platform.Input::Key` publishes; `GLFW_REPEAT` is filtered out at the
+  callback, and ImGui synthesises its own key repeat from hold duration.
 - `CharEvent` is UTF-32 codepoint input for simple text entry. Full IME
   composition is not a promoted platform goal yet.
 - `WindowDropEvent` carries dropped file paths only. Runtime owns import,
