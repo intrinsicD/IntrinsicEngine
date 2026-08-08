@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "\nctest --test-dir build/ci --output-on-failure -R \"RuntimeAssetIngestStateMachine|AssetImportQueue|SandboxEditorModels\" --timeout 120\n"
+  ],
+  "command_display": "/bin/bash -o pipefail -c '\nctest --test-dir build/ci --output-on-failure -R \"RuntimeAssetIngestStateMachine|AssetImportQueue|SandboxEditorModels\" --timeout 120\n'",
+  "cwd": ".",
+  "duration_ms": 190,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T01:24:00Z",
+  "label": "queue-contract-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-08T01:24:00Z",
+  "stderr_path": "tasks/evidence/BUG-142/commands/queue-contract-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-142/commands/queue-contract-tests.stdout.log",
+  "stdout_sha256": "3ecb319f08bb14a2cf49771421289068e52d285585ce6b6ff14144e1c0b693dc",
+  "task_id": "BUG-142"
+}

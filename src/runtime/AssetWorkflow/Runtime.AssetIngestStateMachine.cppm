@@ -137,6 +137,13 @@ export namespace Extrinsic::Runtime
         std::optional<RuntimeAssetImportQueueTimePoint> StartedAt{};
         std::optional<RuntimeAssetImportQueueTimePoint> FinishedAt{};
         RuntimeAssetImportQueueTimePoint LastUpdatedAt{};
+        // Read as a pair. ProgressDeterminate == false means "no progress
+        // information", and NormalizedProgress is then 0.0 and carries nothing;
+        // a caller must not render it as a fraction. Determinate 0.0 therefore
+        // means exactly Queued, the one stage that has genuinely made no
+        // progress. Complete is the only terminal stage with a fraction (1.0):
+        // Failed and Cancelled stopped part-way, so they are indeterminate and
+        // are described by StageText rather than by a bar.
         bool ProgressDeterminate{true};
         float NormalizedProgress{0.0f};
         std::string StageText{};

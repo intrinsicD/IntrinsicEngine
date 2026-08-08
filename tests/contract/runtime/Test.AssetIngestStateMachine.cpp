@@ -251,6 +251,97 @@ TEST(RuntimeAssetIngestStateMachine, QueueSnapshotReportsStagesProgressAndTimest
                  "Complete");
 }
 
+TEST(RuntimeAssetIngestStateMachine, TerminalRowsNeverReportZeroDeterminateProgress)
+{
+    Runtime::RuntimeAssetIngestStateMachine machine;
+
+    // Complete: the only terminal stage with a meaningful fraction.
+    const auto completed = machine.Submit(ManualMeshRequest("done.obj"));
+    ASSERT_TRUE(completed.Succeeded());
+    DriveToApplying(machine, completed.Handle);
+    Runtime::RuntimeAssetIngestResult applied{};
+    applied.Asset = Assets::AssetId{7u, 1u};
+    applied.PayloadKind = Assets::AssetPayloadKind::Mesh;
+    ASSERT_TRUE(machine.CompleteApply(
+        completed.Handle, completed.Handle.Generation, applied).Succeeded());
+
+    const auto failed = machine.Submit(ManualMeshRequest("missing.obj"));
+    ASSERT_TRUE(failed.Succeeded());
+    ASSERT_TRUE(machine.MarkMissingFile(failed.Handle).Mutated);
+
+    const auto cancelled = machine.Submit(ManualMeshRequest("cancel.obj"));
+    ASSERT_TRUE(cancelled.Succeeded());
+    DriveToDecodeQueued(machine, cancelled.Handle);
+    ASSERT_TRUE(machine.MarkDecoding(cancelled.Handle).Succeeded());
+    ASSERT_TRUE(machine.Cancel(cancelled.Handle).Mutated);
+
+    const Runtime::RuntimeAssetImportQueueSnapshot queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 3u);
+    EXPECT_EQ(queue.TerminalCount, 3u);
+
+    for (const Runtime::RuntimeAssetImportQueueEntry& entry : queue.Entries)
+    {
+        SCOPED_TRACE(entry.StageText);
+        ASSERT_NE(entry.TerminalStatus,
+                  Runtime::RuntimeAssetImportQueueTerminalStatus::None);
+        // The reported defect: a terminal row that claims to be finished while
+        // also claiming no progress was made.
+        const bool zeroDeterminate =
+            entry.ProgressDeterminate && entry.NormalizedProgress == 0.0f;
+        EXPECT_FALSE(zeroDeterminate);
+    }
+
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Complete);
+    EXPECT_TRUE(queue.Entries[0].ProgressDeterminate);
+    EXPECT_FLOAT_EQ(queue.Entries[0].NormalizedProgress, 1.0f);
+
+    // Failed and cancelled imports stopped part-way, so they carry no fraction
+    // at all rather than a full bar.
+    EXPECT_EQ(queue.Entries[1].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Failed);
+    EXPECT_FALSE(queue.Entries[1].ProgressDeterminate);
+    EXPECT_FLOAT_EQ(queue.Entries[1].NormalizedProgress, 0.0f);
+    EXPECT_EQ(queue.Entries[2].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Cancelled);
+    EXPECT_FALSE(queue.Entries[2].ProgressDeterminate);
+    EXPECT_FLOAT_EQ(queue.Entries[2].NormalizedProgress, 0.0f);
+}
+
+TEST(RuntimeAssetIngestStateMachine, IndeterminateProgressIsDistinguishableFromZeroProgress)
+{
+    Runtime::RuntimeAssetIngestStateMachine machine;
+
+    // A freshly queued import has genuinely made no progress: determinate 0.
+    const auto queued = machine.Submit(ManualMeshRequest("waiting.obj"));
+    ASSERT_TRUE(queued.Succeeded());
+
+    // A decoding import has unknown progress: indeterminate, and its value
+    // carries nothing rather than a plausible-looking fraction.
+    const auto decoding = machine.Submit(ManualMeshRequest("decoding.obj"));
+    ASSERT_TRUE(decoding.Succeeded());
+    DriveToDecodeQueued(machine, decoding.Handle);
+    ASSERT_TRUE(machine.MarkDecoding(decoding.Handle).Succeeded());
+
+    const Runtime::RuntimeAssetImportQueueSnapshot queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Queued);
+    EXPECT_TRUE(queue.Entries[0].ProgressDeterminate);
+    EXPECT_FLOAT_EQ(queue.Entries[0].NormalizedProgress, 0.0f);
+
+    EXPECT_EQ(queue.Entries[1].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_FALSE(queue.Entries[1].ProgressDeterminate);
+    EXPECT_FLOAT_EQ(queue.Entries[1].NormalizedProgress, 0.0f);
+
+    // Same float, different meaning — the determinate flag is what separates
+    // them, so it must differ.
+    EXPECT_NE(queue.Entries[0].ProgressDeterminate,
+              queue.Entries[1].ProgressDeterminate);
+}
+
 TEST(RuntimeAssetIngestStateMachine, QueueSnapshotReportsFailedCancelledAndClearCompleted)
 {
     Runtime::RuntimeAssetIngestStateMachine machine;

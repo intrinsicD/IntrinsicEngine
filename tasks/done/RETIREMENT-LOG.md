@@ -7114,3 +7114,43 @@ regeneration. The full per-site inventory is recorded in the retired task and
 spun out as [`BUG-145`](../backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md)
 rather than widening this fix. ICP registration is the counter-example already
 mapping history state through `ToEditorCommandStatus`.
+
+[`BUG-142`](BUG-142-assetio-queue-terminal-row-zero-progress.md) — the AssetIO
+queue terminal-row progress defect retired on 2026-08-08, with an honest
+correction to its premise. The reported `Completed` + `0%` row does not
+reproduce from the current code: `StageForPhase` maps a complete phase to the
+`Complete` stage, `ProgressForStage` returns `1.0f` for it,
+`IsIndeterminateProgressStage` reports it determinate, the executor post-pass
+touches only cancellation, and the editor row copies both fields faithfully, so
+a genuinely complete row renders `100%`. The precise trigger for the observed
+screenshot was not identified; the plausible producers are a row whose stage
+never advanced past `Queued` while completion was signalled elsewhere, or a
+default-constructed entry reaching the table, both of which render exactly `0%`.
+
+Two real defects were found in that same code and are what the task's required
+changes actually describe. `ProgressForStage` returned `1.0f` for `Failed` and
+`Cancelled`, so a failed or cancelled import drew a full bar labelled `100%`;
+both are now indeterminate, because an import that stopped part-way has no
+completion fraction, and they are described by stage text instead. Indeterminate
+stages also carried a plausible-looking number — `Decoding` reported `0.45` —
+so the float alone could not be distinguished from real progress; every
+indeterminate stage now carries `0.0`.
+
+The `(ProgressDeterminate, NormalizedProgress)` pair was kept rather than
+switching this one consumer to an optional. That pair is the repository-wide
+progress idiom, shared with `Runtime.JobService` and
+`Runtime.EditorJobProjection`, and a second representation for the AssetIO queue
+alone would have added surface for no gain. It is now documented as the "no
+progress information" representation, and determinate `0.0` means exactly
+`Queued`. No panel highlight change was needed: the queue table has no colour
+code at all, and the misleading emphasis was the full progress-bar fill on
+failed rows, removed at the source.
+
+Two contract tests were added — one asserting no terminal row is ever
+determinate-with-zero while pinning `Complete` at `1.0` and `Failed`/`Cancelled`
+at none, one proving an indeterminate in-flight import is distinguishable from a
+queued zero-progress one — and both fail against the unfixed source. 11/11
+state-machine cases pass and the default CPU gate passes 4142/4142 across three
+consecutive runs. One earlier gate run reported a single unidentified failure
+that did not recur; it is recorded on the task rather than dismissed, and most
+likely is the already-open `BUG-134` intermittent.

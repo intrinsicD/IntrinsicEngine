@@ -177,17 +177,25 @@ namespace Extrinsic::Runtime
             case RuntimeAssetImportQueueStage::MainThreadApply:
             case RuntimeAssetImportQueueStage::GpuUpload:
                 return true;
+            // Failed and Cancelled stopped part-way, so no completion fraction
+            // describes them. Reporting one would draw a full bar on an import
+            // that never finished.
+            case RuntimeAssetImportQueueStage::Failed:
+            case RuntimeAssetImportQueueStage::Cancelled:
+                return true;
             case RuntimeAssetImportQueueStage::Queued:
             case RuntimeAssetImportQueueStage::Routing:
             case RuntimeAssetImportQueueStage::DecodeQueued:
             case RuntimeAssetImportQueueStage::Complete:
-            case RuntimeAssetImportQueueStage::Failed:
-            case RuntimeAssetImportQueueStage::Cancelled:
                 return false;
             }
             return false;
         }
 
+        // Only meaningful for determinate stages. An indeterminate stage carries
+        // 0.0 so the float can never be mistaken for a real fraction; callers
+        // must read ProgressDeterminate first. Determinate 0.0 therefore means
+        // exactly Queued, the one stage that has genuinely made no progress.
         [[nodiscard]] float ProgressForStage(
             const RuntimeAssetImportQueueStage stage) noexcept
         {
@@ -199,16 +207,14 @@ namespace Extrinsic::Runtime
                 return 0.15f;
             case RuntimeAssetImportQueueStage::DecodeQueued:
                 return 0.25f;
-            case RuntimeAssetImportQueueStage::Decoding:
-                return 0.45f;
-            case RuntimeAssetImportQueueStage::MainThreadApply:
-                return 0.80f;
-            case RuntimeAssetImportQueueStage::GpuUpload:
-                return 0.90f;
             case RuntimeAssetImportQueueStage::Complete:
+                return 1.0f;
+            case RuntimeAssetImportQueueStage::Decoding:
+            case RuntimeAssetImportQueueStage::MainThreadApply:
+            case RuntimeAssetImportQueueStage::GpuUpload:
             case RuntimeAssetImportQueueStage::Failed:
             case RuntimeAssetImportQueueStage::Cancelled:
-                return 1.0f;
+                return 0.0f;
             }
             return 0.0f;
         }

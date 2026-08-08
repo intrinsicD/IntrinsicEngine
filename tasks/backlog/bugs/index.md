@@ -9,11 +9,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-142` — AssetIO queue shows 0% progress on a completed import row](BUG-142-assetio-queue-terminal-row-zero-progress.md):
-  a successful import row reports stage `Completed` and elapsed `0.29 s` while
-  its progress cell renders a highlighted `0%`. Make the snapshot distinguish
-  absent progress information from zero progress, and keep terminal rows
-  self-consistent.
 - [`BUG-141` — Editor geometry-processing diagnostics are mislabeled, duplicated, unscoped, and unactionable](BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md):
   a normally queued job is reported as `GeometryProcessingFailed`, each event is
   emitted twice, the entries then appear in every unrelated mesh domain window
@@ -82,6 +77,16 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-08: [`BUG-142` — AssetIO queue shows 0% progress on a completed
+  import row](../../done/BUG-142-assetio-queue-terminal-row-zero-progress.md).
+  The reported `Completed` + `0%` screenshot does not reproduce — a complete row
+  maps to `1.0` determinate through the whole chain — but two real defects in
+  that code are fixed: `Failed` and `Cancelled` returned `1.0f` and drew a full
+  bar labelled `100%`, and indeterminate stages carried a plausible-looking
+  `0.45` that could not be told apart from real progress. Both terminal states
+  now report no progress and are labelled by stage; indeterminate stages carry
+  `0.0`, so determinate `0.0` means exactly `Queued`.
 
 - Closed 2026-08-08: [`BUG-140` — Mesh denoise reports Applied/Success after
   moving zero

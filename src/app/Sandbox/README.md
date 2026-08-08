@@ -194,7 +194,12 @@ discovery for the
 runtime-owned AssetIO queue. Rows show queued/running/apply/upload/terminal
 import stages, payload kind, path basename, elapsed time, determinate progress
 where available, indeterminate stage labels where decoder progress is unknown,
-and failure/cancellation diagnostics. Clear-completed and cancellable
+and failure/cancellation diagnostics. Progress is reported as a pair: when the
+snapshot marks a row indeterminate its normalized value is `0.0` and carries no
+information, so a row is labelled by its stage instead of drawn as a fraction.
+A determinate `0.0` therefore means exactly `Queued`. `Complete` is the only
+terminal stage with a fraction (`1.0`); failed and cancelled imports stopped
+part-way and so report no progress rather than a full bar. Clear-completed and cancellable
 manual or dropped import commands route back to
 that same published service; the sandbox app and UI never own asset, ECS,
 or graphics state.
