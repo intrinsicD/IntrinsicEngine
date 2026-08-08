@@ -1,0 +1,128 @@
+schema_version: 1
+task_id: BUG-144
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-08T00:18:54Z'
+claim_eligible: false
+source:
+  base_ref: d1c281a354e0ab31ad3e43af92c6547b69b5849c
+  base_revision: d1c281a354e0ab31ad3e43af92c6547b69b5849c
+  head_revision: 8f63f95ecf83778f8e2307ecd3a4abc780c797eb
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: docs/agent/workflow-evidence.md
+    sha256: 2979083384c2a375e16b27017d33425f3091a30b971d3c59c384514297536ebc
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 17dcfb51bec489a77c57f398233d0670b9531b47bd79d51d4335c67712ecd5e3
+  - path: tasks/backlog/bugs/index.md
+    sha256: 6f10a98a6181212e56b8d189d11ad0b84f91f42d3fa2c74a58db6d4656610ba9
+  - path: tasks/done/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md
+    sha256: 6e573886e334ba8effd4423c8c254061a6d0a1c64c6179c80bc4a7d74eb44e4c
+  - path: tasks/done/PROC-032-repository-native-agent-work-graph.md
+    sha256: b4ab82c4d106a63e0e68645c9d84391163b13d6ed1542aff19865ce2326fbfe9
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 17d0d52fbd9f8b9848e35b697658f653e1845f0f8a7a56d93e5c8a110e520956
+  - path: tests/regression/tooling/Test.AgentWorkGraph.py
+    sha256: 0109cd706fbee6e21894dfa0b24b4356b89393d23f7720836673e06eba039513
+  - path: tests/regression/tooling/Test.TaskClaim.py
+    sha256: 9298fb9a4c2e9f3010c5c25ccb95051c81cea721ee6ceb6f288a968a2430bfef
+  - path: tools/agents/agent_work_graph.py
+    sha256: cbca36a3705fb0c66516acba1c3e3dca0853c3b9635b9df4a024dd840090d778
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 2979083384c2a375e16b27017d33425f3091a30b971d3c59c384514297536ebc
+  - path: tools/agents/task_claim.py
+    sha256: 0a457c74667b0ed3379880e2cae57f793d1434aa28a6bd03b71bd51179b081b2
+  content_digest: 5bb46e9823e75b7c46497459954c12f68e51cdfa75e72f17cb7a203351558a45
+touched:
+  paths:
+  - docs/agent/workflow-evidence.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md
+  - tasks/done/PROC-032-repository-native-agent-work-graph.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/regression/tooling/Test.AgentWorkGraph.py
+  - tests/regression/tooling/Test.TaskClaim.py
+  - tools/agents/agent_work_graph.py
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  - tools/agents/task_claim.py
+  layers:
+  - agent-workflow
+  modules:
+  - tools.agents.agent_work_graph
+extension_seam: The lock stays one directory mutex with a holder record; no lock service, daemon, or dependency
+  was added.
+future_change_plan: A resident lock manager is reconsidered only if a measured multi-worktree corpus shows
+  identified-holder breaking is inadequate.
+acceptance:
+- criterion: A writer holding the lock beyond the stale threshold keeps it, and a
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No sequence of contending readers and writers can produce a
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: '`task_claim.py` rejects invalid task IDs in every command that resolves a'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The full agent-work-graph, task-claim, and workflow-evidence regression
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-144/commands/structural-gates.json
+- receipt: tasks/evidence/BUG-144/commands/tooling-regressions.json
+changed_public_contracts:
+- repo.agent-work-graph
+diagnostics_and_previews:
+- Contending readers fail with "timed out waiting for the work-graph lock"; a holder whose lock was broken
+  fails with "taken over by another holder"; task_claim release/recover reject invalid task IDs before
+  resolving a path.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- 'A pid can be reused, so a dead holder may read as alive and delay a break. That is conservative by
+  design: it delays, never steals.'
+- A foreign-host holder cannot be liveness-checked and is only broken after 900 s, so a crashed cross-host
+  holder blocks that long.
+- The live-slow-holder regression pins the new contract but cannot fail against the unfixed tool, which
+  publishes no holder record; the cascade and liveness regressions carry the discrimination.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No engine source, backend, shader, RHI, or byte layout changed; this is Python tooling under
+    tools/agents.
+- check: build-and-ctest
+  reason: No C++ source, CMake input, module surface, or compiled test is in the surface; the focused
+    tooling regressions and strict structural gates are the strongest relevant evidence.
+artifacts:
+- path: tools/agents/agent_work_graph.py
+  sha256: cbca36a3705fb0c66516acba1c3e3dca0853c3b9635b9df4a024dd840090d778
+  kind: file
+- path: tools/agents/task_claim.py
+  sha256: 0a457c74667b0ed3379880e2cae57f793d1434aa28a6bd03b71bd51179b081b2
+  kind: file
+- path: tests/regression/tooling/Test.AgentWorkGraph.py
+  sha256: 0109cd706fbee6e21894dfa0b24b4356b89393d23f7720836673e06eba039513
+  kind: file
+- path: tests/regression/tooling/Test.TaskClaim.py
+  sha256: 9298fb9a4c2e9f3010c5c25ccb95051c81cea721ee6ceb6f288a968a2430bfef
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
