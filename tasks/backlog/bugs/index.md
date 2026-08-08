@@ -9,11 +9,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-144` — Work-graph stale-lock breaker can steal a live lock](BUG-144-work-graph-lock-breaker-and-claim-path-validation.md):
-  the `agent_work_graph.py` directory mutex breaks any lock whose `mkdir` mtime
-  is older than 30 s, so a writer legitimately hashing a large surface loses its
-  lock and then removes its successor's. Make lock ownership verifiable, and
-  validate task IDs in the remaining `task_claim.py` path-building commands.
 - [`BUG-142` — AssetIO queue shows 0% progress on a completed import row](BUG-142-assetio-queue-terminal-row-zero-progress.md):
   a successful import row reports stage `Completed` and elapsed `0.29 s` while
   its progress cell renders a highlighted `0%`. Make the snapshot distinguish
@@ -86,6 +81,15 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-08: [`BUG-144` — Work-graph stale-lock breaker can steal a live
+  lock](../../done/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md).
+  Lock holders now publish a token/pid/host record inside the lock directory,
+  and a waiter breaks only on a provably dead same-host pid, an unreadable
+  record past a grace window, or a stale foreign-host record — never on elapsed
+  time alone. Release compares the token and refuses to delete a successor's
+  lock, reporting the takeover instead of cascading. `task_claim.py`
+  `release`/`recover` now validate task IDs before building a path.
 
 - Closed 2026-08-08: [`BUG-110` — Implicit smoothing applies boundary pins after
   rather than during

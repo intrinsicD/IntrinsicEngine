@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import socket
 import shutil
 import subprocess
 import sys
@@ -744,6 +746,142 @@ class AgentWorkGraphTests(unittest.TestCase):
                 outputs.append(output)
         self.assertEqual(json.loads(outputs[0])["task_id"], fixture.task_id)
         self.assertEqual(json.loads(outputs[1])[0]["task_id"], fixture.task_id)
+
+    def _graph_root(self, fixture: WorkGraphFixture) -> Path:
+        common = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=fixture.root,
+            text=True,
+            stdout=subprocess.PIPE,
+            check=True,
+        ).stdout.strip()
+        return Path(common) / "intrinsic-agent-work-graphs/v1"
+
+    def test_waiter_does_not_break_lock_held_by_a_live_slow_holder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = WorkGraphFixture(Path(tmp))
+            fixture._assert_success(fixture.claim())
+            fixture._assert_success(fixture.start())
+            graph_root = self._graph_root(fixture)
+            lock = graph_root / ".lock"
+            lock.mkdir()
+            # A holder that is alive but has been working far longer than any
+            # elapsed-time threshold would tolerate.
+            (lock / "owner.json").write_text(
+                json.dumps(
+                    {
+                        "token": "live-holder",
+                        "pid": os.getpid(),
+                        "host": socket.gethostname(),
+                        "acquired_at": time.time() - 3600.0,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            # Backdate the directory mtime so an elapsed-time breaker would
+            # fire. Only a liveness check can tell this lock is still held.
+            stale = time.time() - 3600.0
+            os.utime(lock, (stale, stale))
+
+            result = invoke(
+                fixture.root,
+                TOOL,
+                "show",
+                "--root",
+                str(fixture.root),
+                "--task-id",
+                fixture.task_id,
+            )
+
+            self.assertEqual(result.returncode, 2, result.stdout)
+            self.assertIn("timed out waiting for the work-graph lock", result.stdout)
+            self.assertTrue(lock.is_dir(), "waiter stole a live holder's lock")
+            self.assertEqual(
+                json.loads((lock / "owner.json").read_text(encoding="utf-8"))["token"],
+                "live-holder",
+            )
+
+    def test_waiter_breaks_lock_whose_holder_is_provably_gone(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = WorkGraphFixture(Path(tmp))
+            fixture._assert_success(fixture.claim())
+            fixture._assert_success(fixture.start())
+            graph_root = self._graph_root(fixture)
+            lock = graph_root / ".lock"
+            lock.mkdir()
+            dead_pid = subprocess.run(
+                [sys.executable, "-c", "import os; print(os.getpid())"],
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip()
+            (lock / "owner.json").write_text(
+                json.dumps(
+                    {
+                        "token": "dead-holder",
+                        "pid": int(dead_pid),
+                        "host": socket.gethostname(),
+                        "acquired_at": time.time(),
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+
+            result = invoke(
+                fixture.root,
+                TOOL,
+                "show",
+                "--root",
+                str(fixture.root),
+                "--task-id",
+                fixture.task_id,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_broken_lock_victim_does_not_delete_the_successor_lock(self) -> None:
+        sys.path.insert(0, str(REPOSITORY / "tools/agents"))
+        import agent_work_graph  # noqa: PLC0415
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "graphs"
+            lock = root / ".lock"
+            owner = lock / "owner.json"
+
+            with self.assertRaises(agent_work_graph.WorkGraphError) as caught:
+                with agent_work_graph._state_lock(root):
+                    # Simulate this holder being broken and a successor taking
+                    # the lock while the critical section is still running.
+                    owner.write_text(
+                        json.dumps({"token": "successor"}, sort_keys=True),
+                        encoding="utf-8",
+                    )
+
+            self.assertIn("taken over by another holder", str(caught.exception))
+            self.assertTrue(lock.is_dir(), "victim deleted the successor's lock")
+            self.assertEqual(
+                json.loads(owner.read_text(encoding="utf-8"))["token"], "successor"
+            )
+
+    def test_lock_release_does_not_mask_an_error_from_the_critical_section(self) -> None:
+        sys.path.insert(0, str(REPOSITORY / "tools/agents"))
+        import agent_work_graph  # noqa: PLC0415
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "graphs"
+            owner = root / ".lock" / "owner.json"
+
+            with self.assertRaises(RuntimeError) as caught:
+                with agent_work_graph._state_lock(root):
+                    owner.write_text(
+                        json.dumps({"token": "successor"}, sort_keys=True),
+                        encoding="utf-8",
+                    )
+                    raise RuntimeError("original failure")
+
+            self.assertEqual(str(caught.exception), "original failure")
 
     def test_success_is_immutable_and_inspectable_after_claim_release(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

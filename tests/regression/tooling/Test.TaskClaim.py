@@ -220,6 +220,48 @@ class TaskClaimTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout)
         self.assertIn("wrong owner", result.stdout)
 
+    def test_release_and_recover_reject_traversal_shaped_task_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ClaimFixture(Path(tmp))
+            fixture.acquire(fixture.main, "TEST-001", "driver-a")
+
+            for bad in ("../../etc", "TEST-001/../TEST-002", "../TEST-001"):
+                with self.subTest(task_id=bad):
+                    released = invoke(
+                        fixture.main,
+                        "release",
+                        "--root",
+                        str(fixture.main),
+                        "--task-id",
+                        bad,
+                        "--owner",
+                        "driver-a",
+                        "--reason",
+                        "traversal probe",
+                    )
+                    self.assertEqual(released.returncode, 2, released.stdout)
+                    self.assertIn("invalid task ID", released.stdout)
+
+                    recovered = invoke(
+                        fixture.main,
+                        "recover",
+                        "--root",
+                        str(fixture.main),
+                        "--task-id",
+                        bad,
+                        "--actor",
+                        "driver-b",
+                        "--reason",
+                        "traversal probe",
+                    )
+                    self.assertEqual(recovered.returncode, 2, recovered.stdout)
+                    self.assertIn("invalid task ID", recovered.stdout)
+
+            # The real claim is untouched by any of the rejected calls.
+            status = invoke(fixture.main, "status", "--root", str(fixture.main))
+            self.assertEqual(status.returncode, 0, status.stdout)
+            self.assertIn("LIVE TEST-001", status.stdout)
+
     def test_owner_release_retains_history_and_allows_reclaim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ClaimFixture(Path(tmp))

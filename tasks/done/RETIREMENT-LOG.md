@@ -6901,8 +6901,8 @@ Twenty isolated temporary-Git-worktree regressions pass, `ci-docs` executes
 both the recipe validator and the suite, and the strict task, docs-sync,
 doc-link, ARA-claim, skill-mirror, root-hygiene, and workflow-evidence gates are
 green on the retirement surface. Follow-up
-[`BUG-144`](../backlog/bugs/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md)
-owns two residuals found while auditing that final surface: the lock's
+[`BUG-144`](BUG-144-work-graph-lock-breaker-and-claim-path-validation.md)
+(done, 2026-08-08) owned two residuals found while auditing that final surface: the lock's
 mtime-based stale breaker can steal a live lock from a slow writer, and
 `task_claim.py` `release`/`recover` build claim paths without the `TASK_ID_RE`
 validation `acquire` applies. Neither is reachable through a reviewed workflow
@@ -7035,3 +7035,43 @@ preservation across five iterations, `PreserveBoundary=false` finiteness at a
 `Sparse` cases pass, the default CPU gate passes 4138/4138 with its expected
 GLFW/LeakSanitizer skip, and the generated module inventory is unchanged at 382
 modules because only free functions were added to existing modules.
+
+[`BUG-144`](BUG-144-work-graph-lock-breaker-and-claim-path-validation.md) — the
+work-graph stale-lock breaker retired on 2026-08-08. `PROC-032`'s directory
+mutex decided staleness from `lock.stat().st_mtime`, stamped once at `mkdir`
+and never refreshed, against a fixed 30 s. Any writer slower than that — a
+`finish` hashing a large changed surface, for instance — had its lock taken
+while it was still working, and its unconditional `finally: lock.rmdir()` then
+removed whichever lock directory existed, which could be its successor's. That
+was the last route back to the reader-visible append-to-replace window
+`PROC-032`'s independent review required closed.
+
+Ownership is now identified rather than inferred. Each holder publishes a
+record naming its token, pid, host, and acquisition time inside the lock
+directory, and a waiter breaks the lock only when the holder is provably gone
+(same host, dead pid), when the record is unreadable past a 30 s grace window
+covering the instant between `mkdir` and publishing, or when a foreign-host
+record is older than 900 s. The liveness check is deliberately conservative:
+anything but a clean `ProcessLookupError` counts as alive, so the failure mode
+is waiting, never stealing. Release compares the recorded token and refuses to
+remove a lock it no longer owns, raising an actionable "taken over by another
+holder" error instead of cascading, and stays quiet when the critical section
+itself raised so the original exception is not masked. The directory mutex
+remains a directory mutex — no lock service, daemon, or new dependency, only
+stdlib `os`, `socket`, and `uuid`.
+
+Alongside it, `task_claim.py` `release` and `recover` now validate `TASK_ID_RE`
+before building a claim path, matching `acquire`, and the dead
+`.events.json` filter in `list_runs` is gone — event files end in
+`.events.jsonl` while the glob is `*.json`, so it never fired.
+
+Five regressions were added. Against the unfixed tools the cascade test and the
+error-masking test both error, the provably-gone liveness test fails, and all
+three task-claim traversal subtests fail. One limitation is recorded rather
+than papered over: the live-slow-holder regression pins the new contract but
+cannot fail against the unfixed tool, because that version publishes no holder
+record at all, so there is nothing to liveness-check. 24 work-graph, 9
+task-claim, and the workflow-evidence regressions pass along with the recipe
+validator and the strict structural set. `docs/agent/workflow-evidence.md`
+documents the new lock contract and its diagnostics, and the generated skill
+mirrors are re-synced.

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "\nset -e\npython3 tests/regression/tooling/Test.AgentWorkGraph.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py\npython3 tools/agents/agent_work_graph.py validate-recipe --recipe tools/agents/work_graphs/review-diamond.v1.json\n"
+  ],
+  "command_display": "/bin/bash -o pipefail -c '\nset -e\npython3 tests/regression/tooling/Test.AgentWorkGraph.py\npython3 tests/regression/tooling/Test.TaskClaim.py\npython3 tests/regression/tooling/Test.WorkflowEvidence.py\npython3 tools/agents/agent_work_graph.py validate-recipe --recipe tools/agents/work_graphs/review-diamond.v1.json\n'",
+  "cwd": ".",
+  "duration_ms": 31289,
+  "exit_code": 0,
+  "finished_at": "2026-08-08T00:12:50Z",
+  "label": "tooling-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-08T00:12:18Z",
+  "stderr_path": "tasks/evidence/BUG-144/commands/tooling-regressions.stderr.log",
+  "stderr_sha256": "e89032c0a75f3d942ed1d8a22b391dfd3ae77bc42151cd4d52186af60a0ee670",
+  "stdout_path": "tasks/evidence/BUG-144/commands/tooling-regressions.stdout.log",
+  "stdout_sha256": "52c6bbc9d0db615d5736b9fbc53c1e5e4201630ff9d3a8414d3251174528ab5b",
+  "task_id": "BUG-144"
+}

@@ -5,15 +5,52 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "claude-bug144"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-07T23:58:08Z"
 contract_schema: 1
 contracts:
   - repo.agent-work-graph
 ---
 # BUG-144 — Work-graph stale-lock breaker can steal a live lock
+
+## Status
+
+- Completed and retired on 2026-08-08.
+- Lock ownership is now identified rather than inferred from elapsed time. Each
+  holder publishes a record naming its token, pid, host, and acquisition time
+  inside the lock directory. A waiter breaks the lock only when the holder is
+  provably gone (same host, dead pid), when the record is unreadable past a
+  30 s grace window covering the instant between `mkdir` and publishing, or
+  when a foreign-host record is older than 900 s. Elapsed time alone is never
+  sufficient, which is exactly what let the previous 30 s `mkdir`-mtime
+  comparison rob a slow writer.
+- The liveness check is deliberately conservative: anything other than a clean
+  `ProcessLookupError` is treated as alive, so the failure mode is waiting, not
+  stealing.
+- Release now compares the recorded token and refuses to remove a lock it no
+  longer owns, raising an actionable "taken over by another holder" error
+  instead of deleting its successor's lock and cascading. When the critical
+  section itself raised, the release stays quiet so the original exception is
+  not masked.
+- `task_claim.py` `release` and `recover` validate `TASK_ID_RE` before building
+  any claim path, matching `acquire`. The dead `.events.json` filter in
+  `list_runs` is gone: event files end in `.events.jsonl` and the glob is
+  `*.json`, so it never fired.
+- Five regressions were added. Against the unfixed tools the cascade test and
+  the error-masking test both error, the provably-gone liveness test fails, and
+  all three task-claim traversal subtests fail.
+- Honest limitation: the live-slow-holder regression pins the new contract but
+  cannot fail against the unfixed tool, because that version publishes no
+  holder record at all — its lock directory is empty, so there is nothing to
+  liveness-check. It is kept as a contract test, and the cascade and liveness
+  regressions are the ones that discriminate the fix.
+- Verified: 24 work-graph, 9 task-claim, and the workflow-evidence regressions
+  pass, along with the recipe validator and the strict task, policy,
+  state-link, maturity-followup, skill-mirror, ARA-claim, doc-link,
+  root-hygiene, and whitespace gates.
+- Completion commit: this retirement commit.
 
 ## Goal
 
@@ -59,42 +96,42 @@ contracts:
 
 ## Required changes
 
-- [ ] Make lock ownership verifiable rather than mtime-inferred — for example
+- [x] Make lock ownership verifiable rather than mtime-inferred — for example
       write a holder record (pid, host, acquired-at) inside the lock directory,
       refresh it while held, and let a waiter break the lock only when the
       recorded holder is provably gone or its record is genuinely stale.
-- [ ] Ensure a broken-lock victim cannot remove a lock it no longer owns, so
+- [x] Ensure a broken-lock victim cannot remove a lock it no longer owns, so
       the failure mode is a clear error rather than a cascading steal.
-- [ ] Apply `TASK_ID_RE` validation in `task_claim.py` `release` and `recover`
+- [x] Apply `TASK_ID_RE` validation in `task_claim.py` `release` and `recover`
       before any path is built, matching `acquire`.
-- [ ] Remove the dead `.events.json` filter in `list_runs`.
+- [x] Remove the dead `.events.json` filter in `list_runs`.
 
 ## Tests
 
-- [ ] Add a regression proving a waiter does not break a lock whose holder is
+- [x] Add a regression proving a waiter does not break a lock whose holder is
       alive and slow past the stale threshold.
-- [ ] Add a regression proving a victim of a legitimate break does not delete
+- [x] Add a regression proving a victim of a legitimate break does not delete
       the succeeding holder's lock.
-- [ ] Add negative `task_claim.py` `release`/`recover` tests for traversal-shaped
+- [x] Add negative `task_claim.py` `release`/`recover` tests for traversal-shaped
       task IDs.
-- [ ] Existing work-graph, task-claim, and workflow-evidence regressions stay
+- [x] Existing work-graph, task-claim, and workflow-evidence regressions stay
       green.
 
 ## Docs
 
-- [ ] Update the work-graph failure-semantics section of
+- [x] Update the work-graph failure-semantics section of
       `docs/agent/workflow-evidence.md` if the lock contract or its diagnostics
       change, and re-sync the generated skill mirrors.
 
 ## Acceptance criteria
 
-- [ ] A writer holding the lock beyond the stale threshold keeps it, and a
+- [x] A writer holding the lock beyond the stale threshold keeps it, and a
       contending reader either waits or fails with an actionable timeout.
-- [ ] No sequence of contending readers and writers can produce a
+- [x] No sequence of contending readers and writers can produce a
       `state/event projection mismatch` for a reader.
-- [ ] `task_claim.py` rejects invalid task IDs in every command that resolves a
+- [x] `task_claim.py` rejects invalid task IDs in every command that resolves a
       claim path.
-- [ ] The full agent-work-graph, task-claim, and workflow-evidence regression
+- [x] The full agent-work-graph, task-claim, and workflow-evidence regression
       suites pass.
 
 ## Verification

@@ -38,10 +38,10 @@ contracts:
   claim, verification, independent-review, and experiment-custody authorities
   are unchanged, and `CI-012`, `CI-013`, and `PROC-031` retain the planned
   verifier-receipt integration.
-- Follow-up [`BUG-144`](../backlog/bugs/BUG-144-work-graph-lock-breaker-and-claim-path-validation.md)
-  owns the stale-lock-breaker and `task_claim` path-validation residuals found
-  while auditing this task's final surface; neither is reachable through a
-  reviewed workflow today.
+- Follow-up [`BUG-144`](BUG-144-work-graph-lock-breaker-and-claim-path-validation.md)
+  owned the stale-lock-breaker and `task_claim` path-validation residuals found
+  while auditing this task's final surface; neither was reachable through a
+  reviewed workflow, and both are now fixed and retired (done, 2026-08-08).
 - Completion commit: this retirement commit.
 
 ## Goal

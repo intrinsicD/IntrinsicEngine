@@ -11,9 +11,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import socket
 import sys
 import time
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -291,29 +294,120 @@ def _events_path(repo_root: Path, task_id: str) -> Path:
     return _work_graph_root(repo_root) / f"{task_id}.events.jsonl"
 
 
+# A lock whose holder record cannot be read is only broken after this long, to
+# cover the instant between mkdir and publishing the record.
+LOCK_UNIDENTIFIED_GRACE_SECONDS = 30.0
+# A holder on another host cannot be liveness-checked, so it is only broken
+# after a window far longer than any legitimate critical section.
+LOCK_FOREIGN_HOST_STALE_SECONDS = 900.0
+
+
+def _process_is_running(pid: object) -> bool:
+    """Conservative liveness check: unknown means alive, so we never steal."""
+    if not isinstance(pid, int) or pid <= 0:
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def _lock_holder(owner_path: Path) -> dict[str, Any] | None:
+    try:
+        record = json.loads(owner_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def _lock_is_breakable(lock: Path, owner_path: Path) -> bool:
+    """True only when the recorded holder is provably gone or genuinely stale.
+
+    Elapsed time alone is never sufficient: the previous implementation compared
+    a mkdir mtime that was never refreshed, so any writer slower than the
+    threshold had its lock taken while it was still working.
+    """
+    holder = _lock_holder(owner_path)
+    if holder is None:
+        # Either the holder has not published yet, or the record is damaged.
+        try:
+            age = time.time() - lock.stat().st_mtime
+        except OSError:
+            return False
+        return age > LOCK_UNIDENTIFIED_GRACE_SECONDS
+    if holder.get("host") == socket.gethostname():
+        return not _process_is_running(holder.get("pid"))
+    acquired_at = holder.get("acquired_at")
+    if not isinstance(acquired_at, (int, float)):
+        return False
+    return (time.time() - float(acquired_at)) > LOCK_FOREIGN_HOST_STALE_SECONDS
+
+
+def _break_lock(lock: Path, owner_path: Path) -> None:
+    try:
+        owner_path.unlink()
+    except OSError:
+        pass
+    try:
+        lock.rmdir()
+    except OSError:
+        pass
+
+
 @contextmanager
 def _state_lock(root: Path, timeout_seconds: float = 5.0) -> Iterator[None]:
     root.mkdir(parents=True, exist_ok=True)
     lock = root / ".lock"
+    owner_path = lock / "owner.json"
+    token = uuid.uuid4().hex
     deadline = time.monotonic() + timeout_seconds
     while True:
         try:
             lock.mkdir()
-            break
         except FileExistsError:
-            try:
-                if time.time() - lock.stat().st_mtime > 30:
-                    lock.rmdir()
-                    continue
-            except (FileNotFoundError, OSError):
-                pass
+            if _lock_is_breakable(lock, owner_path):
+                _break_lock(lock, owner_path)
+                continue
             if time.monotonic() >= deadline:
                 raise WorkGraphError("timed out waiting for the work-graph lock")
             time.sleep(0.05)
+            continue
+        _atomic_write(
+            owner_path,
+            json.dumps(
+                {
+                    "token": token,
+                    "pid": os.getpid(),
+                    "host": socket.gethostname(),
+                    "acquired_at": time.time(),
+                },
+                sort_keys=True,
+            ).encode("utf-8"),
+        )
+        break
+
+    def release(quiet: bool) -> None:
+        holder = _lock_holder(owner_path)
+        if holder is not None and holder.get("token") != token:
+            # Our lock was broken and someone else holds it now. Removing it
+            # would steal theirs and cascade, so surface the anomaly instead.
+            if quiet:
+                return
+            raise WorkGraphError(
+                "the work-graph lock was taken over by another holder while "
+                "this operation was running; re-run and inspect the run state"
+            )
+        _break_lock(lock, owner_path)
+
     try:
         yield
-    finally:
-        lock.rmdir()
+    except BaseException:
+        release(quiet=True)
+        raise
+    release(quiet=False)
 
 
 def _load_live_claim(repo_root: Path, task_id: str) -> dict[str, Any]:
@@ -848,11 +942,7 @@ def list_runs(args: argparse.Namespace) -> int:
     repo_root = repo_root_from(args.root)
     root = _work_graph_root(repo_root)
     with _state_lock(root):
-        task_ids = sorted(
-            path.stem
-            for path in root.glob("*.json")
-            if not path.name.endswith(".events.json")
-        )
+        task_ids = sorted(path.stem for path in root.glob("*.json"))
         payloads = [_status_payload(repo_root, task_id) for task_id in task_ids]
     if args.json:
         print(json.dumps(payloads, indent=2, sort_keys=True))

@@ -167,7 +167,23 @@ append-only and hash-chained. Both bind the task ID, claim owner, branch,
 worktree, exact claim-record generation, task profile, checked-in recipe
 digest, base revision, writer-frozen review digest, and node events. `show` and
 `list` take the same projection lock as transitions, so they cannot observe
-the normal event-append/state-replace window. `finalize` records the exact
+the normal event-append/state-replace window.
+
+That projection lock is a directory mutex whose holder is identified rather
+than inferred from elapsed time. Each holder publishes a record naming its
+token, pid, host, and acquisition time inside the lock directory. A waiter
+breaks the lock only when the holder is provably gone — same host, dead pid —
+or when the record is genuinely stale: unreadable past a short grace period, or
+belonging to a foreign host past a much longer window. A holder that is simply
+slow, such as a `finish` hashing a large changed surface, therefore keeps its
+lock, and a contending reader waits or fails with `timed out waiting for the
+work-graph lock` rather than reading a torn projection. On release a holder
+compares the recorded token and refuses to remove a lock it no longer owns,
+reporting that the lock `was taken over by another holder` instead of deleting
+its successor's; when the critical section itself failed, that release stays
+quiet so the original error is not masked.
+
+`finalize` records the exact
 already-reviewed non-evidence changed-surface digest; it cannot absorb a later
 source edit. Subsequent source/task/docs changes make the completed graph
 visibly `stale`. Success and abort are immutable terminal states and retain

@@ -350,6 +350,8 @@ def acquire(args: argparse.Namespace) -> int:
 
 def release(args: argparse.Namespace) -> int:
     repo_root = repo_root_from(args.root)
+    if not TASK_ID_RE.fullmatch(args.task_id):
+        raise ClaimError(f"invalid task ID: {args.task_id}")
     root = _claim_root(repo_root)
     path = root / f"{args.task_id}.json"
     with _claim_lock(root):
@@ -368,6 +370,8 @@ def release(args: argparse.Namespace) -> int:
 
 def recover(args: argparse.Namespace) -> int:
     repo_root = repo_root_from(args.root)
+    if not TASK_ID_RE.fullmatch(args.task_id):
+        raise ClaimError(f"invalid task ID: {args.task_id}")
     root = _claim_root(repo_root)
     path = root / f"{args.task_id}.json"
     with _claim_lock(root):
