@@ -1,0 +1,102 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxEditorUi.*NoChange*:SandboxEditorUi.*VertexNormal*:SandboxEditorUi.*Simplify*:SandboxEditorUi.*Remesh*:SandboxEditorUi.*Subdivide*:SandboxEditorUi.*UvRegeneration*
+[==========] Running 36 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 36 tests from SandboxEditorUi
+[ RUN      ] SandboxEditorUi.MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned
+[       OK ] SandboxEditorUi.MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned (0 ms)
+[ RUN      ] SandboxEditorUi.MeshSimplifyThatCollapsesNothingReportsNoChange
+[       OK ] SandboxEditorUi.MeshSimplifyThatCollapsesNothingReportsNoChange (3 ms)
+[ RUN      ] SandboxEditorUi.MeshRemeshThatChangesNothingReportsNoChange
+[       OK ] SandboxEditorUi.MeshRemeshThatChangesNothingReportsNoChange (5 ms)
+[ RUN      ] SandboxEditorUi.MeshSubdivideCannotRunAndLeaveTheMeshUnchanged
+[       OK ] SandboxEditorUi.MeshSubdivideCannotRunAndLeaveTheMeshUnchanged (1 ms)
+[ RUN      ] SandboxEditorUi.MeshCurvatureRecomputeThatChangesNothingReportsNoChange
+[       OK ] SandboxEditorUi.MeshCurvatureRecomputeThatChangesNothingReportsNoChange (0 ms)
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalRejectingNothingReportsNoChange
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalRejectingNothingReportsNoChange (0 ms)
+[ RUN      ] SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo
+[       OK ] SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo (6 ms)
+[ RUN      ] SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply (10 ms)
+[ RUN      ] SandboxEditorUi.MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo
+[       OK ] SandboxEditorUi.MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo (1 ms)
+[ RUN      ] SandboxEditorUi.MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply (9 ms)
+[ RUN      ] SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply (6 ms)
+[ RUN      ] SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply (6 ms)
+[ RUN      ] SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo
+[       OK ] SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo (4 ms)
+[ RUN      ] SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply (9 ms)
+[ RUN      ] SandboxEditorUi.MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit (9 ms)
+[ RUN      ] SandboxEditorUi.MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify (10 ms)
+[ RUN      ] SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending (8 ms)
+[ RUN      ] SandboxEditorUi.MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults (10 ms)
+[ RUN      ] SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+[       OK ] SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel (0 ms)
+[ RUN      ] SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent
+[       OK ] SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent (3 ms)
+[ RUN      ] SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings
+[       OK ] SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings (0 ms)
+[ RUN      ] SandboxEditorUi.VertexNormalRecomputeThatChangesNothingReportsNoChange
+[       OK ] SandboxEditorUi.VertexNormalRecomputeThatChangesNothingReportsNoChange (0 ms)
+[ RUN      ] SandboxEditorUi.VertexNormalCpuJobThatChangesNothingReportsNoChange
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.VertexNormalCpuJobThatChangesNothingReportsNoChange (6 ms)
+[ RUN      ] SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply (6 ms)
+[ RUN      ] SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply (6 ms)
+[ RUN      ] SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply (21 ms)
+[ RUN      ] SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets
+[       OK ] SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets (0 ms)
+[ RUN      ] SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals
+[       OK ] SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals (0 ms)
+[ RUN      ] SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets
+[       OK ] SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets (0 ms)
+[ RUN      ] SandboxEditorUi.UvRegenerationThatReproducesStoredUvsReportsNoChange
+[       OK ] SandboxEditorUi.UvRegenerationThatReproducesStoredUvsReportsNoChange (0 ms)
+[ RUN      ] SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords
+[       OK ] SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords (1 ms)
+[ RUN      ] SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply (7 ms)
+[ RUN      ] SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob (7 ms)
+[ RUN      ] SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource (6 ms)
+[ RUN      ] SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty (6 ms)
+[ RUN      ] SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache (6 ms)
+[----------] 36 tests from SandboxEditorUi (191 ms total)
+
+[----------] Global test environment tear-down
+[==========] 36 tests from 1 test suite ran. (191 ms total)
+[  PASSED  ] 36 tests.

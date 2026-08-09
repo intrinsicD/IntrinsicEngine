@@ -1,0 +1,20 @@
+{
+  "command": [
+    "./build/ci/bin/IntrinsicRuntimeContractTests",
+    "--gtest_filter=SandboxEditorUi.*NoChange*:SandboxEditorUi.*VertexNormal*:SandboxEditorUi.*Simplify*:SandboxEditorUi.*Remesh*:SandboxEditorUi.*Subdivide*:SandboxEditorUi.*UvRegeneration*"
+  ],
+  "command_display": "./build/ci/bin/IntrinsicRuntimeContractTests '--gtest_filter=SandboxEditorUi.*NoChange*:SandboxEditorUi.*VertexNormal*:SandboxEditorUi.*Simplify*:SandboxEditorUi.*Remesh*:SandboxEditorUi.*Subdivide*:SandboxEditorUi.*UvRegeneration*'",
+  "cwd": ".",
+  "duration_ms": 196,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T13:34:02Z",
+  "label": "focused-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T13:34:02Z",
+  "stderr_path": "tasks/evidence/BUG-145/commands/focused-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-145/commands/focused-final.stdout.log",
+  "stdout_sha256": "886052362ce5a264a6d7106a598ae8b2bece1702d598673d85c3a7ab77e31316",
+  "task_id": "BUG-145"
+}
