@@ -3,24 +3,36 @@ task_id: BUG-138
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-09T01:45:02Z'
+generated_at: '2026-08-09T03:41:09Z'
 claim_eligible: false
 source:
-  base_ref: HEAD~1
+  base_ref: 04a48243
   base_revision: 04a48243ef384c424a2d2d954b2e0ca1375b23a8
-  head_revision: 6130c7bfbb34711a1139f12a77699424803af4be
+  head_revision: 725593363714130a718dda4dc2f059478f5f737e
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
   surface:
   - path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
     sha256: a65ac39eb8d95f4546885fbe5847004ef59ad9e07ea1caf4c25c63f33ce16f0a
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+    sha256: ea8dc14e0731c419f796b1e13070ddb32256a8eb726f030af5d5db8ecb9bfc38
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 2e55416858fc3192ebf19fb350f3de067ba6314d1524554266b889173048b970
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 703c8f836978402e0dc671f341eefa45e7a372e37ee604aa0f83cba950738109
   - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
     sha256: 70f359524008069208199d125b2b27de13eda216a79e9e3aa7020848b51f96fa
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: ff406a9c9e41b7572c90809321a7cfd63f7e9ba762f9da3a729f9b9e61009172
+  - path: src/runtime/README.md
+    sha256: 2568c5285a87d1aafded82f81e62de963c33ac01fba39e077ca258e258c57f1d
   - path: tasks/SESSION-BRIEF.md
     sha256: c62eca362637d69badc668cdd4dfb585298b8508f50798f7676dcee9ed0caf04
   - path: tasks/backlog/bugs/BUG-138-async-mesh-geometry-jobs-never-execute.md
     sha256: null
+  - path: tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
+    sha256: 51fc8c6e4ef689f1ea67b9d467bdcc4b3f7e8d5c9e0f374b0ed93595a4bc6d36
   - path: tasks/backlog/bugs/index.md
     sha256: 5b7deb9a286656c5dc7bdba955747e7335dc6033318c169905129a8956d3a907
   - path: tasks/done/BUG-138-async-mesh-geometry-jobs-never-execute.md
@@ -47,15 +59,51 @@ source:
     sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   - path: tasks/evidence/BUG-139/commands/imgui-adapter-suites.stdout.log
     sha256: 43bc76484a04a3c566b9d4f41b16dc90e1f7d42c0edd9fd048dab914fb8ead95
+  - path: tasks/evidence/BUG-139/report.yaml
+    sha256: 3023411b3ab3ebdf708925b99e32bfb951ca80b4225fec556e2c4364f753d80c
+  - path: tasks/evidence/BUG-141/artifacts/README.md
+    sha256: 486c6d0df3ecd3a3c88710547e128f2980466f9da04881478dae30169a988251
+  - path: tasks/evidence/BUG-141/artifacts/denoise-panel-after.png
+    sha256: d2e451e7734d6bd0e8a23d7b70666eaa236e87efc555aeb83cfe031a040f7064
+  - path: tasks/evidence/BUG-141/artifacts/denoise-panel-before.png
+    sha256: 18ba86ae8ac8633db383a39f0c8ff34c82f46f20ce561751ff526cc82a9f9161
+  - path: tasks/evidence/BUG-141/artifacts/queued-job-after.png
+    sha256: 847346a1fd04a965513362a2bbd40f38437ed5beff038b692c101675e5991230
+  - path: tasks/evidence/BUG-141/artifacts/queued-job-before.png
+    sha256: 42e4eab3e97c505cc8c25a462d1fa017ad839affa40f061370ef3faef3dcef00
+  - path: tasks/evidence/BUG-141/commands/cpu-gate.json
+    sha256: 8b3b4defbf43621e4038d3e9a4c3ce5c673e971d02ecb9738c1e3c77d1d28838
+  - path: tasks/evidence/BUG-141/commands/cpu-gate.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-141/commands/cpu-gate.stdout.log
+    sha256: 7d559591316ef9a0128710d805f3e3630237f1e432163e24648a799a5fdc08f2
+  - path: tasks/evidence/BUG-141/commands/editor-suites.json
+    sha256: b6e4f8332a7a05b25fff1a754216bfe55a9a0207c80d6efe88de0d820429f480
+  - path: tasks/evidence/BUG-141/commands/editor-suites.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-141/commands/editor-suites.stdout.log
+    sha256: a3974ff963ed1cca038ebcbf8f2d739c428569bf962b721e3696778de972fe08
+  - path: tasks/evidence/BUG-141/commands/structural-gates.json
+    sha256: e7c838031c88b41a2408942abde259193a5367d5e2900f9b8446ff31f5a4c782
+  - path: tasks/evidence/BUG-141/commands/structural-gates.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-141/commands/structural-gates.stdout.log
+    sha256: c893d5cf3edd6ff24e826fcc7e9e4e75ea2b600e3f407b9e584ed94b60bb16a2
   - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
-    sha256: d3835f5692cbae86e02685290acbe7da96060038de49a3228a20759be9af27d0
-  content_digest: fedbdf92568a69da372ed6547ccd0a0d730114446fa78de42928fb292b7bccc4
+    sha256: e542f3f24921533e31116c931dc6f1d2a199282421b33657fe3e451ab1d28a3d
+  content_digest: 2f0b8ed4b202f6a5dd7fe8868bfb55be542e3aa46be12a11afafc30ad140edb0
 touched:
   paths:
   - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/README.md
   - tasks/SESSION-BRIEF.md
   - tasks/backlog/bugs/BUG-138-async-mesh-geometry-jobs-never-execute.md
+  - tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
   - tasks/backlog/bugs/index.md
   - tasks/done/BUG-138-async-mesh-geometry-jobs-never-execute.md
   - tasks/done/BUG-139-imgui-adapter-drops-key-events.md
@@ -69,6 +117,21 @@ touched:
   - tasks/evidence/BUG-139/commands/imgui-adapter-suites.json
   - tasks/evidence/BUG-139/commands/imgui-adapter-suites.stderr.log
   - tasks/evidence/BUG-139/commands/imgui-adapter-suites.stdout.log
+  - tasks/evidence/BUG-139/report.yaml
+  - tasks/evidence/BUG-141/artifacts/README.md
+  - tasks/evidence/BUG-141/artifacts/denoise-panel-after.png
+  - tasks/evidence/BUG-141/artifacts/denoise-panel-before.png
+  - tasks/evidence/BUG-141/artifacts/queued-job-after.png
+  - tasks/evidence/BUG-141/artifacts/queued-job-before.png
+  - tasks/evidence/BUG-141/commands/cpu-gate.json
+  - tasks/evidence/BUG-141/commands/cpu-gate.stderr.log
+  - tasks/evidence/BUG-141/commands/cpu-gate.stdout.log
+  - tasks/evidence/BUG-141/commands/editor-suites.json
+  - tasks/evidence/BUG-141/commands/editor-suites.stderr.log
+  - tasks/evidence/BUG-141/commands/editor-suites.stdout.log
+  - tasks/evidence/BUG-141/commands/structural-gates.json
+  - tasks/evidence/BUG-141/commands/structural-gates.stderr.log
+  - tasks/evidence/BUG-141/commands/structural-gates.stdout.log
   - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
   layers:
   - runtime
@@ -113,8 +176,8 @@ docs_sync:
   skill_mirrors_checked: true
 residual_risks:
 - The gate no longer rejects a mesh whose halfedge numbering was rewritten without any change in incidence;
-  that is intended, but it means a writer that permutes numbering while also changing geometry must still
-  change an index value, a count, or a position to be detected.
+  that is intended, but a writer that permutes numbering while also changing geometry must still move
+  an index, a count, or a position to be caught.
 skipped_checks: []
 artifacts:
 - path: tasks/evidence/BUG-138/artifacts/README.md

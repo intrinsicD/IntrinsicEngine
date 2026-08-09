@@ -1,0 +1,122 @@
+schema_version: 1
+task_id: BUG-141
+workflow_profile: standard
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-09T03:43:39Z'
+claim_eligible: false
+source:
+  base_ref: 6d26556b
+  base_revision: 6d26556be5066cbd92613885b1e224045647b100
+  head_revision: 725593363714130a718dda4dc2f059478f5f737e
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+    sha256: ea8dc14e0731c419f796b1e13070ddb32256a8eb726f030af5d5db8ecb9bfc38
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 2e55416858fc3192ebf19fb350f3de067ba6314d1524554266b889173048b970
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 703c8f836978402e0dc671f341eefa45e7a372e37ee604aa0f83cba950738109
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: ff406a9c9e41b7572c90809321a7cfd63f7e9ba762f9da3a729f9b9e61009172
+  - path: src/runtime/README.md
+    sha256: 2568c5285a87d1aafded82f81e62de963c33ac01fba39e077ca258e258c57f1d
+  - path: tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
+    sha256: 51fc8c6e4ef689f1ea67b9d467bdcc4b3f7e8d5c9e0f374b0ed93595a4bc6d36
+  - path: tasks/evidence/BUG-138/report.yaml
+    sha256: b8394b14885fe47a95baa975b78f368e0c187474fb40dce90ae2f82c80a200af
+  - path: tasks/evidence/BUG-139/report.yaml
+    sha256: a2aa814cefbbee420a3756e7b1a87d89dafc2c60e9b21086f00d385ae293326a
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: e542f3f24921533e31116c931dc6f1d2a199282421b33657fe3e451ab1d28a3d
+  content_digest: 7efb75efcabce949155525ad54c36d4d9700b8bc61dd45014d50bf1d4b65708e
+touched:
+  paths:
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/README.md
+  - tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
+  - tasks/evidence/BUG-138/report.yaml
+  - tasks/evidence/BUG-139/report.yaml
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  layers:
+  - app
+  - runtime
+  modules: []
+extension_seam: EditorGeometryProcessingModel::Diagnostics is now reserved for model-wide entries; slice
+  B adds lifetime on top of that narrowed contract rather than to a mixed list.
+future_change_plan: Slice B adds the dismissal affordance and the parameterization rejection cause (connected-component
+  and boundary-loop counts).
+acceptance:
+- criterion: No queued job is reported under a failure code.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: One command produces one diagnostic.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Diagnostics appear only in the panel that produced them.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Diagnostics expire or can be cleared.
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+- criterion: A parameterization rejection names its cause.
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-141/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-141/commands/editor-suites.json
+- receipt: tasks/evidence/BUG-141/commands/structural-gates.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- A queued job reports Pending on its own result instead of GeometryProcessingFailed in a shared header.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks: []
+skipped_checks:
+- check: slice-b
+  reason: Lifetime/dismissal and the parameterization rejection cause are not attempted; the task stays
+    open with those boxes unchecked.
+- check: dedup-assertion
+  reason: A planned de-duplication assertion was dropped rather than shipped because it cannot fail after
+    the fix; the reason is recorded in the task and the behaviour is proven by the before/after live pair.
+artifacts:
+- path: tasks/evidence/BUG-141/artifacts/README.md
+  sha256: 486c6d0df3ecd3a3c88710547e128f2980466f9da04881478dae30169a988251
+  kind: file
+- path: tasks/evidence/BUG-141/artifacts/queued-job-before.png
+  sha256: 42e4eab3e97c505cc8c25a462d1fa017ad839affa40f061370ef3faef3dcef00
+  kind: file
+- path: tasks/evidence/BUG-141/artifacts/queued-job-after.png
+  sha256: 847346a1fd04a965513362a2bbd40f38437ed5beff038b692c101675e5991230
+  kind: file
+- path: tasks/evidence/BUG-141/artifacts/denoise-panel-before.png
+  sha256: 18ba86ae8ac8633db383a39f0c8ff34c82f46f20ce561751ff526cc82a9f9161
+  kind: file
+- path: tasks/evidence/BUG-141/artifacts/denoise-panel-after.png
+  sha256: d2e451e7734d6bd0e8a23d7b70666eaa236e87efc555aeb83cfe031a040f7064
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
