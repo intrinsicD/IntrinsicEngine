@@ -3438,6 +3438,18 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 work);
         }
 
+        // BUG-146 — a discarded parameterization is a user-visible loss, so it
+        // is named in the message and not left to the enum alone.
+        [[nodiscard]] std::string AppendedTexcoordDiscardSentence(
+            const EditorMeshTexcoordOutcome outcome)
+        {
+            if (outcome != EditorMeshTexcoordOutcome::Discarded)
+                return {};
+            return " The mesh's UV parameterization was discarded: this "
+                   "operation replaces the topology and cannot resample UVs "
+                   "onto it. Re-parameterize the result if you need UVs.";
+        }
+
         [[nodiscard]] std::string BuildMeshRemeshSuccessMessage(
             const EditorMeshRemeshResult& result)
         {
@@ -3449,7 +3461,11 @@ struct EditorJobResult { std::string Diagnostic{}; };
             message += std::to_string(result.OutputFaceCount);
             message += ", iterations=";
             message += std::to_string(result.IterationsPerformed);
+            message += ", ";
+            message += DebugNameForEditorMeshTexcoordOutcome(
+                result.TexcoordOutcome);
             message += ").";
+            message += AppendedTexcoordDiscardSentence(result.TexcoordOutcome);
             return message;
         }
 
@@ -3465,7 +3481,11 @@ struct EditorJobResult { std::string Diagnostic{}; };
             message += std::to_string(result.OutputFaceCount);
             message += ", iterations=";
             message += std::to_string(result.IterationsPerformed);
+            message += ", ";
+            message += DebugNameForEditorMeshTexcoordOutcome(
+                result.TexcoordOutcome);
             message += ").";
+            message += AppendedTexcoordDiscardSentence(result.TexcoordOutcome);
             return message;
         }
 
@@ -3481,7 +3501,11 @@ struct EditorJobResult { std::string Diagnostic{}; };
             message += std::to_string(result.OutputFaceCount);
             message += ", collapses=";
             message += std::to_string(result.CollapseCount);
+            message += ", ";
+            message += DebugNameForEditorMeshTexcoordOutcome(
+                result.TexcoordOutcome);
             message += ").";
+            message += AppendedTexcoordDiscardSentence(result.TexcoordOutcome);
             return message;
         }
 
@@ -5580,32 +5604,70 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 cornerUvs);
         }
 
-        void CopyMeshSimplifyAuxiliaryProperties(
+        // BUG-146 — does this mesh carry UVs a topology edit could destroy?
+        // Follows the canonical corner-over-vertex order, and ignores a
+        // property whose size does not match its domain, exactly as every
+        // reader does.
+        [[nodiscard]] bool MeshHasResolvableTexcoords(
+            const GS::ConstSourceView& view) noexcept
+        {
+            if (view.HalfedgeSource != nullptr)
+            {
+                const Geometry::PropertySet& corners =
+                    view.HalfedgeSource->Properties;
+                if (const auto uvs = corners.Get<glm::vec2>(
+                        Geometry::MeshUtils::kHalfedgeTexcoordPropertyName);
+                    uvs && uvs.Vector().size() == corners.Size())
+                {
+                    return true;
+                }
+            }
+            if (view.VertexSource != nullptr)
+            {
+                const Geometry::PropertySet& vertices =
+                    view.VertexSource->Properties;
+                if (const auto uvs = vertices.Get<glm::vec2>("v:texcoord");
+                    uvs && uvs.Vector().size() == vertices.Size())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        [[nodiscard]] EditorMeshTexcoordOutcome
+        CopyMeshSimplifyAuxiliaryProperties(
             const GS::ConstSourceView& view,
             Geometry::HalfedgeMesh::Mesh& mesh)
         {
             if (view.VertexSource == nullptr)
-                return;
+                return EditorMeshTexcoordOutcome::None;
 
-            (void)CopyMeshSimplifyCornerTexcoords(view, mesh);
+            const bool hadTexcoords = MeshHasResolvableTexcoords(view);
+            bool carried = CopyMeshSimplifyCornerTexcoords(view, mesh);
 
             const auto sourceTexcoords =
                 view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-            if (!sourceTexcoords ||
-                sourceTexcoords.Vector().size() != mesh.VerticesSize())
+            if (sourceTexcoords &&
+                sourceTexcoords.Vector().size() == mesh.VerticesSize())
             {
-                return;
+                auto meshTexcoords = mesh.VertexProperties().GetOrAdd<glm::vec2>(
+                    "v:texcoord",
+                    glm::vec2{0.0f});
+                for (std::size_t i = 0u;
+                     i < sourceTexcoords.Vector().size();
+                     ++i)
+                {
+                    meshTexcoords[i] = sourceTexcoords.Vector()[i];
+                }
+                carried = true;
             }
 
-            auto meshTexcoords = mesh.VertexProperties().GetOrAdd<glm::vec2>(
-                "v:texcoord",
-                glm::vec2{0.0f});
-            for (std::size_t i = 0u;
-                 i < sourceTexcoords.Vector().size();
-                 ++i)
-            {
-                meshTexcoords[i] = sourceTexcoords.Vector()[i];
-            }
+            if (!hadTexcoords)
+                return EditorMeshTexcoordOutcome::None;
+            return carried
+                ? EditorMeshTexcoordOutcome::Preserved
+                : EditorMeshTexcoordOutcome::Discarded;
         }
 
         struct EditorMeshCpuJobState
@@ -6787,7 +6849,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             const EditorGeometryProcessingContext& context,
             const EditorMeshRemeshCommand& command,
             MeshTopologySourceResult source,
-            const std::uint64_t geometryMetadataSignature)
+            const std::uint64_t geometryMetadataSignature,
+            const EditorMeshTexcoordOutcome texcoordOutcome)
         {
             auto state = std::make_shared<EditorMeshCpuJobState>();
             state->Kind = EditorMeshCpuJobKind::Remesh;
@@ -6807,6 +6870,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->Mesh = std::move(source.Mesh);
             state->RemeshCommand = command;
             state->RemeshResult = MakeMeshRemeshBaseResult(command);
+            state->RemeshResult.TexcoordOutcome = texcoordOutcome;
             state->RemeshResult.InputVertexCount =
                 state->BeforeMesh.VertexCount();
             state->RemeshResult.InputFaceCount = state->BeforeMesh.FaceCount();
@@ -6850,7 +6914,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             const EditorGeometryProcessingContext& context,
             const EditorMeshSubdivideCommand& command,
             MeshTopologySourceResult source,
-            const std::uint64_t geometryMetadataSignature)
+            const std::uint64_t geometryMetadataSignature,
+            const EditorMeshTexcoordOutcome texcoordOutcome)
         {
             auto state = std::make_shared<EditorMeshCpuJobState>();
             state->Kind = EditorMeshCpuJobKind::Subdivide;
@@ -6870,6 +6935,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->Mesh = std::move(source.Mesh);
             state->SubdivideCommand = command;
             state->SubdivideResult = MakeMeshSubdivideBaseResult(command);
+            state->SubdivideResult.TexcoordOutcome = texcoordOutcome;
             state->SubdivideResult.InputVertexCount =
                 state->BeforeMesh.VertexCount();
             state->SubdivideResult.InputFaceCount =
@@ -6916,7 +6982,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             const EditorGeometryProcessingContext& context,
             const EditorMeshSimplifyCommand& command,
             MeshTopologySourceResult source,
-            const std::uint64_t geometryMetadataSignature)
+            const std::uint64_t geometryMetadataSignature,
+            const EditorMeshTexcoordOutcome texcoordOutcome)
         {
             auto state = std::make_shared<EditorMeshCpuJobState>();
             state->Kind = EditorMeshCpuJobKind::Simplify;
@@ -6936,6 +7003,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->Mesh = std::move(source.Mesh);
             state->SimplifyCommand = command;
             state->SimplifyResult = MakeMeshSimplifyBaseResult(command);
+            state->SimplifyResult.TexcoordOutcome = texcoordOutcome;
             state->SimplifyResult.InputVertexCount =
                 state->BeforeMesh.VertexCount();
             state->SimplifyResult.InputFaceCount = state->BeforeMesh.FaceCount();
@@ -8042,6 +8110,21 @@ DebugNameForEditorMeshRemeshMode(
             return "Classical QEM";
         case EditorMeshSimplifyMetric::FA_QEM:
             return "FA-QEM (feature-aware)";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForEditorMeshTexcoordOutcome(
+        const EditorMeshTexcoordOutcome outcome) noexcept
+    {
+        switch (outcome)
+        {
+        case EditorMeshTexcoordOutcome::None:
+            return "no UVs";
+        case EditorMeshTexcoordOutcome::Preserved:
+            return "UVs preserved";
+        case EditorMeshTexcoordOutcome::Discarded:
+            return "UVs discarded";
         }
         return "Unknown";
     }
@@ -9329,14 +9412,26 @@ ApplyEditorMeshRemeshCommand(
             return result;
         }
 
+        // BUG-146 — remesh and subdivide replace the topology with one whose
+        // corners have no source UV, so they cannot carry the parameterization
+        // and the publish step removes it. Report that instead of leaving the
+        // loss silent; resampling UVs onto a re-tessellated surface is a
+        // separate capability, not a side effect of this command.
+        const EditorMeshTexcoordOutcome texcoordOutcome =
+            MeshHasResolvableTexcoords(view)
+                ? EditorMeshTexcoordOutcome::Discarded
+                : EditorMeshTexcoordOutcome::None;
+
         if (context.JobCommands.Available())
         {
             return SubmitMeshRemeshCpuJob(
                 context,
                 command,
                 std::move(source),
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                GeometryMetadataSignatureForEntity(raw, *entity),
+                texcoordOutcome);
         }
+        result.TexcoordOutcome = texcoordOutcome;
 
         result.InputVertexCount = source.Mesh.VertexCount();
         result.InputFaceCount = source.Mesh.FaceCount();
@@ -9525,14 +9620,26 @@ ApplyEditorMeshSubdivideCommand(
             return result;
         }
 
+        // BUG-146 — remesh and subdivide replace the topology with one whose
+        // corners have no source UV, so they cannot carry the parameterization
+        // and the publish step removes it. Report that instead of leaving the
+        // loss silent; resampling UVs onto a re-tessellated surface is a
+        // separate capability, not a side effect of this command.
+        const EditorMeshTexcoordOutcome texcoordOutcome =
+            MeshHasResolvableTexcoords(view)
+                ? EditorMeshTexcoordOutcome::Discarded
+                : EditorMeshTexcoordOutcome::None;
+
         if (context.JobCommands.Available())
         {
             return SubmitMeshSubdivideCpuJob(
                 context,
                 command,
                 std::move(source),
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                GeometryMetadataSignatureForEntity(raw, *entity),
+                texcoordOutcome);
         }
+        result.TexcoordOutcome = texcoordOutcome;
 
         result.InputVertexCount = source.Mesh.VertexCount();
         result.InputFaceCount = source.Mesh.FaceCount();
@@ -9705,11 +9812,13 @@ ApplyEditorMeshSimplifyCommand(
         }
 
         // BuildHalfedgeMeshForTopologyEdit carries only positions + topology, so
-        // the scratch halfedge mesh has no v:texcoord even when the selected mesh
-        // does. Copy it in (the builder guarantees a 1:1 source->halfedge vertex
-        // mapping) so FA_QEM's PreserveUvSeams can actually pin UV-seam vertices
-        // instead of silently no-opping when the halfedge mesh lacks texcoords.
-        CopyMeshSimplifyAuxiliaryProperties(view, source.Mesh);
+        // the scratch halfedge mesh has neither v:texcoord nor h:texcoord even
+        // when the selected mesh has them. Copy them in so FA_QEM's
+        // PreserveUvSeams can actually see a seam, and -- since the publish step
+        // replaces the entity's properties wholesale -- so the mesh keeps the
+        // UVs it came in with (BUG-146).
+        const EditorMeshTexcoordOutcome texcoordOutcome =
+            CopyMeshSimplifyAuxiliaryProperties(view, source.Mesh);
 
         if (context.JobCommands.Available())
         {
@@ -9717,8 +9826,10 @@ ApplyEditorMeshSimplifyCommand(
                 context,
                 command,
                 std::move(source),
-                GeometryMetadataSignatureForEntity(raw, *entity));
+                GeometryMetadataSignatureForEntity(raw, *entity),
+                texcoordOutcome);
         }
+        result.TexcoordOutcome = texcoordOutcome;
 
         result.InputVertexCount = source.Mesh.VertexCount();
         result.InputFaceCount = source.Mesh.FaceCount();

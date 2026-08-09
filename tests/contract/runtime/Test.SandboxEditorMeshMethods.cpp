@@ -3465,6 +3465,127 @@ TEST(SandboxEditorUi, MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit)
     }
 }
 
+// BUG-146 — remesh and subdivide replace the topology with one whose corners
+// have no source UV, so the publish step removes the parameterization. That is
+// a defensible outcome; doing it silently is not. Simplify is the counterpart
+// that preserves, so the same field distinguishes the two.
+TEST(SandboxEditorUi, TopologyOperationsReportWhatTheyDidToTheParameterization)
+{
+    constexpr int kGrid = 4;
+
+    const auto makeTexturedMesh =
+        [](ECS::Scene::Registry& registry, const char* name)
+    {
+        Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(kGrid);
+        const ECS::EntityHandle entity = MakeSelectable(registry, name);
+        GS::PopulateFromMesh(registry.Raw(), entity, grid);
+        registry.Raw().emplace<G::RenderSurface>(entity);
+        SetTexcoords(registry.Raw().get<GS::Vertices>(entity),
+                     GridPlaneTexcoords(kGrid));
+        return entity;
+    };
+
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Intrinsic::Tests::EditorFeatureTestContext context =
+            MakeContext(registry, selection);
+        const ECS::EntityHandle mesh = makeTexturedMesh(registry, "RemeshUv");
+
+        const Runtime::EditorMeshRemeshResult result =
+            Runtime::ApplyEditorMeshRemeshCommand(
+                context,
+                Runtime::EditorMeshRemeshCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(mesh),
+                    .Iterations = 1u,
+                    .TargetEdgeLength = 0.5,
+                });
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.TexcoordOutcome,
+                  Runtime::EditorMeshTexcoordOutcome::Discarded);
+        EXPECT_NE(result.Message.find("discarded"), std::string::npos)
+            << "message was: " << result.Message;
+        EXPECT_FALSE(registry.Raw()
+                         .get<GS::Vertices>(mesh)
+                         .Properties.Exists("v:texcoord"))
+            << "the reported discard must match what actually happened";
+    }
+
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Intrinsic::Tests::EditorFeatureTestContext context =
+            MakeContext(registry, selection);
+        const ECS::EntityHandle mesh =
+            makeTexturedMesh(registry, "SubdivideUv");
+
+        const Runtime::EditorMeshSubdivideResult result =
+            Runtime::ApplyEditorMeshSubdivideCommand(
+                context,
+                Runtime::EditorMeshSubdivideCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(mesh),
+                    .Iterations = 1u,
+                });
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.TexcoordOutcome,
+                  Runtime::EditorMeshTexcoordOutcome::Discarded);
+        EXPECT_NE(result.Message.find("discarded"), std::string::npos)
+            << "message was: " << result.Message;
+    }
+
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Intrinsic::Tests::EditorFeatureTestContext context =
+            MakeContext(registry, selection);
+        const ECS::EntityHandle mesh = makeTexturedMesh(registry, "SimplifyUv");
+
+        const Runtime::EditorMeshSimplifyResult result =
+            Runtime::ApplyEditorMeshSimplifyCommand(
+                context,
+                Runtime::EditorMeshSimplifyCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(mesh),
+                    .TargetFaces = 8u,
+                });
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.TexcoordOutcome,
+                  Runtime::EditorMeshTexcoordOutcome::Preserved);
+        EXPECT_EQ(result.Message.find("discarded"), std::string::npos)
+            << "message was: " << result.Message;
+        EXPECT_TRUE(registry.Raw()
+                        .get<GS::Vertices>(mesh)
+                        .Properties.Exists("v:texcoord"));
+    }
+
+    {
+        // A mesh with no UVs reports neither preserved nor discarded.
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Intrinsic::Tests::EditorFeatureTestContext context =
+            MakeContext(registry, selection);
+        Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(kGrid);
+        const ECS::EntityHandle mesh = MakeSelectable(registry, "BareUv");
+        GS::PopulateFromMesh(registry.Raw(), mesh, grid);
+        registry.Raw().emplace<G::RenderSurface>(mesh);
+
+        const Runtime::EditorMeshSubdivideResult result =
+            Runtime::ApplyEditorMeshSubdivideCommand(
+                context,
+                Runtime::EditorMeshSubdivideCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(mesh),
+                    .Iterations = 1u,
+                });
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.TexcoordOutcome,
+                  Runtime::EditorMeshTexcoordOutcome::None);
+        EXPECT_EQ(result.Message.find("discarded"), std::string::npos);
+    }
+}
+
 TEST(SandboxEditorUi, MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels)
 {
     ECS::Scene::Registry registry;

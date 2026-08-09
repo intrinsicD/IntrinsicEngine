@@ -459,6 +459,24 @@ export namespace Extrinsic::Runtime
         double MaxReferenceProjectionDistance{0.0};
     };
 
+    // BUG-146 — what a topology-replacing mesh operation did to the mesh's UV
+    // parameterization. These operations rebuild the entity's halfedge mesh, so
+    // a UV property the rebuilt mesh does not carry is removed outright rather
+    // than left stale. That outcome is reported, never silent.
+    enum class EditorMeshTexcoordOutcome : std::uint8_t
+    {
+        // The mesh carried no resolvable UVs, so there was nothing to keep.
+        None = 0,
+        // The output carries the mesh's UVs.
+        Preserved = 1,
+        // The operation could not carry the UVs onto the topology it produced,
+        // so the parameterization was discarded. Re-parameterize afterwards.
+        Discarded = 2,
+    };
+
+    [[nodiscard]] const char* DebugNameForEditorMeshTexcoordOutcome(
+        EditorMeshTexcoordOutcome outcome) noexcept;
+
     struct EditorMeshRemeshResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
@@ -475,6 +493,8 @@ export namespace Extrinsic::Runtime
         std::size_t SplitCount{0u};
         std::size_t CollapseCount{0u};
         std::size_t FlipCount{0u};
+        EditorMeshTexcoordOutcome TexcoordOutcome{
+            EditorMeshTexcoordOutcome::None};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -505,6 +525,8 @@ export namespace Extrinsic::Runtime
         std::size_t InputFaceCount{0u};
         std::size_t OutputVertexCount{0u};
         std::size_t OutputFaceCount{0u};
+        EditorMeshTexcoordOutcome TexcoordOutcome{
+            EditorMeshTexcoordOutcome::None};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -548,6 +570,8 @@ export namespace Extrinsic::Runtime
         std::size_t CollapsesRejectedQuality{0u};
         std::size_t SharpFeatureVerticesPinned{0u};
         std::size_t SeamVerticesPinned{0u};
+        EditorMeshTexcoordOutcome TexcoordOutcome{
+            EditorMeshTexcoordOutcome::None};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
