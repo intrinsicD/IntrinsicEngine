@@ -3,15 +3,15 @@ task_id: BUG-141
 workflow_profile: standard
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-09T03:43:39Z'
+generated_at: '2026-08-09T03:51:17Z'
 claim_eligible: false
 source:
   base_ref: 6d26556b
   base_revision: 6d26556be5066cbd92613885b1e224045647b100
-  head_revision: 725593363714130a718dda4dc2f059478f5f737e
+  head_revision: 0a58bc1129bcdc1ac509cdc22418791985038a97
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
     sha256: ea8dc14e0731c419f796b1e13070ddb32256a8eb726f030af5d5db8ecb9bfc38
