@@ -688,40 +688,76 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return true;
         }
 
-        void CopyUvOutputPropertiesToHalfedgeMesh(
-            const Geometry::ConstPropertySet& sourceFaceProperties,
-            const bool hasSourceFaceProperties,
+        // BUG-147 — publish regenerated UVs onto a mesh that kept its own
+        // topology, on whichever domain can represent them.
+        //
+        // A chart split needs two or more UVs at a seam vertex, which a
+        // per-vertex property cannot hold; those go on the corner domain. An
+        // atlas that needed no seam stays on the vertex domain, so a mesh is
+        // not promoted to corner UVs for nothing. Either way exactly one UV
+        // authority survives, because the resolution order is corner-over-vertex
+        // and a leftover disagreeing property would silently win or lose.
+        //
+        // Returns false only when the atlas cross-references do not line up
+        // with the source mesh, which would otherwise publish UVs mapped to the
+        // wrong corners.
+        [[nodiscard]] bool PublishUvRegenerationTexcoords(
+            const Geometry::UvAtlas::UvAtlasResult& atlas,
             const MeshSoupFromGeometrySourcesResult& soup,
-            Geometry::UvAtlas::UvAtlasResult& atlas,
             Geometry::HalfedgeMesh::Mesh& mesh)
         {
-            std::vector<std::uint32_t> sourceVertexForOutputVertex;
-            sourceVertexForOutputVertex.reserve(atlas.OutputMesh.VertexCount());
-            for (std::size_t i = 0u; i < atlas.OutputMesh.VertexCount(); ++i)
-                sourceVertexForOutputVertex.push_back(static_cast<std::uint32_t>(i));
-
-            CopyKnownPropertiesByXref(
-                Geometry::ConstPropertySet(atlas.OutputMesh.VertexProperties()),
-                sourceVertexForOutputVertex,
-                mesh.VertexProperties());
-
-            if (!hasSourceFaceProperties)
-                return;
-
-            std::vector<std::uint32_t> sourceFaceForOutputFace;
-            sourceFaceForOutputFace.reserve(atlas.SourceFaceForOutputFace.size());
-            for (const std::uint32_t soupFace : atlas.SourceFaceForOutputFace)
+            const auto removeProperty =
+                [](Geometry::PropertySet& properties,
+                   const std::string_view name)
             {
-                sourceFaceForOutputFace.push_back(
-                    soupFace < soup.SourceFaceForSoupFace.size()
-                        ? soup.SourceFaceForSoupFace[soupFace]
-                        : std::numeric_limits<std::uint32_t>::max());
+                if (const auto id = properties.Registry().Find(name))
+                    (void)properties.Registry().Remove(*id);
+            };
+
+            const auto outputUvs =
+                atlas.OutputMesh.VertexProperties().Get<glm::vec2>("v:texcoord");
+            if (!outputUvs)
+                return false;
+
+            MeshCornerTexcoords corners{};
+            if (!GatherSplitMeshCornerTexcoords(
+                    atlas.OutputMesh,
+                    outputUvs.Vector(),
+                    atlas.SourceFaceForOutputFace,
+                    atlas.SourceVertexForOutputVertex,
+                    soup.Mesh.Faces(),
+                    soup.Mesh.VertexCount(),
+                    corners))
+            {
+                return false;
             }
 
-            CopyKnownPropertiesByXref(
-                sourceFaceProperties,
-                sourceFaceForOutputFace,
-                mesh.FaceProperties());
+            if (corners.HasSeam &&
+                PublishMeshCornerTexcoords(
+                    mesh,
+                    soup.Mesh.Faces(),
+                    soup.Mesh.VertexCount(),
+                    corners.CornerUvs))
+            {
+                removeProperty(mesh.VertexProperties(), "v:texcoord");
+                return true;
+            }
+
+            // No seam, or the corner publication could not map: the per-vertex
+            // representatives are the exact answer in the first case and the
+            // best available one in the second.
+            if (corners.VertexUvs.size() != mesh.VerticesSize())
+                return false;
+            removeProperty(
+                mesh.HalfedgeProperties(),
+                Geometry::MeshUtils::kHalfedgeTexcoordPropertyName);
+            auto target = mesh.VertexProperties().GetOrAdd<glm::vec2>(
+                "v:texcoord",
+                glm::vec2{0.0f});
+            if (!target || target.Vector().size() != corners.VertexUvs.size())
+                return false;
+            target.Vector() = corners.VertexUvs;
+            return true;
         }
 
         void CopyUvSourcePropertiesToHalfedgeMesh(
@@ -3374,15 +3410,33 @@ struct EditorJobResult { std::string Diagnostic{}; };
             if (!SameMeshTopologyAndPositions(before, after))
                 return false;
 
-            const Geometry::ConstProperty<glm::vec2> beforeUvs =
-                before.VertexProperties().Get<glm::vec2>("v:texcoord");
-            const Geometry::ConstProperty<glm::vec2> afterUvs =
-                after.VertexProperties().Get<glm::vec2>("v:texcoord");
-            if (static_cast<bool>(beforeUvs) != static_cast<bool>(afterUvs))
-                return false;
-            if (!beforeUvs)
-                return true;
-            return beforeUvs.Vector() == afterUvs.Vector();
+            // BUG-147 — UVs now land on whichever domain can represent them, so
+            // a comparison that reads only the vertex domain would call a
+            // corner-UV rewrite "unchanged" and publish nothing.
+            const auto sameProperty =
+                [](const Geometry::ConstPropertySet& beforeSet,
+                   const Geometry::ConstPropertySet& afterSet,
+                   const std::string_view name)
+            {
+                const Geometry::ConstProperty<glm::vec2> beforeUvs =
+                    beforeSet.Get<glm::vec2>(name);
+                const Geometry::ConstProperty<glm::vec2> afterUvs =
+                    afterSet.Get<glm::vec2>(name);
+                if (static_cast<bool>(beforeUvs) != static_cast<bool>(afterUvs))
+                    return false;
+                if (!beforeUvs)
+                    return true;
+                return beforeUvs.Vector() == afterUvs.Vector();
+            };
+
+            return sameProperty(
+                       Geometry::ConstPropertySet(before.VertexProperties()),
+                       Geometry::ConstPropertySet(after.VertexProperties()),
+                       "v:texcoord") &&
+                   sameProperty(
+                       Geometry::ConstPropertySet(before.HalfedgeProperties()),
+                       Geometry::ConstPropertySet(after.HalfedgeProperties()),
+                       Geometry::MeshUtils::kHalfedgeTexcoordPropertyName);
         }
 
         [[nodiscard]] std::string BuildMeshTopologyNoChangeMessage(
@@ -5520,21 +5574,22 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return GeometryPresentationSlotSemantic::Displacement;
         }
 
-        // BUG-146 — forward the mesh's UVs into the scratch halfedge mesh.
+        // BUG-146 — forward the mesh's corner UVs into a scratch halfedge mesh.
         //
-        // The scratch mesh is rebuilt from a triangle soup and starts with no
+        // A scratch mesh is rebuilt from a triangle soup and starts with no
         // properties at all, and `ApplyMeshTopologyState` publishes its
         // halfedge properties wholesale — so anything not forwarded here is not
         // merely stale afterwards, it is removed from the entity. Vertex
         // numbering survives the round trip; halfedge numbering does not, so
         // corner UVs go through the canonical corner walk rather than a copy.
         //
-        // Simplify preserves rather than resamples: an edge collapse removes
-        // corners and the survivors keep their own UVs, which is the correct
-        // answer and is also what makes `PreserveUvSeams` able to see a seam at
-        // all. Operations that *create* corners (remesh, subdivide) have no
-        // source UV for them and must not use this path.
-        [[nodiscard]] bool CopyMeshSimplifyCornerTexcoords(
+        // Used by simplify, which preserves rather than resamples (an edge
+        // collapse removes corners and the survivors keep their own UVs), and
+        // by UV regeneration's before-state, which needs the mesh's existing
+        // corner UVs to tell a genuine no-op from a change (BUG-147).
+        // Operations that *create* corners (remesh, subdivide) have no source
+        // UV for them and must not use this path.
+        [[nodiscard]] bool CopyStoredCornerTexcoordsToScratchMesh(
             const GS::ConstSourceView& view,
             Geometry::HalfedgeMesh::Mesh& mesh)
         {
@@ -5644,7 +5699,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return EditorMeshTexcoordOutcome::None;
 
             const bool hadTexcoords = MeshHasResolvableTexcoords(view);
-            bool carried = CopyMeshSimplifyCornerTexcoords(view, mesh);
+            bool carried = CopyStoredCornerTexcoordsToScratchMesh(view, mesh);
 
             const auto sourceTexcoords =
                 view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
@@ -8615,26 +8670,47 @@ DebugNameForEditorICPVariant(
                 });
         }
 
+        // BUG-147 — build the published mesh from the *source* soup, never
+        // from `atlas.OutputMesh`. An unwrapper emits a fresh output vertex per
+        // (chart, source vertex) pair, so publishing its output as the entity
+        // mesh converts a manifold into a triangle soup: a closed icosahedron
+        // used to come back as 60 vertices and 60 edges with one chart per
+        // face. The seam is a UV fact, so it is carried on the corner domain
+        // and the duplication happens once, at GPU upload.
         auto converted =
-            Geometry::Mesh::Conversion::ToHalfedgeMesh(atlas.OutputMesh);
+            Geometry::Mesh::Conversion::ToHalfedgeMesh(state->Soup.Mesh);
         if (!converted.Succeeded())
         {
             state->Result.Status =
                 EditorCommandStatus::GeometryProcessingFailed;
             state->Result.Diagnostic =
-                "generated UV mesh could not be converted back to halfedge topology";
+                "selected mesh could not be converted back to halfedge topology";
             return JobResultEnvelope::Make<EditorJobResult>(
                 EditorJobResult{
                     .Diagnostic = state->Result.Diagnostic,
                 });
         }
 
-        CopyUvOutputPropertiesToHalfedgeMesh(
+        CopyUvSourcePropertiesToHalfedgeMesh(
+            Geometry::ConstPropertySet(state->SourceVertexProperties),
+            state->HasSourceVertexProperties,
             Geometry::ConstPropertySet(state->SourceFaceProperties),
             state->HasSourceFaceProperties,
             state->Soup,
-            atlas,
             converted.Mesh);
+
+        if (!PublishUvRegenerationTexcoords(atlas, state->Soup, converted.Mesh))
+        {
+            state->Result.Status =
+                EditorCommandStatus::GeometryProcessingFailed;
+            state->Result.Diagnostic =
+                "generated UVs could not be mapped back onto the selected "
+                "mesh's own corners";
+            return JobResultEnvelope::Make<EditorJobResult>(
+                EditorJobResult{
+                    .Diagnostic = state->Result.Diagnostic,
+                });
+        }
         state->AfterMesh = std::move(converted.Mesh);
         state->Result.Status = EditorCommandStatus::Applied;
         state->Result.Diagnostic = atlas.Diagnostics.BackendDetail;
@@ -8664,8 +8740,8 @@ DebugNameForEditorICPVariant(
                 "stored (" +
                 std::to_string(result.ChartCount) +
                 " charts, " + std::to_string(result.SeamSplitVertexCount) +
-                " seam splits). Nothing was published and no undo entry was "
-                "created.";
+                " GPU-side seam-split vertices). Nothing was published and no "
+                "undo entry was created.";
             return result;
         }
 
@@ -8894,6 +8970,11 @@ DebugNameForEditorICPVariant(
             state->HasSourceFaceProperties,
             state->Soup,
             state->BeforeMesh);
+        // BUG-147 — the before-state needs the mesh's existing corner UVs too,
+        // both so a genuine no-op is recognised as one and so undo restores
+        // them. Vertex-domain properties came across above; halfedge numbering
+        // does not survive the round trip, so these go through the corner walk.
+        (void)CopyStoredCornerTexcoordsToScratchMesh(view, state->BeforeMesh);
 
         if (context.JobCommands.Available())
             return SubmitUvRegenerationCpuJob(context, state);

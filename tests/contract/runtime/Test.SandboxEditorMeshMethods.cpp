@@ -5580,6 +5580,117 @@ TEST(SandboxEditorUi, UvRegenerationThatReproducesStoredUvsReportsNoChange)
         << "a no-op must not leave an undo entry";
 }
 
+// BUG-147 — the atlas emits a fresh output vertex per (chart, source vertex)
+// pair, so publishing its output mesh as the entity mesh converted a manifold
+// into a triangle soup: a closed icosahedron came back as 60 vertices and 60
+// edges with one chart per face, reporting `Applied`. The seam is a UV fact,
+// carried on the corner domain over the mesh's own topology.
+TEST(SandboxEditorUi, UvRegenerationPreservesClosedManifoldTopology)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+
+    Geometry::HalfedgeMesh::Mesh closed =
+        Geometry::HalfedgeMesh::MakeMeshIcosahedron();
+    const std::size_t sourceVertices = closed.VertexCount();
+    const std::size_t sourceEdges = closed.EdgeCount();
+    const std::size_t sourceFaces = closed.FaceCount();
+    ASSERT_EQ(sourceVertices, 12u);
+    ASSERT_EQ(sourceEdges, 30u);
+    ASSERT_EQ(sourceFaces, 20u);
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UvClosedManifold");
+    GS::PopulateFromMesh(registry.Raw(), mesh, closed);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const Runtime::EditorUvRegenerationCommandResult result =
+        Runtime::ApplyEditorUvRegenerationCommand(
+            context,
+            Runtime::EditorUvRegenerationCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Resolution = 64u,
+                .Padding = 2u,
+            });
+    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Applied)
+        << result.Diagnostic;
+
+    const GS::ConstSourceView after = GS::BuildConstView(registry.Raw(), mesh);
+    EXPECT_EQ(after.VerticesAlive(), sourceVertices);
+    EXPECT_EQ(after.EdgesAlive(), sourceEdges);
+    EXPECT_EQ(after.FacesAlive(), sourceFaces);
+    // Euler characteristic of a closed genus-0 surface.
+    EXPECT_EQ(static_cast<long long>(after.VerticesAlive()) -
+                  static_cast<long long>(after.EdgesAlive()) +
+                  static_cast<long long>(after.FacesAlive()),
+              2);
+
+    // UVs are present and finite. The atlas has to cut a closed surface open,
+    // so they land on the corner domain.
+    const auto& halfedgeProperties =
+        registry.Raw().get<GS::Halfedges>(mesh).Properties;
+    const auto corners = halfedgeProperties.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(static_cast<bool>(corners))
+        << "a closed surface cannot carry an atlas on the vertex domain";
+    EXPECT_EQ(corners.Vector().size(), halfedgeProperties.Size());
+    for (const glm::vec2 uv : corners.Vector())
+        EXPECT_TRUE(std::isfinite(uv.x) && std::isfinite(uv.y));
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Vertices>(mesh)
+                     .Properties.Exists("v:texcoord"))
+        << "exactly one UV authority must survive";
+
+    // Undo restores the unparameterized mesh, and its topology too.
+    ASSERT_TRUE(history.Undo().Succeeded());
+    const GS::ConstSourceView undone = GS::BuildConstView(registry.Raw(), mesh);
+    EXPECT_EQ(undone.VerticesAlive(), sourceVertices);
+    EXPECT_EQ(undone.FacesAlive(), sourceFaces);
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Halfedges>(mesh)
+                     .Properties.Exists("h:texcoord"));
+}
+
+// BUG-147 — a mesh the atlas can lay out without cutting stays on the vertex
+// domain, so nothing is promoted to corner UVs for nothing.
+TEST(SandboxEditorUi, UvRegenerationWithoutASeamStaysOnTheVertexDomain)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UvFlatPatch");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    const Runtime::EditorUvRegenerationCommandResult result =
+        Runtime::ApplyEditorUvRegenerationCommand(
+            context,
+            Runtime::EditorUvRegenerationCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Resolution = 64u,
+                .Padding = 2u,
+            });
+    ASSERT_TRUE(result.Status == Runtime::EditorCommandStatus::Applied ||
+                result.Status == Runtime::EditorCommandStatus::NoChange)
+        << result.Diagnostic;
+
+    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
+    EXPECT_TRUE(registry.Raw()
+                    .get<GS::Vertices>(mesh)
+                    .Properties.Exists("v:texcoord"));
+    EXPECT_FALSE(registry.Raw()
+                     .get<GS::Halfedges>(mesh)
+                     .Properties.Exists("h:texcoord"));
+}
+
 TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
 {
     ECS::Scene::Registry registry;

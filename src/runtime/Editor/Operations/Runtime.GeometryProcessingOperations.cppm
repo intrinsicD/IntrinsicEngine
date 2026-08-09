@@ -1085,6 +1085,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t AtlasWidth{0u};
         std::uint32_t AtlasHeight{0u};
         std::uint32_t ChartCount{0u};
+        // BUG-147 — how many extra vertices an indexed GPU vertex buffer needs
+        // to carry this atlas's seams, i.e. the duplication that happens once
+        // at upload. It is not, and must never again become, a count of
+        // vertices added to the mesh: the mesh keeps its own topology and the
+        // seam is carried on the corner domain.
         std::size_t SeamSplitVertexCount{0u};
         std::string Diagnostic{};
 
