@@ -113,4 +113,58 @@ export namespace Extrinsic::Runtime
         std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
         std::size_t sourceVertexCount,
         std::span<const glm::vec2> cornerUvs);
+
+    // BUG-137 / BUG-147 — per-corner UVs mapped back onto a *source* mesh's
+    // faces, so a chart split can be carried as a UV fact instead of being
+    // baked into the entity mesh's topology.
+    struct MeshCornerTexcoords
+    {
+        // Three entries per source triangle, in that triangle's corner order.
+        std::vector<glm::vec2> CornerUvs{};
+        // One representative UV per source vertex; only meaningful when
+        // `HasSeam` is false, where it is also the exact per-vertex answer.
+        std::vector<glm::vec2> VertexUvs{};
+        std::size_t UnmappedCornerCount{0};
+        bool HasSeam{false};
+    };
+
+    // Maps a chart-split output mesh's per-vertex UVs back onto the corners of
+    // the source faces they came from.
+    //
+    // An unwrapper emits a fresh output vertex per `(chart, source vertex)`
+    // pair, so its output carries the seam as duplicated *topology*. This is
+    // the inverse: given the output's per-vertex UVs and the two cross-
+    // references an unwrapper reports (`sourceFaceForOutputFace`,
+    // `sourceVertexForOutputVertex`), it recovers the per-corner UVs of the
+    // unsplit source, from which `PublishMeshCornerTexcoords` writes
+    // `h:texcoord` onto a mesh that kept its own topology.
+    //
+    // Takes the cross-references directly rather than an unwrapper result type,
+    // so it stays independent of any particular atlas backend and is testable
+    // without one.
+    //
+    // A face the unwrapper dropped leaves its corners unassigned; those inherit
+    // a sibling corner at the same vertex, so the buffer stays finite and no
+    // new `(vertex, UV)` pair — and therefore no phantom seam — is invented.
+    // The count of such corners is reported in `UnmappedCornerCount`.
+    //
+    // Returns false when the cross-references do not line up with the meshes.
+    [[nodiscard]] bool GatherSplitMeshCornerTexcoords(
+        const Geometry::MeshSoup::IndexedMesh& outputMesh,
+        std::span<const glm::vec2> outputVertexUvs,
+        std::span<const std::uint32_t> sourceFaceForOutputFace,
+        std::span<const std::uint32_t> sourceVertexForOutputVertex,
+        std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+        std::size_t sourceVertexCount,
+        MeshCornerTexcoords& out);
+
+    // Fills `VertexUvs`, `HasSeam`, and the unmapped-corner inheritance from an
+    // already-populated `CornerUvs` + per-corner assignment mask. Exposed for
+    // producers that gather corners some other way (authored payload corners,
+    // for example) and still need the same finalization.
+    [[nodiscard]] bool FinalizeMeshCornerTexcoords(
+        MeshCornerTexcoords& corners,
+        std::span<const std::uint8_t> cornerAssigned,
+        std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+        std::size_t sourceVertexCount);
 }

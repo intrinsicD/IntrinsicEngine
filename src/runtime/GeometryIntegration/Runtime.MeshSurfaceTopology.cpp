@@ -427,4 +427,141 @@ namespace Extrinsic::Runtime
         property.Vector() = std::move(values);
         return true;
     }
+
+    bool FinalizeMeshCornerTexcoords(
+        MeshCornerTexcoords& corners,
+        const std::span<const std::uint8_t> cornerAssigned,
+        const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+        const std::size_t sourceVertexCount)
+    {
+        if (corners.CornerUvs.size() != sourceFaces.size() * 3u ||
+            cornerAssigned.size() != corners.CornerUvs.size())
+        {
+            return false;
+        }
+
+        corners.VertexUvs.assign(sourceVertexCount, glm::vec2{0.0f});
+        std::vector<std::uint8_t> vertexAssigned(sourceVertexCount, 0u);
+
+        for (std::size_t face = 0u; face < sourceFaces.size(); ++face)
+        {
+            const std::vector<std::uint32_t>& indices =
+                sourceFaces[face].Indices;
+            for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k)
+            {
+                const std::size_t corner = face * 3u + k;
+                if (cornerAssigned[corner] == 0u)
+                    continue;
+                const std::uint32_t vertex = indices[k];
+                if (vertex >= corners.VertexUvs.size())
+                    return false;
+                if (vertexAssigned[vertex] == 0u)
+                {
+                    corners.VertexUvs[vertex] = corners.CornerUvs[corner];
+                    vertexAssigned[vertex] = 1u;
+                }
+                else if (corners.VertexUvs[vertex] != corners.CornerUvs[corner])
+                {
+                    corners.HasSeam = true;
+                }
+            }
+        }
+
+        for (std::size_t face = 0u; face < sourceFaces.size(); ++face)
+        {
+            const std::vector<std::uint32_t>& indices =
+                sourceFaces[face].Indices;
+            for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k)
+            {
+                const std::size_t corner = face * 3u + k;
+                if (cornerAssigned[corner] != 0u)
+                    continue;
+                ++corners.UnmappedCornerCount;
+                const std::uint32_t vertex = indices[k];
+                if (vertex < corners.VertexUvs.size() &&
+                    vertexAssigned[vertex] != 0u)
+                {
+                    corners.CornerUvs[corner] = corners.VertexUvs[vertex];
+                }
+            }
+        }
+        return true;
+    }
+
+    bool GatherSplitMeshCornerTexcoords(
+        const Geometry::MeshSoup::IndexedMesh& outputMesh,
+        const std::span<const glm::vec2> outputVertexUvs,
+        const std::span<const std::uint32_t> sourceFaceForOutputFace,
+        const std::span<const std::uint32_t> sourceVertexForOutputVertex,
+        const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+        const std::size_t sourceVertexCount,
+        MeshCornerTexcoords& out)
+    {
+        out = MeshCornerTexcoords{};
+
+        if (outputVertexUvs.size() != outputMesh.VertexCount())
+            return false;
+
+        const std::span<const Geometry::MeshSoup::PolygonFace> outputFaces =
+            outputMesh.Faces();
+        if (sourceFaceForOutputFace.size() != outputFaces.size())
+            return false;
+
+        out.CornerUvs.assign(sourceFaces.size() * 3u, glm::vec2{0.0f});
+        std::vector<std::uint8_t> cornerAssigned(sourceFaces.size() * 3u, 0u);
+
+        for (std::size_t outputFace = 0u; outputFace < outputFaces.size();
+             ++outputFace)
+        {
+            const std::uint32_t sourceFace =
+                sourceFaceForOutputFace[outputFace];
+            if (sourceFace >= sourceFaces.size())
+                return false;
+
+            const std::vector<std::uint32_t>& outputIndices =
+                outputFaces[outputFace].Indices;
+            const std::vector<std::uint32_t>& sourceIndices =
+                sourceFaces[sourceFace].Indices;
+            if (outputIndices.size() != 3u || sourceIndices.size() != 3u)
+                return false;
+
+            for (std::size_t k = 0u; k < 3u; ++k)
+            {
+                const std::uint32_t outputVertex = outputIndices[k];
+                if (outputVertex >= sourceVertexForOutputVertex.size())
+                    return false;
+                const std::uint32_t sourceVertex =
+                    sourceVertexForOutputVertex[outputVertex];
+
+                // Chart splitting preserves winding, so corner k normally maps
+                // to corner k; the search only covers a backend that rotated
+                // the triangle.
+                std::size_t slot = 3u;
+                if (sourceIndices[k] == sourceVertex)
+                {
+                    slot = k;
+                }
+                else
+                {
+                    for (std::size_t candidate = 0u; candidate < 3u; ++candidate)
+                    {
+                        if (sourceIndices[candidate] == sourceVertex)
+                        {
+                            slot = candidate;
+                            break;
+                        }
+                    }
+                }
+                if (slot >= 3u)
+                    return false;
+
+                const std::size_t corner = sourceFace * 3u + slot;
+                out.CornerUvs[corner] = outputVertexUvs[outputVertex];
+                cornerAssigned[corner] = 1u;
+            }
+        }
+
+        return FinalizeMeshCornerTexcoords(
+            out, cornerAssigned, sourceFaces, sourceVertexCount);
+    }
 }

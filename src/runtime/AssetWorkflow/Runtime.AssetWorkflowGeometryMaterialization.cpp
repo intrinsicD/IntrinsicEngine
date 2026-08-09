@@ -437,139 +437,26 @@ MakeRuntimeDiagnostics(const Geometry::UvAtlas::UvAtlasResult &atlas,
   return diagnostics;
 }
 
-// BUG-137 — the atlas output carries one vertex per (chart, source vertex)
-// pair. Pull its UVs back onto the *source* corners so the seam can be stored
-// as a UV fact instead of being baked into the entity mesh's topology.
-struct AtlasCornerTexcoords {
-  // Three entries per source triangle, in that triangle's corner order.
-  std::vector<glm::vec2> CornerUvs{};
-  // One representative UV per source vertex; only meaningful when `HasSeam` is
-  // false, where it is also the exact per-vertex answer.
-  std::vector<glm::vec2> VertexUvs{};
-  std::size_t UnmappedCornerCount{0};
-  bool HasSeam{false};
-};
-
-// Derives the per-vertex representative UVs, the seam flag, and the fill for
-// corners no source supplied. Shared by the atlas and authored gatherers.
-[[nodiscard]] bool FinalizeCornerTexcoords(
-    AtlasCornerTexcoords &corners,
-    const std::vector<std::uint8_t> &cornerAssigned,
-    const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
-    const std::size_t vertexCount) {
-  corners.VertexUvs.assign(vertexCount, glm::vec2{0.0f});
-  std::vector<std::uint8_t> vertexAssigned(vertexCount, 0u);
-
-  for (std::size_t face = 0u; face < sourceFaces.size(); ++face) {
-    const std::vector<std::uint32_t> &indices = sourceFaces[face].Indices;
-    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
-      const std::size_t corner = face * 3u + k;
-      if (cornerAssigned[corner] == 0u) {
-        continue;
-      }
-      const std::uint32_t vertex = indices[k];
-      if (vertex >= corners.VertexUvs.size()) {
-        return false;
-      }
-      if (vertexAssigned[vertex] == 0u) {
-        corners.VertexUvs[vertex] = corners.CornerUvs[corner];
-        vertexAssigned[vertex] = 1u;
-      } else if (corners.VertexUvs[vertex] != corners.CornerUvs[corner]) {
-        corners.HasSeam = true;
-      }
-    }
-  }
-
-  // A face the atlas dropped leaves its corners without a UV. Inherit a
-  // sibling corner at the same vertex so the buffer stays finite and no new
-  // (vertex, UV) pair — and therefore no phantom seam — is invented.
-  for (std::size_t face = 0u; face < sourceFaces.size(); ++face) {
-    const std::vector<std::uint32_t> &indices = sourceFaces[face].Indices;
-    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
-      const std::size_t corner = face * 3u + k;
-      if (cornerAssigned[corner] != 0u) {
-        continue;
-      }
-      ++corners.UnmappedCornerCount;
-      const std::uint32_t vertex = indices[k];
-      if (vertex < corners.VertexUvs.size() && vertexAssigned[vertex] != 0u) {
-        corners.CornerUvs[corner] = corners.VertexUvs[vertex];
-      }
-    }
-  }
-  return true;
-}
+// BUG-137 — the atlas-to-corner mapping and its finalization are shared with
+// the editor's UV regeneration command (BUG-147), so they live next to the
+// corner walk in `Runtime.MeshSurfaceTopology` rather than here. `AtlasCornerTexcoords`
+// is that shared record.
+using AtlasCornerTexcoords = MeshCornerTexcoords;
 
 [[nodiscard]] std::optional<AtlasCornerTexcoords>
 GatherAtlasCornerTexcoords(const Geometry::UvAtlas::UvAtlasResult &atlas,
                            const Geometry::MeshSoup::IndexedMesh &sourceMesh) {
   const auto outputUvs =
       atlas.OutputMesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty);
-  if (!outputUvs ||
-      outputUvs.Vector().size() != atlas.OutputMesh.VertexCount()) {
-    return std::nullopt;
-  }
-
-  const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces =
-      sourceMesh.Faces();
-  const std::span<const Geometry::MeshSoup::PolygonFace> outputFaces =
-      atlas.OutputMesh.Faces();
-  if (atlas.SourceFaceForOutputFace.size() != outputFaces.size()) {
+  if (!outputUvs) {
     return std::nullopt;
   }
 
   AtlasCornerTexcoords corners{};
-  corners.CornerUvs.assign(sourceFaces.size() * 3u, glm::vec2{0.0f});
-  std::vector<std::uint8_t> cornerAssigned(sourceFaces.size() * 3u, 0u);
-
-  for (std::size_t outputFace = 0u; outputFace < outputFaces.size();
-       ++outputFace) {
-    const std::uint32_t sourceFace = atlas.SourceFaceForOutputFace[outputFace];
-    if (sourceFace >= sourceFaces.size()) {
-      return std::nullopt;
-    }
-
-    const std::vector<std::uint32_t> &outputIndices =
-        outputFaces[outputFace].Indices;
-    const std::vector<std::uint32_t> &sourceIndices =
-        sourceFaces[sourceFace].Indices;
-    if (outputIndices.size() != 3u || sourceIndices.size() != 3u) {
-      return std::nullopt;
-    }
-
-    for (std::size_t k = 0u; k < 3u; ++k) {
-      const std::uint32_t outputVertex = outputIndices[k];
-      if (outputVertex >= atlas.SourceVertexForOutputVertex.size()) {
-        return std::nullopt;
-      }
-      const std::uint32_t sourceVertex =
-          atlas.SourceVertexForOutputVertex[outputVertex];
-
-      // Chart splitting preserves winding, so corner k normally maps to corner
-      // k; the search only covers a backend that rotated the triangle.
-      std::size_t slot = 3u;
-      if (sourceIndices[k] == sourceVertex) {
-        slot = k;
-      } else {
-        for (std::size_t candidate = 0u; candidate < 3u; ++candidate) {
-          if (sourceIndices[candidate] == sourceVertex) {
-            slot = candidate;
-            break;
-          }
-        }
-      }
-      if (slot >= 3u) {
-        return std::nullopt;
-      }
-
-      const std::size_t corner = sourceFace * 3u + slot;
-      corners.CornerUvs[corner] = outputUvs.Vector()[outputVertex];
-      cornerAssigned[corner] = 1u;
-    }
-  }
-
-  if (!FinalizeCornerTexcoords(corners, cornerAssigned, sourceFaces,
-                               sourceMesh.VertexCount())) {
+  if (!GatherSplitMeshCornerTexcoords(
+          atlas.OutputMesh, outputUvs.Vector(), atlas.SourceFaceForOutputFace,
+          atlas.SourceVertexForOutputVertex, sourceMesh.Faces(),
+          sourceMesh.VertexCount(), corners)) {
     return std::nullopt;
   }
   return corners;
@@ -629,8 +516,8 @@ GatherAtlasCornerTexcoords(const Geometry::UvAtlas::UvAtlasResult &atlas,
     return std::nullopt;
   }
 
-  if (!FinalizeCornerTexcoords(corners, cornerAssigned, sourceFaces,
-                               sourceMesh.VertexCount())) {
+  if (!FinalizeMeshCornerTexcoords(corners, cornerAssigned, sourceFaces,
+                                  sourceMesh.VertexCount())) {
     return std::nullopt;
   }
   return corners;
