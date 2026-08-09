@@ -1,0 +1,146 @@
+schema_version: 1
+task_id: BUG-138
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-09T01:45:02Z'
+claim_eligible: false
+source:
+  base_ref: HEAD~1
+  base_revision: 04a48243ef384c424a2d2d954b2e0ca1375b23a8
+  head_revision: 6130c7bfbb34711a1139f12a77699424803af4be
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+    sha256: a65ac39eb8d95f4546885fbe5847004ef59ad9e07ea1caf4c25c63f33ce16f0a
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 70f359524008069208199d125b2b27de13eda216a79e9e3aa7020848b51f96fa
+  - path: tasks/SESSION-BRIEF.md
+    sha256: c62eca362637d69badc668cdd4dfb585298b8508f50798f7676dcee9ed0caf04
+  - path: tasks/backlog/bugs/BUG-138-async-mesh-geometry-jobs-never-execute.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 5b7deb9a286656c5dc7bdba955747e7335dc6033318c169905129a8956d3a907
+  - path: tasks/done/BUG-138-async-mesh-geometry-jobs-never-execute.md
+    sha256: 54f3919e8adea26aeaa066219e499f37c1b741d1ea7cef6a1000c8db1d797b77
+  - path: tasks/done/BUG-139-imgui-adapter-drops-key-events.md
+    sha256: 55e67a2ffd2d509d4c7d367f01bf6859a1b82799c52c09ab23554da9b82309e0
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 822df4a2f229fb4e10400755a02033b6c2ef640dbe409737fa729cf4ef416b5d
+  - path: tasks/evidence/BUG-139/artifacts/README.md
+    sha256: d56b41a31c8bb273cd49cb9c1eff72cd23a212ce0242c3173820e3e6023b74e1
+  - path: tasks/evidence/BUG-139/artifacts/editing-keys-and-clipboard-chords.png
+    sha256: 3602347e69a6ecbb8fc88b85467039a07ac0eb86e516f0a955f8cb066fa8be74
+  - path: tasks/evidence/BUG-139/artifacts/path-corrected-with-backspace.png
+    sha256: 997411e489b5f900ed3667785530fc3fbd2a487388966d1f3c72eddeba1341b8
+  - path: tasks/evidence/BUG-139/commands/cpu-gate-retirement.json
+    sha256: 5d961c2fc37faaff4dc9463f30fc4dec00b2aa9d25acbf009a8b83925a158ed7
+  - path: tasks/evidence/BUG-139/commands/cpu-gate-retirement.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-139/commands/cpu-gate-retirement.stdout.log
+    sha256: f1320a3aa1088fb918e469ae029bffd7f79fbf92c77b5cfcea2816327af644f9
+  - path: tasks/evidence/BUG-139/commands/imgui-adapter-suites.json
+    sha256: 882f2dc72ec8d487ac3f57a56ff847b8ab7adf45996366c26eac7912ce5a993e
+  - path: tasks/evidence/BUG-139/commands/imgui-adapter-suites.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-139/commands/imgui-adapter-suites.stdout.log
+    sha256: 43bc76484a04a3c566b9d4f41b16dc90e1f7d42c0edd9fd048dab914fb8ead95
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: d3835f5692cbae86e02685290acbe7da96060038de49a3228a20759be9af27d0
+  content_digest: fedbdf92568a69da372ed6547ccd0a0d730114446fa78de42928fb292b7bccc4
+touched:
+  paths:
+  - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-138-async-mesh-geometry-jobs-never-execute.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-138-async-mesh-geometry-jobs-never-execute.md
+  - tasks/done/BUG-139-imgui-adapter-drops-key-events.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/BUG-139/artifacts/README.md
+  - tasks/evidence/BUG-139/artifacts/editing-keys-and-clipboard-chords.png
+  - tasks/evidence/BUG-139/artifacts/path-corrected-with-backspace.png
+  - tasks/evidence/BUG-139/commands/cpu-gate-retirement.json
+  - tasks/evidence/BUG-139/commands/cpu-gate-retirement.stderr.log
+  - tasks/evidence/BUG-139/commands/cpu-gate-retirement.stdout.log
+  - tasks/evidence/BUG-139/commands/imgui-adapter-suites.json
+  - tasks/evidence/BUG-139/commands/imgui-adapter-suites.stderr.log
+  - tasks/evidence/BUG-139/commands/imgui-adapter-suites.stdout.log
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  layers:
+  - runtime
+  - tests
+  modules: []
+extension_seam: MeshTopologyValueSignature is a file-local fingerprint of the stored topology arrays;
+  any future gate that needs 'did the stored mesh change' reads it instead of re-deriving a halfedge mesh.
+future_change_plan: BUG-137 removes the atlas topology replacement on import, which retires the earliest
+  trigger of this mismatch; the fingerprint stays correct either way.
+acceptance:
+- criterion: Simplify, subdivide, and remesh complete and change the selected mesh in
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No editor geometry action can be left permanently disabled by a job that
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The stall cause is recorded above, not just worked around.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-138/commands/cpu-gate-final.json
+- receipt: tasks/evidence/BUG-138/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-138/commands/focused-tests.json
+- receipt: tasks/evidence/BUG-138/commands/mesh-editor-suites.json
+- receipt: tasks/evidence/BUG-138/commands/structural-gates-retirement.json
+- receipt: tasks/evidence/BUG-138/commands/structural-gates.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- A refused topology edit names its reason in the panel (slice A) and the reason is now representation-independent,
+  so a stale report means the mesh genuinely changed.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-138-async-mesh-geometry-jobs-never-execute.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- The gate no longer rejects a mesh whose halfedge numbering was rewritten without any change in incidence;
+  that is intended, but it means a writer that permutes numbering while also changing geometry must still
+  change an index value, a count, or a position to be detected.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/BUG-138/artifacts/README.md
+  sha256: 9fd71bddb80545f6b88f999439723743ea1adc3cdb3800900c23e768d70a7de5
+  kind: file
+- path: tasks/evidence/BUG-138/artifacts/refusal-before-fix.png
+  sha256: 42e4eab3e97c505cc8c25a462d1fa017ad839affa40f061370ef3faef3dcef00
+  kind: file
+- path: tasks/evidence/BUG-138/artifacts/denoise-applies-on-the-same-entity.png
+  sha256: dd1c4f8249fcc3dff69bca78abb5669af8c695c179e626134b713d2bddc80876
+  kind: file
+- path: tasks/evidence/BUG-138/artifacts/second-simplify-applied.png
+  sha256: f62e30da4562d04c928c47fde51e64993d50fb7e9b880731fe937d5f95c8803a
+  kind: file
+- path: tasks/evidence/BUG-138/artifacts/third-simplify-applied.png
+  sha256: be0be93f40f5f1debd08285301be6b903ad45533b8f8c1902766791ba3e97bc3
+  kind: file
+- path: tasks/evidence/BUG-138/artifacts/subdivide-applied.png
+  sha256: 775edef577fba098a57c2c8797d83c774d311de128912fa2bb275935f696ab12
+  kind: file
+- path: tasks/evidence/BUG-138/artifacts/remesh-applied.png
+  sha256: 30acdf3e2592e0490a4582c3e6cff7671d849fb0925099bc7708652e804e4369
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
