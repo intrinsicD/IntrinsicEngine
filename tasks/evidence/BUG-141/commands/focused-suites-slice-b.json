@@ -1,0 +1,20 @@
+{
+  "command": [
+    "./build/ci/bin/IntrinsicRuntimeContractTests",
+    "--gtest_filter=ParameterizationOperations.*:SandboxEditorSession.*"
+  ],
+  "command_display": "./build/ci/bin/IntrinsicRuntimeContractTests '--gtest_filter=ParameterizationOperations.*:SandboxEditorSession.*'",
+  "cwd": ".",
+  "duration_ms": 302,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T08:18:58Z",
+  "label": "focused-suites-slice-b",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T08:18:58Z",
+  "stderr_path": "tasks/evidence/BUG-141/commands/focused-suites-slice-b.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-141/commands/focused-suites-slice-b.stdout.log",
+  "stdout_sha256": "0618cd8447e21aefe5e87f0c62edc28450effa4af53fdb324647316452425668",
+  "task_id": "BUG-141"
+}

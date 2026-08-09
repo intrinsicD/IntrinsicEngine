@@ -1,0 +1,20 @@
+{
+  "command": [
+    "./build/ci/bin/IntrinsicGeometryTests",
+    "--gtest_filter=ParameterizationDispatch.*"
+  ],
+  "command_display": "./build/ci/bin/IntrinsicGeometryTests '--gtest_filter=ParameterizationDispatch.*'",
+  "cwd": ".",
+  "duration_ms": 6,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T08:18:58Z",
+  "label": "geometry-dispatch-slice-b",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T08:18:58Z",
+  "stderr_path": "tasks/evidence/BUG-141/commands/geometry-dispatch-slice-b.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-141/commands/geometry-dispatch-slice-b.stdout.log",
+  "stdout_sha256": "a2112d75bb86d424a5444a12a2b9df1dc06638525fa0f15ea47087d4d0ea1894",
+  "task_id": "BUG-141"
+}

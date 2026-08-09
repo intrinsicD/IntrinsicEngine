@@ -1,0 +1,24 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = ParameterizationDispatch.*
+[==========] Running 7 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 7 tests from ParameterizationDispatch
+[ RUN      ] ParameterizationDispatch.LscmMatchesDirectSolverAndCarriesDiagnostics
+[       OK ] ParameterizationDispatch.LscmMatchesDirectSolverAndCarriesDiagnostics (0 ms)
+[ RUN      ] ParameterizationDispatch.HarmonicAndTutteMatchDirectSolver
+[       OK ] ParameterizationDispatch.HarmonicAndTutteMatchDirectSolver (0 ms)
+[ RUN      ] ParameterizationDispatch.InvalidInputsFailClosedThroughStatus
+[       OK ] ParameterizationDispatch.InvalidInputsFailClosedThroughStatus (0 ms)
+[ RUN      ] ParameterizationDispatch.RejectionCarriesConnectedComponentAndBoundaryLoopCounts
+[       OK ] ParameterizationDispatch.RejectionCarriesConnectedComponentAndBoundaryLoopCounts (0 ms)
+[ RUN      ] ParameterizationDispatch.UnusableDiagnosticsFailClosedWithoutUvs
+[       OK ] ParameterizationDispatch.UnusableDiagnosticsFailClosedWithoutUvs (0 ms)
+[ RUN      ] ParameterizationDispatch.LscmNonConvergenceIsSolverFailureWithoutUvs
+[       OK ] ParameterizationDispatch.LscmNonConvergenceIsSolverFailureWithoutUvs (0 ms)
+[ RUN      ] ParameterizationDispatch.RepeatedCallsAreDeterministic
+[       OK ] ParameterizationDispatch.RepeatedCallsAreDeterministic (0 ms)
+[----------] 7 tests from ParameterizationDispatch (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 7 tests from 1 test suite ran. (1 ms total)
+[  PASSED  ] 7 tests.
