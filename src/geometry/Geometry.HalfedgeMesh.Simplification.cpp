@@ -697,6 +697,87 @@ namespace Geometry::Simplification
             return 180.0 - interior;
         }
 
+        // BUG-137 — which vertices sit on a UV seam, per storage index.
+        //
+        // A UV seam is two corners at one vertex carrying different UVs. When
+        // the corner domain owns the UVs (`h:texcoord`) that is directly
+        // observable, so read it: the mesh stays manifold and the seam is a
+        // property fact. When only `v:texcoord` exists a seam is not
+        // representable per vertex at all — one vertex has exactly one UV — so
+        // an atlas expresses it by cutting the surface open, and the boundary
+        // remains the only proxy available on that representation.
+        //
+        // Before this split, the boundary proxy was the only path. On a
+        // corner-UV mesh it pinned nothing (no `v:texcoord`, and no boundary
+        // to find), so `PreserveUvSeams` silently protected no seam at all on
+        // exactly the meshes an atlas produces.
+        [[nodiscard]] std::vector<std::uint8_t> ClassifySeamVertices(
+            HalfedgeMesh::Mesh const& mesh)
+        {
+            const std::size_t nV = mesh.VerticesSize();
+            std::vector<std::uint8_t> seam(nV, 0u);
+
+            switch (MeshUtils::ResolveTexcoordDomain(mesh))
+            {
+            case MeshUtils::TexcoordDomain::Halfedge:
+            {
+                const auto corner = mesh.HalfedgeProperties().Get<glm::vec2>(
+                    MeshUtils::kHalfedgeTexcoordPropertyName);
+                const std::vector<glm::vec2>& uvs = corner.Vector();
+
+                // One pass over corners, keeping the first UV seen at each
+                // vertex; any later corner that disagrees marks a seam.
+                std::vector<glm::vec2> firstUv(nV, glm::vec2{0.0f});
+                std::vector<std::uint8_t> seen(nV, 0u);
+                for (std::size_t hi = 0u; hi < mesh.HalfedgesSize(); ++hi)
+                {
+                    const HalfedgeHandle h{static_cast<PropertyIndex>(hi)};
+                    if (mesh.IsDeleted(h))
+                    {
+                        continue;
+                    }
+                    const VertexHandle v = mesh.ToVertex(h);
+                    if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                    {
+                        continue;
+                    }
+                    const std::size_t vi = static_cast<std::size_t>(v.Index);
+                    if (seen[vi] == 0u)
+                    {
+                        firstUv[vi] = uvs[hi];
+                        seen[vi] = 1u;
+                    }
+                    else if (firstUv[vi] != uvs[hi])
+                    {
+                        seam[vi] = 1u;
+                    }
+                }
+                break;
+            }
+            case MeshUtils::TexcoordDomain::Vertex:
+            {
+                for (std::size_t vi = 0u; vi < nV; ++vi)
+                {
+                    const VertexHandle vh{static_cast<PropertyIndex>(vi)};
+                    if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
+                    {
+                        continue;
+                    }
+                    if (mesh.IsBoundary(vh))
+                    {
+                        seam[vi] = 1u;
+                    }
+                }
+                break;
+            }
+            case MeshUtils::TexcoordDomain::None:
+            default:
+                break;
+            }
+
+            return seam;
+        }
+
     } // anonymous namespace
 
     // =========================================================================
@@ -773,9 +854,10 @@ namespace Geometry::Simplification
         std::size_t seamPinnedCount = 0;
         if (faQem && (params.PreserveSharpFeatures || params.PreserveUvSeams))
         {
-            const Property<glm::vec2> texcoord = params.PreserveUvSeams
-                ? mesh.VertexProperties().Get<glm::vec2>("v:texcoord")
-                : Property<glm::vec2>{};
+            const std::vector<std::uint8_t> seamCandidate =
+                params.PreserveUvSeams
+                    ? ClassifySeamVertices(mesh)
+                    : std::vector<std::uint8_t>(nV, 0u);
 
             for (std::size_t vi = 0; vi < nV; ++vi)
             {
@@ -820,7 +902,7 @@ namespace Geometry::Simplification
                     }
                 }
 
-                if (params.PreserveUvSeams && texcoord && mesh.IsBoundary(vh))
+                if (params.PreserveUvSeams && seamCandidate[vi] != 0u)
                 {
                     seamVertex[vi] = 1u;
                     ++seamPinnedCount;

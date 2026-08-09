@@ -570,6 +570,97 @@ TEST(Simplification, FeatureAwarePreservesUvSeams)
         EXPECT_TRUE(HasLiveVertexNear(mesh, p)) << "seam vertex removed";
 }
 
+// BUG-137 — on a corner-UV mesh the seam is a property fact, not a boundary.
+// `MakeTessellatedCube` is closed, so the boundary proxy finds nothing here;
+// the classifier must read the disagreeing corners instead. Splitting the UV
+// assignment by the sign of each face's centroid x cuts one seam ring at x=0.
+TEST(Simplification, FeatureAwarePreservesCornerUvSeams)
+{
+    auto mesh = MakeTessellatedCube(4);
+
+    auto corner = mesh.HalfedgeProperties().GetOrAdd<glm::vec2>(
+        "h:texcoord", glm::vec2(0.0f));
+    ASSERT_TRUE(static_cast<bool>(corner));
+
+    for (std::size_t f = 0; f < mesh.FacesSize(); ++f)
+    {
+        const Geometry::FaceHandle face{static_cast<Geometry::PropertyIndex>(f)};
+        if (mesh.IsDeleted(face))
+            continue;
+        const float chart =
+            Geometry::MeshUtils::FaceCentroid(mesh, face).x >= 0.0 ? 0.0f : 1.0f;
+        for (const Geometry::HalfedgeHandle h : mesh.HalfedgesAroundFace(face))
+            corner[h.Index] = glm::vec2(chart, 0.0f);
+    }
+
+    // Independently derive the expected seam set: a vertex whose incident
+    // corners do not all agree. Nothing here is on a boundary.
+    std::vector<glm::vec3> seamPositions;
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(v) || mesh.IsIsolated(v))
+            continue;
+        ASSERT_FALSE(mesh.IsBoundary(v)) << "fixture must be closed";
+
+        bool disagrees = false;
+        bool seen = false;
+        glm::vec2 first{0.0f};
+        for (const Geometry::HalfedgeHandle h : mesh.HalfedgesAroundVertex(v))
+        {
+            // HalfedgesAroundVertex yields outgoing halfedges; the corner at
+            // `v` belongs to the incoming opposite one.
+            const glm::vec2 uv = corner[mesh.OppositeHalfedge(h).Index];
+            if (!seen)
+            {
+                first = uv;
+                seen = true;
+            }
+            else if (first != uv)
+            {
+                disagrees = true;
+            }
+        }
+        if (disagrees)
+            seamPositions.push_back(mesh.Position(v));
+    }
+    ASSERT_GT(seamPositions.size(), 0u);
+    ASSERT_LT(seamPositions.size(), mesh.VertexCount())
+        << "a seam that covers every vertex would not discriminate";
+
+    Geometry::Simplification::Params params; // FA_QEM default
+    params.TargetFaces = 24;
+    params.PreserveBoundary = false;
+    params.PreserveUvSeams = true;
+
+    auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->SeamVerticesPinned, seamPositions.size());
+
+    mesh.GarbageCollection();
+    for (const glm::vec3& p : seamPositions)
+        EXPECT_TRUE(HasLiveVertexNear(mesh, p)) << "corner-UV seam vertex removed";
+}
+
+// The corner-UV classifier must not over-pin: uniform corner UVs carry no seam,
+// so nothing is protected even though the property exists.
+TEST(Simplification, UniformCornerUvsPinNoSeam)
+{
+    auto mesh = MakeTessellatedCube(4);
+    auto corner = mesh.HalfedgeProperties().GetOrAdd<glm::vec2>(
+        "h:texcoord", glm::vec2(0.25f, 0.75f));
+    ASSERT_TRUE(static_cast<bool>(corner));
+
+    Geometry::Simplification::Params params;
+    params.TargetFaces = 24;
+    params.PreserveBoundary = false;
+    params.PreserveUvSeams = true;
+
+    auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->SeamVerticesPinned, 0u);
+}
+
 // Diagnostics counters include rejected candidate evaluations as well as the
 // protected feature-set cardinality on a feature mesh.
 TEST(Simplification, DiagnosticsCountersPopulated)

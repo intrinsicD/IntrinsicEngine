@@ -158,11 +158,15 @@ export namespace Geometry::Simplification
         // under ClassicalQEM.
         bool PreserveSharpFeatures{true};
 
-        // FA_QEM only. When the mesh carries a "v:texcoord" property, treat
-        // texcoord-bearing boundary (UV-seam) vertices as immovable even when
-        // PreserveBoundary is false. With vertex-resident texcoords a UV seam is
-        // a geometric boundary loop, so this pins those loops. No-op when no
-        // texcoord property is present.
+        // FA_QEM only. Treat UV-seam vertices as immovable even when
+        // PreserveBoundary is false. Which vertices those are depends on the
+        // domain that owns the mesh's UVs (BUG-137):
+        //   "h:texcoord" — a seam is read exactly, as a vertex whose incident
+        //     corners disagree on their UV. The mesh stays manifold.
+        //   "v:texcoord" — one vertex can hold only one UV, so a seam is not
+        //     representable per vertex; an atlas cuts the surface open
+        //     instead, and every boundary vertex is pinned as the proxy.
+        // No-op when the mesh carries neither property.
         bool PreserveUvSeams{true};
 
         // Target number of faces. The algorithm stops when FaceCount() <= TargetFaces.
@@ -231,8 +235,9 @@ export namespace Geometry::Simplification
         // deliberately not counted as pinned. Zero under ClassicalQEM.
         std::size_t SharpFeatureVerticesPinned{0};
 
-        // FA_QEM: number of UV-seam (texcoord-bearing boundary) vertices pinned.
-        // Zero under ClassicalQEM or when no "v:texcoord" property exists.
+        // FA_QEM: number of UV-seam vertices pinned, classified per the domain
+        // that owns the UVs (see PreserveUvSeams). Zero under ClassicalQEM or
+        // when the mesh carries no texcoord property.
         std::size_t SeamVerticesPinned{0};
     };
 
