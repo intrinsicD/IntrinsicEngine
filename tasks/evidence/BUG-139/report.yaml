@@ -3,15 +3,15 @@ task_id: BUG-139
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-09T03:42:22Z'
+generated_at: '2026-08-09T03:56:12Z'
 claim_eligible: false
 source:
   base_ref: 04a48243
   base_revision: 04a48243ef384c424a2d2d954b2e0ca1375b23a8
-  head_revision: 725593363714130a718dda4dc2f059478f5f737e
+  head_revision: e9ca4ec835f4dd67bd59e0d93195251a35c6613f
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
     sha256: a65ac39eb8d95f4546885fbe5847004ef59ad9e07ea1caf4c25c63f33ce16f0a
@@ -103,9 +103,11 @@ source:
     sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   - path: tasks/evidence/BUG-141/commands/structural-gates.stdout.log
     sha256: c893d5cf3edd6ff24e826fcc7e9e4e75ea2b600e3f407b9e584ed94b60bb16a2
+  - path: tasks/evidence/BUG-141/report.yaml
+    sha256: e8ff9190905a0579a0af511291b634f5a98bb36966518aa04c76b4a941c184f6
   - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
     sha256: e542f3f24921533e31116c931dc6f1d2a199282421b33657fe3e451ab1d28a3d
-  content_digest: 7284af8d6a857a83cfb52c9c95393a920eabf44b9275bc3afd3b01e5cb441b61
+  content_digest: aeb9256157cad98913f8e7576e78854e92e5ae0f8e042d3d84c0cca2916818db
 touched:
   paths:
   - docs/reviews/2026-07-31-runtime-200-clean-workshop-review.md
@@ -153,6 +155,7 @@ touched:
   - tasks/evidence/BUG-141/commands/structural-gates.json
   - tasks/evidence/BUG-141/commands/structural-gates.stderr.log
   - tasks/evidence/BUG-141/commands/structural-gates.stdout.log
+  - tasks/evidence/BUG-141/report.yaml
   - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
   layers:
   - platform
@@ -195,7 +198,10 @@ docs_sync:
   canonical_docs_changed: true
   skill_mirrors_checked: true
 residual_risks: []
-skipped_checks: []
+skipped_checks:
+- check: surface-breadth
+  reason: Generated after the session's later commits landed, so the recorded surface spans 04a48243..HEAD
+    rather than only the retirement commit 6130c7bf; it is a superset that contains this task's changes.
 artifacts:
 - path: tasks/evidence/BUG-139/artifacts/README.md
   sha256: d56b41a31c8bb273cd49cb9c1eff72cd23a212ce0242c3173820e3e6023b74e1
