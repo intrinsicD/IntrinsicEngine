@@ -451,7 +451,9 @@ Each operation therefore:
 - computes its own change signal — moved vertices for denoise, differing normals
   for the vertex-normal families, differing curvature values across every
   property the run publishes, a non-empty rejected set for point-cloud outlier
-  removal, a topology delta for remesh/subdivide/simplify;
+  removal, and, for the operations that commit a whole replacement mesh
+  (remesh, simplify, UV regeneration), a comparison of that mesh against the one
+  it replaces;
 - returns `NoChange` with a message naming the counts, *before* the history
   commit, so a no-op leaves no undo entry to step through and stamps no dirty
   tag; and
@@ -472,6 +474,21 @@ slot, because every value is newly authored.
 Panels render the counter block for `NoChange` as well as `Applied`: `NoChange`
 is exactly the state where the user needs the counts to understand why nothing
 happened.
+
+For a replacement-mesh operation, counts alone decide neither direction: an edge
+flip and a tangential relaxation pass each change the mesh while leaving vertex
+and face counts identical, so `SameMeshTopologyAndPositions` compares storage
+sizes, positions, and halfedge connectivity, and a mesh still carrying garbage
+reads as different — the conservative direction, which reports `Applied`. UV
+regeneration extends that with the `v:texcoord` values, because a run that
+rewrote only the texcoords would otherwise read as unchanged and be dropped.
+
+Subdivide is deliberately **not** gated. Every implemented operator either
+refines, which always raises the face count, or fails closed — including when
+`MaxOutputFaces` blocks the first iteration. A changed-count gate there would be
+a branch no input can reach, so the absence is pinned by
+`MeshSubdivideCannotRunAndLeaveTheMeshUnchanged` rather than left as an
+omission.
 
 ### Sandbox Editor Point-Cloud Outlier Removal
 

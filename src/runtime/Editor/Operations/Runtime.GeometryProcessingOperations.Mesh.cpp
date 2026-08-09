@@ -3186,6 +3186,126 @@ struct EditorJobResult { std::string Diagnostic{}; };
             target.FlipCount = source.FlipCount;
         }
 
+        // BUG-145: a topology operation commits a whole replacement mesh, so
+        // the honest change signal is whether that mesh differs from the one it
+        // replaced. Counts decide neither direction on their own: an edge flip
+        // and a tangential relaxation pass each change the mesh while leaving
+        // vertex and face counts identical, and reporting `NoChange` for either
+        // would silently drop the user's edit. Storage sizes are compared
+        // rather than live counts, so a mesh still carrying garbage reads as
+        // different — the conservative direction, which reports `Applied`.
+        [[nodiscard]] bool SameMeshTopologyAndPositions(
+            const Geometry::HalfedgeMesh::Mesh& before,
+            const Geometry::HalfedgeMesh::Mesh& after) noexcept
+        {
+            if (before.VerticesSize() != after.VerticesSize() ||
+                before.HalfedgesSize() != after.HalfedgesSize() ||
+                before.FacesSize() != after.FacesSize() ||
+                before.DeletedVertexCount() != after.DeletedVertexCount() ||
+                before.DeletedEdgeCount() != after.DeletedEdgeCount() ||
+                before.DeletedFaceCount() != after.DeletedFaceCount())
+            {
+                return false;
+            }
+
+            for (std::size_t i = 0u; i < before.VerticesSize(); ++i)
+            {
+                const Geometry::VertexHandle vertex{
+                    static_cast<Geometry::PropertyIndex>(i)};
+                if (before.Position(vertex) != after.Position(vertex))
+                    return false;
+            }
+            for (std::size_t i = 0u; i < before.HalfedgesSize(); ++i)
+            {
+                const Geometry::HalfedgeHandle halfedge{
+                    static_cast<Geometry::PropertyIndex>(i)};
+                if (before.ToVertex(halfedge) != after.ToVertex(halfedge) ||
+                    before.NextHalfedge(halfedge) !=
+                        after.NextHalfedge(halfedge) ||
+                    before.Face(halfedge) != after.Face(halfedge))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // BUG-145: UV regeneration also commits a replacement mesh, but its
+        // point is the texcoord property, so the topology-and-positions
+        // comparison alone is not enough: a run that rewrote only `v:texcoord`
+        // would read as unchanged and be silently dropped. A texcoord present
+        // on one side and absent on the other is a change.
+        [[nodiscard]] bool SameUvRegenerationOutput(
+            const Geometry::HalfedgeMesh::Mesh& before,
+            const Geometry::HalfedgeMesh::Mesh& after)
+        {
+            if (!SameMeshTopologyAndPositions(before, after))
+                return false;
+
+            const Geometry::ConstProperty<glm::vec2> beforeUvs =
+                before.VertexProperties().Get<glm::vec2>("v:texcoord");
+            const Geometry::ConstProperty<glm::vec2> afterUvs =
+                after.VertexProperties().Get<glm::vec2>("v:texcoord");
+            if (static_cast<bool>(beforeUvs) != static_cast<bool>(afterUvs))
+                return false;
+            if (!beforeUvs)
+                return true;
+            return beforeUvs.Vector() == afterUvs.Vector();
+        }
+
+        [[nodiscard]] std::string BuildMeshTopologyNoChangeMessage(
+            const char* const operation,
+            const std::size_t vertexCount,
+            const std::size_t faceCount,
+            const std::string& work)
+        {
+            std::string message = "Mesh ";
+            message += operation;
+            message += " left the mesh unchanged (";
+            message += std::to_string(vertexCount);
+            message += " vertices, ";
+            message += std::to_string(faceCount);
+            message += " faces, ";
+            message += work;
+            message += "). Nothing was published and no undo entry was "
+                       "created.";
+            return message;
+        }
+
+        [[nodiscard]] std::string BuildMeshRemeshNoChangeMessage(
+            const EditorMeshRemeshResult& result)
+        {
+            std::string work = std::to_string(result.IterationsPerformed);
+            work += " iterations, ";
+            work += std::to_string(result.SplitCount);
+            work += " splits, ";
+            work += std::to_string(result.CollapseCount);
+            work += " collapses, ";
+            work += std::to_string(result.FlipCount);
+            work += " flips";
+            return BuildMeshTopologyNoChangeMessage(
+                "remesh",
+                result.OutputVertexCount,
+                result.OutputFaceCount,
+                work);
+        }
+
+        [[nodiscard]] std::string BuildMeshSimplifyNoChangeMessage(
+            const EditorMeshSimplifyResult& result)
+        {
+            std::string work = std::to_string(result.CollapseCount);
+            work += " collapses, ";
+            work += std::to_string(result.CollapsesRejectedTopology);
+            work += " rejected on topology, ";
+            work += std::to_string(result.CollapsesRejectedQuality);
+            work += " rejected on quality";
+            return BuildMeshTopologyNoChangeMessage(
+                "simplify",
+                result.OutputVertexCount,
+                result.OutputFaceCount,
+                work);
+        }
+
         [[nodiscard]] std::string BuildMeshRemeshSuccessMessage(
             const EditorMeshRemeshResult& result)
         {
@@ -6026,6 +6146,15 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
 
+            if (SameMeshTopologyAndPositions(job.BeforeMesh, job.Mesh))
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                result.Error = Core::ErrorCode::Success;
+                result.Message = BuildMeshRemeshNoChangeMessage(result);
+                PublishMeshRemeshResultSink(context, result);
+                return Core::Ok();
+            }
+
             const EditorCommandStatus commitStatus =
                 CommitMeshTopologyReplacement(
                     context,
@@ -6063,6 +6192,11 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
 
+            // BUG-145: no `NoChange` gate here, unlike remesh and simplify.
+            // Every implemented subdivision operator either refines — which
+            // always raises the face count — or fails closed, including when
+            // `MaxOutputFaces` blocks the first iteration. A changed-count gate
+            // would be a branch no input can reach.
             const EditorCommandStatus commitStatus =
                 CommitMeshTopologyReplacement(
                     context,
@@ -6098,6 +6232,15 @@ struct EditorJobResult { std::string Diagnostic{}; };
             {
                 PublishMeshSimplifyResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            if (SameMeshTopologyAndPositions(job.BeforeMesh, job.Mesh))
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                result.Error = Core::ErrorCode::Success;
+                result.Message = BuildMeshSimplifyNoChangeMessage(result);
+                PublishMeshSimplifyResultSink(context, result);
+                return Core::Ok();
             }
 
             const EditorCommandStatus commitStatus =
@@ -8146,6 +8289,22 @@ DebugNameForEditorICPVariant(
         if (!result.Succeeded())
             return result;
 
+        if (SameUvRegenerationOutput(job.BeforeMesh, job.AfterMesh))
+        {
+            // The atlas resolved to exactly the UVs and topology already
+            // stored, so there is nothing to commit; replacing the mesh with
+            // itself would leave a useless undo entry.
+            result.Status = EditorCommandStatus::NoChange;
+            result.Diagnostic =
+                "UV regeneration produced the texcoords and topology already "
+                "stored (" +
+                std::to_string(result.ChartCount) +
+                " charts, " + std::to_string(result.SeamSplitVertexCount) +
+                " seam splits). Nothing was published and no undo entry was "
+                "created.";
+            return result;
+        }
+
         const EditorCommandStatus commitStatus =
             CommitUvMeshTopologyReplacement(
                 context,
@@ -8952,6 +9111,16 @@ ApplyEditorMeshRemeshCommand(
         result.OutputVertexCount = source.Mesh.VertexCount();
         result.OutputFaceCount = source.Mesh.FaceCount();
 
+        if (SameMeshTopologyAndPositions(before, source.Mesh))
+        {
+            // Nothing differs, so there is nothing to commit; replacing the
+            // mesh with itself would also leave a useless undo entry.
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshRemeshNoChangeMessage(result);
+            return result;
+        }
+
         const EditorCommandStatus commitStatus =
             CommitMeshTopologyReplacement(
                 context,
@@ -9163,6 +9332,8 @@ ApplyEditorMeshSubdivideCommand(
         result.OutputVertexCount = output.VertexCount();
         result.OutputFaceCount = output.FaceCount();
 
+        // BUG-145: see the subdivide job publisher — subdivision cannot both
+        // run and leave the mesh unchanged, so there is no gate here.
         const EditorCommandStatus commitStatus =
             CommitMeshTopologyReplacement(
                 context,
@@ -9313,6 +9484,16 @@ ApplyEditorMeshSimplifyCommand(
         result.SharpFeatureVerticesPinned =
             simplification->SharpFeatureVerticesPinned;
         result.SeamVerticesPinned = simplification->SeamVerticesPinned;
+
+        if (SameMeshTopologyAndPositions(before, source.Mesh))
+        {
+            // Nothing differs, so there is nothing to commit; replacing the
+            // mesh with itself would also leave a useless undo entry.
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshSimplifyNoChangeMessage(result);
+            return result;
+        }
 
         const EditorCommandStatus commitStatus =
             CommitMeshTopologyReplacement(

@@ -8,6 +8,54 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-145`](BUG-145-editor-operations-report-applied-from-written-counts.md) —
+no audited editor geometry-processing operation can report `Applied` while
+changing nothing. `BUG-140` fixed this for denoise and its audit found the same
+shape in 22 sibling sites; those did not share a change signal, so the work was
+sliced by signal rather than by file.
+
+Vertex normals and curvature compare the values they are about to publish
+against the property state each path already captures for undo, and report
+`ChangedNormalCount` / `ChangedValueCount`. The comparison is exact rather than
+epsilon-based: these paths write a kernel's own output back into the storage it
+was read from, so an unchanged value is bit-identical, and an epsilon would have
+invented a tolerance the undo snapshot does not share — a value differing by
+less than it would be committed while being reported as unchanged. An absent
+output property is a change in every slot.
+
+Point-cloud outlier removal needed no new field at all. `RejectedIndices` was
+the change signal the operation already computed and then ignored, so an empty
+rejection set was committing an identical compaction of the cloud over itself
+and leaving an undo entry that restored the same points.
+
+Remesh, simplify, and UV regeneration commit a whole replacement mesh, and there
+counts alone would have been unsafe in both directions: an edge flip and a
+tangential relaxation pass each change the mesh while leaving vertex and face
+counts identical, and reporting `NoChange` for either would silently drop the
+user's edit — a worse failure than the one being fixed. The gate compares
+storage sizes, positions, and halfedge connectivity, treats a mesh still
+carrying garbage as different, and for UV regeneration also compares
+`v:texcoord`, whose rewrite is the whole point of that operation.
+
+Subdivide is the one audited operation left ungated, and that is the deliberate
+deviation. Probing all three operators showed subdivision cannot both run and
+leave the mesh unchanged: Loop, Catmull-Clark, and Sqrt3 each either refine —
+always raising the face count — or fail closed, including when `MaxOutputFaces`
+blocks the first iteration. The gate was written, proven unreachable, and
+removed rather than shipped as decoration, and
+`MeshSubdivideCannotRunAndLeaveTheMeshUnchanged` pins the reasoning so the
+absence reads as a decision. One observation was recorded rather than fixed: a
+cap that blocks subdivision reports `GeometryProcessingFailed` when what
+happened is that the configured cap refused the work.
+
+Seven contract tests were added across the synchronous commands, the CPU job
+publishers, and the unreachable-gate case. One existing test,
+`MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings`, turned out
+to be three no-ops after its first iteration — every weighting agrees on a flat
+triangle — and now asserts that explicitly instead of expecting `Applied` four
+times. The default CPU gate passes 4162/4162 with the expected GLFW/LeakSanitizer
+skip.
+
 [`BUG-141`](BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md) —
 editor geometry-processing diagnostics report the right severity, appear only
 in the panel that produced them, can be dismissed, and name the cause when a
@@ -7266,7 +7314,7 @@ point-cloud vertex normals; curvature; remesh, subdivide and simplify — simpli
 computes a `CollapseCount` and does not consult it; point-cloud outlier removal,
 whose `RejectedIndices` may be empty while the status is `Applied`; and UV
 regeneration. The full per-site inventory is recorded in the retired task and
-spun out as [`BUG-145`](../backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md)
+spun out as [`BUG-145`](BUG-145-editor-operations-report-applied-from-written-counts.md)
 rather than widening this fix. ICP registration is the counter-example already
 mapping history state through `ToEditorCommandStatus`.
 

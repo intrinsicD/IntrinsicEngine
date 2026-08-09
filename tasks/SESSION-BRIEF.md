@@ -46,7 +46,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-137` — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh (tasks/backlog/bugs/BUG-137-direct-mesh-import-atlas-replaces-topology.md)
-- unblocked: `BUG-145` — Editor geometry operations report Applied from written counts (tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md)
 
 ## Theme H — Agentic workflow hardening
 

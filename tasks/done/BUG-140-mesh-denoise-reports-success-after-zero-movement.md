@@ -51,7 +51,7 @@ contracts:
 The required audit found the same written-count-implies-success shape in every
 operation below. They are **not** fixed here — this task was scoped to the
 reporting defect it reproduced — and are spun out as
-[`BUG-145`](../backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md),
+[`BUG-145`](BUG-145-editor-operations-report-applied-from-written-counts.md),
 which carries the full per-site inventory with file and line references:
 
 - Mesh, graph, and point-cloud **vertex normals** (six sites): status comes

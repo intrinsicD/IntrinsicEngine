@@ -15,6 +15,12 @@ contracts:
 ---
 # BUG-145 — Editor geometry operations report Applied from written counts
 
+## Status
+
+- Completed and retired on 2026-08-09.
+- Completion commit: this retirement commit. Slice A landed in `49fc104d`,
+  slice B in `acb7194a`.
+
 ## Slice plan
 
 Written before implementing. The audit lists 22 sites, but they do not share a
@@ -48,7 +54,46 @@ each slice keeps the default CPU gate green on its own:
   `ApplyUvRegenerationCommit`. Separate because the writeback path is shared
   with the parameterization lane and worth reviewing on its own.
 
-## Progress — slices A and B landed 2026-08-09; the task stays open for C-D
+## Progress — all four slices landed 2026-08-09; the task closes
+
+### Slices C and D — replacement-mesh operations
+
+Remesh, simplify, and UV regeneration each commit a whole replacement mesh, and
+none of them compared that mesh against the one it replaced. Counts alone would
+not have been a safe signal in either direction: an edge flip and a tangential
+relaxation pass both change the mesh while leaving vertex and face counts
+identical, and reporting `NoChange` for either would silently drop the user's
+edit — a worse failure than the `Applied`-that-changed-nothing this task is
+about. `SameMeshTopologyAndPositions` therefore compares storage sizes,
+positions, and halfedge connectivity, and reads a mesh still carrying garbage as
+different, which is the conservative direction. UV regeneration extends that
+with the `v:texcoord` values, because its whole point is the texcoord property
+and a run that rewrote only those would otherwise read as unchanged.
+
+No new result field was needed for any of the three: they already report
+input/output vertex and face counts plus their own operation counters
+(splits/collapses/flips, collapses, charts/seam splits), and those *are* the
+change counts the acceptance criterion asks for.
+
+**Subdivide is deliberately not gated, and that is the one deviation from the
+audit.** Probing all three operators showed subdivision cannot both run and
+leave the mesh unchanged: Loop, Catmull-Clark, and Sqrt3 each either refine —
+which always raises the face count — or fail closed, including when
+`MaxOutputFaces` blocks the first iteration. A gate there would have been a
+branch no input can reach, so it was written, proven unreachable, and removed
+rather than shipped as decoration (the same call `BUG-141` slice A made about an
+assertion that could not fail). `MeshSubdivideCannotRunAndLeaveTheMeshUnchanged`
+pins the reasoning so the absence reads as a decision.
+
+### Observation for a follow-up, not fixed here
+
+`MaxOutputFaces` blocking the first subdivision iteration is reported as
+`GeometryProcessingFailed` with a message about the operator failing, when what
+actually happened is that the configured cap refused the work. That is a
+misclassification of the same family `BUG-141` fixed for queued jobs, but it is
+a different defect from this task's written-count reporting and was left alone.
+
+## Progress — slices A and B landed 2026-08-09
 
 ### Slice B — curvature and point-cloud outlier removal
 
@@ -165,63 +210,75 @@ comparing against nothing.
 
 ## Required changes
 
-- [ ] For each operation above, derive the terminal status from a changed
+- [x] For each operation above, derive the terminal status from a changed
       quantity: normals that actually differ, curvature values that actually
       differ, a topology delta, a non-empty rejected set, or a UV change.
       (Slice A done: all six vertex-normal sites compare against the
       `VertexNormalPropertyState` already captured for undo. Slice B done:
       curvature compares its four published properties, and outlier removal
-      consults the rejected set it already computed. Slices C-D own topology
-      and UV regeneration.)
-- [ ] Return `NoChange` with an actionable reason when nothing changed, and do
-      not create an undo-history entry for a no-op. (Slices A and B done; the
+      consults the rejected set it already computed. Slices C-D done: remesh,
+      simplify, and UV regeneration compare the replacement mesh against the
+      one it replaces. Subdivide is the one audited operation left ungated,
+      because its no-op state is unreachable; see `## Progress`.)
+- [x] Return `NoChange` with an actionable reason when nothing changed, and do
+      not create an undo-history entry for a no-op. (All slices done; each
       gate also skips the dirty stamp, because a run that published nothing has
       nothing to re-extract.)
-- [ ] Keep the existing failure statuses and diagnostics unchanged. (Slices A
-      and B done: every gate sits after the failure returns, so no kernel or
-      validation failure changes shape.)
-- [ ] Surface the change count in each result so the UI can explain the
+- [x] Keep the existing failure statuses and diagnostics unchanged. Every gate
+      sits after the failure returns, so no kernel or validation failure changes
+      shape.
+- [x] Surface the change count in each result so the UI can explain the
       outcome. (Slice A done: `ChangedNormalCount` on all three normals
       results, in the success message, and in the three panels — which now
       render their counter block for `NoChange` too, since that is exactly
       when the counts are what explains the outcome. Slice B done:
       `ChangedValueCount` for curvature; outlier removal already reported
-      `RejectedCount` and only needed the panel to render it for `NoChange`.)
+      `RejectedCount` and only needed the panel to render it for `NoChange`.
+      Slices C-D needed no new field: the replacement-mesh operations already
+      report input/output counts and their own operation counters.)
 
 ## Tests
 
-- [ ] For each operation, add a contract test that drives a genuinely no-op
+- [x] For each operation, add a contract test that drives a genuinely no-op
       input and asserts a non-success status plus its explanatory diagnostic.
       (Slice A: `VertexNormalRecomputeThatChangesNothingReportsNoChange` covers
       the three synchronous commands and
       `VertexNormalCpuJobThatChangesNothingReportsNoChange` the job publisher,
       which is a separate code path. Slice B:
       `MeshCurvatureRecomputeThatChangesNothingReportsNoChange` and
-      `PointCloudOutlierRemovalRejectingNothingReportsNoChange`.)
-- [ ] For each operation, assert a normal run still reports `Applied` with a
+      `PointCloudOutlierRemovalRejectingNothingReportsNoChange`. Slices C-D:
+      `MeshSimplifyThatCollapsesNothingReportsNoChange`,
+      `MeshRemeshThatChangesNothingReportsNoChange`,
+      `UvRegenerationThatReproducesStoredUvsReportsNoChange`, and
+      `MeshSubdivideCannotRunAndLeaveTheMeshUnchanged` for the operation whose
+      no-op state is unreachable.)
+- [x] For each operation, assert a normal run still reports `Applied` with a
       non-zero change count. (Slice A: asserted in both new tests and in
       `MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings`,
       whose four-weighting loop turned out to be three no-ops on a flat
       triangle and now asserts that explicitly.)
-- [ ] Assert that a no-op run leaves no command-history entry. (Slice A: both
+- [x] Assert that a no-op run leaves no command-history entry. (Slice A: both
       new tests compare `EditorCommandHistory::UndoCount()` across the no-op.)
-- [ ] Default CPU gate stays green. (Slice A: 4156/4156; slice B: 4158/4158;
-      expected GLFW/LSan skip in both.)
+- [x] Default CPU gate stays green. Slice A 4156/4156, slice B 4158/4158,
+      slices C-D 4162/4162; expected GLFW/LSan skip throughout.
 
 ## Docs
 
-- [ ] Extend the editor command-status documentation with the per-operation
+- [x] Extend the editor command-status documentation with the per-operation
       changed-count rule that `BUG-140` recorded for denoise. (Slice A: the
       rule, the exact-comparison rationale, and the panel rule are in
-      `src/runtime/README.md`; slice B added curvature and outlier removal to
-      the per-operation list; slices C-D extend it further.)
+      `src/runtime/README.md`; slice B added curvature and outlier removal;
+      slices C-D added the replacement-mesh comparison, the UV texcoord
+      extension, and why subdivide has no gate.)
 
 ## Acceptance criteria
 
-- [ ] No audited operation can report `Applied` while changing nothing.
-- [ ] Every no-op result explains why nothing changed.
-- [ ] No no-op run creates an undo-history entry.
-- [ ] The complete default CPU gate passes.
+- [x] No audited operation can report `Applied` while changing nothing.
+      Subdivide is the one audited operation without a gate, because it cannot
+      run and change nothing; the reasoning is pinned by a test.
+- [x] Every no-op result explains why nothing changed.
+- [x] No no-op run creates an undo-history entry.
+- [x] The complete default CPU gate passes (4162/4162).
 
 ## Verification
 

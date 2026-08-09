@@ -9,11 +9,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-145` — Editor geometry operations report Applied from written counts](BUG-145-editor-operations-report-applied-from-written-counts.md):
-  the `BUG-140` audit found the same written-count-implies-success shape in
-  vertex normals, curvature, remesh/subdivide/simplify, outlier removal, and UV
-  regeneration — 22 sites in all. Derive each terminal status from a changed
-  quantity and report `NoChange` with a reason.
 - [`BUG-137` — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh](BUG-137-direct-mesh-import-atlas-replaces-topology.md):
   importing a closed manifold OBJ (3669 V / 11013 E / 7342 F, every edge
   2-manifold) materializes 21464 vertices, 21745 edges and 21464 boundary
@@ -92,6 +87,15 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   `0.45` that could not be told apart from real progress. Both terminal states
   now report no progress and are labelled by stage; indeterminate stages carry
   `0.0`, so determinate `0.0` means exactly `Queued`.
+
+- Closed 2026-08-09: [`BUG-145` — Editor geometry operations report Applied from
+  written
+  counts](../../done/BUG-145-editor-operations-report-applied-from-written-counts.md).
+  Vertex normals, curvature, outlier removal, remesh, simplify, and UV
+  regeneration all derive their terminal status from a changed quantity now, and
+  a no-op reports `NoChange` with a reason, publishes nothing, and leaves no undo
+  entry. Subdivide is the one audited operation without a gate: it cannot run and
+  change nothing, and a test pins that reasoning.
 
 - Closed 2026-08-09: [`BUG-141` — Editor geometry-processing diagnostics are
   mislabeled, duplicated, unscoped, and

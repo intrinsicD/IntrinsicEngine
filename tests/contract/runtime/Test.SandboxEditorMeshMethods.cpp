@@ -1803,6 +1803,183 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
 // which is `mean.size() + gaussian.size()` — a pure written count that is
 // non-zero whenever the kernel ran. Recomputing curvature on an unchanged mesh
 // must report `NoChange` and leave no undo entry.
+// BUG-145 slice C: a topology operation commits a whole replacement mesh, and
+// none of the three compared that mesh against the one it replaced. Simplify is
+// the case the audit named: it computes a CollapseCount and did not consult it,
+// so a target at or above the current face count collapsed nothing and still
+// reported Applied.
+TEST(SandboxEditorUi, MeshSimplifyThatCollapsesNothingReportsNoChange)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "NoOpSimplify");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const std::size_t faceCount =
+        registry.Raw().get<GS::Faces>(mesh).Properties.Size();
+    ASSERT_GT(faceCount, 0u);
+
+    // A target at the current face count leaves nothing to collapse.
+    const Runtime::EditorMeshSimplifyResult result =
+        Runtime::ApplyEditorMeshSimplifyCommand(
+            context,
+            Runtime::EditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .Metric = Runtime::EditorMeshSimplifyMetric::ClassicalQEM,
+                .TargetFaces = faceCount,
+                .PreserveBoundary = true,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::NoChange)
+        << result.Message;
+    EXPECT_EQ(result.CollapseCount, 0u);
+    EXPECT_EQ(result.OutputFaceCount, result.InputFaceCount);
+    EXPECT_EQ(result.OutputVertexCount, result.InputVertexCount);
+    EXPECT_NE(result.Message.find("left the mesh unchanged"),
+              std::string::npos)
+        << result.Message;
+    EXPECT_FALSE(history.CanUndo())
+        << "a run that collapsed nothing must not leave an undo entry";
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+
+    // A real target still applies and still reports its collapses.
+    const Runtime::EditorMeshSimplifyResult applied =
+        Runtime::ApplyEditorMeshSimplifyCommand(
+            context,
+            Runtime::EditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .Metric = Runtime::EditorMeshSimplifyMetric::ClassicalQEM,
+                .TargetFaces = faceCount / 2u,
+                .PreserveBoundary = true,
+            });
+    ASSERT_TRUE(applied.Succeeded()) << applied.Message;
+    EXPECT_GT(applied.CollapseCount, 0u);
+    EXPECT_LT(applied.OutputFaceCount, applied.InputFaceCount);
+    EXPECT_TRUE(history.CanUndo());
+}
+
+// BUG-145 slice C: remesh reported `Applied` from its output counts without
+// ever comparing them to the input. Counts alone would not be enough either —
+// a tangential relaxation pass moves vertices while leaving vertex and face
+// counts identical — so the gate compares the replacement mesh against the one
+// it replaces.
+TEST(SandboxEditorUi, MeshRemeshThatChangesNothingReportsNoChange)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "NoOpRemesh");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    // A target at the icosahedron's own edge length triggers no split, collapse
+    // or flip, and a negligible lambda leaves the relaxation pass below the
+    // float representation of every position.
+    const Runtime::EditorMeshRemeshResult result =
+        Runtime::ApplyEditorMeshRemeshCommand(
+            context,
+            Runtime::EditorMeshRemeshCommand{
+                .StableEntityId = stableId,
+                .Mode = Runtime::EditorMeshRemeshMode::Uniform,
+                .Iterations = 1u,
+                .TargetEdgeLength = 1.0515,
+                .Lambda = 1.0e-12,
+                .PreserveBoundary = true,
+                .ProjectToSurface = false,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::NoChange)
+        << result.Message;
+    EXPECT_EQ(result.SplitCount, 0u);
+    EXPECT_EQ(result.CollapseCount, 0u);
+    EXPECT_EQ(result.FlipCount, 0u);
+    EXPECT_EQ(result.OutputFaceCount, result.InputFaceCount);
+    EXPECT_NE(result.Message.find("left the mesh unchanged"),
+              std::string::npos)
+        << result.Message;
+    EXPECT_FALSE(history.CanUndo())
+        << "a run that changed nothing must not leave an undo entry";
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+
+    // A target that forces real work still applies.
+    const Runtime::EditorMeshRemeshResult applied =
+        Runtime::ApplyEditorMeshRemeshCommand(
+            context,
+            Runtime::EditorMeshRemeshCommand{
+                .StableEntityId = stableId,
+                .Mode = Runtime::EditorMeshRemeshMode::Uniform,
+                .Iterations = 2u,
+                .TargetEdgeLength = 0.35,
+                .Lambda = 0.5,
+                .PreserveBoundary = true,
+                .ProjectToSurface = false,
+            });
+    ASSERT_TRUE(applied.Succeeded()) << applied.Message;
+    EXPECT_GT(applied.OutputFaceCount, applied.InputFaceCount);
+    EXPECT_TRUE(history.CanUndo());
+}
+
+// Subdivide is deliberately not gated: every implemented operator either
+// refines, which always raises the face count, or fails closed. This pins that
+// reasoning so the missing gate reads as a decision rather than an omission.
+TEST(SandboxEditorUi, MeshSubdivideCannotRunAndLeaveTheMeshUnchanged)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "SubdivideProbe");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    // A cap below one iteration's output blocks the operator entirely; it
+    // reports a processing failure rather than an unchanged mesh.
+    const Runtime::EditorMeshSubdivideResult blocked =
+        Runtime::ApplyEditorMeshSubdivideCommand(
+            context,
+            Runtime::EditorMeshSubdivideCommand{
+                .StableEntityId = stableId,
+                .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
+                .Iterations = 1u,
+                .MaxOutputFaces = 1u,
+            });
+    EXPECT_EQ(blocked.Status,
+              Runtime::EditorCommandStatus::GeometryProcessingFailed)
+        << blocked.Message;
+    EXPECT_EQ(blocked.IterationsPerformed, 0u);
+    EXPECT_FALSE(history.CanUndo());
+
+    // An operator that does run always raises the face count.
+    const Runtime::EditorMeshSubdivideResult applied =
+        Runtime::ApplyEditorMeshSubdivideCommand(
+            context,
+            Runtime::EditorMeshSubdivideCommand{
+                .StableEntityId = stableId,
+                .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
+                .Iterations = 1u,
+            });
+    ASSERT_TRUE(applied.Succeeded()) << applied.Message;
+    EXPECT_GT(applied.OutputFaceCount, applied.InputFaceCount);
+}
+
 TEST(SandboxEditorUi, MeshCurvatureRecomputeThatChangesNothingReportsNoChange)
 {
     ECS::Scene::Registry registry;
@@ -5135,6 +5312,50 @@ TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsFailClosedForInvali
                     .get<GS::Vertices>(cloudConflict)
                     .Properties.Get<float>(PN::kNormal));
 }
+// BUG-145 slice D: UV regeneration commits a replacement mesh and reported
+// `Applied` from a written count. Re-running it on a mesh whose authored UVs
+// the atlas preserves resolves to the texcoords and topology already stored,
+// which must read as `NoChange` and leave no undo entry.
+TEST(SandboxEditorUi, UvRegenerationThatReproducesStoredUvsReportsNoChange)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UvIdempotent");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto regenerate = [&]()
+    {
+        return Runtime::ApplyEditorUvRegenerationCommand(
+            context,
+            Runtime::EditorUvRegenerationCommand{
+                .StableEntityId = stableId,
+                .PreserveValidAuthoredUvs = true,
+                .Resolution = 64u,
+                .Padding = 2u,
+            });
+    };
+
+    const Runtime::EditorUvRegenerationCommandResult first = regenerate();
+    ASSERT_TRUE(first.Succeeded()) << first.Diagnostic;
+    const std::size_t undoAfterFirst = history.UndoCount();
+    EXPECT_GT(undoAfterFirst, 0u);
+
+    const Runtime::EditorUvRegenerationCommandResult second = regenerate();
+    EXPECT_EQ(second.Status, Runtime::EditorCommandStatus::NoChange)
+        << second.Diagnostic;
+    EXPECT_NE(second.Diagnostic.find("already stored"), std::string::npos)
+        << second.Diagnostic;
+    EXPECT_EQ(history.UndoCount(), undoAfterFirst)
+        << "a no-op must not leave an undo entry";
+}
+
 TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
 {
     ECS::Scene::Registry registry;

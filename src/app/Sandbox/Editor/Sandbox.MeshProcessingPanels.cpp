@@ -1020,7 +1020,10 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::DebugNameForEditorMeshRemeshMode(result->Mode),
             Runtime::DebugNameForEditorMeshRemeshSizingLaw(
                 result->SizingLaw));
-        if (result->Succeeded())
+        // BUG-145: NoChange means the operation ran and left the mesh
+        // identical, so its counters are exactly what explains why.
+        if (result->Succeeded() ||
+            result->Status == Runtime::EditorCommandStatus::NoChange)
         {
             ImGui::Text(
                 "Vertices: %zu -> %zu  faces: %zu -> %zu",
@@ -1309,7 +1312,8 @@ namespace Extrinsic::Sandbox::Editor
             "Metric: %s",
             Runtime::DebugNameForEditorMeshSimplifyMetric(
                 result->Metric));
-        if (result->Succeeded())
+        if (result->Succeeded() ||
+            result->Status == Runtime::EditorCommandStatus::NoChange)
         {
             ImGui::Text(
                 "Vertices: %zu -> %zu  faces: %zu -> %zu",
