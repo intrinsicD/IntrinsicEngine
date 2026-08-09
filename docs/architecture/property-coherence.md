@@ -80,7 +80,10 @@ buffer dirty stamp. The graphics residency cache therefore reuses unchanged
 property buffers and reuploads a changed scalar, label, color, vector, or
 isoline property without an authored generation bump. Explicit dirty stamps
 remain meaningful for external GPU-address sources that have no canonical CPU
-property.
+property. A CPU fragment bake's texcoord stamp resolves through the same
+corner-over-vertex order it reads the UVs by: watching only `v:texcoord` would
+pin a seam-carrying mesh — which has no `v:texcoord` at all — to its authored
+stamp, so corner-UV edits would never re-bake.
 
 ## Vulkan upload and lifetime
 

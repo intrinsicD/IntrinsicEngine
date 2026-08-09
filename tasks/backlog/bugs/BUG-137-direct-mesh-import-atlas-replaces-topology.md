@@ -168,12 +168,43 @@ side is ready before the producing side changes.
       revision both follow the resolution order, so a corner-UV mesh is neither
       reported as "no resolved texcoord property" nor left stale on the GPU
       after a UV edit.
-- [ ] Slice D — remaining vertex-domain consumers, none of which lose data
-      today: `Runtime.ParameterizationOperations` preflight wording,
-      `Runtime.VisualizationRecipes` CPU-recipe dirty-stamp fallback,
-      `Runtime.EditorWorkspaceSnapshots.Models` reserved-name filters, and
-      `Geometry.HalfedgeMesh.Simplification` FA-QEM seam cost (which can now
-      read the seam directly rather than inferring it from boundary vertices).
+- [x] Slice D — remaining vertex-domain consumers. Two of the four turned out
+      to lose behavior, not just wording, so this entry's original "none of
+      which lose data today" premise was wrong and is corrected here:
+      - `Geometry.HalfedgeMesh.Simplification` now classifies a UV seam as a
+        vertex whose incident corners disagree on their UV when the corner
+        domain owns the UVs, instead of pinning boundary vertices. The
+        boundary proxy remains for vertex-owned UVs, where a seam is not
+        representable per vertex and an atlas expresses it by cutting the
+        surface open. Before this, `PreserveUvSeams` pinned **nothing** on a
+        corner-UV mesh: there is no `v:texcoord` to find and no boundary to
+        infer from.
+      - `Runtime.ParameterizationOperations` now captures, applies, and
+        undoes both UV domains, and retires the corner UVs its vertex-domain
+        result supersedes. Before this, a parameterization run on an imported
+        mesh published `v:texcoord` underneath a surviving `h:texcoord`,
+        which wins the resolution order — the result was computed, reported
+        successful, and read by nothing. Its view model also names the
+        corner-domain UVs the vertex-indexed layout view cannot draw, instead
+        of rendering as "no UVs".
+      - `Runtime.VisualizationRecipes` CPU-recipe dirty stamp follows the
+        resolution order, so editing a seam mesh's corner UVs re-bakes.
+      - `Runtime.EditorWorkspaceSnapshots.Models` and
+        `Runtime.VisualizationEditingOperations.Actions` reserved-name filters
+        classify `h:texcoord` as the same reserved property as `v:texcoord`,
+        so the catalog no longer flips a row's `Internal`/`Canonical` flags
+        purely by which domain holds the UVs.
+
+      Not in scope, and spun out rather than widened: topology-replacing
+      editor operations destroy `h:texcoord` outright, because the scratch
+      halfedge mesh is rebuilt from a triangle soup that never carries it and
+      `PopulateFromMesh` then publishes the scratch mesh's halfedge properties
+      wholesale. Confirmed by probe (`h:texcoord exists=1 size=112` before
+      simplify, `exists=0 size=64` after, command reporting success) and
+      tracked as [`BUG-146`](BUG-146-topology-edits-destroy-corner-uvs.md).
+      That is also why FA-QEM's corner-seam classification cannot yet fire
+      through the editor path: the geometry contract is correct, the runtime
+      does not hand it the data.
 
 ## Tests
 - [x] Slice A — unit coverage for corner-domain UV storage and the
@@ -218,7 +249,21 @@ side is ready before the producing side changes.
       `ObjWithoutTexcoordSeamStaysVertexDomain` pinning both sides of the
       policy, and `DirectObjImportPreservesAuthoredCornerUvs` /
       `SaveLoadRoundTripPreservesCornerDomainTexcoords` at the runtime level.
-- [ ] Default CPU gate stays green after every slice.
+- [x] Slice D — the four remaining consumers each carry coverage that fails
+      against the unfixed source:
+      `Test_Simplification.FeatureAwarePreservesCornerUvSeams` (closed cube,
+      one seam ring, zero boundary vertices — pre-fix the seam vertices are
+      collapsed away) and `UniformCornerUvsPinNoSeam` (guards against
+      over-pinning); `Test.ParameterizationOperations`
+      `RetiresSupersededCornerUvsAndUndoRestoresThem` and
+      `ViewModelNamesCornerDomainUvsItCannotDraw`;
+      `Test.VisualizationRecipes.FragmentBakeTexcoordStampFollowsTheOwningDomain`
+      (vertex-owned then corner-owned, asserting the stamp equals the owning
+      domain's revision); and `Test.SandboxEditorModels`
+      `PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection`, extended to
+      assert the `h:texcoord` row's flags equal the `v:texcoord` row's.
+- [x] Default CPU gate stays green after every slice. 4172/4172 on the final
+      slice-D state, with the expected `GlfwLifecycleLsan` skip.
 
 ## Docs
 - [x] Record the corner-domain UV decision and the corner-over-vertex resolution

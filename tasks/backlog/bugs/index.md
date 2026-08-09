@@ -14,6 +14,14 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   2-manifold) materializes 21464 vertices, 21745 edges and 21464 boundary
   vertices, because the entity mesh is built from `atlas.OutputMesh`. The split
   is already computed as `SeamSplitVertexCount` and never surfaced.
+- [`BUG-146` — Topology-changing mesh operations silently destroy corner-domain UVs](BUG-146-topology-edits-destroy-corner-uvs.md):
+  simplify rebuilds the entity's halfedge mesh from a triangle soup that never
+  carries `h:texcoord`, and `PopulateFromMesh` then publishes the scratch
+  mesh's halfedge properties wholesale, so the property is removed rather than
+  left stale. A probe through the real editor command reports success with
+  `h:texcoord exists=1 size=112` before and `exists=0 size=64` after. Spun out
+  of `BUG-137` slice D, which also explains why FA-QEM's corner-seam
+  classification cannot fire through the editor path yet.
 - [`BUG-134` — ImGui adapter panel draw-list test fails intermittently](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
   one default CPU run reported the panel draw-list contract as its sole
   failure, followed by ten passing isolated repetitions and a clean 4,103-case

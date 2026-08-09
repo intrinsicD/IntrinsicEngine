@@ -197,6 +197,22 @@ same vertex/edge/halfedge counts, and the duplication an indexed GPU vertex
 buffer needs happens once at upload, where one GPU vertex is emitted per
 distinct `(vertex, UV)` pair. See `BUG-137`.
 
+Two consequences for consumers:
+
+- **A boundary is not a seam.** An operation that must know where the seams are
+  reads them: on corner-owned UVs a seam vertex is one whose incident corners
+  disagree on their UV. Treating boundary vertices as seams is a proxy that is
+  only valid for vertex-owned UVs, where one vertex holds exactly one UV and an
+  atlas has no choice but to cut the surface open. On a corner-owned mesh that
+  proxy finds nothing, because there is no boundary to find — which is exactly
+  how FA-QEM's `PreserveUvSeams` silently stopped protecting anything.
+- **Leave exactly one authority behind.** A producer that publishes UVs on one
+  domain must retire the other domain's property when its result supersedes it.
+  A parameterization computes one UV per vertex, so publishing `v:texcoord`
+  beside a surviving `h:texcoord` would leave the corner property winning the
+  resolution order and the result read by nothing. Undoable operations capture
+  both domains so the retirement is reversible.
+
 ## Naming and count terminology
 
 - Prefer `PascalCase` for public functions and methods, matching the dominant
