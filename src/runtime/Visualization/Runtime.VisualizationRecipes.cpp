@@ -1136,16 +1136,36 @@ namespace Extrinsic::Runtime
                         authored.TexcoordDirtyStamp;
                     if (authored.TexcoordBufferBDA == 0u)
                     {
-                        if (const Geometry::PropertySet* vertexProperties =
-                            ResolveGeometryPropertySet(
-                                availability,
-                                GeometryElementDomain::MeshVertex);
-                            vertexProperties != nullptr)
+                        // BUG-137 — the CPU bake reads whichever domain owns
+                        // the UVs, so its dirty stamp has to follow the same
+                        // corner-over-vertex resolution order. Watching only
+                        // `v:texcoord` left a seam-carrying mesh — which has
+                        // no `v:texcoord` at all — pinned to the authored
+                        // stamp, so editing its corner UVs never re-baked.
+                        const auto revisionIn =
+                            [&availability](
+                                const GeometryElementDomain domain,
+                                const std::string_view name)
+                            -> std::optional<std::uint64_t>
                         {
-                            texcoordRevision =
-                                vertexProperties->FindPropertyRevision(
-                                    "v:texcoord").value_or(texcoordRevision);
-                        }
+                            const Geometry::PropertySet* properties =
+                                ResolveGeometryPropertySet(availability, domain);
+                            return properties != nullptr
+                                ? properties->FindPropertyRevision(name)
+                                : std::nullopt;
+                        };
+
+                        const std::optional<std::uint64_t> resolved =
+                            revisionIn(
+                                GeometryElementDomain::MeshHalfedge,
+                                "h:texcoord");
+                        texcoordRevision =
+                            resolved.has_value()
+                                ? *resolved
+                                : revisionIn(
+                                      GeometryElementDomain::MeshVertex,
+                                      "v:texcoord")
+                                      .value_or(texcoordRevision);
                     }
 
                     switch (authored.Mapping)

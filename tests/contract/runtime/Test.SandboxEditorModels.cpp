@@ -2657,6 +2657,11 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     edges.Properties.GetOrAdd<double>("e:weight", 0.0)
         .Vector() = {1.0, 2.0, 3.0};
 
+    auto& halfedges = registry.Raw().get<GS::Halfedges>(mesh);
+    halfedges.Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.0f})
+        .Vector()
+        .assign(halfedges.Properties.Size(), glm::vec2{0.25f, 0.5f});
+
     auto& faces = registry.Raw().get<GS::Faces>(mesh);
     faces.Properties.GetOrAdd<glm::vec4>("f:debug_color", glm::vec4{1.0f})
         .Vector() = {glm::vec4{0.1f, 0.2f, 0.3f, 1.0f}};
@@ -2702,6 +2707,20 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     ASSERT_NE(texcoord, nullptr);
     EXPECT_EQ(texcoord->ValueKind, Kind::Vec2);
     EXPECT_EQ(texcoord->ComponentCount, 2u);
+
+    // BUG-137 — UVs are the same reserved property whichever domain owns
+    // them, so the corner-domain row must classify identically. Before the
+    // fix `h:texcoord` reported Internal/Canonical false and showed up beside
+    // user attributes purely because it sat on the halfedge domain.
+    const auto* cornerTexcoord =
+        FindCatalogProperty(catalog, Domain::MeshHalfedges, "h:texcoord");
+    ASSERT_NE(cornerTexcoord, nullptr);
+    EXPECT_EQ(cornerTexcoord->ValueKind, Kind::Vec2);
+    EXPECT_EQ(cornerTexcoord->ComponentCount, 2u);
+    EXPECT_EQ(cornerTexcoord->Internal, texcoord->Internal);
+    EXPECT_EQ(cornerTexcoord->Canonical, texcoord->Canonical);
+    EXPECT_EQ(cornerTexcoord->Connectivity, texcoord->Connectivity);
+    EXPECT_TRUE(cornerTexcoord->Internal);
 
     const auto* unsupported =
         FindCatalogProperty(catalog, Domain::MeshVertices, "v:unsupported_int");

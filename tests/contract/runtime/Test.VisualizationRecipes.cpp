@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
 #include <thread>
 #include <utility>
@@ -300,6 +301,84 @@ TEST(VisualizationRecipes, EncodesVectorAndIsolineProperties)
     EXPECT_FLOAT_EQ(isolinePacket.RangeMin, 0.0f);
     EXPECT_FLOAT_EQ(isolinePacket.RangeMax, 20.0f);
     EXPECT_FALSE(isolinePacket.DepthTested);
+}
+
+// BUG-137 — the CPU fragment bake reads whichever domain owns the UVs, so its
+// dirty stamp must follow the same corner-over-vertex resolution order. A
+// seam-carrying mesh has no `v:texcoord` at all; watching only that name left
+// the stamp pinned to the authored value, so editing corner UVs never re-baked.
+TEST(VisualizationRecipes, FragmentBakeTexcoordStampFollowsTheOwningDomain)
+{
+    constexpr std::uint64_t kAuthoredStamp = 41u;
+
+    const auto bakeStamp =
+        [](const R::GeometryEntityAvailability& availability) -> std::uint64_t
+    {
+        const R::VisualizationEncodingResult bake = R::EncodeVisualizationRecipe(
+            availability,
+            R::VisualizationRecipe{.Data = R::FragmentBakeVisualizationRecipe{
+                .Name = "curvature.bake",
+                .Source = {
+                    .Domain = R::GeometryElementDomain::MeshFace,
+                    .Name = "curvature",
+                    .ValueKind = Geometry::PropertyValueKind::Float,
+                },
+                .Mapping = G::VisualizationFragmentBakeMapping::ExistingTexcoords,
+                .MeshHasTexcoords = true,
+                .FaceCount = 4u,
+                .AtlasWidth = 64u,
+                .AtlasHeight = 32u,
+                .TexcoordBufferSourceKey = "mesh.texcoords",
+                .TexcoordDirtyStamp = kAuthoredStamp,
+                .SourceAttributeDirtyStamp = 42u,
+            }});
+        EXPECT_TRUE(bake.Succeeded());
+        EXPECT_EQ(bake.Batch.FragmentBakeAtlases.size(), 1u);
+        return bake.Batch.FragmentBakeAtlases.empty()
+            ? 0u
+            : bake.Batch.FragmentBakeAtlases.front().TexcoordDirtyStamp;
+    };
+
+    GS::Vertices vertices{};
+    GS::Halfedges halfedges{};
+    GS::Faces faces{};
+    vertices.Properties = MakeScalarProperties();
+    faces.Properties = MakeScalarProperties();
+    halfedges.Properties.Resize(12u);
+
+    // Vertex-owned UVs: the stamp comes from the vertex property, not the
+    // authored fallback.
+    vertices.Properties.Add<glm::vec2>("v:texcoord", glm::vec2{0.0f});
+    const R::GeometryEntityAvailability vertexOwned =
+        R::BuildGeometryAvailability(GS::ConstSourceView{
+            .ActiveDomain = GS::Domain::Mesh,
+            .HasMeshTopologyMarker = true,
+            .VertexSource = &vertices,
+            .HalfedgeSource = &halfedges,
+            .FaceSource = &faces,
+        });
+    const std::optional<Geometry::PropertyRevision> vertexRevision =
+        vertices.Properties.FindPropertyRevision("v:texcoord");
+    ASSERT_TRUE(vertexRevision.has_value());
+    EXPECT_NE(*vertexRevision, kAuthoredStamp);
+    EXPECT_EQ(bakeStamp(vertexOwned), *vertexRevision);
+
+    // Corner-owned UVs win, even while the vertex property is still present.
+    halfedges.Properties.Add<float>("h:filler", 0.0f);
+    halfedges.Properties.Add<glm::vec2>("h:texcoord", glm::vec2{0.0f});
+    const R::GeometryEntityAvailability cornerOwned =
+        R::BuildGeometryAvailability(GS::ConstSourceView{
+            .ActiveDomain = GS::Domain::Mesh,
+            .HasMeshTopologyMarker = true,
+            .VertexSource = &vertices,
+            .HalfedgeSource = &halfedges,
+            .FaceSource = &faces,
+        });
+    const std::optional<Geometry::PropertyRevision> cornerRevision =
+        halfedges.Properties.FindPropertyRevision("h:texcoord");
+    ASSERT_TRUE(cornerRevision.has_value());
+    EXPECT_NE(*cornerRevision, *vertexRevision);
+    EXPECT_EQ(bakeStamp(cornerOwned), *cornerRevision);
 }
 
 TEST(VisualizationRecipes, EncodesAtlasMetadataWithoutSchedulingWork)

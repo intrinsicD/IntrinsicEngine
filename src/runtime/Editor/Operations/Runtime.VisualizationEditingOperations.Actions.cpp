@@ -448,6 +448,9 @@ namespace {
                    name == "v:point" ||
                    name == "v:tex" ||
                    name == "v:texcoord" ||
+                   // BUG-137 — same reserved property, on the domain that can
+                   // carry a seam.
+                   name == "h:texcoord" ||
                    name == "p:position" ||
                    name == "p:normal";
         }
@@ -467,6 +470,9 @@ namespace {
                    name == "v:point" ||
                    name == "v:tex" ||
                    name == "v:texcoord" ||
+                   // BUG-137 — same reserved property, on the domain that can
+                   // carry a seam.
+                   name == "h:texcoord" ||
                    name == "p:position";
         }
 
