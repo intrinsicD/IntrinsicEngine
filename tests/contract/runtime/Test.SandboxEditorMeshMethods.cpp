@@ -1799,6 +1799,111 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     EXPECT_TRUE(model.Processing.LastMeshCurvatureResult->Succeeded());
     EXPECT_EQ(model.Processing.LastMeshCurvatureResult->ScalarWrittenCount, 8u);
 }
+// BUG-145 slice B: curvature derived `Applied` from `ScalarWrittenCount`,
+// which is `mean.size() + gaussian.size()` — a pure written count that is
+// non-zero whenever the kernel ran. Recomputing curvature on an unchanged mesh
+// must report `NoChange` and leave no undo entry.
+TEST(SandboxEditorUi, MeshCurvatureRecomputeThatChangesNothingReportsNoChange)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "IdempotentCurv");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto recompute = [&]()
+    {
+        return Runtime::ApplyEditorMeshCurvatureCommand(
+            context,
+            Runtime::EditorMeshCurvatureCommand{
+                .StableEntityId = stableId,
+                .Output = Runtime::EditorMeshCurvatureOutput::All,
+                .PublishPrincipalDirections = true,
+            });
+    };
+
+    const Runtime::EditorMeshCurvatureResult first = recompute();
+    ASSERT_TRUE(first.Succeeded()) << first.Message;
+    EXPECT_EQ(first.ChangedValueCount,
+              first.ScalarWrittenCount + first.DirectionWrittenCount)
+        << "absent curvature properties make every slot a change";
+    const std::size_t undoAfterFirst = history.UndoCount();
+    EXPECT_GT(undoAfterFirst, 0u);
+
+    registry.Raw().remove<Dirty::DirtyVertexAttributes>(mesh);
+    const Runtime::EditorMeshCurvatureResult second = recompute();
+    EXPECT_EQ(second.Status, Runtime::EditorCommandStatus::NoChange)
+        << second.Message;
+    EXPECT_EQ(second.ChangedValueCount, 0u);
+    EXPECT_GT(second.ScalarWrittenCount, 0u);
+    EXPECT_EQ(second.NonFiniteScalarCount, 0u);
+    EXPECT_NE(second.Message.find("already up to date"), std::string::npos)
+        << second.Message;
+    EXPECT_EQ(history.UndoCount(), undoAfterFirst)
+        << "a no-op must not leave an undo entry";
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh))
+        << "a run that published nothing must not mark attributes dirty";
+}
+
+// BUG-145 slice B: outlier removal already computed the rejected set and then
+// reported `Applied` regardless of whether it was empty, replacing the cloud
+// with itself and leaving an undo entry that restores identical points.
+TEST(SandboxEditorUi, PointCloudOutlierRemovalRejectingNothingReportsNoChange)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    // A tight uniform grid: every point has plenty of close neighbours, so no
+    // radius rejection is possible.
+    std::vector<glm::vec3> positions{};
+    for (int x = 0; x < 4; ++x)
+    {
+        for (int y = 0; y < 4; ++y)
+        {
+            positions.push_back(glm::vec3{static_cast<float>(x) * 0.1f,
+                                          static_cast<float>(y) * 0.1f,
+                                          0.0f});
+        }
+    }
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "DenseCloud");
+    AddPointCloudSource(registry, cloud, positions.size());
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+
+    const Runtime::EditorPointCloudOutlierRemovalResult result =
+        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
+            context,
+            Runtime::EditorPointCloudOutlierRemovalCommand{
+                .StableEntityId = stableId,
+                .Method = Runtime::EditorPointCloudOutlierMethod::Radius,
+                .SearchRadius = 1.0f,
+                .MinNeighbors = 1u,
+            });
+
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::NoChange)
+        << result.Message;
+    EXPECT_EQ(result.RejectedCount, 0u);
+    EXPECT_EQ(result.KeptCount, positions.size());
+    EXPECT_NE(result.Message.find("No outliers were rejected"),
+              std::string::npos)
+        << result.Message;
+    EXPECT_EQ(PointCloudPositionCount(registry, cloud), positions.size());
+    EXPECT_FALSE(history.CanUndo())
+        << "a run that rejected nothing must not leave an undo entry";
+}
+
 TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
 {
     ECS::Scene::Registry registry;

@@ -1683,7 +1683,10 @@ void DrawPointCloudOutlierRemovalResultStatus(
               result.Method == EditorPointCloudOutlierMethod::Statistical
                   ? "Statistical"
                   : "Radius");
-  if (result.Succeeded()) {
+  // BUG-145: NoChange means the kernel ran and rejected nothing, so its
+  // counters are exactly what explains why — keep showing them.
+  if (result.Succeeded() ||
+      result.Status == EditorCommandStatus::NoChange) {
     ImGui::Text("Kept %zu / %zu  rejected %zu  non-finite %zu",
                 result.KeptCount, result.OriginalCount, result.RejectedCount,
                 result.NonFiniteCount);

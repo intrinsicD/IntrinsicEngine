@@ -449,14 +449,18 @@ values already stored.
 Each operation therefore:
 
 - computes its own change signal — moved vertices for denoise, differing normals
-  for the vertex-normal families, a rejected set for outlier removal, a topology
-  delta for remesh/subdivide/simplify;
+  for the vertex-normal families, differing curvature values across every
+  property the run publishes, a non-empty rejected set for point-cloud outlier
+  removal, a topology delta for remesh/subdivide/simplify;
 - returns `NoChange` with a message naming the counts, *before* the history
   commit, so a no-op leaves no undo entry to step through and stamps no dirty
   tag; and
 - surfaces the change count on its result (for example
-  `EditorMeshVertexNormalsResult::ChangedNormalCount`) so a panel can explain
-  the outcome instead of showing a written count that always looks like success.
+  `EditorMeshVertexNormalsResult::ChangedNormalCount` or
+  `EditorMeshCurvatureResult::ChangedValueCount`) so a panel can explain the
+  outcome instead of showing a written count that always looks like success.
+  An operation that already reports its change signal — outlier removal's
+  `RejectedCount` — needs no new field, only the gate.
 
 The comparison is exact rather than epsilon-based. These paths publish a
 kernel's own output back into the storage it was read from, so an unchanged

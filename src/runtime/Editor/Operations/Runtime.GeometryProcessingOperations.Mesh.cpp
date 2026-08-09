@@ -1266,6 +1266,27 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return true;
         }
 
+        // BUG-145: how many published values differ from the ones already
+        // stored. A property the previous run did not have counts as changed in
+        // every slot, because every value is newly authored.
+        template <typename T>
+        [[nodiscard]] std::size_t CountChangedValues(
+            const bool hadProperty,
+            const std::vector<T>& before,
+            const std::vector<T>& after) noexcept
+        {
+            if (!hadProperty || before.size() != after.size())
+                return after.size();
+
+            std::size_t changed = 0u;
+            for (std::size_t i = 0u; i < after.size(); ++i)
+            {
+                if (after[i] != before[i])
+                    ++changed;
+            }
+            return changed;
+        }
+
         // BUG-145: `WrittenCount` is non-zero whenever the kernel ran at all,
         // so it cannot tell a recompute that changed something from one that
         // republished the values already stored. Compare exactly: these paths
@@ -1278,16 +1299,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             const std::vector<glm::vec3>& before,
             const std::vector<glm::vec3>& after) noexcept
         {
-            if (!hadNormalProperty || before.size() != after.size())
-                return after.size();
-
-            std::size_t changed = 0u;
-            for (std::size_t i = 0u; i < after.size(); ++i)
-            {
-                if (after[i] != before[i])
-                    ++changed;
-            }
-            return changed;
+            return CountChangedValues(hadNormalProperty, before, after);
         }
 
         [[nodiscard]] std::string BuildVertexNormalsNoChangeMessage(
@@ -2057,6 +2069,30 @@ struct EditorJobResult { std::string Diagnostic{}; };
         using MeshCurvaturePropertySnapshot =
             std::shared_ptr<const MeshCurvaturePropertyState>;
 
+        [[nodiscard]] std::size_t CountChangedCurvatureValues(
+            const MeshCurvaturePropertyState& before,
+            const MeshCurvaturePropertyState& after) noexcept
+        {
+            return CountChangedValues(before.HadMean, before.Mean, after.Mean) +
+                   CountChangedValues(
+                       before.HadGaussian, before.Gaussian, after.Gaussian) +
+                   CountChangedValues(before.HadDir1, before.Dir1, after.Dir1) +
+                   CountChangedValues(before.HadDir2, before.Dir2, after.Dir2);
+        }
+
+        [[nodiscard]] std::string BuildMeshCurvatureNoChangeMessage(
+            const EditorMeshCurvatureResult& result)
+        {
+            std::string message =
+                "Mesh curvature is already up to date (";
+            message += std::to_string(result.ScalarWrittenCount);
+            message += " scalar and ";
+            message += std::to_string(result.DirectionWrittenCount);
+            message += " direction values recomputed, 0 changed). Nothing was "
+                       "published and no undo entry was created.";
+            return message;
+        }
+
         struct MeshCurvatureMutationGeneration
         {
             std::uint64_t GeometryMetadataSignature{0u};
@@ -2485,6 +2521,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             message += std::to_string(result.VertexSlotCount);
             message += ", scalars=";
             message += std::to_string(result.ScalarWrittenCount);
+            message += ", changed=";
+            message += std::to_string(result.ChangedValueCount);
             message += ", directions=";
             message += result.DirectionsPublished ? "published" : "not published";
             message += ").";
@@ -3390,6 +3428,21 @@ struct EditorJobResult { std::string Diagnostic{}; };
             target.DistanceThreshold = source.DistanceThreshold;
         }
 
+        // BUG-145: `RejectedIndices` is the change signal this operation already
+        // computed and then ignored — an empty rejection set means the cloud is
+        // unchanged, however many points were inspected.
+        [[nodiscard]] std::string BuildPointCloudOutlierRemovalNoChangeMessage(
+            const EditorPointCloudOutlierRemovalResult& result)
+        {
+            std::string message = "No outliers were rejected: all ";
+            message += std::to_string(result.OriginalCount);
+            message += " points passed the threshold (";
+            message += std::to_string(result.DistanceThreshold);
+            message += "). The cloud is unchanged and no undo entry was "
+                       "created.";
+            return message;
+        }
+
         [[nodiscard]] std::string BuildPointCloudOutlierRemovalSuccessMessage(
             const EditorPointCloudOutlierRemovalResult& result)
         {
@@ -3564,6 +3617,16 @@ struct EditorJobResult { std::string Diagnostic{}; };
             {
                 PublishPointCloudOutlierRemovalResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            if (result.RejectedCount == 0u)
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                result.Error = Core::ErrorCode::Success;
+                result.Message =
+                    BuildPointCloudOutlierRemovalNoChangeMessage(result);
+                PublishPointCloudOutlierRemovalResultSink(context, result);
+                return Core::Ok();
             }
 
             const bool statistical =
@@ -5911,6 +5974,17 @@ struct EditorJobResult { std::string Diagnostic{}; };
             {
                 PublishMeshCurvatureResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
+            }
+
+            result.ChangedValueCount = CountChangedCurvatureValues(
+                job.CurvatureBefore, job.CurvatureAfter);
+            if (result.ChangedValueCount == 0u)
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                result.Error = Core::ErrorCode::Success;
+                result.Message = BuildMeshCurvatureNoChangeMessage(result);
+                PublishMeshCurvatureResultSink(context, result);
+                return Core::Ok();
             }
 
             const EditorCommandStatus commitStatus =
@@ -8679,6 +8753,17 @@ ApplyEditorMeshCurvatureCommand(
             result.DirectionWrittenCount = dir1.size() + dir2.size();
         }
 
+        result.ChangedValueCount = CountChangedCurvatureValues(before, after);
+        if (result.ChangedValueCount == 0u)
+        {
+            // Nothing differs, so there is nothing to commit; publishing an
+            // identity edit would also leave a useless undo entry.
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildMeshCurvatureNoChangeMessage(result);
+            return result;
+        }
+
         const EditorCommandStatus commitStatus =
             CommitMeshCurvatureProperties(
                 context,
@@ -9985,6 +10070,18 @@ ApplyEditorPointCloudOutlierRemovalCommand(
             afterCloud.DeletePoint(
                 Geometry::VertexHandle{static_cast<std::uint32_t>(rejected)});
         afterCloud.GarbageCollection();
+
+        if (removal.RejectedIndices.empty())
+        {
+            // Nothing was rejected, so the compacted cloud equals the input;
+            // committing it would replace the cloud with itself and leave a
+            // useless undo entry.
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message =
+                BuildPointCloudOutlierRemovalNoChangeMessage(result);
+            return result;
+        }
 
         const EditorCommandStatus status =
             CommitPointCloudReplacement(

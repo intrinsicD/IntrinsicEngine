@@ -835,11 +835,15 @@ namespace Extrinsic::Sandbox::Editor
             "Output: %s",
             Runtime::DebugNameForEditorMeshCurvatureOutput(
                 result->Output));
-        if (result->Succeeded())
+        // BUG-145: NoChange means the kernel ran and changed nothing, so its
+        // counters are exactly what explains why — keep showing them.
+        if (result->Succeeded() ||
+            result->Status == Runtime::EditorCommandStatus::NoChange)
         {
             ImGui::Text(
-                "Vertices: %zu  scalar values: %zu  nonfinite scalars: %zu",
+                "Vertices: %zu  scalar values: %zu  changed: %zu  nonfinite scalars: %zu",
                 result->VertexSlotCount, result->ScalarWrittenCount,
+                result->ChangedValueCount,
                 result->NonFiniteScalarCount);
             ImGui::Text(
                 "Directions: %s  values: %zu  nonfinite: %zu",

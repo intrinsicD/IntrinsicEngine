@@ -48,7 +48,26 @@ each slice keeps the default CPU gate green on its own:
   `ApplyUvRegenerationCommit`. Separate because the writeback path is shared
   with the parameterization lane and worth reviewing on its own.
 
-## Progress — slice A landed 2026-08-09; the task stays open for slices B-D
+## Progress — slices A and B landed 2026-08-09; the task stays open for C-D
+
+### Slice B — curvature and point-cloud outlier removal
+
+Curvature compared four published properties — mean, gaussian, and both
+principal directions — against the `MeshCurvaturePropertyState` it already
+captures for undo, and reports `ChangedValueCount` summed across them. The
+comparison reuses the generic `CountChangedValues` written for slice A rather
+than a curvature-specific one, because the rule is the same and only the
+property list differs.
+
+Outlier removal needed no new field at all: `RejectedIndices` (and its copied
+`RejectedCount`) is the change signal the operation already computed and then
+ignored. Both paths now return `NoChange` when the set is empty, before
+`CommitPointCloudReplacement`, which previously replaced the cloud with an
+identical compaction of itself and left an undo entry restoring the same
+points. The no-change message names the threshold that nothing crossed, so the
+user can act on it by loosening the parameter.
+
+## Progress — slice A landed 2026-08-09
 
 All three vertex-normal families now compare the normals they are about to
 publish against the ones already stored, and report `ChangedNormalCount`. A run
@@ -150,20 +169,24 @@ comparing against nothing.
       quantity: normals that actually differ, curvature values that actually
       differ, a topology delta, a non-empty rejected set, or a UV change.
       (Slice A done: all six vertex-normal sites compare against the
-      `VertexNormalPropertyState` already captured for undo. Slices B-D own
-      curvature, outlier removal, topology, and UV regeneration.)
+      `VertexNormalPropertyState` already captured for undo. Slice B done:
+      curvature compares its four published properties, and outlier removal
+      consults the rejected set it already computed. Slices C-D own topology
+      and UV regeneration.)
 - [ ] Return `NoChange` with an actionable reason when nothing changed, and do
-      not create an undo-history entry for a no-op. (Slice A done for vertex
-      normals; the gate also skips the dirty stamp, because a run that
-      published nothing has nothing to re-extract.)
-- [ ] Keep the existing failure statuses and diagnostics unchanged. (Slice A
-      done: the gate sits after every failure return, so no kernel or
+      not create an undo-history entry for a no-op. (Slices A and B done; the
+      gate also skips the dirty stamp, because a run that published nothing has
+      nothing to re-extract.)
+- [ ] Keep the existing failure statuses and diagnostics unchanged. (Slices A
+      and B done: every gate sits after the failure returns, so no kernel or
       validation failure changes shape.)
 - [ ] Surface the change count in each result so the UI can explain the
       outcome. (Slice A done: `ChangedNormalCount` on all three normals
       results, in the success message, and in the three panels — which now
       render their counter block for `NoChange` too, since that is exactly
-      when the counts are what explains the outcome.)
+      when the counts are what explains the outcome. Slice B done:
+      `ChangedValueCount` for curvature; outlier removal already reported
+      `RejectedCount` and only needed the panel to render it for `NoChange`.)
 
 ## Tests
 
@@ -172,7 +195,9 @@ comparing against nothing.
       (Slice A: `VertexNormalRecomputeThatChangesNothingReportsNoChange` covers
       the three synchronous commands and
       `VertexNormalCpuJobThatChangesNothingReportsNoChange` the job publisher,
-      which is a separate code path.)
+      which is a separate code path. Slice B:
+      `MeshCurvatureRecomputeThatChangesNothingReportsNoChange` and
+      `PointCloudOutlierRemovalRejectingNothingReportsNoChange`.)
 - [ ] For each operation, assert a normal run still reports `Applied` with a
       non-zero change count. (Slice A: asserted in both new tests and in
       `MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings`,
@@ -180,15 +205,16 @@ comparing against nothing.
       triangle and now asserts that explicitly.)
 - [ ] Assert that a no-op run leaves no command-history entry. (Slice A: both
       new tests compare `EditorCommandHistory::UndoCount()` across the no-op.)
-- [ ] Default CPU gate stays green. (Slice A: 4156/4156, expected GLFW/LSan
-      skip.)
+- [ ] Default CPU gate stays green. (Slice A: 4156/4156; slice B: 4158/4158;
+      expected GLFW/LSan skip in both.)
 
 ## Docs
 
 - [ ] Extend the editor command-status documentation with the per-operation
       changed-count rule that `BUG-140` recorded for denoise. (Slice A: the
       rule, the exact-comparison rationale, and the panel rule are in
-      `src/runtime/README.md`; later slices extend the per-operation list.)
+      `src/runtime/README.md`; slice B added curvature and outlier removal to
+      the per-operation list; slices C-D extend it further.)
 
 ## Acceptance criteria
 
