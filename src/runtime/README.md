@@ -798,6 +798,25 @@ list once, through `DrawDomainWindowHeader`; rendering
 `model.Processing.Diagnostics` alongside it prints every entry twice, since the
 header list is a superset.
 
+Those per-operation outcomes have a lifetime. Each one is superseded by the
+next run of its own operation, because the session stores exactly one
+`Last<Operation>Result` per slot. For the outcome a user will not overwrite by
+running again, `EditorMethodResultSinks::DismissResult` takes an
+`EditorGeometryProcessingResultSlot` and the session resets that one slot; the
+panel drops its own copy at the same time so the line does not reappear on the
+next prepared frame. Dismissal is per-slot on purpose — clearing simplify must
+not clear denoise. The sink obeys the same attachment-epoch rule as every
+result sink, so a surface copied out of a prepared frame cannot reach into a
+detached session.
+
+A rejection also has to name its cause. `Geometry::Parameterization::
+ParameterizeMesh` fills `ParameterizeResult::Rejection` with the connected-
+component and boundary-loop counts whenever a run did not succeed, and the
+editor copies it onto `EditorParameterizationResult::Rejection` and repeats it
+in the message. The counts are taken only on the failure path, and
+`Evaluated` stays false when there was no mesh to count — an empty mesh, or a
+rejection raised before the solver ran.
+
 `UI-015`, migrated by `RUNTIME-193`, extends
 `Extrinsic.Runtime.VisualizationEditingOperations` with data-only
 geometry-presentation operations; presentation-free copied inspector models

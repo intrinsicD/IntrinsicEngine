@@ -153,6 +153,26 @@ namespace
         return mesh;
     }
 
+    // Closed surface: reaches the solver and is rejected on topology, which is
+    // the case BUG-141 saw reported without a cause.
+    [[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeClosedTetrahedronMesh()
+    {
+        Geometry::HalfedgeMesh::Mesh mesh{};
+        const Geometry::VertexHandle v0 =
+            mesh.AddVertex(glm::vec3{0.0f, 0.0f, 0.0f});
+        const Geometry::VertexHandle v1 =
+            mesh.AddVertex(glm::vec3{1.0f, 0.0f, 0.0f});
+        const Geometry::VertexHandle v2 =
+            mesh.AddVertex(glm::vec3{0.0f, 1.0f, 0.0f});
+        const Geometry::VertexHandle v3 =
+            mesh.AddVertex(glm::vec3{0.0f, 0.0f, 1.0f});
+        (void)mesh.AddTriangle(v0, v2, v1);
+        (void)mesh.AddTriangle(v0, v1, v3);
+        (void)mesh.AddTriangle(v0, v3, v2);
+        (void)mesh.AddTriangle(v1, v2, v3);
+        return mesh;
+    }
+
     struct ParameterizationHarness
     {
         ECS::Scene::Registry Scene{};
@@ -792,6 +812,68 @@ TEST(ParameterizationOperations, WrongTypedUvAndNonTriangleFacesFailClosed)
     EXPECT_EQ(result.Status,
               Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_FALSE(quad.Vertices().Properties.Exists("v:texcoord"));
+}
+
+// BUG-141: "Mesh parameterization solver rejected the selected mesh or config."
+// named neither the mesh property that was wrong nor a way to fix it. A solver
+// rejection now carries the two counts it rejects on, and the message repeats
+// them so a user who never opens a debugger can act.
+TEST(ParameterizationOperations, SolverRejectionCarriesStructuredTopologyCause)
+{
+    ParameterizationHarness closed{MakeClosedTetrahedronMesh()};
+    const Runtime::EditorParameterizationResult result =
+        Apply(closed, Runtime::ParameterizationStrategyKind::Lscm);
+
+    ASSERT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::EditorCommandStatus::GeometryProcessingFailed);
+    ASSERT_TRUE(result.Rejection.Evaluated);
+    EXPECT_EQ(result.Rejection.ConnectedComponentCount, 1u);
+    EXPECT_EQ(result.Rejection.BoundaryLoopCount, 0u);
+    EXPECT_TRUE(result.Rejection.ViolatesDiskTopology());
+    EXPECT_NE(result.Message.find("1 connected component"),
+              std::string::npos)
+        << result.Message;
+    EXPECT_NE(result.Message.find("0 boundary loops"), std::string::npos)
+        << result.Message;
+    EXPECT_NE(result.Message.find("disk topology"), std::string::npos)
+        << result.Message;
+
+    // A rejection raised before the solver ran has no mesh to count, and must
+    // not pretend otherwise.
+    ParameterizationHarness quad{MakeQuadMesh()};
+    const Runtime::EditorParameterizationResult preSolver =
+        Apply(quad, Runtime::ParameterizationStrategyKind::Lscm);
+    ASSERT_FALSE(preSolver.Succeeded());
+    EXPECT_FALSE(preSolver.Rejection.Evaluated);
+
+    // The success path pays nothing for the summary.
+    ParameterizationHarness disk{};
+    const Runtime::EditorParameterizationResult applied =
+        Apply(disk, Runtime::ParameterizationStrategyKind::Lscm);
+    ASSERT_TRUE(applied.Succeeded());
+    EXPECT_FALSE(applied.Rejection.Evaluated);
+}
+
+// BUG-141: the panel renders its header from the view model's `Message` and
+// its "Last run diagnostics" block from the result, so mirroring the result's
+// message onto the view model printed one command's outcome twice in one
+// window. The header keeps only what is true of the view itself.
+TEST(ParameterizationOperations, ViewModelDoesNotMirrorTheLastResultMessage)
+{
+    ParameterizationHarness closed{MakeClosedTetrahedronMesh()};
+    const Runtime::EditorParameterizationResult result =
+        Apply(closed, Runtime::ParameterizationStrategyKind::Lscm);
+    ASSERT_FALSE(result.Succeeded());
+    ASSERT_FALSE(result.Message.empty());
+
+    closed.Context.LastParameterizationResult = &result;
+    const Runtime::EditorParameterizationViewModel model =
+        Runtime::BuildEditorParameterizationViewModel(closed.Context);
+    ASSERT_TRUE(model.HasLastResult);
+    EXPECT_NE(model.Message, result.Message);
+    EXPECT_TRUE(model.LastStatus.has_value())
+        << "the outcome must still reach the panel through the result";
 }
 
 TEST(ParameterizationOperations, ViewModelIsPointerFreeAndCarriesAggregateDiagnostics)

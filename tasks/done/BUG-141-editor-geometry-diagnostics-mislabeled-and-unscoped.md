@@ -18,6 +18,11 @@ contract_review: >-
 ---
 # BUG-141 — Editor geometry-processing diagnostics are mislabeled, duplicated, unscoped, and unactionable
 
+## Status
+
+- Completed and retired on 2026-08-09.
+- Completion commit: this retirement commit. Slice A landed in `72559336`.
+
 ## Slice plan
 
 Written before implementing, because the five required changes do not share a
@@ -54,7 +59,49 @@ same end state with a second copy of information the model already carries per
 operation, so it was rejected as the larger of two equivalent designs. If
 review prefers the tag, it is a contained follow-up.
 
-## Progress — slice A landed 2026-08-09; the task stays open for slice B
+## Progress — slice B landed 2026-08-09; the task closes
+
+**Lifetime.** Half of the requirement was already true and worth naming rather
+than rebuilding: the session stores exactly one `Last<Operation>Result` per
+operation, so every outcome is superseded by the next run of the operation that
+produced it. What was missing is the case where the user is not going to run it
+again. `EditorMethodResultSinks::DismissResult` takes an
+`EditorGeometryProcessingResultSlot` and the session resets that one slot;
+panels drop their own copy at the same call site so the line does not reappear
+on the next prepared frame. It is one enum and one sink rather than a
+per-operation dismissal sink because the session's only reaction is to reset
+the matching optional. Dismissal is per-slot: clearing simplify must not clear
+denoise, which the contract test asserts. The sink obeys the same
+attachment-epoch rule as every other result sink.
+
+**Rejection cause.** `ParameterizeMesh` now fills
+`ParameterizeResult::Rejection` with the connected-component and boundary-loop
+counts whenever a run did not succeed. It is computed once in the unified
+dispatch, so all three strategies get it, and only on the failure path, so the
+success path pays nothing. The count needed a const-mesh flood fill, which is
+`MeshRepair::LabelConnectedComponents` — the same labelling
+`ComputeConnectedComponents` already ran, minus the `v:component`/`f:component`
+publication a diagnostic has no business doing. The editor copies the counts
+onto `EditorParameterizationResult::Rejection` and repeats them in the message,
+and distinguishes the two cases honestly: when the counts violate disk topology
+it says so and names the fix, and when they do not (a punctured torus has one
+component and one loop) it says the failure was geometry or config rather than
+claiming the topology explains it. `Evaluated` stays false when no mesh reached
+the solver, so a stale-entity or bad-config rejection does not report counts it
+never took.
+
+**One duplication slice A missed.** The live capture for the rejection cause
+showed the new sentence printed twice in the `Parameterize (UV)` window: once
+in the panel header and once in `Last run diagnostics`. That is the same mirror
+slice A removed, in the one panel that does not use `DrawDomainWindowHeader` —
+`BuildEditorParameterizationViewModel` copied the last result's message onto
+`EditorParameterizationViewModel::Message`, and the panel renders both. The
+mirror is gone; the header keeps only what is true of the view itself (no
+selection, stale entity, unusable `v:texcoord`, unavailable topology), and the
+outcome stays on the result. Pinned by
+`ViewModelDoesNotMirrorTheLastResultMessage`.
+
+## Progress — slice A landed 2026-08-09
 
 `BuildGeometryProcessingModel` mirrored every `Last<Operation>Result` whose
 status was not `Succeeded()` into the shared
@@ -81,8 +128,9 @@ header now shows no header diagnostic at all and reports
 previously carried two `Sandbox.MeshSimplify.CPU did not apply: …` lines it had
 nothing to do with, is clean.
 
-Not attempted here, and the reason the task stays open: the dismissal
-affordance and the parameterization rejection cause. One test named in
+Not attempted in slice A, and the reason the task stayed open at the time: the
+dismissal affordance and the parameterization rejection cause, both of which
+slice B above now lands. One test named in
 `## Tests` was written and then deliberately dropped rather than shipped —
 an assertion that the header list contains each processing diagnostic exactly
 once. With the mirrors gone, a matching-domain window's processing diagnostics
@@ -136,14 +184,22 @@ shared editor geometry-processing diagnostic surface:
       diagnostic at all and is reported as `Pending` on its own result, which
       is what the K-Means path already did via its `Status != Queued` guard.
 - [x] De-duplicate diagnostic emission for a single command. (Slice A) The
-      duplication was a double render in `app`, not a double emission.
+      duplication was a double render in `app`, not a double emission. (Slice B)
+      One more mirror surfaced in the `Parameterize (UV)` panel, the only one
+      that does not use `DrawDomainWindowHeader`; it is removed at the runtime
+      view model.
 - [x] Scope diagnostics to the originating operation/panel so unrelated windows
       do not display them. (Slice A)
-- [ ] Give diagnostics a lifetime (superseded by the next run of the same
-      operation, or explicitly dismissible). (Slice B)
-- [ ] Include the rejection cause in parameterization failures (at minimum
+- [x] Give diagnostics a lifetime (superseded by the next run of the same
+      operation, or explicitly dismissible). (Slice B) Each outcome was already
+      superseded by the next run of its own operation; slice B adds the
+      explicit per-slot dismissal via
+      `EditorMethodResultSinks::DismissResult`.
+- [x] Include the rejection cause in parameterization failures (at minimum
       connected-component count and boundary-loop count when the solver rejects
-      the mesh). (Slice B)
+      the mesh). (Slice B) `ParameterizeResult::Rejection` carries both counts;
+      the editor copies them onto the result and repeats them in the
+      message.
 
 ## Tests
 - [x] Add a contract test asserting a queued job produces a pending-class
@@ -152,15 +208,21 @@ shared editor geometry-processing diagnostic surface:
 - [x] Add a test asserting one command yields exactly one diagnostic entry.
       Recorded as covered by the two tests either side of it plus the live
       before/after pair, and not by a third assertion: see `## Progress` for
-      why the obvious one could not fail.
+      why the obvious one could not fail. Slice B adds the one case that could
+      fail, `ViewModelDoesNotMirrorTheLastResultMessage`.
 - [x] Add a test asserting a diagnostic raised by one operation is absent from
       another operation's model
       (`OneOperationsFailureIsAbsentFromTheSharedProcessingModel`, plus the
       updated assertion in
       `MeshVertexNormalsCommandRejectsConflictingPropertyType`).
-- [ ] Add a test asserting a parameterization rejection carries a structured
-      cause.
-- [x] Default CPU gate stays green (4150/4150, expected GLFW/LSan skip).
+- [x] Add a test asserting a parameterization rejection carries a structured
+      cause (`ParameterizationOperations.SolverRejectionCarriesStructuredTopologyCause`,
+      plus `ParameterizationDispatch.RejectionCarriesConnectedComponentAndBoundaryLoopCounts`
+      at the geometry seam and
+      `SandboxEditorSession.DismissClearsOneGeometryProcessingResultSlot`
+      for the lifetime half).
+- [x] Default CPU gate stays green (slice A 4150/4150, slice B 4154/4154;
+      expected GLFW/LSan skip in both).
 
 ## Docs
 - [x] Document diagnostic scoping and the pending-is-not-a-failure rule in
@@ -171,8 +233,8 @@ shared editor geometry-processing diagnostic surface:
 - [x] No queued job is reported under a failure code.
 - [x] One command produces one diagnostic.
 - [x] Diagnostics appear only in the panel that produced them.
-- [ ] Diagnostics expire or can be cleared.
-- [ ] A parameterization rejection names its cause.
+- [x] Diagnostics expire or can be cleared.
+- [x] A parameterization rejection names its cause.
 
 ## Verification
 ```bash

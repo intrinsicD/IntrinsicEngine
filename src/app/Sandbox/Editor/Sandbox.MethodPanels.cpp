@@ -100,6 +100,25 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
+        // BUG-141: see the same helper in `Sandbox.MeshProcessingPanels.cpp`.
+        // A stored outcome is superseded by the next run of its own operation;
+        // this is the explicit clear for the user who will not run it again.
+        // It drops the panel's copy and the session slot the model is rebuilt
+        // from, so draw it after everything that reads the result.
+        template <typename ResultT>
+        void DrawDismissLastResultButton(
+            const char* const label,
+            std::optional<ResultT>& panelResult,
+            const Runtime::EditorGeometryProcessingResultSlot slot,
+            const SandboxEditorContext& context)
+        {
+            if (!ImGui::SmallButton(label))
+                return;
+            panelResult.reset();
+            if (context.MethodResultSinks.DismissResult)
+                context.MethodResultSinks.DismissResult(slot);
+        }
+
         void DrawDomainWindowHeader(
             const Runtime::EditorDomainWindowModel& model)
         {
@@ -2198,7 +2217,16 @@ namespace Extrinsic::Sandbox::Editor
                 KMeans.LastResult.has_value()
                     ? KMeans.LastResult
                     : processing.LastKMeansResult;
+            const bool hasResult = result.has_value();
             DrawKMeansResultStatus(result);
+            if (hasResult)
+            {
+                DrawDismissLastResultButton(
+                    "Dismiss##KMeans",
+                    KMeans.LastResult,
+                    Runtime::EditorGeometryProcessingResultSlot::KMeans,
+                    context);
+            }
         }
 
         static void DrawKMeansResultStatus(
@@ -2667,7 +2695,17 @@ namespace Extrinsic::Sandbox::Editor
                 ProgressivePoisson.LastResult.has_value()
                     ? ProgressivePoisson.LastResult
                     : processing.LastProgressivePoissonResult;
+            const bool hasResult = result.has_value();
             DrawProgressivePoissonResultStatus(result);
+            if (hasResult)
+            {
+                DrawDismissLastResultButton(
+                    "Dismiss##ProgressivePoisson",
+                    ProgressivePoisson.LastResult,
+                    Runtime::EditorGeometryProcessingResultSlot::
+                        ProgressivePoisson,
+                    context);
+            }
         }
 
         static bool DrawParameterizationU32(
@@ -3108,6 +3146,18 @@ namespace Extrinsic::Sandbox::Editor
                     summary.MeanAreaDistortion,
                     summary.MeanStretch);
             }
+            // BUG-141: a rejection used to say only that the solver refused
+            // the mesh. The two preconditions it refuses on are counted.
+            if (!result->Succeeded() && result->Rejection.Evaluated)
+            {
+                const std::size_t components =
+                    result->Rejection.ConnectedComponentCount;
+                const std::size_t loops = result->Rejection.BoundaryLoopCount;
+                ImGui::Text(
+                    "Rejected mesh: %zu connected %s, %zu boundary %s",
+                    components, components == 1u ? "component" : "components",
+                    loops, loops == 1u ? "loop" : "loops");
+            }
             if (!summary.Message.empty())
                 ImGui::TextWrapped("%s", summary.Message.c_str());
         }
@@ -3231,6 +3281,15 @@ namespace Extrinsic::Sandbox::Editor
                     Parameterization.LastConfigResult->Message.c_str());
             }
             DrawParameterizationResult(Parameterization.LastResult);
+            if (Parameterization.LastResult.has_value())
+            {
+                DrawDismissLastResultButton(
+                    "Dismiss##Parameterization",
+                    Parameterization.LastResult,
+                    Runtime::EditorGeometryProcessingResultSlot::
+                        Parameterization,
+                    context);
+            }
         }
 
         static ImVec2 ToImVec2(const glm::vec2 value) noexcept

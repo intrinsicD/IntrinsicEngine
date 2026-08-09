@@ -8,6 +8,53 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-141`](BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md) —
+editor geometry-processing diagnostics report the right severity, appear only
+in the panel that produced them, can be dismissed, and name the cause when a
+parameterization is refused. Slice A removed the mirror that put one
+operation's outcome in every domain window's header and announced a merely
+`Pending` job under `GeometryProcessingFailed`; slice B closes the remaining
+two defects.
+
+Lifetime turned out to be half-solved already, and saying so was worth more
+than rebuilding it: the session stores exactly one `Last<Operation>Result` per
+operation, so every outcome is superseded by the next run of its own operation.
+What was missing was the explicit clear for the user who will not run it again.
+`EditorMethodResultSinks::DismissResult` takes an
+`EditorGeometryProcessingResultSlot` and the session resets that one slot —
+one enum and one sink rather than a dismissal callback per operation, because
+resetting the matching optional is the session's entire reaction. Panels drop
+their own copy at the same call site, so a dismissed line does not reappear on
+the next prepared frame, and dismissal is per-slot: clearing simplify must not
+clear denoise.
+
+The rejection cause needed a solver-side fact that did not exist.
+`ParameterizeMesh` now fills `ParameterizeResult::Rejection` with the
+connected-component and boundary-loop counts whenever a run did not succeed —
+once in the unified dispatch, so all three strategies get it, and only on the
+failure path, so success pays nothing. The count needed a const-mesh flood
+fill, which is `MeshRepair::LabelConnectedComponents`: the labelling
+`ComputeConnectedComponents` already ran, minus the `v:component`/`f:component`
+publication a read-only diagnostic has no business doing. The editor repeats
+both counts in the message and distinguishes the two cases honestly — when they
+violate disk topology it names the fix, and when they do not (a punctured torus
+has one component and one loop) it says the failure was geometry or config
+rather than claiming the topology explains it. `Evaluated` stays false when no
+mesh reached the solver.
+
+Capturing that live surfaced one duplication slice A had missed: the new
+sentence printed twice in the `Parameterize (UV)` window, the one panel that
+does not use `DrawDomainWindowHeader`, because
+`BuildEditorParameterizationViewModel` copied the result's message onto the
+view model that the panel header renders. Same mirror, same fix.
+
+Four contract/unit tests were added across the geometry seam, the editor
+command, the view model, and the session; the default CPU gate passes
+4154/4154 with the expected GLFW/LeakSanitizer skip. Live before/after pairs
+for both halves are registered under `tasks/evidence/BUG-141/artifacts/`,
+captured from a `ci-vulkan` sandbox session on a nested `Xephyr` display with
+`tests/data/sculpt.obj` imported.
+
 [`BUG-138`](BUG-138-async-mesh-geometry-jobs-never-execute.md) — queued mesh
 simplify, subdivide, and remesh jobs run, publish, and change the selected mesh
 again. They were never failing to dispatch: the worker ran and the apply gate

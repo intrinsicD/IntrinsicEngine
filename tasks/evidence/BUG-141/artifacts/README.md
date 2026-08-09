@@ -28,3 +28,26 @@ they are what slice A is measured against.
   domain window's header.
 - `denoise-panel-after.png` — the same panel on the same entity after a
   simplify, with a clean header.
+
+## Slice B — lifetime and rejection cause
+
+Captured 2026-08-09 from a second live `ExtrinsicSandbox` session, same
+`ci-vulkan` build and the same imported `tests/data/sculpt.obj`, driven on the
+nested `Xephyr` display. Both panels were widened first, because at their
+default size the result block is clipped (`UI-049`).
+
+- `dismiss-simplify-before.png` — `Mesh / Processing / Simplify` after a run at
+  target 2000: `Last simplify run: Applied`, the full result block, and the new
+  `Dismiss` button.
+- `dismiss-simplify-after.png` — the same panel one click later:
+  `Last simplify run: none`. The state is cleared in the session, not only in
+  the panel, so it does not come back on the next prepared frame.
+- `parameterization-rejection-cause.png` — `Mesh / Processing /
+  Parameterize (UV)` refusing the mesh. `Last run diagnostics` now reads
+  `Rejected mesh: 1 connected component, 0 boundary loops` above a message that
+  names the precondition and what to do about it. The window header carries
+  only `Selected entity: 2 (mesh)`: the result message used to be mirrored onto
+  the view model and printed there as well, so one command's outcome appeared
+  twice in one window.
+- `dismiss-parameterization-after.png` — the same panel after `Dismiss`:
+  `No parameterization has run this session.`

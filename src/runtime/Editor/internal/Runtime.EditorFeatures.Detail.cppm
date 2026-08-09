@@ -244,6 +244,8 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
 
         private:
         void ResetAttachmentState();
+        void DismissGeometryProcessingResult(
+            EditorGeometryProcessingResultSlot slot);
 
         WorldRegistry* m_Worlds{nullptr};
         ServiceRegistry* m_Services{nullptr};

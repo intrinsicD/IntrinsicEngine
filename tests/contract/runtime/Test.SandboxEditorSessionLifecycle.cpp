@@ -400,3 +400,85 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         secondEngine.Shutdown();
     }
 }
+
+// BUG-141: a geometry-processing outcome had no lifetime — it was superseded
+// only by the next run of the same operation, and a user who was not going to
+// run that operation again had no way to clear it. The session now owns an
+// explicit per-slot dismissal, and dismissing one operation must not touch
+// another operation's outcome.
+TEST(SandboxEditorSession, DismissClearsOneGeometryProcessingResultSlot)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    engine.Initialize();
+
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+
+    // The session captures its result pointers when the workspace frame is
+    // prepared, so every observation below reads a freshly prepared frame.
+    const auto observe =
+        [&attachment]() -> Runtime::EditorGeometryProcessingResultsSnapshot
+    {
+        EXPECT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment)
+                        .has_value());
+        return Runtime::PrepareEditorGeometryProcessingFrame(attachment)
+            .Results;
+    };
+
+    ASSERT_TRUE(
+        Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment).has_value());
+    const Runtime::EditorGeometryProcessingPreparedFrame prepared =
+        Runtime::PrepareEditorGeometryProcessingFrame(attachment);
+    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.MeshSimplify));
+    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.MeshDenoise));
+    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.DismissResult));
+
+    Runtime::EditorMeshSimplifyResult simplify{};
+    simplify.Status = Runtime::EditorCommandStatus::GeometryProcessingFailed;
+    simplify.Message = "simplify rejected the selected mesh";
+    prepared.ResultSinks.MeshSimplify(simplify);
+
+    Runtime::EditorMeshDenoiseResult denoise{};
+    denoise.Status = Runtime::EditorCommandStatus::NoChange;
+    denoise.Message = "denoise moved nothing";
+    prepared.ResultSinks.MeshDenoise(denoise);
+
+    {
+        const auto results = observe();
+        ASSERT_TRUE(results.LastMeshSimplifyResult.has_value());
+        ASSERT_TRUE(results.LastMeshDenoiseResult.has_value());
+    }
+
+    // The next run of the same operation supersedes rather than accumulates.
+    simplify.Message = "simplify rejected it again";
+    prepared.ResultSinks.MeshSimplify(simplify);
+    {
+        const auto results = observe();
+        ASSERT_TRUE(results.LastMeshSimplifyResult.has_value());
+        EXPECT_EQ(results.LastMeshSimplifyResult->Message,
+                  "simplify rejected it again");
+    }
+
+    prepared.ResultSinks.DismissResult(
+        Runtime::EditorGeometryProcessingResultSlot::MeshSimplify);
+    {
+        const auto results = observe();
+        EXPECT_FALSE(results.LastMeshSimplifyResult.has_value());
+        ASSERT_TRUE(results.LastMeshDenoiseResult.has_value())
+            << "dismissing one operation must not clear another's outcome";
+        EXPECT_EQ(results.LastMeshDenoiseResult->Message,
+                  "denoise moved nothing");
+    }
+
+    prepared.ResultSinks.DismissResult(
+        Runtime::EditorGeometryProcessingResultSlot::MeshDenoise);
+    EXPECT_FALSE(observe().LastMeshDenoiseResult.has_value());
+
+    // A dismissal sink copied out of a prepared frame must not reach into a
+    // detached session, which is the same epoch rule every result sink obeys.
+    attachment.Detach();
+    prepared.ResultSinks.DismissResult(
+        Runtime::EditorGeometryProcessingResultSlot::MeshSimplify);
+
+    engine.Shutdown();
+}

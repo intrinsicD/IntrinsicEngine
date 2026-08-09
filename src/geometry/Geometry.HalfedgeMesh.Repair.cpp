@@ -507,6 +507,11 @@ namespace Geometry::MeshRepair
         return labels;
     }
 
+    std::optional<ConnectedComponentsResult> LabelConnectedComponents(const HalfedgeMesh::Mesh& mesh)
+    {
+        return LabelComponents(mesh);
+    }
+
     std::optional<std::vector<HalfedgeMesh::Mesh>> SplitIntoComponents(const HalfedgeMesh::Mesh& mesh)
     {
         auto labels = LabelComponents(mesh);

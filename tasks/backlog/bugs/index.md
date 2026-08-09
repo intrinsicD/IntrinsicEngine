@@ -9,11 +9,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-141` — Editor geometry-processing diagnostics are mislabeled, duplicated, unscoped, and unactionable](BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md):
-  a normally queued job is reported as `GeometryProcessingFailed`, each event is
-  emitted twice, the entries then appear in every unrelated mesh domain window
-  and never expire, and parameterization rejections give no cause. Classify,
-  de-duplicate, scope, and expire them, and name the rejection reason.
 - [`BUG-145` — Editor geometry operations report Applied from written counts](BUG-145-editor-operations-report-applied-from-written-counts.md):
   the `BUG-140` audit found the same written-count-implies-success shape in
   vertex normals, curvature, remesh/subdivide/simplify, outlier removal, and UV
@@ -97,6 +92,15 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   `0.45` that could not be told apart from real progress. Both terminal states
   now report no progress and are labelled by stage; indeterminate stages carry
   `0.0`, so determinate `0.0` means exactly `Queued`.
+
+- Closed 2026-08-09: [`BUG-141` — Editor geometry-processing diagnostics are
+  mislabeled, duplicated, unscoped, and
+  unactionable](../../done/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md).
+  A queued job no longer reports under a failure code, one operation's outcome
+  no longer prints in every other panel, each stored outcome can be dismissed
+  per slot on top of already being superseded by the next run of its own
+  operation, and a parameterization rejection carries the connected-component
+  and boundary-loop counts it was refused on.
 
 - Closed 2026-08-08: [`BUG-140` — Mesh denoise reports Applied/Success after
   moving zero

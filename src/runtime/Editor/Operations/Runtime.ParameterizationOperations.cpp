@@ -939,6 +939,45 @@ namespace Extrinsic::Runtime
             };
         }
 
+        // BUG-141: a bare "solver rejected the selected mesh or config" told a
+        // user nothing they could act on. Every implemented strategy needs one
+        // connected component with exactly one boundary loop, and both counts
+        // are computable, so name whichever precondition the mesh missed.
+        [[nodiscard]] std::string DescribeParameterizationRejection(
+            const Parameterization::ParameterizationRejection& rejection)
+        {
+            if (!rejection.Evaluated)
+            {
+                return "Mesh parameterization solver rejected the selected "
+                       "mesh or config.";
+            }
+
+            std::string message =
+                "Mesh parameterization solver rejected the selected mesh: " +
+                std::to_string(rejection.ConnectedComponentCount) +
+                (rejection.ConnectedComponentCount == 1u
+                     ? " connected component, "
+                     : " connected components, ") +
+                std::to_string(rejection.BoundaryLoopCount) +
+                (rejection.BoundaryLoopCount == 1u
+                     ? " boundary loop."
+                     : " boundary loops.");
+            if (rejection.ViolatesDiskTopology())
+            {
+                message +=
+                    " The solver needs disk topology: exactly one connected "
+                    "component with exactly one boundary loop. Split the mesh "
+                    "into components or cut seams before parameterizing.";
+            }
+            else
+            {
+                message +=
+                    " Disk topology holds, so the solver failed on the "
+                    "geometry or config rather than the topology.";
+            }
+            return message;
+        }
+
         [[nodiscard]] EditorParameterizationResult PublishResult(
             const EditorGeometryProcessingContext& context,
             EditorParameterizationResult result)
@@ -1093,8 +1132,9 @@ namespace Extrinsic::Runtime
             parameterized.Status,
             parameterized.Succeeded()
                 ? "Mesh parameterization applied."
-                : "Mesh parameterization solver rejected the selected mesh or config.");
+                : DescribeParameterizationRejection(parameterized.Rejection));
         result.Diagnostics = parameterized.Diagnostics;
+        result.Rejection = parameterized.Rejection;
         result.VertexCount = parameterized.UVs.size();
         if (!parameterized.Succeeded())
             return finish(std::move(result));
@@ -1432,8 +1472,13 @@ namespace Extrinsic::Runtime
                             : std::numeric_limits<float>::quiet_NaN());
                 }
             }
-            if (!context.LastParameterizationResult->Message.empty())
-                model.Message = context.LastParameterizationResult->Message;
+            // BUG-141: the last result's message used to be mirrored onto the
+            // view model, and the panel renders both — its header from
+            // `Message` and its "Last run diagnostics" block from the result —
+            // so one command printed one sentence twice in one window. The
+            // header keeps only what is true of the view itself (no selection,
+            // stale entity, unusable v:texcoord, unavailable topology); the
+            // outcome stays on the result that owns it.
         }
         return model;
     }

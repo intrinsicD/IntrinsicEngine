@@ -173,6 +173,12 @@ export namespace Geometry::MeshRepair
     [[nodiscard]] std::optional<ConnectedComponentsResult> ComputeConnectedComponents(
         HalfedgeMesh::Mesh& mesh);
 
+    // The same deterministic flood fill without publishing v:component or
+    // f:component, for read-only callers that need the labels or only the
+    // count (for example a solver reporting why it rejected a mesh).
+    [[nodiscard]] std::optional<ConnectedComponentsResult> LabelConnectedComponents(
+        const HalfedgeMesh::Mesh& mesh);
+
     [[nodiscard]] std::optional<std::vector<HalfedgeMesh::Mesh>> SplitIntoComponents(
         const HalfedgeMesh::Mesh& mesh);
 

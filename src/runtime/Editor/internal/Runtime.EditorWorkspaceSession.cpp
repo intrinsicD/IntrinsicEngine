@@ -452,6 +452,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         context.Clustering = m_ClusteringService;
         context.PointCloudConsolidation =
             m_PointCloudConsolidationService;
+        context.MethodResultSinks.DismissResult =
+            [epoch = m_AttachmentEpoch, this](
+                const EditorGeometryProcessingResultSlot slot)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    DismissGeometryProcessingResult(slot);
+            };
         context.MethodResultSinks.ProgressivePoisson =
             [epoch = m_AttachmentEpoch, this](
                 EditorProgressivePoissonResult result)
@@ -734,6 +741,59 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
         m_AttachmentEpoch.reset();
         ResetAttachmentState();
+    }
+
+    void EditorWorkspaceSession::DismissGeometryProcessingResult(
+        const EditorGeometryProcessingResultSlot slot)
+    {
+        switch (slot)
+        {
+        case EditorGeometryProcessingResultSlot::KMeans:
+            m_LastKMeansResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::PointCloudConsolidation:
+            m_LastPointCloudConsolidationResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::ProgressivePoisson:
+            m_LastProgressivePoissonResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::UvRegeneration:
+            m_LastUvRegenerationResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::Parameterization:
+            m_LastParameterizationResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::MeshCurvature:
+            m_LastMeshCurvatureResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::MeshDenoise:
+            m_LastMeshDenoiseResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::MeshRemesh:
+            m_LastMeshRemeshResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::MeshSubdivide:
+            m_LastMeshSubdivideResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::MeshSimplify:
+            m_LastMeshSimplifyResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::MeshVertexNormals:
+            m_LastMeshVertexNormalsResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::GraphVertexNormals:
+            m_LastGraphVertexNormalsResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::PointCloudVertexNormals:
+            m_LastPointCloudVertexNormalsResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::PointCloudOutlierRemoval:
+            m_LastPointCloudOutlierRemovalResult.reset();
+            return;
+        case EditorGeometryProcessingResultSlot::Registration:
+            m_LastRegistrationResult.reset();
+            return;
+        }
     }
 
     void EditorWorkspaceSession::ResetAttachmentState()

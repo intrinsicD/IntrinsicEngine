@@ -21,6 +21,7 @@ module Geometry.Parameterization;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
+import Geometry.HalfedgeMesh.Repair;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Parameterization.Diagnostics;
 import Geometry.Parameterization.Harmonic;
@@ -617,18 +618,38 @@ namespace Geometry::Parameterization
                 return result;
             }
         }
+
+        // Only ever called on the failure path, so the flood fill and the
+        // boundary walk stay off the success path entirely.
+        [[nodiscard]] ParameterizationRejection SummarizeRejection(
+            const HalfedgeMesh::Mesh& mesh)
+        {
+            const std::optional<MeshRepair::ConnectedComponentsResult> components =
+                MeshRepair::LabelConnectedComponents(mesh);
+            if (!components.has_value())
+                return {};
+
+            return ParameterizationRejection{
+                .Evaluated = true,
+                .ConnectedComponentCount = components->ComponentCount,
+                .BoundaryLoopCount = MeshUtils::CollectBoundaryLoops(mesh).size(),
+            };
+        }
     } // namespace
 
     ParameterizeResult ParameterizeMesh(
         const HalfedgeMesh::Mesh& mesh,
         const ParameterizationStrategy& strategy)
     {
-        return std::visit(
+        ParameterizeResult result = std::visit(
             [&mesh](const auto& params)
             {
                 return DispatchParameterization(mesh, params);
             },
             strategy);
+        if (!result.Succeeded())
+            result.Rejection = SummarizeRejection(mesh);
+        return result;
     }
 
 } // namespace Geometry::Parameterization

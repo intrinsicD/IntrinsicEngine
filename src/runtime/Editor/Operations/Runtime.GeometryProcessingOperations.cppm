@@ -787,8 +787,33 @@ export namespace Extrinsic::Runtime
     struct EditorUvRegenerationCommandResult;
     struct EditorParameterizationResult;
 
+    // BUG-141: names one stored `Last<Operation>Result` slot so a panel can
+    // dismiss the outcome it is showing. Every result is already superseded by
+    // the next run of its own operation; this is the explicit clear, and it is
+    // one enum rather than one sink per operation because the session's only
+    // reaction is to reset the matching optional.
+    enum class EditorGeometryProcessingResultSlot : std::uint8_t
+    {
+        KMeans,
+        PointCloudConsolidation,
+        ProgressivePoisson,
+        UvRegeneration,
+        Parameterization,
+        MeshCurvature,
+        MeshDenoise,
+        MeshRemesh,
+        MeshSubdivide,
+        MeshSimplify,
+        MeshVertexNormals,
+        GraphVertexNormals,
+        PointCloudVertexNormals,
+        PointCloudOutlierRemoval,
+        Registration,
+    };
+
     struct EditorMethodResultSinks
     {
+        std::function<void(EditorGeometryProcessingResultSlot)> DismissResult{};
         std::function<void(EditorProgressivePoissonResult)> ProgressivePoisson{};
         std::function<void(EditorUvRegenerationCommandResult)> UvRegeneration{};
         std::function<void(EditorParameterizationResult)> Parameterization{};
@@ -1045,6 +1070,11 @@ export namespace Extrinsic::Runtime
         Geometry::Parameterization::ParameterizationStatus ParameterizationStatus{
             Geometry::Parameterization::ParameterizationStatus::InvalidInput};
         Geometry::Parameterization::ParameterizationDiagnostics Diagnostics{};
+        // BUG-141: the structured cause behind a solver rejection. Populated
+        // only when the solver ran and refused the mesh; a rejection raised
+        // before the solver (stale entity, bad config, unusable source) leaves
+        // it unevaluated because no mesh reached the solver.
+        Geometry::Parameterization::ParameterizationRejection Rejection{};
         std::size_t VertexCount{0u};
         // Identifies the exact canonical triangle topology and UV payload that
         // produced Diagnostics. A missing value means the diagnostics must not

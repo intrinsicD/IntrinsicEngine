@@ -168,6 +168,26 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
+        // BUG-141: a stored outcome is superseded by the next run of its own
+        // operation, but a user who is not going to run it again had no way to
+        // clear the line. Dismissal drops both the panel's own copy and the
+        // session slot the model is rebuilt from, so it does not reappear on
+        // the next frame. Draw it last: it invalidates the result the caller
+        // is rendering.
+        template <typename ResultT>
+        void DrawDismissLastResultButton(
+            const char* const label,
+            std::optional<ResultT>& panelResult,
+            const Runtime::EditorGeometryProcessingResultSlot slot,
+            const SandboxEditorContext& context)
+        {
+            if (!ImGui::SmallButton(label))
+                return;
+            panelResult.reset();
+            if (context.MethodResultSinks.DismissResult)
+                context.MethodResultSinks.DismissResult(slot);
+        }
+
         void DrawDomainWindowHeader(
             const Runtime::EditorDomainWindowModel& model)
         {
@@ -730,6 +750,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
+        DrawDismissLastResultButton(
+            "Dismiss##MeshDenoise",
+            Denoise.LastResult,
+            Runtime::EditorGeometryProcessingResultSlot::MeshDenoise,
+            context);
     }
 
     void MeshProcessingPanels::Impl::DrawCurvatureControls(
@@ -824,6 +849,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
+        DrawDismissLastResultButton(
+            "Dismiss##MeshCurvature",
+            Curvature.LastResult,
+            Runtime::EditorGeometryProcessingResultSlot::MeshCurvature,
+            context);
     }
 
     void MeshProcessingPanels::Impl::DrawRemeshControls(
@@ -999,6 +1029,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
+        DrawDismissLastResultButton(
+            "Dismiss##MeshRemesh",
+            Remesh.LastResult,
+            Runtime::EditorGeometryProcessingResultSlot::MeshRemesh,
+            context);
     }
 
     void MeshProcessingPanels::Impl::DrawSubdivideControls(
@@ -1131,6 +1166,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
+        DrawDismissLastResultButton(
+            "Dismiss##MeshSubdivide",
+            Subdivide.LastResult,
+            Runtime::EditorGeometryProcessingResultSlot::MeshSubdivide,
+            context);
     }
 
     void MeshProcessingPanels::Impl::DrawSimplifyControls(
@@ -1285,6 +1325,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
+        DrawDismissLastResultButton(
+            "Dismiss##MeshSimplify",
+            Simplify.LastResult,
+            Runtime::EditorGeometryProcessingResultSlot::MeshSimplify,
+            context);
     }
 
     void MeshProcessingPanels::Impl::DrawMeshNormalsControls(
@@ -1385,6 +1430,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
+        DrawDismissLastResultButton(
+            "Dismiss##MeshNormals",
+            MeshNormals.LastResult,
+            Runtime::EditorGeometryProcessingResultSlot::MeshVertexNormals,
+            context);
     }
 
     void MeshProcessingPanels::Impl::DrawGraphNormalsControls(
@@ -1462,6 +1512,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
+        DrawDismissLastResultButton(
+            "Dismiss##GraphNormals",
+            GraphNormals.LastResult,
+            Runtime::EditorGeometryProcessingResultSlot::GraphVertexNormals,
+            context);
     }
 
     void MeshProcessingPanels::Impl::DrawPointNormalsControls(
@@ -1599,6 +1654,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
+        DrawDismissLastResultButton(
+            "Dismiss##PointNormals",
+            PointNormals.LastResult,
+            Runtime::EditorGeometryProcessingResultSlot::PointCloudVertexNormals,
+            context);
     }
 
     void MeshProcessingPanels::Impl::DrawRegistrationWindow(
@@ -1760,6 +1820,11 @@ namespace Extrinsic::Sandbox::Editor
             }
             if (!result.Message.empty())
                 ImGui::TextWrapped("%s", result.Message.c_str());
+            DrawDismissLastResultButton(
+                "Dismiss##Registration",
+                Registration.LastResult,
+                Runtime::EditorGeometryProcessingResultSlot::Registration,
+                context);
         }
         ImGui::End();
     }
