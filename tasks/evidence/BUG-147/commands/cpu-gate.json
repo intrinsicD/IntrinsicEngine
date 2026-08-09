@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 59248,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T22:28:16Z",
+  "label": "cpu-gate",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T22:27:16Z",
+  "stderr_path": "tasks/evidence/BUG-147/commands/cpu-gate.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-147/commands/cpu-gate.stdout.log",
+  "stdout_sha256": "a837e63b2c6d6132b6f372865c24af2dc37af96881ef469322c74649d6f779e0",
+  "task_id": "BUG-147"
+}

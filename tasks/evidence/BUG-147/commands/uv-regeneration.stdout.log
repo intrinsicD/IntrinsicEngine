@@ -1,0 +1,44 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1016: SandboxEditorUi.MeshSimplifyThatCollapsesNothingReportsNoChange
+ 1/17 Test #1016: SandboxEditorUi.MeshSimplifyThatCollapsesNothingReportsNoChange ........................   Passed    0.01 sec
+      Start 1031: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo
+ 2/17 Test #1031: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo .................   Passed    0.01 sec
+      Start 1032: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply
+ 3/17 Test #1032: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply .................   Passed    0.02 sec
+      Start 1033: SandboxEditorUi.MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit
+ 4/17 Test #1033: SandboxEditorUi.MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit .....................   Passed    0.02 sec
+      Start 1035: SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending
+ 5/17 Test #1035: SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending ...   Passed    0.02 sec
+      Start 1037: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+ 6/17 Test #1037: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel ....   Passed    0.00 sec
+      Start 1038: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent
+ 7/17 Test #1038: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent .......................   Passed    0.01 sec
+      Start 1039: SandboxEditorUi.MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit
+ 8/17 Test #1039: SandboxEditorUi.MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit ................   Passed    0.01 sec
+      Start 1060: SandboxEditorUi.UvRegenerationThatReproducesStoredUvsReportsNoChange
+ 9/17 Test #1060: SandboxEditorUi.UvRegenerationThatReproducesStoredUvsReportsNoChange ...................   Passed    0.01 sec
+      Start 1061: SandboxEditorUi.UvRegenerationPreservesClosedManifoldTopology
+10/17 Test #1061: SandboxEditorUi.UvRegenerationPreservesClosedManifoldTopology ..........................   Passed    0.01 sec
+      Start 1062: SandboxEditorUi.UvRegenerationWithoutASeamStaysOnTheVertexDomain
+11/17 Test #1062: SandboxEditorUi.UvRegenerationWithoutASeamStaysOnTheVertexDomain .......................   Passed    0.00 sec
+      Start 1063: SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords
+12/17 Test #1063: SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords ......................   Passed    0.01 sec
+      Start 1064: SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply
+13/17 Test #1064: SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply ...............   Passed    0.02 sec
+      Start 1065: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+14/17 Test #1065: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob .....................   Passed    0.02 sec
+      Start 1066: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource
+15/17 Test #1066: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource ............................   Passed    0.02 sec
+      Start 1067: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty
+16/17 Test #1067: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty ..................   Passed    0.02 sec
+      Start 1068: SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache
+17/17 Test #1068: SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache ..............   Passed    0.02 sec
+
+100% tests passed, 0 tests failed out of 17
+
+Label Time Summary:
+contract    =   0.20 sec*proc (17 tests)
+runtime     =   0.20 sec*proc (17 tests)
+
+Total Test time (real) =   0.35 sec

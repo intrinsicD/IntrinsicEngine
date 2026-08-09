@@ -1,0 +1,79 @@
+schema_version: 1
+task_id: BUG-147
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-09T22:28:51Z'
+claim_eligible: false
+source:
+  base_ref: 7926a09e
+  base_revision: 7926a09ed473ccb7b10cab53c57184bc6ee22c60
+  head_revision: 7926a09ed473ccb7b10cab53c57184bc6ee22c60
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface: []
+  content_digest: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+touched:
+  paths: []
+  layers:
+  - app
+  - runtime
+  modules:
+  - Extrinsic.Runtime.AssetWorkflowGeometryMaterialization
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Runtime.MeshSurfaceTopology
+extension_seam: GatherSplitMeshCornerTexcoords is the backend-independent chart-split recovery any further
+  UV producer binds to; PublishUvRegenerationTexcoords is the per-domain publication decision a new unwrapping
+  command copies.
+future_change_plan: None owed. UV resampling across topology-replacing edits remains deliberately unowned
+  and reported as a discard (BUG-146).
+acceptance:
+- criterion: Regenerating UVs on a closed manifold leaves it closed and manifold with
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: UVs are present, finite, and corner-owned when the atlas produced a seam.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Split counts are still reported, described as upload duplication.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: 'No dual authoritative mesh identity is introduced: the atlas output is an'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No layering violation.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-147/commands/build-tests.json
+- receipt: tasks/evidence/BUG-147/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-147/commands/layering.json
+- receipt: tasks/evidence/BUG-147/commands/task-policy.json
+- receipt: tasks/evidence/BUG-147/commands/uv-regeneration.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-147-uv-regeneration-shatters-mesh-topology.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks: []
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
