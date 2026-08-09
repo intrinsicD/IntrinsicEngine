@@ -5,16 +5,27 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "claude-bug137"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-09T17:30:00Z"
+maturity_target: Operational
 contract_schema: 1
 contracts:
   - geometry.element-domain-sources
   - geometry.property-coherence
 ---
 # BUG-137 — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh
+
+## Status
+
+- Completed and retired on 2026-08-09.
+- Completion commit: this retirement commit.
+- Slice commits: `115adf51` (A), `90938dea` + `e1416f08`/`d358b1af` (B),
+  `1cbfcaec` (C), `2896fc64` + `5c47aaef` + `725d491e` + `2075a611` +
+  `942a4ee6` (D).
+- Follow-up opened rather than widened into slice D:
+  [`BUG-146`](../backlog/bugs/BUG-146-topology-edits-destroy-corner-uvs.md).
 
 ## Goal
 - Make direct mesh import preserve the source mesh's vertex/edge/halfedge
@@ -201,7 +212,7 @@ side is ready before the producing side changes.
       `PopulateFromMesh` then publishes the scratch mesh's halfedge properties
       wholesale. Confirmed by probe (`h:texcoord exists=1 size=112` before
       simplify, `exists=0 size=64` after, command reporting success) and
-      tracked as [`BUG-146`](BUG-146-topology-edits-destroy-corner-uvs.md).
+      tracked as [`BUG-146`](../backlog/bugs/BUG-146-topology-edits-destroy-corner-uvs.md).
       That is also why FA-QEM's corner-seam classification cannot yet fire
       through the editor path: the geometry contract is correct, the runtime
       does not hand it the data.

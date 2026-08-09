@@ -7402,3 +7402,83 @@ state-machine cases pass and the default CPU gate passes 4142/4142 across three
 consecutive runs. One earlier gate run reported a single unidentified failure
 that did not recur; it is recorded on the task rather than dismissed, and most
 likely is the already-open `BUG-134` intermittent.
+
+## 2026-08-09 — BUG-137 retired
+
+[`BUG-137`](BUG-137-direct-mesh-import-atlas-replaces-topology.md) — direct mesh
+import replacing halfedge topology with the UV-atlas chart-split mesh — retired
+on 2026-08-09 after its fourth and last slice.
+
+The bug was that importing a closed manifold OBJ produced a triangle soup:
+`tests/data/sculpt.obj` (3669 V / 11013 E / 7342 F, every edge 2-manifold,
+closed genus-2) materialized 21464 vertices, 21745 edges, and 21464 boundary
+vertices, because the entity halfedge mesh was built from `atlas.OutputMesh`
+rather than from the source mesh with UVs attached. Face count was the only
+quantity preserved. Every connectivity-dependent operation downstream then ran
+on that soup, which is why mesh denoise pinned all 21464 vertices as boundary
+and moved none, LSCM rejected the mesh, and per-vertex curvature was
+per-triangle speckle.
+
+The decision taken in slice A and held through the rest was that a UV seam is a
+UV fact, not a topology fact. Atlas UVs live on the halfedge/corner domain
+(`h:texcoord`), the entity keeps its source topology, and the duplication an
+indexed GPU vertex buffer genuinely needs happens once at upload. The rejected
+alternative — a separate render mesh distinct from the processing mesh — would
+have been the smaller diff, but it trades a one-time cost for a standing dual
+identity that picking, primitive IDs, gizmo, readback, and texture bake would
+all have to map across forever. Switching the default atlas backend to `xatlas`
+was rejected explicitly as a quality improvement that leaves the connectivity
+defect intact; it must not be mistaken for a fix.
+
+Slices A–C landed the corner-domain property and its corner-over-vertex
+resolution order, taught GPU upload to de-index corner UVs, and stopped import
+from building topology out of the atlas output. `sculpt.obj` now imports as its
+own 3669 / 11013 / 22026 / 7342 with χ = −2 and zero boundary vertices, and the
+17795 GPU-side duplicated vertices — the same count the old
+`SeamSplitVertexCount` computed and discarded without ever showing it — are
+reported in the import result. Slice B's `gpu;vulkan` readback smoke was written
+as `e1416f08`, reverted for straddling the cohort's 30 s budget, and restored by
+`BUG-143` with every assertion intact once that task found the variance was
+`vkQueuePresentKHR` throttling to roughly 1 Hz whenever the display is not being
+scanned out.
+
+Slice D retired the vertex-domain assumptions left across the tree: OBJ read and
+write now preserve authored per-corner UVs without splitting positions, texture
+bake de-indexes corner UVs through the shared split table, scene save/load
+round-trips `h:texcoord`, and the UV-view readiness model and reupload revision
+both follow the resolution order.
+
+The slice's final entry is where this task's own record needed correcting. It
+listed four remaining consumers and asserted "none of which lose data today".
+Two of them did lose behavior. FA-QEM's `PreserveUvSeams` classified a seam as
+"the mesh has `v:texcoord` and this vertex is on a boundary" — a proxy that is
+only valid for vertex-owned UVs, where one vertex holds exactly one UV and an
+atlas must cut the surface open to represent a seam at all. On a corner-UV mesh
+that proxy finds nothing on both counts, so seam protection was silently dead on
+exactly the meshes an atlas produces. It now reads the seam directly: a vertex
+whose incident corners disagree on their UV. And a parameterization published
+its result as `v:texcoord` underneath a surviving `h:texcoord`, which wins the
+resolution order — so the result was computed, reported successful, written to
+history, and read by nothing. It now retires the corner UVs it supersedes, with
+both domains captured so undo restores them. The remaining two were the wording
+the entry described: the CPU fragment bake's dirty stamp now resolves by the
+same order it reads by, and the editor property catalog no longer flips a UV
+row's `Internal`/`Canonical` flags purely by which domain holds it.
+
+One defect found during that slice was deliberately not widened into it.
+Topology-replacing editor operations destroy `h:texcoord` outright, because the
+scratch halfedge mesh is rebuilt from a triangle soup that never carries it and
+`PopulateFromMesh` publishes the scratch mesh's halfedge properties wholesale —
+so the property is removed, not left stale. A probe through the real simplify
+command reported `h:texcoord exists=1 size=112` before and `exists=0 size=64`
+after, with the command reporting success. That is also why FA-QEM's new
+corner-seam classification cannot fire through the editor path yet: the geometry
+contract is correct, the runtime does not hand it the data. It is tracked as
+[`BUG-146`](../backlog/bugs/BUG-146-topology-edits-destroy-corner-uvs.md) with
+that probe as its repro.
+
+Coverage across the slices includes 9 corner-UV storage and resolution cases,
+the split-upload contract tests, the restored Vulkan readback smoke, the
+`sculpt.obj` and generated-cube import topology assertions, OBJ corner round
+trips, and slice D's four new failing-first cases. The default CPU gate passes
+4172/4172 with its expected `GlfwLifecycleLsan` skip.

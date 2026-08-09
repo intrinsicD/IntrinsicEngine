@@ -1,0 +1,97 @@
+schema_version: 1
+task_id: BUG-137
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-09T18:52:43Z'
+claim_eligible: false
+source:
+  base_ref: 27ac89eb
+  base_revision: 27ac89eb7b73eb590f6f23976b78f0bb62db29e4
+  head_revision: 27ac89eb7b73eb590f6f23976b78f0bb62db29e4
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 2d964967f8edf9cebf79807cf0936a484adeae99de0eb9f5a0925c0116336f29
+  - path: tasks/backlog/bugs/index.md
+    sha256: 193dab550080a344c53ae62e88c14323f273dddb911f9cef0aefe41d90c5c2af
+  - path: tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
+    sha256: 3f248eb4d2e2e348dc97ceacee1847052101230ca46d6d09f07352ed15140cc0
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 818486b3b5b12b2835863ad02831eb03a0a8cec4802775f5f04a943e64676b11
+  content_digest: 0188841d0c699acb23da90fc1dab2eb9a276d1b6c1c816a8e9599c78b0ae3828
+touched:
+  paths:
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
+  - tasks/done/RETIREMENT-LOG.md
+  layers:
+  - app
+  - geometry
+  - runtime
+  modules:
+  - Extrinsic.Runtime.ParameterizationOperations
+  - Extrinsic.Runtime.VisualizationRecipes
+  - Geometry.Simplification
+extension_seam: Geometry::MeshUtils::ResolveTexcoordDomain is the single resolution point every new UV
+  consumer binds to; ClassifySeamVertices is the per-domain seam definition a seam-aware operation extends;
+  ParameterizationUvState is the two-domain undo record a future UV-publishing operation copies.
+future_change_plan: BUG-146 owns corner-UV survival across topology-replacing editor operations, which
+  is the one path this task deliberately did not widen into.
+acceptance:
+- criterion: Importing `tests/data/sculpt.obj` yields 3669 vertices, 11013 edges,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: UVs are present and finite after that import, on the corner domain, with
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A textured mesh still renders correctly, with the seam split occurring at
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: GPU-side vertex duplication is reported in the import result, never
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No dual authoritative mesh identity is introduced.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No layering violation; `geometry` still owns the atlas method and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-137/commands/build-tests.json
+- receipt: tasks/evidence/BUG-137/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-137/commands/layering.json
+- receipt: tasks/evidence/BUG-137/commands/slice-d-focused.json
+- receipt: tasks/evidence/BUG-137/commands/task-policy.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks: []
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

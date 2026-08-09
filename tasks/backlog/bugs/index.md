@@ -9,11 +9,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-137` — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh](BUG-137-direct-mesh-import-atlas-replaces-topology.md):
-  importing a closed manifold OBJ (3669 V / 11013 E / 7342 F, every edge
-  2-manifold) materializes 21464 vertices, 21745 edges and 21464 boundary
-  vertices, because the entity mesh is built from `atlas.OutputMesh`. The split
-  is already computed as `SeamSplitVertexCount` and never surfaced.
 - [`BUG-146` — Topology-changing mesh operations silently destroy corner-domain UVs](BUG-146-topology-edits-destroy-corner-uvs.md):
   simplify rebuilds the entity's halfedge mesh from a triangle soup that never
   carries `h:texcoord`, and `PopulateFromMesh` then publishes the scratch
@@ -55,6 +50,22 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-09: [`BUG-137` — Direct mesh import replaces halfedge topology
+  with the UV-atlas chart-split
+  mesh](../../done/BUG-137-direct-mesh-import-atlas-replaces-topology.md).
+  Importing `tests/data/sculpt.obj` now yields its own 3669 V / 11013 E /
+  22026 H / 7342 F and zero boundary vertices, because atlas UVs are published
+  on the corner domain (`h:texcoord`) and the seam split happens once, at GPU
+  upload, where 17795 duplicated vertices are reported instead of silently
+  rewriting the authoritative mesh. Slice D's last entry claimed its four
+  remaining consumers were wording only; two of them lost behavior and are
+  fixed: FA-QEM's `PreserveUvSeams` pinned nothing on a corner-UV mesh, and a
+  parameterization published `v:texcoord` underneath a surviving `h:texcoord`
+  that wins the resolution order, so its result was read by nothing.
+  Topology-replacing operations still destroy `h:texcoord` outright; that is
+  [`BUG-146`](BUG-146-topology-edits-destroy-corner-uvs.md), opened with a
+  probe rather than widened into this fix.
 
 - Closed 2026-08-08: [`BUG-143` — Corner-UV `gpu;vulkan` smoke exceeds the 30 s
   cohort
