@@ -75,6 +75,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshPrimitiveView;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -97,6 +98,7 @@ import Geometry.Curvature;
 import Geometry.CatmullClark;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.AdaptiveRemeshing;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.HalfedgeMesh.SubdivisionSqrt3;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.Mesh.Conversion;
@@ -5494,12 +5496,98 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return GeometryPresentationSlotSemantic::Displacement;
         }
 
+        // BUG-146 — forward the mesh's UVs into the scratch halfedge mesh.
+        //
+        // The scratch mesh is rebuilt from a triangle soup and starts with no
+        // properties at all, and `ApplyMeshTopologyState` publishes its
+        // halfedge properties wholesale — so anything not forwarded here is not
+        // merely stale afterwards, it is removed from the entity. Vertex
+        // numbering survives the round trip; halfedge numbering does not, so
+        // corner UVs go through the canonical corner walk rather than a copy.
+        //
+        // Simplify preserves rather than resamples: an edge collapse removes
+        // corners and the survivors keep their own UVs, which is the correct
+        // answer and is also what makes `PreserveUvSeams` able to see a seam at
+        // all. Operations that *create* corners (remesh, subdivide) have no
+        // source UV for them and must not use this path.
+        [[nodiscard]] bool CopyMeshSimplifyCornerTexcoords(
+            const GS::ConstSourceView& view,
+            Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            if (view.HalfedgeSource == nullptr || view.VertexSource == nullptr)
+                return false;
+
+            const Geometry::PropertySet& halfedgeProperties =
+                view.HalfedgeSource->Properties;
+            const auto storedCorners = halfedgeProperties.Get<glm::vec2>(
+                Geometry::MeshUtils::kHalfedgeTexcoordPropertyName);
+            if (!storedCorners ||
+                storedCorners.Vector().size() != halfedgeProperties.Size())
+            {
+                return false;
+            }
+            for (const glm::vec2 uv : storedCorners.Vector())
+            {
+                if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                    return false;
+            }
+
+            std::vector<std::uint32_t> surfaceIndices{};
+            std::vector<std::uint32_t> triangleFaces{};
+            std::vector<std::uint32_t> cornerHalfedges{};
+            if (BuildMeshSurfaceTriangleCornerTopology(
+                    view,
+                    surfaceIndices,
+                    triangleFaces,
+                    cornerHalfedges) != MeshSurfaceTopologyStatus::Success)
+            {
+                return false;
+            }
+            if (cornerHalfedges.size() != surfaceIndices.size() ||
+                surfaceIndices.size() % 3u != 0u)
+            {
+                return false;
+            }
+
+            // The corner walk and the soup builder fan every face the same way
+            // — `(ring[0], ring[i], ring[i+1])`, faces in index order, skipping
+            // the same rings — so triangle `t` here is soup face `t`, which
+            // `ToHalfedgeMesh` added as scratch face `t`.
+            std::vector<Geometry::MeshSoup::PolygonFace> faces{};
+            faces.reserve(surfaceIndices.size() / 3u);
+            std::vector<glm::vec2> cornerUvs{};
+            cornerUvs.reserve(surfaceIndices.size());
+            for (std::size_t i = 0u; i + 2u < surfaceIndices.size(); i += 3u)
+            {
+                faces.push_back(Geometry::MeshSoup::PolygonFace{
+                    .Indices = {surfaceIndices[i],
+                                surfaceIndices[i + 1u],
+                                surfaceIndices[i + 2u]},
+                });
+                for (std::size_t k = 0u; k < 3u; ++k)
+                {
+                    const std::uint32_t halfedge = cornerHalfedges[i + k];
+                    if (halfedge >= storedCorners.Vector().size())
+                        return false;
+                    cornerUvs.push_back(storedCorners.Vector()[halfedge]);
+                }
+            }
+
+            return PublishMeshCornerTexcoords(
+                mesh,
+                faces,
+                view.VertexSource->Properties.Size(),
+                cornerUvs);
+        }
+
         void CopyMeshSimplifyAuxiliaryProperties(
             const GS::ConstSourceView& view,
             Geometry::HalfedgeMesh::Mesh& mesh)
         {
             if (view.VertexSource == nullptr)
                 return;
+
+            (void)CopyMeshSimplifyCornerTexcoords(view, mesh);
 
             const auto sourceTexcoords =
                 view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");

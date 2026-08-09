@@ -736,6 +736,14 @@ namespace Geometry::Simplification
                     {
                         continue;
                     }
+                    // A boundary halfedge owns no corner. Producers fill its
+                    // slot by repeating a UV already present at its target
+                    // vertex, but reading it as a corner would let any producer
+                    // that leaves a default there invent a seam (BUG-146).
+                    if (!mesh.Face(h).IsValid())
+                    {
+                        continue;
+                    }
                     const VertexHandle v = mesh.ToVertex(h);
                     if (!mesh.IsValid(v) || mesh.IsDeleted(v))
                     {

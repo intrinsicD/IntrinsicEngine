@@ -105,6 +105,7 @@ import Geometry.Graph.Vertex.Normals;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.KMeans;
 import Geometry.PointCloud.Normals;
@@ -3362,6 +3363,108 @@ TEST(SandboxEditorUi, MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent)
     EXPECT_GT(result.SeamVerticesPinned, 0u);
     EXPECT_LT(result.OutputFaceCount, before.Faces);
 }
+// BUG-146 — a topology edit rebuilds the entity's halfedge mesh from a triangle
+// soup and publishes that mesh's halfedge properties wholesale, so anything not
+// forwarded into the scratch mesh is removed from the entity outright rather
+// than left stale. Before the fix this command reported success while deleting
+// every UV a corner-parameterized mesh had, and FA_QEM saw no seam to pin.
+TEST(SandboxEditorUi, MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+
+    constexpr int kGrid = 4;
+    Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(kGrid);
+
+    // Two UV charts split at x == 2, which is an interior line of the grid:
+    // the seam is a property fact with no boundary anywhere near it.
+    auto gridCorners = grid.HalfedgeProperties().GetOrAdd<glm::vec2>(
+        "h:texcoord", glm::vec2{0.0f});
+    ASSERT_TRUE(static_cast<bool>(gridCorners));
+    for (std::size_t f = 0u; f < grid.FacesSize(); ++f)
+    {
+        const Geometry::FaceHandle face{static_cast<Geometry::PropertyIndex>(f)};
+        if (grid.IsDeleted(face))
+            continue;
+        const float chart =
+            Geometry::MeshUtils::FaceCentroid(grid, face).x >= 2.0 ? 1.0f : 0.0f;
+        for (const Geometry::HalfedgeHandle h : grid.HalfedgesAroundFace(face))
+            gridCorners[h.Index] = glm::vec2{chart, 0.5f};
+    }
+
+    std::size_t expectedSeamVertices = 0u;
+    for (std::size_t i = 0u; i < grid.VerticesSize(); ++i)
+    {
+        const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (grid.IsDeleted(v) || grid.IsIsolated(v))
+            continue;
+        bool seen = false;
+        bool disagrees = false;
+        glm::vec2 first{0.0f};
+        for (const Geometry::HalfedgeHandle h : grid.HalfedgesAroundVertex(v))
+        {
+            const Geometry::HalfedgeHandle corner = grid.OppositeHalfedge(h);
+            if (!grid.Face(corner).IsValid())
+                continue;
+            const glm::vec2 uv = gridCorners[corner.Index];
+            if (!seen)
+            {
+                first = uv;
+                seen = true;
+            }
+            else if (first != uv)
+            {
+                disagrees = true;
+            }
+        }
+        if (disagrees)
+            ++expectedSeamVertices;
+    }
+    ASSERT_GT(expectedSeamVertices, 0u);
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "CornerUvGrid");
+    GS::PopulateFromMesh(registry.Raw(), mesh, grid);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    ASSERT_TRUE(registry.Raw()
+                    .get<GS::Halfedges>(mesh)
+                    .Properties.Exists("h:texcoord"));
+
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    ASSERT_GT(before.Faces, 8u);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::EditorMeshSimplifyResult result =
+        Runtime::ApplyEditorMeshSimplifyCommand(
+            context,
+            Runtime::EditorMeshSimplifyCommand{
+                .StableEntityId = stableId,
+                .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
+                .TargetFaces = 8u,
+                .PreserveBoundary = false,
+                .PreserveSharpFeatures = true,
+                .PreserveUvSeams = true,
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_LT(result.OutputFaceCount, before.Faces);
+
+    // The classification is taken from the input mesh, so the count is exactly
+    // the seam set derived above -- proving the corner UVs reached the solver.
+    EXPECT_EQ(result.SeamVerticesPinned, expectedSeamVertices);
+
+    const GS::Halfedges& halfedges = registry.Raw().get<GS::Halfedges>(mesh);
+    const auto survivingCorners =
+        halfedges.Properties.Get<glm::vec2>("h:texcoord");
+    ASSERT_TRUE(static_cast<bool>(survivingCorners))
+        << "the topology edit removed the mesh's only UV property";
+    EXPECT_EQ(survivingCorners.Vector().size(), halfedges.Properties.Size());
+    for (const glm::vec2 uv : survivingCorners.Vector())
+    {
+        EXPECT_TRUE(std::isfinite(uv.x) && std::isfinite(uv.y));
+    }
+}
+
 TEST(SandboxEditorUi, MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels)
 {
     ECS::Scene::Registry registry;
