@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "ctest --test-dir build/ci --output-on-failure -R 'EditorWorkspaceSnapshots|GeometryProcessing|SandboxEditor' --timeout 120"
+  ],
+  "command_display": "bash -lc 'ctest --test-dir build/ci --output-on-failure -R '\"'\"'EditorWorkspaceSnapshots|GeometryProcessing|SandboxEditor'\"'\"' --timeout 120'",
+  "cwd": ".",
+  "duration_ms": 4153,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T03:35:42Z",
+  "label": "editor-suites",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T03:35:38Z",
+  "stderr_path": "tasks/evidence/BUG-141/commands/editor-suites.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-141/commands/editor-suites.stdout.log",
+  "stdout_sha256": "a3974ff963ed1cca038ebcbf8f2d739c428569bf962b721e3696778de972fe08",
+  "task_id": "BUG-141"
+}

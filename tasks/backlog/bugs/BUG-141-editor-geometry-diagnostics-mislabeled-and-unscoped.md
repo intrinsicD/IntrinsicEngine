@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "claude-bug141"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-09T02:25:00Z"
 contract_schema: 1
 contracts: []
 contract_review: >-
@@ -17,6 +17,78 @@ contract_review: >-
   integration surface changes.
 ---
 # BUG-141 — Editor geometry-processing diagnostics are mislabeled, duplicated, unscoped, and unactionable
+
+## Slice plan
+
+Written before implementing, because the five required changes do not share a
+mechanism.
+
+**Slice A — classification, scoping, de-duplication.** The three defects that a
+live session on 2026-08-09 reproduced directly while diagnosing `BUG-138`
+(screenshot: `tasks/evidence/BUG-138/artifacts/refusal-before-fix.png`, which
+shows `GeometryProcessingFailed: Mesh simplify CPU job queued (job 3:1).`
+rendered twice, and `denoise-applies-on-the-same-entity.png`, which shows
+simplify's diagnostics inside the Denoise panel).
+
+**Slice B — lifetime and rejection cause.** A dismissal affordance and the
+parameterization rejection cause (connected-component and boundary-loop
+counts). Slice B needs a solver-side reason that does not exist yet, which is
+why it is separate.
+
+### Slice A design note — why scoping is relocation, not a tag
+
+`## Forbidden changes` rules out suppressing diagnostics instead of scoping
+them, so this is worth stating explicitly. Each per-operation entry in the
+shared `EditorGeometryProcessingModel::Diagnostics` list is a *mirror* of
+`Last<Operation>Result.Message`, which the owning panel already renders on its
+own ("`Last simplify run: StaleEntity`" followed by the same message). The
+mirror is what leaks into unrelated windows, because
+`AppendDiagnostics(model.Diagnostics, model.Processing.Diagnostics)` folds the
+shared list into every domain window's header.
+
+Slice A therefore drops the mirror rather than tagging it with a scope. Nothing
+is hidden: the message stays in the model on the operation's own result and
+stays on screen in the panel that produced it. Tagging each entry with
+`EditorGeometryProcessingAlgorithm` and filtering per panel would reach the
+same end state with a second copy of information the model already carries per
+operation, so it was rejected as the larger of two equivalent designs. If
+review prefers the tag, it is a contained follow-up.
+
+## Progress — slice A landed 2026-08-09; the task stays open for slice B
+
+`BuildGeometryProcessingModel` mirrored every `Last<Operation>Result` whose
+status was not `Succeeded()` into the shared
+`EditorGeometryProcessingModel::Diagnostics` list, under
+`EditorDiagnosticCode::GeometryProcessingFailed`. That single mirror caused two
+of the reported defects at once: `EditorCommandStatus::Pending` is not
+`Succeeded()`, so a queued job was announced as a failure, and
+`BuildEditorDomainWindowModel` folds the shared list into every domain window's
+header, so one operation's outcome was printed by all of them. The eleven
+mirrors are gone; each outcome stays on its own result, which the owning panel
+already renders.
+
+The duplication was separate and lived in `app`: four panels called
+`DrawDomainWindowHeader(model)` — which renders `model.Diagnostics`, the
+superset — and then `DrawDiagnostics(model.Processing.Diagnostics)` again. The
+second call is removed at all four sites (`Sandbox.MeshProcessingPanels.cpp`,
+`Sandbox.DomainPanels.cpp`, and two in `Sandbox.MethodPanels.cpp`).
+
+Live evidence, same build and mesh before and after
+(`tasks/evidence/BUG-141/artifacts/`): a queued simplify that previously read
+`GeometryProcessingFailed: Mesh simplify CPU job queued (job 3:1).` twice in the
+header now shows no header diagnostic at all and reports
+`Last simplify run: Pending`, then `Applied`; and the Denoise panel, which
+previously carried two `Sandbox.MeshSimplify.CPU did not apply: …` lines it had
+nothing to do with, is clean.
+
+Not attempted here, and the reason the task stays open: the dismissal
+affordance and the parameterization rejection cause. One test named in
+`## Tests` was written and then deliberately dropped rather than shipped —
+an assertion that the header list contains each processing diagnostic exactly
+once. With the mirrors gone, a matching-domain window's processing diagnostics
+list is empty in every reachable state, so the assertion could not fail and
+would have been decoration. The de-duplication is proven by the before/after
+screenshots instead, and by the removal of the second render call itself.
 
 ## Goal
 - Make editor geometry-processing diagnostics report the right severity, appear
@@ -59,35 +131,46 @@ shared editor geometry-processing diagnostic surface:
   `Sandbox.MeshProcessingPanels`.
 
 ## Required changes
-- [ ] Classify a queued async job as a pending/informational diagnostic, not
-      `GeometryProcessingFailed`.
-- [ ] De-duplicate diagnostic emission for a single command.
-- [ ] Scope diagnostics to the originating operation/panel so unrelated windows
-      do not display them.
+- [x] Classify a queued async job as a pending/informational diagnostic, not
+      `GeometryProcessingFailed`. (Slice A) A queued job now raises no
+      diagnostic at all and is reported as `Pending` on its own result, which
+      is what the K-Means path already did via its `Status != Queued` guard.
+- [x] De-duplicate diagnostic emission for a single command. (Slice A) The
+      duplication was a double render in `app`, not a double emission.
+- [x] Scope diagnostics to the originating operation/panel so unrelated windows
+      do not display them. (Slice A)
 - [ ] Give diagnostics a lifetime (superseded by the next run of the same
-      operation, or explicitly dismissible).
+      operation, or explicitly dismissible). (Slice B)
 - [ ] Include the rejection cause in parameterization failures (at minimum
       connected-component count and boundary-loop count when the solver rejects
-      the mesh).
+      the mesh). (Slice B)
 
 ## Tests
-- [ ] Add a contract test asserting a queued job produces a pending-class
-      diagnostic, not a failure-class one.
-- [ ] Add a test asserting one command yields exactly one diagnostic entry.
-- [ ] Add a test asserting a diagnostic raised by one operation is absent from
-      another operation's model.
+- [x] Add a contract test asserting a queued job produces a pending-class
+      diagnostic, not a failure-class one
+      (`QueuedMeshJobIsNotReportedAsAProcessingFailure`).
+- [x] Add a test asserting one command yields exactly one diagnostic entry.
+      Recorded as covered by the two tests either side of it plus the live
+      before/after pair, and not by a third assertion: see `## Progress` for
+      why the obvious one could not fail.
+- [x] Add a test asserting a diagnostic raised by one operation is absent from
+      another operation's model
+      (`OneOperationsFailureIsAbsentFromTheSharedProcessingModel`, plus the
+      updated assertion in
+      `MeshVertexNormalsCommandRejectsConflictingPropertyType`).
 - [ ] Add a test asserting a parameterization rejection carries a structured
       cause.
-- [ ] Default CPU gate stays green.
+- [x] Default CPU gate stays green (4150/4150, expected GLFW/LSan skip).
 
 ## Docs
-- [ ] Document diagnostic severity classes, scoping, and lifetime in the owning
-      runtime editor doc.
+- [x] Document diagnostic scoping and the pending-is-not-a-failure rule in
+      `src/runtime/README.md` (slice A). Lifetime is documented with slice B,
+      which is what introduces it.
 
 ## Acceptance criteria
-- [ ] No queued job is reported under a failure code.
-- [ ] One command produces one diagnostic.
-- [ ] Diagnostics appear only in the panel that produced them.
+- [x] No queued job is reported under a failure code.
+- [x] One command produces one diagnostic.
+- [x] Diagnostics appear only in the panel that produced them.
 - [ ] Diagnostics expire or can be cleared.
 - [ ] A parameterization rejection names its cause.
 

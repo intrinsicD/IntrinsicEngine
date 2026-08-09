@@ -1783,10 +1783,12 @@ void DrawDomainProcessingWindow(
     const EditorDomainWindowModel &model,
     const SandboxEditorContext &context,
     PointCloudOutlierRemovalUiState *pointCloudOutlierState) {
+  // BUG-141: `DrawDomainWindowHeader` already renders `model.Diagnostics`,
+  // into which the runtime folds `model.Processing.Diagnostics`. Rendering the
+  // processing list again here printed every entry twice.
   DrawDomainWindowHeader(model);
 
   const EditorGeometryProcessingModel &processing = model.Processing;
-  DrawDiagnostics(processing.Diagnostics);
   if (!DomainWindowReady(model) || !processing.HasSelectedEntity) {
     ImGui::TextDisabled(
         "Select a matching domain entity to inspect processing affordances.");

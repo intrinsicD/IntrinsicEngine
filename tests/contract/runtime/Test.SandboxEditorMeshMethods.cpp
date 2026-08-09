@@ -4459,10 +4459,113 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandFailsClosedForInvalidTargets)
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_TRUE(HasDiagnostic(
+    // BUG-141: the failure belongs to the operation that raised it and is
+    // carried on that operation's own result, which its panel renders. It must
+    // not also be mirrored into the shared processing diagnostics, because the
+    // runtime folds that list into every domain window's header.
+    ASSERT_TRUE(model.Processing.LastMeshVertexNormalsResult.has_value());
+    EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->Status,
+              Runtime::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->Message,
+              conflict.Message);
+    EXPECT_FALSE(HasDiagnostic(
         model.Processing.Diagnostics,
         Runtime::EditorDiagnosticCode::GeometryProcessingFailed));
 }
+
+// BUG-141: a queued async job is not a failure. `EditorCommandStatus::Pending`
+// is simply not `Succeeded()`, and the shared diagnostics list used to announce
+// every not-succeeded result under `GeometryProcessingFailed`, so the live
+// session's header read "GeometryProcessingFailed: Mesh simplify CPU job queued
+// (job 3:1)." while the job was running perfectly well.
+TEST(SandboxEditorUi, QueuedMeshJobIsNotReportedAsAProcessingFailure)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedDiagnostics");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const Runtime::EditorMeshSimplifyResult queued =
+        Runtime::ApplyEditorMeshSimplifyCommand(
+            context,
+            Runtime::EditorMeshSimplifyCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
+                .TargetFaces = 12u,
+                .PreserveBoundary = false,
+            });
+    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
+
+    context.LastMeshSimplifyResult = &queued;
+    const Runtime::EditorDomainWindowModel model =
+        Runtime::BuildEditorDomainWindowModel(
+            context,
+            Runtime::EditorDomainWindowKind::Mesh);
+
+    EXPECT_FALSE(HasDiagnostic(
+        model.Processing.Diagnostics,
+        Runtime::EditorDiagnosticCode::GeometryProcessingFailed));
+    EXPECT_FALSE(HasDiagnostic(
+        model.Diagnostics,
+        Runtime::EditorDiagnosticCode::GeometryProcessingFailed));
+    ASSERT_TRUE(model.Processing.LastMeshSimplifyResult.has_value());
+    EXPECT_EQ(model.Processing.LastMeshSimplifyResult->Status,
+              Runtime::EditorCommandStatus::Pending);
+}
+
+// BUG-141: one operation's outcome must not appear in another operation's
+// panel. Every mesh processing panel reads the same
+// `EditorDomainWindowModel::Processing`, so an entry parked in its shared
+// diagnostics list is an entry printed by the Denoise, K-Means, and
+// Parameterize (UV) panels too.
+TEST(SandboxEditorUi, OneOperationsFailureIsAbsentFromTheSharedProcessingModel)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "ScopedDiagnostics");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::EditorMeshSimplifyResult failed{};
+    failed.Status = Runtime::EditorCommandStatus::StaleEntity;
+    failed.Error = Core::ErrorCode::InvalidState;
+    failed.Message = "Sandbox.MeshSimplify.CPU did not apply.";
+    context.LastMeshSimplifyResult = &failed;
+
+    const Runtime::EditorDomainWindowModel model =
+        Runtime::BuildEditorDomainWindowModel(
+            context,
+            Runtime::EditorDomainWindowKind::Mesh);
+
+    // The simplify panel still has its outcome...
+    ASSERT_TRUE(model.Processing.LastMeshSimplifyResult.has_value());
+    EXPECT_EQ(model.Processing.LastMeshSimplifyResult->Message, failed.Message);
+    // ...and no other panel reading this model inherits it.
+    for (const Runtime::EditorDiagnostic& diagnostic :
+         model.Processing.Diagnostics)
+    {
+        EXPECT_EQ(diagnostic.Message.find(failed.Message), std::string::npos)
+            << diagnostic.Message;
+    }
+    for (const Runtime::EditorDiagnostic& diagnostic : model.Diagnostics)
+    {
+        EXPECT_EQ(diagnostic.Message.find(failed.Message), std::string::npos)
+            << diagnostic.Message;
+    }
+}
+
 TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals)
 {
     ECS::Scene::Registry registry;

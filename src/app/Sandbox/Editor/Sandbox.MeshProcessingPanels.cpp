@@ -514,8 +514,11 @@ namespace Extrinsic::Sandbox::Editor
         {
             const Runtime::EditorDomainWindowModel& model =
                 GetDomainWindowModel(context, kind);
+            // BUG-141: `DrawDomainWindowHeader` already renders
+            // `model.Diagnostics`, into which the runtime folds
+            // `model.Processing.Diagnostics`. Rendering the processing list
+            // again here printed every entry twice.
             DrawDomainWindowHeader(model);
-            DrawDiagnostics(model.Processing.Diagnostics);
             if (!DomainWindowReady(model) ||
                 !model.Processing.HasSelectedEntity)
             {

@@ -3302,160 +3302,70 @@ namespace {
                     break;
                 }
             }
+            // BUG-141: the per-operation results below are carried on the
+            // model and rendered by the panel that produced them. They used to
+            // be mirrored into `model.Diagnostics` as well, and that mirror was
+            // the defect: `BuildDomainWindowModel` folds this shared list into
+            // every domain window's header, so a simplify failure surfaced in
+            // the K-Means and Parameterize (UV) panels, and a merely `Pending`
+            // result — which is not `Succeeded()` — was announced under
+            // `GeometryProcessingFailed`. The list now carries only diagnostics
+            // that are true of the whole processing model (no scene, no
+            // selection, unsupported domain); anything owned by one operation
+            // stays on that operation's result.
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;
-                if (!context.LastKMeansResult->Succeeded() &&
-                    context.LastKMeansResult->Status !=
-                        KMeansRunStatus::Queued)
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastKMeansResult->Message.empty()
-                            ? "Last K-Means command failed."
-                            : context.LastKMeansResult->Message);
-                }
             }
             if (context.LastMeshDenoiseResult != nullptr)
             {
                 model.LastMeshDenoiseResult =
                     *context.LastMeshDenoiseResult;
-                if (!context.LastMeshDenoiseResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastMeshDenoiseResult->Message.empty()
-                            ? "Last mesh denoise command failed."
-                            : context.LastMeshDenoiseResult->Message);
-                }
             }
             if (context.LastMeshCurvatureResult != nullptr)
             {
                 model.LastMeshCurvatureResult =
                     *context.LastMeshCurvatureResult;
-                if (!context.LastMeshCurvatureResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastMeshCurvatureResult->Message.empty()
-                            ? "Last mesh curvature command failed."
-                            : context.LastMeshCurvatureResult->Message);
-                }
             }
             if (context.LastMeshRemeshResult != nullptr)
             {
                 model.LastMeshRemeshResult =
                     *context.LastMeshRemeshResult;
-                if (!context.LastMeshRemeshResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastMeshRemeshResult->Message.empty()
-                            ? "Last mesh remesh command failed."
-                            : context.LastMeshRemeshResult->Message);
-                }
             }
             if (context.LastMeshSubdivideResult != nullptr)
             {
                 model.LastMeshSubdivideResult =
                     *context.LastMeshSubdivideResult;
-                if (!context.LastMeshSubdivideResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastMeshSubdivideResult->Message.empty()
-                            ? "Last mesh subdivide command failed."
-                            : context.LastMeshSubdivideResult->Message);
-                }
             }
             if (context.LastMeshSimplifyResult != nullptr)
             {
                 model.LastMeshSimplifyResult =
                     *context.LastMeshSimplifyResult;
-                if (!context.LastMeshSimplifyResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastMeshSimplifyResult->Message.empty()
-                            ? "Last mesh simplify command failed."
-                            : context.LastMeshSimplifyResult->Message);
-                }
             }
             if (context.LastMeshVertexNormalsResult != nullptr)
             {
                 model.LastMeshVertexNormalsResult =
                     *context.LastMeshVertexNormalsResult;
-                if (!context.LastMeshVertexNormalsResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastMeshVertexNormalsResult->Message.empty()
-                            ? "Last mesh vertex-normal command failed."
-                            : context.LastMeshVertexNormalsResult->Message);
-                }
             }
             if (context.LastGraphVertexNormalsResult != nullptr)
             {
                 model.LastGraphVertexNormalsResult =
                     *context.LastGraphVertexNormalsResult;
-                if (!context.LastGraphVertexNormalsResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastGraphVertexNormalsResult->Message.empty()
-                            ? "Last graph vertex-normal command failed."
-                            : context.LastGraphVertexNormalsResult->Message);
-                }
             }
             if (context.LastPointCloudVertexNormalsResult != nullptr)
             {
                 model.LastPointCloudVertexNormalsResult =
                     *context.LastPointCloudVertexNormalsResult;
-                if (!context.LastPointCloudVertexNormalsResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastPointCloudVertexNormalsResult->Message.empty()
-                            ? "Last point-cloud vertex-normal command failed."
-                            : context.LastPointCloudVertexNormalsResult->Message);
-                }
             }
             if (context.LastPointCloudOutlierRemovalResult != nullptr)
             {
                 model.LastPointCloudOutlierRemovalResult =
                     *context.LastPointCloudOutlierRemovalResult;
-                if (!context.LastPointCloudOutlierRemovalResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastPointCloudOutlierRemovalResult->Message.empty()
-                            ? "Last point-cloud outlier-removal command failed."
-                            : context.LastPointCloudOutlierRemovalResult->Message);
-                }
             }
             if (context.LastProgressivePoissonResult != nullptr)
             {
                 model.LastProgressivePoissonResult =
                     *context.LastProgressivePoissonResult;
-                if (!context.LastProgressivePoissonResult->Succeeded())
-                {
-                    AddDiagnostic(
-                        model.Diagnostics,
-                        EditorDiagnosticCode::GeometryProcessingFailed,
-                        context.LastProgressivePoissonResult->Message.empty()
-                            ? "Last progressive-Poisson command failed."
-                            : context.LastProgressivePoissonResult->Message);
-                }
             }
             if (!model.Capabilities.HasAny())
             {

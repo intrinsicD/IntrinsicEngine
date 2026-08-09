@@ -1,0 +1,16 @@
+[check_layering] Scan root: /home/alex/Documents/IntrinsicEngine/src
+[check_layering] Files scanned: 746
+[check_layering] References scanned: 7172 import/include, 84 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+test layout check complete. findings=0 mode=strict
+Validated 253 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 95
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3238
+[check_doc_links] Mode: warning
+[check_doc_links] No broken relative links found.

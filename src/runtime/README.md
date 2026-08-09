@@ -783,6 +783,21 @@ lane they need while preserving mesh, graph, or point-cloud provenance labels.
 
 ### Geometry Presentation Editor Inspector
 
+`BUG-141` fixes the scope of editor geometry-processing diagnostics.
+`EditorGeometryProcessingModel::Diagnostics` carries only diagnostics that are
+true of the whole processing model — no scene, no selection controller, no
+selected entity. An outcome that belongs to one operation stays on that
+operation's `Last<Operation>Result`, which the owning panel renders. The rule
+exists because `BuildEditorDomainWindowModel` folds the shared list into every
+domain window's `Diagnostics`: anything parked there is printed by the
+Denoise, K-Means, and Parameterize (UV) panels too, whether or not it concerns
+them. It also removes a severity error, because `EditorCommandStatus::Pending`
+is not `Succeeded()` and a merely queued job used to be announced under
+`EditorDiagnosticCode::GeometryProcessingFailed`. App panels render the header
+list once, through `DrawDomainWindowHeader`; rendering
+`model.Processing.Diagnostics` alongside it prints every entry twice, since the
+header list is a superset.
+
 `UI-015`, migrated by `RUNTIME-193`, extends
 `Extrinsic.Runtime.VisualizationEditingOperations` with data-only
 geometry-presentation operations; presentation-free copied inspector models
