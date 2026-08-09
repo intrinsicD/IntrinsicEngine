@@ -75,6 +75,25 @@ distinct `(vertex, UV)` pair, carrying positions, normals, and packed colors
 across the split. The ECS mesh is never split to satisfy the vertex buffer; the
 duplication belongs to the upload, not to the authoritative geometry.
 
+### Topology-replacing operations and UVs
+
+An editor operation that replaces a mesh's topology rebuilds the entity's
+halfedge mesh and republishes its property sets wholesale, so a property the
+rebuilt mesh does not carry is **removed**, not left stale. Each such operation
+therefore owes an explicit decision, reported in its result as
+`EditorMeshTexcoordOutcome` and named in its message when UVs are lost:
+
+- **Preserve** when the output's corners have source corners to inherit from.
+  Simplify is the case: a collapse removes corners and the survivors keep their
+  own UVs. Corner attributes are forwarded through the canonical corner walk,
+  because vertex numbering survives the GeometrySources → soup → halfedge round
+  trip but halfedge numbering does not.
+- **Discard, reported** when the output has corners no source UV describes.
+  Remesh and subdivide are those cases; resampling UVs onto a re-tessellated
+  surface is a separate capability, not a side effect of the command.
+
+A silent discard is a defect, not a policy. See `BUG-146`.
+
 CPU-backed visualization recipes use the resolved property's revision as their
 buffer dirty stamp. The graphics residency cache therefore reuses unchanged
 property buffers and reuploads a changed scalar, label, color, vector, or

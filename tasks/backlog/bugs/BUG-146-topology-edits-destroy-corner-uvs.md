@@ -85,35 +85,64 @@ contracts:
   vocabulary and needs no change.
 
 ## Required changes
-- [ ] Decide and document, per topology-replacing operation, whether corner
-      UVs are preserved (simplify: collapse keeps surviving corners),
-      resampled, or explicitly dropped with a reported diagnostic. A silent
-      drop is not an acceptable outcome for any of them.
-- [ ] Forward `h:texcoord` into the scratch halfedge mesh through a real
+- [x] Decide and document, per topology-replacing operation, whether corner
+      UVs are preserved, resampled, or explicitly dropped with a reported
+      diagnostic. The decisions, and what the audit found, are recorded in
+      `## Per-operation audit` below.
+- [x] Forward `h:texcoord` into the scratch halfedge mesh through a real
       per-corner map for the operations that preserve it, reusing
       `BuildMeshSurfaceTriangleCornerTopology` rather than writing a second
-      corner walk.
-- [ ] Report the outcome in the operation result when UVs are dropped or
+      corner walk. The publish half of that mapping moved out of asset
+      materialization into `Runtime::PublishMeshCornerTexcoords`, so both
+      consumers produce the same mapping by construction.
+- [x] Report the outcome in the operation result when UVs are dropped or
       resampled, so a lost parameterization is never silent.
-- [ ] Audit the sibling paths (`remesh`, `subdivide`, UV regeneration) against
+      `EditorMeshTexcoordOutcome` (`None` / `Preserved` / `Discarded`) is on
+      all three topology-replacing results, and a discard also states the loss
+      in the result message, which all three panels already render.
+- [x] Audit the sibling paths (`remesh`, `subdivide`, UV regeneration) against
       the same rule and record the per-operation decision in the task.
 
+## Per-operation audit
+
+| Operation | Decision | State |
+| --- | --- | --- |
+| Simplify | Preserve | Done. A collapse removes corners and the survivors keep their own UVs, which is the correct answer and is what lets `PreserveUvSeams` see a seam at all. |
+| Remesh | Discard, reported | Done. Re-tessellation produces corners with no source UV; resampling onto the new surface is a separate capability, not a side effect of this command. |
+| Subdivide | Discard, reported | Done. Same reason. Loop and Catmull-Clark UV rules exist and would be the eventual answer, but they are new work, not a repair. |
+| UV regeneration | Neither — it is a UV *producer*, and the audit found it broken in a different way | Spun out as [`BUG-147`](BUG-147-uv-regeneration-shatters-mesh-topology.md). |
+
+The UV-regeneration finding is worth stating plainly because it is not the
+defect this task set out to fix. That command builds the published mesh from
+`atlas.OutputMesh` and commits it as the entity mesh — exactly what `BUG-137`
+slice C removed from the import path, at an entry point slice C never touched.
+Probed on a closed icosahedron: 12 V / 30 E / 60 H / 20 F in, 60 V / 60 E /
+120 H / 20 F out, 20 charts for 20 faces, status `Applied`. It does not merely
+drop UVs; it converts the mesh into a triangle soup.
+
 ## Tests
-- [ ] Contract test: simplify a corner-UV mesh through the editor command and
+- [x] Contract test: simplify a corner-UV mesh through the editor command and
       assert `h:texcoord` still exists, is count-matched to the new halfedge
-      count, and is finite. Fails against the current source with the property
-      absent.
-- [ ] Contract test: FA_QEM `SeamVerticesPinned` is non-zero for a corner-UV
-      mesh with a real seam driven through the editor command, mirroring the
-      existing vertex-domain case in `Test.SandboxEditorMeshMethods`.
-- [ ] Contract test for each operation that deliberately drops UVs: the drop
-      is reported, not silent.
-- [ ] Default CPU gate stays green.
+      count, and is finite
+      (`MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit`). Against the
+      unfixed source the property is absent entirely.
+- [x] Contract test: FA_QEM `SeamVerticesPinned` matches an independently
+      derived seam set for a corner-UV mesh with a real interior seam, driven
+      through the editor command (same test). Against the unfixed source it
+      reports 0 against 5 expected.
+- [x] Contract test for each operation that deliberately drops UVs: the drop is
+      reported, not silent
+      (`TopologyOperationsReportWhatTheyDidToTheParameterization`, covering
+      remesh, subdivide, the preserving simplify counterpart, and the no-UV
+      case). Each reported outcome is cross-checked against what the entity
+      actually holds afterwards rather than trusting the field alone.
+- [x] Default CPU gate stays green: 4174/4174 with the expected
+      `GlfwLifecycleLsan` skip.
 
 ## Docs
-- [ ] Record the per-operation corner-UV policy in
+- [x] Record the per-operation corner-UV policy in
       `docs/architecture/property-coherence.md` next to the `BUG-137`
-      resolution order.
+      resolution order ("Topology-replacing operations and UVs").
 
 ## Acceptance criteria
 - [ ] A corner-UV mesh survives simplify with its UVs intact and

@@ -9,6 +9,12 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
+- [`BUG-147` — Editor UV regeneration replaces the mesh with the atlas chart-split mesh](BUG-147-uv-regeneration-shatters-mesh-topology.md):
+  "Regenerate UVs" publishes `ToHalfedgeMesh(atlas.OutputMesh)` as the entity
+  mesh, which is `BUG-137`'s defect at an entry point slice C never touched. A
+  closed icosahedron goes in as 12 V / 30 E / 60 H / 20 F and comes out as
+  60 V / 60 E / 120 H / 20 F — one chart per triangle — with status `Applied`.
+  Found by the `BUG-146` per-operation audit.
 - [`BUG-146` — Topology-changing mesh operations silently destroy corner-domain UVs](BUG-146-topology-edits-destroy-corner-uvs.md):
   simplify rebuilds the entity's halfedge mesh from a triangle soup that never
   carries `h:texcoord`, and `PopulateFromMesh` then publishes the scratch
