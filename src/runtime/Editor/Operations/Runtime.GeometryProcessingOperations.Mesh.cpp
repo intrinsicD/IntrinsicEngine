@@ -834,6 +834,109 @@ struct EditorJobResult { std::string Diagnostic{}; };
             }
         }
 
+        // BUG-138: a topology edit's apply gate has to answer "do the stored
+        // GeometrySources still hold the mesh this job was computed from", and
+        // it has to read the same data on both sides of that question. The gate
+        // used to compare the stored halfedge arrays against the job's
+        // `BeforeMesh`, which is those sources re-derived through a triangle
+        // soup. A soup round-trip reproduces the numbering an import published,
+        // but not the numbering a previous topology edit published, so the
+        // first simplify/subdivide/remesh on an entity applied and every later
+        // one was refused as stale forever. Hashing the stored arrays
+        // themselves is representation-independent and still detects every real
+        // change. Positions are covered separately by the snapshot comparison.
+        [[nodiscard]] bool AppendTopologyValueSignature(
+            std::uint64_t& signature,
+            const Geometry::PropertySet* properties,
+            const std::size_t deletedCount,
+            const std::uint64_t domainTag,
+            const std::span<const std::string_view> propertyNames)
+        {
+            MixSignature(signature, domainTag);
+            if (properties == nullptr)
+                return false;
+
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(properties->Size()));
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(deletedCount));
+            for (const std::string_view name : propertyNames)
+            {
+                const auto values = properties->Get<std::uint32_t>(name);
+                if (!values)
+                    return false;
+                MixSignatureString(signature, name);
+                MixSignature(
+                    signature,
+                    static_cast<std::uint64_t>(values.Vector().size()));
+                for (const std::uint32_t value : values.Vector())
+                    MixSignature(signature, static_cast<std::uint64_t>(value));
+            }
+            return true;
+        }
+
+        // `std::nullopt` means the stored topology could not be read at all, so
+        // no two readings may be treated as equal.
+        [[nodiscard]] std::optional<std::uint64_t> MeshTopologyValueSignature(
+            const GS::ConstSourceView& view)
+        {
+            static constexpr std::array<std::string_view, 2> kEdgeNames{
+                GS::PropertyNames::kEdgeV0,
+                GS::PropertyNames::kEdgeV1,
+            };
+            static constexpr std::array<std::string_view, 3> kHalfedgeNames{
+                GS::PropertyNames::kHalfedgeToVertex,
+                GS::PropertyNames::kHalfedgeNext,
+                GS::PropertyNames::kHalfedgeFace,
+            };
+            static constexpr std::array<std::string_view, 1> kFaceNames{
+                GS::PropertyNames::kFaceHalfedge,
+            };
+
+            std::uint64_t signature = kEditorSignatureOffset;
+            if (!AppendTopologyValueSignature(
+                    signature,
+                    view.EdgeSource != nullptr ? &view.EdgeSource->Properties
+                                               : nullptr,
+                    view.EdgeSource != nullptr ? view.EdgeSource->NumDeleted
+                                               : 0u,
+                    1u,
+                    kEdgeNames) ||
+                !AppendTopologyValueSignature(
+                    signature,
+                    view.HalfedgeSource != nullptr
+                        ? &view.HalfedgeSource->Properties
+                        : nullptr,
+                    0u,
+                    2u,
+                    kHalfedgeNames) ||
+                !AppendTopologyValueSignature(
+                    signature,
+                    view.FaceSource != nullptr ? &view.FaceSource->Properties
+                                               : nullptr,
+                    view.FaceSource != nullptr ? view.FaceSource->NumDeleted
+                                               : 0u,
+                    3u,
+                    kFaceNames))
+            {
+                return std::nullopt;
+            }
+            return signature;
+        }
+
+        [[nodiscard]] std::optional<std::uint64_t>
+        StoredMeshTopologySignatureForEntity(
+            entt::registry& raw,
+            const std::uint32_t stableEntityId)
+        {
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return std::nullopt;
+            return MeshTopologyValueSignature(
+                GS::BuildConstView(raw, *entity));
+        }
+
         [[nodiscard]] std::uint64_t GeometryMetadataSignatureForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity)
@@ -2466,10 +2569,30 @@ struct EditorJobResult { std::string Diagnostic{}; };
         struct MeshTopologyMutationGeneration
         {
             std::uint64_t GeometryMetadataSignature{0u};
+            // `std::nullopt` means the stored topology could not be read, which
+            // no later reading may match. See `MeshTopologyValueSignature`.
+            std::optional<std::uint64_t> TopologySignature{};
             MeshTopologySnapshot Mesh{};
         };
 
-        [[nodiscard]] bool SameMeshTopologyState(
+        [[nodiscard]] bool SameStoredMeshTopology(
+            const GS::ConstSourceView& view,
+            const std::optional<std::uint64_t>& expected)
+        {
+            const std::optional<std::uint64_t> current =
+                MeshTopologyValueSignature(view);
+            return current.has_value() && expected.has_value() &&
+                   *current == *expected;
+        }
+
+        // Vertex-slot state of the stored mesh, compared against the
+        // halfedge mesh a job or history entry captured. Vertex numbering
+        // survives the GeometrySources -> triangle-soup -> halfedge round-trip
+        // that produces those captures, so this half of the old
+        // `SameMeshTopologyState` is representation-faithful. Its edge,
+        // halfedge, and face half was not, and now goes through
+        // `MeshTopologyValueSignature` instead (BUG-138).
+        [[nodiscard]] bool SameMeshVertexState(
             const GS::ConstSourceView& view,
             const Geometry::HalfedgeMesh::Mesh& mesh) noexcept
         {
@@ -2478,12 +2601,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 view.HalfedgeSource == nullptr ||
                 view.FaceSource == nullptr ||
                 view.VertexSource->Properties.Size() != mesh.VerticesSize() ||
-                view.EdgeSource->Properties.Size() != mesh.EdgesSize() ||
-                view.HalfedgeSource->Properties.Size() != mesh.HalfedgesSize() ||
-                view.FaceSource->Properties.Size() != mesh.FacesSize() ||
-                view.VertexSource->NumDeleted != mesh.DeletedVertexCount() ||
-                view.EdgeSource->NumDeleted != mesh.DeletedEdgeCount() ||
-                view.FaceSource->NumDeleted != mesh.DeletedFaceCount())
+                view.VertexSource->NumDeleted != mesh.DeletedVertexCount())
             {
                 return false;
             }
@@ -2491,45 +2609,13 @@ struct EditorJobResult { std::string Diagnostic{}; };
             const auto positions =
                 view.VertexSource->Properties.Get<glm::vec3>(
                     GS::PropertyNames::kPosition);
-            const auto edgeV0 =
-                view.EdgeSource->Properties.Get<std::uint32_t>(
-                    GS::PropertyNames::kEdgeV0);
-            const auto edgeV1 =
-                view.EdgeSource->Properties.Get<std::uint32_t>(
-                    GS::PropertyNames::kEdgeV1);
-            const auto halfedgeTo =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                    GS::PropertyNames::kHalfedgeToVertex);
-            const auto halfedgeNext =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                    GS::PropertyNames::kHalfedgeNext);
-            const auto halfedgeFace =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                    GS::PropertyNames::kHalfedgeFace);
-            const auto faceHalfedge =
-                view.FaceSource->Properties.Get<std::uint32_t>(
-                    GS::PropertyNames::kFaceHalfedge);
-            if (!positions || !edgeV0 || !edgeV1 || !halfedgeTo ||
-                !halfedgeNext || !halfedgeFace || !faceHalfedge)
-            {
+            if (!positions)
                 return false;
-            }
+
             if (!SameKnownPropertyValues(
                     Geometry::ConstPropertySet(
                         view.VertexSource->Properties),
-                    mesh.VertexProperties()) ||
-                !SameKnownPropertyValues(
-                    Geometry::ConstPropertySet(
-                        view.EdgeSource->Properties),
-                    mesh.EdgeProperties()) ||
-                !SameKnownPropertyValues(
-                    Geometry::ConstPropertySet(
-                        view.HalfedgeSource->Properties),
-                    mesh.HalfedgeProperties()) ||
-                !SameKnownPropertyValues(
-                    Geometry::ConstPropertySet(
-                        view.FaceSource->Properties),
-                    mesh.FaceProperties()))
+                    mesh.VertexProperties()))
             {
                 return false;
             }
@@ -2546,58 +2632,6 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 {
                     return false;
                 }
-            }
-
-            for (std::size_t i = 0u; i < mesh.EdgesSize(); ++i)
-            {
-                const Geometry::HalfedgeHandle halfedge =
-                    mesh.Halfedge(
-                        Geometry::EdgeHandle{
-                            static_cast<Geometry::PropertyIndex>(i)},
-                        0u);
-                if (edgeV0.Vector()[i] !=
-                        static_cast<std::uint32_t>(
-                            mesh.FromVertex(halfedge).Index) ||
-                    edgeV1.Vector()[i] !=
-                        static_cast<std::uint32_t>(
-                            mesh.ToVertex(halfedge).Index))
-                {
-                    return false;
-                }
-            }
-
-            for (std::size_t i = 0u; i < mesh.HalfedgesSize(); ++i)
-            {
-                const Geometry::HalfedgeHandle halfedge{
-                    static_cast<Geometry::PropertyIndex>(i)};
-                const Geometry::FaceHandle face = mesh.Face(halfedge);
-                const std::uint32_t expectedFace =
-                    face.IsValid()
-                        ? static_cast<std::uint32_t>(face.Index)
-                        : std::numeric_limits<std::uint32_t>::max();
-                if (halfedgeTo.Vector()[i] !=
-                        static_cast<std::uint32_t>(
-                            mesh.ToVertex(halfedge).Index) ||
-                    halfedgeNext.Vector()[i] !=
-                        static_cast<std::uint32_t>(
-                            mesh.NextHalfedge(halfedge).Index) ||
-                    halfedgeFace.Vector()[i] != expectedFace)
-                {
-                    return false;
-                }
-            }
-
-            for (std::size_t i = 0u; i < mesh.FacesSize(); ++i)
-            {
-                const Geometry::HalfedgeHandle halfedge =
-                    mesh.Halfedge(Geometry::FaceHandle{
-                        static_cast<Geometry::PropertyIndex>(i)});
-                const std::uint32_t expectedHalfedge =
-                    halfedge.IsValid()
-                        ? static_cast<std::uint32_t>(halfedge.Index)
-                        : std::numeric_limits<std::uint32_t>::max();
-                if (faceHalfedge.Vector()[i] != expectedHalfedge)
-                    return false;
             }
             return true;
         }
@@ -2638,6 +2672,17 @@ struct EditorJobResult { std::string Diagnostic{}; };
 
             if (context.CommandHistory != nullptr)
             {
+                // Read the stored topology before the apply rewrites it: this
+                // is the "what we expect to still be there" side of the first
+                // undo transition, and it has to come from the sources rather
+                // than from `before`, which is a re-derivation of them
+                // (BUG-138).
+                const std::optional<std::uint64_t> beforeTopology =
+                    context.Scene != nullptr
+                        ? StoredMeshTopologySignatureForEntity(
+                              context.Scene->Raw(),
+                              stableEntityId)
+                        : std::nullopt;
                 const MeshTopologySnapshot beforeState =
                     std::make_shared<Geometry::HalfedgeMesh::Mesh>(
                         std::move(before));
@@ -2656,6 +2701,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                         MeshTopologyMutationGeneration{
                             .GeometryMetadataSignature =
                                 expectedGeometryMetadataSignature,
+                            .TopologySignature = beforeTopology,
                             .Mesh = beforeState,
                         },
                         beforeState,
@@ -2699,7 +2745,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
                                     raw,
                                     *entity) !=
                                     expected.GeometryMetadataSignature ||
-                                !SameMeshTopologyState(view, *expected.Mesh))
+                                !SameMeshVertexState(view, *expected.Mesh) ||
+                                !SameStoredMeshTopology(
+                                    view,
+                                    expected.TopologySignature))
                             {
                                 return EditorCommandHistoryStatus::StaleEntity;
                             }
@@ -2738,6 +2787,16 @@ struct EditorJobResult { std::string Diagnostic{}; };
                                               raw,
                                               *entity)
                                         : 0u,
+                                // Re-read from the sources the apply just
+                                // wrote, so the next undo/redo transition
+                                // compares against the numbering that is
+                                // actually stored rather than a re-derivation
+                                // of it (BUG-138).
+                                .TopologySignature =
+                                    entity.has_value()
+                                        ? MeshTopologyValueSignature(
+                                              GS::BuildConstView(raw, *entity))
+                                        : std::nullopt,
                                 .Mesh = target,
                             };
                         });
@@ -5072,6 +5131,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
             std::uint64_t GeometryMetadataSignature{0u};
             std::vector<glm::vec3> SnapshotPositions{};
             std::vector<bool> DeletedVertices{};
+            // Stored-topology fingerprint taken at submit. `std::nullopt` means
+            // the topology could not be read, which no later reading may match.
+            // See `MeshTopologyValueSignature` (BUG-138).
+            std::optional<std::uint64_t> TopologySignature{};
             Geometry::HalfedgeMesh::Mesh BeforeMesh{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             MeshCurvaturePropertyState CurvatureBefore{};
@@ -5157,12 +5220,18 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return JobApplyValidation::StaleGeneration;
             }
 
-            if ((job.Kind == EditorMeshCpuJobKind::Remesh ||
-                 job.Kind == EditorMeshCpuJobKind::Subdivide ||
-                 job.Kind == EditorMeshCpuJobKind::Simplify) &&
-                !SameMeshTopologyState(view, job.BeforeMesh))
+            if (job.Kind == EditorMeshCpuJobKind::Remesh ||
+                job.Kind == EditorMeshCpuJobKind::Subdivide ||
+                job.Kind == EditorMeshCpuJobKind::Simplify)
             {
-                return JobApplyValidation::StaleGeneration;
+                const std::optional<std::uint64_t> current =
+                    MeshTopologyValueSignature(view);
+                if (!current.has_value() ||
+                    !job.TopologySignature.has_value() ||
+                    *current != *job.TopologySignature)
+                {
+                    return JobApplyValidation::StaleGeneration;
+                }
             }
 
             if (job.Kind == EditorMeshCpuJobKind::Curvature)
@@ -6207,6 +6276,15 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
             state->BeforeMesh = source.Mesh;
+            // BUG-138: the apply gate must compare the stored topology
+            // against the stored topology, so fingerprint it here rather than
+            // re-deriving it from `BeforeMesh` later.
+            state->TopologySignature =
+                context.Scene != nullptr
+                    ? StoredMeshTopologySignatureForEntity(
+                          context.Scene->Raw(),
+                          command.StableEntityId)
+                    : std::nullopt;
             state->Mesh = std::move(source.Mesh);
             state->RemeshCommand = command;
             state->RemeshResult = MakeMeshRemeshBaseResult(command);
@@ -6261,6 +6339,15 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
             state->BeforeMesh = source.Mesh;
+            // BUG-138: the apply gate must compare the stored topology
+            // against the stored topology, so fingerprint it here rather than
+            // re-deriving it from `BeforeMesh` later.
+            state->TopologySignature =
+                context.Scene != nullptr
+                    ? StoredMeshTopologySignatureForEntity(
+                          context.Scene->Raw(),
+                          command.StableEntityId)
+                    : std::nullopt;
             state->Mesh = std::move(source.Mesh);
             state->SubdivideCommand = command;
             state->SubdivideResult = MakeMeshSubdivideBaseResult(command);
@@ -6318,6 +6405,15 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
             state->BeforeMesh = source.Mesh;
+            // BUG-138: the apply gate must compare the stored topology
+            // against the stored topology, so fingerprint it here rather than
+            // re-deriving it from `BeforeMesh` later.
+            state->TopologySignature =
+                context.Scene != nullptr
+                    ? StoredMeshTopologySignatureForEntity(
+                          context.Scene->Raw(),
+                          command.StableEntityId)
+                    : std::nullopt;
             state->Mesh = std::move(source.Mesh);
             state->SimplifyCommand = command;
             state->SimplifyResult = MakeMeshSimplifyBaseResult(command);

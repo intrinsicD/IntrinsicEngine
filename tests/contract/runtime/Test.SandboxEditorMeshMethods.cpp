@@ -2690,6 +2690,158 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces,
               completedResult->OutputFaceCount);
 }
+
+// BUG-138: the first topology edit on an entity succeeds and every later one is
+// refused as stale, forever. The live session showed simplify applying once on a
+// freshly imported mesh and then reporting "the mesh changed after the job was
+// queued" on every subsequent attempt, with denoise — which runs the same
+// staleness checks minus the topology comparison — still applying on the same
+// entity. Nothing mutates the entity between the two attempts here, so a refusal
+// is the apply gate misreading a re-derived halfedge numbering as a change.
+TEST(SandboxEditorUi, MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    std::optional<Runtime::EditorMeshSimplifyResult> completedResult{};
+    context.MethodResultSinks.MeshSimplify =
+        [&completedResult](Runtime::EditorMeshSimplifyResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "TwiceSimplified");
+    AddIcosahedronMeshSource(registry, mesh);
+    const MeshCounts before = SourceMeshCounts(registry, mesh);
+    ASSERT_GT(before.Faces, 16u);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const auto simplifyTo = [&](const std::size_t targetFaces)
+    {
+        completedResult.reset();
+        const Runtime::EditorMeshSimplifyResult submitted =
+            Runtime::ApplyEditorMeshSimplifyCommand(
+                context,
+                Runtime::EditorMeshSimplifyCommand{
+                    .StableEntityId = stableId,
+                    .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
+                    .TargetFaces = targetFaces,
+                    .PreserveBoundary = false,
+                });
+        EXPECT_EQ(submitted.Status, Runtime::EditorCommandStatus::Pending);
+        return jobs.DrainUntilTerminal();
+    };
+
+    ASSERT_TRUE(simplifyTo(16u));
+    ASSERT_TRUE(completedResult.has_value());
+    ASSERT_TRUE(completedResult->Succeeded()) << completedResult->Message;
+    const MeshCounts afterFirst = SourceMeshCounts(registry, mesh);
+    ASSERT_LT(afterFirst.Faces, before.Faces);
+
+    // The sources now carry the halfedge numbering the first edit published
+    // rather than the one an import produced. That is a different
+    // representation of an unchanged mesh, not a change, and the second edit
+    // must still apply.
+    ASSERT_TRUE(simplifyTo(8u));
+    ASSERT_TRUE(completedResult.has_value());
+    const std::string secondReport =
+        std::string{Runtime::DebugNameForEditorCommandStatus(
+            completedResult->Status)} +
+        ": " + completedResult->Message;
+    EXPECT_TRUE(completedResult->Succeeded()) << secondReport;
+    EXPECT_EQ(completedResult->InputFaceCount, afterFirst.Faces)
+        << secondReport;
+    EXPECT_LT(completedResult->OutputFaceCount, afterFirst.Faces)
+        << secondReport;
+    EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces,
+              completedResult->OutputFaceCount)
+        << secondReport;
+}
+
+// BUG-138: subdivide and remesh share the apply gate simplify exposed, so a
+// topology edit published by any of them must not poison the other two.
+TEST(SandboxEditorUi, MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    std::optional<Runtime::EditorMeshSimplifyResult> simplified{};
+    std::optional<Runtime::EditorMeshSubdivideResult> subdivided{};
+    std::optional<Runtime::EditorMeshRemeshResult> remeshed{};
+    context.MethodResultSinks.MeshSimplify =
+        [&simplified](Runtime::EditorMeshSimplifyResult result)
+        {
+            simplified = std::move(result);
+        };
+    context.MethodResultSinks.MeshSubdivide =
+        [&subdivided](Runtime::EditorMeshSubdivideResult result)
+        {
+            subdivided = std::move(result);
+        };
+    context.MethodResultSinks.MeshRemesh =
+        [&remeshed](Runtime::EditorMeshRemeshResult result)
+        {
+            remeshed = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "EditedThenSubdivided");
+    AddIcosahedronMeshSource(registry, mesh);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    ASSERT_EQ(Runtime::ApplyEditorMeshSimplifyCommand(
+                  context,
+                  Runtime::EditorMeshSimplifyCommand{
+                      .StableEntityId = stableId,
+                      .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
+                      .TargetFaces = 16u,
+                      .PreserveBoundary = false,
+                  })
+                  .Status,
+              Runtime::EditorCommandStatus::Pending);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(simplified.has_value());
+    ASSERT_TRUE(simplified->Succeeded()) << simplified->Message;
+    const MeshCounts afterSimplify = SourceMeshCounts(registry, mesh);
+
+    ASSERT_EQ(Runtime::ApplyEditorMeshSubdivideCommand(
+                  context,
+                  Runtime::EditorMeshSubdivideCommand{
+                      .StableEntityId = stableId,
+                      .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
+                      .Iterations = 1u,
+                  })
+                  .Status,
+              Runtime::EditorCommandStatus::Pending);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(subdivided.has_value());
+    EXPECT_TRUE(subdivided->Succeeded()) << subdivided->Message;
+    const MeshCounts afterSubdivide = SourceMeshCounts(registry, mesh);
+    EXPECT_GT(afterSubdivide.Faces, afterSimplify.Faces);
+
+    ASSERT_EQ(Runtime::ApplyEditorMeshRemeshCommand(
+                  context,
+                  Runtime::EditorMeshRemeshCommand{
+                      .StableEntityId = stableId,
+                      .Mode = Runtime::EditorMeshRemeshMode::Uniform,
+                      .Iterations = 1u,
+                  })
+                  .Status,
+              Runtime::EditorCommandStatus::Pending);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(remeshed.has_value());
+    EXPECT_TRUE(remeshed->Succeeded()) << remeshed->Message;
+}
+
 // BUG-138: a queued mesh job that terminates without publishing must still
 // deliver one terminal result. Before this, the discard was silent: the panel
 // kept the "…CPU job queued" text it was handed at submit time, so an

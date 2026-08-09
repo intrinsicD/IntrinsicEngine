@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "ctest --test-dir build/ci --output-on-failure -R 'ImGuiAdapter|EditorInputCapture|SandboxEditor' --timeout 120"
+  ],
+  "command_display": "bash -lc 'ctest --test-dir build/ci --output-on-failure -R '\"'\"'ImGuiAdapter|EditorInputCapture|SandboxEditor'\"'\"' --timeout 120'",
+  "cwd": ".",
+  "duration_ms": 4996,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T01:24:34Z",
+  "label": "imgui-adapter-suites",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T01:24:29Z",
+  "stderr_path": "tasks/evidence/BUG-139/commands/imgui-adapter-suites.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-139/commands/imgui-adapter-suites.stdout.log",
+  "stdout_sha256": "43bc76484a04a3c566b9d4f41b16dc90e1f7d42c0edd9fd048dab914fb8ead95",
+  "task_id": "BUG-139"
+}

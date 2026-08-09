@@ -8,6 +8,54 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-138`](BUG-138-async-mesh-geometry-jobs-never-execute.md) — queued mesh
+simplify, subdivide, and remesh jobs run, publish, and change the selected mesh
+again. They were never failing to dispatch: the worker ran and the apply gate
+threw the result away. `ValidateMeshCpuJobApply` gated the three topology kinds
+on `SameMeshTopologyState`, which compared the halfedge/edge/face index arrays
+stored in GeometrySources against `job.BeforeMesh` — those same sources
+re-derived through a triangle soup at submit time. An import writes the sources
+from exactly such a conversion, so the first topology edit on a freshly imported
+entity passed and applied; that edit then published its own numbering through
+`GS::PopulateFromMesh`, and every later edit compared a soup re-derivation
+against a post-edit numbering and returned `StaleGeneration`. The mesh had not
+changed, only its representation. Curvature and denoise skip that comparison,
+which is exactly the three-and-two operation split the report described, and the
+live session confirmed it by applying denoise on the entity where simplify was
+refused. Slice A's terminal-result finalizer (2026-08-08) is what made the
+diagnosis cheap: it replaced a permanent "…CPU job queued" with the named
+refusal. The gate now fingerprints the stored topology arrays at submit and
+recomputes that fingerprint at apply (`MeshTopologyValueSignature`), so both
+sides read the same data; the vertex half of the old comparison survives as
+`SameMeshVertexState` because vertex numbering does survive the round-trip, and
+the command-history generation carries and restamps the same fingerprint so undo
+and redo are not exposed to the mismatch either.
+`MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit` and
+`MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify` fail against the unfixed
+source with the live session's exact wording and pass with it. Proven
+`Operational` on 2026-08-09 by a live `ci-vulkan` session with the promoted
+Vulkan device: one imported `tests/data/sculpt.obj` taken through five
+consecutive topology edits — simplify 7342 → 4000 → 2000 → 1000, Loop subdivide
+back to 4000, then a uniform remesh — every one `Applied`. Default CPU gate
+4148/4148 with the expected GLFW/LSan skip.
+
+[`BUG-139`](BUG-139-imgui-adapter-drops-key-events.md) — editor text fields are
+editable. The engine-owned `ImGuiAdapter::PumpEvents` key translation and the
+removal of the unreachable `ImGui_ImplGlfw_*Callback` forwards landed on
+2026-08-08 with adapter contract coverage; what this retirement adds is the live
+confirmation the task's `## Maturity` section required and that session could
+not produce. Driven on 2026-08-09 against the `ci-vulkan` build with the
+promoted Vulkan device, on a nested `Xephyr` display because the host seat was
+locked and the lock screen holds the real seat's input grab. In `File / Import`'s
+`Path` field, every keystroke delivered as a real X key event through the GLFW
+backend: `tests/data/sculpt.objXX` typed, then corrected to
+`tests/data/sculpt.obj` with two Backspaces — the exact proof the Maturity
+section names — followed by `Home`+`Delete`, `End`+`Left`+`Delete`, `Ctrl+A`,
+`Ctrl+X`, `Ctrl+V`, and `Ctrl+Z`, each producing the expected buffer. The
+`Ctrl+V` restore also exercises the clipboard round-trip the report called
+unreachable. The same field then took a full absolute path and imported the
+mesh.
+
 [`BUG-143`](BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md) — the
 corner-UV seam-split readback smoke is restored and back inside the cohort's
 30 s budget. Its 13 s ↔ 34 s wall-clock variance was never in the test's own

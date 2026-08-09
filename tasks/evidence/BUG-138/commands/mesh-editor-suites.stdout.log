@@ -1,0 +1,1508 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+        Start  282: ECSGeometrySourcesPopulate.PopulateFromMeshEmplacesAllFourDomains
+  1/742 Test  #282: ECSGeometrySourcesPopulate.PopulateFromMeshEmplacesAllFourDomains ...............................................   Passed    0.00 sec
+        Start  283: ECSGeometrySourcesPopulate.PopulateFromMeshWritesCanonicalKeysAndPositions
+  2/742 Test  #283: ECSGeometrySourcesPopulate.PopulateFromMeshWritesCanonicalKeysAndPositions ......................................   Passed    0.00 sec
+        Start  284: ECSGeometrySourcesPopulate.PopulateFromMeshAliveCountsMatchSourceMesh
+  3/742 Test  #284: ECSGeometrySourcesPopulate.PopulateFromMeshAliveCountsMatchSourceMesh ...........................................   Passed    0.00 sec
+        Start  285: ECSGeometrySourcesPopulate.PopulateFromMeshCopiesUserDefinedVertexProperty
+  4/742 Test  #285: ECSGeometrySourcesPopulate.PopulateFromMeshCopiesUserDefinedVertexProperty ......................................   Passed    0.00 sec
+        Start  286: ECSGeometrySourcesPopulate.PopulateFromMeshYieldsMeshDomain
+  5/742 Test  #286: ECSGeometrySourcesPopulate.PopulateFromMeshYieldsMeshDomain .....................................................   Passed    0.00 sec
+        Start  287: ECSGeometrySourcesPopulate.MeshAvailabilitySeparatesProvenanceFromSourceCapabilities
+  6/742 Test  #287: ECSGeometrySourcesPopulate.MeshAvailabilitySeparatesProvenanceFromSourceCapabilities ............................   Passed    0.00 sec
+        Start  293: ECSGeometrySourcesPopulate.GraphAndMeshSharePhysicalSourcesButKeepProvenance
+  7/742 Test  #293: ECSGeometrySourcesPopulate.GraphAndMeshSharePhysicalSourcesButKeepProvenance ....................................   Passed    0.00 sec
+        Start  299: ECSGeometrySourcesPopulate.PartialMeshMarkedEntityKeepsMeshProvenanceWithoutMissingSources
+  8/742 Test  #299: ECSGeometrySourcesPopulate.PartialMeshMarkedEntityKeepsMeshProvenanceWithoutMissingSources ......................   Passed    0.00 sec
+        Start  300: ECSGeometrySourcesPopulate.ECSComponentSurvivesSourceMeshDestruction
+  9/742 Test  #300: ECSGeometrySourcesPopulate.ECSComponentSurvivesSourceMeshDestruction ............................................   Passed    0.00 sec
+        Start  301: ECSGeometrySourcesPopulate.MeshToCloudRePopulationDropsMeshTopology
+ 10/742 Test  #301: ECSGeometrySourcesPopulate.MeshToCloudRePopulationDropsMeshTopology .............................................   Passed    0.00 sec
+        Start  303: ECSGeometrySourcesPopulate.MeshToGraphRePopulationReplacesSharedSources
+ 11/742 Test  #303: ECSGeometrySourcesPopulate.MeshToGraphRePopulationReplacesSharedSources .........................................   Passed    0.00 sec
+        Start  304: ECSGeometrySourcesPopulate.CloudToMeshRePopulationProducesMeshDomain
+ 12/742 Test  #304: ECSGeometrySourcesPopulate.CloudToMeshRePopulationProducesMeshDomain ............................................   Passed    0.00 sec
+        Start  351: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid
+ 13/742 Test  #351: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid ..............................   Passed    0.08 sec
+        Start  360: RuntimeAssetImportFormatCoverage.ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities
+ 14/742 Test  #360: RuntimeAssetImportFormatCoverage.ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities ................   Passed    0.04 sec
+        Start  389: RuntimeAsyncWorkModule.PublishesBorrowedJobServiceAndCanReinitialize
+ 15/742 Test  #389: RuntimeAsyncWorkModule.PublishesBorrowedJobServiceAndCanReinitialize ............................................   Passed    0.00 sec
+        Start  392: RuntimeAsyncWorkModule.ShutdownCancelsParkedJobServiceSurvivor
+ 16/742 Test  #392: RuntimeAsyncWorkModule.ShutdownCancelsParkedJobServiceSurvivor ..................................................   Passed    0.01 sec
+        Start  393: EditorCommandHistory.ExecuteRecordUndoRedoCapacityAndDirtyState
+ 17/742 Test  #393: EditorCommandHistory.ExecuteRecordUndoRedoCapacityAndDirtyState .................................................   Passed    0.00 sec
+        Start  394: EditorCommandHistory.UndoableEntityMutationRevalidatesAndTracksGenerationsAcrossUndoRedo
+ 18/742 Test  #394: EditorCommandHistory.UndoableEntityMutationRevalidatesAndTracksGenerationsAcrossUndoRedo ........................   Passed    0.00 sec
+        Start  395: EditorCommandHistory.UndoableEntityMutationRecordsAlreadyAppliedTargetWithoutRepublishing
+ 19/742 Test  #395: EditorCommandHistory.UndoableEntityMutationRecordsAlreadyAppliedTargetWithoutRepublishing .......................   Passed    0.00 sec
+        Start  396: EditorCommandHistory.UndoableEntityMutationRejectsStaleIdentityWithoutMutationOrHistory
+ 20/742 Test  #396: EditorCommandHistory.UndoableEntityMutationRejectsStaleIdentityWithoutMutationOrHistory .........................   Passed    0.00 sec
+        Start  397: EditorCommandHistory.UndoableEntityMutationRejectsStaleGenerationWithoutMutationOrHistory
+ 21/742 Test  #397: EditorCommandHistory.UndoableEntityMutationRejectsStaleGenerationWithoutMutationOrHistory .......................   Passed    0.00 sec
+        Start  398: EditorCommandHistory.UndoableEntityMutationValidationFailurePublishesNoMutationOrHistory
+ 22/742 Test  #398: EditorCommandHistory.UndoableEntityMutationValidationFailurePublishesNoMutationOrHistory ........................   Passed    0.00 sec
+        Start  399: EditorCommandHistory.UndoableEntityMutationApplyFailurePublishesNoPartialStateOrHistory
+ 23/742 Test  #399: EditorCommandHistory.UndoableEntityMutationApplyFailurePublishesNoPartialStateOrHistory .........................   Passed    0.00 sec
+        Start  400: EditorCommandHistory.SelectionAdapterRestoresSingleSelectionWithoutDirtyingDocument
+ 24/742 Test  #400: EditorCommandHistory.SelectionAdapterRestoresSingleSelectionWithoutDirtyingDocument .............................   Passed    0.00 sec
+        Start  401: EditorCommandHistory.CompoundCommandRollsBackAppliedCommandsOnFailure
+ 25/742 Test  #401: EditorCommandHistory.CompoundCommandRollsBackAppliedCommandsOnFailure ...........................................   Passed    0.00 sec
+        Start  402: EditorCommandHistory.HierarchyDeletePlanDefinesRecursiveDeleteAndOrphanPolicies
+ 26/742 Test  #402: EditorCommandHistory.HierarchyDeletePlanDefinesRecursiveDeleteAndOrphanPolicies .................................   Passed    0.00 sec
+        Start  403: EditorCommandHistory.CorruptHierarchyDeletePlanFailsWithoutPartialMutation
+ 27/742 Test  #403: EditorCommandHistory.CorruptHierarchyDeletePlanFailsWithoutPartialMutation ......................................   Passed    0.00 sec
+        Start  449: MeshGeometryExtraction.SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
+ 28/742 Test  #449: MeshGeometryExtraction.SingleMeshEntityUploadsOnceAndBindsInstanceGeometry ......................................   Passed    0.06 sec
+        Start  450: MeshGeometryExtraction.MaterialTextureBindingsResolveOntoExtractionMaterialSidecar
+ 29/742 Test  #450: MeshGeometryExtraction.MaterialTextureBindingsResolveOntoExtractionMaterialSidecar ..............................   Passed    0.03 sec
+        Start  451: MeshGeometryExtraction.GeometryPresentationRecipeIsConsumedDuringExtraction
+ 30/742 Test  #451: MeshGeometryExtraction.GeometryPresentationRecipeIsConsumedDuringExtraction .....................................   Passed    0.03 sec
+        Start  452: MeshGeometryExtraction.GeneratedGeometryPresentationTexturesBindUniqueMaterialSlots
+ 31/742 Test  #452: MeshGeometryExtraction.GeneratedGeometryPresentationTexturesBindUniqueMaterialSlots .............................   Passed    0.03 sec
+        Start  453: MeshGeometryExtraction.RepeatedExtractionReusesMeshHandleWithoutReupload
+ 32/742 Test  #453: MeshGeometryExtraction.RepeatedExtractionReusesMeshHandleWithoutReupload ........................................   Passed    0.06 sec
+        Start  454: MeshGeometryExtraction.PropertyRevisionUpdatesResidentPositionsWithoutDirtyTag
+ 33/742 Test  #454: MeshGeometryExtraction.PropertyRevisionUpdatesResidentPositionsWithoutDirtyTag ..................................   Passed    0.06 sec
+        Start  455: MeshGeometryExtraction.TwoMeshEntitiesAllocateIndependentMeshUploads
+ 34/742 Test  #455: MeshGeometryExtraction.TwoMeshEntitiesAllocateIndependentMeshUploads ............................................   Passed    0.06 sec
+        Start  456: MeshGeometryExtraction.EntityDestructionRetiresMeshGeometryAfterDeferredWindow
+ 35/742 Test  #456: MeshGeometryExtraction.EntityDestructionRetiresMeshGeometryAfterDeferredWindow ..................................   Passed    0.06 sec
+        Start  457: MeshGeometryExtraction.ShutdownReleasesPendingMeshResidency
+ 36/742 Test  #457: MeshGeometryExtraction.ShutdownReleasesPendingMeshResidency .....................................................   Passed    0.06 sec
+        Start  458: MeshGeometryExtraction.ProceduralRefPreemptsMeshPathOnSameEntity
+ 37/742 Test  #458: MeshGeometryExtraction.ProceduralRefPreemptsMeshPathOnSameEntity ................................................   Passed    0.06 sec
+        Start  459: MeshGeometryExtraction.AssetSourcePresentPreemptsMeshPathOnSameEntity
+ 38/742 Test  #459: MeshGeometryExtraction.AssetSourcePresentPreemptsMeshPathOnSameEntity ...........................................   Passed    0.06 sec
+        Start  460: MeshGeometryExtraction.MissingPositionsIncrementsMissingPositionsCounter
+ 39/742 Test  #460: MeshGeometryExtraction.MissingPositionsIncrementsMissingPositionsCounter ........................................   Passed    0.05 sec
+        Start  461: MeshGeometryExtraction.MissingTexcoordsUploadsWithDefaultUvFallback
+ 40/742 Test  #461: MeshGeometryExtraction.MissingTexcoordsUploadsWithDefaultUvFallback .............................................   Passed    0.06 sec
+        Start  462: MeshGeometryExtraction.NonFiniteTexcoordsUploadWithDefaultUvFallback
+ 41/742 Test  #462: MeshGeometryExtraction.NonFiniteTexcoordsUploadWithDefaultUvFallback ............................................   Passed    0.07 sec
+        Start  463: MeshGeometryExtraction.InvalidTopologyIncrementsInvalidTopologyCounter
+ 42/742 Test  #463: MeshGeometryExtraction.InvalidTopologyIncrementsInvalidTopologyCounter ..........................................   Passed    0.06 sec
+        Start  464: MeshGeometryExtraction.DegenerateAllFacesIncrementsFailedPackCounter
+ 43/742 Test  #464: MeshGeometryExtraction.DegenerateAllFacesIncrementsFailedPackCounter ............................................   Passed    0.06 sec
+        Start  465: MeshGeometryExtraction.AddingProceduralRefAfterMeshUploadReleasesMeshResidency
+ 44/742 Test  #465: MeshGeometryExtraction.AddingProceduralRefAfterMeshUploadReleasesMeshResidency ..................................   Passed    0.06 sec
+        Start  466: MeshGeometryExtraction.AddingAssetSourceAfterMeshUploadReleasesMeshResidency
+ 45/742 Test  #466: MeshGeometryExtraction.AddingAssetSourceAfterMeshUploadReleasesMeshResidency ....................................   Passed    0.06 sec
+        Start  467: MeshGeometryExtraction.LosingMeshDomainTopologyReleasesMeshResidency
+ 46/742 Test  #467: MeshGeometryExtraction.LosingMeshDomainTopologyReleasesMeshResidency ............................................   Passed    0.06 sec
+        Start  468: MeshGeometryExtraction.NonMeshDomainEntityIsIgnoredByMeshPath
+ 47/742 Test  #468: MeshGeometryExtraction.NonMeshDomainEntityIsIgnoredByMeshPath ...................................................   Passed    0.05 sec
+        Start  469: MeshGeometryExtraction.MultipleDirtyTagsCoalesceIntoSingleReupload
+ 48/742 Test  #469: MeshGeometryExtraction.MultipleDirtyTagsCoalesceIntoSingleReupload ..............................................   Passed    0.05 sec
+        Start  470: MeshGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag
+ 49/742 Test  #470: MeshGeometryExtraction.ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag ................................   Passed    0.06 sec
+        Start  471: MeshGeometryExtraction.UniformCornerTexcoordsUploadWithoutSplittingVertices
+ 50/742 Test  #471: MeshGeometryExtraction.UniformCornerTexcoordsUploadWithoutSplittingVertices .....................................   Passed    0.06 sec
+        Start  472: MeshGeometryExtraction.DisagreeingCornerTexcoordsSplitOnlyTheSeamVertexAtUpload
+ 51/742 Test  #472: MeshGeometryExtraction.DisagreeingCornerTexcoordsSplitOnlyTheSeamVertexAtUpload .................................   Passed    0.06 sec
+        Start  475: MeshPrimitiveViewExtraction.EnableEdgeViewUploadsSeparateEdgeRenderable
+ 52/742 Test  #475: MeshPrimitiveViewExtraction.EnableEdgeViewUploadsSeparateEdgeRenderable .........................................   Passed    0.06 sec
+        Start  476: MeshPrimitiveViewExtraction.EdgeViewWidthConfigUpdateReusesGeometry
+ 53/742 Test  #476: MeshPrimitiveViewExtraction.EdgeViewWidthConfigUpdateReusesGeometry .............................................   Passed    0.06 sec
+        Start  477: MeshPrimitiveViewExtraction.EnableVertexViewUploadsSeparatePointRenderable
+ 54/742 Test  #477: MeshPrimitiveViewExtraction.EnableVertexViewUploadsSeparatePointRenderable ......................................   Passed    0.06 sec
+        Start  478: MeshPrimitiveViewExtraction.MeshVertexPointLaneDoesNotRequireSurfaceTopology
+ 55/742 Test  #478: MeshPrimitiveViewExtraction.MeshVertexPointLaneDoesNotRequireSurfaceTopology ....................................   Passed    0.08 sec
+        Start  479: MeshPrimitiveViewExtraction.VertexViewConfigUpdateReusesGeometry
+ 56/742 Test  #479: MeshPrimitiveViewExtraction.VertexViewConfigUpdateReusesGeometry ................................................   Passed    0.06 sec
+        Start  480: MeshPrimitiveViewExtraction.EnableBothViewsAllocatesThreeIndependentRenderables
+ 57/742 Test  #480: MeshPrimitiveViewExtraction.EnableBothViewsAllocatesThreeIndependentRenderables .................................   Passed    0.06 sec
+        Start  481: MeshPrimitiveViewExtraction.EdgeAndPointComponentsDoNotRequireRenderSurface
+ 58/742 Test  #481: MeshPrimitiveViewExtraction.EdgeAndPointComponentsDoNotRequireRenderSurface .....................................   Passed    0.06 sec
+        Start  482: MeshPrimitiveViewExtraction.LaneOverridesColorEdgeAndVertexViewsIndependently
+ 59/742 Test  #482: MeshPrimitiveViewExtraction.LaneOverridesColorEdgeAndVertexViewsIndependently ...................................   Passed    0.06 sec
+        Start  483: MeshPrimitiveViewExtraction.RepeatedExtractionReusesViewsWithoutReupload
+ 60/742 Test  #483: MeshPrimitiveViewExtraction.RepeatedExtractionReusesViewsWithoutReupload ........................................   Passed    0.07 sec
+        Start  484: MeshPrimitiveViewExtraction.VertexPositionDirtyRepacksBothViews
+ 61/742 Test  #484: MeshPrimitiveViewExtraction.VertexPositionDirtyRepacksBothViews .................................................   Passed    0.06 sec
+        Start  485: MeshPrimitiveViewExtraction.DisablingEdgeViewReleasesItsGeometryAfterWindow
+ 62/742 Test  #485: MeshPrimitiveViewExtraction.DisablingEdgeViewReleasesItsGeometryAfterWindow .....................................   Passed    0.06 sec
+        Start  486: MeshPrimitiveViewExtraction.EntityDestructionReleasesViewsAfterWindow
+ 63/742 Test  #486: MeshPrimitiveViewExtraction.EntityDestructionReleasesViewsAfterWindow ...........................................   Passed    0.06 sec
+        Start  487: MeshPrimitiveViewExtraction.ShutdownReleasesViewResidency
+ 64/742 Test  #487: MeshPrimitiveViewExtraction.ShutdownReleasesViewResidency .......................................................   Passed    0.06 sec
+        Start  488: MeshPrimitiveViewExtraction.ProceduralRefFlipReleasesViews
+ 65/742 Test  #488: MeshPrimitiveViewExtraction.ProceduralRefFlipReleasesViews ......................................................   Passed    0.06 sec
+        Start  489: MeshPrimitiveViewExtraction.EdgeViewDerivesWireframeWithoutExplicitEdges
+ 66/742 Test  #489: MeshPrimitiveViewExtraction.EdgeViewDerivesWireframeWithoutExplicitEdges ........................................   Passed    0.07 sec
+        Start  490: MeshPrimitiveViewExtraction.OutOfRangeEdgeEndpointIncrementsInvalidEdgesCounter
+ 67/742 Test  #490: MeshPrimitiveViewExtraction.OutOfRangeEdgeEndpointIncrementsInvalidEdgesCounter .................................   Passed    0.06 sec
+        Start  491: MeshPrimitiveViewExtraction.NonMeshEntityWithRenderComponentsCreatesNoMeshViews
+ 68/742 Test  #491: MeshPrimitiveViewExtraction.NonMeshEntityWithRenderComponentsCreatesNoMeshViews .................................   Passed    0.07 sec
+        Start  513: RenderExtractionContract.FailedMeshPackPublishesNoDrawCandidate
+ 69/742 Test  #513: RenderExtractionContract.FailedMeshPackPublishesNoDrawCandidate .................................................   Passed    0.07 sec
+        Start  545: RuntimeGeometryAvailability.MeshResolvesIndependentSurfaceEdgeAndPointLanes
+ 70/742 Test  #545: RuntimeGeometryAvailability.MeshResolvesIndependentSurfaceEdgeAndPointLanes .....................................   Passed    0.00 sec
+        Start  550: RuntimeGeometryAvailability.MeshEdgeLaneCanDeriveFromSurfaceTopologyWithoutEdges
+ 71/742 Test  #550: RuntimeGeometryAvailability.MeshEdgeLaneCanDeriveFromSurfaceTopologyWithoutEdges ................................   Passed    0.00 sec
+        Start  551: RuntimeGeometryAvailability.PartialMeshCanSupportPointsWhileSurfaceReportsMissingHalfedges
+ 72/742 Test  #551: RuntimeGeometryAvailability.PartialMeshCanSupportPointsWhileSurfaceReportsMissingHalfedges ......................   Passed    0.00 sec
+        Start  605: PrimitiveSelectionRefinement.MeshFaceHintAnchorsFaceWithNearestVertexAndEdge
+ 73/742 Test  #605: PrimitiveSelectionRefinement.MeshFaceHintAnchorsFaceWithNearestVertexAndEdge ....................................   Passed    0.00 sec
+        Start  606: PrimitiveSelectionRefinement.MeshFaceHintWithoutAnchorReportsCentroidOnly
+ 74/742 Test  #606: PrimitiveSelectionRefinement.MeshFaceHintWithoutAnchorReportsCentroidOnly .......................................   Passed    0.00 sec
+        Start  607: PrimitiveSelectionRefinement.MeshEdgeHintReturnsEdgeAndNearestEndpoint
+ 75/742 Test  #607: PrimitiveSelectionRefinement.MeshEdgeHintReturnsEdgeAndNearestEndpoint ..........................................   Passed    0.00 sec
+        Start  608: PrimitiveSelectionRefinement.MeshPointHintResolvesVertex
+ 76/742 Test  #608: PrimitiveSelectionRefinement.MeshPointHintResolvesVertex ........................................................   Passed    0.00 sec
+        Start  609: PrimitiveSelectionRefinement.MeshEntityHintSelectsWholeEntity
+ 77/742 Test  #609: PrimitiveSelectionRefinement.MeshEntityHintSelectsWholeEntity ...................................................   Passed    0.00 sec
+        Start  611: PrimitiveSelectionRefinement.MeshFaceIndexOutOfRangeFailsClosed
+ 78/742 Test  #611: PrimitiveSelectionRefinement.MeshFaceIndexOutOfRangeFailsClosed .................................................   Passed    0.00 sec
+        Start  612: PrimitiveSelectionRefinement.MeshMissingPositionsFailsClosed
+ 79/742 Test  #612: PrimitiveSelectionRefinement.MeshMissingPositionsFailsClosed ....................................................   Passed    0.00 sec
+        Start  613: PrimitiveSelectionRefinement.MeshFaceHintMapsTrianglePayloadToFaceRow
+ 80/742 Test  #613: PrimitiveSelectionRefinement.MeshFaceHintMapsTrianglePayloadToFaceRow ...........................................   Passed    0.00 sec
+        Start  626: PrimitiveSelectionRefinement.MeshMissingHintRayFallbackResolvesNearestVertex
+ 81/742 Test  #626: PrimitiveSelectionRefinement.MeshMissingHintRayFallbackResolvesNearestVertex ....................................   Passed    0.00 sec
+        Start  630: MeshSurfaceTopology.CorruptRingVariantsFailClosedAndClearOutputs
+ 82/742 Test  #630: MeshSurfaceTopology.CorruptRingVariantsFailClosedAndClearOutputs ................................................   Passed    0.00 sec
+        Start  631: MeshSurfaceTopology.MissingOwnershipPropertyFailsClosed
+ 83/742 Test  #631: MeshSurfaceTopology.MissingOwnershipPropertyFailsClosed .........................................................   Passed    0.00 sec
+        Start  632: MeshSurfaceTopology.DeletedFaceSlotsAreSkipped
+ 84/742 Test  #632: MeshSurfaceTopology.DeletedFaceSlotsAreSkipped ..................................................................   Passed    0.00 sec
+        Start  633: MeshSurfaceTopology.AllDeletedFacesAreDegenerate
+ 85/742 Test  #633: MeshSurfaceTopology.AllDeletedFacesAreDegenerate ................................................................   Passed    0.00 sec
+        Start  635: PrimitiveSelectionRefinementWiring.PointHitResolvesToMeshVertex
+ 86/742 Test  #635: PrimitiveSelectionRefinementWiring.PointHitResolvesToMeshVertex .................................................   Passed    0.00 sec
+        Start  718: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService
+ 87/742 Test  #718: RuntimeEngineLayering.AsyncWorkModulePublishesOnlyKernelJobService ..............................................   Passed    0.00 sec
+        Start  722: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface
+ 88/742 Test  #722: RuntimeEngineLayering.SandboxEditorJobsUseSingleJobServiceSurface ...............................................   Passed    0.00 sec
+        Start  725: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted
+ 89/742 Test  #725: RuntimeEngineLayering.ObsoleteMeshPrimitiveViewControlsAreDeleted ...............................................   Passed    0.00 sec
+        Start  796: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate
+ 90/742 Test  #796: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate ......................................................   Passed    0.02 sec
+        Start  797: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState
+ 91/742 Test  #797: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState ..........................................   Passed    0.02 sec
+        Start  798: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters
+ 92/742 Test  #798: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters ................................................   Passed    0.00 sec
+        Start  799: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder
+ 93/742 Test  #799: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder ................................................   Passed    0.00 sec
+        Start  800: RuntimeJobService.CancelBeforeStartPreventsWork
+ 94/742 Test  #800: RuntimeJobService.CancelBeforeStartPreventsWork .................................................................   Passed    0.02 sec
+        Start  801: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion
+ 95/742 Test  #801: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion ...................................................   Passed    0.02 sec
+        Start  802: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication
+ 96/742 Test  #802: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication ..............................................   Passed    0.02 sec
+        Start  803: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope
+ 97/742 Test  #803: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope .....................................................   Passed    0.02 sec
+        Start  804: RuntimeJobService.ReapCompletedRemovesTerminalRecords
+ 98/742 Test  #804: RuntimeJobService.ReapCompletedRemovesTerminalRecords ...........................................................   Passed    0.02 sec
+        Start  805: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread
+ 99/742 Test  #805: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread ..........................................   Passed    0.04 sec
+        Start  806: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes
+100/742 Test  #806: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes ................................................   Passed    0.02 sec
+        Start  807: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish
+101/742 Test  #807: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish ................................................   Passed    0.02 sec
+        Start  808: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving
+102/742 Test  #808: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving .................................................   Passed    0.02 sec
+        Start  809: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking
+103/742 Test  #809: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking ................................................   Passed    0.02 sec
+        Start  810: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate
+104/742 Test  #810: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate ................................................   Passed    0.02 sec
+        Start  811: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce
+105/742 Test  #811: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce .............................................   Passed    0.02 sec
+        Start  812: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread
+106/742 Test  #812: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread ...........................................   Passed    0.02 sec
+        Start  813: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion
+107/742 Test  #813: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion ...............................   Passed    0.01 sec
+        Start  814: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+108/742 Test  #814: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing .....................................   Passed    0.02 sec
+        Start  815: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce
+109/742 Test  #815: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce ...................................................   Passed    0.02 sec
+        Start  816: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak
+110/742 Test  #816: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak ................................................   Passed    0.02 sec
+        Start  817: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain
+111/742 Test  #817: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain .................................................   Passed    0.02 sec
+        Start  818: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer
+112/742 Test  #818: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer ..................................................   Passed    0.02 sec
+        Start  819: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder
+113/742 Test  #819: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder .................................................   Passed    0.02 sec
+        Start  820: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge
+114/742 Test  #820: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge ......................................................   Passed    0.02 sec
+        Start  851: RuntimeJobServiceEngineWiring.RunFrameAppliesSubmittedJob
+115/742 Test  #851: RuntimeJobServiceEngineWiring.RunFrameAppliesSubmittedJob .......................................................   Passed    0.04 sec
+        Start  900: RuntimeSceneSerialization.LegacyMeshSurfaceDomainLoadsAsUnknown
+116/742 Test  #900: RuntimeSceneSerialization.LegacyMeshSurfaceDomainLoadsAsUnknown .................................................   Passed    0.01 sec
+        Start  908: SandboxEditorUi.EmptyContextProducesDeterministicDisabledDiagnostics
+117/742 Test  #908: SandboxEditorUi.EmptyContextProducesDeterministicDisabledDiagnostics ............................................   Passed    0.00 sec
+        Start  909: SandboxEditorUi.RenderGraphPanelModelCopiesRendererStats
+118/742 Test  #909: SandboxEditorUi.RenderGraphPanelModelCopiesRendererStats ........................................................   Passed    0.00 sec
+        Start  910: SandboxEditorUi.GpuProfilingToggleUsesConfigPreviewApplyAndPreservesRejectedState
+119/742 Test  #910: SandboxEditorUi.GpuProfilingToggleUsesConfigPreviewApplyAndPreservesRejectedState ...............................   Passed    0.00 sec
+        Start  911: SandboxEditorUi.AssetImportQueueModelCopiesRowsProgressAndCommands
+120/742 Test  #911: SandboxEditorUi.AssetImportQueueModelCopiesRowsProgressAndCommands ..............................................   Passed    0.00 sec
+        Start  912: SandboxEditorUi.DocumentModelReportsRuntimeHistoryDirtyState
+121/742 Test  #912: SandboxEditorUi.DocumentModelReportsRuntimeHistoryDirtyState ....................................................   Passed    0.00 sec
+        Start  913: SandboxEditorUi.HierarchyInspectorModelReportsSelectionRenderHintsAndDomain
+122/742 Test  #913: SandboxEditorUi.HierarchyInspectorModelReportsSelectionRenderHintsAndDomain .....................................   Passed    0.00 sec
+        Start  914: SandboxEditorUi.HiddenPanelBuildRequestSkipsSelectedEntityModels
+123/742 Test  #914: SandboxEditorUi.HiddenPanelBuildRequestSkipsSelectedEntityModels ................................................   Passed    0.00 sec
+        Start  915: SandboxEditorUi.InspectorOnlyBuildRequestAvoidsSiblingPanelWork
+124/742 Test  #915: SandboxEditorUi.InspectorOnlyBuildRequestAvoidsSiblingPanelWork .................................................   Passed    0.00 sec
+        Start  916: SandboxEditorUi.DomainWindowBuildReportsTimingDiagnostics
+125/742 Test  #916: SandboxEditorUi.DomainWindowBuildReportsTimingDiagnostics .......................................................   Passed    0.00 sec
+        Start  917: SandboxEditorUi.SelectedModelCacheReusesInspectorAnalysis
+126/742 Test  #917: SandboxEditorUi.SelectedModelCacheReusesInspectorAnalysis .......................................................   Passed    0.00 sec
+        Start  918: SandboxEditorUi.SelectedModelCachePartitionsAnalysisByVisibleWindow
+127/742 Test  #918: SandboxEditorUi.SelectedModelCachePartitionsAnalysisByVisibleWindow .............................................   Passed    0.00 sec
+        Start  919: SandboxEditorUi.SelectedModelCacheInvalidatesOnSelectionGeneration
+128/742 Test  #919: SandboxEditorUi.SelectedModelCacheInvalidatesOnSelectionGeneration ..............................................   Passed    0.00 sec
+        Start  920: SandboxEditorUi.SelectedModelCacheInvalidatesOnPrimitiveGeneration
+129/742 Test  #920: SandboxEditorUi.SelectedModelCacheInvalidatesOnPrimitiveGeneration ..............................................   Passed    0.00 sec
+        Start  921: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryPresentationRecipeGeneration
+130/742 Test  #921: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryPresentationRecipeGeneration .............................   Passed    0.00 sec
+        Start  922: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryMetadataSignature
+131/742 Test  #922: SandboxEditorUi.SelectedModelCacheInvalidatesOnGeometryMetadataSignature ........................................   Passed    0.00 sec
+        Start  923: SandboxEditorUi.SelectedModelCacheInvalidatesOnRenderHintSignature
+132/742 Test  #923: SandboxEditorUi.SelectedModelCacheInvalidatesOnRenderHintSignature ..............................................   Passed    0.00 sec
+        Start  924: SandboxEditorUi.SelectedModelCacheReusesVisualizationModel
+133/742 Test  #924: SandboxEditorUi.SelectedModelCacheReusesVisualizationModel ......................................................   Passed    0.00 sec
+        Start  925: SandboxEditorUi.VisualizationModelCacheInvalidatesOnGeometryMetadataSignature
+134/742 Test  #925: SandboxEditorUi.VisualizationModelCacheInvalidatesOnGeometryMetadataSignature ...................................   Passed    0.00 sec
+        Start  926: SandboxEditorUi.VisualizationModelCacheInvalidatesOnConfigSignature
+135/742 Test  #926: SandboxEditorUi.VisualizationModelCacheInvalidatesOnConfigSignature .............................................   Passed    0.00 sec
+        Start  927: SandboxEditorUi.VisualizationModelCacheInvalidatesOnLaneOverrideSignature
+136/742 Test  #927: SandboxEditorUi.VisualizationModelCacheInvalidatesOnLaneOverrideSignature .......................................   Passed    0.00 sec
+        Start  928: SandboxEditorUi.VisualizationModelCacheInvalidatesOnRecipeRevision
+137/742 Test  #928: SandboxEditorUi.VisualizationModelCacheInvalidatesOnRecipeRevision ..............................................   Passed    0.00 sec
+        Start  929: SandboxEditorUi.GeometryProcessingSupportedDomainsMatchPromotedEditorContract
+138/742 Test  #929: SandboxEditorUi.GeometryProcessingSupportedDomainsMatchPromotedEditorContract ...................................   Passed    0.00 sec
+        Start  930: SandboxEditorUi.GeometrySourcesReportProcessingCapabilitiesAndStableEntries
+139/742 Test  #930: SandboxEditorUi.GeometrySourcesReportProcessingCapabilitiesAndStableEntries .....................................   Passed    0.00 sec
+        Start  931: SandboxEditorUi.VisualizationModelEnumeratesPromotedGeometryProperties
+140/742 Test  #931: SandboxEditorUi.VisualizationModelEnumeratesPromotedGeometryProperties ..........................................   Passed    0.00 sec
+        Start  932: SandboxEditorUi.PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection
+141/742 Test  #932: SandboxEditorUi.PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection .......................................   Passed    0.00 sec
+        Start  933: SandboxEditorUi.PropertyCatalogReportsGraphAndPointCloudDomains
+142/742 Test  #933: SandboxEditorUi.PropertyCatalogReportsGraphAndPointCloudDomains .................................................   Passed    0.00 sec
+        Start  934: SandboxEditorUi.VisualizationPresetPreservesConfiguredScalarStyling
+143/742 Test  #934: SandboxEditorUi.VisualizationPresetPreservesConfiguredScalarStyling .............................................   Passed    0.00 sec
+        Start  935: SandboxEditorUi.DomainWindowModelsReportSelectedMeshGraphAndPointCloudState
+144/742 Test  #935: SandboxEditorUi.DomainWindowModelsReportSelectedMeshGraphAndPointCloudState .....................................   Passed    0.00 sec
+        Start  936: SandboxEditorUi.DomainVisualizationTargetsFollowLaneSourcePresence
+145/742 Test  #936: SandboxEditorUi.DomainVisualizationTargetsFollowLaneSourcePresence ..............................................   Passed    0.00 sec
+        Start  937: SandboxEditorUi.DomainWindowModelsReportNoSelectionStaleAndWrongDomain
+146/742 Test  #937: SandboxEditorUi.DomainWindowModelsReportNoSelectionStaleAndWrongDomain ..........................................   Passed    0.00 sec
+        Start  938: SandboxEditorUi.SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds
+147/742 Test  #938: SandboxEditorUi.SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds ........................................   Passed    0.00 sec
+        Start  939: SandboxEditorUi.GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
+148/742 Test  #939: SandboxEditorUi.GeometryPresentationInspectorReportsSlotsPropertiesAndJobs ......................................   Passed    0.00 sec
+        Start  940: SandboxEditorUi.GeometryPresentationInspectorInfersGraphPointCloudAndComposition
+149/742 Test  #940: SandboxEditorUi.GeometryPresentationInspectorInfersGraphPointCloudAndComposition ................................   Passed    0.00 sec
+        Start  941: SandboxEditorUi.GeometryPresentationCompositionReportsCorruptHierarchyWithoutPartialSummary
+150/742 Test  #941: SandboxEditorUi.GeometryPresentationCompositionReportsCorruptHierarchyWithoutPartialSummary .....................   Passed    0.00 sec
+        Start  942: SandboxEditorUi.RenderRecipeEditorModelListsDeclaredRecipeControls
+151/742 Test  #942: SandboxEditorUi.RenderRecipeEditorModelListsDeclaredRecipeControls ..............................................   Passed    0.00 sec
+        Start  943: SandboxEditorUi.FileImportPrerequisitesAreDeterministic
+152/742 Test  #943: SandboxEditorUi.FileImportPrerequisitesAreDeterministic .........................................................   Passed    0.00 sec
+        Start  944: SandboxEditorUi.FileImportDispatchRejectsInvalidPrerequisitesBeforeCallback
+153/742 Test  #944: SandboxEditorUi.FileImportDispatchRejectsInvalidPrerequisitesBeforeCallback .....................................   Passed    0.00 sec
+        Start  945: SandboxEditorUi.FileImportCommandRoutesThroughRuntimeOwnedSurface
+154/742 Test  #945: SandboxEditorUi.FileImportCommandRoutesThroughRuntimeOwnedSurface ...............................................   Passed    0.00 sec
+        Start  946: SandboxEditorUi.FileImportCommandTreatsAsyncPendingAsNonFailure
+155/742 Test  #946: SandboxEditorUi.FileImportCommandTreatsAsyncPendingAsNonFailure .................................................   Passed    0.00 sec
+        Start  947: SandboxEditorUi.SceneFileCommandRoutesThroughRuntimeOwnedSurface
+156/742 Test  #947: SandboxEditorUi.SceneFileCommandRoutesThroughRuntimeOwnedSurface ................................................   Passed    0.00 sec
+        Start  948: SandboxEditorUi.SceneLoadCommandTreatsAsyncPendingAsNonFailure
+157/742 Test  #948: SandboxEditorUi.SceneLoadCommandTreatsAsyncPendingAsNonFailure ..................................................   Passed    0.00 sec
+        Start  949: SandboxEditorUi.SceneSaveCommandTreatsAsyncPendingAsNonFailure
+158/742 Test  #949: SandboxEditorUi.SceneSaveCommandTreatsAsyncPendingAsNonFailure ..................................................   Passed    0.00 sec
+        Start  950: SandboxEditorUi.AssetWorkflowReportsMissingFile
+159/742 Test  #950: SandboxEditorUi.AssetWorkflowReportsMissingFile .................................................................   Passed    0.04 sec
+        Start  951: SandboxEditorUi.AssetWorkflowMaterializesStandaloneGeometryDomains
+160/742 Test  #951: SandboxEditorUi.AssetWorkflowMaterializesStandaloneGeometryDomains ..............................................   Passed    0.04 sec
+        Start  952: SandboxEditorUi.AssetWorkflowMaterializesNonManifoldObjAsRenderableMesh
+161/742 Test  #952: SandboxEditorUi.AssetWorkflowMaterializesNonManifoldObjAsRenderableMesh .........................................   Passed    0.05 sec
+        Start  953: SandboxEditorUi.AssetWorkflowMaterializesObjWithoutAuthoredTexcoordsAsRenderableMesh
+162/742 Test  #953: SandboxEditorUi.AssetWorkflowMaterializesObjWithoutAuthoredTexcoordsAsRenderableMesh ............................   Passed    0.05 sec
+        Start  954: SandboxEditorUi.QueuedManualGeometryImportsRemainResponsiveAndApplyOnce
+163/742 Test  #954: SandboxEditorUi.QueuedManualGeometryImportsRemainResponsiveAndApplyOnce .........................................   Passed    0.12 sec
+        Start  955: SandboxEditorUi.QueuedManualGeometryCancellationPreventsApply
+164/742 Test  #955: SandboxEditorUi.QueuedManualGeometryCancellationPreventsApply ...................................................   Passed    0.07 sec
+        Start  956: SandboxEditorUi.ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown
+165/742 Test  #956: SandboxEditorUi.ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown .......................................   Passed    0.08 sec
+        Start  957: SandboxEditorUi.QueuedManualGeometryDecodeFailureIsFailClosed
+166/742 Test  #957: SandboxEditorUi.QueuedManualGeometryDecodeFailureIsFailClosed ...................................................   Passed    0.04 sec
+        Start  958: SandboxEditorUi.DuplicateDroppedGeometryImportUsesSingleIngestRecord
+167/742 Test  #958: SandboxEditorUi.DuplicateDroppedGeometryImportUsesSingleIngestRecord ............................................   Passed    0.08 sec
+        Start  959: SandboxEditorUi.DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
+168/742 Test  #959: SandboxEditorUi.DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted ......................................   Passed    0.08 sec
+        Start  960: SandboxEditorUi.DroppedGeometryQueueCancellationPreventsMainThreadApply
+169/742 Test  #960: SandboxEditorUi.DroppedGeometryQueueCancellationPreventsMainThreadApply .........................................   Passed    0.05 sec
+        Start  961: SandboxEditorUi.DroppedGeometryAssetReimportWaitReportsDeadlineAndCancellationPhase
+170/742 Test  #961: SandboxEditorUi.DroppedGeometryAssetReimportWaitReportsDeadlineAndCancellationPhase .............................   Passed    0.30 sec
+        Start  962: SandboxEditorUi.DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity
+171/742 Test  #962: SandboxEditorUi.DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity ..............................   Passed    0.22 sec
+        Start  963: SandboxEditorUi.PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderComponents
+172/742 Test  #963: SandboxEditorUi.PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderComponents ..............................   Passed    0.05 sec
+        Start  964: SandboxEditorUi.PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProcess
+173/742 Test  #964: SandboxEditorUi.PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProcess ...................................   Passed    0.05 sec
+        Start  965: SandboxEditorUi.DroppedFileImportFailureLogsDiagnostics
+174/742 Test  #965: SandboxEditorUi.DroppedFileImportFailureLogsDiagnostics .........................................................   Passed    0.05 sec
+        Start  966: SandboxEditorUi.PlatformDropEventImportsOffMesh
+175/742 Test  #966: SandboxEditorUi.PlatformDropEventImportsOffMesh .................................................................   Passed    0.05 sec
+        Start  967: SandboxEditorUi.ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic
+176/742 Test  #967: SandboxEditorUi.ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic ...........................................   Passed    0.01 sec
+        Start  968: SandboxEditorUi.PlatformCloseEventStopsEngineRunState
+177/742 Test  #968: SandboxEditorUi.PlatformCloseEventStopsEngineRunState ...........................................................   Passed    0.04 sec
+        Start  969: SandboxEditorUi.RenderRecipeEditorDraftValidationPreviewActivationAndCancel
+178/742 Test  #969: SandboxEditorUi.RenderRecipeEditorDraftValidationPreviewActivationAndCancel .....................................   Passed    0.00 sec
+        Start  970: SandboxEditorUi.RenderRecipeEditorUnchangedDraftIsNoOp
+179/742 Test  #970: SandboxEditorUi.RenderRecipeEditorUnchangedDraftIsNoOp ..........................................................   Passed    0.00 sec
+        Start  971: SandboxEditorUi.RenderRecipeEditorArtifactPublishAndApplyUseRegistry
+180/742 Test  #971: SandboxEditorUi.RenderRecipeEditorArtifactPublishAndApplyUseRegistry ............................................   Passed    0.00 sec
+        Start  972: SandboxEditorUi.ProgressivePoissonCommandPublishesPointPropertiesAndVisualization
+181/742 Test  #972: SandboxEditorUi.ProgressivePoissonCommandPublishesPointPropertiesAndVisualization ...............................   Passed    0.00 sec
+        Start  973: SandboxEditorUi.ProgressivePoissonPublishesIdenticalSourceCardinalityChannelsForEveryVertexDomain
+182/742 Test  #973: SandboxEditorUi.ProgressivePoissonPublishesIdenticalSourceCardinalityChannelsForEveryVertexDomain ...............   Passed    0.00 sec
+        Start  974: SandboxEditorUi.ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState
+183/742 Test  #974: SandboxEditorUi.ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState ..........................   Passed    0.00 sec
+        Start  975: SandboxEditorUi.ProgressivePoissonMeshVulkanRequestFallsBackWithoutDomainReplacement
+184/742 Test  #975: SandboxEditorUi.ProgressivePoissonMeshVulkanRequestFallsBackWithoutDomainReplacement ............................   Passed    0.00 sec
+        Start  976: SandboxEditorUi.ProgressivePoissonCommandMatchesDirectMethodConfig
+185/742 Test  #976: SandboxEditorUi.ProgressivePoissonCommandMatchesDirectMethodConfig ..............................................   Passed    0.00 sec
+        Start  977: SandboxEditorUi.ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply
+186/742 Test  #977: SandboxEditorUi.ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply .................................   Passed    0.02 sec
+        Start  978: SandboxEditorUi.ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply
+187/742 Test  #978: SandboxEditorUi.ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply ...............................   Passed    0.02 sec
+        Start  979: SandboxEditorUi.ProgressivePoissonGraphCpuJobRejectsStaleProductionConnectivity
+188/742 Test  #979: SandboxEditorUi.ProgressivePoissonGraphCpuJobRejectsStaleProductionConnectivity .................................   Passed    0.02 sec
+        Start  980: SandboxEditorUi.ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply
+189/742 Test  #980: SandboxEditorUi.ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply .............................   Passed    0.02 sec
+        Start  981: SandboxEditorUi.ProgressivePoissonMeshCpuJobRejectsStaleProductionConnectivity
+190/742 Test  #981: SandboxEditorUi.ProgressivePoissonMeshCpuJobRejectsStaleProductionConnectivity ..................................   Passed    0.02 sec
+        Start  982: SandboxEditorUi.ProgressivePoissonConfigCommandRoutesThroughConfigControl
+191/742 Test  #982: SandboxEditorUi.ProgressivePoissonConfigCommandRoutesThroughConfigControl .......................................   Passed    0.01 sec
+        Start  983: SandboxEditorUi.ClusteringSectionValidationKeepsPerFieldReferenceFallback
+192/742 Test  #983: SandboxEditorUi.ClusteringSectionValidationKeepsPerFieldReferenceFallback .......................................   Passed    0.00 sec
+        Start  984: SandboxEditorUi.ProgressivePoissonSectionValidationKeepsPerFieldReferenceFallback
+193/742 Test  #984: SandboxEditorUi.ProgressivePoissonSectionValidationKeepsPerFieldReferenceFallback ...............................   Passed    0.01 sec
+        Start  985: SandboxEditorUi.ProgressivePoissonCommandUsesMeshVerticesWithoutDomainReplacement
+194/742 Test  #985: SandboxEditorUi.ProgressivePoissonCommandUsesMeshVerticesWithoutDomainReplacement ...............................   Passed    0.01 sec
+        Start  986: SandboxEditorUi.ProgressivePoissonMeshHistoryPreservesTopologyDomainAndPresentation
+195/742 Test  #986: SandboxEditorUi.ProgressivePoissonMeshHistoryPreservesTopologyDomainAndPresentation .............................   Passed    0.00 sec
+        Start  987: SandboxEditorUi.ProgressivePoissonGraphHistoryPreservesTopologyOrderingAndProperties
+196/742 Test  #987: SandboxEditorUi.ProgressivePoissonGraphHistoryPreservesTopologyOrderingAndProperties ............................   Passed    0.00 sec
+        Start  988: SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo
+197/742 Test  #988: SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo ....................................   Passed    0.01 sec
+        Start  989: SandboxEditorUi.RegistrationRequestQueuesDerivedJobAndPublishesOnApply
+198/742 Test  #989: SandboxEditorUi.RegistrationRequestQueuesDerivedJobAndPublishesOnApply ..........................................   Passed    0.02 sec
+        Start  990: SandboxEditorUi.RegistrationDerivedJobDiscardsStaleSourceBeforeApply
+199/742 Test  #990: SandboxEditorUi.RegistrationDerivedJobDiscardsStaleSourceBeforeApply ............................................   Passed    0.02 sec
+        Start  991: SandboxEditorUi.RegistrationCommandFailsClosedForInvalidSelectionAndParameters
+200/742 Test  #991: SandboxEditorUi.RegistrationCommandFailsClosedForInvalidSelectionAndParameters ..................................   Passed    0.00 sec
+        Start  992: SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms
+201/742 Test  #992: SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms .................................................   Passed    0.01 sec
+        Start  993: SandboxEditorUi.MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo
+202/742 Test  #993: SandboxEditorUi.MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo .........................................   Passed    0.00 sec
+        Start  994: SandboxEditorUi.MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned
+203/742 Test  #994: SandboxEditorUi.MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned ...............................................   Passed    0.00 sec
+        Start  995: SandboxEditorUi.MeshDenoisePinnedRatioIsReportedForPartiallyPinnedRuns
+204/742 Test  #995: SandboxEditorUi.MeshDenoisePinnedRatioIsReportedForPartiallyPinnedRuns ..........................................   Passed    0.00 sec
+        Start  996: SandboxEditorUi.MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply
+205/742 Test  #996: SandboxEditorUi.MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply ...........................................   Passed    0.02 sec
+        Start  997: SandboxEditorUi.MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply
+206/742 Test  #997: SandboxEditorUi.MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply ...............................................   Passed    0.02 sec
+        Start  998: SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo
+207/742 Test  #998: SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo ..............................   Passed    0.01 sec
+        Start  999: SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply
+208/742 Test  #999: SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply ..............................   Passed    0.02 sec
+        Start 1000: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource
+209/742 Test #1000: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource ...........................................   Passed    0.02 sec
+        Start 1001: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty
+210/742 Test #1001: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty .........................................   Passed    0.02 sec
+        Start 1002: SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed
+211/742 Test #1002: SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed ...........................................   Passed    0.00 sec
+        Start 1003: SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties
+212/742 Test #1003: SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties .......................................   Passed    0.01 sec
+        Start 1004: SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots
+213/742 Test #1004: SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots ....................................................   Passed    0.00 sec
+        Start 1005: SandboxEditorUi.MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+214/742 Test #1005: SandboxEditorUi.MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel ..............................   Passed    0.00 sec
+        Start 1006: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo
+215/742 Test #1006: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo .............................   Passed    0.00 sec
+        Start 1007: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply
+216/742 Test #1007: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply .........................................   Passed    0.02 sec
+        Start 1008: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply
+217/742 Test #1008: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply .......................................   Passed    0.02 sec
+        Start 1009: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable
+218/742 Test #1009: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable ..............................   Passed    0.01 sec
+        Start 1010: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts
+219/742 Test #1010: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts ....................................   Passed    0.00 sec
+        Start 1011: SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo
+220/742 Test #1011: SandboxEditorUi.MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo ............................................   Passed    0.01 sec
+        Start 1012: SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply
+221/742 Test #1012: SandboxEditorUi.MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply ............................................   Passed    0.02 sec
+        Start 1013: SandboxEditorUi.MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo
+222/742 Test #1013: SandboxEditorUi.MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo ..........................   Passed    0.01 sec
+        Start 1014: SandboxEditorUi.MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply
+223/742 Test #1014: SandboxEditorUi.MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply .........................................   Passed    0.02 sec
+        Start 1015: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply
+224/742 Test #1015: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply .............................................   Passed    0.02 sec
+        Start 1016: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply
+225/742 Test #1016: SandboxEditorUi.MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply .........................................   Passed    0.02 sec
+        Start 1017: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo
+226/742 Test #1017: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo ..........................................   Passed    0.01 sec
+        Start 1018: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply
+227/742 Test #1018: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply ..........................................   Passed    0.02 sec
+        Start 1019: SandboxEditorUi.MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit
+228/742 Test #1019: SandboxEditorUi.MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit ..............................................   Passed    0.02 sec
+        Start 1020: SandboxEditorUi.MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify
+229/742 Test #1020: SandboxEditorUi.MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify ...............................................   Passed    0.02 sec
+        Start 1021: SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending
+230/742 Test #1021: SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending ............................   Passed    0.02 sec
+        Start 1022: SandboxEditorUi.MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults
+231/742 Test #1022: SandboxEditorUi.MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults ........................................   Passed    0.02 sec
+        Start 1023: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+232/742 Test #1023: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel .............................   Passed    0.00 sec
+        Start 1024: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent
+233/742 Test #1024: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent ................................................   Passed    0.01 sec
+        Start 1025: SandboxEditorUi.MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels
+234/742 Test #1025: SandboxEditorUi.MeshTopologyProcessingCommandsFailClosedForInvalidTargetsAndUnavailableKernels ..................   Passed    0.00 sec
+        Start 1026: SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings
+235/742 Test #1026: SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings ...............................   Passed    0.01 sec
+        Start 1027: SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply
+236/742 Test #1027: SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply .....................................   Passed    0.02 sec
+        Start 1028: SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply
+237/742 Test #1028: SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply ........................   Passed    0.02 sec
+        Start 1029: SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply
+238/742 Test #1029: SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply ..........................................   Passed    0.03 sec
+        Start 1030: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit
+239/742 Test #1030: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit ........................................   Passed    0.04 sec
+        Start 1031: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties
+240/742 Test #1031: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties ........................................   Passed    0.04 sec
+        Start 1032: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterBindingChange
+241/742 Test #1032: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterBindingChange .......................................   Passed    0.04 sec
+        Start 1033: SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions
+242/742 Test #1033: SandboxEditorUi.DirectMeshPostProcessPendingStateGatesMutatingActions ...........................................   Passed    0.04 sec
+        Start 1034: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterWorldSwitch
+243/742 Test #1034: SandboxEditorUi.DirectMeshPostProcessDiscardsCompletionAfterWorldSwitch .........................................   Passed    0.04 sec
+        Start 1035: SandboxEditorUi.DirectMeshPostProcessWorldDestructionIsLifetimeSafe
+244/742 Test #1035: SandboxEditorUi.DirectMeshPostProcessWorldDestructionIsLifetimeSafe .............................................   Passed    0.04 sec
+        Start 1036: SandboxEditorUi.DirectMeshPostProcessRejectsRecycledEntityTarget
+245/742 Test #1036: SandboxEditorUi.DirectMeshPostProcessRejectsRecycledEntityTarget ................................................   Passed    0.04 sec
+        Start 1037: SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets
+246/742 Test #1037: SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets ............................................   Passed    0.00 sec
+        Start 1038: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals
+247/742 Test #1038: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals ..................................   Passed    0.01 sec
+        Start 1039: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets
+248/742 Test #1039: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets ..............................   Passed    0.00 sec
+        Start 1040: SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords
+249/742 Test #1040: SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords ...............................................   Passed    0.01 sec
+        Start 1041: SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply
+250/742 Test #1041: SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply ........................................   Passed    0.02 sec
+        Start 1042: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+251/742 Test #1042: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ..............................................   Passed    0.02 sec
+        Start 1043: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource
+252/742 Test #1043: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource .....................................................   Passed    0.02 sec
+        Start 1044: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty
+253/742 Test #1044: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty ...........................................   Passed    0.02 sec
+        Start 1045: SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache
+254/742 Test #1045: SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache .......................................   Passed    0.02 sec
+        Start 1046: SandboxEditorUi.TextureBakeControlsReportUvSourcesAndRequireRuntimeModule
+255/742 Test #1046: SandboxEditorUi.TextureBakeControlsReportUvSourcesAndRequireRuntimeModule .......................................   Passed    0.00 sec
+        Start 1047: SandboxEditorUi.AttachedEngineContextWiresTextureBakeModule
+256/742 Test #1047: SandboxEditorUi.AttachedEngineContextWiresTextureBakeModule .....................................................   Passed    0.04 sec
+        Start 1048: SandboxEditorUi.TextureBakeOperationDoesNotBypassUnavailableRuntimeModule
+257/742 Test #1048: SandboxEditorUi.TextureBakeOperationDoesNotBypassUnavailableRuntimeModule .......................................   Passed    0.00 sec
+        Start 1049: SandboxEditorUi.UnavailableTextureBakeModuleHasNoCpuFallback
+258/742 Test #1049: SandboxEditorUi.UnavailableTextureBakeModuleHasNoCpuFallback ....................................................   Passed    0.00 sec
+        Start 1050: SandboxEditorUi.TextureBakeModuleAvailabilityPrecedesAssetCreation
+259/742 Test #1050: SandboxEditorUi.TextureBakeModuleAvailabilityPrecedesAssetCreation ..............................................   Passed    0.00 sec
+        Start 1051: SandboxEditorUi.TextureBakeRequiresOperationalGpuBackend
+260/742 Test #1051: SandboxEditorUi.TextureBakeRequiresOperationalGpuBackend ........................................................   Passed    0.00 sec
+        Start 1052: SandboxEditorUi.VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud
+261/742 Test #1052: SandboxEditorUi.VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud ..............................   Passed    0.01 sec
+        Start 1053: SandboxEditorUi.VertexChannelBindingCommandBindsColorAndDisablesCleanly
+262/742 Test #1053: SandboxEditorUi.VertexChannelBindingCommandBindsColorAndDisablesCleanly .........................................   Passed    0.00 sec
+        Start 1054: SandboxEditorUi.VertexChannelBindingHistoryRestoresExactlyAndRejectsInterveningState
+263/742 Test #1054: SandboxEditorUi.VertexChannelBindingHistoryRestoresExactlyAndRejectsInterveningState ............................   Passed    0.00 sec
+        Start 1055: SandboxEditorUi.VisualizationPropertyPresetCommandRoutesThroughConfig
+264/742 Test #1055: SandboxEditorUi.VisualizationPropertyPresetCommandRoutesThroughConfig ...........................................   Passed    0.00 sec
+        Start 1056: SandboxEditorUi.RenderHintCommandEditsDomainComponentsAndHistory
+265/742 Test #1056: SandboxEditorUi.RenderHintCommandEditsDomainComponentsAndHistory ................................................   Passed    0.00 sec
+        Start 1057: SandboxEditorUi.RenderHintCommandRepackagesGraphLaneResidency
+266/742 Test #1057: SandboxEditorUi.RenderHintCommandRepackagesGraphLaneResidency ...................................................   Passed    0.04 sec
+        Start 1058: SandboxEditorUi.SelectEntityCommandRoutesThroughSelectionController
+267/742 Test #1058: SandboxEditorUi.SelectEntityCommandRoutesThroughSelectionController .............................................   Passed    0.00 sec
+        Start 1059: SandboxEditorUi.TransformEditCommandMutatesLocalTransformAndMarksDirty
+268/742 Test #1059: SandboxEditorUi.TransformEditCommandMutatesLocalTransformAndMarksDirty ..........................................   Passed    0.00 sec
+        Start 1060: SandboxEditorUi.TransformEditHistoryRejectsInterveningStateAndRestoresExactly
+269/742 Test #1060: SandboxEditorUi.TransformEditHistoryRejectsInterveningStateAndRestoresExactly ...................................   Passed    0.00 sec
+        Start 1061: SandboxEditorUi.CameraControllerCommandReplacesMainController
+270/742 Test #1061: SandboxEditorUi.CameraControllerCommandReplacesMainController ...................................................   Passed    0.00 sec
+        Start 1062: SandboxEditorUi.PrimitiveViewCommandTranslatesToRenderHintComponents
+271/742 Test #1062: SandboxEditorUi.PrimitiveViewCommandTranslatesToRenderHintComponents ............................................   Passed    0.00 sec
+        Start 1063: SandboxEditorUi.PrimitiveViewHistoryRejectsInterveningRenderHints
+272/742 Test #1063: SandboxEditorUi.PrimitiveViewHistoryRejectsInterveningRenderHints ...............................................   Passed    0.00 sec
+        Start 1064: SandboxEditorUi.VisualizationConfigCommandRoutesThroughSelectedEntity
+273/742 Test #1064: SandboxEditorUi.VisualizationConfigCommandRoutesThroughSelectedEntity ...........................................   Passed    0.00 sec
+        Start 1065: SandboxEditorUi.VisualizationConfigCommandTargetsPointLaneOverride
+274/742 Test #1065: SandboxEditorUi.VisualizationConfigCommandTargetsPointLaneOverride ..............................................   Passed    0.00 sec
+        Start 1066: SandboxEditorUi.VisualizationConfigHistoryRejectsInterveningStateAndRestoresExactly
+275/742 Test #1066: SandboxEditorUi.VisualizationConfigHistoryRejectsInterveningStateAndRestoresExactly .............................   Passed    0.00 sec
+        Start 1067: SandboxEditorUi.VisualizationRecipeCommandRoutesThroughRuntimeSurface
+276/742 Test #1067: SandboxEditorUi.VisualizationRecipeCommandRoutesThroughRuntimeSurface ...........................................   Passed    0.00 sec
+        Start 1068: SandboxEditorUi.GeometryPresentationSlotCommandsUseCommandHistory
+277/742 Test #1068: SandboxEditorUi.GeometryPresentationSlotCommandsUseCommandHistory ...............................................   Passed    0.00 sec
+        Start 1069: SandboxEditorUi.GeometryPresentationHistoryRejectsInterveningGenerationWithoutMutation
+278/742 Test #1069: SandboxEditorUi.GeometryPresentationHistoryRejectsInterveningGenerationWithoutMutation ..........................   Passed    0.00 sec
+        Start 1070: SandboxEditorProgressivePoisson.CopiedReadinessExplainsInvalidVertexPositions
+279/742 Test #1070: SandboxEditorProgressivePoisson.CopiedReadinessExplainsInvalidVertexPositions ...................................   Passed    0.00 sec
+        Start 1071: SandboxEditorSession.UnattachedPrepareFrameFailsClosed
+280/742 Test #1071: SandboxEditorSession.UnattachedPrepareFrameFailsClosed ..........................................................   Passed    0.00 sec
+        Start 1072: SandboxEditorSession.AttachPrepareDetachBoundsPreparedFrameLifetime
+281/742 Test #1072: SandboxEditorSession.AttachPrepareDetachBoundsPreparedFrameLifetime .............................................   Passed    0.04 sec
+        Start 1073: SandboxEditorSession.StaleCopiedCommandSurfacesFailAfterDetachAndReattach
+282/742 Test #1073: SandboxEditorSession.StaleCopiedCommandSurfacesFailAfterDetachAndReattach .......................................   Passed    0.04 sec
+        Start 1074: SandboxEditorSession.ReattachObservesEqualSequenceFromDifferentEngine
+283/742 Test #1074: SandboxEditorSession.ReattachObservesEqualSequenceFromDifferentEngine ...........................................   Passed    0.08 sec
+        Start 1150: VertexChannelStreams.InterleaveReproducesMeshVertexBytes
+284/742 Test #1150: VertexChannelStreams.InterleaveReproducesMeshVertexBytes ........................................................   Passed    0.00 sec
+        Start 1179: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty"
+285/742 Test #1179: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"GpuDirty" ..............................   Passed    0.06 sec
+        Start 1180: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions"
+286/742 Test #1180: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexPositions" ..................   Passed    0.06 sec
+        Start 1181: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes"
+287/742 Test #1181: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexAttributes" .................   Passed    0.06 sec
+        Start 1182: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords"
+288/742 Test #1182: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexTexcoords" ..................   Passed    0.06 sec
+        Start 1183: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals"
+289/742 Test #1183: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals" ....................   Passed    0.06 sec
+        Start 1184: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors"
+290/742 Test #1184: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexColors" .....................   Passed    0.06 sec
+        Start 1185: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyFaceTopology"
+291/742 Test #1185: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyFaceTopology" .....................   Passed    0.06 sec
+        Start 1186: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyEdgeTopology"
+292/742 Test #1186: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyEdgeTopology" .....................   Passed    0.05 sec
+        Start 1200: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically
+293/742 Test #1200: RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically ......   Passed    0.42 sec
+        Start 1214: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+294/742 Test #1214: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ...............................................   Passed    0.04 sec
+        Start 1215: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+295/742 Test #1215: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...................................   Passed    0.04 sec
+        Start 1216: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+296/742 Test #1216: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication .................................   Passed    0.00 sec
+        Start 1217: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+297/742 Test #1217: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ..............................   Passed    0.00 sec
+        Start 1218: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+298/742 Test #1218: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ...................................................   Passed    0.02 sec
+        Start 1219: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+299/742 Test #1219: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell .................................   Passed    0.14 sec
+        Start 1220: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+300/742 Test #1220: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus ....................................   Passed    0.00 sec
+        Start 1221: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+301/742 Test #1221: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame ........................................   Passed    0.04 sec
+        Start 1222: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+302/742 Test #1222: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ..............................   Passed    0.22 sec
+        Start 1223: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+303/742 Test #1223: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls .......................   Passed    0.01 sec
+        Start 1224: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+304/742 Test #1224: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel ...........................................   Passed    0.04 sec
+        Start 1225: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+305/742 Test #1225: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ...............................................   Passed    0.04 sec
+        Start 1226: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+306/742 Test #1226: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy ......................................   Passed    0.09 sec
+        Start 1227: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+307/742 Test #1227: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ...............................................   Passed    0.04 sec
+        Start 1228: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+308/742 Test #1228: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ..................................   Passed    0.01 sec
+        Start 1229: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+309/742 Test #1229: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry ....................................   Passed    0.04 sec
+        Start 1230: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+310/742 Test #1230: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext ......................................   Passed    0.04 sec
+        Start 1231: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+311/742 Test #1231: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath ....................................   Passed    0.04 sec
+        Start 1232: SandboxEditorProgressivePoisson.RegistersAndDrawsAllVertexDomainWindows
+312/742 Test #1232: SandboxEditorProgressivePoisson.RegistersAndDrawsAllVertexDomainWindows .........................................   Passed    0.04 sec
+        Start 1233: SandboxEditorProgressivePoisson.ProgressivePoissonPanelUsesOneNonDestructiveConfigAndRunPath
+313/742 Test #1233: SandboxEditorProgressivePoisson.ProgressivePoissonPanelUsesOneNonDestructiveConfigAndRunPath ....................   Passed    0.01 sec
+        Start 1234: SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow
+314/742 Test #1234: SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughAssetWorkflow ...........................................   Passed    0.05 sec
+        Start 1243: SandboxPointCloudConsolidationPanel.MeshVertexAndFaceSlotsUseTheSameEditorPreflight
+315/742 Test #1243: SandboxPointCloudConsolidationPanel.MeshVertexAndFaceSlotsUseTheSameEditorPreflight .............................   Passed    0.04 sec
+        Start 1387: GeometryMeshQuantities.SingleTriangleAreaVectorCentroid
+316/742 Test #1387: GeometryMeshQuantities.SingleTriangleAreaVectorCentroid .........................................................   Passed    0.00 sec
+        Start 1388: GeometryMeshQuantities.BarycentricAreasSumToSurfaceArea
+317/742 Test #1388: GeometryMeshQuantities.BarycentricAreasSumToSurfaceArea .........................................................   Passed    0.00 sec
+        Start 1389: GeometryMeshQuantities.EquilateralTriangleAreaIsAnalytic
+318/742 Test #1389: GeometryMeshQuantities.EquilateralTriangleAreaIsAnalytic ........................................................   Passed    0.00 sec
+        Start 1390: GeometryMeshQuantities.ClosedMeshAreaVectorsSumToZero
+319/742 Test #1390: GeometryMeshQuantities.ClosedMeshAreaVectorsSumToZero ...........................................................   Passed    0.00 sec
+        Start 1391: GeometryMeshQuantities.PublishCanonicalQuantityProperties
+320/742 Test #1391: GeometryMeshQuantities.PublishCanonicalQuantityProperties .......................................................   Passed    0.00 sec
+        Start 1392: GeometryMeshQuantities.FaceCentroidIsCornerAverageNotOneRing
+321/742 Test #1392: GeometryMeshQuantities.FaceCentroidIsCornerAverageNotOneRing ....................................................   Passed    0.00 sec
+        Start 1393: GeometryMeshQuantities.FailClosedOnInvalidFace
+322/742 Test #1393: GeometryMeshQuantities.FailClosedOnInvalidFace ..................................................................   Passed    0.00 sec
+        Start 1394: GeometryMeshQuantities.FaceScalarGradientMatchesLinearField
+323/742 Test #1394: GeometryMeshQuantities.FaceScalarGradientMatchesLinearField .....................................................   Passed    0.00 sec
+        Start 1395: GeometryMeshQuantities.FaceScalarGradientFailsClosed
+324/742 Test #1395: GeometryMeshQuantities.FaceScalarGradientFailsClosed ............................................................   Passed    0.00 sec
+        Start 1396: GeometryMeshQuantities.ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices
+325/742 Test #1396: GeometryMeshQuantities.ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices ...............................   Passed    0.00 sec
+        Start 1397: GeometryMeshQuantities.VertexOneRingPcaAlignsWithSphereNormal
+326/742 Test #1397: GeometryMeshQuantities.VertexOneRingPcaAlignsWithSphereNormal ...................................................   Passed    0.00 sec
+        Start 1398: GeometryMeshQuantities.VertexOneRingPcaFailsClosedWhenUnderdetermined
+327/742 Test #1398: GeometryMeshQuantities.VertexOneRingPcaFailsClosedWhenUnderdetermined ...........................................   Passed    0.00 sec
+        Start 1399: GeometryMeshQuantities.NonPlanarQuadAreaUsesTriangleFan
+328/742 Test #1399: GeometryMeshQuantities.NonPlanarQuadAreaUsesTriangleFan .........................................................   Passed    0.00 sec
+        Start 1400: GeometryMeshQuantities.PlanarConcavePolygonUsesShoelaceArea
+329/742 Test #1400: GeometryMeshQuantities.PlanarConcavePolygonUsesShoelaceArea .....................................................   Passed    0.00 sec
+        Start 1401: GeometryMeshQuantities.FailClosedOnNonFiniteCorner
+330/742 Test #1401: GeometryMeshQuantities.FailClosedOnNonFiniteCorner ..............................................................   Passed    0.00 sec
+        Start 1402: GeometryMeshClosestFace.MatchesBruteForce
+331/742 Test #1402: GeometryMeshClosestFace.MatchesBruteForce .......................................................................   Passed    0.06 sec
+        Start 1403: GeometryMeshClosestFace.PointOnSurfaceHasZeroDistance
+332/742 Test #1403: GeometryMeshClosestFace.PointOnSurfaceHasZeroDistance ...........................................................   Passed    0.00 sec
+        Start 1404: GeometryMeshClosestFace.FailClosed
+333/742 Test #1404: GeometryMeshClosestFace.FailClosed ..............................................................................   Passed    0.00 sec
+        Start 1405: GeometryMeshClosestFace.KNearestAndRadiusMatchBruteForce
+334/742 Test #1405: GeometryMeshClosestFace.KNearestAndRadiusMatchBruteForce ........................................................   Passed    0.01 sec
+        Start 1406: GeometryMeshClosestFace.SubsetBuildRestrictsCandidates
+335/742 Test #1406: GeometryMeshClosestFace.SubsetBuildRestrictsCandidates ..........................................................   Passed    0.00 sec
+        Start 1456: GeometryPropertiesContract.MeshLiveRangesMatchManualDeletedFilter
+336/742 Test #1456: GeometryPropertiesContract.MeshLiveRangesMatchManualDeletedFilter ...............................................   Passed    0.00 sec
+        Start 1492: DEC_ExteriorDerivative0.DimensionsMatchMesh
+337/742 Test #1492: DEC_ExteriorDerivative0.DimensionsMatchMesh .....................................................................   Passed    0.00 sec
+        Start 1497: DEC_ExteriorDerivative1.DimensionsMatchMesh
+338/742 Test #1497: DEC_ExteriorDerivative1.DimensionsMatchMesh .....................................................................   Passed    0.00 sec
+        Start 1562: DEC_StiffnessModes.FailClosedOnEmptyMesh
+339/742 Test #1562: DEC_StiffnessModes.FailClosedOnEmptyMesh ........................................................................   Passed    0.00 sec
+        Start 1577: MeshTopology_Flip.FlipPreservesVertexCount
+340/742 Test #1577: MeshTopology_Flip.FlipPreservesVertexCount ......................................................................   Passed    0.00 sec
+        Start 1578: MeshTopology_Flip.FlipChangesEndpoints
+341/742 Test #1578: MeshTopology_Flip.FlipChangesEndpoints ..........................................................................   Passed    0.00 sec
+        Start 1579: MeshTopology_Flip.TwoTriangleSquareRejected
+342/742 Test #1579: MeshTopology_Flip.TwoTriangleSquareRejected .....................................................................   Passed    0.00 sec
+        Start 1580: MeshTopology_Flip.BoundaryEdgeReject
+343/742 Test #1580: MeshTopology_Flip.BoundaryEdgeReject ............................................................................   Passed    0.00 sec
+        Start 1581: MeshTopology_Split.InteriorSplitCreatesCorrectCounts
+344/742 Test #1581: MeshTopology_Split.InteriorSplitCreatesCorrectCounts ............................................................   Passed    0.00 sec
+        Start 1582: MeshTopology_Split.BoundarySplitCreatesCorrectCounts
+345/742 Test #1582: MeshTopology_Split.BoundarySplitCreatesCorrectCounts ............................................................   Passed    0.00 sec
+        Start 1583: MeshTopology_Split.NewVertexAtCorrectPosition
+346/742 Test #1583: MeshTopology_Split.NewVertexAtCorrectPosition ...................................................................   Passed    0.00 sec
+        Start 1584: MeshTopology_Collapse.CollapseReducesCounts
+347/742 Test #1584: MeshTopology_Collapse.CollapseReducesCounts .....................................................................   Passed    0.00 sec
+        Start 1585: MeshTopology_Collapse.SingleCollapsePreservesNextCycles
+348/742 Test #1585: MeshTopology_Collapse.SingleCollapsePreservesNextCycles .........................................................   Passed    0.00 sec
+        Start 1586: MeshTopology_Collapse.SurvivingVertexAtCorrectPosition
+349/742 Test #1586: MeshTopology_Collapse.SurvivingVertexAtCorrectPosition ..........................................................   Passed    0.00 sec
+        Start 1587: MeshTopology_Collapse.DirectedHalfedgeCollapsePreservesToVertexWhileLegacyEdgeCollapseKeepsHistoricalSurvivor
+350/742 Test #1587: MeshTopology_Collapse.DirectedHalfedgeCollapsePreservesToVertexWhileLegacyEdgeCollapseKeepsHistoricalSurvivor ...   Passed    0.00 sec
+        Start 1592: Simplification_QEM.PreservedMeshIsValid
+351/742 Test #1592: Simplification_QEM.PreservedMeshIsValid .........................................................................   Passed    0.01 sec
+        Start 1594: Simplification_QEM.DenseClosedMeshStaysClosed
+352/742 Test #1594: Simplification_QEM.DenseClosedMeshStaysClosed ...................................................................   Passed    0.24 sec
+        Start 1595: Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel
+353/742 Test #1595: Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel ....................................................   Passed    0.02 sec
+        Start 1596: Simplification_QEM.RepeatedWorkflowSmallMeshSentinel
+354/742 Test #1596: Simplification_QEM.RepeatedWorkflowSmallMeshSentinel ............................................................   Passed    0.01 sec
+        Start 1597: Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel
+355/742 Test #1597: Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel ........................................................   Passed    0.01 sec
+        Start 1598: Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel
+356/742 Test #1598: Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel .......................................................   Passed    0.01 sec
+        Start 1602: MeshRepair_BoundaryDetection.ClosedMeshHasNoBoundary
+357/742 Test #1602: MeshRepair_BoundaryDetection.ClosedMeshHasNoBoundary ............................................................   Passed    0.00 sec
+        Start 1603: MeshRepair_BoundaryDetection.OpenMeshHasBoundary
+358/742 Test #1603: MeshRepair_BoundaryDetection.OpenMeshHasBoundary ................................................................   Passed    0.00 sec
+        Start 1604: MeshRepair_BoundaryDetection.TwoTriangleSquareHasBoundary
+359/742 Test #1604: MeshRepair_BoundaryDetection.TwoTriangleSquareHasBoundary .......................................................   Passed    0.00 sec
+        Start 1605: MeshRepair_HoleFilling.FillsTriangularHole
+360/742 Test #1605: MeshRepair_HoleFilling.FillsTriangularHole ......................................................................   Passed    0.00 sec
+        Start 1606: MeshRepair_HoleFilling.EmptyMeshReturnsNullopt
+361/742 Test #1606: MeshRepair_HoleFilling.EmptyMeshReturnsNullopt ..................................................................   Passed    0.00 sec
+        Start 1607: MeshRepair_HoleFilling.ClosedMeshReportsZeroHoles
+362/742 Test #1607: MeshRepair_HoleFilling.ClosedMeshReportsZeroHoles ...............................................................   Passed    0.00 sec
+        Start 1608: MeshRepair_DegenerateFaces.DetectsZeroAreaTriangle
+363/742 Test #1608: MeshRepair_DegenerateFaces.DetectsZeroAreaTriangle ..............................................................   Passed    0.00 sec
+        Start 1609: MeshRepair_DegenerateFaces.PreservesValidTriangles
+364/742 Test #1609: MeshRepair_DegenerateFaces.PreservesValidTriangles ..............................................................   Passed    0.00 sec
+        Start 1610: MeshRepair_DegenerateFaces.EmptyMeshReturnsNullopt
+365/742 Test #1610: MeshRepair_DegenerateFaces.EmptyMeshReturnsNullopt ..............................................................   Passed    0.00 sec
+        Start 1611: MeshRepair_Orientation.ClosedMeshIsConsistent
+366/742 Test #1611: MeshRepair_Orientation.ClosedMeshIsConsistent ...................................................................   Passed    0.00 sec
+        Start 1612: MeshRepair_Orientation.EmptyMeshReturnsNullopt
+367/742 Test #1612: MeshRepair_Orientation.EmptyMeshReturnsNullopt ..................................................................   Passed    0.00 sec
+        Start 1613: MeshRepair_Orientation.IcosahedronSingleComponent
+368/742 Test #1613: MeshRepair_Orientation.IcosahedronSingleComponent ...............................................................   Passed    0.00 sec
+        Start 1614: MeshRepair_Combined.RepairValidMesh
+369/742 Test #1614: MeshRepair_Combined.RepairValidMesh .............................................................................   Passed    0.00 sec
+        Start 1615: MeshRepair_Combined.RepairWithDegenerates
+370/742 Test #1615: MeshRepair_Combined.RepairWithDegenerates .......................................................................   Passed    0.00 sec
+        Start 1616: MeshRepair_Combined.EmptyMeshReturnsNullopt
+371/742 Test #1616: MeshRepair_Combined.EmptyMeshReturnsNullopt .....................................................................   Passed    0.01 sec
+        Start 1617: MeshConversion.ConvertsValidSoupToHalfedgeMeshWithFailureDiagnostics
+372/742 Test #1617: MeshConversion.ConvertsValidSoupToHalfedgeMeshWithFailureDiagnostics ............................................   Passed    0.00 sec
+        Start 1618: MeshConversion.ConvertsHalfedgeMeshToIndexedSoupAndBack
+373/742 Test #1618: MeshConversion.ConvertsHalfedgeMeshToIndexedSoupAndBack .........................................................   Passed    0.00 sec
+        Start 1619: MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer
+374/742 Test #1619: MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer ......................................   Passed    0.00 sec
+        Start 1620: MeshSoup.EmptyInputIsValid
+375/742 Test #1620: MeshSoup.EmptyInputIsValid ......................................................................................   Passed    0.00 sec
+        Start 1621: MeshSoup.ValidTriangleSoupAndBorrowedViewAreAccepted
+376/742 Test #1621: MeshSoup.ValidTriangleSoupAndBorrowedViewAreAccepted ............................................................   Passed    0.01 sec
+        Start 1622: MeshSoup.PolygonSoupIsAccepted
+377/742 Test #1622: MeshSoup.PolygonSoupIsAccepted ..................................................................................   Passed    0.00 sec
+        Start 1623: MeshSoup.DuplicateVerticesAreWarnings
+378/742 Test #1623: MeshSoup.DuplicateVerticesAreWarnings ...........................................................................   Passed    0.00 sec
+        Start 1624: MeshSoup.DuplicateVerticesTreatSignedZeroAsEqual
+379/742 Test #1624: MeshSoup.DuplicateVerticesTreatSignedZeroAsEqual ................................................................   Passed    0.00 sec
+        Start 1625: MeshSoup.InvalidIndicesAreErrors
+380/742 Test #1625: MeshSoup.InvalidIndicesAreErrors ................................................................................   Passed    0.00 sec
+        Start 1626: MeshSoup.DegenerateFacesAreErrors
+381/742 Test #1626: MeshSoup.DegenerateFacesAreErrors ...............................................................................   Passed    0.00 sec
+        Start 1627: MeshSoup.NonManifoldEdgesAreErrors
+382/742 Test #1627: MeshSoup.NonManifoldEdgesAreErrors ..............................................................................   Passed    0.00 sec
+        Start 1628: MeshSoup.InconsistentWindingIsReportedForSameDirectedSharedEdge
+383/742 Test #1628: MeshSoup.InconsistentWindingIsReportedForSameDirectedSharedEdge .................................................   Passed    0.00 sec
+        Start 1629: MeshSoup.PropertySetsStoreVertexFaceAndCornerDomains
+384/742 Test #1629: MeshSoup.PropertySetsStoreVertexFaceAndCornerDomains ............................................................   Passed    0.00 sec
+        Start 1630: MeshSoup.CopyAndMoveRebindBuiltInPropertyHandles
+385/742 Test #1630: MeshSoup.CopyAndMoveRebindBuiltInPropertyHandles ................................................................   Passed    0.00 sec
+        Start 1631: MeshSoup.AttributeArityMismatchesUsePropertySetDomainCardinality
+386/742 Test #1631: MeshSoup.AttributeArityMismatchesUsePropertySetDomainCardinality ................................................   Passed    0.00 sec
+        Start 1643: MeshBuilder.AABBProducesQuadBox
+387/742 Test #1643: MeshBuilder.AABBProducesQuadBox .................................................................................   Passed    0.00 sec
+        Start 1644: MeshBuilder.DegenerateAABBReturnsNullopt
+388/742 Test #1644: MeshBuilder.DegenerateAABBReturnsNullopt ........................................................................   Passed    0.00 sec
+        Start 1645: MeshBuilder.OBBProducesQuadBox
+389/742 Test #1645: MeshBuilder.OBBProducesQuadBox ..................................................................................   Passed    0.00 sec
+        Start 1646: MeshBuilder.SphereSubdivisionZeroMatchesIcosahedronCounts
+390/742 Test #1646: MeshBuilder.SphereSubdivisionZeroMatchesIcosahedronCounts .......................................................   Passed    0.00 sec
+        Start 1647: MeshBuilder.DegenerateSphereReturnsNullopt
+391/742 Test #1647: MeshBuilder.DegenerateSphereReturnsNullopt ......................................................................   Passed    0.00 sec
+        Start 1648: MeshBuilder.CylinderProducesClosedMesh
+392/742 Test #1648: MeshBuilder.CylinderProducesClosedMesh ..........................................................................   Passed    0.00 sec
+        Start 1649: MeshBuilder.CapsuleZeroAxisFallsBackToSphere
+393/742 Test #1649: MeshBuilder.CapsuleZeroAxisFallsBackToSphere ....................................................................   Passed    0.02 sec
+        Start 1650: MeshBuilder.CapsuleProducesClosedMesh
+394/742 Test #1650: MeshBuilder.CapsuleProducesClosedMesh ...........................................................................   Passed    0.01 sec
+        Start 1651: MeshBuilder.EllipsoidProducesFiniteTransformedSphere
+395/742 Test #1651: MeshBuilder.EllipsoidProducesFiniteTransformedSphere ............................................................   Passed    0.01 sec
+        Start 1652: MeshBuilder.PlatonicSolidCounts
+396/742 Test #1652: MeshBuilder.PlatonicSolidCounts .................................................................................   Passed    0.00 sec
+        Start 1662: Remeshing_Isotropic.MaintainsValidMesh
+397/742 Test #1662: Remeshing_Isotropic.MaintainsValidMesh ..........................................................................   Passed    0.01 sec
+        Start 1664: Remeshing_Isotropic.EmptyMeshReturnsNullopt
+398/742 Test #1664: Remeshing_Isotropic.EmptyMeshReturnsNullopt .....................................................................   Passed    0.01 sec
+        Start 1665: MeshUtils_CotanLaplacian.EmptyMeshReturnsEmptyVector
+399/742 Test #1665: MeshUtils_CotanLaplacian.EmptyMeshReturnsEmptyVector ............................................................   Passed    0.00 sec
+        Start 1666: MeshUtils_CotanLaplacian.SingleTriangleNonZero
+400/742 Test #1666: MeshUtils_CotanLaplacian.SingleTriangleNonZero ..................................................................   Passed    0.00 sec
+        Start 1667: MeshUtils_CotanLaplacian.EquilateralTriangleSymmetry
+401/742 Test #1667: MeshUtils_CotanLaplacian.EquilateralTriangleSymmetry ............................................................   Passed    0.00 sec
+        Start 1668: MeshUtils_CotanLaplacian.ClampedWeightsNonNegative
+402/742 Test #1668: MeshUtils_CotanLaplacian.ClampedWeightsNonNegative ..............................................................   Passed    0.00 sec
+        Start 1669: MeshUtils_CotanLaplacian.ClosedMeshLaplacianSumsToZero
+403/742 Test #1669: MeshUtils_CotanLaplacian.ClosedMeshLaplacianSumsToZero ..........................................................   Passed    0.00 sec
+        Start 1670: MeshUtils_EdgeCotanWeight.EquilateralTriangleBoundaryWeight
+404/742 Test #1670: MeshUtils_EdgeCotanWeight.EquilateralTriangleBoundaryWeight .....................................................   Passed    0.00 sec
+        Start 1671: MeshUtils_OneRingCentroid.IsolatedVertexReturnsSelf
+405/742 Test #1671: MeshUtils_OneRingCentroid.IsolatedVertexReturnsSelf .............................................................   Passed    0.00 sec
+        Start 1672: MeshUtils_OneRingCentroid.EquilateralTriangleCentroids
+406/742 Test #1672: MeshUtils_OneRingCentroid.EquilateralTriangleCentroids ..........................................................   Passed    0.00 sec
+        Start 1673: MeshUtils_OneRingCentroid.RegularTetrahedronSymmetry
+407/742 Test #1673: MeshUtils_OneRingCentroid.RegularTetrahedronSymmetry ............................................................   Passed    0.00 sec
+        Start 1678: EdgeLoop.ClosedMeshNoDuplicatesOrOverflow
+408/742 Test #1678: EdgeLoop.ClosedMeshNoDuplicatesOrOverflow .......................................................................   Passed    0.00 sec
+        Start 1683: EdgeLoop.BoundaryMeshStopsAtBoundary
+409/742 Test #1683: EdgeLoop.BoundaryMeshStopsAtBoundary ............................................................................   Passed    0.00 sec
+        Start 1694: EdgeRing.ClosedMeshNoDuplicatesOrOverflow
+410/742 Test #1694: EdgeRing.ClosedMeshNoDuplicatesOrOverflow .......................................................................   Passed    0.01 sec
+        Start 1698: EdgeRing.BoundaryMeshStopsAtBoundary
+411/742 Test #1698: EdgeRing.BoundaryMeshStopsAtBoundary ............................................................................   Passed    0.00 sec
+        Start 1724: SurfaceReconstruction.OutputMeshHasVerticesAndFaces
+412/742 Test #1724: SurfaceReconstruction.OutputMeshHasVerticesAndFaces .............................................................   Passed    0.04 sec
+        Start 1728: MeshQuality.EmptyMeshReturnsNullopt
+413/742 Test #1728: MeshQuality.EmptyMeshReturnsNullopt .............................................................................   Passed    0.00 sec
+        Start 1729: MeshQuality.EquilateralAngles60
+414/742 Test #1729: MeshQuality.EquilateralAngles60 .................................................................................   Passed    0.00 sec
+        Start 1730: MeshQuality.EquilateralAspectRatio1
+415/742 Test #1730: MeshQuality.EquilateralAspectRatio1 .............................................................................   Passed    0.00 sec
+        Start 1731: MeshQuality.TetrahedronClosed
+416/742 Test #1731: MeshQuality.TetrahedronClosed ...................................................................................   Passed    0.00 sec
+        Start 1732: MeshQuality.TetrahedronVolume
+417/742 Test #1732: MeshQuality.TetrahedronVolume ...................................................................................   Passed    0.00 sec
+        Start 1733: MeshQuality.SingleTriangleNotClosed
+418/742 Test #1733: MeshQuality.SingleTriangleNotClosed .............................................................................   Passed    0.00 sec
+        Start 1734: MeshQuality.EulerCharacteristic
+419/742 Test #1734: MeshQuality.EulerCharacteristic .................................................................................   Passed    0.00 sec
+        Start 1735: MeshQuality.IcosahedronUniformValence5
+420/742 Test #1735: MeshQuality.IcosahedronUniformValence5 ..........................................................................   Passed    0.00 sec
+        Start 1736: MeshQuality.EdgeLengthStats
+421/742 Test #1736: MeshQuality.EdgeLengthStats .....................................................................................   Passed    0.00 sec
+        Start 1737: MeshQuality.BoundaryLoopCount
+422/742 Test #1737: MeshQuality.BoundaryLoopCount ...................................................................................   Passed    0.00 sec
+        Start 1738: MeshAnalysis.EmptyMeshReturnsNullopt
+423/742 Test #1738: MeshAnalysis.EmptyMeshReturnsNullopt ............................................................................   Passed    0.00 sec
+        Start 1739: MeshAnalysis.TetrahedronHasNoProblems
+424/742 Test #1739: MeshAnalysis.TetrahedronHasNoProblems ...........................................................................   Passed    0.00 sec
+        Start 1740: MeshAnalysis.SingleTriangleMarksBoundaryRegion
+425/742 Test #1740: MeshAnalysis.SingleTriangleMarksBoundaryRegion ..................................................................   Passed    0.00 sec
+        Start 1741: MeshAnalysis.DegenerateTriangleIsDetected
+426/742 Test #1741: MeshAnalysis.DegenerateTriangleIsDetected .......................................................................   Passed    0.00 sec
+        Start 1742: MeshAnalysis.SingleQuadFlagsNonTriangleFace
+427/742 Test #1742: MeshAnalysis.SingleQuadFlagsNonTriangleFace .....................................................................   Passed    0.00 sec
+        Start 1743: LSCM.EmptyMeshReturnsNullopt
+428/742 Test #1743: LSCM.EmptyMeshReturnsNullopt ....................................................................................   Passed    0.00 sec
+        Start 1744: LSCM.ClosedMeshReturnsNullopt
+429/742 Test #1744: LSCM.ClosedMeshReturnsNullopt ...................................................................................   Passed    0.00 sec
+        Start 1765: HarmonicParameterization.ClosedMeshIsNotDiskTopology
+430/742 Test #1765: HarmonicParameterization.ClosedMeshIsNotDiskTopology ............................................................   Passed    0.00 sec
+        Start 1767: HarmonicParameterization.PuncturedGenusOneMeshIsNotDiskTopology
+431/742 Test #1767: HarmonicParameterization.PuncturedGenusOneMeshIsNotDiskTopology .................................................   Passed    0.01 sec
+        Start 1769: HarmonicParameterization.NonTriangleMeshIsRejected
+432/742 Test #1769: HarmonicParameterization.NonTriangleMeshIsRejected ..............................................................   Passed    0.00 sec
+        Start 1816: AdaptiveRemesh.EmptyMeshReturnsNullopt
+433/742 Test #1816: AdaptiveRemesh.EmptyMeshReturnsNullopt ..........................................................................   Passed    0.00 sec
+        Start 1826: AdaptiveRemesh.ReferenceProjectionPathProducesValidMesh
+434/742 Test #1826: AdaptiveRemesh.ReferenceProjectionPathProducesValidMesh .........................................................   Passed    0.01 sec
+        Start 1828: AdaptiveRemesh.ErrorBoundedSizingPathProducesValidMesh
+435/742 Test #1828: AdaptiveRemesh.ErrorBoundedSizingPathProducesValidMesh ..........................................................   Passed    0.01 sec
+        Start 1850: ConvexHull_Mesh.BuildMeshProducesValidHalfedgeMesh
+436/742 Test #1850: ConvexHull_Mesh.BuildMeshProducesValidHalfedgeMesh ..............................................................   Passed    0.00 sec
+        Start 1851: ConvexHull_Mesh.CubeMeshTopology
+437/742 Test #1851: ConvexHull_Mesh.CubeMeshTopology ................................................................................   Passed    0.00 sec
+        Start 1852: ConvexHull_Mesh.MeshNotBuiltByDefault
+438/742 Test #1852: ConvexHull_Mesh.MeshNotBuiltByDefault ...........................................................................   Passed    0.00 sec
+        Start 1853: ConvexHull_FromMesh.TetrahedronMesh
+439/742 Test #1853: ConvexHull_FromMesh.TetrahedronMesh .............................................................................   Passed    0.00 sec
+        Start 1854: ConvexHull_FromMesh.EmptyMeshReturnsNullopt
+440/742 Test #1854: ConvexHull_FromMesh.EmptyMeshReturnsNullopt .....................................................................   Passed    0.00 sec
+        Start 1926: BooleanCSG.DisjointUnionAppendsBothMeshes
+441/742 Test #1926: BooleanCSG.DisjointUnionAppendsBothMeshes .......................................................................   Passed    0.00 sec
+        Start 1927: BooleanCSG.DisjointIntersectionReturnsEmptyMesh
+442/742 Test #1927: BooleanCSG.DisjointIntersectionReturnsEmptyMesh .................................................................   Passed    0.01 sec
+        Start 1928: BooleanCSG.DisjointDifferenceReturnsFirstMesh
+443/742 Test #1928: BooleanCSG.DisjointDifferenceReturnsFirstMesh ...................................................................   Passed    0.00 sec
+        Start 1930: BooleanCSG.ContainmentIntersectionReturnsInnerMesh
+444/742 Test #1930: BooleanCSG.ContainmentIntersectionReturnsInnerMesh ..............................................................   Passed    0.00 sec
+        Start 1931: BooleanCSG.ContainmentUnionReturnsOuterMesh
+445/742 Test #1931: BooleanCSG.ContainmentUnionReturnsOuterMesh .....................................................................   Passed    0.01 sec
+        Start 1939: BooleanCSG.EmptyMeshA_ReturnsNullopt
+446/742 Test #1939: BooleanCSG.EmptyMeshA_ReturnsNullopt ............................................................................   Passed    0.00 sec
+        Start 1940: BooleanCSG.EmptyMeshB_ReturnsNullopt
+447/742 Test #1940: BooleanCSG.EmptyMeshB_ReturnsNullopt ............................................................................   Passed    0.00 sec
+        Start 1941: BooleanCSG.BothMeshesEmpty_ReturnsNullopt
+448/742 Test #1941: BooleanCSG.BothMeshesEmpty_ReturnsNullopt .......................................................................   Passed    0.00 sec
+        Start 1942: BooleanCSG.IdenticalMeshes_UnionReturnsOneMesh
+449/742 Test #1942: BooleanCSG.IdenticalMeshes_UnionReturnsOneMesh ..................................................................   Passed    0.00 sec
+        Start 1943: BooleanCSG.IdenticalMeshes_IntersectionReturnsOneMesh
+450/742 Test #1943: BooleanCSG.IdenticalMeshes_IntersectionReturnsOneMesh ...........................................................   Passed    0.00 sec
+        Start 1950: BooleanCSG.OutputMeshIsClearedBeforeWrite
+451/742 Test #1950: BooleanCSG.OutputMeshIsClearedBeforeWrite .......................................................................   Passed    0.00 sec
+        Start 1951: MeshBoundary.EmptyMeshReturnsEmptyResult
+452/742 Test #1951: MeshBoundary.EmptyMeshReturnsEmptyResult ........................................................................   Passed    0.00 sec
+        Start 1952: MeshBoundary.ClosedMeshHasNoBoundary
+453/742 Test #1952: MeshBoundary.ClosedMeshHasNoBoundary ............................................................................   Passed    0.00 sec
+        Start 1953: MeshBoundary.SingleTriangleHasBoundary
+454/742 Test #1953: MeshBoundary.SingleTriangleHasBoundary ..........................................................................   Passed    0.00 sec
+        Start 1954: MeshBoundary.TwoTriangleSquareBoundary
+455/742 Test #1954: MeshBoundary.TwoTriangleSquareBoundary ..........................................................................   Passed    0.00 sec
+        Start 1955: MeshBoundary.IcosahedronFullyClosed
+456/742 Test #1955: MeshBoundary.IcosahedronFullyClosed .............................................................................   Passed    0.00 sec
+        Start 1956: MeshBoundary.MarkBoundaryVerticesAsFeature
+457/742 Test #1956: MeshBoundary.MarkBoundaryVerticesAsFeature ......................................................................   Passed    0.00 sec
+        Start 1957: MeshBoundary.MarkBoundaryEdgesAsFeature
+458/742 Test #1957: MeshBoundary.MarkBoundaryEdgesAsFeature .........................................................................   Passed    0.00 sec
+        Start 1958: MeshBoundary.BoundaryPropertyTracksCorrectly
+459/742 Test #1958: MeshBoundary.BoundaryPropertyTracksCorrectly ....................................................................   Passed    0.00 sec
+        Start 1959: MeshBoundary.CubeIsFullyClosed
+460/742 Test #1959: MeshBoundary.CubeIsFullyClosed ..................................................................................   Passed    0.00 sec
+        Start 1977: HalfedgeMeshVertexNormals.DebugNamesAreStable
+461/742 Test #1977: HalfedgeMeshVertexNormals.DebugNamesAreStable ...................................................................   Passed    0.00 sec
+        Start 1978: HalfedgeMeshVertexNormals.WeightingModesProduceExpectedCornerNormal
+462/742 Test #1978: HalfedgeMeshVertexNormals.WeightingModesProduceExpectedCornerNormal .............................................   Passed    0.01 sec
+        Start 1979: HalfedgeMeshVertexNormals.DegenerateFaceWritesFallbackNormals
+463/742 Test #1979: HalfedgeMeshVertexNormals.DegenerateFaceWritesFallbackNormals ...................................................   Passed    0.00 sec
+        Start 1980: HalfedgeMeshVertexNormals.InvalidFallbackIsRepairedDeterministically
+464/742 Test #1980: HalfedgeMeshVertexNormals.InvalidFallbackIsRepairedDeterministically ............................................   Passed    0.00 sec
+        Start 1981: HalfedgeMeshVertexNormals.NonFiniteFaceDoesNotProduceNaNNormals
+465/742 Test #1981: HalfedgeMeshVertexNormals.NonFiniteFaceDoesNotProduceNaNNormals .................................................   Passed    0.00 sec
+        Start 1982: HalfedgeMeshVertexNormals.EmptyMeshReturnsEmptyProperty
+466/742 Test #1982: HalfedgeMeshVertexNormals.EmptyMeshReturnsEmptyProperty .........................................................   Passed    0.00 sec
+        Start 1983: HalfedgeMeshVertexNormals.InvalidOutputPropertyFailsClosed
+467/742 Test #1983: HalfedgeMeshVertexNormals.InvalidOutputPropertyFailsClosed ......................................................   Passed    0.00 sec
+        Start 1984: HalfedgeMeshVertexNormals.ExistingPropertyWithWrongTypeFailsClosed
+468/742 Test #1984: HalfedgeMeshVertexNormals.ExistingPropertyWithWrongTypeFailsClosed ..............................................   Passed    0.01 sec
+        Start 1985: HalfedgeMesh_PropertyAccess.EdgeProperties_NonConst_ReturnsCorrectSize
+469/742 Test #1985: HalfedgeMesh_PropertyAccess.EdgeProperties_NonConst_ReturnsCorrectSize ..........................................   Passed    0.00 sec
+        Start 1986: HalfedgeMesh_PropertyAccess.EdgeProperties_Const_ReturnsCorrectSize
+470/742 Test #1986: HalfedgeMesh_PropertyAccess.EdgeProperties_Const_ReturnsCorrectSize .............................................   Passed    0.00 sec
+        Start 1987: HalfedgeMesh_PropertyAccess.EdgeProperties_CanAddUserProperty
+471/742 Test #1987: HalfedgeMesh_PropertyAccess.EdgeProperties_CanAddUserProperty ...................................................   Passed    0.00 sec
+        Start 1988: HalfedgeMesh_PropertyAccess.EdgeProperties_ListsProperties
+472/742 Test #1988: HalfedgeMesh_PropertyAccess.EdgeProperties_ListsProperties ......................................................   Passed    0.00 sec
+        Start 1989: HalfedgeMesh_PropertyAccess.FaceProperties_NonConst_ReturnsCorrectSize
+473/742 Test #1989: HalfedgeMesh_PropertyAccess.FaceProperties_NonConst_ReturnsCorrectSize ..........................................   Passed    0.00 sec
+        Start 1990: HalfedgeMesh_PropertyAccess.FaceProperties_Const_ReturnsCorrectSize
+474/742 Test #1990: HalfedgeMesh_PropertyAccess.FaceProperties_Const_ReturnsCorrectSize .............................................   Passed    0.00 sec
+        Start 1991: HalfedgeMesh_PropertyAccess.FaceProperties_CanAddUserProperty
+475/742 Test #1991: HalfedgeMesh_PropertyAccess.FaceProperties_CanAddUserProperty ...................................................   Passed    0.00 sec
+        Start 1992: HalfedgeMesh_PropertyAccess.FaceProperties_SpanAccess
+476/742 Test #1992: HalfedgeMesh_PropertyAccess.FaceProperties_SpanAccess ...........................................................   Passed    0.00 sec
+        Start 1993: HalfedgeMesh_PropertyAccess.HalfedgeProperties_NonConst_ReturnsCorrectSize
+477/742 Test #1993: HalfedgeMesh_PropertyAccess.HalfedgeProperties_NonConst_ReturnsCorrectSize ......................................   Passed    0.00 sec
+        Start 1994: HalfedgeMesh_PropertyAccess.HalfedgeProperties_Const_ReturnsCorrectSize
+478/742 Test #1994: HalfedgeMesh_PropertyAccess.HalfedgeProperties_Const_ReturnsCorrectSize .........................................   Passed    0.00 sec
+        Start 1995: HalfedgeMesh_PropertyAccess.HalfedgeProperties_CanAddUserProperty
+479/742 Test #1995: HalfedgeMesh_PropertyAccess.HalfedgeProperties_CanAddUserProperty ...............................................   Passed    0.00 sec
+        Start 1996: HalfedgeMesh_PropertyAccess.AllPropertySets_SizesConsistent
+480/742 Test #1996: HalfedgeMesh_PropertyAccess.AllPropertySets_SizesConsistent .....................................................   Passed    0.00 sec
+        Start 1997: HalfedgeMesh_PropertyAccess.PropertySet_RemoveThenReuseSameNameWorks
+481/742 Test #1997: HalfedgeMesh_PropertyAccess.PropertySet_RemoveThenReuseSameNameWorks ............................................   Passed    0.00 sec
+        Start 1998: HalfedgeMesh_PropertyAccess.VertexProperties_RemainUsableAfterGarbageCollection
+482/742 Test #1998: HalfedgeMesh_PropertyAccess.VertexProperties_RemainUsableAfterGarbageCollection .................................   Passed    0.00 sec
+        Start 1999: HalfedgeMesh_PropertyAccess.CurvatureMutableOverloadsPublishVertexProperties
+483/742 Test #1999: HalfedgeMesh_PropertyAccess.CurvatureMutableOverloadsPublishVertexProperties ....................................   Passed    0.00 sec
+        Start 2000: HalfedgeMesh_PropertyAccess.GeodesicMutableOverloadPublishesDistanceAndSourceProperties
+484/742 Test #2000: HalfedgeMesh_PropertyAccess.GeodesicMutableOverloadPublishesDistanceAndSourceProperties .........................   Passed    0.00 sec
+        Start 2001: HalfedgeMesh_PropertyAccess.ParameterizationMutableOverloadPublishesUvAndPinProperties
+485/742 Test #2001: HalfedgeMesh_PropertyAccess.ParameterizationMutableOverloadPublishesUvAndPinProperties ..........................   Passed    0.00 sec
+        Start 2002: HalfedgeMesh_View.Mesh_BindsDirectPropertySets
+486/742 Test #2002: HalfedgeMesh_View.Mesh_BindsDirectPropertySets ..................................................................   Passed    0.00 sec
+        Start 2003: HalfedgeMesh_View.MoveAssignment_RebindsBuiltInPropertyHandles
+487/742 Test #2003: HalfedgeMesh_View.MoveAssignment_RebindsBuiltInPropertyHandles ..................................................   Passed    0.00 sec
+        Start 2004: HalfedgeMesh_Traversal.HalfedgesAroundFace_QuadMatchesNextCycle
+488/742 Test #2004: HalfedgeMesh_Traversal.HalfedgesAroundFace_QuadMatchesNextCycle .................................................   Passed    0.00 sec
+        Start 2005: HalfedgeMesh_Traversal.VerticesAroundFace_QuadMatchesHalfedgeToVertices
+489/742 Test #2005: HalfedgeMesh_Traversal.VerticesAroundFace_QuadMatchesHalfedgeToVertices .........................................   Passed    0.00 sec
+        Start 2006: HalfedgeMesh_Traversal.HalfedgesAroundVertex_CountMatchesValence
+490/742 Test #2006: HalfedgeMesh_Traversal.HalfedgesAroundVertex_CountMatchesValence ................................................   Passed    0.00 sec
+        Start 2007: HalfedgeMesh_Traversal.FacesAroundVertex_BoundaryVertexSkipsBoundaryGap
+491/742 Test #2007: HalfedgeMesh_Traversal.FacesAroundVertex_BoundaryVertexSkipsBoundaryGap .........................................   Passed    0.00 sec
+        Start 2008: HalfedgeMesh_Traversal.FacesAroundVertex_InteriorVertexVisitsIncidentFacesOnce
+492/742 Test #2008: HalfedgeMesh_Traversal.FacesAroundVertex_InteriorVertexVisitsIncidentFacesOnce ..................................   Passed    0.00 sec
+        Start 2009: HalfedgeMesh_Traversal.VertexOneRingRangesAreEmptyForIsolatedVertex
+493/742 Test #2009: HalfedgeMesh_Traversal.VertexOneRingRangesAreEmptyForIsolatedVertex .............................................   Passed    0.00 sec
+        Start 2010: HalfedgeMesh_Traversal.BoundaryHalfedges_VisitsEachBoundaryEdgeOnce
+494/742 Test #2010: HalfedgeMesh_Traversal.BoundaryHalfedges_VisitsEachBoundaryEdgeOnce .............................................   Passed    0.00 sec
+        Start 2011: HalfedgeMesh_Traversal.BoundaryVertices_MatchesBoundaryLoopConnectivity
+495/742 Test #2011: HalfedgeMesh_Traversal.BoundaryVertices_MatchesBoundaryLoopConnectivity .........................................   Passed    0.00 sec
+        Start 2012: HalfedgeMesh_EdgeExtraction.SingleTriangle_ReturnsThreeEdges
+496/742 Test #2012: HalfedgeMesh_EdgeExtraction.SingleTriangle_ReturnsThreeEdges ....................................................   Passed    0.00 sec
+        Start 2013: HalfedgeMesh_EdgeExtraction.EdgeVertices_AreValidIndices
+497/742 Test #2013: HalfedgeMesh_EdgeExtraction.EdgeVertices_AreValidIndices ........................................................   Passed    0.00 sec
+        Start 2014: HalfedgeMesh_EdgeExtraction.TwoTriangles_SharedEdgeAppearsOnce
+498/742 Test #2014: HalfedgeMesh_EdgeExtraction.TwoTriangles_SharedEdgeAppearsOnce ..................................................   Passed    0.00 sec
+        Start 2015: HalfedgeMesh_EdgeExtraction.TwoQuads_SharedEdgeAppearsOnce
+499/742 Test #2015: HalfedgeMesh_EdgeExtraction.TwoQuads_SharedEdgeAppearsOnce ......................................................   Passed    0.00 sec
+        Start 2016: HalfedgeMesh_EdgeExtraction.MatchesFromVertex_ToVertex
+500/742 Test #2016: HalfedgeMesh_EdgeExtraction.MatchesFromVertex_ToVertex ..........................................................   Passed    0.00 sec
+        Start 2017: HalfedgeMesh_EdgeExtraction.SpanOverload_FillsCorrectly
+501/742 Test #2017: HalfedgeMesh_EdgeExtraction.SpanOverload_FillsCorrectly .........................................................   Passed    0.00 sec
+        Start 2018: HalfedgeMesh_EdgeExtraction.SpanOverload_PartialBuffer
+502/742 Test #2018: HalfedgeMesh_EdgeExtraction.SpanOverload_PartialBuffer ..........................................................   Passed    0.00 sec
+        Start 2019: HalfedgeMesh_EdgeExtraction.EmptyMesh_ReturnsEmpty
+503/742 Test #2019: HalfedgeMesh_EdgeExtraction.EmptyMesh_ReturnsEmpty ..............................................................   Passed    0.00 sec
+        Start 2020: HalfedgeMesh_EdgeExtraction.AfterEdgeDelete_SkipsDeletedEdge
+504/742 Test #2020: HalfedgeMesh_EdgeExtraction.AfterEdgeDelete_SkipsDeletedEdge ....................................................   Passed    0.00 sec
+        Start 2021: HalfedgeMesh_EdgeExtraction.EdgeVertexPair_SizeOf8
+505/742 Test #2021: HalfedgeMesh_EdgeExtraction.EdgeVertexPair_SizeOf8 ..............................................................   Passed    0.00 sec
+        Start 2022: HalfedgeMesh_Topology.EmptyMesh_HasZeroCounts
+506/742 Test #2022: HalfedgeMesh_Topology.EmptyMesh_HasZeroCounts ...................................................................   Passed    0.00 sec
+        Start 2023: HalfedgeMesh_Topology.AddVertex_IncreasesCount
+507/742 Test #2023: HalfedgeMesh_Topology.AddVertex_IncreasesCount ..................................................................   Passed    0.00 sec
+        Start 2024: HalfedgeMesh_Topology.SingleTriangle_Counts
+508/742 Test #2024: HalfedgeMesh_Topology.SingleTriangle_Counts .....................................................................   Passed    0.00 sec
+        Start 2025: HalfedgeMesh_Topology.TwoTriangles_SharedEdge
+509/742 Test #2025: HalfedgeMesh_Topology.TwoTriangles_SharedEdge ...................................................................   Passed    0.00 sec
+        Start 2026: HalfedgeMesh_Topology.Tetrahedron_ClosedManifold
+510/742 Test #2026: HalfedgeMesh_Topology.Tetrahedron_ClosedManifold ................................................................   Passed    0.00 sec
+        Start 2027: HalfedgeMesh_Topology.Icosahedron_ClosedManifold
+511/742 Test #2027: HalfedgeMesh_Topology.Icosahedron_ClosedManifold ................................................................   Passed    0.00 sec
+        Start 2028: HalfedgeMesh_Topology.Cube_ClosedManifold
+512/742 Test #2028: HalfedgeMesh_Topology.Cube_ClosedManifold .......................................................................   Passed    0.00 sec
+        Start 2029: HalfedgeMesh_Topology.QuadPair_Counts
+513/742 Test #2029: HalfedgeMesh_Topology.QuadPair_Counts ...........................................................................   Passed    0.00 sec
+        Start 2030: HalfedgeMesh_Topology.SingleTriangle_AllVerticesBoundary
+514/742 Test #2030: HalfedgeMesh_Topology.SingleTriangle_AllVerticesBoundary ........................................................   Passed    0.00 sec
+        Start 2031: HalfedgeMesh_Topology.Tetrahedron_NoBoundaryVertices
+515/742 Test #2031: HalfedgeMesh_Topology.Tetrahedron_NoBoundaryVertices ............................................................   Passed    0.00 sec
+        Start 2032: HalfedgeMesh_Topology.Tetrahedron_NoBoundaryEdges
+516/742 Test #2032: HalfedgeMesh_Topology.Tetrahedron_NoBoundaryEdges ...............................................................   Passed    0.00 sec
+        Start 2033: HalfedgeMesh_Topology.SingleTriangle_AllValence2
+517/742 Test #2033: HalfedgeMesh_Topology.SingleTriangle_AllValence2 ................................................................   Passed    0.00 sec
+        Start 2034: HalfedgeMesh_Topology.Tetrahedron_AllValence3
+518/742 Test #2034: HalfedgeMesh_Topology.Tetrahedron_AllValence3 ...................................................................   Passed    0.00 sec
+        Start 2035: HalfedgeMesh_Topology.SubdividedTriangle_InteriorVertexValence
+519/742 Test #2035: HalfedgeMesh_Topology.SubdividedTriangle_InteriorVertexValence ..................................................   Passed    0.00 sec
+        Start 2036: HalfedgeMesh_Topology.DeleteFace_ReducesFaceCount
+520/742 Test #2036: HalfedgeMesh_Topology.DeleteFace_ReducesFaceCount ...............................................................   Passed    0.00 sec
+        Start 2037: HalfedgeMesh_Topology.DeleteAllFaces_EmptyAfterGC
+521/742 Test #2037: HalfedgeMesh_Topology.DeleteAllFaces_EmptyAfterGC ...............................................................   Passed    0.00 sec
+        Start 2038: HalfedgeMesh_Topology.GarbageCollection_CompactsStorage
+522/742 Test #2038: HalfedgeMesh_Topology.GarbageCollection_CompactsStorage .........................................................   Passed    0.01 sec
+        Start 2039: HalfedgeMesh_Topology.SetPosition_UpdatesCorrectly
+523/742 Test #2039: HalfedgeMesh_Topology.SetPosition_UpdatesCorrectly ..............................................................   Passed    0.00 sec
+        Start 2040: HalfedgeMesh_Topology.ConstMesh_PositionIsReadOnly
+524/742 Test #2040: HalfedgeMesh_Topology.ConstMesh_PositionIsReadOnly ..............................................................   Passed    0.00 sec
+        Start 2041: HalfedgeMesh_Topology.OppositeHalfedge_IsSymmetric
+525/742 Test #2041: HalfedgeMesh_Topology.OppositeHalfedge_IsSymmetric ..............................................................   Passed    0.00 sec
+        Start 2042: HalfedgeMesh_Topology.NextHalfedge_CyclesBackToStart
+526/742 Test #2042: HalfedgeMesh_Topology.NextHalfedge_CyclesBackToStart ............................................................   Passed    0.00 sec
+        Start 2043: HalfedgeMesh_Topology.FromToVertex_Consistency
+527/742 Test #2043: HalfedgeMesh_Topology.FromToVertex_Consistency ..................................................................   Passed    0.00 sec
+        Start 2044: HalfedgeMesh_Topology.FaceIncidence_IsSeparateFromGraphTraversalConnectivity
+528/742 Test #2044: HalfedgeMesh_Topology.FaceIncidence_IsSeparateFromGraphTraversalConnectivity ....................................   Passed    0.00 sec
+        Start 2045: HalfedgeMesh_Topology.EdgeHalfedge_RoundTrip
+529/742 Test #2045: HalfedgeMesh_Topology.EdgeHalfedge_RoundTrip ....................................................................   Passed    0.00 sec
+        Start 2046: HalfedgeMesh_Topology.IsolatedVertex_HasNoConnectivity
+530/742 Test #2046: HalfedgeMesh_Topology.IsolatedVertex_HasNoConnectivity ..........................................................   Passed    0.00 sec
+        Start 2047: HalfedgeMesh_Topology.ConnectedVertex_IsNotIsolated
+531/742 Test #2047: HalfedgeMesh_Topology.ConnectedVertex_IsNotIsolated .............................................................   Passed    0.00 sec
+        Start 2048: HalfedgeMesh_Topology.MakeEquilateralTriangle_SameAsSingleTriangle
+532/742 Test #2048: HalfedgeMesh_Topology.MakeEquilateralTriangle_SameAsSingleTriangle ..............................................   Passed    0.00 sec
+        Start 2049: HalfedgeMesh_Topology.MakeTwoTriangles_SameAsTwoTriangleSquare
+533/742 Test #2049: HalfedgeMesh_Topology.MakeTwoTriangles_SameAsTwoTriangleSquare ..................................................   Passed    0.00 sec
+        Start 2050: MeshTopologyUtilities.TriangulateFansPolygonFace
+534/742 Test #2050: MeshTopologyUtilities.TriangulateFansPolygonFace ................................................................   Passed    0.00 sec
+        Start 2051: MeshTopologyUtilities.ConnectedComponentsPublishLabelsAndSplitMeshes
+535/742 Test #2051: MeshTopologyUtilities.ConnectedComponentsPublishLabelsAndSplitMeshes ............................................   Passed    0.00 sec
+        Start 2052: MeshTopologyUtilities.TriangleAdjacencyAndNearestFaceAreDeterministic
+536/742 Test #2052: MeshTopologyUtilities.TriangleAdjacencyAndNearestFaceAreDeterministic ...........................................   Passed    0.00 sec
+        Start 2053: MeshTopologyUtilities.UpdateEdgeLengthsPublishesCanonicalCache
+537/742 Test #2053: MeshTopologyUtilities.UpdateEdgeLengthsPublishesCanonicalCache ..................................................   Passed    0.00 sec
+        Start 2054: CornerTexcoords.ResolvesNoneWhenMeshCarriesNoUvs
+538/742 Test #2054: CornerTexcoords.ResolvesNoneWhenMeshCarriesNoUvs ................................................................   Passed    0.00 sec
+        Start 2089: Curvature_MeanCurvature.EmptyMesh_ReturnsNullopt
+539/742 Test #2089: Curvature_MeanCurvature.EmptyMesh_ReturnsNullopt ................................................................   Passed    0.00 sec
+        Start 2091: Curvature_MeanCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices
+540/742 Test #2091: Curvature_MeanCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices ............................................   Passed    0.00 sec
+        Start 2092: Curvature_MeanCurvature.FlippedClosedMesh_NegativeCurvature
+541/742 Test #2092: Curvature_MeanCurvature.FlippedClosedMesh_NegativeCurvature .....................................................   Passed    0.00 sec
+        Start 2093: Curvature_GaussianCurvature.EmptyMesh_ReturnsNullopt
+542/742 Test #2093: Curvature_GaussianCurvature.EmptyMesh_ReturnsNullopt ............................................................   Passed    0.00 sec
+        Start 2095: Curvature_GaussianCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices
+543/742 Test #2095: Curvature_GaussianCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices ........................................   Passed    0.00 sec
+        Start 2098: MeshUtils_VertexNormal.ClosedConvexMesh_NormalsPointOutward
+544/742 Test #2098: MeshUtils_VertexNormal.ClosedConvexMesh_NormalsPointOutward .....................................................   Passed    0.00 sec
+        Start 2099: MeshUtils_VertexNormal.FlatMesh_NormalsPointAlongFaceNormal
+545/742 Test #2099: MeshUtils_VertexNormal.FlatMesh_NormalsPointAlongFaceNormal .....................................................   Passed    0.00 sec
+        Start 2100: MeshUtils_PublishNormals.VertexNormals_StoredAsProperty
+546/742 Test #2100: MeshUtils_PublishNormals.VertexNormals_StoredAsProperty .........................................................   Passed    0.00 sec
+        Start 2101: MeshUtils_PublishNormals.FaceNormals_StoredAsProperty
+547/742 Test #2101: MeshUtils_PublishNormals.FaceNormals_StoredAsProperty ...........................................................   Passed    0.00 sec
+        Start 2102: MeshUtils_AngleDefect.ClosedTetrahedron_TotalDefectEqualsFourPi
+548/742 Test #2102: MeshUtils_AngleDefect.ClosedTetrahedron_TotalDefectEqualsFourPi .................................................   Passed    0.00 sec
+        Start 2103: MeshUtils_AngleDefect.BoundaryVertex_UsesPiMinusAngleSum
+549/742 Test #2103: MeshUtils_AngleDefect.BoundaryVertex_UsesPiMinusAngleSum ........................................................   Passed    0.00 sec
+        Start 2104: CurvatureTensor.EmptyMesh_ReturnsNullopt
+550/742 Test #2104: CurvatureTensor.EmptyMesh_ReturnsNullopt ........................................................................   Passed    0.00 sec
+        Start 2105: CurvatureTensor.NoFaceMesh_ReturnsNullopt
+551/742 Test #2105: CurvatureTensor.NoFaceMesh_ReturnsNullopt .......................................................................   Passed    0.00 sec
+        Start 2109: CurvatureTensor.NonFiniteCornerOnClosedMeshFailsClosed
+552/742 Test #2109: CurvatureTensor.NonFiniteCornerOnClosedMeshFailsClosed ..........................................................   Passed    0.00 sec
+        Start 2210: MarchingCubes.ToMeshProducesValidHalfedgeMesh
+553/742 Test #2210: MarchingCubes.ToMeshProducesValidHalfedgeMesh ...................................................................   Passed    0.01 sec
+        Start 2211: MarchingCubes.ToMeshEmptyResultReturnsNullopt
+554/742 Test #2211: MarchingCubes.ToMeshEmptyResultReturnsNullopt ...................................................................   Passed    0.00 sec
+        Start 2217: ImplicitPlaneField.EmptyMeshReturnsNullopt
+555/742 Test #2217: ImplicitPlaneField.EmptyMeshReturnsNullopt ......................................................................   Passed    0.00 sec
+        Start 2219: ImplicitPlaneField.ExtractMeshProducesGeometry
+556/742 Test #2219: ImplicitPlaneField.ExtractMeshProducesGeometry ..................................................................   Passed    0.03 sec
+        Start 2290: Simplification.ClosedMeshRemainsClosedAfterSimplification
+557/742 Test #2290: Simplification.ClosedMeshRemainsClosedAfterSimplification .......................................................   Passed    0.07 sec
+        Start 2291: Simplification.ReturnsNulloptForEmptyMesh
+558/742 Test #2291: Simplification.ReturnsNulloptForEmptyMesh .......................................................................   Passed    0.00 sec
+        Start 2292: Simplification.ReturnsNulloptForSingleFaceMesh
+559/742 Test #2292: Simplification.ReturnsNulloptForSingleFaceMesh ..................................................................   Passed    0.00 sec
+        Start 2306: Geodesic.ReturnsNulloptForEmptyMesh
+560/742 Test #2306: Geodesic.ReturnsNulloptForEmptyMesh .............................................................................   Passed    0.00 sec
+        Start 2319: VectorHeatMethod.TransportReturnsNulloptForEmptyMesh
+561/742 Test #2319: VectorHeatMethod.TransportReturnsNulloptForEmptyMesh ............................................................   Passed    0.01 sec
+        Start 2322: VectorHeatMethod.LogMapReturnsNulloptForEmptyMesh
+562/742 Test #2322: VectorHeatMethod.LogMapReturnsNulloptForEmptyMesh ...............................................................   Passed    0.00 sec
+        Start 2326: ShortestPath.MeshBackedGraphViewTriangleChoosesDirectEdge
+563/742 Test #2326: ShortestPath.MeshBackedGraphViewTriangleChoosesDirectEdge .......................................................   Passed    0.00 sec
+        Start 2327: ShortestPath.MeshBackedGraphViewReusesSharedConnectivityProperties
+564/742 Test #2327: ShortestPath.MeshBackedGraphViewReusesSharedConnectivityProperties ..............................................   Passed    0.00 sec
+        Start 2331: ShortestPath.GraphChainMatchesMeshBackedGraphViewContract
+565/742 Test #2331: ShortestPath.GraphChainMatchesMeshBackedGraphViewContract .......................................................   Passed    0.00 sec
+        Start 2333: ShortestPath.ReturnsNulloptForEmptyMeshBackedGraphView
+566/742 Test #2333: ShortestPath.ReturnsNulloptForEmptyMeshBackedGraphView ..........................................................   Passed    0.00 sec
+        Start 2344: Subdivision.ReturnsNulloptForEmptyMesh
+567/742 Test #2344: Subdivision.ReturnsNulloptForEmptyMesh ..........................................................................   Passed    0.00 sec
+        Start 2345: Subdivision.ReturnsNulloptForNonTriangleMesh
+568/742 Test #2345: Subdivision.ReturnsNulloptForNonTriangleMesh ....................................................................   Passed    0.01 sec
+        Start 2347: Subdivision.InputMeshIsNotModified
+569/742 Test #2347: Subdivision.InputMeshIsNotModified ..............................................................................   Passed    0.00 sec
+        Start 2354: CatmullClark.PreservesClosedMeshEulerCharacteristic
+570/742 Test #2354: CatmullClark.PreservesClosedMeshEulerCharacteristic .............................................................   Passed    0.00 sec
+        Start 2358: CatmullClark.EmptyMeshReturnsNullopt
+571/742 Test #2358: CatmullClark.EmptyMeshReturnsNullopt ............................................................................   Passed    0.00 sec
+        Start 2364: Smoothing.UniformLaplacianReturnsNulloptForEmptyMesh
+572/742 Test #2364: Smoothing.UniformLaplacianReturnsNulloptForEmptyMesh ............................................................   Passed    0.00 sec
+        Start 2368: Smoothing.TaubinReturnsNulloptForEmptyMesh
+573/742 Test #2368: Smoothing.TaubinReturnsNulloptForEmptyMesh ......................................................................   Passed    0.00 sec
+        Start 2370: Smoothing.ImplicitLaplacianReturnsNulloptForEmptyMesh
+574/742 Test #2370: Smoothing.ImplicitLaplacianReturnsNulloptForEmptyMesh ...........................................................   Passed    0.00 sec
+        Start 2374: Smoothing.TaubinFlatMeshStaysFlat
+575/742 Test #2374: Smoothing.TaubinFlatMeshStaysFlat ...............................................................................   Passed    0.00 sec
+        Start 2375: Smoothing.ImplicitFlatMeshStaysFlat
+576/742 Test #2375: Smoothing.ImplicitFlatMeshStaysFlat .............................................................................   Passed    0.00 sec
+        Start 2380: Smoothing.FilterFaceNormalsFlatMeshIsIdentity
+577/742 Test #2380: Smoothing.FilterFaceNormalsFlatMeshIsIdentity ...................................................................   Passed    0.00 sec
+        Start 2381: Smoothing.FilterFaceNormalsCleanMeshNearIdentity
+578/742 Test #2381: Smoothing.FilterFaceNormalsCleanMeshNearIdentity ................................................................   Passed    0.01 sec
+        Start 2383: Smoothing.FilterFaceNormalsFailsClosedOnEmptyMesh
+579/742 Test #2383: Smoothing.FilterFaceNormalsFailsClosedOnEmptyMesh ...............................................................   Passed    0.00 sec
+        Start 2385: Smoothing.DenoiseBilateralCleanMeshNearIdentity
+580/742 Test #2385: Smoothing.DenoiseBilateralCleanMeshNearIdentity .................................................................   Passed    0.02 sec
+        Start 2389: Smoothing.DenoiseBilateralFailsClosedOnEmptyMesh
+581/742 Test #2389: Smoothing.DenoiseBilateralFailsClosedOnEmptyMesh ................................................................   Passed    0.00 sec
+        Start 2420: SurfaceSampling.FailsClosedForEmptyMesh
+582/742 Test #2420: SurfaceSampling.FailsClosedForEmptyMesh .........................................................................   Passed    0.01 sec
+        Start 2637: SubmeshView_Mesh.DefaultMeshIsNotView
+583/742 Test #2637: SubmeshView_Mesh.DefaultMeshIsNotView ...........................................................................   Passed    0.00 sec
+        Start 2638: SubmeshView_Mesh.CreateViewSharesStorage
+584/742 Test #2638: SubmeshView_Mesh.CreateViewSharesStorage ........................................................................   Passed    0.00 sec
+        Start 2639: SubmeshView_Mesh.ViewPositionsReturnSubspan
+585/742 Test #2639: SubmeshView_Mesh.ViewPositionsReturnSubspan .....................................................................   Passed    0.00 sec
+        Start 2640: SubmeshView_Mesh.ViewRangeAccessors
+586/742 Test #2640: SubmeshView_Mesh.ViewRangeAccessors .............................................................................   Passed    0.00 sec
+        Start 2641: SubmeshView_Mesh.ViewClampsToSourceExtent
+587/742 Test #2641: SubmeshView_Mesh.ViewClampsToSourceExtent .......................................................................   Passed    0.00 sec
+        Start 2642: SubmeshView_Mesh.ViewWithOffsetBeyondSizeGivesEmpty
+588/742 Test #2642: SubmeshView_Mesh.ViewWithOffsetBeyondSizeGivesEmpty .............................................................   Passed    0.00 sec
+        Start 2643: SubmeshView_Mesh.ViewSharesPositionDataWithSource
+589/742 Test #2643: SubmeshView_Mesh.ViewSharesPositionDataWithSource ...............................................................   Passed    0.00 sec
+        Start 2654: SubmeshView_Cloud.MeshBackedCloudUsesCanonicalVertexPointProperty
+590/742 Test #2654: SubmeshView_Cloud.MeshBackedCloudUsesCanonicalVertexPointProperty ...............................................   Passed    0.00 sec
+        Start 2656: SubmeshViewDomainBorrows.MeshAsGraphSharesVertexAndConnectivityPropertyStorage
+591/742 Test #2656: SubmeshViewDomainBorrows.MeshAsGraphSharesVertexAndConnectivityPropertyStorage ..................................   Passed    0.01 sec
+        Start 2657: SubmeshViewDomainBorrows.MeshAsGraphDoesNotAllocateCompatibilityCopyProperties
+592/742 Test #2657: SubmeshViewDomainBorrows.MeshAsGraphDoesNotAllocateCompatibilityCopyProperties ..................................   Passed    0.00 sec
+        Start 2658: SubmeshViewDomainBorrows.MeshAsGraphSharesSizesAndIgnoresFaceState
+593/742 Test #2658: SubmeshViewDomainBorrows.MeshAsGraphSharesSizesAndIgnoresFaceState ..............................................   Passed    0.00 sec
+        Start 2659: SubmeshViewDomainBorrows.MeshSidePositionEditIsVisibleThroughGraphView
+594/742 Test #2659: SubmeshViewDomainBorrows.MeshSidePositionEditIsVisibleThroughGraphView ..........................................   Passed    0.00 sec
+        Start 2660: SubmeshViewDomainBorrows.GraphSidePositionEditIsVisibleOnSourceMesh
+595/742 Test #2660: SubmeshViewDomainBorrows.GraphSidePositionEditIsVisibleOnSourceMesh .............................................   Passed    0.00 sec
+        Start 2661: SubmeshViewDomainBorrows.EmptyMeshBorrowsAsEmptyGraph
+596/742 Test #2661: SubmeshViewDomainBorrows.EmptyMeshBorrowsAsEmptyGraph ...........................................................   Passed    0.00 sec
+        Start 2662: SubmeshViewDomainBorrows.MeshAsCloudSharesVertexPositionPropertyStorage
+597/742 Test #2662: SubmeshViewDomainBorrows.MeshAsCloudSharesVertexPositionPropertyStorage .........................................   Passed    0.00 sec
+        Start 2663: SubmeshViewDomainBorrows.MeshAsCloudDoesNotAllocatePPositionCompatibilityCopy
+598/742 Test #2663: SubmeshViewDomainBorrows.MeshAsCloudDoesNotAllocatePPositionCompatibilityCopy ...................................   Passed    0.00 sec
+        Start 2664: SubmeshViewDomainBorrows.MeshAsCloudReusesExistingVertexNormalProperty
+599/742 Test #2664: SubmeshViewDomainBorrows.MeshAsCloudReusesExistingVertexNormalProperty ..........................................   Passed    0.00 sec
+        Start 2665: SubmeshViewDomainBorrows.MeshSidePositionEditIsVisibleThroughCloudView
+600/742 Test #2665: SubmeshViewDomainBorrows.MeshSidePositionEditIsVisibleThroughCloudView ..........................................   Passed    0.00 sec
+        Start 2666: SubmeshViewDomainBorrows.CloudSidePositionEditIsVisibleOnSourceMesh
+601/742 Test #2666: SubmeshViewDomainBorrows.CloudSidePositionEditIsVisibleOnSourceMesh .............................................   Passed    0.00 sec
+        Start 2667: SubmeshViewDomainBorrows.PointAddedThroughCloudViewAppearsOnSourceMesh
+602/742 Test #2667: SubmeshViewDomainBorrows.PointAddedThroughCloudViewAppearsOnSourceMesh ..........................................   Passed    0.00 sec
+        Start 2668: SubmeshViewDomainBorrows.EmptyMeshBorrowsAsEmptyCloud
+603/742 Test #2668: SubmeshViewDomainBorrows.EmptyMeshBorrowsAsEmptyCloud ...........................................................   Passed    0.00 sec
+        Start 2669: SubmeshViewDomainBorrows.CloudSubviewOfMeshBorrowSeesMeshBackedRows
+604/742 Test #2669: SubmeshViewDomainBorrows.CloudSubviewOfMeshBorrowSeesMeshBackedRows .............................................   Passed    0.00 sec
+        Start 2670: SubmeshViewDomainBorrows.CloudSubviewOfEmptyMeshBorrowClampsToZero
+605/742 Test #2670: SubmeshViewDomainBorrows.CloudSubviewOfEmptyMeshBorrowClampsToZero ..............................................   Passed    0.00 sec
+        Start 2671: SubmeshViewDomainBorrows.CloudDeleteThroughMeshBorrowDoesNotTouchMeshDeletionCounter
+606/742 Test #2671: SubmeshViewDomainBorrows.CloudDeleteThroughMeshBorrowDoesNotTouchMeshDeletionCounter ............................   Passed    0.00 sec
+        Start 2672: SubmeshViewDomainBorrows.MeshGarbageCollectionAfterCloudDeleteIsConsistent
+607/742 Test #2672: SubmeshViewDomainBorrows.MeshGarbageCollectionAfterCloudDeleteIsConsistent ......................................   Passed    0.00 sec
+        Start 2684: SubmeshViewDomainBorrows.ConstMeshGraphViewSharesStorageAndSeesLiveEdits
+608/742 Test #2684: SubmeshViewDomainBorrows.ConstMeshGraphViewSharesStorageAndSeesLiveEdits ........................................   Passed    0.01 sec
+        Start 2685: SubmeshViewDomainBorrows.ConstMeshCloudViewSharesStorageAndSeesLiveEdits
+609/742 Test #2685: SubmeshViewDomainBorrows.ConstMeshCloudViewSharesStorageAndSeesLiveEdits ........................................   Passed    0.00 sec
+        Start 2687: SubmeshViewDomainBorrows.HardCopyOfMeshBackedGraphBorrowOwnsIndependentStorage
+610/742 Test #2687: SubmeshViewDomainBorrows.HardCopyOfMeshBackedGraphBorrowOwnsIndependentStorage ..................................   Passed    0.00 sec
+        Start 2688: SubmeshViewDomainBorrows.HardCopyOfMeshBackedCloudBorrowOwnsIndependentStorage
+611/742 Test #2688: SubmeshViewDomainBorrows.HardCopyOfMeshBackedCloudBorrowOwnsIndependentStorage ..................................   Passed    0.00 sec
+        Start 2693: GeometryIO_MeshIO.LoadsOFFTriangle
+612/742 Test #2693: GeometryIO_MeshIO.LoadsOFFTriangle ..............................................................................   Passed    0.00 sec
+        Start 2694: GeometryIO_MeshIO.LoadsCOFFTriangleWithVertexColors
+613/742 Test #2694: GeometryIO_MeshIO.LoadsCOFFTriangleWithVertexColors .............................................................   Passed    0.00 sec
+        Start 2695: GeometryIO_MeshIO.LoadsCOFFAlphaTokenIsConsumedNotStored
+614/742 Test #2695: GeometryIO_MeshIO.LoadsCOFFAlphaTokenIsConsumedNotStored ........................................................   Passed    0.00 sec
+        Start 2696: GeometryIO_MeshIO.LoadsNOFFTriangleWithVertexNormals
+615/742 Test #2696: GeometryIO_MeshIO.LoadsNOFFTriangleWithVertexNormals ............................................................   Passed    0.00 sec
+        Start 2697: GeometryIO_MeshIO.LoadsCNOFFTriangleWithNormalsAndColors
+616/742 Test #2697: GeometryIO_MeshIO.LoadsCNOFFTriangleWithNormalsAndColors ........................................................   Passed    0.00 sec
+        Start 2698: GeometryIO_MeshIO.LoadOFFRejectsDegenerateFaceRows
+617/742 Test #2698: GeometryIO_MeshIO.LoadOFFRejectsDegenerateFaceRows ..............................................................   Passed    0.00 sec
+        Start 2699: GeometryIO_MeshIO.LoadOFFRejectsAllDegenerateFaces
+618/742 Test #2699: GeometryIO_MeshIO.LoadOFFRejectsAllDegenerateFaces ..............................................................   Passed    0.00 sec
+        Start 2700: GeometryIO_MeshIO.LoadOFFRejectsHugeHeaderCountsBeforeReserve
+619/742 Test #2700: GeometryIO_MeshIO.LoadOFFRejectsHugeHeaderCountsBeforeReserve ...................................................   Passed    0.00 sec
+        Start 2701: GeometryIO_MeshIO.LoadOFFPreservesCommentBeforeFirstVertexAndFaceRows
+620/742 Test #2701: GeometryIO_MeshIO.LoadOFFPreservesCommentBeforeFirstVertexAndFaceRows ...........................................   Passed    0.00 sec
+        Start 2702: GeometryIO_MeshIO.LoadOFFRejectsUnknownMagic
+621/742 Test #2702: GeometryIO_MeshIO.LoadOFFRejectsUnknownMagic ....................................................................   Passed    0.00 sec
+        Start 2703: GeometryIO_MeshIO.LoadOFFRejectsOutOfRangeVertexIndex
+622/742 Test #2703: GeometryIO_MeshIO.LoadOFFRejectsOutOfRangeVertexIndex ...........................................................   Passed    0.00 sec
+        Start 2704: GeometryIO_MeshIO.LoadsOBJTriangle
+623/742 Test #2704: GeometryIO_MeshIO.LoadsOBJTriangle ..............................................................................   Passed    0.00 sec
+        Start 2705: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexNormals
+624/742 Test #2705: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexNormals .............................................................   Passed    0.00 sec
+        Start 2706: GeometryIO_MeshIO.LoadOBJIgnoresMismatchedVertexNormalCount
+625/742 Test #2706: GeometryIO_MeshIO.LoadOBJIgnoresMismatchedVertexNormalCount .....................................................   Passed    0.00 sec
+        Start 2707: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexNormal
+626/742 Test #2707: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexNormal ...........................................................   Passed    0.00 sec
+        Start 2708: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexTexcoords
+627/742 Test #2708: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexTexcoords ...........................................................   Passed    0.00 sec
+        Start 2709: GeometryIO_MeshIO.LoadsOBJVertexTexcoordWithOptionalThirdComponent
+628/742 Test #2709: GeometryIO_MeshIO.LoadsOBJVertexTexcoordWithOptionalThirdComponent ..............................................   Passed    0.00 sec
+        Start 2710: GeometryIO_MeshIO.LoadOBJIgnoresMismatchedVertexTexcoordCount
+629/742 Test #2710: GeometryIO_MeshIO.LoadOBJIgnoresMismatchedVertexTexcoordCount ...................................................   Passed    0.00 sec
+        Start 2711: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexTexcoord
+630/742 Test #2711: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexTexcoord .........................................................   Passed    0.00 sec
+        Start 2712: GeometryIO_MeshIO.LoadOBJVertexTexcoordAndNormalCoexist
+631/742 Test #2712: GeometryIO_MeshIO.LoadOBJVertexTexcoordAndNormalCoexist .........................................................   Passed    0.00 sec
+        Start 2713: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexColors
+632/742 Test #2713: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexColors ..............................................................   Passed    0.00 sec
+        Start 2714: GeometryIO_MeshIO.LoadOBJIgnoresMismatchedVertexColorCount
+633/742 Test #2714: GeometryIO_MeshIO.LoadOBJIgnoresMismatchedVertexColorCount ......................................................   Passed    0.00 sec
+        Start 2715: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexColor
+634/742 Test #2715: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexColor ............................................................   Passed    0.00 sec
+        Start 2716: GeometryIO_MeshIO.LoadOBJVertexColorAndTexcoordCoexist
+635/742 Test #2716: GeometryIO_MeshIO.LoadOBJVertexColorAndTexcoordCoexist ..........................................................   Passed    0.00 sec
+        Start 2717: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexColorsAndAlpha
+636/742 Test #2717: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexColorsAndAlpha ......................................................   Passed    0.00 sec
+        Start 2718: GeometryIO_MeshIO.LoadsOBJMixedSevenAndEightTokenVertexColors
+637/742 Test #2718: GeometryIO_MeshIO.LoadsOBJMixedSevenAndEightTokenVertexColors ...................................................   Passed    0.00 sec
+        Start 2719: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexColorAlpha
+638/742 Test #2719: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexColorAlpha .......................................................   Passed    0.00 sec
+        Start 2720: GeometryIO_MeshIO.LoadOBJVertexColorAlphaSurvivesFaceAttributeRemap
+639/742 Test #2720: GeometryIO_MeshIO.LoadOBJVertexColorAlphaSurvivesFaceAttributeRemap .............................................   Passed    0.00 sec
+        Start 2721: GeometryIO_MeshIO.LoadsOBJFaceTexcoordSeamOnCornersWithoutDuplicatingPositions
+640/742 Test #2721: GeometryIO_MeshIO.LoadsOBJFaceTexcoordSeamOnCornersWithoutDuplicatingPositions ..................................   Passed    0.00 sec
+        Start 2722: GeometryIO_MeshIO.ObjCornerTexcoordsSurviveWriteAndReload
+641/742 Test #2722: GeometryIO_MeshIO.ObjCornerTexcoordsSurviveWriteAndReload .......................................................   Passed    0.00 sec
+        Start 2723: GeometryIO_MeshIO.ObjWithoutTexcoordSeamStaysVertexDomain
+642/742 Test #2723: GeometryIO_MeshIO.ObjWithoutTexcoordSeamStaysVertexDomain .......................................................   Passed    0.00 sec
+        Start 2724: GeometryIO_MeshIO.LoadsOBJFaceNormalIndicesWithoutLockstepNormals
+643/742 Test #2724: GeometryIO_MeshIO.LoadsOBJFaceNormalIndicesWithoutLockstepNormals ...............................................   Passed    0.00 sec
+        Start 2725: GeometryIO_MeshIO.LoadsOBJFaceAttributeNegativeIndices
+644/742 Test #2725: GeometryIO_MeshIO.LoadsOBJFaceAttributeNegativeIndices ..........................................................   Passed    0.00 sec
+        Start 2726: GeometryIO_MeshIO.LoadOBJRejectsOutOfRangeFaceTexcoordIndex
+645/742 Test #2726: GeometryIO_MeshIO.LoadOBJRejectsOutOfRangeFaceTexcoordIndex .....................................................   Passed    0.00 sec
+        Start 2727: GeometryIO_MeshIO.LoadsASCIIPLYTriangle
+646/742 Test #2727: GeometryIO_MeshIO.LoadsASCIIPLYTriangle .........................................................................   Passed    0.00 sec
+        Start 2728: GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexNormalsAndColors
+647/742 Test #2728: GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexNormalsAndColors ...............................................   Passed    0.00 sec
+        Start 2729: GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexTexcoords
+648/742 Test #2729: GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexTexcoords ......................................................   Passed    0.00 sec
+        Start 2730: GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithTextureUVAliases
+649/742 Test #2730: GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithTextureUVAliases .....................................................   Passed    0.00 sec
+        Start 2731: GeometryIO_MeshIO.LoadASCIIPLYIgnoresPartialTexcoordAxis
+650/742 Test #2731: GeometryIO_MeshIO.LoadASCIIPLYIgnoresPartialTexcoordAxis ........................................................   Passed    0.00 sec
+        Start 2732: GeometryIO_MeshIO.LoadsASCIISTLTriangle
+651/742 Test #2732: GeometryIO_MeshIO.LoadsASCIISTLTriangle .........................................................................   Passed    0.00 sec
+        Start 2733: GeometryIO_MeshIO.MeshImportersRejectNonFinitePositions
+652/742 Test #2733: GeometryIO_MeshIO.MeshImportersRejectNonFinitePositions .........................................................   Passed    0.00 sec
+        Start 2734: GeometryIO_MeshIO.MeshImportersRejectNonFiniteVertexColors
+653/742 Test #2734: GeometryIO_MeshIO.MeshImportersRejectNonFiniteVertexColors ......................................................   Passed    0.00 sec
+        Start 2735: GeometryIO_MeshIO.MeshImportersRejectNonFiniteVertexNormals
+654/742 Test #2735: GeometryIO_MeshIO.MeshImportersRejectNonFiniteVertexNormals .....................................................   Passed    0.00 sec
+        Start 2736: GeometryIO_MeshIO.MeshImportersRejectNonFiniteVertexTexcoords
+655/742 Test #2736: GeometryIO_MeshIO.MeshImportersRejectNonFiniteVertexTexcoords ...................................................   Passed    0.00 sec
+        Start 2737: GeometryIO_MeshIO.WritesOFFQuadRoundTripsFaceArity
+656/742 Test #2737: GeometryIO_MeshIO.WritesOFFQuadRoundTripsFaceArity ..............................................................   Passed    0.00 sec
+        Start 2738: GeometryIO_MeshIO.WriteOFFIsByteDeterministic
+657/742 Test #2738: GeometryIO_MeshIO.WriteOFFIsByteDeterministic ...................................................................   Passed    0.00 sec
+        Start 2739: GeometryIO_MeshIO.WriteOFFFailsClosed
+658/742 Test #2739: GeometryIO_MeshIO.WriteOFFFailsClosed ...........................................................................   Passed    0.00 sec
+        Start 2740: GeometryIO_MeshIO.WritesOBJTriangle
+659/742 Test #2740: GeometryIO_MeshIO.WritesOBJTriangle .............................................................................   Passed    0.00 sec
+        Start 2741: GeometryIO_MeshIO.WritesOBJTriangleWithNormals
+660/742 Test #2741: GeometryIO_MeshIO.WritesOBJTriangleWithNormals ..................................................................   Passed    0.00 sec
+        Start 2742: GeometryIO_MeshIO.WritesOBJTriangleWithTexcoords
+661/742 Test #2742: GeometryIO_MeshIO.WritesOBJTriangleWithTexcoords ................................................................   Passed    0.00 sec
+        Start 2743: GeometryIO_MeshIO.WritesOBJTriangleWithTexcoordsAndNormals
+662/742 Test #2743: GeometryIO_MeshIO.WritesOBJTriangleWithTexcoordsAndNormals ......................................................   Passed    0.00 sec
+        Start 2744: GeometryIO_MeshIO.WritesOBJTriangleWithVertexColors
+663/742 Test #2744: GeometryIO_MeshIO.WritesOBJTriangleWithVertexColors .............................................................   Passed    0.00 sec
+        Start 2745: GeometryIO_MeshIO.WritesOBJTriangleWithColorsAndNormals
+664/742 Test #2745: GeometryIO_MeshIO.WritesOBJTriangleWithColorsAndNormals .........................................................   Passed    0.00 sec
+        Start 2746: GeometryIO_MeshIO.WritesOBJTriangleWithColorsAndTexcoords
+665/742 Test #2746: GeometryIO_MeshIO.WritesOBJTriangleWithColorsAndTexcoords .......................................................   Passed    0.00 sec
+        Start 2747: GeometryIO_MeshIO.WriteOBJOmitsColorsWhenAbsent
+666/742 Test #2747: GeometryIO_MeshIO.WriteOBJOmitsColorsWhenAbsent .................................................................   Passed    0.00 sec
+        Start 2748: GeometryIO_MeshIO.WriteOBJOmitsColorsWhenMismatchedCount
+667/742 Test #2748: GeometryIO_MeshIO.WriteOBJOmitsColorsWhenMismatchedCount ........................................................   Passed    0.00 sec
+        Start 2749: GeometryIO_MeshIO.WriteOBJReportsFailureOnUnformattableVertexColor
+668/742 Test #2749: GeometryIO_MeshIO.WriteOBJReportsFailureOnUnformattableVertexColor ..............................................   Passed    0.00 sec
+        Start 2750: GeometryIO_MeshIO.WriteOBJOmitsTexcoordsWhenAbsent
+669/742 Test #2750: GeometryIO_MeshIO.WriteOBJOmitsTexcoordsWhenAbsent ..............................................................   Passed    0.00 sec
+        Start 2751: GeometryIO_MeshIO.WritesOBJQuadRoundTripsFaceArity
+670/742 Test #2751: GeometryIO_MeshIO.WritesOBJQuadRoundTripsFaceArity ..............................................................   Passed    0.00 sec
+        Start 2752: GeometryIO_MeshIO.WriteOBJRejectsEmptyMesh
+671/742 Test #2752: GeometryIO_MeshIO.WriteOBJRejectsEmptyMesh ......................................................................   Passed    0.00 sec
+        Start 2753: GeometryIO_MeshIO.WriteOBJRejectsOutOfRangeIndex
+672/742 Test #2753: GeometryIO_MeshIO.WriteOBJRejectsOutOfRangeIndex ................................................................   Passed    0.00 sec
+        Start 2754: GeometryIO_MeshIO.WriteOBJRejectsBadPath
+673/742 Test #2754: GeometryIO_MeshIO.WriteOBJRejectsBadPath ........................................................................   Passed    0.00 sec
+        Start 2755: GeometryIO_MeshIO.WritesPLYTriangle
+674/742 Test #2755: GeometryIO_MeshIO.WritesPLYTriangle .............................................................................   Passed    0.00 sec
+        Start 2756: GeometryIO_MeshIO.WritesPLYTriangleWithNormals
+675/742 Test #2756: GeometryIO_MeshIO.WritesPLYTriangleWithNormals ..................................................................   Passed    0.00 sec
+        Start 2757: GeometryIO_MeshIO.WritesPLYTriangleWithVertexColors
+676/742 Test #2757: GeometryIO_MeshIO.WritesPLYTriangleWithVertexColors .............................................................   Passed    0.00 sec
+        Start 2758: GeometryIO_MeshIO.WritesPLYTriangleWithVertexTexcoords
+677/742 Test #2758: GeometryIO_MeshIO.WritesPLYTriangleWithVertexTexcoords ..........................................................   Passed    0.00 sec
+        Start 2759: GeometryIO_MeshIO.WritesPLYQuadRoundTripsFaceArity
+678/742 Test #2759: GeometryIO_MeshIO.WritesPLYQuadRoundTripsFaceArity ..............................................................   Passed    0.00 sec
+        Start 2760: GeometryIO_MeshIO.WritePLYRejectsEmptyMesh
+679/742 Test #2760: GeometryIO_MeshIO.WritePLYRejectsEmptyMesh ......................................................................   Passed    0.00 sec
+        Start 2761: GeometryIO_MeshIO.WritePLYRejectsOutOfRangeIndex
+680/742 Test #2761: GeometryIO_MeshIO.WritePLYRejectsOutOfRangeIndex ................................................................   Passed    0.00 sec
+        Start 2762: GeometryIO_MeshIO.WritePLYRejectsBadPath
+681/742 Test #2762: GeometryIO_MeshIO.WritePLYRejectsBadPath ........................................................................   Passed    0.00 sec
+        Start 2763: GeometryIO_MeshIO.WritesPLYBinaryTriangle
+682/742 Test #2763: GeometryIO_MeshIO.WritesPLYBinaryTriangle .......................................................................   Passed    0.00 sec
+        Start 2764: GeometryIO_MeshIO.WritesPLYBinaryTriangleWithNormals
+683/742 Test #2764: GeometryIO_MeshIO.WritesPLYBinaryTriangleWithNormals ............................................................   Passed    0.00 sec
+        Start 2765: GeometryIO_MeshIO.WritesPLYBinaryTriangleWithVertexColors
+684/742 Test #2765: GeometryIO_MeshIO.WritesPLYBinaryTriangleWithVertexColors .......................................................   Passed    0.00 sec
+        Start 2766: GeometryIO_MeshIO.WritesPLYBinaryTriangleWithVertexTexcoords
+685/742 Test #2766: GeometryIO_MeshIO.WritesPLYBinaryTriangleWithVertexTexcoords ....................................................   Passed    0.00 sec
+        Start 2767: GeometryIO_MeshIO.WritesPLYBinaryQuadRoundTripsFaceArity
+686/742 Test #2767: GeometryIO_MeshIO.WritesPLYBinaryQuadRoundTripsFaceArity ........................................................   Passed    0.00 sec
+        Start 2768: GeometryIO_MeshIO.WritePLYBinaryRejectsEmptyMesh
+687/742 Test #2768: GeometryIO_MeshIO.WritePLYBinaryRejectsEmptyMesh ................................................................   Passed    0.00 sec
+        Start 2769: GeometryIO_MeshIO.WritePLYBinaryRejectsOutOfRangeIndex
+688/742 Test #2769: GeometryIO_MeshIO.WritePLYBinaryRejectsOutOfRangeIndex ..........................................................   Passed    0.00 sec
+        Start 2770: GeometryIO_MeshIO.WritePLYBinaryRejectsBadPath
+689/742 Test #2770: GeometryIO_MeshIO.WritePLYBinaryRejectsBadPath ..................................................................   Passed    0.00 sec
+        Start 2771: GeometryIO_MeshIO.MeshExportersRejectNonFinitePositions
+690/742 Test #2771: GeometryIO_MeshIO.MeshExportersRejectNonFinitePositions .........................................................   Passed    0.00 sec
+        Start 2772: GeometryIO_MeshIO.MeshExportersRejectNonFiniteVertexColors
+691/742 Test #2772: GeometryIO_MeshIO.MeshExportersRejectNonFiniteVertexColors ......................................................   Passed    0.00 sec
+        Start 2773: GeometryIO_MeshIO.MeshExportersRejectNonFiniteVertexNormals
+692/742 Test #2773: GeometryIO_MeshIO.MeshExportersRejectNonFiniteVertexNormals .....................................................   Passed    0.00 sec
+        Start 2774: GeometryIO_MeshIO.MeshExportersRejectNonFiniteVertexTexcoords
+693/742 Test #2774: GeometryIO_MeshIO.MeshExportersRejectNonFiniteVertexTexcoords ...................................................   Passed    0.00 sec
+        Start 2775: GeometryIO_MeshIO.LoadsBinarySTLSingleTriangle
+694/742 Test #2775: GeometryIO_MeshIO.LoadsBinarySTLSingleTriangle ..................................................................   Passed    0.00 sec
+        Start 2776: GeometryIO_MeshIO.LoadsBinarySTLTwoTriangles
+695/742 Test #2776: GeometryIO_MeshIO.LoadsBinarySTLTwoTriangles ....................................................................   Passed    0.00 sec
+        Start 2777: GeometryIO_MeshIO.LoadSTLRejectsTruncatedBinaryPayload
+696/742 Test #2777: GeometryIO_MeshIO.LoadSTLRejectsTruncatedBinaryPayload ..........................................................   Passed    0.00 sec
+        Start 2778: GeometryIO_MeshIO.LoadsASCIISTLAfterBinaryDispatch
+697/742 Test #2778: GeometryIO_MeshIO.LoadsASCIISTLAfterBinaryDispatch ..............................................................   Passed    0.00 sec
+        Start 2779: GeometryIO_MeshIO.WritesSTLTriangle
+698/742 Test #2779: GeometryIO_MeshIO.WritesSTLTriangle .............................................................................   Passed    0.00 sec
+        Start 2780: GeometryIO_MeshIO.WritesSTLTriangleEmitsFacetNormal
+699/742 Test #2780: GeometryIO_MeshIO.WritesSTLTriangleEmitsFacetNormal .............................................................   Passed    0.00 sec
+        Start 2781: GeometryIO_MeshIO.WriteSTLRejectsQuadFace
+700/742 Test #2781: GeometryIO_MeshIO.WriteSTLRejectsQuadFace .......................................................................   Passed    0.00 sec
+        Start 2782: GeometryIO_MeshIO.WriteSTLRejectsEmptyMesh
+701/742 Test #2782: GeometryIO_MeshIO.WriteSTLRejectsEmptyMesh ......................................................................   Passed    0.00 sec
+        Start 2783: GeometryIO_MeshIO.WriteSTLRejectsOutOfRangeIndex
+702/742 Test #2783: GeometryIO_MeshIO.WriteSTLRejectsOutOfRangeIndex ................................................................   Passed    0.00 sec
+        Start 2784: GeometryIO_MeshIO.WriteSTLRejectsBadPath
+703/742 Test #2784: GeometryIO_MeshIO.WriteSTLRejectsBadPath ........................................................................   Passed    0.00 sec
+        Start 2785: GeometryIO_MeshIO.WritesSTLBinaryTriangleRoundTrip
+704/742 Test #2785: GeometryIO_MeshIO.WritesSTLBinaryTriangleRoundTrip ..............................................................   Passed    0.00 sec
+        Start 2786: GeometryIO_MeshIO.WritesSTLBinaryReportsTriangleCountInHeader
+705/742 Test #2786: GeometryIO_MeshIO.WritesSTLBinaryReportsTriangleCountInHeader ...................................................   Passed    0.00 sec
+        Start 2787: GeometryIO_MeshIO.WriteSTLBinaryRejectsQuadFace
+706/742 Test #2787: GeometryIO_MeshIO.WriteSTLBinaryRejectsQuadFace .................................................................   Passed    0.00 sec
+        Start 2788: GeometryIO_MeshIO.WriteSTLBinaryRejectsEmptyMesh
+707/742 Test #2788: GeometryIO_MeshIO.WriteSTLBinaryRejectsEmptyMesh ................................................................   Passed    0.00 sec
+        Start 2789: GeometryIO_MeshIO.WriteSTLBinaryRejectsOutOfRangeIndex
+708/742 Test #2789: GeometryIO_MeshIO.WriteSTLBinaryRejectsOutOfRangeIndex ..........................................................   Passed    0.00 sec
+        Start 2790: GeometryIO_MeshIO.WriteSTLBinaryRejectsBadPath
+709/742 Test #2790: GeometryIO_MeshIO.WriteSTLBinaryRejectsBadPath ..................................................................   Passed    0.00 sec
+        Start 2791: GeometryIO_MeshIO.LoadsBinaryLittleEndianPLYTriangle
+710/742 Test #2791: GeometryIO_MeshIO.LoadsBinaryLittleEndianPLYTriangle ............................................................   Passed    0.00 sec
+        Start 2792: GeometryIO_MeshIO.LoadsBinaryBigEndianPLYTriangle
+711/742 Test #2792: GeometryIO_MeshIO.LoadsBinaryBigEndianPLYTriangle ...............................................................   Passed    0.00 sec
+        Start 2793: GeometryIO_MeshIO.LoadsBinaryLittleEndianPLYQuad
+712/742 Test #2793: GeometryIO_MeshIO.LoadsBinaryLittleEndianPLYQuad ................................................................   Passed    0.00 sec
+        Start 2794: GeometryIO_MeshIO.LoadsBinaryLittleEndianPLYWithExtraVertexProperties
+713/742 Test #2794: GeometryIO_MeshIO.LoadsBinaryLittleEndianPLYWithExtraVertexProperties ...........................................   Passed    0.00 sec
+        Start 2795: GeometryIO_MeshIO.LoadsBinaryPLYTriangleWithVertexTexcoords
+714/742 Test #2795: GeometryIO_MeshIO.LoadsBinaryPLYTriangleWithVertexTexcoords .....................................................   Passed    0.00 sec
+        Start 2796: GeometryIO_MeshIO.LoadsBinaryPLYTriangleWithDoubleScalars
+715/742 Test #2796: GeometryIO_MeshIO.LoadsBinaryPLYTriangleWithDoubleScalars .......................................................   Passed    0.00 sec
+        Start 2797: GeometryIO_MeshIO.LoadPLYRejectsTruncatedBinaryBody
+716/742 Test #2797: GeometryIO_MeshIO.LoadPLYRejectsTruncatedBinaryBody .............................................................   Passed    0.00 sec
+        Start 2798: GeometryIO_MeshIO.LoadPLYRejectsHugeAsciiHeaderCountsBeforeReserve
+717/742 Test #2798: GeometryIO_MeshIO.LoadPLYRejectsHugeAsciiHeaderCountsBeforeReserve ..............................................   Passed    0.00 sec
+        Start 2799: GeometryIO_MeshIO.LoadPLYRejectsHugeBinaryHeaderCountsBeforeReserve
+718/742 Test #2799: GeometryIO_MeshIO.LoadPLYRejectsHugeBinaryHeaderCountsBeforeReserve .............................................   Passed    0.00 sec
+        Start 2800: GeometryIO_MeshIO.LoadPLYRejectsNonIntegralListCountType
+719/742 Test #2800: GeometryIO_MeshIO.LoadPLYRejectsNonIntegralListCountType ........................................................   Passed    0.00 sec
+        Start 2801: GeometryIO_MeshIO.LoadPLYRejectsNegativeBinaryListCount
+720/742 Test #2801: GeometryIO_MeshIO.LoadPLYRejectsNegativeBinaryListCount .........................................................   Passed    0.00 sec
+        Start 2802: GeometryIO_MeshIO.LoadPLYRejectsBinaryFaceListBelowThree
+721/742 Test #2802: GeometryIO_MeshIO.LoadPLYRejectsBinaryFaceListBelowThree ........................................................   Passed    0.00 sec
+        Start 2803: GeometryIO_MeshIO.LoadsAsciiPLYAfterBinaryDispatch
+722/742 Test #2803: GeometryIO_MeshIO.LoadsAsciiPLYAfterBinaryDispatch ..............................................................   Passed    0.00 sec
+        Start 2804: GeometryIO_MeshIO.LoadPLYRejectsUnsupportedFormatVersion
+723/742 Test #2804: GeometryIO_MeshIO.LoadPLYRejectsUnsupportedFormatVersion ........................................................   Passed    0.00 sec
+        Start 2805: GeometryIO_MeshIO.MeshImportersRejectDuplicateVertexFaces
+724/742 Test #2805: GeometryIO_MeshIO.MeshImportersRejectDuplicateVertexFaces .......................................................   Passed    0.00 sec
+        Start 2909: HalfedgeMesh.SingleTriangle_Connectivity
+725/742 Test #2909: HalfedgeMesh.SingleTriangle_Connectivity ........................................................................   Passed    0.00 sec
+        Start 2910: HalfedgeMesh.TwoTriangles_SharedEdge
+726/742 Test #2910: HalfedgeMesh.TwoTriangles_SharedEdge ............................................................................   Passed    0.00 sec
+        Start 2911: HalfedgeMesh.AddFace_RejectsNonBoundaryInsertion
+727/742 Test #2911: HalfedgeMesh.AddFace_RejectsNonBoundaryInsertion ................................................................   Passed    0.00 sec
+        Start 2912: HalfedgeMesh.DeleteFace_ThenGarbageCollect
+728/742 Test #2912: HalfedgeMesh.DeleteFace_ThenGarbageCollect ......................................................................   Passed    0.00 sec
+        Start 2920: HtexPatch.BuildPatchMetadataRejectsEmptyMesh
+729/742 Test #2920: HtexPatch.BuildPatchMetadataRejectsEmptyMesh ....................................................................   Passed    0.00 sec
+        Start 3053: AssetImportRouter.RoutesObjMeshImportFromPath
+730/742 Test #3053: AssetImportRouter.RoutesObjMeshImportFromPath ...................................................................   Passed    0.00 sec
+        Start 3420: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent
+731/742 Test #3420: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent ...............***Skipped   0.06 sec
+        Start 3431: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+732/742 Test #3431: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface .................***Skipped   0.06 sec
+        Start 3434: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement
+733/742 Test #3434: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement ..................***Skipped   0.91 sec
+        Start 4169: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferUploadsFromGeometrySources
+734/742 Test #4169: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferUploadsFromGeometrySources ..........................   Passed    0.03 sec
+        Start 4171: RuntimeRenderExtraction.MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange
+735/742 Test #4171: RuntimeRenderExtraction.MeshScalarPropertyBufferReachesPreparedEntityConfigWithAutoRange ........................   Passed    0.07 sec
+        Start 4172: RuntimeRenderExtraction.MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig
+736/742 Test #4172: RuntimeRenderExtraction.MeshSurfaceLaneOverrideDoubleCurvatureReachesPreparedEntityConfig .......................   Passed    0.07 sec
+        Start 4173: RuntimeRenderExtraction.MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig
+737/742 Test #4173: RuntimeRenderExtraction.MeshSurfaceLaneOverrideIsolinePresetReachesPreparedEntityConfig .........................   Passed    0.07 sec
+        Start 4174: RuntimeRenderExtraction.MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames
+738/742 Test #4174: RuntimeRenderExtraction.MeshScalarVisualizationSurvivesLatePropertyAndSteadyStateFrames .........................   Passed    0.10 sec
+        Start 4175: RuntimeRenderExtraction.MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig
+739/742 Test #4175: RuntimeRenderExtraction.MeshScalarDegenerateManualRangeIsSanitizedInPreparedConfig ..............................   Passed    0.07 sec
+        Start 4178: RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream
+740/742 Test #4178: RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream ........................   Passed    0.08 sec
+        Start 4179: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferFailsClosed
+741/742 Test #4179: RuntimeRenderExtraction.MeshColorVisualizationPropertyBufferFailsClosed .........................................   Passed    0.03 sec
+        Start 4203: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction
+742/742 Test #4203: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction .......................................   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 742
+
+Label Time Summary:
+assets         =   0.00 sec*proc (1 test)
+contract       =   7.63 sec*proc (281 tests)
+ecs            =   0.02 sec*proc (12 tests)
+geometry       =   2.99 sec*proc (415 tests)
+gpu            =   1.04 sec*proc (3 tests)
+graphics       =   0.68 sec*proc (11 tests)
+integration    =   2.59 sec*proc (34 tests)
+runtime        =  10.22 sec*proc (315 tests)
+slow           =   0.42 sec*proc (1 test)
+unit           =   2.11 sec*proc (427 tests)
+vulkan         =   1.04 sec*proc (3 tests)
+
+Total Test time (real) =  12.08 sec
+
+The following tests did not run:
+	3420 - RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent (Skipped)
+	3431 - RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface (Skipped)
+	3434 - PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement (Skipped)

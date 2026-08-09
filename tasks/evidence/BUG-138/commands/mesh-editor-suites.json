@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "ctest --test-dir build/ci --output-on-failure -R 'SandboxEditor|GeometryProcessing|JobService|EditorCommandHistory|Mesh' --timeout 180"
+  ],
+  "command_display": "bash -lc 'ctest --test-dir build/ci --output-on-failure -R '\"'\"'SandboxEditor|GeometryProcessing|JobService|EditorCommandHistory|Mesh'\"'\"' --timeout 180'",
+  "cwd": ".",
+  "duration_ms": 12102,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T01:20:06Z",
+  "label": "mesh-editor-suites",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T01:19:54Z",
+  "stderr_path": "tasks/evidence/BUG-138/commands/mesh-editor-suites.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-138/commands/mesh-editor-suites.stdout.log",
+  "stdout_sha256": "eeeb283c2abd63e2105511b2b96016c7182a60d7c851f40c63a463cf1c0d0e72",
+  "task_id": "BUG-138"
+}

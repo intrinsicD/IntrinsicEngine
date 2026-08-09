@@ -18,41 +18,44 @@ contract_review: >-
 ---
 # BUG-139 — ImGui receives no key events, so every editor text field is append-only
 
-## Progress — `CPUContracted` landed 2026-08-08; open for its `Operational` proof
+## Status
 
-The fix is in and every required change and test is done. The task stays open
-for one reason only: its Maturity section requires a live `ExtrinsicSandbox`
-session in which a typed path is corrected with Backspace, and this session
-could not drive an interactive GUI to produce that evidence. Nothing else is
-owed.
+- Completed and retired on 2026-08-09.
+- Completion commit: this retirement commit.
 
-What landed:
+The engine-owned pump landed on 2026-08-08 with its adapter contract coverage;
+what stayed open was the live confirmation this task's `## Maturity` section
+requires, because that session could not drive an interactive GUI. It has now
+been driven.
 
-- `Runtime.ImGuiAdapter::PumpEvents` translates `Platform::KeyEvent` into
-  `io.AddKeyEvent`. The mapping is numeric — the platform's key-code space is
-  GLFW's, which `Platform::Input::Key` already pins (65 = A, 256 = Escape,
-  341 = LeftControl) — so the runtime adapter needs no GLFW header and any
-  backend emitting those codes works.
-- Modifier chords are derived from the modifier keys' own press/release,
-  because `Platform::KeyEvent` carries no modifier mask and widening it was not
-  warranted for this. The adapter tracks all eight left/right modifier sides so
-  releasing Left Shift while Right Shift is held does not drop `ImGuiMod_Shift`.
-- The engine-owned pump was chosen over adopting the upstream backend. The five
-  `ImGui_ImplGlfw_*Callback` forwards, the `HasImGuiGlfwBackend()` predicate
-  that could never be true, and both ImGui includes are gone from
-  `Platform.Backend.Glfw.cpp`, and `src/platform/CMakeLists.txt` no longer
-  links `imgui_lib` — the platform layer now names no ImGui type at all.
-- Two contract tests. Both fail against the unfixed pump.
-  `PumpedKeyEventsReachImGuiIoWithModifierChords` covers the Ctrl+V chord,
-  left/right modifier independence, and all nine editing keys the report named.
-  `BackspaceShortensSeededInputTextAndCapturesKeyboard` types End then two
-  Backspaces into a focused `InputText` through the same pump the window uses
-  and watches the buffer shorten one character at a time — collapsing the
-  selection first, because ImGui selects the whole field on focus and a
-  Backspace against that selection would clear the field and pass for the wrong
-  reason.
+### Live-session evidence (2026-08-09)
 
-Owed for closure: the live-session Backspace evidence named in `## Maturity`.
+The host's seat was locked, so the session ran against a nested `Xephyr`
+display (`:7`) whose XTEST input is independent of the lock screen's grab, with
+the `ci-vulkan` `ExtrinsicSandbox` build and the promoted Vulkan device. Every
+keystroke below was delivered as a real X key event through the GLFW backend
+and the engine-owned pump — nothing was written into `ImGuiIO` directly.
+
+In `File / Import`'s `Path` field:
+
+| Step | Keys | Field contents |
+| --- | --- | --- |
+| typed | `tests/data/sculpt.objXX` | `tests/data/sculpt.objXX` |
+| corrected | `BackSpace` ×2 | `tests/data/sculpt.obj` |
+| | `Home`, `Delete` ×6 | `data/sculpt.obj` |
+| | `End`, `Left` ×4, `Delete` | `data/sculptobj` |
+| | `Ctrl+A`, `Ctrl+X` | *(empty)* |
+| | `Ctrl+V` | `data/sculptobj` |
+| | `Ctrl+Z` | *(empty)* |
+
+That is the Backspace correction the Maturity section names, plus every other
+editing key and clipboard chord the acceptance criteria list. `Ctrl+V`
+restoring the cut text also exercises the clipboard round-trip through
+`GetClipboardText`/`SetClipboardText`, which the report called unreachable.
+
+The same session then typed a full absolute path into that field and imported
+`tests/data/sculpt.obj`, which is the workflow the report said was close to
+unusable. Screenshots are in `tasks/evidence/BUG-139/artifacts/`.
 
 ## Goal
 - Deliver platform key events to ImGui so editor text fields support editing
@@ -140,11 +143,9 @@ Owed for closure: the live-session Backspace evidence named in `## Maturity`.
       ImGui adapter prose to describe key-event ownership accurately.
 
 ## Acceptance criteria
-- [ ] Backspace, Delete, arrows, Home/End, Enter, Tab, Escape and Ctrl+A/C/V/X/Z
-      work in Sandbox text fields. Proven at the adapter contract level — the
-      keys reach `ImGuiIO` and a focused `InputText` shortens under Backspace —
-      but the live-session confirmation this task's Maturity section requires
-      is still owed.
+- [x] Backspace, Delete, arrows, Home/End, Enter, Tab, Escape and Ctrl+A/C/V/X/Z
+      work in Sandbox text fields. Proven at the adapter contract level and
+      then in the live session recorded under `## Status`.
 - [x] No unreachable ImGui platform-backend forwarding remains in
       `Platform.Backend.Glfw.cpp`.
 - [x] Camera/gizmo/pick input capture gating is unchanged in behavior: the
@@ -170,3 +171,5 @@ python3 tools/repo/check_layering.py --root src --strict
 ## Maturity
 - Target: `Operational` — proven by a live `ExtrinsicSandbox` session in which a
   typed path is corrected with Backspace, not by adapter unit coverage alone.
+- Reached `Operational` on 2026-08-09; the session is recorded under
+  `## Status`.

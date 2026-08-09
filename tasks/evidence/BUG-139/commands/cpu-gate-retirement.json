@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+  ],
+  "command_display": "bash -lc 'ctest --test-dir build/ci --output-on-failure -LE '\"'\"'gpu|vulkan|slow|flaky-quarantine'\"'\"' --timeout 60'",
+  "cwd": ".",
+  "duration_ms": 57694,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T01:24:29Z",
+  "label": "cpu-gate-retirement",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T01:23:31Z",
+  "stderr_path": "tasks/evidence/BUG-139/commands/cpu-gate-retirement.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-139/commands/cpu-gate-retirement.stdout.log",
+  "stdout_sha256": "f1320a3aa1088fb918e469ae029bffd7f79fbf92c77b5cfcea2816327af644f9",
+  "task_id": "BUG-139"
+}

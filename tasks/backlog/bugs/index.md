@@ -19,16 +19,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   vertex normals, curvature, remesh/subdivide/simplify, outlier removal, and UV
   regeneration — 22 sites in all. Derive each terminal status from a changed
   quantity and report `NoChange` with a reason.
-- [`BUG-139` — ImGui receives no key events, so every editor text field is append-only](BUG-139-imgui-adapter-drops-key-events.md):
-  `ImGuiAdapter::PumpEvents()` deliberately drops `Platform::KeyEvent` and there
-  is no `io.AddKeyEvent` anywhere, so Backspace, arrows, Enter and every Ctrl
-  shortcut are dead in all editor fields; the five `ImGui_ImplGlfw_*Callback`
-  forwards that would have supplied them are unreachable because the upstream
-  backend is never initialized.
-- [`BUG-138` — Async mesh geometry jobs never execute and stay Pending forever](BUG-138-async-mesh-geometry-jobs-never-execute.md):
-  simplify, subdivide and remesh each queue a CPU job that never completes
-  (observed > 90 s) while all worker threads sit idle, permanently disabling
-  their editor actions. Synchronous operations on the same selection still run.
 - [`BUG-137` — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh](BUG-137-direct-mesh-import-atlas-replaces-topology.md):
   importing a closed manifold OBJ (3669 V / 11013 E / 7342 F, every edge
   2-manifold) materializes 21464 vertices, 21745 edges and 21464 boundary
