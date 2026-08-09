@@ -1,0 +1,20 @@
+{
+  "command": [
+    "./build/ci/bin/IntrinsicRuntimeContractTests",
+    "--gtest_filter=SandboxEditorUi.*Registration*"
+  ],
+  "command_display": "./build/ci/bin/IntrinsicRuntimeContractTests '--gtest_filter=SandboxEditorUi.*Registration*'",
+  "cwd": ".",
+  "duration_ms": 95,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T15:11:58Z",
+  "label": "focused-registration",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T15:11:58Z",
+  "stderr_path": "tasks/evidence/BUG-096/commands/focused-registration.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-096/commands/focused-registration.stdout.log",
+  "stdout_sha256": "416dd6a79d500e78c51d96f4a21193250c9e64adc0447572c4f061e6ee9ccd1b",
+  "task_id": "BUG-096"
+}

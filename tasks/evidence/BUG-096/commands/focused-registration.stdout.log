@@ -1,0 +1,35 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxEditorUi.*Registration*
+[==========] Running 10 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 10 tests from SandboxEditorUi
+[ RUN      ] SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo
+[       OK ] SandboxEditorUi.RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo (1 ms)
+[ RUN      ] SandboxEditorUi.RegistrationRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.RegistrationRequestQueuesDerivedJobAndPublishesOnApply (10 ms)
+[ RUN      ] SandboxEditorUi.RegistrationDerivedJobDiscardsStaleSourceBeforeApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.RegistrationDerivedJobDiscardsStaleSourceBeforeApply (9 ms)
+[ RUN      ] SandboxEditorUi.RegistrationPointToPlaneUsesTargetNormals
+[       OK ] SandboxEditorUi.RegistrationPointToPlaneUsesTargetNormals (17 ms)
+[ RUN      ] SandboxEditorUi.QueuedRegistrationPointToPlaneUsesTargetNormals
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.QueuedRegistrationPointToPlaneUsesTargetNormals (41 ms)
+[ RUN      ] SandboxEditorUi.RegistrationPointToPlaneRejectsInvalidTargetNormals
+[       OK ] SandboxEditorUi.RegistrationPointToPlaneRejectsInvalidTargetNormals (0 ms)
+[ RUN      ] SandboxEditorUi.RegistrationPointToPlaneTransformsNormalsByInverseTranspose
+[       OK ] SandboxEditorUi.RegistrationPointToPlaneTransformsNormalsByInverseTranspose (0 ms)
+[ RUN      ] SandboxEditorUi.QueuedRegistrationPointToPlaneDiscardsStaleTargetNormals
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.QueuedRegistrationPointToPlaneDiscardsStaleTargetNormals (7 ms)
+[ RUN      ] SandboxEditorUi.RegistrationCommandFailsClosedForInvalidSelectionAndParameters
+[       OK ] SandboxEditorUi.RegistrationCommandFailsClosedForInvalidSelectionAndParameters (0 ms)
+[ RUN      ] SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms
+[       OK ] SandboxEditorUi.RegistrationCommandAlignsAcrossEntityTransforms (1 ms)
+[----------] 10 tests from SandboxEditorUi (90 ms total)
+
+[----------] Global test environment tear-down
+[==========] 10 tests from 1 test suite ran. (90 ms total)
+[  PASSED  ] 10 tests.
