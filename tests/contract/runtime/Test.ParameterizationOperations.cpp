@@ -202,6 +202,22 @@ namespace
             return Scene.Raw().get<GS::Vertices>(Entity);
         }
 
+        [[nodiscard]] GS::Halfedges& Halfedges()
+        {
+            return Scene.Raw().get<GS::Halfedges>(Entity);
+        }
+
+        [[nodiscard]] std::optional<std::vector<glm::vec2>> CornerUvs() const
+        {
+            const GS::Halfedges& halfedges =
+                Scene.Raw().get<GS::Halfedges>(Entity);
+            const auto uvs =
+                halfedges.Properties.Get<glm::vec2>("h:texcoord");
+            if (!uvs)
+                return std::nullopt;
+            return uvs.Vector();
+        }
+
         [[nodiscard]] std::optional<std::vector<glm::vec2>> Uvs() const
         {
             const GS::Vertices& vertices =
@@ -853,6 +869,66 @@ TEST(ParameterizationOperations, SolverRejectionCarriesStructuredTopologyCause)
         Apply(disk, Runtime::ParameterizationStrategyKind::Lscm);
     ASSERT_TRUE(applied.Succeeded());
     EXPECT_FALSE(applied.Rejection.Evaluated);
+}
+
+// BUG-137: corner UVs win the canonical resolution order, so publishing a
+// vertex-domain parameterization underneath a surviving `h:texcoord` would
+// compute a result that no consumer reads. The operation retires what it
+// supersedes, and undo restores it.
+TEST(ParameterizationOperations, RetiresSupersededCornerUvsAndUndoRestoresThem)
+{
+    ParameterizationHarness harness{};
+    ASSERT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
+
+    std::vector<glm::vec2> authoredCorners(
+        harness.Halfedges().Properties.Size(), glm::vec2{0.0f});
+    for (std::size_t i = 0u; i < authoredCorners.size(); ++i)
+    {
+        authoredCorners[i] =
+            glm::vec2{static_cast<float>(i) * 0.03125f, 0.5f};
+    }
+    harness.Halfedges()
+        .Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.0f})
+        .Vector() = authoredCorners;
+    ASSERT_TRUE(harness.CornerUvs().has_value());
+
+    const Runtime::EditorParameterizationResult result =
+        Apply(harness, Runtime::ParameterizationStrategyKind::TutteUniform);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+
+    ASSERT_TRUE(harness.Uvs().has_value());
+    const std::vector<glm::vec2> generated = *harness.Uvs();
+    EXPECT_TRUE(AllFinite(generated));
+    EXPECT_FALSE(harness.Halfedges().Properties.Exists("h:texcoord"))
+        << "a superseded corner property would keep winning the resolution "
+           "order over the parameterization just computed";
+
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
+    ASSERT_TRUE(harness.CornerUvs().has_value());
+    EXPECT_EQ(*harness.CornerUvs(), authoredCorners);
+
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    ASSERT_TRUE(harness.Uvs().has_value());
+    EXPECT_EQ(*harness.Uvs(), generated);
+    EXPECT_FALSE(harness.Halfedges().Properties.Exists("h:texcoord"));
+}
+
+// BUG-137: the vertex-indexed UV layout view cannot draw corner UVs, and
+// reporting nothing at all read as "this mesh has no UVs" for exactly the
+// meshes an atlas produces.
+TEST(ParameterizationOperations, ViewModelNamesCornerDomainUvsItCannotDraw)
+{
+    ParameterizationHarness harness{};
+    ASSERT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
+    harness.Halfedges()
+        .Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.25f, 0.5f});
+
+    const Runtime::EditorParameterizationViewModel model =
+        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+    EXPECT_FALSE(model.HasUvCoordinates);
+    EXPECT_NE(model.Message.find("h:texcoord"), std::string::npos)
+        << "message was: " << model.Message;
 }
 
 // BUG-141: the panel renders its header from the view model's `Message` and

@@ -48,13 +48,22 @@ namespace Extrinsic::Runtime
         namespace Parameterization = Geometry::Parameterization;
 
         constexpr std::string_view kTexcoordProperty{"v:texcoord"};
+        constexpr std::string_view kCornerTexcoordProperty{"h:texcoord"};
         constexpr std::uint32_t kInvalidIndex =
             std::numeric_limits<std::uint32_t>::max();
 
+        // BUG-137 — the mesh's UVs live on whichever of the two domains owns
+        // them, and the corner domain wins when both exist. Parameterization
+        // computes one UV per vertex, so it publishes to the vertex domain and
+        // retires any corner UVs it supersedes: publishing underneath a stale
+        // `h:texcoord` would compute a result that nothing downstream reads.
+        // Undo therefore has to restore both halves, so both are captured.
         struct ParameterizationUvState
         {
             bool Present{false};
             std::vector<glm::vec2> Values{};
+            bool CornerPresent{false};
+            std::vector<glm::vec2> CornerValues{};
         };
 
         [[nodiscard]] bool IsFiniteUv(const glm::vec2 uv) noexcept
@@ -538,20 +547,42 @@ namespace Extrinsic::Runtime
         {
             if (view.VertexSource == nullptr)
                 return std::nullopt;
+
+            ParameterizationUvState state{};
+
             const Geometry::PropertySet& properties =
                 view.VertexSource->Properties;
-            if (!properties.Exists(kTexcoordProperty))
-                return ParameterizationUvState{};
-            const auto uvs = properties.Get<glm::vec2>(kTexcoordProperty);
-            if (!uvs || uvs.Vector().size() != properties.Size() ||
-                !AllFiniteUvs(uvs.Vector()))
+            if (properties.Exists(kTexcoordProperty))
             {
-                return std::nullopt;
+                const auto uvs = properties.Get<glm::vec2>(kTexcoordProperty);
+                if (!uvs || uvs.Vector().size() != properties.Size() ||
+                    !AllFiniteUvs(uvs.Vector()))
+                {
+                    return std::nullopt;
+                }
+                state.Present = true;
+                state.Values = uvs.Vector();
             }
-            return ParameterizationUvState{
-                .Present = true,
-                .Values = uvs.Vector(),
-            };
+
+            if (view.HalfedgeSource != nullptr)
+            {
+                const Geometry::PropertySet& corners =
+                    view.HalfedgeSource->Properties;
+                if (corners.Exists(kCornerTexcoordProperty))
+                {
+                    const auto uvs =
+                        corners.Get<glm::vec2>(kCornerTexcoordProperty);
+                    if (!uvs || uvs.Vector().size() != corners.Size() ||
+                        !AllFiniteUvs(uvs.Vector()))
+                    {
+                        return std::nullopt;
+                    }
+                    state.CornerPresent = true;
+                    state.CornerValues = uvs.Vector();
+                }
+            }
+
+            return state;
         }
 
         struct ParameterizationSourceState
@@ -580,26 +611,33 @@ namespace Extrinsic::Runtime
             ParameterizationSourceSnapshot Source{};
         };
 
-        [[nodiscard]] bool SameUvState(
-            const ParameterizationUvState& lhs,
-            const ParameterizationUvState& rhs) noexcept
+        [[nodiscard]] bool SameUvValues(
+            const std::span<const glm::vec2> lhs,
+            const std::span<const glm::vec2> rhs) noexcept
         {
-            if (lhs.Present != rhs.Present ||
-                lhs.Values.size() != rhs.Values.size())
-            {
+            if (lhs.size() != rhs.size())
                 return false;
-            }
-            for (std::size_t i = 0u; i < lhs.Values.size(); ++i)
+            for (std::size_t i = 0u; i < lhs.size(); ++i)
             {
-                if (std::bit_cast<std::uint32_t>(lhs.Values[i].x) !=
-                        std::bit_cast<std::uint32_t>(rhs.Values[i].x) ||
-                    std::bit_cast<std::uint32_t>(lhs.Values[i].y) !=
-                        std::bit_cast<std::uint32_t>(rhs.Values[i].y))
+                if (std::bit_cast<std::uint32_t>(lhs[i].x) !=
+                        std::bit_cast<std::uint32_t>(rhs[i].x) ||
+                    std::bit_cast<std::uint32_t>(lhs[i].y) !=
+                        std::bit_cast<std::uint32_t>(rhs[i].y))
                 {
                     return false;
                 }
             }
             return true;
+        }
+
+        [[nodiscard]] bool SameUvState(
+            const ParameterizationUvState& lhs,
+            const ParameterizationUvState& rhs) noexcept
+        {
+            return lhs.Present == rhs.Present &&
+                   lhs.CornerPresent == rhs.CornerPresent &&
+                   SameUvValues(lhs.Values, rhs.Values) &&
+                   SameUvValues(lhs.CornerValues, rhs.CornerValues);
         }
 
         [[nodiscard]] bool SamePositions(
@@ -725,35 +763,65 @@ namespace Extrinsic::Runtime
                 return EditorCommandHistoryStatus::UnsupportedOperation;
             }
 
-            Geometry::PropertySet& properties = view.VertexSource->Properties;
-            const auto existingId =
-                properties.Registry().Find(kTexcoordProperty);
-            if (!state.Present)
+            // BUG-137 — one UV property per domain, restored or retired to
+            // match `state` exactly. Applying only the vertex half would leave
+            // a superseded `h:texcoord` winning the resolution order, so the
+            // computed parameterization would never be the one read.
+            const auto applyDomain =
+                [](Geometry::PropertySet& properties,
+                   const std::string_view name,
+                   const bool present,
+                   const std::vector<glm::vec2>& values)
+                -> EditorCommandHistoryStatus
             {
-                if (existingId.has_value() &&
-                    !properties.Registry().Remove(*existingId))
+                const auto existingId = properties.Registry().Find(name);
+                if (!present)
+                {
+                    if (existingId.has_value() &&
+                        !properties.Registry().Remove(*existingId))
+                    {
+                        return EditorCommandHistoryStatus::CommandFailed;
+                    }
+                    return EditorCommandHistoryStatus::Applied;
+                }
+
+                if (values.size() != properties.Size() ||
+                    !AllFiniteUvs(values))
                 {
                     return EditorCommandHistoryStatus::CommandFailed;
                 }
-            }
-            else
-            {
-                if (state.Values.size() != properties.Size() ||
-                    !AllFiniteUvs(state.Values))
-                {
+                if (existingId.has_value() && !properties.Get<glm::vec2>(name))
                     return EditorCommandHistoryStatus::CommandFailed;
-                }
-                if (existingId.has_value() &&
-                    !properties.Get<glm::vec2>(kTexcoordProperty))
-                {
-                    return EditorCommandHistoryStatus::CommandFailed;
-                }
+
                 auto target = properties.GetOrAdd<glm::vec2>(
-                    std::string{kTexcoordProperty},
+                    std::string{name},
                     glm::vec2{0.0f});
-                if (!target || target.Vector().size() != state.Values.size())
+                if (!target || target.Vector().size() != values.size())
                     return EditorCommandHistoryStatus::CommandFailed;
-                target.Vector() = state.Values;
+                target.Vector() = values;
+                return EditorCommandHistoryStatus::Applied;
+            };
+
+            if (state.CornerPresent && view.HalfedgeSource == nullptr)
+                return EditorCommandHistoryStatus::CommandFailed;
+
+            const EditorCommandHistoryStatus vertexStatus = applyDomain(
+                view.VertexSource->Properties,
+                kTexcoordProperty,
+                state.Present,
+                state.Values);
+            if (vertexStatus != EditorCommandHistoryStatus::Applied)
+                return vertexStatus;
+
+            if (view.HalfedgeSource != nullptr)
+            {
+                const EditorCommandHistoryStatus cornerStatus = applyDomain(
+                    view.HalfedgeSource->Properties,
+                    kCornerTexcoordProperty,
+                    state.CornerPresent,
+                    state.CornerValues);
+                if (cornerStatus != EditorCommandHistoryStatus::Applied)
+                    return cornerStatus;
             }
 
             return EditorCommandHistoryStatus::Applied;
@@ -1180,6 +1248,11 @@ namespace Extrinsic::Runtime
             geometryMetadataSignature,
             sourceGeneration,
             *before,
+            // BUG-137 — a parameterization is one UV per vertex, so it
+            // publishes on the vertex domain and leaves `CornerPresent` false:
+            // any corner UVs it supersedes are retired here rather than left
+            // to win the resolution order over the result just computed. Undo
+            // restores them from `before`.
             ParameterizationUvState{
                 .Present = true,
                 .Values = std::move(parameterized.UVs),
@@ -1438,6 +1511,21 @@ namespace Extrinsic::Runtime
         {
             model.Message =
                 "Selected mesh v:texcoord has the wrong type, count, or non-finite values.";
+        }
+        else if (view.HalfedgeSource != nullptr &&
+                 view.HalfedgeSource->Properties.Exists(
+                     kCornerTexcoordProperty))
+        {
+            // BUG-137 — the mesh is parameterized, just on the corner domain,
+            // which this vertex-indexed layout view cannot draw. Reporting
+            // nothing at all read as "no UVs" for exactly the meshes an atlas
+            // produces. Running a parameterization from here republishes on
+            // the vertex domain and retires the corner UVs, so say so.
+            model.Message =
+                "Selected mesh carries corner-domain UVs (h:texcoord), which "
+                "the vertex-indexed UV layout view cannot draw. Running a "
+                "parameterization republishes UVs on the vertex domain and "
+                "retires the corner UVs.";
         }
 
         if (context.LastParameterizationResult != nullptr &&
