@@ -5,16 +5,27 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "claude-bug146"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-09T19:20:00Z"
+maturity_target: CPUContracted
 contract_schema: 1
 contracts:
   - geometry.element-domain-sources
   - geometry.property-coherence
 ---
 # BUG-146 — Topology-changing mesh operations silently destroy corner-domain UVs
+
+## Status
+
+- Completed and retired on 2026-08-09.
+- Completion commit: this retirement commit.
+- Slice commits: `cda42c9f` (shared corner-publish mapping, mechanical),
+  `7bba3100` (simplify preserves), `548cf690` (remesh/subdivide report their
+  discard).
+- Follow-up opened by this task's audit:
+  [`BUG-147`](../backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md).
 
 ## Goal
 - Stop mesh simplify (and the sibling topology-replacing operations) from
@@ -110,7 +121,7 @@ contracts:
 | Simplify | Preserve | Done. A collapse removes corners and the survivors keep their own UVs, which is the correct answer and is what lets `PreserveUvSeams` see a seam at all. |
 | Remesh | Discard, reported | Done. Re-tessellation produces corners with no source UV; resampling onto the new surface is a separate capability, not a side effect of this command. |
 | Subdivide | Discard, reported | Done. Same reason. Loop and Catmull-Clark UV rules exist and would be the eventual answer, but they are new work, not a repair. |
-| UV regeneration | Neither — it is a UV *producer*, and the audit found it broken in a different way | Spun out as [`BUG-147`](BUG-147-uv-regeneration-shatters-mesh-topology.md). |
+| UV regeneration | Neither — it is a UV *producer*, and the audit found it broken in a different way | Spun out as [`BUG-147`](../backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md). |
 
 The UV-regeneration finding is worth stating plainly because it is not the
 defect this task set out to fix. That command builds the published mesh from
@@ -145,12 +156,17 @@ drop UVs; it converts the mesh into a triangle soup.
       resolution order ("Topology-replacing operations and UVs").
 
 ## Acceptance criteria
-- [ ] A corner-UV mesh survives simplify with its UVs intact and
+- [x] A corner-UV mesh survives simplify with its UVs intact and
       count-matched.
-- [ ] No topology-replacing operation removes a UV property without saying so
+- [x] No topology-replacing operation removes a UV property without saying so
       in its result.
-- [ ] `PreserveUvSeams` pins a real corner seam through the editor path.
-- [ ] No layering violation; no second corner-walk implementation.
+- [x] `PreserveUvSeams` pins a real corner seam through the editor path: the
+      pinned count now equals an independently derived seam set (5 of 25 grid
+      vertices) where the unfixed source reported 0.
+- [x] No layering violation; no second corner-walk implementation — the publish
+      mapping moved into `Runtime::PublishMeshCornerTexcoords` so both
+      consumers share one, and the forwarding reuses
+      `BuildMeshSurfaceTriangleCornerTopology` rather than adding a walk.
 
 ## Verification
 ```bash

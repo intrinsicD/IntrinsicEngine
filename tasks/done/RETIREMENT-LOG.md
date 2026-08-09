@@ -7474,7 +7474,7 @@ command reported `h:texcoord exists=1 size=112` before and `exists=0 size=64`
 after, with the command reporting success. That is also why FA-QEM's new
 corner-seam classification cannot fire through the editor path yet: the geometry
 contract is correct, the runtime does not hand it the data. It is tracked as
-[`BUG-146`](../backlog/bugs/BUG-146-topology-edits-destroy-corner-uvs.md) with
+[`BUG-146`](BUG-146-topology-edits-destroy-corner-uvs.md) with
 that probe as its repro.
 
 Coverage across the slices includes 9 corner-UV storage and resolution cases,
@@ -7482,3 +7482,65 @@ the split-upload contract tests, the restored Vulkan readback smoke, the
 `sculpt.obj` and generated-cube import topology assertions, OBJ corner round
 trips, and slice D's four new failing-first cases. The default CPU gate passes
 4172/4172 with its expected `GlfwLifecycleLsan` skip.
+
+## 2026-08-09 — BUG-146 retired
+
+[`BUG-146`](BUG-146-topology-edits-destroy-corner-uvs.md) — topology-changing
+mesh operations silently destroying corner-domain UVs — retired on 2026-08-09,
+opened and closed in the same session that finished `BUG-137`.
+
+`BUG-137` moved atlas UVs onto the corner domain so import could stop shattering
+mesh topology. This defect was the immediate consequence: the first topology
+edit after such an import threw those UVs away. The scratch halfedge mesh every
+topology operation works on is rebuilt from a triangle soup and starts with no
+properties, and `ApplyMeshTopologyState` publishes that mesh's halfedge
+properties wholesale through `PopulateFromMesh` — so a property the scratch mesh
+does not carry is not merely stale afterwards, it is removed from the entity.
+Probed through the real simplify command: `h:texcoord exists=1 size=112` before,
+`exists=0 size=64` after, command reporting success.
+
+The forwarding could not be a straight copy. Vertex numbering survives the
+GeometrySources → soup → halfedge round trip; halfedge numbering does not. The
+fix goes through the canonical corner walk instead, which fans every face
+identically to the soup builder, so triangle `t` is soup face `t` is scratch
+face `t` and each scratch halfedge resolves to its corner slot by target vertex.
+The publish half of that mapping was already written once, privately, inside
+asset materialization; it moved to `Runtime::PublishMeshCornerTexcoords` next to
+the corner walk and split table it belongs with, as a separate mechanical commit,
+so the two consumers cannot drift apart. That module exists precisely because
+more than one consumer has to produce the same corner mapping.
+
+The task's second half was deciding what the *other* topology operations owe.
+Simplify preserves, because a collapse removes corners and the survivors keep
+their own UVs — which is also what finally lets FA-QEM's `PreserveUvSeams` see a
+seam at all: on the fixed path it pins 5 of 25 grid vertices where the unfixed
+source pinned 0. Remesh and subdivide genuinely cannot preserve, because they
+create corners no source UV describes, and resampling onto a re-tessellated
+surface is a separate capability rather than a side effect these commands should
+grow. What they owed was honesty, so all three now report
+`EditorMeshTexcoordOutcome` and a discard also states the loss in the result
+message. All three panels already render that message, so no UI change was
+needed. The coherence contract records the rule for any future operation that
+replaces topology: a silent discard is a defect, not a policy.
+
+While classifying seams during this work, one more robustness gap closed. The
+seam classifier read every live halfedge, including boundary halfedges, which
+own no corner. Producers fill those slots by repeating a UV already present at
+the target vertex, so the production path was safe — but any producer leaving a
+default there would have invented a seam. The classifier now skips them rather
+than depending on producer discipline.
+
+The per-operation audit's fourth target turned out not to be this task's defect
+at all. Editor UV regeneration publishes `ToHalfedgeMesh(atlas.OutputMesh)` as
+the entity mesh — `BUG-137`'s exact defect, at an entry point slice C never
+touched. A closed icosahedron goes in as 12 V / 30 E / 60 H / 20 F and comes out
+as 60 V / 60 E / 120 H / 20 F, twenty charts for twenty faces, status `Applied`:
+it does not drop UVs, it converts the mesh into a triangle soup. That is
+[`BUG-147`](../backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md),
+filed with the probe as its repro and with `BUG-137`'s already-proven
+corner-domain publication as its fix shape, rather than widened into this task.
+
+Two contract tests carry the work, both failing against the unfixed source, and
+the discard-reporting test cross-checks every reported outcome against what the
+entity actually holds afterwards rather than trusting the field. The default CPU
+gate passes 4174/4174 with its expected `GlfwLifecycleLsan` skip.

@@ -1,0 +1,91 @@
+schema_version: 1
+task_id: BUG-146
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-09T20:47:52Z'
+claim_eligible: false
+source:
+  base_ref: 50c75007
+  base_revision: 50c75007ee89b38f05168367c9e3ee9f812185ae
+  head_revision: 50c75007ee89b38f05168367c9e3ee9f812185ae
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b469316975cacc07c8d9ecfec25ade60d960eab4c49533d74b32708f3c12d6e7
+  - path: tasks/backlog/bugs/index.md
+    sha256: c6dd395b20a4b74780e6e7cde16776c2b076800ab6e90f43b86417ad1d495de5
+  - path: tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
+    sha256: 68720096d6f8d16c6537c3bbebc9a11ff95e3a2c30e0c60732835e309e78f751
+  - path: tasks/done/BUG-146-topology-edits-destroy-corner-uvs.md
+    sha256: 34f90940d06797e40ce09a6b5147de4e8aec0462de70d0010361ce54be9a6010
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: bca49a2f5241df798fccd266f7e601aa983f9d3b690a7aedd9b1271a5fa18b43
+  content_digest: 2de28a45582024a423002e5e7aa2e3352b825cb5260ff82cb030cf18a902c75e
+touched:
+  paths:
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
+  - tasks/done/BUG-146-topology-edits-destroy-corner-uvs.md
+  - tasks/done/RETIREMENT-LOG.md
+  layers:
+  - app
+  - geometry
+  - runtime
+  modules:
+  - Extrinsic.Runtime.AssetWorkflowGeometryMaterialization
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Runtime.MeshSurfaceTopology
+extension_seam: Runtime::PublishMeshCornerTexcoords is the single corner-publish mapping any further consumer
+  binds to; EditorMeshTexcoordOutcome is the per-operation UV disposition a new topology-replacing command
+  must answer.
+future_change_plan: BUG-147 owns editor UV regeneration, which the per-operation audit found publishing
+  the atlas chart-split mesh as the entity mesh. UV resampling for remesh and subdivide remains unowned
+  and is deliberately reported as a discard rather than faked.
+acceptance:
+- criterion: A corner-UV mesh survives simplify with its UVs intact and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No topology-replacing operation removes a UV property without saying so
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: '`PreserveUvSeams` pins a real corner seam through the editor path: the'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No layering violation; no second corner-walk implementation — the publish
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-146/commands/build-tests.json
+- receipt: tasks/evidence/BUG-146/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-146/commands/focused-mesh-ops.json
+- receipt: tasks/evidence/BUG-146/commands/layering.json
+- receipt: tasks/evidence/BUG-146/commands/task-policy.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-146-topology-edits-destroy-corner-uvs.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks: []
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

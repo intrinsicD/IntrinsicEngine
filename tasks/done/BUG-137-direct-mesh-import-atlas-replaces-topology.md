@@ -25,7 +25,7 @@ contracts:
   `1cbfcaec` (C), `2896fc64` + `5c47aaef` + `725d491e` + `2075a611` +
   `942a4ee6` (D).
 - Follow-up opened rather than widened into slice D:
-  [`BUG-146`](../backlog/bugs/BUG-146-topology-edits-destroy-corner-uvs.md).
+  [`BUG-146`](BUG-146-topology-edits-destroy-corner-uvs.md).
 
 ## Goal
 - Make direct mesh import preserve the source mesh's vertex/edge/halfedge
@@ -212,7 +212,7 @@ side is ready before the producing side changes.
       `PopulateFromMesh` then publishes the scratch mesh's halfedge properties
       wholesale. Confirmed by probe (`h:texcoord exists=1 size=112` before
       simplify, `exists=0 size=64` after, command reporting success) and
-      tracked as [`BUG-146`](../backlog/bugs/BUG-146-topology-edits-destroy-corner-uvs.md).
+      tracked as [`BUG-146`](BUG-146-topology-edits-destroy-corner-uvs.md).
       That is also why FA-QEM's corner-seam classification cannot yet fire
       through the editor path: the geometry contract is correct, the runtime
       does not hand it the data.

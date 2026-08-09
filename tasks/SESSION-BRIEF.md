@@ -44,7 +44,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
-- unblocked: `BUG-146` — Topology-changing mesh operations silently destroy corner-domain UVs (tasks/backlog/bugs/BUG-146-topology-edits-destroy-corner-uvs.md)
 - unblocked: `BUG-147` — Editor UV regeneration replaces the mesh with the atlas chart-split mesh (tasks/backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md)
 
 ## Theme H — Agentic workflow hardening

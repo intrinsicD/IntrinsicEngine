@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "SandboxEditorUi|Simplification|GeometryMaterialization",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|Simplification|GeometryMaterialization' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 7319,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T20:43:01Z",
+  "label": "focused-mesh-ops",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T20:42:54Z",
+  "stderr_path": "tasks/evidence/BUG-146/commands/focused-mesh-ops.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-146/commands/focused-mesh-ops.stdout.log",
+  "stdout_sha256": "1c66c6d1f4c0d3ef919a1a4313e806a67de37c68de7350d4196d7f19a423a993",
+  "task_id": "BUG-146"
+}

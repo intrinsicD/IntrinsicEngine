@@ -14,15 +14,7 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   mesh, which is `BUG-137`'s defect at an entry point slice C never touched. A
   closed icosahedron goes in as 12 V / 30 E / 60 H / 20 F and comes out as
   60 V / 60 E / 120 H / 20 F — one chart per triangle — with status `Applied`.
-  Found by the `BUG-146` per-operation audit.
-- [`BUG-146` — Topology-changing mesh operations silently destroy corner-domain UVs](BUG-146-topology-edits-destroy-corner-uvs.md):
-  simplify rebuilds the entity's halfedge mesh from a triangle soup that never
-  carries `h:texcoord`, and `PopulateFromMesh` then publishes the scratch
-  mesh's halfedge properties wholesale, so the property is removed rather than
-  left stale. A probe through the real editor command reports success with
-  `h:texcoord exists=1 size=112` before and `exists=0 size=64` after. Spun out
-  of `BUG-137` slice D, which also explains why FA-QEM's corner-seam
-  classification cannot fire through the editor path yet.
+  Found by the [`BUG-146`](../../done/BUG-146-topology-edits-destroy-corner-uvs.md) per-operation audit.
 - [`BUG-134` — ImGui adapter panel draw-list test fails intermittently](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
   one default CPU run reported the panel draw-list contract as its sole
   failure, followed by ten passing isolated repetitions and a clean 4,103-case
@@ -57,6 +49,18 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-08-09: [`BUG-146` — Topology-changing mesh operations silently
+  destroy corner-domain
+  UVs](../../done/BUG-146-topology-edits-destroy-corner-uvs.md). Simplify now
+  forwards corner UVs into its scratch mesh through the canonical corner walk,
+  so a corner-parameterized mesh keeps its UVs and FA-QEM's `PreserveUvSeams`
+  pins the seam it can now see — 5 of 25 grid vertices where the unfixed source
+  pinned 0 and deleted the property outright. Remesh and subdivide legitimately
+  cannot carry UVs onto the topology they produce, so they now report the
+  discard in both the result and the message instead of losing a
+  parameterization under a success line. The audit's fourth target became
+  [`BUG-147`](BUG-147-uv-regeneration-shatters-mesh-topology.md).
+
 - Closed 2026-08-09: [`BUG-137` — Direct mesh import replaces halfedge topology
   with the UV-atlas chart-split
   mesh](../../done/BUG-137-direct-mesh-import-atlas-replaces-topology.md).
@@ -70,7 +74,7 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   parameterization published `v:texcoord` underneath a surviving `h:texcoord`
   that wins the resolution order, so its result was read by nothing.
   Topology-replacing operations still destroy `h:texcoord` outright; that is
-  [`BUG-146`](BUG-146-topology-edits-destroy-corner-uvs.md), opened with a
+  [`BUG-146`](../../done/BUG-146-topology-edits-destroy-corner-uvs.md), opened with a
   probe rather than widened into this fix.
 
 - Closed 2026-08-08: [`BUG-143` — Corner-UV `gpu;vulkan` smoke exceeds the 30 s
