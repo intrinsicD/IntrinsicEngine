@@ -47,6 +47,23 @@ contract_review: "Reviewed the full catalog; this task diagnoses an intermittent
 - Impact: a recurrence can make the required full CPU gate nondeterministic.
   The fresh `REVIEW-003` audit completed without recurrence, so that readiness
   gate retired cleanly and this bug remains an independent follow-up.
+- **Recurrence captured 2026-08-09** during an unrelated `BUG-145` gate run, with
+  the exact assertion this task asked to preserve. It is **not** the draw-list
+  assertion the test is named for. Every draw-list, byte-count, and command
+  assertion passed; the failure was
+  `Test.ImGuiAdapter.cpp:298`,
+  `EXPECT_GE(diag.LastEndFrameMicros, diag.LastEditorCallbackMicros)`, actual
+  `12 vs 13`. That is a whole-frame duration compared against one of its own
+  nested phases at microsecond resolution, where the two are within one tick of
+  each other; an immediate rerun of the complete selector passed 4156/4156.
+  This reframes the diagnosis: the candidate is the timing instrumentation
+  (independent clock reads, rounding at 1 µs granularity, or a phase timer that
+  is not strictly nested inside the frame timer), not the ImGui frame lifecycle
+  or draw-data translation. The three `LastEndFrameMicros >= <phase>` assertions
+  at `:298-300` share the shape.
+- The `## Required changes` below still stand as written; the first is now
+  satisfied for evidence purposes, and the second should classify against the
+  timing hypothesis before the lifecycle ones.
 
 ## Required changes
 

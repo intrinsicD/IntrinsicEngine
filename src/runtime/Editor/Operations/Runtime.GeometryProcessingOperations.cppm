@@ -614,6 +614,10 @@ export namespace Extrinsic::Runtime
             Geometry::HalfedgeMesh::VertexNormals::AveragingMode::AreaWeighted};
         std::size_t VertexSlotCount{0};
         std::size_t WrittenCount{0};
+        // BUG-145: how many published normals actually differ from the ones
+        // already stored. `WrittenCount` is non-zero whenever the kernel ran at
+        // all, so it cannot decide `Applied` versus `NoChange`.
+        std::size_t ChangedNormalCount{0};
         std::size_t ValidNormalVertexCount{0};
         std::size_t ProcessedFaceCount{0};
         std::size_t DegenerateFaceCount{0};
@@ -651,6 +655,8 @@ export namespace Extrinsic::Runtime
         std::size_t VertexSlotCount{0};
         std::size_t EdgeSlotCount{0};
         std::size_t WrittenCount{0};
+        // BUG-145: see EditorMeshVertexNormalsResult::ChangedNormalCount.
+        std::size_t ChangedNormalCount{0};
         std::size_t ValidNormalVertexCount{0};
         std::size_t FallbackVertexCount{0};
         std::size_t IsolatedVertexCount{0};
@@ -701,6 +707,8 @@ export namespace Extrinsic::Runtime
         std::size_t PointSlotCount{0};
         std::size_t FinitePointCount{0};
         std::size_t WrittenCount{0};
+        // BUG-145: see EditorMeshVertexNormalsResult::ChangedNormalCount.
+        std::size_t ChangedNormalCount{0};
         std::size_t ValidNormalPointCount{0};
         std::size_t FallbackPointCount{0};
         std::size_t DegenerateNeighborhoodCount{0};

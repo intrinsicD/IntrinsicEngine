@@ -1408,11 +1408,15 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::Text(
             "Weighting: %s",
             IndexedName(result->Weighting, kMeshNormalWeightingNames));
-        if (result->Succeeded())
+        // BUG-145: NoChange means the kernel ran and changed nothing, so its
+        // counters are exactly what explains why — keep showing them.
+        if (result->Succeeded() ||
+            result->Status == Runtime::EditorCommandStatus::NoChange)
         {
             ImGui::Text(
-                "Written: %zu / %zu  valid: %zu  fallback: %zu",
+                "Written: %zu / %zu  changed: %zu  valid: %zu  fallback: %zu",
                 result->WrittenCount, result->VertexSlotCount,
+                result->ChangedNormalCount,
                 result->ValidNormalVertexCount, result->FallbackVertexCount);
             ImGui::Text(
                 "Faces: processed=%zu  degenerate=%zu  nonfinite=%zu  invalid=%zu",
@@ -1488,11 +1492,13 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::Text(
             "Geometry status: %s",
             IndexedName(result->NormalStatus, kGraphNormalStatusNames));
-        if (result->Succeeded())
+        if (result->Succeeded() ||
+            result->Status == Runtime::EditorCommandStatus::NoChange)
         {
             ImGui::Text(
-                "Written: %zu / %zu  valid: %zu  fallback: %zu",
+                "Written: %zu / %zu  changed: %zu  valid: %zu  fallback: %zu",
                 result->WrittenCount, result->VertexSlotCount,
+                result->ChangedNormalCount,
                 result->ValidNormalVertexCount, result->FallbackVertexCount);
             ImGui::Text(
                 "Edges: %zu  invalid=%zu  deleted=%zu",
@@ -1626,11 +1632,13 @@ namespace Extrinsic::Sandbox::Editor
             "Backend: %s  orientation: %s",
             IndexedName(result->Backend, kPointNormalBackendNames),
             IndexedName(result->Orientation, kPointNormalOrientationNames));
-        if (result->Succeeded())
+        if (result->Succeeded() ||
+            result->Status == Runtime::EditorCommandStatus::NoChange)
         {
             ImGui::Text(
-                "Written: %zu / %zu  finite: %zu  valid: %zu",
+                "Written: %zu / %zu  changed: %zu  finite: %zu  valid: %zu",
                 result->WrittenCount, result->PointSlotCount,
+                result->ChangedNormalCount,
                 result->FinitePointCount, result->ValidNormalPointCount);
             ImGui::Text(
                 "Fallback: %zu  tooFew=%zu  degenerate=%zu  collinear=%zu",

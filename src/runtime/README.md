@@ -437,6 +437,38 @@ extraction/reupload and does not call renderer/RHI upload APIs or stamp broad
 `GpuDirty`. Runtime owns the ECS composition and history seam; geometry owns
 the denoising algorithm.
 
+### Editor command status is decided by a changed count, not a written count
+
+`BUG-140` established the rule for denoise and `BUG-145` is extending it to the
+sibling operations: an editor geometry-processing operation derives its terminal
+`EditorCommandStatus` from a quantity that actually *changed*, never from a
+written or processed count. A slot-derived written count is non-zero whenever
+the kernel ran at all, so it reports `Applied` for a run that republished the
+values already stored.
+
+Each operation therefore:
+
+- computes its own change signal — moved vertices for denoise, differing normals
+  for the vertex-normal families, a rejected set for outlier removal, a topology
+  delta for remesh/subdivide/simplify;
+- returns `NoChange` with a message naming the counts, *before* the history
+  commit, so a no-op leaves no undo entry to step through and stamps no dirty
+  tag; and
+- surfaces the change count on its result (for example
+  `EditorMeshVertexNormalsResult::ChangedNormalCount`) so a panel can explain
+  the outcome instead of showing a written count that always looks like success.
+
+The comparison is exact rather than epsilon-based. These paths publish a
+kernel's own output back into the storage it was read from, so an unchanged
+value is bit-identical; an epsilon would invent a tolerance the undo snapshot
+does not share, and a value differing by less than it would be committed while
+being reported as unchanged. An absent output property is a change in every
+slot, because every value is newly authored.
+
+Panels render the counter block for `NoChange` as well as `Applied`: `NoChange`
+is exactly the state where the user needs the counts to understand why nothing
+happened.
+
 ### Sandbox Editor Point-Cloud Outlier Removal
 
 `UI-027` adds a point-cloud-only outlier-removal editor command at

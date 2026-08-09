@@ -3249,7 +3249,14 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWei
         GN::AveragingMode::MaxWeighted,
     }};
 
+    // BUG-145: every weighting agrees on a single flat triangle, so only the
+    // first run changes anything. The later three recompute the same normals
+    // and must report `NoChange` rather than `Applied`, publish nothing, and
+    // leave no undo entry — while still proving each weighting produces the
+    // canonical normal.
+    Runtime::EditorMeshVertexNormalsResult firstResult{};
     Runtime::EditorMeshVertexNormalsResult lastResult{};
+    bool first = true;
     for (const GN::AveragingMode weighting : kWeightings)
     {
         registry.Raw().remove<Dirty::GpuDirty,
@@ -3260,6 +3267,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWei
                               Dirty::DirtyVertexColors,
                               Dirty::DirtyFaceTopology,
                               Dirty::DirtyEdgeTopology>(mesh);
+        const std::size_t undoCountBefore = history.UndoCount();
 
         lastResult = Runtime::ApplyEditorMeshVertexNormalsCommand(
             context,
@@ -3268,15 +3276,32 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWei
                 .Weighting = weighting,
             });
 
-        ASSERT_TRUE(lastResult.Succeeded())
-            << lastResult.Message;
         EXPECT_EQ(lastResult.NormalStatus, GN::RecomputeStatus::Success);
         EXPECT_EQ(lastResult.Weighting, weighting);
         EXPECT_EQ(lastResult.VertexSlotCount, 3u);
         EXPECT_EQ(lastResult.WrittenCount, 3u);
         EXPECT_EQ(lastResult.ProcessedFaceCount, 1u);
         EXPECT_EQ(lastResult.FallbackVertexCount, 0u);
-        EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+        if (first)
+        {
+            ASSERT_TRUE(lastResult.Succeeded()) << lastResult.Message;
+            EXPECT_EQ(lastResult.ChangedNormalCount, 3u);
+            EXPECT_EQ(history.UndoCount(), undoCountBefore + 1u);
+            EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+            firstResult = lastResult;
+        }
+        else
+        {
+            EXPECT_EQ(lastResult.Status,
+                      Runtime::EditorCommandStatus::NoChange)
+                << lastResult.Message;
+            EXPECT_EQ(lastResult.ChangedNormalCount, 0u);
+            EXPECT_EQ(history.UndoCount(), undoCountBefore)
+                << "a run that changed nothing must not leave an undo entry";
+            EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh))
+                << "a run that published nothing must not mark normals dirty";
+        }
+        first = false;
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
@@ -3299,7 +3324,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWei
     }
 
     EXPECT_TRUE(history.IsDirty());
-    context.LastMeshVertexNormalsResult = &lastResult;
+    context.LastMeshVertexNormalsResult = &firstResult;
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
@@ -3308,7 +3333,177 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWei
     ASSERT_TRUE(model.Processing.LastMeshVertexNormalsResult.has_value());
     EXPECT_TRUE(model.Processing.LastMeshVertexNormalsResult->Succeeded());
     EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->WrittenCount, 3u);
+    EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->ChangedNormalCount,
+              3u);
 }
+// BUG-145: `WrittenCount` is non-zero whenever the kernel ran, so every
+// vertex-normal path reported `Applied` even when it republished the values
+// already stored. A run that changes nothing must report `NoChange` with a
+// reason, publish nothing, and leave no undo entry — synchronously and through
+// the CPU job.
+TEST(SandboxEditorUi, VertexNormalRecomputeThatChangesNothingReportsNoChange)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "IdempotentMesh");
+    AddTriangleMeshSource(registry, mesh);
+    const std::uint32_t meshId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto recomputeMesh = [&]()
+    {
+        return Runtime::ApplyEditorMeshVertexNormalsCommand(
+            context,
+            Runtime::EditorMeshVertexNormalsCommand{
+                .StableEntityId = meshId,
+                .Weighting = GN::AveragingMode::AreaWeighted,
+            });
+    };
+
+    const Runtime::EditorMeshVertexNormalsResult meshFirst = recomputeMesh();
+    ASSERT_TRUE(meshFirst.Succeeded()) << meshFirst.Message;
+    EXPECT_EQ(meshFirst.ChangedNormalCount, meshFirst.WrittenCount)
+        << "an absent v:normal property makes every slot a change";
+    const std::size_t undoAfterFirst = history.UndoCount();
+    EXPECT_GT(undoAfterFirst, 0u);
+
+    const Runtime::EditorMeshVertexNormalsResult meshSecond = recomputeMesh();
+    EXPECT_EQ(meshSecond.Status, Runtime::EditorCommandStatus::NoChange)
+        << meshSecond.Message;
+    EXPECT_EQ(meshSecond.NormalStatus, GN::RecomputeStatus::Success);
+    EXPECT_EQ(meshSecond.WrittenCount, meshFirst.WrittenCount);
+    EXPECT_EQ(meshSecond.ChangedNormalCount, 0u);
+    EXPECT_NE(meshSecond.Message.find("already up to date"), std::string::npos)
+        << meshSecond.Message;
+    EXPECT_EQ(history.UndoCount(), undoAfterFirst)
+        << "a no-op must not leave an undo entry";
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "IdempotentGraph");
+    AddPlanarCycleGraphSource(registry, graph);
+    const std::uint32_t graphId =
+        Runtime::SelectionController::ToStableEntityId(graph);
+    const auto recomputeGraph = [&]()
+    {
+        return Runtime::ApplyEditorGraphVertexNormalsCommand(
+            context,
+            Runtime::EditorGraphVertexNormalsCommand{
+                .StableEntityId = graphId,
+                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
+                .OrientTowardFallback = true,
+            });
+    };
+    ASSERT_TRUE(recomputeGraph().Succeeded());
+    const std::size_t undoAfterGraph = history.UndoCount();
+    const Runtime::EditorGraphVertexNormalsResult graphSecond = recomputeGraph();
+    EXPECT_EQ(graphSecond.Status, Runtime::EditorCommandStatus::NoChange)
+        << graphSecond.Message;
+    EXPECT_EQ(graphSecond.ChangedNormalCount, 0u);
+    EXPECT_GT(graphSecond.WrittenCount, 0u);
+    EXPECT_EQ(history.UndoCount(), undoAfterGraph);
+
+    const ECS::EntityHandle points =
+        MakeSelectable(registry, "IdempotentPoints");
+    AddPointCloudSource(registry, points, 9u);
+    SetPositions(registry.Raw().get<GS::Vertices>(points),
+                 {
+                     {-1.0f, -1.0f, 0.0f},
+                     {0.0f, -1.0f, 0.0f},
+                     {1.0f, -1.0f, 0.0f},
+                     {-1.0f, 0.0f, 0.0f},
+                     {0.0f, 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                     {-1.0f, 1.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f},
+                     {1.0f, 1.0f, 0.0f},
+                 });
+    const std::uint32_t pointsId =
+        Runtime::SelectionController::ToStableEntityId(points);
+    const auto recomputePoints = [&]()
+    {
+        return Runtime::ApplyEditorPointCloudVertexNormalsCommand(
+            context,
+            Runtime::EditorPointCloudVertexNormalsCommand{
+                .StableEntityId = pointsId,
+                .KNeighbors = 4u,
+                .MinimumNeighbors = 2u,
+                .UseRadiusSearch = false,
+                .Orientation = PCN::OrientationMode::MinimumSpanningTree,
+                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
+            });
+    };
+    ASSERT_TRUE(recomputePoints().Succeeded());
+    const std::size_t undoAfterPoints = history.UndoCount();
+    const Runtime::EditorPointCloudVertexNormalsResult pointsSecond =
+        recomputePoints();
+    EXPECT_EQ(pointsSecond.Status, Runtime::EditorCommandStatus::NoChange)
+        << pointsSecond.Message;
+    EXPECT_EQ(pointsSecond.ChangedNormalCount, 0u);
+    EXPECT_GT(pointsSecond.WrittenCount, 0u);
+    EXPECT_EQ(history.UndoCount(), undoAfterPoints);
+}
+
+// The same rule through the CPU job publisher, which is a separate code path
+// from the synchronous command.
+TEST(SandboxEditorUi, VertexNormalCpuJobThatChangesNothingReportsNoChange)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    std::optional<Runtime::EditorMeshVertexNormalsResult> completed{};
+    context.MethodResultSinks.MeshVertexNormals =
+        [&completed](Runtime::EditorMeshVertexNormalsResult result)
+        {
+            completed = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedIdempotent");
+    AddTriangleMeshSource(registry, mesh);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto submit = [&]()
+    {
+        return Runtime::ApplyEditorMeshVertexNormalsCommand(
+            context,
+            Runtime::EditorMeshVertexNormalsCommand{
+                .StableEntityId = stableId,
+                .Weighting = GN::AveragingMode::AreaWeighted,
+            });
+    };
+
+    ASSERT_EQ(submit().Status, Runtime::EditorCommandStatus::Pending);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(completed.has_value());
+    ASSERT_TRUE(completed->Succeeded()) << completed->Message;
+    EXPECT_EQ(completed->ChangedNormalCount, completed->WrittenCount);
+    const std::size_t undoAfterFirst = history.UndoCount();
+    EXPECT_GT(undoAfterFirst, 0u);
+
+    completed.reset();
+    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
+    ASSERT_EQ(submit().Status, Runtime::EditorCommandStatus::Pending);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(completed.has_value());
+    EXPECT_EQ(completed->Status, Runtime::EditorCommandStatus::NoChange)
+        << completed->Message;
+    EXPECT_EQ(completed->ChangedNormalCount, 0u);
+    EXPECT_GT(completed->WrittenCount, 0u);
+    EXPECT_NE(completed->Message.find("already up to date"), std::string::npos)
+        << completed->Message;
+    EXPECT_EQ(history.UndoCount(), undoAfterFirst)
+        << "a no-op job must not leave an undo entry";
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh))
+        << "a job that published nothing must not mark normals dirty";
+}
+
 TEST(SandboxEditorUi, MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply)
 {
     ECS::Scene::Registry registry;

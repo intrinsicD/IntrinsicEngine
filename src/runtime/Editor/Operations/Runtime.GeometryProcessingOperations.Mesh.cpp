@@ -1266,6 +1266,42 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return true;
         }
 
+        // BUG-145: `WrittenCount` is non-zero whenever the kernel ran at all,
+        // so it cannot tell a recompute that changed something from one that
+        // republished the values already stored. Compare exactly: these paths
+        // write the kernel's own output back into the same `v:normal` storage
+        // they read, so an unchanged normal is bit-identical, and an epsilon
+        // would invent a tolerance the undo snapshot does not share. An absent
+        // property is a change in every slot, because every value is new.
+        [[nodiscard]] std::size_t CountChangedVertexNormals(
+            const bool hadNormalProperty,
+            const std::vector<glm::vec3>& before,
+            const std::vector<glm::vec3>& after) noexcept
+        {
+            if (!hadNormalProperty || before.size() != after.size())
+                return after.size();
+
+            std::size_t changed = 0u;
+            for (std::size_t i = 0u; i < after.size(); ++i)
+            {
+                if (after[i] != before[i])
+                    ++changed;
+            }
+            return changed;
+        }
+
+        [[nodiscard]] std::string BuildVertexNormalsNoChangeMessage(
+            const char* const domain,
+            const std::size_t writtenCount)
+        {
+            std::string message = domain;
+            message += " vertex normals are already up to date (";
+            message += std::to_string(writtenCount);
+            message += " recomputed, 0 changed). Nothing was published and no "
+                       "undo entry was created.";
+            return message;
+        }
+
         [[nodiscard]] std::string BuildMeshNormalsSuccessMessage(
             const EditorMeshVertexNormalsResult& result)
         {
@@ -1273,6 +1309,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             message += std::string(GN::DebugName(result.Weighting));
             message += ", written=";
             message += std::to_string(result.WrittenCount);
+            message += ", changed=";
+            message += std::to_string(result.ChangedNormalCount);
             message += ", fallback=";
             message += std::to_string(result.FallbackVertexCount);
             message += ").";
@@ -1407,6 +1445,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
         {
             std::string message = "Graph vertex normals recomputed (written=";
             message += std::to_string(result.WrittenCount);
+            message += ", changed=";
+            message += std::to_string(result.ChangedNormalCount);
             message += ", fallback=";
             message += std::to_string(result.FallbackVertexCount);
             message += ", invalidEdges=";
@@ -1495,6 +1535,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             message += std::string(PointNormals::DebugName(result.Backend));
             message += ", written=";
             message += std::to_string(result.WrittenCount);
+            message += ", changed=";
+            message += std::to_string(result.ChangedNormalCount);
             message += ", fallback=";
             message += std::to_string(result.FallbackPointCount);
             message += ").";
@@ -4598,6 +4640,20 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return Core::Err(result.Error);
             }
 
+            result.ChangedNormalCount = CountChangedVertexNormals(
+                job.BeforeNormal->HadNormal,
+                job.BeforeNormal->Normals,
+                job.Normals);
+            if (result.ChangedNormalCount == 0u)
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                result.Error = Core::ErrorCode::Success;
+                result.Message = BuildVertexNormalsNoChangeMessage(
+                    "Mesh", result.WrittenCount);
+                PublishMeshVertexNormalsResultSink(context, result);
+                return Core::Ok();
+            }
+
             const EditorCommandStatus commitStatus =
                 CommitVertexNormalProperty(
                     context,
@@ -4646,6 +4702,20 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     "Graph vertex-normal publication is missing its source snapshot.";
                 PublishGraphVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
+            }
+
+            result.ChangedNormalCount = CountChangedVertexNormals(
+                job.BeforeNormal->HadNormal,
+                job.BeforeNormal->Normals,
+                job.Normals);
+            if (result.ChangedNormalCount == 0u)
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                result.Error = Core::ErrorCode::Success;
+                result.Message = BuildVertexNormalsNoChangeMessage(
+                    "Graph", result.WrittenCount);
+                PublishGraphVertexNormalsResultSink(context, result);
+                return Core::Ok();
             }
 
             const EditorCommandStatus commitStatus =
@@ -4697,6 +4767,20 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     "Point-cloud vertex-normal publication is missing its source snapshot.";
                 PublishPointCloudVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
+            }
+
+            result.ChangedNormalCount = CountChangedVertexNormals(
+                job.BeforeNormal->HadNormal,
+                job.BeforeNormal->Normals,
+                job.Normals);
+            if (result.ChangedNormalCount == 0u)
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                result.Error = Core::ErrorCode::Success;
+                result.Message = BuildVertexNormalsNoChangeMessage(
+                    "Point-cloud", result.WrittenCount);
+                PublishPointCloudVertexNormalsResultSink(context, result);
+                return Core::Ok();
             }
 
             const EditorCommandStatus commitStatus =
@@ -9287,6 +9371,21 @@ ApplyEditorMeshSimplifyCommand(
             return result;
         }
 
+        result.ChangedNormalCount = CountChangedVertexNormals(
+            beforeNormal.HadNormal,
+            beforeNormal.Normals,
+            normalResult.Normals.Vector());
+        if (result.ChangedNormalCount == 0u)
+        {
+            // Nothing differs, so there is nothing to commit; publishing an
+            // identity edit would also leave a useless undo entry.
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildVertexNormalsNoChangeMessage(
+                "Mesh", result.WrittenCount);
+            return result;
+        }
+
         const EditorCommandStatus commitStatus =
             CommitVertexNormalProperty(
                 context,
@@ -9460,6 +9559,19 @@ ApplyEditorMeshSimplifyCommand(
             return result;
         }
 
+        result.ChangedNormalCount = CountChangedVertexNormals(
+            beforeNormal.HadNormal,
+            beforeNormal.Normals,
+            normalResult.Normals.Vector());
+        if (result.ChangedNormalCount == 0u)
+        {
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildVertexNormalsNoChangeMessage(
+                "Graph", result.WrittenCount);
+            return result;
+        }
+
         const EditorCommandStatus commitStatus =
             CommitVertexNormalProperty(
                 context,
@@ -9630,6 +9742,19 @@ ApplyEditorPointCloudVertexNormalsCommand(
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
                 "Point-cloud vertex-normal recompute produced no normal property.";
+            return result;
+        }
+
+        result.ChangedNormalCount = CountChangedVertexNormals(
+            beforeNormal.HadNormal,
+            beforeNormal.Normals,
+            normalResult.Normals.Vector());
+        if (result.ChangedNormalCount == 0u)
+        {
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildVertexNormalsNoChangeMessage(
+                "Point-cloud", result.WrittenCount);
             return result;
         }
 
