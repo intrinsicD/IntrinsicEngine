@@ -1,0 +1,102 @@
+schema_version: 1
+task_id: BUG-145
+workflow_profile: standard
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-09T09:31:47Z'
+claim_eligible: false
+source:
+  base_ref: 9ed4c23b
+  base_revision: 9ed4c23be16de628063912e606f81f15ea2ffee2
+  head_revision: 5600e44e4cb67ad5db6db5a4fd71dfb33364f642
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 9a666ffe11e638ce108d3a2d8b943c8323aa30df0feab7fdc94c436986fa222a
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 86b76c4edfd8af24dafcbaa576a7826e8f3460f6242ff92cca6ce9ffae4cbad6
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: c6fd1d8eaf53f4560717b68222bdb3680cf0bcc05de19bae98b297c776af24df
+  - path: src/runtime/README.md
+    sha256: 68083ec114e88bac1e8f3b59ac63d6c63f0ebaa9e52d0830d4748018eac09fe6
+  - path: tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+    sha256: 38e0a9d892669f8771b77b6d2f90e31e61c0f6837b560f421990072e25b5ade3
+  - path: tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md
+    sha256: b1ed608780e725f237aa48a949f0e97e0781f41456322be67b6f524dcf570633
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: 96852b67b0837da1c755f9773a12f7ffb335c13481f1bebdc6f3e189d3969dfd
+  content_digest: 395f807d90f8026dbc19eeead16fb914d11d23f2af24b77d223f3a040728e83a
+touched:
+  paths:
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/README.md
+  - tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+  - tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  layers:
+  - app
+  - runtime
+  modules:
+  - Extrinsic.Runtime.GeometryProcessingOperations
+extension_seam: CountChangedVertexNormals and BuildVertexNormalsNoChangeMessage are the shared shape for
+  the remaining slices; each later operation supplies its own change signal rather than reusing this comparison.
+future_change_plan: Slices B (curvature, point-cloud outlier removal), C (remesh/subdivide/simplify),
+  and D (UV regeneration) are planned in the task file and remain open.
+acceptance:
+- criterion: No audited operation can report `Applied` while changing nothing.
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+- criterion: Every no-op result explains why nothing changed.
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+- criterion: No no-op run creates an undo-history entry.
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+- criterion: The complete default CPU gate passes.
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-145/commands/cpu-gate-slice-a.json
+- receipt: tasks/evidence/BUG-145/commands/focused-normals-slice-a.json
+- receipt: tasks/evidence/BUG-145/commands/structural-gates-slice-a.json
+changed_public_contracts:
+- EditorMeshVertexNormalsResult, EditorGraphVertexNormalsResult, and EditorPointCloudVertexNormalsResult
+  each gain ChangedNormalCount; a run that changes nothing now reports NoChange instead of Applied.
+diagnostics_and_previews:
+- A vertex-normal recompute that changes nothing reports NoChange with the recomputed and changed counts,
+  publishes nothing, and creates no undo entry.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- The exact comparison means a kernel that legitimately produces bit-identical output for a changed input
+  would report NoChange; that cannot happen on these paths because the input snapshot is what the comparison
+  is against.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No RHI, shader, backend, or command-recording behavior changed.
+- check: asan-ubsan
+  reason: No allocation, ownership, or asynchronous lifetime changed; the added comparison reads two vectors
+    already owned by the surrounding scope.
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
