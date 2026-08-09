@@ -1,56 +1,88 @@
 schema_version: 1
 task_id: BUG-141
 workflow_profile: standard
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-09T03:51:17Z'
+generated_at: '2026-08-09T08:24:09Z'
 claim_eligible: false
 source:
-  base_ref: 6d26556b
-  base_revision: 6d26556be5066cbd92613885b1e224045647b100
-  head_revision: 0a58bc1129bcdc1ac509cdc22418791985038a97
+  base_ref: 391c7f60
+  base_revision: 391c7f605ba4b61d2e9539d54c07453fe5b24244
+  head_revision: e95d58ba14013c08ee35aae6b93643bc7e7f79b9
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
   surface:
-  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
-    sha256: ea8dc14e0731c419f796b1e13070ddb32256a8eb726f030af5d5db8ecb9bfc38
   - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
-    sha256: 2e55416858fc3192ebf19fb350f3de067ba6314d1524554266b889173048b970
+    sha256: ff216550f66bdb7731580b79303ac729a7be5d6c8d8dd676188c1d216b2da286
   - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
-    sha256: 703c8f836978402e0dc671f341eefa45e7a372e37ee604aa0f83cba950738109
-  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
-    sha256: ff406a9c9e41b7572c90809321a7cfd63f7e9ba762f9da3a729f9b9e61009172
+    sha256: 7c3c8e12f3322f3ddac685aba8f18a5ce6187706662911b557190a8a1eb782a8
+  - path: src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp
+    sha256: abf42544e423e545ef2e42bd280c6e23923f1bf8389357aeae6dd4b4e1284dd4
+  - path: src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm
+    sha256: d88eef62b311258ba8e9a65e23282815de233ae1754ec4ed4a8f865002a41b93
+  - path: src/geometry/Geometry.HalfedgeMesh.Repair.cpp
+    sha256: 28d336156b9c76f7b3508d2929134bc632badd42610d78756353c545267d3633
+  - path: src/geometry/Geometry.HalfedgeMesh.Repair.cppm
+    sha256: 91f373a3d8b55a4c7fc3cad6d7ea653f3c0c901f4dd8453ec44de0a393cc8089
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: ffb83b8561d05ac0967f126bb636e682e04e26b29f9d40b6422997b6bc8762a2
+  - path: src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+    sha256: fcc70e6c4e28de346b663b2e45bda69eec68b15a8dc97538b00c5f06aa5f0b38
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: 11875925ed5c605403d45dcefd71a7644b631a8ee8de0998a0de074a86f81265
+  - path: src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+    sha256: 8ee8ca368e643b8bbe3c4734afec2b160f45bf7d140e232b86e86c6133bf41f3
   - path: src/runtime/README.md
-    sha256: 2568c5285a87d1aafded82f81e62de963c33ac01fba39e077ca258e258c57f1d
-  - path: tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
-    sha256: 51fc8c6e4ef689f1ea67b9d467bdcc4b3f7e8d5c9e0f374b0ed93595a4bc6d36
-  - path: tasks/evidence/BUG-138/report.yaml
-    sha256: b8394b14885fe47a95baa975b78f368e0c187474fb40dce90ae2f82c80a200af
-  - path: tasks/evidence/BUG-139/report.yaml
-    sha256: a2aa814cefbbee420a3756e7b1a87d89dafc2c60e9b21086f00d385ae293326a
-  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
-    sha256: e542f3f24921533e31116c931dc6f1d2a199282421b33657fe3e451ab1d28a3d
-  content_digest: 7efb75efcabce949155525ad54c36d4d9700b8bc61dd45014d50bf1d4b65708e
+    sha256: 297a2daecafe3e09632b843d63f13c3f50c340c25ef38ad3dbc5318dcebc3ab7
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 3f8e159ac9c5891160bcd1073688c9aa0e0e1e22ba5d4b5884e273260c6b6a74
+  - path: tasks/backlog/bugs/index.md
+    sha256: 7c92a78d18ea2468d4ff56c189be44a764ee923b96108fd7a02d00c082c4c663
+  - path: tasks/done/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
+    sha256: 858069809048adf80e5967c7380374e21f60dcd05652caca5acae0b6700950b3
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: b316a43898e7e28748236ab11d20efac42f6b47d0bfc5bdf682d2a0a2fb61091
+  - path: tests/contract/runtime/Test.ParameterizationOperations.cpp
+    sha256: 03bb2fd29a4c7446002995ad6467b613a530959491f704850c3fd15d5a902f0c
+  - path: tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+    sha256: 0948b1982ff12af6b56490527ce5203cb613112da6eaa556dee85ee2f9e69089
+  - path: tests/unit/geometry/Test.ParameterizationDispatch.cpp
+    sha256: 7fc39e1c70c5b21125e8bb9ab3ea0c8311ec4e1477d7d3783e9a32a600bb5106
+  content_digest: 3d6aaf9c4bf38ebc4674f83b103c0658fb4231658134641a1082cef06790db1e
 touched:
   paths:
-  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
   - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
   - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
-  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm
+  - src/geometry/Geometry.HalfedgeMesh.Repair.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Repair.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
   - src/runtime/README.md
-  - tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
-  - tasks/evidence/BUG-138/report.yaml
-  - tasks/evidence/BUG-139/report.yaml
-  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.ParameterizationOperations.cpp
+  - tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+  - tests/unit/geometry/Test.ParameterizationDispatch.cpp
   layers:
   - app
+  - geometry
   - runtime
-  modules: []
-extension_seam: EditorGeometryProcessingModel::Diagnostics is now reserved for model-wide entries; slice
-  B adds lifetime on top of that narrowed contract rather than to a mixed list.
-future_change_plan: Slice B adds the dismissal affordance and the parameterization rejection cause (connected-component
-  and boundary-loop counts).
+  modules:
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Geometry.HalfedgeMesh.Repair
+  - Geometry.Parameterization
+extension_seam: EditorGeometryProcessingResultSlot names one stored Last<Operation>Result slot; a new
+  operation adds an enumerator and a session case rather than a new dismissal sink. ParameterizeResult::Rejection
+  is the solver-side reason surface a future strategy extends.
+future_change_plan: None owed by this task. Any further per-operation diagnostic work reuses the same
+  slot enum; the sibling written-count reporting defect is owned by BUG-145.
 acceptance:
 - criterion: No queued job is reported under a failure code.
   task_checked: true
@@ -68,39 +100,66 @@ acceptance:
   evidence: []
   reason: null
 - criterion: Diagnostics expire or can be cleared.
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 - criterion: A parameterization rejection names its cause.
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 commands:
+- receipt: tasks/evidence/BUG-141/commands/cpu-gate-slice-b.json
 - receipt: tasks/evidence/BUG-141/commands/cpu-gate.json
 - receipt: tasks/evidence/BUG-141/commands/editor-suites.json
+- receipt: tasks/evidence/BUG-141/commands/focused-suites-slice-b.json
+- receipt: tasks/evidence/BUG-141/commands/geometry-dispatch-slice-b.json
+- receipt: tasks/evidence/BUG-141/commands/structural-gates-slice-b.json
 - receipt: tasks/evidence/BUG-141/commands/structural-gates.json
-changed_public_contracts: []
+changed_public_contracts:
+- Geometry::Parameterization::ParameterizeResult gains Rejection (ParameterizationRejection), populated
+  only when a run did not succeed.
+- Geometry::MeshRepair::LabelConnectedComponents exposes the existing const flood fill without publishing
+  v:component / f:component.
+- Extrinsic::Runtime::EditorMethodResultSinks gains DismissResult(EditorGeometryProcessingResultSlot);
+  EditorParameterizationResult gains Rejection.
 diagnostics_and_previews:
-- A queued job reports Pending on its own result instead of GeometryProcessingFailed in a shared header.
+- A parameterization rejection reports its connected-component and boundary-loop counts and names the
+  disk-topology precondition when the counts violate it.
+- A stored geometry-processing outcome can be dismissed per slot; the panel and the session clear together.
 benchmark_or_parity_evidence: []
 docs_sync:
-  task_file: tasks/backlog/bugs/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
+  task_file: tasks/done/BUG-141-editor-geometry-diagnostics-mislabeled-and-unscoped.md
   session_brief_present: true
   canonical_docs_changed: false
   skill_mirrors_checked: true
-residual_risks: []
+residual_risks:
+- Dismissal is app-driven and cannot be exercised by a headless ImGui test; the runtime contract is covered
+  by SandboxEditorSession.DismissClearsOneGeometryProcessingResultSlot and the button itself by the registered
+  live before/after pair.
 skipped_checks:
-- check: slice-b
-  reason: Lifetime/dismissal and the parameterization rejection cause are not attempted; the task stays
-    open with those boxes unchecked.
-- check: dedup-assertion
-  reason: A planned de-duplication assertion was dropped rather than shipped because it cannot fail after
-    the fix; the reason is recorded in the task and the behaviour is proven by the before/after live pair.
+- check: gpu-vulkan
+  reason: No RHI, shader, backend, or command-recording behavior changed; the live capture used the ci-vulkan
+    build only to reproduce the reported panels.
+- check: asan-ubsan
+  reason: No allocation, ownership, or asynchronous lifetime changed; the dismissal sink reuses the attachment-epoch
+    capture shared by every existing result sink.
 artifacts:
+- path: tasks/evidence/BUG-141/artifacts/dismiss-simplify-before.png
+  sha256: 6b706a39f64db7c3102b371b68c6f8e6b29770d49cda0f9e72ecde16931e4eb0
+  kind: file
+- path: tasks/evidence/BUG-141/artifacts/dismiss-simplify-after.png
+  sha256: 29ebc2dc22560683a235473ff7d2cb77abc5901d94f18d3739befa6d6dfa0701
+  kind: file
+- path: tasks/evidence/BUG-141/artifacts/parameterization-rejection-cause.png
+  sha256: a6330e4c40325d069665bc75942e2e1b14a5648e64ef6093e257f188d8a3a356
+  kind: file
+- path: tasks/evidence/BUG-141/artifacts/dismiss-parameterization-after.png
+  sha256: 57a9ee150dc0b83024c15ec91400a034200cdea3003637f0077092f212764199
+  kind: file
 - path: tasks/evidence/BUG-141/artifacts/README.md
-  sha256: 486c6d0df3ecd3a3c88710547e128f2980466f9da04881478dae30169a988251
+  sha256: 6fca82824ad518e978ccd494f426a6b231be065f3a6316385e9a40a6c6644ae4
   kind: file
 - path: tasks/evidence/BUG-141/artifacts/queued-job-before.png
   sha256: 42e4eab3e97c505cc8c25a462d1fa017ad839affa40f061370ef3faef3dcef00
