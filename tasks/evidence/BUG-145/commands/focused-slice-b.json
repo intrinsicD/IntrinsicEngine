@@ -1,0 +1,20 @@
+{
+  "command": [
+    "./build/ci/bin/IntrinsicRuntimeContractTests",
+    "--gtest_filter=SandboxEditorUi.*Curvature*:SandboxEditorUi.*Outlier*:SandboxEditorUi.*VertexNormal*"
+  ],
+  "command_display": "./build/ci/bin/IntrinsicRuntimeContractTests '--gtest_filter=SandboxEditorUi.*Curvature*:SandboxEditorUi.*Outlier*:SandboxEditorUi.*VertexNormal*'",
+  "cwd": ".",
+  "duration_ms": 92,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T10:17:34Z",
+  "label": "focused-slice-b",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T10:17:34Z",
+  "stderr_path": "tasks/evidence/BUG-145/commands/focused-slice-b.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-145/commands/focused-slice-b.stdout.log",
+  "stdout_sha256": "847c8e9c023a0460d6050bdaa0771b48b620e89eed3baf2452b75ce3279edb05",
+  "task_id": "BUG-145"
+}

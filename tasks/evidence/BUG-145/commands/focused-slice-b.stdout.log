@@ -1,0 +1,67 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxEditorUi.*Curvature*:SandboxEditorUi.*Outlier*:SandboxEditorUi.*VertexNormal*
+[==========] Running 23 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 23 tests from SandboxEditorUi
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo (1 ms)
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply (10 ms)
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource (9 ms)
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty (7 ms)
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed (0 ms)
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties (0 ms)
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots (0 ms)
+[ RUN      ] SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo
+[       OK ] SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo (0 ms)
+[ RUN      ] SandboxEditorUi.MeshCurvatureRecomputeThatChangesNothingReportsNoChange
+[       OK ] SandboxEditorUi.MeshCurvatureRecomputeThatChangesNothingReportsNoChange (0 ms)
+[ RUN      ] SandboxEditorUi.PointCloudOutlierRemovalRejectingNothingReportsNoChange
+[       OK ] SandboxEditorUi.PointCloudOutlierRemovalRejectingNothingReportsNoChange (0 ms)
+[ RUN      ] SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply (7 ms)
+[ RUN      ] SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply (6 ms)
+[ RUN      ] SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable
+[       OK ] SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable (0 ms)
+[ RUN      ] SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts
+[       OK ] SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts (0 ms)
+[ RUN      ] SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings
+[       OK ] SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings (0 ms)
+[ RUN      ] SandboxEditorUi.VertexNormalRecomputeThatChangesNothingReportsNoChange
+[       OK ] SandboxEditorUi.VertexNormalRecomputeThatChangesNothingReportsNoChange (0 ms)
+[ RUN      ] SandboxEditorUi.VertexNormalCpuJobThatChangesNothingReportsNoChange
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.VertexNormalCpuJobThatChangesNothingReportsNoChange (6 ms)
+[ RUN      ] SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply (6 ms)
+[ RUN      ] SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply (6 ms)
+[ RUN      ] SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[32m[INFO] Initialized Scheduler with 2 worker threads.[0m
+[       OK ] SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply (18 ms)
+[ RUN      ] SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets
+[       OK ] SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets (0 ms)
+[ RUN      ] SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals
+[       OK ] SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals (0 ms)
+[ RUN      ] SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets
+[       OK ] SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets (0 ms)
+[----------] 23 tests from SandboxEditorUi (87 ms total)
+
+[----------] Global test environment tear-down
+[==========] 23 tests from 1 test suite ran. (87 ms total)
+[  PASSED  ] 23 tests.
