@@ -10,6 +10,8 @@ module;
 export module Extrinsic.Runtime.MeshSurfaceTopology;
 
 import Extrinsic.ECS.Components.GeometrySources;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshSoup;
 
 export namespace Extrinsic::Runtime
 {
@@ -88,4 +90,27 @@ export namespace Extrinsic::Runtime
         std::size_t vertexCount,
         std::vector<std::uint32_t>& surfaceIndices,
         MeshCornerTexcoordSplit& outSplit);
+
+    // Writes `h:texcoord` for every halfedge of `mesh`, whose faces and
+    // vertices must be index-identical to `sourceFaces` / `sourceVertexCount`
+    // — the relationship `Geometry::Mesh::Conversion::ToHalfedgeMesh` produces
+    // from a mesh soup, which adds vertices and faces in source order.
+    //
+    // `cornerUvs` holds three entries per source face, in that face's corner
+    // order. Each halfedge is matched to its corner slot by its target vertex.
+    // Boundary halfedges carry no corner of their own, so they repeat a UV
+    // already present at their target vertex rather than a default that would
+    // read as an extra seam.
+    //
+    // Returns false — writing nothing — when the meshes do not correspond or a
+    // halfedge's target vertex is not a corner of its own face.
+    //
+    // Shared because both asset materialization and the editor's scratch-mesh
+    // round trip must produce the *same* corner mapping: a second, independent
+    // implementation would silently disagree about which corner owns which UV.
+    [[nodiscard]] bool PublishMeshCornerTexcoords(
+        Geometry::HalfedgeMesh::Mesh& mesh,
+        std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+        std::size_t sourceVertexCount,
+        std::span<const glm::vec2> cornerUvs);
 }

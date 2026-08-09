@@ -17,6 +17,7 @@ module;
 module Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Mesh.Conversion;
 import Geometry.MeshSoup;
@@ -635,80 +636,20 @@ GatherAtlasCornerTexcoords(const Geometry::UvAtlas::UvAtlasResult &atlas,
   return corners;
 }
 
-// Writes `h:texcoord` for every halfedge of `mesh`, whose faces and vertices
-// are index-identical to `sourceMesh`. Boundary halfedges carry no corner of
-// their own, so they repeat a UV already present at their target vertex rather
-// than a default that would read as an extra seam.
+// Publishes the atlas's per-corner UVs onto `mesh` through the shared corner
+// mapping, then leaves exactly one UV authority behind: a stale authored
+// `v:texcoord` copied from the payload would otherwise disagree with — and win
+// nothing against — the corner UVs.
 [[nodiscard]] bool
 PublishCornerTexcoords(Geometry::HalfedgeMesh::Mesh &mesh,
                        const Geometry::MeshSoup::IndexedMesh &sourceMesh,
                        const AtlasCornerTexcoords &corners) {
-  const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces =
-      sourceMesh.Faces();
-  if (mesh.FacesSize() != sourceFaces.size() ||
-      mesh.VerticesSize() != sourceMesh.VertexCount()) {
+  if (!PublishMeshCornerTexcoords(mesh, sourceMesh.Faces(),
+                                  sourceMesh.VertexCount(),
+                                  corners.CornerUvs)) {
     return false;
   }
 
-  std::vector<glm::vec2> values(mesh.HalfedgesSize(), glm::vec2{0.0f});
-  std::vector<std::uint8_t> written(mesh.HalfedgesSize(), 0u);
-  std::vector<glm::vec2> uvForVertex(mesh.VerticesSize(), glm::vec2{0.0f});
-  std::vector<std::uint8_t> vertexHasUv(mesh.VerticesSize(), 0u);
-
-  for (std::size_t faceIndex = 0u; faceIndex < mesh.FacesSize(); ++faceIndex) {
-    const Geometry::FaceHandle face{
-        static_cast<Geometry::PropertyIndex>(faceIndex)};
-    if (mesh.IsDeleted(face)) {
-      continue;
-    }
-
-    const std::vector<std::uint32_t> &indices = sourceFaces[faceIndex].Indices;
-    for (const Geometry::HalfedgeHandle halfedge :
-         mesh.HalfedgesAroundFace(face)) {
-      const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
-      std::size_t slot = indices.size();
-      for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k) {
-        if (indices[k] == vertex.Index) {
-          slot = k;
-          break;
-        }
-      }
-      if (slot >= 3u) {
-        return false;
-      }
-
-      const glm::vec2 uv = corners.CornerUvs[faceIndex * 3u + slot];
-      values[halfedge.Index] = uv;
-      written[halfedge.Index] = 1u;
-      uvForVertex[vertex.Index] = uv;
-      vertexHasUv[vertex.Index] = 1u;
-    }
-  }
-
-  for (std::size_t index = 0u; index < values.size(); ++index) {
-    if (written[index] != 0u) {
-      continue;
-    }
-    const Geometry::HalfedgeHandle halfedge{
-        static_cast<Geometry::PropertyIndex>(index)};
-    if (mesh.IsDeleted(halfedge)) {
-      continue;
-    }
-    const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
-    if (mesh.IsValid(vertex) && vertexHasUv[vertex.Index] != 0u) {
-      values[index] = uvForVertex[vertex.Index];
-    }
-  }
-
-  auto property = mesh.HalfedgeProperties().GetOrAdd<glm::vec2>(
-      std::string{kCornerTexcoordProperty}, glm::vec2{0.0f});
-  if (property.Vector().size() != values.size()) {
-    return false;
-  }
-  property.Vector() = std::move(values);
-
-  // Leave exactly one authority behind: a stale authored `v:texcoord` copied
-  // from the payload would otherwise disagree with the corner UVs.
   if (auto stale = mesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty)) {
     mesh.VertexProperties().Remove(stale);
   }

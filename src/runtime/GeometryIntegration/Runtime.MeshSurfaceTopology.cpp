@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <span>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -14,6 +15,9 @@ module;
 module Extrinsic.Runtime.MeshSurfaceTopology;
 
 import Extrinsic.ECS.Components.GeometrySources;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.MeshSoup;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -348,6 +352,79 @@ namespace Extrinsic::Runtime
         }
 
         surfaceIndices = std::move(remappedIndices);
+        return true;
+    }
+
+    bool PublishMeshCornerTexcoords(
+        Geometry::HalfedgeMesh::Mesh& mesh,
+        const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+        const std::size_t sourceVertexCount,
+        const std::span<const glm::vec2> cornerUvs)
+    {
+        if (mesh.FacesSize() != sourceFaces.size() ||
+            mesh.VerticesSize() != sourceVertexCount ||
+            cornerUvs.size() != sourceFaces.size() * 3u)
+        {
+            return false;
+        }
+
+        std::vector<glm::vec2> values(mesh.HalfedgesSize(), glm::vec2{0.0f});
+        std::vector<std::uint8_t> written(mesh.HalfedgesSize(), 0u);
+        std::vector<glm::vec2> uvForVertex(mesh.VerticesSize(), glm::vec2{0.0f});
+        std::vector<std::uint8_t> vertexHasUv(mesh.VerticesSize(), 0u);
+
+        for (std::size_t faceIndex = 0u; faceIndex < mesh.FacesSize(); ++faceIndex)
+        {
+            const Geometry::FaceHandle face{
+                static_cast<Geometry::PropertyIndex>(faceIndex)};
+            if (mesh.IsDeleted(face))
+                continue;
+
+            const std::vector<std::uint32_t>& indices =
+                sourceFaces[faceIndex].Indices;
+            for (const Geometry::HalfedgeHandle halfedge :
+                 mesh.HalfedgesAroundFace(face))
+            {
+                const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
+                std::size_t slot = indices.size();
+                for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k)
+                {
+                    if (indices[k] == vertex.Index)
+                    {
+                        slot = k;
+                        break;
+                    }
+                }
+                if (slot >= 3u)
+                    return false;
+
+                const glm::vec2 uv = cornerUvs[faceIndex * 3u + slot];
+                values[halfedge.Index] = uv;
+                written[halfedge.Index] = 1u;
+                uvForVertex[vertex.Index] = uv;
+                vertexHasUv[vertex.Index] = 1u;
+            }
+        }
+
+        for (std::size_t index = 0u; index < values.size(); ++index)
+        {
+            if (written[index] != 0u)
+                continue;
+            const Geometry::HalfedgeHandle halfedge{
+                static_cast<Geometry::PropertyIndex>(index)};
+            if (mesh.IsDeleted(halfedge))
+                continue;
+            const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
+            if (mesh.IsValid(vertex) && vertexHasUv[vertex.Index] != 0u)
+                values[index] = uvForVertex[vertex.Index];
+        }
+
+        auto property = mesh.HalfedgeProperties().GetOrAdd<glm::vec2>(
+            std::string{Geometry::MeshUtils::kHalfedgeTexcoordPropertyName},
+            glm::vec2{0.0f});
+        if (property.Vector().size() != values.size())
+            return false;
+        property.Vector() = std::move(values);
         return true;
     }
 }
