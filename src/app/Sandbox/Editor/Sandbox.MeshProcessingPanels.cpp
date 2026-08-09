@@ -1818,13 +1818,20 @@ namespace Extrinsic::Sandbox::Editor
                 "Last ICP run: %s",
                 Runtime::DebugNameForEditorCommandStatus(
                     result.Status));
+            // BUG-096: show the variant that actually ran, not only the one
+            // that was asked for. Runtime now refuses a point-to-plane request
+            // it cannot satisfy, so these agree — and a disagreement is a bug
+            // the user can see rather than one they cannot.
+            ImGui::Text(
+                "Variant: %s (ran %s)",
+                Runtime::DebugNameForEditorICPVariant(result.Variant),
+                Runtime::DebugNameForEditorICPVariant(result.EffectiveVariant));
             if (result.Succeeded() && result.HasResult)
             {
                 ImGui::Text(
-                    "Variant: %s  points: %zu -> %zu",
-                    Runtime::DebugNameForEditorICPVariant(
-                        result.Variant),
-                    result.SourcePointCount, result.TargetPointCount);
+                    "Points: %zu -> %zu  target normals: %zu",
+                    result.SourcePointCount, result.TargetPointCount,
+                    result.TargetNormalCount);
                 ImGui::Text(
                     "Iterations: %zu  final RMSE: %.6g  converged: %s",
                     result.IterationsPerformed, result.FinalRMSE,

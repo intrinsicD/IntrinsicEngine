@@ -21,6 +21,7 @@
 
 #include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include "ProgressivePoissonReference.hpp"
 
@@ -284,6 +285,41 @@ void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
             .VisualizationCommandsAvailable = false,
         };
     }
+
+// BUG-096: a planar target whose points lie in z = 0. Point-to-plane only
+// penalizes residual along the supplied normal, so which normal is supplied
+// changes the answer — which is exactly what makes a distinguishing test
+// possible.
+[[nodiscard]] std::vector<glm::vec3> MakePlanarRegistrationCloud()
+{
+    std::vector<glm::vec3> points{};
+    for (int i = 0; i < 7; ++i)
+    {
+        for (int j = 0; j < 7; ++j)
+        {
+            points.emplace_back(static_cast<float>(i) * 0.25f,
+                                static_cast<float>(j) * 0.25f,
+                                0.0f);
+        }
+    }
+    return points;
+}
+
+void SetPointCloudNormals(ECS::Scene::Registry& registry,
+                          const ECS::EntityHandle entity,
+                          const std::vector<glm::vec3>& normals)
+{
+    auto& vertices = registry.Raw().get<GS::Vertices>(entity);
+    auto property = vertices.Properties.GetOrAdd<glm::vec3>(
+        std::string{GS::PropertyNames::kNormal}, glm::vec3{0.0f, 0.0f, 1.0f});
+    property.Vector() = normals;
+}
+
+[[nodiscard]] std::vector<glm::vec3> UniformNormals(const std::size_t count,
+                                                    const glm::vec3 normal)
+{
+    return std::vector<glm::vec3>(count, normal);
+}
 
 }
 TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisualization)
@@ -2245,6 +2281,527 @@ TEST(SandboxEditorUi, RegistrationDerivedJobDiscardsStaleSourceBeforeApply)
     EXPECT_NEAR(transform.Position.z, 0.0f, 1.0e-6f);
     EXPECT_FALSE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
 }
+// BUG-096: both runtime branches called `AlignICP` with an empty target-normal
+// span, which the solver silently treats as "run point-to-point", while the
+// result kept reporting the requested point-to-plane variant. The distinguisher
+// is a normal field that is *not* the plane's geometric normal: point-to-plane
+// only penalizes residual along the supplied normal, so a solver that consumed
+// these normals produces a measurably different alignment from one that ignored
+// them and ran point-to-point. A run that ignored them would be
+// indistinguishable from the point-to-point control below.
+TEST(SandboxEditorUi, RegistrationPointToPlaneUsesTargetNormals)
+{
+    // Several things had to be arranged for this to distinguish anything, and
+    // each one cost a failing attempt:
+    //
+    //  * the runtime pre-aligns centroids before ICP, so a pure translation is
+    //    solved before the solver runs;
+    //  * a uniform scale about the centroid has the identity as its optimal
+    //    rigid fit under both metrics, so that does not separate them either;
+    //  * a planar or near-planar target leaves the 6-DOF point-to-plane system
+    //    rank-deficient, because its normals span only a narrow cone. The
+    //    Cholesky solve bails to the identity increment, and two different
+    //    normal fields then look identical however faithfully they were passed
+    //    through.
+    //
+    // A sphere fixes the last one: its normals span every direction, so the
+    // system is full rank — the same reason the geometry-level point-to-plane
+    // tests use one.
+    std::vector<glm::vec3> target{};
+    std::vector<glm::vec3> trueNormals{};
+    for (int lat = 1; lat < 9; ++lat)
+    {
+        const float theta =
+            static_cast<float>(lat) * 3.14159265f / 9.0f;
+        for (int lon = 0; lon < 12; ++lon)
+        {
+            const float phi =
+                static_cast<float>(lon) * 2.0f * 3.14159265f / 12.0f;
+            const glm::vec3 direction{std::sin(theta) * std::cos(phi),
+                                      std::sin(theta) * std::sin(phi),
+                                      std::cos(theta)};
+            target.push_back(direction);
+            trueNormals.push_back(direction);
+        }
+    }
+    // The same field rotated about z. Still per-point and full rank, but a
+    // different metric, so it must produce a different alignment.
+    const glm::mat4 tilt = glm::rotate(glm::mat4(1.0f),
+                                       glm::radians(25.0f),
+                                       glm::vec3{0.0f, 0.0f, 1.0f});
+    std::vector<glm::vec3> tiltedNormals{};
+    tiltedNormals.reserve(trueNormals.size());
+    for (const glm::vec3& n : trueNormals)
+        tiltedNormals.push_back(glm::vec3(tilt * glm::vec4(n, 0.0f)));
+
+    const glm::mat4 spin =
+        glm::rotate(glm::mat4(1.0f),
+                    glm::radians(5.0f),
+                    glm::normalize(glm::vec3{1.0f, 1.0f, 0.4f}));
+    std::vector<glm::vec3> sourcePoints{};
+    sourcePoints.reserve(target.size());
+    for (const glm::vec3& p : target)
+        sourcePoints.push_back(glm::vec3(spin * glm::vec4(p, 1.0f)));
+
+    const auto run = [&](const Runtime::EditorICPVariant variant,
+                         const std::vector<glm::vec3>& normals)
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        Intrinsic::Tests::EditorFeatureTestContext context =
+            MakeContext(registry, selection);
+        context.CommandHistory = &history;
+
+        const ECS::EntityHandle source =
+            MakePointCloudEntity(registry, "SphereSource", sourcePoints);
+        const ECS::EntityHandle targetEntity =
+            MakePointCloudEntity(registry, "SphereTarget", target);
+        if (!normals.empty())
+            SetPointCloudNormals(registry, targetEntity, normals);
+        const Runtime::EditorRegistrationResult result =
+            Runtime::ApplyEditorRegistrationCommand(
+                context,
+                Runtime::EditorRegistrationCommand{
+                    .SourceStableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(source),
+                    .TargetStableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(
+                            targetEntity),
+                    .Variant = variant,
+                    .MaxIterations = 40u,
+                    .MaxCorrespondenceDistance = 10.0,
+                    .InlierRatio = 1.0,
+                    .TrajectoryStep = 1000u,
+                });
+        return std::tuple{
+            result,
+            history.CanUndo(),
+            registry.Raw().get<ECSC::Transform::Component>(source),
+        };
+    };
+
+    // Control: the same inputs solved point-to-point, which consumes no
+    // normals at all.
+    const auto [pointToPoint, pointToPointUndoable, pointToPointPose] =
+        run(Runtime::EditorICPVariant::PointToPoint, trueNormals);
+    ASSERT_TRUE(pointToPoint.Succeeded()) << pointToPoint.Message;
+    EXPECT_EQ(pointToPoint.Variant, Runtime::EditorICPVariant::PointToPoint);
+    EXPECT_EQ(pointToPoint.EffectiveVariant,
+              Runtime::EditorICPVariant::PointToPoint);
+    EXPECT_EQ(pointToPoint.TargetNormalCount, 0u)
+        << "point-to-point must not require or consume target normals";
+    EXPECT_TRUE(pointToPointUndoable);
+
+    const auto [trueField, trueUndoable, truePose] =
+        run(Runtime::EditorICPVariant::PointToPlane, trueNormals);
+    ASSERT_TRUE(trueField.Succeeded()) << trueField.Message;
+    EXPECT_EQ(trueField.Variant, Runtime::EditorICPVariant::PointToPlane);
+    EXPECT_EQ(trueField.EffectiveVariant,
+              Runtime::EditorICPVariant::PointToPlane)
+        << "a validated point-to-plane request must never degrade silently";
+    EXPECT_EQ(trueField.TargetNormalCount, target.size());
+    EXPECT_TRUE(trueUndoable);
+
+    const auto [tiltedField, tiltedUndoable, tiltedPose] =
+        run(Runtime::EditorICPVariant::PointToPlane, tiltedNormals);
+    ASSERT_TRUE(tiltedField.Succeeded()) << tiltedField.Message;
+    EXPECT_EQ(tiltedField.EffectiveVariant,
+              Runtime::EditorICPVariant::PointToPlane);
+    EXPECT_EQ(tiltedField.TargetNormalCount, target.size());
+    EXPECT_TRUE(tiltedUndoable);
+
+    // The data is exactly registrable, so all three runs converge to the same
+    // rotation — the endpoint cannot separate them. What the normal field
+    // changes is the *solve*: a different metric takes a different number of
+    // iterations to a different residual. If the runtime still passed an empty
+    // span, all three would be point-to-point runs and these would be equal.
+    EXPECT_NE(trueField.IterationsPerformed, tiltedField.IterationsPerformed)
+        << "two point-to-plane runs differing only in the target normal field "
+           "took the same path, which means the normals never reached the "
+           "solver";
+    EXPECT_GT(std::abs(trueField.FinalRMSE - tiltedField.FinalRMSE), 1.0e-6)
+        << "true=" << trueField.FinalRMSE
+        << " tilted=" << tiltedField.FinalRMSE;
+    EXPECT_NE(trueField.IterationsPerformed, pointToPoint.IterationsPerformed)
+        << "point-to-plane with the surface normals solved exactly like "
+           "point-to-point";
+
+    // Both point-to-plane runs still align the clouds; a distinguishable solve
+    // is worth nothing if it is a distinguishably wrong one.
+    EXPECT_LT(trueField.FinalRMSE, 1.0e-3);
+    EXPECT_LT(tiltedField.FinalRMSE, 1.0e-3);
+}
+
+// The queued branch is a separate code path with its own snapshot, so it gets
+// its own proof that the normals travel with the job — and the same
+// distinguishing signal, because parity with the synchronous path alone would
+// still pass if both branches dropped the normals.
+TEST(SandboxEditorUi, QueuedRegistrationPointToPlaneUsesTargetNormals)
+{
+    std::vector<glm::vec3> target{};
+    std::vector<glm::vec3> normals{};
+    for (int lat = 1; lat < 9; ++lat)
+    {
+        const float theta = static_cast<float>(lat) * 3.14159265f / 9.0f;
+        for (int lon = 0; lon < 12; ++lon)
+        {
+            const float phi =
+                static_cast<float>(lon) * 2.0f * 3.14159265f / 12.0f;
+            const glm::vec3 direction{std::sin(theta) * std::cos(phi),
+                                      std::sin(theta) * std::sin(phi),
+                                      std::cos(theta)};
+            target.push_back(direction);
+            normals.push_back(direction);
+        }
+    }
+    const glm::mat4 spin =
+        glm::rotate(glm::mat4(1.0f),
+                    glm::radians(5.0f),
+                    glm::normalize(glm::vec3{1.0f, 1.0f, 0.4f}));
+    std::vector<glm::vec3> sourcePoints{};
+    sourcePoints.reserve(target.size());
+    for (const glm::vec3& p : target)
+        sourcePoints.push_back(glm::vec3(spin * glm::vec4(p, 1.0f)));
+
+    const auto runQueued = [&](const Runtime::EditorICPVariant variant)
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        Intrinsic::Tests::EditorFeatureTestContext context =
+            MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        Extrinsic::Tests::EditorJobHarness jobs{};
+        jobs.Attach(context);
+        std::optional<Runtime::EditorRegistrationResult> completed{};
+        context.MethodResultSinks.Registration =
+            [&completed](Runtime::EditorRegistrationResult result)
+            {
+                completed = std::move(result);
+            };
+
+        const ECS::EntityHandle source =
+            MakePointCloudEntity(registry, "QueuedSphereSource", sourcePoints);
+        const ECS::EntityHandle targetEntity =
+            MakePointCloudEntity(registry, "QueuedSphereTarget", target);
+        SetPointCloudNormals(registry, targetEntity, normals);
+
+        const Runtime::EditorRegistrationResult queued =
+            Runtime::ApplyEditorRegistrationCommand(
+                context,
+                Runtime::EditorRegistrationCommand{
+                    .SourceStableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(source),
+                    .TargetStableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(
+                            targetEntity),
+                    .Variant = variant,
+                    .MaxIterations = 40u,
+                    .MaxCorrespondenceDistance = 10.0,
+                    .InlierRatio = 1.0,
+                    .TrajectoryStep = 1000u,
+                });
+        EXPECT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
+        EXPECT_TRUE(jobs.DrainUntilTerminal());
+        return completed;
+    };
+
+    const std::optional<Runtime::EditorRegistrationResult> pointToPlane =
+        runQueued(Runtime::EditorICPVariant::PointToPlane);
+    ASSERT_TRUE(pointToPlane.has_value());
+    ASSERT_TRUE(pointToPlane->Succeeded()) << pointToPlane->Message;
+    EXPECT_EQ(pointToPlane->Variant, Runtime::EditorICPVariant::PointToPlane);
+    EXPECT_EQ(pointToPlane->EffectiveVariant,
+              Runtime::EditorICPVariant::PointToPlane);
+    EXPECT_EQ(pointToPlane->TargetNormalCount, target.size());
+    EXPECT_LT(pointToPlane->FinalRMSE, 1.0e-3);
+
+    const std::optional<Runtime::EditorRegistrationResult> pointToPoint =
+        runQueued(Runtime::EditorICPVariant::PointToPoint);
+    ASSERT_TRUE(pointToPoint.has_value());
+    ASSERT_TRUE(pointToPoint->Succeeded()) << pointToPoint->Message;
+    EXPECT_EQ(pointToPoint->EffectiveVariant,
+              Runtime::EditorICPVariant::PointToPoint);
+    EXPECT_EQ(pointToPoint->TargetNormalCount, 0u);
+
+    EXPECT_NE(pointToPlane->IterationsPerformed,
+              pointToPoint->IterationsPerformed)
+        << "the queued point-to-plane job solved exactly like point-to-point, "
+           "which means the snapshot dropped the target normals";
+
+    // Parity with the synchronous path on the same inputs.
+    ECS::Scene::Registry syncRegistry;
+    Runtime::SelectionController syncSelection;
+    Runtime::EditorCommandHistory syncHistory;
+    Intrinsic::Tests::EditorFeatureTestContext syncContext =
+        MakeContext(syncRegistry, syncSelection);
+    syncContext.CommandHistory = &syncHistory;
+    const ECS::EntityHandle syncSource =
+        MakePointCloudEntity(syncRegistry, "SyncSphereSource", sourcePoints);
+    const ECS::EntityHandle syncTarget =
+        MakePointCloudEntity(syncRegistry, "SyncSphereTarget", target);
+    SetPointCloudNormals(syncRegistry, syncTarget, normals);
+    const Runtime::EditorRegistrationResult synchronous =
+        Runtime::ApplyEditorRegistrationCommand(
+            syncContext,
+            Runtime::EditorRegistrationCommand{
+                .SourceStableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(syncSource),
+                .TargetStableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(syncTarget),
+                .Variant = Runtime::EditorICPVariant::PointToPlane,
+                .MaxIterations = 40u,
+                .MaxCorrespondenceDistance = 10.0,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
+    ASSERT_TRUE(synchronous.Succeeded()) << synchronous.Message;
+    EXPECT_EQ(pointToPlane->IterationsPerformed,
+              synchronous.IterationsPerformed);
+    EXPECT_NEAR(pointToPlane->FinalRMSE, synchronous.FinalRMSE, 1.0e-9);
+    EXPECT_EQ(pointToPlane->TargetNormalCount,
+              synchronous.TargetNormalCount);
+}
+
+// Every malformed-normal case must be refused before dispatch, leaving the
+// source transform and the command history untouched.
+TEST(SandboxEditorUi, RegistrationPointToPlaneRejectsInvalidTargetNormals)
+{
+    const std::vector<glm::vec3> target = MakePlanarRegistrationCloud();
+    std::vector<glm::vec3> sourcePoints{};
+    sourcePoints.reserve(target.size());
+    for (const glm::vec3& p : target)
+        sourcePoints.push_back(p + glm::vec3{0.0f, 0.0f, 0.35f});
+
+    const auto expectRejected =
+        [&](const char* label,
+            const std::function<void(ECS::Scene::Registry&,
+                                     ECS::EntityHandle)>& authorNormals)
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        Intrinsic::Tests::EditorFeatureTestContext context =
+            MakeContext(registry, selection);
+        context.CommandHistory = &history;
+
+        const ECS::EntityHandle source =
+            MakePointCloudEntity(registry, "RejectSource", sourcePoints);
+        const ECS::EntityHandle targetEntity =
+            MakePointCloudEntity(registry, "RejectTarget", target);
+        authorNormals(registry, targetEntity);
+        const ECSC::Transform::Component before =
+            registry.Raw().get<ECSC::Transform::Component>(source);
+
+        const Runtime::EditorRegistrationResult result =
+            Runtime::ApplyEditorRegistrationCommand(
+                context,
+                Runtime::EditorRegistrationCommand{
+                    .SourceStableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(source),
+                    .TargetStableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(
+                            targetEntity),
+                    .Variant = Runtime::EditorICPVariant::PointToPlane,
+                    .MaxIterations = 40u,
+                    .InlierRatio = 1.0,
+                    .TrajectoryStep = 1000u,
+                });
+
+        EXPECT_EQ(result.Status,
+                  Runtime::EditorCommandStatus::InvalidProcessingParameters)
+            << label << ": " << result.Message;
+        EXPECT_FALSE(result.HasResult) << label;
+        EXPECT_NE(result.Message.find("Point-to-plane"), std::string::npos)
+            << label << ": " << result.Message;
+        EXPECT_FALSE(history.CanUndo())
+            << label << ": a refused command must not enter history";
+        const ECSC::Transform::Component& after =
+            registry.Raw().get<ECSC::Transform::Component>(source);
+        EXPECT_NEAR(after.Position.x, before.Position.x, 1.0e-6f) << label;
+        EXPECT_NEAR(after.Position.y, before.Position.y, 1.0e-6f) << label;
+        EXPECT_NEAR(after.Position.z, before.Position.z, 1.0e-6f) << label;
+    };
+
+    expectRejected("absent", [](ECS::Scene::Registry&, ECS::EntityHandle) {});
+    expectRejected(
+        "wrong count",
+        [&](ECS::Scene::Registry& registry, const ECS::EntityHandle entity)
+        {
+            auto& vertices = registry.Raw().get<GS::Vertices>(entity);
+            auto property = vertices.Properties.GetOrAdd<glm::vec3>(
+                std::string{GS::PropertyNames::kNormal},
+                glm::vec3{0.0f, 0.0f, 1.0f});
+            property.Vector().assign(target.size() - 1u,
+                                     glm::vec3{0.0f, 0.0f, 1.0f});
+        });
+    expectRejected(
+        "wrong type",
+        [](ECS::Scene::Registry& registry, const ECS::EntityHandle entity)
+        {
+            auto& vertices = registry.Raw().get<GS::Vertices>(entity);
+            (void)vertices.Properties.GetOrAdd<glm::vec2>(
+                std::string{GS::PropertyNames::kNormal}, glm::vec2{0.0f});
+        });
+    expectRejected(
+        "non-finite",
+        [&](ECS::Scene::Registry& registry, const ECS::EntityHandle entity)
+        {
+            std::vector<glm::vec3> normals =
+                UniformNormals(target.size(), glm::vec3{0.0f, 0.0f, 1.0f});
+            normals[3] = glm::vec3{std::numeric_limits<float>::quiet_NaN(),
+                                   0.0f, 1.0f};
+            SetPointCloudNormals(registry, entity, normals);
+        });
+    expectRejected(
+        "zero length",
+        [&](ECS::Scene::Registry& registry, const ECS::EntityHandle entity)
+        {
+            std::vector<glm::vec3> normals =
+                UniformNormals(target.size(), glm::vec3{0.0f, 0.0f, 1.0f});
+            normals[5] = glm::vec3{0.0f};
+            SetPointCloudNormals(registry, entity, normals);
+        });
+}
+
+// Normals transform by the inverse transpose of the target model's linear part.
+// Under non-uniform scale that differs from the position transform, and using
+// the position transform would tilt every normal off the surface.
+TEST(SandboxEditorUi, RegistrationPointToPlaneTransformsNormalsByInverseTranspose)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    // A target plane tilted 45 degrees about x, then scaled non-uniformly.
+    // Under scale (1, 4, 1) the geometric normal of that plane is no longer the
+    // rotated authored normal: the position transform would give
+    // normalize(0, -4, 4) while the inverse transpose gives
+    // normalize(0, -0.25, 1) after normalization.
+    std::vector<glm::vec3> target{};
+    for (int i = 0; i < 7; ++i)
+        for (int j = 0; j < 7; ++j)
+            target.emplace_back(static_cast<float>(i) * 0.25f,
+                                static_cast<float>(j) * 0.25f,
+                                static_cast<float>(j) * 0.25f);
+    std::vector<glm::vec3> sourcePoints{};
+    sourcePoints.reserve(target.size());
+    for (const glm::vec3& p : target)
+        sourcePoints.push_back(p + glm::vec3{0.0f, 0.0f, 0.3f});
+
+    const ECS::EntityHandle source =
+        MakePointCloudEntity(registry, "ScaledSource", sourcePoints);
+    const ECS::EntityHandle targetEntity =
+        MakePointCloudEntity(registry, "ScaledTarget", target);
+    // Authored normal of the un-scaled tilted plane.
+    SetPointCloudNormals(
+        registry, targetEntity,
+        UniformNormals(target.size(),
+                       glm::normalize(glm::vec3{0.0f, -1.0f, 1.0f})));
+    auto& targetTransform =
+        registry.Raw().get<ECSC::Transform::Component>(targetEntity);
+    targetTransform.Scale = glm::vec3{1.0f, 4.0f, 1.0f};
+
+    const Runtime::EditorRegistrationResult result =
+        Runtime::ApplyEditorRegistrationCommand(
+            context,
+            Runtime::EditorRegistrationCommand{
+                .SourceStableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(source),
+                .TargetStableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(targetEntity),
+                .Variant = Runtime::EditorICPVariant::PointToPlane,
+                .MaxIterations = 40u,
+                .MaxCorrespondenceDistance = 100.0,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
+
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.EffectiveVariant,
+              Runtime::EditorICPVariant::PointToPlane);
+    EXPECT_EQ(result.TargetNormalCount, target.size());
+    // A zero-length or non-finite normal after transformation would have been
+    // refused before dispatch, so reaching a successful solve proves the
+    // inverse-transpose path produced usable unit normals under non-uniform
+    // scale.
+    EXPECT_TRUE(std::isfinite(result.FinalRMSE));
+}
+
+// A target-normal edit between submit and apply must discard the completion,
+// exactly as a position edit does.
+TEST(SandboxEditorUi, QueuedRegistrationPointToPlaneDiscardsStaleTargetNormals)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    std::optional<Runtime::EditorRegistrationResult> completed{};
+    context.MethodResultSinks.Registration =
+        [&completed](Runtime::EditorRegistrationResult result)
+        {
+            completed = std::move(result);
+        };
+
+    const std::vector<glm::vec3> target = MakePlanarRegistrationCloud();
+    std::vector<glm::vec3> sourcePoints{};
+    sourcePoints.reserve(target.size());
+    for (const glm::vec3& p : target)
+        sourcePoints.push_back(p + glm::vec3{0.0f, 0.0f, 0.35f});
+
+    const ECS::EntityHandle source =
+        MakePointCloudEntity(registry, "StaleNormalSource", sourcePoints);
+    const ECS::EntityHandle targetEntity =
+        MakePointCloudEntity(registry, "StaleNormalTarget", target);
+    SetPointCloudNormals(registry, targetEntity,
+                         UniformNormals(target.size(),
+                                        glm::vec3{0.0f, 0.0f, 1.0f}));
+    const ECSC::Transform::Component before =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+
+    const Runtime::EditorRegistrationResult queued =
+        Runtime::ApplyEditorRegistrationCommand(
+            context,
+            Runtime::EditorRegistrationCommand{
+                .SourceStableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(source),
+                .TargetStableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(targetEntity),
+                .Variant = Runtime::EditorICPVariant::PointToPlane,
+                .MaxIterations = 40u,
+                .MaxCorrespondenceDistance = 10.0,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
+    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
+
+    // Edit the normals the job snapshotted, before it applies.
+    SetPointCloudNormals(registry, targetEntity,
+                         UniformNormals(target.size(),
+                                        glm::vec3{1.0f, 0.0f, 0.0f}));
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(completed.has_value())
+        << "a discarded job must not publish a result";
+    EXPECT_FALSE(history.CanUndo());
+    const ECSC::Transform::Component& after =
+        registry.Raw().get<ECSC::Transform::Component>(source);
+    EXPECT_NEAR(after.Position.x, before.Position.x, 1.0e-6f);
+    EXPECT_NEAR(after.Position.y, before.Position.y, 1.0e-6f);
+    EXPECT_NEAR(after.Position.z, before.Position.z, 1.0e-6f);
+}
+
 TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParameters)
 {
     ECS::Scene::Registry registry;

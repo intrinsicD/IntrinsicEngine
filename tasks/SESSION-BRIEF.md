@@ -31,7 +31,7 @@ the authoritative open/unblocked view.
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
-- blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
+- unblocked: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 - unblocked: `UI-046` — Sandbox cannot export geometry at all (tasks/backlog/ui/UI-046-sandbox-geometry-export.md)
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
@@ -42,7 +42,6 @@ the authoritative open/unblocked view.
 ## Theme G — Active bugs
 
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
-- unblocked: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-137` — Direct mesh import replaces halfedge topology with the UV-atlas chart-split mesh (tasks/backlog/bugs/BUG-137-direct-mesh-import-atlas-replaces-topology.md)
@@ -100,7 +99,7 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
-- blocked by `BUG-096`: `RUNTIME-207` — ICP element-domain source integration (tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md)
+- unblocked: `RUNTIME-207` — ICP element-domain source integration (tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md)
 - unblocked: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)

@@ -8,6 +8,51 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-096`](BUG-096-icp-point-to-plane-target-normals.md) — runtime
+point-to-plane ICP consumes the target's normals, and a request it cannot
+satisfy is refused rather than degraded. Both branches called
+`Geometry::Registration::AlignICP` with an empty target-normal span, which that
+contract silently treats as "run point-to-point", while the result kept
+reporting the requested variant — so the editor could display a point-to-plane
+success for a point-to-point run.
+
+Refusing rather than degrading is the fix. Because the geometry contract
+degrades by design, the only way to stop the editor mislabelling a run is never
+to hand the solver a request it will degrade. Runtime resolves the target's
+`v:normal` before anything is dispatched or mutated and rejects the request when
+the property is absent, wrongly typed, count-mismatched, non-finite,
+zero-length, or when the target transform is not invertible; each cause names
+itself and suggests estimating normals or choosing point-to-point.
+`EffectiveVariant` and `TargetNormalCount` on the result make the guarantee
+legible rather than merely true, and the panel renders both variants.
+
+Normals reach world space through the inverse transpose of the target model's
+linear part, not the model matrix, which under non-uniform scale would tilt
+every normal off the surface it describes. The queued branch snapshots them in
+local space next to the positions and converts them in the worker, so a normal
+edit between submit and apply makes the job stale by the same comparison the
+positions already had.
+
+The distinguishing regression the task demanded took four attempts, and the
+three failures are recorded on the task because they are the traps: a pure
+translation is removed by the runtime's centroid pre-align before the solver
+runs; a uniform scale about the centroid has the identity as its optimal rigid
+fit under both metrics; and a planar target leaves the 6-DOF point-to-plane
+system rank-deficient, so `SolvePointToPlane`'s Cholesky bails to the identity
+increment and two *different* normal fields produce bit-identical results
+however faithfully they were passed through. A sphere makes the system full
+rank, and since the data is then exactly registrable and every metric converges
+to the same rotation, the evidence is the convergence path rather than the
+endpoint: two point-to-plane runs differing only in the normal field take
+different iteration counts to different residuals. The regression was confirmed
+to fail against a tree with only the solver hand-off reverted.
+
+Five contract tests cover the synchronous distinguisher, the queued path with
+its own point-to-point control, the five malformed-normal rejections, the
+inverse-transpose transform under non-uniform scale, and the stale-normal
+discard. The default CPU gate passes 4167/4167 with the expected GLFW/LeakSanitizer
+skip.
+
 [`BUG-145`](BUG-145-editor-operations-report-applied-from-written-counts.md) —
 no audited editor geometry-processing operation can report `Applied` while
 changing nothing. `BUG-140` fixed this for denoise and its audit found the same

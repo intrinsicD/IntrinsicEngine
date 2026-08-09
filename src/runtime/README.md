@@ -743,6 +743,39 @@ the previewed pose. The command owns no geometry, renderer, or asset state; it
 only reads point positions, calls the runtime controller, and edits the source
 `Transform`.
 
+#### Point-to-plane prerequisites and the effective variant (`BUG-096`)
+
+`Geometry.Registration::AlignICP` silently degrades a `PointToPlane` request to
+`PointToPoint` when the target-normal span is empty or count-mismatched. Both
+runtime branches used to pass an empty span while the result kept reporting the
+requested variant, so the editor could display a point-to-plane success for a
+point-to-point run.
+
+Runtime now resolves the target's `v:normal` before anything is dispatched or
+mutated and **fails a point-to-plane request closed** rather than degrading it.
+The prerequisites are: a `vec3 v:normal` property on the target point cloud,
+exactly one vector per target point, every value finite and non-zero-length, and
+an invertible target entity transform. Each rejection names its own cause and
+suggests estimating normals or selecting point-to-point; none of them mutates
+the source or touches the command history.
+
+Normals are carried into world space by the **inverse transpose** of the target
+model's linear part, then normalized — not by the model matrix, which under
+non-uniform scale would tilt every normal off the surface it describes. A normal
+that becomes non-finite or zero-length under that transform is rejected the same
+way.
+
+The queued branch snapshots the local-space normals alongside the positions and
+converts them in the worker, so a normal edit between submit and apply makes the
+job stale by the same comparison the positions get, and the completion is
+discarded.
+
+`EditorRegistrationResult` carries `Variant` (requested), `EffectiveVariant`
+(what the solver ran), and `TargetNormalCount`. Because a point-to-plane request
+is now refused rather than degraded, the two variants agree on every successful
+run; the field exists so that a disagreement would be visible rather than
+invisible, and the panel renders both.
+
 ### Sandbox Editor Appearance / Properties Reorganization
 
 `UI-031` reorganizes the per-domain windows so concern ownership is clear. The

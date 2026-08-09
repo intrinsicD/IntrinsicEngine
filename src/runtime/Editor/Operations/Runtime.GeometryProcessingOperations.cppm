@@ -583,9 +583,21 @@ export namespace Extrinsic::Runtime
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
         bool HasResult{false};
+        // The variant the command asked for.
         EditorICPVariant Variant{EditorICPVariant::PointToPoint};
+        // BUG-096: the variant the solver actually ran. `Geometry.Registration`
+        // silently degrades `PointToPlane` to `PointToPoint` when target
+        // normals are absent or count-mismatched, and the runtime used to
+        // report the requested variant regardless. Runtime now fails a
+        // point-to-plane request closed rather than degrading it, so on a
+        // successful run these agree; the field exists so a disagreement is
+        // visible rather than invisible.
+        EditorICPVariant EffectiveVariant{EditorICPVariant::PointToPoint};
         std::size_t SourcePointCount{0u};
         std::size_t TargetPointCount{0u};
+        // Target normals resolved, transformed to world space, and handed to
+        // the solver. Zero for a point-to-point run.
+        std::size_t TargetNormalCount{0u};
         std::size_t IterationsPerformed{0u};
         std::size_t TrajectoryLength{0u};
         std::size_t AppliedStep{0u};

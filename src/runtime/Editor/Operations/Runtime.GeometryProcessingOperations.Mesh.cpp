@@ -1008,6 +1008,136 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return points;
         }
 
+        // BUG-096: point-to-plane ICP needs the target's normals, and both
+        // runtime branches used to hand the solver an empty span, which
+        // `Geometry.Registration` silently treats as "run point-to-point". The
+        // status distinguishes every rejection cause so the editor can say
+        // which one applies rather than reporting a generic failure.
+        enum class RegistrationNormalStatus : std::uint8_t
+        {
+            Ok,
+            Absent,
+            CountMismatch,
+            NonFinite,
+            ZeroLength,
+            TargetTransformNotInvertible,
+        };
+
+        [[nodiscard]] const char* DescribeRegistrationNormalStatus(
+            const RegistrationNormalStatus status) noexcept
+        {
+            switch (status)
+            {
+            case RegistrationNormalStatus::Ok:
+                return "";
+            case RegistrationNormalStatus::Absent:
+                return "the target point cloud has no vec3 v:normal property";
+            case RegistrationNormalStatus::CountMismatch:
+                return "the target v:normal property does not carry exactly "
+                       "one vector per target point";
+            case RegistrationNormalStatus::NonFinite:
+                return "the target v:normal property contains a non-finite "
+                       "value";
+            case RegistrationNormalStatus::ZeroLength:
+                return "the target v:normal property contains a zero-length "
+                       "vector";
+            case RegistrationNormalStatus::TargetTransformNotInvertible:
+                return "the target entity transform is not invertible, so "
+                       "normals cannot be carried into world space";
+            }
+            return "the target normals are unusable";
+        }
+
+        // Local-space read and validation. World-space conversion is separate
+        // because the queued path snapshots local normals at submit and
+        // converts them in the worker, exactly as it does for positions.
+        [[nodiscard]] RegistrationNormalStatus CollectTargetRegistrationNormals(
+            const Geometry::PropertySet& properties,
+            std::vector<glm::vec3>& out)
+        {
+            out.clear();
+            const auto normals =
+                properties.Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (!normals || normals.Vector().empty())
+                return RegistrationNormalStatus::Absent;
+            if (normals.Vector().size() != properties.Size())
+                return RegistrationNormalStatus::CountMismatch;
+
+            out.reserve(normals.Vector().size());
+            for (const glm::vec3& normal : normals.Vector())
+            {
+                if (!std::isfinite(normal.x) || !std::isfinite(normal.y) ||
+                    !std::isfinite(normal.z))
+                {
+                    out.clear();
+                    return RegistrationNormalStatus::NonFinite;
+                }
+                if (glm::dot(normal, normal) <= 0.0f)
+                {
+                    out.clear();
+                    return RegistrationNormalStatus::ZeroLength;
+                }
+                out.push_back(normal);
+            }
+            return RegistrationNormalStatus::Ok;
+        }
+
+        // Normals transform by the inverse transpose of the model's linear
+        // part, not by the model matrix itself: under non-uniform scale the
+        // two disagree, and using the position transform would tilt every
+        // normal off the surface it describes.
+        [[nodiscard]] RegistrationNormalStatus TransformRegistrationNormalsToWorld(
+            const std::vector<glm::vec3>& localNormals,
+            const glm::mat4& model,
+            std::vector<glm::vec3>& out)
+        {
+            out.clear();
+            const glm::mat3 linear{model};
+            const float determinant = glm::determinant(linear);
+            if (!std::isfinite(determinant) || determinant == 0.0f)
+                return RegistrationNormalStatus::TargetTransformNotInvertible;
+
+            const glm::mat3 normalMatrix =
+                glm::transpose(glm::inverse(linear));
+            out.reserve(localNormals.size());
+            for (const glm::vec3& local : localNormals)
+            {
+                const glm::vec3 world = normalMatrix * local;
+                const float lengthSquared = glm::dot(world, world);
+                if (!std::isfinite(lengthSquared))
+                {
+                    out.clear();
+                    return RegistrationNormalStatus::NonFinite;
+                }
+                if (lengthSquared <= 0.0f)
+                {
+                    out.clear();
+                    return RegistrationNormalStatus::ZeroLength;
+                }
+                const glm::vec3 normalized = world / std::sqrt(lengthSquared);
+                if (!std::isfinite(normalized.x) ||
+                    !std::isfinite(normalized.y) ||
+                    !std::isfinite(normalized.z))
+                {
+                    out.clear();
+                    return RegistrationNormalStatus::NonFinite;
+                }
+                out.push_back(normalized);
+            }
+            return RegistrationNormalStatus::Ok;
+        }
+
+        [[nodiscard]] std::string BuildRegistrationNormalRejectionMessage(
+            const RegistrationNormalStatus status)
+        {
+            std::string message =
+                "Point-to-plane ICP registration requires target normals: ";
+            message += DescribeRegistrationNormalStatus(status);
+            message += ". Estimate point-cloud normals on the target, or "
+                       "select the point-to-point variant.";
+            return message;
+        }
+
         [[nodiscard]] bool SameGeometryPositions(
             const std::vector<glm::vec3>& lhs,
             const std::vector<glm::vec3>& rhs) noexcept
@@ -6829,6 +6959,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return EditorRegistrationResult{
                 .Status = EditorCommandStatus::NoChange,
                 .Variant = command.Variant,
+                // BUG-096: a result that never reached the solver has run
+                // nothing, so the effective variant stays point-to-point until
+                // a validated normal span makes it point-to-plane.
+                .EffectiveVariant = EditorICPVariant::PointToPoint,
                 .Error = Core::ErrorCode::Success,
             };
         }
@@ -6959,6 +7093,11 @@ struct EditorJobResult { std::string Diagnostic{}; };
             EditorRegistrationCommand Command{};
             std::vector<glm::vec3> SourceLocalPoints{};
             std::vector<glm::vec3> TargetLocalPoints{};
+            // BUG-096: empty for a point-to-point request. Snapshotted in local
+            // space alongside the positions and converted in the worker, so a
+            // normal edit between submit and apply is caught by the same
+            // staleness comparison the positions get.
+            std::vector<glm::vec3> TargetLocalNormals{};
             ECSC::Transform::Component SourceBeforeTransform{};
             bool TargetHadTransform{false};
             ECSC::Transform::Component TargetBeforeTransform{};
@@ -7031,6 +7170,22 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return JobApplyValidation::StaleGeneration;
             }
 
+            // BUG-096: a point-to-plane job that snapshotted target normals is
+            // stale the moment those normals change, exactly as it is when the
+            // positions change.
+            if (!job.TargetLocalNormals.empty())
+            {
+                std::vector<glm::vec3> currentNormals{};
+                if (CollectTargetRegistrationNormals(
+                        targetView.VertexSource->Properties,
+                        currentNormals) != RegistrationNormalStatus::Ok ||
+                    !SameGeometryPositions(currentNormals,
+                                           job.TargetLocalNormals))
+                {
+                    return JobApplyValidation::StaleGeneration;
+                }
+            }
+
             const ECSC::Transform::Component* sourceTransform =
                 raw.try_get<ECSC::Transform::Component>(*sourceEntity);
             if (sourceTransform == nullptr ||
@@ -7089,6 +7244,33 @@ struct EditorJobResult { std::string Diagnostic{}; };
             glm::mat4 prealignPose(1.0f);
             prealignPose[3] = glm::vec4(prealignDelta, 1.0f);
 
+            std::vector<glm::vec3> targetWorldNormals{};
+            if (!state->TargetLocalNormals.empty())
+            {
+                const glm::mat4 targetModel =
+                    state->TargetHadTransform
+                        ? ModelMatrixFromTransform(state->TargetBeforeTransform)
+                        : glm::mat4(1.0f);
+                const RegistrationNormalStatus worldStatus =
+                    TransformRegistrationNormalsToWorld(
+                        state->TargetLocalNormals,
+                        targetModel,
+                        targetWorldNormals);
+                if (worldStatus != RegistrationNormalStatus::Ok)
+                {
+                    result.Status =
+                        EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message =
+                        BuildRegistrationNormalRejectionMessage(worldStatus);
+                    return JobResultEnvelope::Make<EditorJobResult>(
+                        EditorJobResult{
+                            .Diagnostic = result.Message,
+                        });
+                }
+            }
+            result.TargetNormalCount = targetWorldNormals.size();
+
             Reg::RegistrationParams params{};
             params.Variant = ToGeometryICPVariant(state->Command.Variant);
             params.MaxIterations = state->Command.MaxIterations;
@@ -7097,9 +7279,18 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     ? state->Command.MaxCorrespondenceDistance
                     : 1.0e6;
             params.InlierRatio = state->Command.InlierRatio;
+            result.EffectiveVariant =
+                targetWorldNormals.size() == targetWorld.size() &&
+                        !targetWorldNormals.empty()
+                    ? EditorICPVariant::PointToPlane
+                    : EditorICPVariant::PointToPoint;
 
             const RegistrationAlignmentOutcome outcome =
-                AlignPointClouds(prealignedSourceWorld, targetWorld, {}, params);
+                AlignPointClouds(
+                    prealignedSourceWorld,
+                    targetWorld,
+                    targetWorldNormals,
+                    params);
             if (!outcome.HasResult)
             {
                 result.Status =
@@ -7282,6 +7473,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             const EditorRegistrationCommand& command,
             std::vector<glm::vec3> sourcePoints,
             std::vector<glm::vec3> targetPoints,
+            std::vector<glm::vec3> targetNormals,
             const ECSC::Transform::Component& sourceTransform,
             const ECSC::Transform::Component* targetTransform,
             const std::uint64_t sourceGeometryMetadataSignature,
@@ -7298,6 +7490,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->Command = command;
             state->SourceLocalPoints = std::move(sourcePoints);
             state->TargetLocalPoints = std::move(targetPoints);
+            state->TargetLocalNormals = std::move(targetNormals);
             state->SourceBeforeTransform = sourceTransform;
             if (targetTransform != nullptr)
             {
@@ -10394,6 +10587,39 @@ ApplyEditorRegistrationCommand(
         result.SourcePointCount = sourcePoints->size();
         result.TargetPointCount = targetPoints->size();
 
+        // BUG-096: resolve and validate the target normals before anything is
+        // dispatched or mutated, so a point-to-plane request with unusable
+        // normals fails closed instead of degrading to point-to-point behind a
+        // point-to-plane label.
+        const bool pointToPlane =
+            command.Variant == EditorICPVariant::PointToPlane;
+        std::vector<glm::vec3> targetLocalNormals{};
+        if (pointToPlane)
+        {
+            const RegistrationNormalStatus normalStatus =
+                CollectTargetRegistrationNormals(
+                    targetView.VertexSource->Properties,
+                    targetLocalNormals);
+            if (normalStatus != RegistrationNormalStatus::Ok)
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    BuildRegistrationNormalRejectionMessage(normalStatus);
+                return result;
+            }
+            if (targetLocalNormals.size() != targetPoints->size())
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = BuildRegistrationNormalRejectionMessage(
+                    RegistrationNormalStatus::CountMismatch);
+                return result;
+            }
+        }
+
         ECSC::Transform::Component* transform =
             raw.try_get<ECSC::Transform::Component>(*sourceEntity);
         if (transform == nullptr)
@@ -10415,6 +10641,7 @@ ApplyEditorRegistrationCommand(
                 command,
                 *sourcePoints,
                 *targetPoints,
+                targetLocalNormals,
                 *transform,
                 targetTransform,
                 GeometryMetadataSignatureForEntity(raw, *sourceEntity),
@@ -10449,6 +10676,24 @@ ApplyEditorRegistrationCommand(
         glm::mat4 prealignPose(1.0f);
         prealignPose[3] = glm::vec4(prealignDelta, 1.0f);
 
+        std::vector<glm::vec3> targetWorldNormals{};
+        if (pointToPlane)
+        {
+            const RegistrationNormalStatus worldStatus =
+                TransformRegistrationNormalsToWorld(
+                    targetLocalNormals, targetModel, targetWorldNormals);
+            if (worldStatus != RegistrationNormalStatus::Ok)
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    BuildRegistrationNormalRejectionMessage(worldStatus);
+                return result;
+            }
+        }
+        result.TargetNormalCount = targetWorldNormals.size();
+
         Reg::RegistrationParams params{};
         params.Variant = ToGeometryICPVariant(command.Variant);
         params.MaxIterations = command.MaxIterations;
@@ -10457,9 +10702,17 @@ ApplyEditorRegistrationCommand(
                 ? command.MaxCorrespondenceDistance
                 : 1.0e6;
         params.InlierRatio = command.InlierRatio;
+        // The solver degrades to point-to-point when the span is empty, and
+        // the span is non-empty here exactly when point-to-plane was requested
+        // and validated, so the two agree by construction.
+        result.EffectiveVariant =
+            pointToPlane && targetWorldNormals.size() == targetWorld.size()
+                ? EditorICPVariant::PointToPlane
+                : EditorICPVariant::PointToPoint;
 
         const RegistrationAlignmentOutcome outcome =
-            AlignPointClouds(prealignedSourceWorld, targetWorld, {}, params);
+            AlignPointClouds(
+                prealignedSourceWorld, targetWorld, targetWorldNormals, params);
         if (!outcome.HasResult)
         {
             result.Status = EditorCommandStatus::GeometryProcessingFailed;

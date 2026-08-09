@@ -41,11 +41,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
   edits; replace it with real atlas output plus generation-safe stale discard.
-- [`BUG-096` — ICP point-to-plane ignores target normals](BUG-096-icp-point-to-plane-target-normals.md):
-  synchronous and queued runtime registration pass an empty target-normal span,
-  so geometry silently executes point-to-point while the editor reports the
-  requested point-to-plane variant; the fix targets the canonical property
-  reference and `JobService` operation before the thin facade wrapper retires.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected
@@ -87,6 +82,14 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   `0.45` that could not be told apart from real progress. Both terminal states
   now report no progress and are labelled by stage; indeterminate stages carry
   `0.0`, so determinate `0.0` means exactly `Queued`.
+
+- Closed 2026-08-09: [`BUG-096` — ICP point-to-plane ignores target
+  normals](../../done/BUG-096-icp-point-to-plane-target-normals.md). Both
+  runtime branches now pass validated, world-space target normals to
+  `AlignICP`, and a point-to-plane request that cannot be satisfied is refused
+  rather than silently degraded to point-to-point behind a point-to-plane
+  label. The result carries the requested and effective variants and the normal
+  count.
 
 - Closed 2026-08-09: [`BUG-145` — Editor geometry operations report Applied from
   written
