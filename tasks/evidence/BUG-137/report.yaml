@@ -3,31 +3,109 @@ task_id: BUG-137
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-09T18:52:43Z'
+generated_at: '2026-08-09T20:50:30Z'
 claim_eligible: false
 source:
   base_ref: 27ac89eb
   base_revision: 27ac89eb7b73eb590f6f23976b78f0bb62db29e4
-  head_revision: 27ac89eb7b73eb590f6f23976b78f0bb62db29e4
+  head_revision: 438e75c60630317e6b9cc2fc4a9b4cc9946fe0e5
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
+  - path: docs/architecture/property-coherence.md
+    sha256: 381cd1c54adc56d623e0890d08d0bfd773ac960152260a85af52275052adb614
+  - path: src/geometry/Geometry.HalfedgeMesh.Simplification.cpp
+    sha256: 4236a7e265154fc161398407a4237cd7e83e7b8589d94615d7d0b8fd67fbc333
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+    sha256: fcc9e55d7d0b574e97c0219bdf154bd4bf0c137259f6f711465f5168ab3b8e2a
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: ca9ba5c9be39cb9b5637d17adf1c06bff307b4b787b8d15626c4d974ae693ac1
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: e71ffcec9995f5284fef2894d6c2945c1abd2cab3b79995ea1b16953be0e85a1
+  - path: src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp
+    sha256: df4428b1c0a8abb551d6dec70586456ae8615a976886f33f287749bcf9328419
+  - path: src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
+    sha256: 5ad827441952b7055b5999543639ee7b8160c1526296fe1fd640ee723e8758f9
   - path: tasks/SESSION-BRIEF.md
-    sha256: 2d964967f8edf9cebf79807cf0936a484adeae99de0eb9f5a0925c0116336f29
+    sha256: b469316975cacc07c8d9ecfec25ade60d960eab4c49533d74b32708f3c12d6e7
+  - path: tasks/backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md
+    sha256: a424cac5ef3995a12d6caa31bdea5ee1b80ad39b69790c3e9fca3cfc1aeffe1e
   - path: tasks/backlog/bugs/index.md
-    sha256: 193dab550080a344c53ae62e88c14323f273dddb911f9cef0aefe41d90c5c2af
+    sha256: c6dd395b20a4b74780e6e7cde16776c2b076800ab6e90f43b86417ad1d495de5
   - path: tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
-    sha256: 3f248eb4d2e2e348dc97ceacee1847052101230ca46d6d09f07352ed15140cc0
+    sha256: 68720096d6f8d16c6537c3bbebc9a11ff95e3a2c30e0c60732835e309e78f751
+  - path: tasks/done/BUG-146-topology-edits-destroy-corner-uvs.md
+    sha256: 34f90940d06797e40ce09a6b5147de4e8aec0462de70d0010361ce54be9a6010
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: 818486b3b5b12b2835863ad02831eb03a0a8cec4802775f5f04a943e64676b11
-  content_digest: 0188841d0c699acb23da90fc1dab2eb9a276d1b6c1c816a8e9599c78b0ae3828
+    sha256: bca49a2f5241df798fccd266f7e601aa983f9d3b690a7aedd9b1271a5fa18b43
+  - path: tasks/evidence/BUG-146/commands/build-tests.json
+    sha256: 9050497cc926dcdc82f90a2661d06297b0f68ac40c0e63fb7deb3bdbbabdfa6f
+  - path: tasks/evidence/BUG-146/commands/build-tests.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-146/commands/build-tests.stdout.log
+    sha256: 72965522129e187bc3b94f7130b668c896caad690a33895729ed8984bdeba4bc
+  - path: tasks/evidence/BUG-146/commands/cpu-gate.json
+    sha256: f4ed53ea5d8fe4b32a26de483ee860b67a8250cdd71d0bfb6f76539c4f68f153
+  - path: tasks/evidence/BUG-146/commands/cpu-gate.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-146/commands/cpu-gate.stdout.log
+    sha256: 4342afa965d4570016ef96da76efd2600121c9df1b53494b7b6ea94a14e6aa10
+  - path: tasks/evidence/BUG-146/commands/focused-mesh-ops.json
+    sha256: b3a47231a224cf4f33abd683ccec0b3b2edbfabc1c933a3f4d4cb2cffd30df0a
+  - path: tasks/evidence/BUG-146/commands/focused-mesh-ops.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-146/commands/focused-mesh-ops.stdout.log
+    sha256: 1c66c6d1f4c0d3ef919a1a4313e806a67de37c68de7350d4196d7f19a423a993
+  - path: tasks/evidence/BUG-146/commands/layering.json
+    sha256: 5017634263068dbface8d23951dfc4806b19551b43414aba4a2d1f28a7bfb41d
+  - path: tasks/evidence/BUG-146/commands/layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-146/commands/layering.stdout.log
+    sha256: 4bf3201045d7aeda4ef82d71e6fa9ecac5d0229827d75443c969ef47490b372b
+  - path: tasks/evidence/BUG-146/commands/task-policy.json
+    sha256: fa80030e34b56d5a287a2da596c8c9f98198380161edf51a869fa91b79ef04bd
+  - path: tasks/evidence/BUG-146/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-146/commands/task-policy.stdout.log
+    sha256: 5c90a7e0720e262c173720bac142b97ed32329602522faf6135885732a26067b
+  - path: tasks/evidence/BUG-146/report.yaml
+    sha256: e19480bc5cd2edb508285535eb6dadfc7e1fe1971e3b1bc59d79adb4a7e0d4e5
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: 9e8580ceeedcc2949ea20d8bba1c80b4d555f624ed7067e9532e8a26b6ad34c2
+  content_digest: b475671dfa9e618a068fe4a2644ae78ca0fd1d86e7a63a6b5a5c3ecd6acbb349
 touched:
   paths:
+  - docs/architecture/property-coherence.md
+  - src/geometry/Geometry.HalfedgeMesh.Simplification.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp
+  - src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
   - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md
   - tasks/backlog/bugs/index.md
   - tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
+  - tasks/done/BUG-146-topology-edits-destroy-corner-uvs.md
   - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/BUG-146/commands/build-tests.json
+  - tasks/evidence/BUG-146/commands/build-tests.stderr.log
+  - tasks/evidence/BUG-146/commands/build-tests.stdout.log
+  - tasks/evidence/BUG-146/commands/cpu-gate.json
+  - tasks/evidence/BUG-146/commands/cpu-gate.stderr.log
+  - tasks/evidence/BUG-146/commands/cpu-gate.stdout.log
+  - tasks/evidence/BUG-146/commands/focused-mesh-ops.json
+  - tasks/evidence/BUG-146/commands/focused-mesh-ops.stderr.log
+  - tasks/evidence/BUG-146/commands/focused-mesh-ops.stdout.log
+  - tasks/evidence/BUG-146/commands/layering.json
+  - tasks/evidence/BUG-146/commands/layering.stderr.log
+  - tasks/evidence/BUG-146/commands/layering.stdout.log
+  - tasks/evidence/BUG-146/commands/task-policy.json
+  - tasks/evidence/BUG-146/commands/task-policy.stderr.log
+  - tasks/evidence/BUG-146/commands/task-policy.stdout.log
+  - tasks/evidence/BUG-146/report.yaml
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
   layers:
   - app
   - geometry
@@ -39,8 +117,9 @@ touched:
 extension_seam: Geometry::MeshUtils::ResolveTexcoordDomain is the single resolution point every new UV
   consumer binds to; ClassifySeamVertices is the per-domain seam definition a seam-aware operation extends;
   ParameterizationUvState is the two-domain undo record a future UV-publishing operation copies.
-future_change_plan: BUG-146 owns corner-UV survival across topology-replacing editor operations, which
-  is the one path this task deliberately did not widen into.
+future_change_plan: BUG-146 (retired) carried corner-UV survival across topology-replacing editor operations;
+  BUG-147 owns editor UV regeneration, which still publishes the atlas chart-split mesh as the entity
+  mesh.
 acceptance:
 - criterion: Importing `tests/data/sculpt.obj` yields 3669 vertices, 11013 edges,
   task_checked: true
@@ -84,7 +163,7 @@ benchmark_or_parity_evidence: []
 docs_sync:
   task_file: tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
   session_brief_present: true
-  canonical_docs_changed: false
+  canonical_docs_changed: true
   skill_mirrors_checked: true
 residual_risks: []
 skipped_checks: []

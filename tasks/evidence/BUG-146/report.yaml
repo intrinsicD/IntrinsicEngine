@@ -3,12 +3,12 @@ task_id: BUG-146
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-09T20:47:52Z'
+generated_at: '2026-08-09T20:50:30Z'
 claim_eligible: false
 source:
   base_ref: 50c75007
   base_revision: 50c75007ee89b38f05168367c9e3ee9f812185ae
-  head_revision: 50c75007ee89b38f05168367c9e3ee9f812185ae
+  head_revision: 438e75c60630317e6b9cc2fc4a9b4cc9946fe0e5
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: true
@@ -23,7 +23,9 @@ source:
     sha256: 34f90940d06797e40ce09a6b5147de4e8aec0462de70d0010361ce54be9a6010
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: bca49a2f5241df798fccd266f7e601aa983f9d3b690a7aedd9b1271a5fa18b43
-  content_digest: 2de28a45582024a423002e5e7aa2e3352b825cb5260ff82cb030cf18a902c75e
+  - path: tasks/evidence/BUG-137/report.yaml
+    sha256: 6dda2b61ba368f8a9ac79856f3c3c0c14c703c93608e3b2bbfe70f8a96227470
+  content_digest: 634489f166b25c450938f33672544e6352942131683bac40f35db480e4afe0e5
 touched:
   paths:
   - tasks/SESSION-BRIEF.md
@@ -31,6 +33,7 @@ touched:
   - tasks/done/BUG-137-direct-mesh-import-atlas-replaces-topology.md
   - tasks/done/BUG-146-topology-edits-destroy-corner-uvs.md
   - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/BUG-137/report.yaml
   layers:
   - app
   - geometry
