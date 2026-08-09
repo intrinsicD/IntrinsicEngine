@@ -1,0 +1,121 @@
+schema_version: 1
+task_id: BUG-096
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-09T15:13:15Z'
+claim_eligible: false
+source:
+  base_ref: 3951ee30
+  base_revision: 3951ee30e0f78f7b02a115bde88194248682f5c6
+  head_revision: 3a27e403d1ec3f805c36538d32478c504e45d76e
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: false
+  surface:
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 933afaed49e2f33e0ab8272a1a348029d8c67a6560364324b25d0a812346d006
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 142d97de03a2cc599699cb26da3b29fde244c9861a328f0464d78fc3c33da92e
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: 2e73b2e8efa3d71e1724e675d7266d3c89265a194f85b83ff3850c95fbf6d024
+  - path: src/runtime/README.md
+    sha256: 2e9a82015e94fa09b70f902fd0cd084842be1fc5921758fc0440640085fa4424
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 389d5872dce0c58c35444056e08f197a43ed94b2fb3c00a919bcaf0f7c61d9f1
+  - path: tasks/backlog/bugs/index.md
+    sha256: a98da9ce5c3b63bc125ad1288e137adbbf42d3482f0fd53f9e12988332d5642c
+  - path: tasks/done/BUG-096-icp-point-to-plane-target-normals.md
+    sha256: d32f2af48b5b905f586bd501540c2cf538373cec207c7912b2dc688a68880084
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 335855a30c80eb05c844034e6ae3456d1c45fa80014bfd53abbb89dca82c9bb4
+  - path: tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    sha256: 0cd764f3a72ed828fcb069941ec548f7ec682bb2fea9772c8152e91cfed2d828
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 721fb1a6c7ed7f8a4a9df966d7749777db39c32257995022adeff51aa1e971eb
+  content_digest: 764b53cfc7cff43b25e1476837a65f594e59910f70ae300ad242d53bd3018c5a
+touched:
+  paths:
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/README.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-096-icp-point-to-plane-target-normals.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - tools/agents/contract_legacy_tasks.json
+  layers:
+  - app
+  - runtime
+  modules:
+  - Extrinsic.Runtime.GeometryProcessingOperations
+extension_seam: RegistrationNormalStatus is the rejection taxonomy a future registration prerequisite
+  extends; CollectTargetRegistrationNormals and TransformRegistrationNormalsToWorld are the local-read
+  and world-conversion halves the queued snapshot splits across.
+future_change_plan: None owed. UI-037 consumes the truthful readiness/result contract this task establishes.
+acceptance:
+- criterion: Both synchronous and queued point-to-plane commands pass finite,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A distinguishing regression proves the effective solver is
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Missing or invalid target normals fail before dispatch with an actionable
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Target-normal edits invalidate queued results, and non-uniform target
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Requested/effective variants are truthful for every terminal result;
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-096/commands/cpu-gate.json
+- receipt: tasks/evidence/BUG-096/commands/focused-registration.json
+- receipt: tasks/evidence/BUG-096/commands/structural-gates.json
+changed_public_contracts:
+- EditorRegistrationResult gains EffectiveVariant and TargetNormalCount. A point-to-plane request with
+  absent, wrongly typed, count-mismatched, non-finite, or zero-length target normals, or a non-invertible
+  target transform, now fails with InvalidProcessingParameters instead of silently running point-to-point.
+diagnostics_and_previews:
+- Each point-to-plane rejection names its own cause and suggests estimating target normals or selecting
+  point-to-point.
+- The ICP panel renders the requested and the effective variant plus the number of target normals handed
+  to the solver.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-096-icp-point-to-plane-target-normals.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- The distinguishing regression rests on the convergence path (iteration count and residual) rather than
+  the final pose, because the sphere data is exactly registrable and every metric converges to the same
+  rotation. A solver change that altered convergence behaviour would need the test re-derived, which is
+  why the three rejected constructions are recorded on the task.
+skipped_checks:
+- check: gpu-vulkan
+  reason: No RHI, shader, backend, or command-recording behavior changed; registration is a CPU operation
+    with no backend promotion axis.
+- check: asan-ubsan
+  reason: No allocation, ownership, or asynchronous lifetime changed; the added snapshot vector follows
+    the same lifetime as the position snapshot beside it.
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
