@@ -1,14 +1,14 @@
 schema_version: 1
 task_id: BUG-145
 workflow_profile: standard
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-09T10:17:34Z'
+generated_at: '2026-08-09T13:35:25Z'
 claim_eligible: false
 source:
   base_ref: 9ed4c23b
   base_revision: 9ed4c23be16de628063912e606f81f15ea2ffee2
-  head_revision: 8ea59cabffe507dbf87de56a1d102dab652e0f4f
+  head_revision: ea23752ff433130940644feaad3f3ecb0df10235
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
@@ -16,20 +16,30 @@ source:
   - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
     sha256: 16a69bc480af5591093a7f271b8874beef5a33fcfa87680371d2afa735a79812
   - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
-    sha256: 78b3ce7a09127b3ceb5abd62ea7feb37e12d08127783944c3f2a5a40f9f748c9
+    sha256: 2dc8dc3ce7a956b005f4b666bf73944fdab98938f2b041b137af1ef2cbb1a5c9
   - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
-    sha256: c17f6c2422215aadaa49c160f6ff27b8d45e7b0ddc2e07d3577722030efab604
+    sha256: e7d2899e36bb00a310e87ac0669348092fb17b084ab2912ae81679b804b4cd47
   - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
     sha256: e468b4d32339b52aaabd6a65624cb8f2190431840f1ae50589aa45985dd38c36
   - path: src/runtime/README.md
-    sha256: d33c04f1567a74e176ebf1407545efb3d1910a67aa0b69644f4c5a004128f71f
+    sha256: adc4100f0e334e2250b0a1169709a20405cc8fb067b54501cba346139e26de88
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 5809a6ba62b6c12a174a92a3af3f8849a266ae5babd60999ed7a36e2fee8c335
   - path: tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
     sha256: 38e0a9d892669f8771b77b6d2f90e31e61c0f6837b560f421990072e25b5ade3
   - path: tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md
-    sha256: 4ee35de222632ec2adc6a28135db382635a404c1b1267240a66d4f0a8da56ed1
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 28e0ee9bc7471f2a57d1ed0d61c8ff2596190dabcdbfbb5582e9ff048ac375e3
+  - path: tasks/done/BUG-140-mesh-denoise-reports-success-after-zero-movement.md
+    sha256: ee2ad20c2ed74263d34909deadbd182b78b180521f4d71e215e740c4a95858cd
+  - path: tasks/done/BUG-145-editor-operations-report-applied-from-written-counts.md
+    sha256: ed90f520aea454bce7ac954eb42a9098cee84c08e5a497b1429ef71643105a3d
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: c7b97a2498f614be9f6df140120d998ad7297968b42dd2aded0075f242478b39
   - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
-    sha256: aa47533de2db2526db231d05e19bb90f616cfbf5fcdbd4774621d34dc78ed562
-  content_digest: 00ea5b035ac8951c44f9a6236a9afc613592e87f596800fe8c96de8deb547806
+    sha256: 5e5d371ecba6d600c4431e30bd73325055ea5ac33d9c1671e165f15ae26ba586
+  content_digest: 00a9aa49b6b1e75ede15ee78982ed6ac8518aa755a1a6baa5c3cce0b31cf3ed6
 touched:
   paths:
   - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
@@ -37,67 +47,82 @@ touched:
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
   - src/runtime/README.md
+  - tasks/SESSION-BRIEF.md
   - tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
   - tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-140-mesh-denoise-reports-success-after-zero-movement.md
+  - tasks/done/BUG-145-editor-operations-report-applied-from-written-counts.md
+  - tasks/done/RETIREMENT-LOG.md
   - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
   layers:
   - app
   - runtime
   modules:
   - Extrinsic.Runtime.GeometryProcessingOperations
-extension_seam: CountChangedValues is the shared comparison; each operation supplies its own property
-  list or change signal. An operation that already reports a change signal needs only the gate.
-future_change_plan: Slices C (remesh/subdivide/simplify) and D (UV regeneration) are planned in the task
-  file and remain open.
+extension_seam: CountChangedValues for value-publishing operations and SameMeshTopologyAndPositions for
+  replacement-mesh operations are the two shared comparisons; a new operation supplies its property list
+  or reuses the mesh comparison. SameUvRegenerationOutput shows how to extend the mesh comparison with
+  the property an operation actually owns.
+future_change_plan: 'None owed by this task. One observation is recorded rather than fixed: MaxOutputFaces
+  blocking subdivision reports GeometryProcessingFailed when the configured cap refused the work.'
 acceptance:
 - criterion: No audited operation can report `Applied` while changing nothing.
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 - criterion: Every no-op result explains why nothing changed.
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 - criterion: No no-op run creates an undo-history entry.
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
-- criterion: The complete default CPU gate passes.
-  task_checked: false
-  disposition: pending
+- criterion: The complete default CPU gate passes (4162/4162).
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 commands:
+- receipt: tasks/evidence/BUG-145/commands/cpu-gate-final.json
 - receipt: tasks/evidence/BUG-145/commands/cpu-gate-slice-a.json
 - receipt: tasks/evidence/BUG-145/commands/cpu-gate-slice-b.json
+- receipt: tasks/evidence/BUG-145/commands/focused-final.json
 - receipt: tasks/evidence/BUG-145/commands/focused-normals-slice-a.json
 - receipt: tasks/evidence/BUG-145/commands/focused-slice-b.json
+- receipt: tasks/evidence/BUG-145/commands/structural-gates-final.json
 - receipt: tasks/evidence/BUG-145/commands/structural-gates-slice-a.json
 changed_public_contracts:
-- The three vertex-normal results gain ChangedNormalCount and EditorMeshCurvatureResult gains ChangedValueCount;
-  vertex normals, curvature, and point-cloud outlier removal now report NoChange instead of Applied when
-  they change nothing.
+- The three vertex-normal results gain ChangedNormalCount and EditorMeshCurvatureResult gains ChangedValueCount.
+  Vertex normals, curvature, point-cloud outlier removal, remesh, simplify, and UV regeneration now report
+  NoChange instead of Applied when they change nothing; subdivide is unchanged because its no-op state
+  is unreachable.
 diagnostics_and_previews:
-- Each gated operation's no-change message names the counts or the threshold nothing crossed, and no undo
-  entry or dirty stamp is produced.
+- Each gated operation's no-change message names the counts, the threshold, or the atlas result that explains
+  why nothing changed, and no undo entry or dirty stamp is produced.
 benchmark_or_parity_evidence: []
 docs_sync:
-  task_file: tasks/backlog/bugs/BUG-145-editor-operations-report-applied-from-written-counts.md
+  task_file: tasks/done/BUG-145-editor-operations-report-applied-from-written-counts.md
   session_brief_present: true
   canonical_docs_changed: false
   skill_mirrors_checked: true
 residual_risks:
-- The exact comparison means a kernel producing bit-identical output for a changed input would report
-  NoChange; that cannot happen on these paths because the comparison is against the input snapshot itself.
+- A false NoChange would silently drop a user edit, which is worse than the defect being fixed; every
+  replacement-mesh comparison is therefore conservative — a mesh carrying garbage, or a differing texcoord
+  property, reads as changed.
+- Subdivide's ungated path rests on all three current operators either refining or failing closed; a future
+  operator that declines to refine would need its own gate, which MeshSubdivideCannotRunAndLeaveTheMeshUnchanged
+  would catch.
 skipped_checks:
 - check: gpu-vulkan
   reason: No RHI, shader, backend, or command-recording behavior changed.
 - check: asan-ubsan
-  reason: No allocation, ownership, or asynchronous lifetime changed; the added comparisons read vectors
-    already owned by the surrounding scope.
+  reason: No allocation, ownership, or asynchronous lifetime changed; the added comparisons read meshes
+    and vectors already owned by the surrounding scope.
 artifacts: []
 self_review:
   completed: true
