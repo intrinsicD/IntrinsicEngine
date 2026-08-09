@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "Simplification|ParameterizationOperations|VisualizationRecipes|SandboxEditorUi",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'Simplification|ParameterizationOperations|VisualizationRecipes|SandboxEditorUi' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 7608,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T18:48:23Z",
+  "label": "slice-d-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T18:48:15Z",
+  "stderr_path": "tasks/evidence/BUG-137/commands/slice-d-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-137/commands/slice-d-focused.stdout.log",
+  "stdout_sha256": "d4e6c6b04205c70c713ab7e0439794b8245714cc114e43411b5ecac047fb9f56",
+  "task_id": "BUG-137"
+}

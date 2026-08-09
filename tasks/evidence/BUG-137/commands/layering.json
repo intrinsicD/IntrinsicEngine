@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_layering.py",
+    "--root",
+    "src",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_layering.py --root src --strict",
+  "cwd": ".",
+  "duration_ms": 181,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T18:48:23Z",
+  "label": "layering",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T18:48:23Z",
+  "stderr_path": "tasks/evidence/BUG-137/commands/layering.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-137/commands/layering.stdout.log",
+  "stdout_sha256": "7eafdf8bbe4e8c2dc40315514d026a7bfa514f0f68b0d96cd32ea249efa36333",
+  "task_id": "BUG-137"
+}
