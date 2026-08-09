@@ -1,0 +1,20 @@
+{
+  "command": [
+    "./build/ci/bin/IntrinsicRuntimeContractTests",
+    "--gtest_filter=SandboxEditorUi.*VertexNormal*"
+  ],
+  "command_display": "./build/ci/bin/IntrinsicRuntimeContractTests '--gtest_filter=SandboxEditorUi.*VertexNormal*'",
+  "cwd": ".",
+  "duration_ms": 51,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T09:30:39Z",
+  "label": "focused-normals-slice-a",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T09:30:39Z",
+  "stderr_path": "tasks/evidence/BUG-145/commands/focused-normals-slice-a.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-145/commands/focused-normals-slice-a.stdout.log",
+  "stdout_sha256": "586a2ba9e24b380f61d918fb9318ba060fea851bebff057f14a707b41f331025",
+  "task_id": "BUG-145"
+}

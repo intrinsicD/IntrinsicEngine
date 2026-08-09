@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root ."
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root .'",
+  "cwd": ".",
+  "duration_ms": 1897,
+  "exit_code": 0,
+  "finished_at": "2026-08-09T09:30:41Z",
+  "label": "structural-gates-slice-a",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-09T09:30:39Z",
+  "stderr_path": "tasks/evidence/BUG-145/commands/structural-gates-slice-a.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-145/commands/structural-gates-slice-a.stdout.log",
+  "stdout_sha256": "e7c45ed97f7fb532f7f02aff7f3768f37faeb519896fd4e229976c1e3e91f72e",
+  "task_id": "BUG-145"
+}
