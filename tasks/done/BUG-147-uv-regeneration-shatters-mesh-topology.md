@@ -5,16 +5,24 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "claude-bug147"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-09T20:10:00Z"
+maturity_target: CPUContracted
 contract_schema: 1
 contracts:
   - geometry.element-domain-sources
   - geometry.property-coherence
 ---
 # BUG-147 — Editor UV regeneration replaces the mesh with the atlas chart-split mesh
+
+## Status
+
+- Completed and retired on 2026-08-10.
+- Completion commit: this retirement commit.
+- Commits: `af092d51` (shared chart-split corner recovery, mechanical),
+  `8514b43f` (UV regeneration keeps the mesh's topology).
 
 ## Goal
 - Make the editor's "Regenerate UVs" command preserve the selected mesh's
@@ -71,41 +79,58 @@ contracts:
   change.
 
 ## Required changes
-- [ ] Stop building the published mesh from `atlas.OutputMesh`; keep the
-      selected mesh's topology and publish atlas UVs on the corner domain.
-- [ ] Preserve the existing `NoChange` idempotence contract: re-running on a
-      mesh whose UVs the atlas reproduces must still report `NoChange` and leave
-      no undo entry, now compared on the corner domain.
-- [ ] Keep reporting the GPU-side split count, which after the fix describes
-      upload duplication rather than mesh damage — the same wording change
-      `BUG-137` made for import.
-- [ ] Verify the atlas-failure and authored-UV-preserved branches keep the same
-      topology guarantee, structurally rather than per branch.
+- [x] Stop building the published mesh from `atlas.OutputMesh`; keep the
+      selected mesh's topology and publish atlas UVs on the corner domain. The
+      published mesh is built from the source soup, and the UVs are recovered
+      onto the source faces' corners through the shared chart-split mapping.
+- [x] Publish on the domain that can represent the result: corner when the
+      atlas cut a seam, vertex when it did not, so a mesh is not promoted to
+      corner UVs for nothing. Exactly one UV authority survives either way.
+- [x] Preserve the existing `NoChange` idempotence contract. The comparison
+      reads both UV domains, and the before-state now carries the mesh's
+      existing corner UVs, so a corner-UV rewrite is not mistaken for a no-op
+      and undo restores what was there.
+- [x] Keep reporting the GPU-side split count, now documented as upload
+      duplication rather than vertices added to the mesh — the same wording
+      correction `BUG-137` made for import.
+- [x] Verify the atlas-failure and authored-UV-preserved branches keep the same
+      topology guarantee, structurally rather than per branch:
+      `atlas.OutputMesh` is no longer used to build topology anywhere in this
+      path, only read for its UVs and cross-references, so every branch
+      inherits the guarantee from the single source-soup conversion.
 
 ## Tests
-- [ ] Contract test: regenerate UVs on a closed manifold fixture and assert
-      vertex/edge/halfedge counts and Euler characteristic are unchanged and no
-      vertex is on a boundary. Fails against the current source with the probe's
-      12→60 vertex split.
-- [ ] Contract test: UVs are resolved and finite afterwards, on the corner
-      domain, with no element-domain cardinality change.
-- [ ] Contract test: the seam-free case stays on the vertex domain, mirroring
+- [x] Contract test: regenerate UVs on a closed icosahedron and assert vertex,
+      edge, and face counts and the Euler characteristic are unchanged
+      (`UvRegenerationPreservesClosedManifoldTopology`). Against the unfixed
+      source it reports 60 vertices against 12, 60 edges against 30, and χ = 20
+      against 2 — the probe's split, reproduced as an assertion.
+- [x] Contract test: UVs are resolved and finite afterwards, on the corner
+      domain, count-matched to the halfedge count, with no element-domain
+      cardinality change and no surviving `v:texcoord` (same test). It also
+      asserts undo restores the unparameterized mesh and its topology.
+- [x] Contract test: the seam-free case stays on the vertex domain
+      (`UvRegenerationWithoutASeamStaysOnTheVertexDomain`), mirroring
       `DirectObjImportKeepsVertexUvsWhenTheAtlasNeedsNoSeam`.
-- [ ] The existing `UvRegenerationThatReproducesStoredUvsReportsNoChange`
-      idempotence case still passes.
-- [ ] Default CPU gate stays green.
+- [x] The existing `UvRegenerationThatReproducesStoredUvsReportsNoChange`
+      idempotence case still passes, now through a comparison that reads both
+      UV domains.
+- [x] Default CPU gate stays green: 4176/4176 with the expected
+      `GlfwLifecycleLsan` skip.
 
 ## Docs
-- [ ] Record that the corner-domain publication rule applies to every UV
-      producer, not only import, in `docs/architecture/geometry-api-style.md`.
+- [x] Record that the corner-domain publication rule applies to every UV
+      producer, not only import, in `docs/architecture/geometry-api-style.md`
+      ("Every UV producer publishes over the source topology").
 
 ## Acceptance criteria
-- [ ] Regenerating UVs on a closed manifold leaves it closed and manifold with
+- [x] Regenerating UVs on a closed manifold leaves it closed and manifold with
       its original counts.
-- [ ] UVs are present, finite, and corner-owned when the atlas produced a seam.
-- [ ] Split counts are still reported, described as upload duplication.
-- [ ] No dual authoritative mesh identity is introduced.
-- [ ] No layering violation.
+- [x] UVs are present, finite, and corner-owned when the atlas produced a seam.
+- [x] Split counts are still reported, described as upload duplication.
+- [x] No dual authoritative mesh identity is introduced: the atlas output is an
+      intermediate that is read and discarded, never published.
+- [x] No layering violation.
 
 ## Verification
 ```bash

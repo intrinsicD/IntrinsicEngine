@@ -7536,7 +7536,7 @@ the entity mesh — `BUG-137`'s exact defect, at an entry point slice C never
 touched. A closed icosahedron goes in as 12 V / 30 E / 60 H / 20 F and comes out
 as 60 V / 60 E / 120 H / 20 F, twenty charts for twenty faces, status `Applied`:
 it does not drop UVs, it converts the mesh into a triangle soup. That is
-[`BUG-147`](../backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md),
+[`BUG-147`](BUG-147-uv-regeneration-shatters-mesh-topology.md),
 filed with the probe as its repro and with `BUG-137`'s already-proven
 corner-domain publication as its fix shape, rather than widened into this task.
 
@@ -7544,3 +7544,59 @@ Two contract tests carry the work, both failing against the unfixed source, and
 the discard-reporting test cross-checks every reported outcome against what the
 entity actually holds afterwards rather than trusting the field. The default CPU
 gate passes 4174/4174 with its expected `GlfwLifecycleLsan` skip.
+
+## 2026-08-10 — BUG-147 retired
+
+[`BUG-147`](BUG-147-uv-regeneration-shatters-mesh-topology.md) — the editor's UV
+regeneration command replacing the mesh with the atlas chart-split mesh —
+retired on 2026-08-10. It was opened by `BUG-146`'s per-operation audit and
+closed in the following session.
+
+`BUG-137` established that a UV seam is a UV fact, not a topology fact, and
+removed `atlas.OutputMesh` from the import path so a closed manifold stays a
+closed manifold. The audit found the same construction still standing in the
+editor's "Regenerate UVs" command, which slice C never touched. Probed on a
+closed icosahedron: 12 V / 30 E / 60 H / 20 F in, 60 V / 60 E / 120 H / 20 F
+out, twenty charts for twenty faces, status `Applied`. An unwrapper emits a
+fresh output vertex per `(chart, source vertex)` pair, so publishing its output
+as the entity mesh does not merely add seams — it detaches every triangle. This
+was the sharper of the two defects that session found, because it fires on the
+one command a user reaches for precisely when they want a usable
+parameterization, and it silently undid `BUG-137` for that mesh.
+
+The fix reuses machinery that already existed and was already proven, which is
+why it stayed small. Recovering per-corner UVs from a chart-split output mesh —
+output face to source face, output vertex to source vertex, corner slot under a
+possibly rotated triangle, then the seam flag and the inheritance for corners
+the unwrapper dropped — was written once for import and sat private to asset
+materialization. It moved next to the corner walk and publish mapping it
+composes with, as a separate mechanical commit, and now takes the two
+cross-references directly instead of an unwrapper result type, so it does not
+depend on any particular atlas backend and is testable without one.
+
+The command then builds its published mesh from the source soup and maps the
+generated UVs back onto that mesh's own corners. Publication follows the domain
+that can represent the result: corner when the atlas cut a seam, vertex when it
+did not, so a mesh is never promoted to corner UVs for nothing. Exactly one UV
+authority survives either way. Because the conversion happens once, from the
+soup, the topology guarantee is structural rather than restated per branch —
+`atlas.OutputMesh` is no longer used to build topology anywhere in the path,
+including the atlas-failure and authored-UV branches.
+
+Two contracts needed widening to match. The no-change comparison read only the
+vertex domain, which would have called a corner-UV rewrite "unchanged" and
+published nothing; it now reads both. The before-state carried only vertex
+properties, so undo would not have restored corner UVs; it now forwards the
+mesh's existing corner UVs through the same corner walk `BUG-146` added for
+simplify, which is why that helper lost its simplify-specific name. And
+`SeamSplitVertexCount` is documented as GPU-side upload duplication rather than
+vertices added to the mesh — the same wording correction `BUG-137` made for
+import, made here before the number could be misread again.
+
+`UvRegenerationPreservesClosedManifoldTopology` pins the counts, the Euler
+characteristic, corner-domain UVs, the single surviving authority, and undo;
+against the unfixed source it reports 60 vertices against 12, 60 edges against
+30, and χ = 20 against 2. `UvRegenerationWithoutASeamStaysOnTheVertexDomain`
+guards the other side of the policy. The existing idempotence case still passes.
+The default CPU gate passes 4176/4176 with its expected `GlfwLifecycleLsan`
+skip.

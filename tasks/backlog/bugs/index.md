@@ -9,12 +9,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-147` — Editor UV regeneration replaces the mesh with the atlas chart-split mesh](BUG-147-uv-regeneration-shatters-mesh-topology.md):
-  "Regenerate UVs" publishes `ToHalfedgeMesh(atlas.OutputMesh)` as the entity
-  mesh, which is `BUG-137`'s defect at an entry point slice C never touched. A
-  closed icosahedron goes in as 12 V / 30 E / 60 H / 20 F and comes out as
-  60 V / 60 E / 120 H / 20 F — one chart per triangle — with status `Applied`.
-  Found by the [`BUG-146`](../../done/BUG-146-topology-edits-destroy-corner-uvs.md) per-operation audit.
 - [`BUG-134` — ImGui adapter panel draw-list test fails intermittently](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
   one default CPU run reported the panel draw-list contract as its sole
   failure, followed by ten passing isolated repetitions and a clean 4,103-case
@@ -49,6 +43,21 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-08-10: [`BUG-147` — Editor UV regeneration replaces the mesh with
+  the atlas chart-split
+  mesh](../../done/BUG-147-uv-regeneration-shatters-mesh-topology.md).
+  "Regenerate UVs" published `ToHalfedgeMesh(atlas.OutputMesh)` as the entity
+  mesh — `BUG-137`'s defect at an entry point its slice C never touched — so
+  the one command a user reaches for when they want a usable parameterization
+  silently converted the mesh into a triangle soup: a closed icosahedron went
+  in as 12 V / 30 E / 60 H / 20 F and came back as 60 V / 60 E / 120 H / 20 F,
+  twenty charts for twenty faces, reporting `Applied`. The published mesh is
+  now built from the source soup and the generated UVs are mapped back onto its
+  own corners, on the corner domain when the atlas cut a seam and the vertex
+  domain when it did not. `atlas.OutputMesh` is no longer used to build
+  topology anywhere in that path, so the guarantee is structural rather than
+  per branch.
+
 - Closed 2026-08-09: [`BUG-146` — Topology-changing mesh operations silently
   destroy corner-domain
   UVs](../../done/BUG-146-topology-edits-destroy-corner-uvs.md). Simplify now
@@ -59,7 +68,7 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   cannot carry UVs onto the topology they produce, so they now report the
   discard in both the result and the message instead of losing a
   parameterization under a success line. The audit's fourth target became
-  [`BUG-147`](BUG-147-uv-regeneration-shatters-mesh-topology.md).
+  [`BUG-147`](../../done/BUG-147-uv-regeneration-shatters-mesh-topology.md).
 
 - Closed 2026-08-09: [`BUG-137` — Direct mesh import replaces halfedge topology
   with the UV-atlas chart-split

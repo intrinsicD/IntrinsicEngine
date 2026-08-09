@@ -206,6 +206,14 @@ Two consequences for consumers:
   atlas has no choice but to cut the surface open. On a corner-owned mesh that
   proxy finds nothing, because there is no boundary to find — which is exactly
   how FA-QEM's `PreserveUvSeams` silently stopped protecting anything.
+- **Every UV producer publishes over the source topology, not the unwrapper's.**
+  An unwrapper emits a fresh output vertex per `(chart, source vertex)` pair, so
+  its output mesh carries the seam as duplicated topology. That output is an
+  intermediate: recover its per-corner UVs against the source faces and publish
+  them over the mesh that kept its own topology. Publishing the output mesh
+  itself converts a manifold into a triangle soup. This applies to every entry
+  point — asset import and the editor's UV regeneration command alike — not
+  only the one that was fixed first. See `BUG-137` and `BUG-147`.
 - **Leave exactly one authority behind.** A producer that publishes UVs on one
   domain must retire the other domain's property when its result supersedes it.
   A parameterization computes one UV per vertex, so publishing `v:texcoord`

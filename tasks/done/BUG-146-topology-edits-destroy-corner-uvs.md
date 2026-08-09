@@ -25,7 +25,7 @@ contracts:
   `7bba3100` (simplify preserves), `548cf690` (remesh/subdivide report their
   discard).
 - Follow-up opened by this task's audit:
-  [`BUG-147`](../backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md).
+  [`BUG-147`](BUG-147-uv-regeneration-shatters-mesh-topology.md).
 
 ## Goal
 - Stop mesh simplify (and the sibling topology-replacing operations) from
@@ -121,7 +121,7 @@ contracts:
 | Simplify | Preserve | Done. A collapse removes corners and the survivors keep their own UVs, which is the correct answer and is what lets `PreserveUvSeams` see a seam at all. |
 | Remesh | Discard, reported | Done. Re-tessellation produces corners with no source UV; resampling onto the new surface is a separate capability, not a side effect of this command. |
 | Subdivide | Discard, reported | Done. Same reason. Loop and Catmull-Clark UV rules exist and would be the eventual answer, but they are new work, not a repair. |
-| UV regeneration | Neither — it is a UV *producer*, and the audit found it broken in a different way | Spun out as [`BUG-147`](../backlog/bugs/BUG-147-uv-regeneration-shatters-mesh-topology.md). |
+| UV regeneration | Neither — it is a UV *producer*, and the audit found it broken in a different way | Spun out as [`BUG-147`](BUG-147-uv-regeneration-shatters-mesh-topology.md). |
 
 The UV-regeneration finding is worth stating plainly because it is not the
 defect this task set out to fix. That command builds the published mesh from
