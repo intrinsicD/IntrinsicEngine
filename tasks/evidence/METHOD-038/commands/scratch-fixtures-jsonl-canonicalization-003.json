@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -eu; method038_raw=tasks/evidence/METHOD-038/experiment/runs/scratch-003/raw_rows.jsonl; method038_compact=${method038_raw}.compact; jq -c . \"$method038_raw\" > \"$method038_compact\"; mv \"$method038_compact\" \"$method038_raw\""
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -eu; method038_raw=tasks/evidence/METHOD-038/experiment/runs/scratch-003/raw_rows.jsonl; method038_compact=${method038_raw}.compact; jq -c . \"$method038_raw\" > \"$method038_compact\"; mv \"$method038_compact\" \"$method038_raw\"'",
+  "cwd": ".",
+  "duration_ms": 3,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T18:36:16Z",
+  "label": "scratch-fixtures-jsonl-canonicalization-003",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T18:36:16Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/scratch-fixtures-jsonl-canonicalization-003.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/scratch-fixtures-jsonl-canonicalization-003.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "METHOD-038"
+}

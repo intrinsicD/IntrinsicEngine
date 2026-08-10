@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/workflow_evidence.py",
+    "validate",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/workflow_evidence.py validate --root .",
+  "cwd": ".",
+  "duration_ms": 7468,
+  "exit_code": 1,
+  "finished_at": "2026-08-10T19:09:19Z",
+  "label": "checkpoint2-workflow-global-bug150",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-08-10T19:09:12Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint2-workflow-global-bug150.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint2-workflow-global-bug150.stdout.log",
+  "stdout_sha256": "4d7e299a5cfffec7381ac195a2e3372412dd39d5b00fc51ada6ed707c06db009",
+  "task_id": "METHOD-038"
+}

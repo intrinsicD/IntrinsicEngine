@@ -9501,11 +9501,11 @@ tree:
     timestamp: "2026-08-10T19:35+02:00"
     also_depends_on: [N403]
     evidence:
-      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
-      - "tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-002/bundle.yaml"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-002/audit.json"
+      - "tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/inputs/automatic_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/inputs/fixed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/bundle.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/audit.json"
     result: >
       The frozen non-claim-eligible scratch replay bound to METHOD-038 checkpoint
       874d09c3 refuted exact two-component recovery by METHOD-037's Automatic
@@ -9516,4 +9516,32 @@ tree:
       recomputed the same failed/passed gates and rejected claim authorization.
       This is a bounded negative fixture result, not a remeshing-stability,
       acceleration, cold-curvature, runtime/UI, Vulkan, GPU, or v2 result.
+    status: resolved
+  - id: N406
+    type: experiment
+    title: "Exercise METHOD-037 across bounded cold, reusable, and continuous-boundary fixtures"
+    provenance: ai-executed
+    timestamp: "2026-08-10T20:43+02:00"
+    also_depends_on: [N403, N405]
+    evidence:
+      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-003/bundle.yaml"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-003/audit.json"
+      - "tasks/evidence/METHOD-038/experiment/inputs/remeshing_fixed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/inputs/remeshing_automatic_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/inputs/cold_fixed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/inputs/cold_automatic_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/inputs/reuse_fixed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/inputs/reuse_automatic_benchmark_result.json"
+    result: >
+      The frozen non-claim scratch replay bound to implementation commit
+      a944b1a1 validated all six schema-v2 results. Fixed passed the expected
+      two-component planar and one-component cold/reusable sphere gates, with
+      0.005 maximum label error and a 0.007071061 normalized planar symmetric-
+      Hausdorff upper bound. Automatic selected four components in every lane;
+      its sphere-pair dominant-label error was 0.656. The independent audit
+      recomputed all five Fixed passes and four Automatic failures. This rejects
+      semantic-count stability for the unchanged Automatic selector on these
+      fixtures only; it is not a general remeshing, convergence, performance,
+      runtime/UI, GPU, or v2 result.
     status: resolved

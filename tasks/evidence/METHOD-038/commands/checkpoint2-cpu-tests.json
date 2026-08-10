@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 57842,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T18:40:53Z",
+  "label": "checkpoint2-cpu-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T18:39:55Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint2-cpu-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint2-cpu-tests.stdout.log",
+  "stdout_sha256": "7ac2b6776b95d488d1b723efdeef56d3b4f22bacb39b8d565a54ee59b7f97f6a",
+  "task_id": "METHOD-038"
+}

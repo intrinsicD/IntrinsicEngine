@@ -1,0 +1,137 @@
+{
+  "attempt_id": "attempt-003",
+  "audited_at": "2026-08-10T18:43:23Z",
+  "audited_revision": "a944b1a1537ec9dc90ef2da75384f3ad515f0924",
+  "auditor_label": "codex-method038-fixture-auditor-20260810-r1",
+  "bundle_path": "tasks/evidence/METHOD-038/experiment/runs/scratch-003/bundle.yaml",
+  "bundle_sha256": "5ad876e7bd68f01fa4c65c1bbb00d6d8c1258958b0417aa7eb59f61402614216",
+  "claim_authorized": false,
+  "disposition": "accepted",
+  "driver_label": "codex-root",
+  "errors": [],
+  "identity_assurance": "cooperative-label-only",
+  "recomputed_gates": [
+    {
+      "metric": "fixed_boundary_error",
+      "observed": 0.007071061,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.02
+    },
+    {
+      "metric": "fixed_transition_population",
+      "observed": 2.0,
+      "operator": "==",
+      "passed": true,
+      "threshold": 2
+    },
+    {
+      "metric": "fixed_cold_population",
+      "observed": 1.0,
+      "operator": "==",
+      "passed": true,
+      "threshold": 1
+    },
+    {
+      "metric": "fixed_reuse_population",
+      "observed": 1.0,
+      "operator": "==",
+      "passed": true,
+      "threshold": 1
+    },
+    {
+      "metric": "fixed_max_label_error",
+      "observed": 0.005,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.02
+    },
+    {
+      "metric": "automatic_transition_population",
+      "observed": 4.0,
+      "operator": "==",
+      "passed": false,
+      "threshold": 2
+    },
+    {
+      "metric": "automatic_cold_population",
+      "observed": 4.0,
+      "operator": "==",
+      "passed": false,
+      "threshold": 1
+    },
+    {
+      "metric": "automatic_reuse_population",
+      "observed": 4.0,
+      "operator": "==",
+      "passed": false,
+      "threshold": 1
+    },
+    {
+      "metric": "automatic_max_label_error",
+      "observed": 0.656,
+      "operator": "<=",
+      "passed": false,
+      "threshold": 0.02
+    }
+  ],
+  "recomputed_summaries": [
+    {
+      "column": "fixed_boundary_error",
+      "name": "fixed_boundary_error",
+      "statistic": "mean",
+      "value": 0.007071061
+    },
+    {
+      "column": "fixed_transition_population",
+      "name": "fixed_transition_population",
+      "statistic": "mean",
+      "value": 2.0
+    },
+    {
+      "column": "fixed_cold_population",
+      "name": "fixed_cold_population",
+      "statistic": "mean",
+      "value": 1.0
+    },
+    {
+      "column": "fixed_reuse_population",
+      "name": "fixed_reuse_population",
+      "statistic": "mean",
+      "value": 1.0
+    },
+    {
+      "column": "fixed_max_label_error",
+      "name": "fixed_max_label_error",
+      "statistic": "mean",
+      "value": 0.005
+    },
+    {
+      "column": "automatic_transition_population",
+      "name": "automatic_transition_population",
+      "statistic": "mean",
+      "value": 4.0
+    },
+    {
+      "column": "automatic_cold_population",
+      "name": "automatic_cold_population",
+      "statistic": "mean",
+      "value": 4.0
+    },
+    {
+      "column": "automatic_reuse_population",
+      "name": "automatic_reuse_population",
+      "statistic": "mean",
+      "value": 4.0
+    },
+    {
+      "column": "automatic_max_label_error",
+      "name": "automatic_max_label_error",
+      "statistic": "mean",
+      "value": 0.656
+    }
+  ],
+  "run_id": "scratch-003",
+  "schema_version": 1,
+  "task_id": "METHOD-038"
+}

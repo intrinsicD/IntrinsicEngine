@@ -1,0 +1,60 @@
+schema_version: 1
+task_id: METHOD-038
+run_id: scratch-003
+attempt_id: attempt-003
+status: initialized
+initialized_at: '2026-08-10T18:34:03Z'
+claim_eligible: false
+protocol_path: tasks/evidence/METHOD-038/experiment/protocol.yaml
+protocol_digest: 668f2bc8df6f1b3b51c1007691c23d0a9019b9e3e2dc14cab3fd2e8f97ab92ad
+task_path: tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+task_sha256: 57665009f655fca04f6c4fb12a723c3612b19a293fe02dded22c564f247923ee
+source:
+  revision: a944b1a1537ec9dc90ef2da75384f3ad515f0924
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_fixed.yaml
+  sha256: 47d87f48cd27d3e12fcd431fcb79912071719288100159b9bf8a496c880b5e06
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+datasets:
+- id: curvature-transition-grid-pair-10k-v1
+  path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: a98afaba7b0536e0ddf8773b96a728e1821551931181a019d698a198809bc0c0
+  split: scratch
+- id: unit-sphere-diagonal-pair-10k-v1
+  path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: a98afaba7b0536e0ddf8773b96a728e1821551931181a019d698a198809bc0c0
+  split: scratch
+implementation_digest: 171d85396b86f385db3806ace24de34630974b6f9b9b9074771d30bce31960db
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel
+  2; result_root=build/ci/custody/METHOD-038-scratch-003-raw; producer_status=0; env INTRINSIC_CURVATURE_PROFILE_COHORT=fixtures
+  GIT_COMMIT=a944b1a1537ec9dc90ef2da75384f3ad515f0924 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicCurvatureSegmentationProfile --output "$result_root" --manifests-root benchmarks
+  --run-id method-038-scratch-003 --attempt-id attempt-003 || producer_status=$?; test "$producer_status"
+  -eq 1; python3 tools/benchmark/validate_benchmark_results.py --root "$result_root" --manifests-root
+  benchmarks --strict; input_root=tasks/evidence/METHOD-038/experiment/inputs; run_root=tasks/evidence/METHOD-038/experiment/runs/scratch-003;
+  mkdir -p "$input_root"; cp "$result_root/geometry.curvature_segmentation.reference.remeshing.10k.fixed.json"
+  "$input_root/remeshing_fixed_benchmark_result.json"; cp "$result_root/geometry.curvature_segmentation.reference.remeshing.10k.automatic.json"
+  "$input_root/remeshing_automatic_benchmark_result.json"; cp "$result_root/geometry.curvature_segmentation.reference.profile.10k.cold.fixed.json"
+  "$input_root/cold_fixed_benchmark_result.json"; cp "$result_root/geometry.curvature_segmentation.reference.profile.10k.cold.automatic.json"
+  "$input_root/cold_automatic_benchmark_result.json"; cp "$result_root/geometry.curvature_segmentation.reference.profile.10k.reuse.fixed.json"
+  "$input_root/reuse_fixed_benchmark_result.json"; cp "$result_root/geometry.curvature_segmentation.reference.profile.10k.reuse.automatic.json"
+  "$input_root/reuse_automatic_benchmark_result.json"; jq -n --slurpfile rf "$input_root/remeshing_fixed_benchmark_result.json"
+  --slurpfile ra "$input_root/remeshing_automatic_benchmark_result.json" --slurpfile cf "$input_root/cold_fixed_benchmark_result.json"
+  --slurpfile ca "$input_root/cold_automatic_benchmark_result.json" --slurpfile uf "$input_root/reuse_fixed_benchmark_result.json"
+  --slurpfile ua "$input_root/reuse_automatic_benchmark_result.json" '{fixed_boundary_error:$rf[0].metrics.quality_error_linf,fixed_transition_population:$rf[0].metrics.population_count,fixed_cold_population:$cf[0].metrics.population_count,fixed_reuse_population:$uf[0].metrics.population_count,fixed_max_label_error:([$rf[0].metrics.quality_error_l2,$cf[0].metrics.quality_error_l2,$uf[0].metrics.quality_error_l2]|max),automatic_transition_population:$ra[0].metrics.population_count,automatic_cold_population:$ca[0].metrics.population_count,automatic_reuse_population:$ua[0].metrics.population_count,automatic_max_label_error:([$ra[0].metrics.quality_error_l2,$ca[0].metrics.quality_error_l2,$ua[0].metrics.quality_error_l2]|max)}'
+  > "$run_root/raw_rows.jsonl"; jq -e '.execution_status == "passed" and .status == "passed"' "$input_root/remeshing_fixed_benchmark_result.json"
+  "$input_root/cold_fixed_benchmark_result.json" "$input_root/reuse_fixed_benchmark_result.json" >/dev/null;
+  jq -e '.execution_status == "failed" and .status == "failed"' "$input_root/remeshing_automatic_benchmark_result.json"
+  "$input_root/cold_automatic_benchmark_result.json" "$input_root/reuse_automatic_benchmark_result.json"
+  >/dev/null
+cell_journal: tasks/evidence/METHOD-038/experiment/runs/scratch-003/cells.jsonl
+bundle: tasks/evidence/METHOD-038/experiment/runs/scratch-003/bundle.yaml
+audit: tasks/evidence/METHOD-038/experiment/runs/scratch-003/audit.json

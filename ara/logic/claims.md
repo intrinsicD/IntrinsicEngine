@@ -1208,3 +1208,41 @@
 - **Tags**: geometry, curvature segmentation, automatic selection, CPU reference,
   negative result, scratch
 - **From staging**: O142
+
+## C41: Bounded fixture lanes preserve Fixed counts but refute Automatic count stability
+- **Statement**: On exact implementation commit
+  `a944b1a1537ec9dc90ef2da75384f3ad515f0924`, METHOD-038 scratch run 003
+  rejects the hypothesis that METHOD-037's unchanged Automatic selector
+  recovers the planted semantic component counts across the paired planar
+  transition, cold-curvature sphere, and reusable-curvature sphere fixtures;
+  the matched Fixed controls satisfy their frozen population, label-error, and
+  continuous planar-boundary gates.
+- **Status**: refuted — non-claim-eligible serial `cpu_reference_v1` scratch
+  only; Fixed recorded populations `2/1/1`, maximum label error `0.005`, and
+  normalized planar symmetric-Hausdorff upper bound `0.007071061`, while
+  Automatic recorded populations `4/4/4` and maximum label error `0.656`; no
+  selector, public API, runtime/config/UI path, default, or v2 backend changed
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Repeating the exact frozen protocol and source
+  makes Automatic satisfy the expected `2/1/1` populations and the `0.02`
+  maximum label-error gate, or makes any Fixed control fail its population,
+  label-error, or normalized planar boundary gate.
+- **Proof**: [benchmarks/runners/CurvatureSegmentationProfileRunner.cpp,
+  benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_fixed.yaml,
+  benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_cold_fixed.yaml,
+  benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_reuse_fixed.yaml,
+  tasks/evidence/METHOD-038/experiment/protocol.yaml,
+  tasks/evidence/METHOD-038/experiment/inputs/remeshing_fixed_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/inputs/remeshing_automatic_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/inputs/cold_fixed_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/inputs/cold_automatic_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/inputs/reuse_fixed_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/inputs/reuse_automatic_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-003/bundle.yaml,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-003/audit.json]
+- **Dependencies**: [C38, C40]
+- **Tags**: geometry, curvature segmentation, cold descriptors, remeshing
+  fixture, continuous boundary, automatic selection, CPU reference, negative
+  result, scratch
+- **From staging**: O143

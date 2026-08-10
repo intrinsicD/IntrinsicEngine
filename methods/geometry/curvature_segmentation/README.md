@@ -96,6 +96,19 @@ control selected two. The independent
 rejected claim authorization as intended. This is bounded negative evidence
 (ARA C40), not a reason to retune or change the production default.
 
+The current non-claim-eligible
+[`scratch-003` protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml)
+extends that screen across the new fixture lanes. Fixed selected the expected
+two planar-transition components and one sphere component in both cold and
+reusable lanes; its maximum label error was `0.005`, and the planar continuous-
+boundary upper bound was `0.007071061` against the frozen `0.02` tolerance.
+Automatic selected four components in all three lanes and reached `0.656`
+maximum label error on the sphere pair. The independent
+[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-003/audit.json)
+accepted the bundle derivation while leaving `claim_authorized: false` (ARA
+C41). This is a bounded negative fixture result, not a curved-surface geodesic,
+refinement-convergence, performance, or candidate-v2 result.
+
 There is no selected v2, optimized, or GPU backend. The output is deliberately
 non-destructive and makes no atlas-quality claim. `GEOM-076` owns the later,
 evidence-gated decision about converting accepted boundaries into cuts and UV

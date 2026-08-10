@@ -1,0 +1,157 @@
+{
+  "attempt_id": "attempt-003",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.reference.profile.10k.reuse.fixed",
+  "claim_eligible": false,
+  "commit": "a944b1a1537ec9dc90ef2da75384f3ad515f0924",
+  "config_digest": "b4ecc638a04b4c83c48b4d24cc5313e0ae3e3685aa60b2db3adf7b7bfe7172ba",
+  "dataset": "builtin.unit_sphere_diagonal_pair.v1",
+  "diagnostics": {
+    "aggregation": "max_of_diagonal_pair_medians",
+    "descriptor_lane": "reusable_precomputed_curvature",
+    "implementation_version": "cpu_reference_v1",
+    "quality_error_l2_unit": "dominant_component_misclassified_face_fraction",
+    "runner": "IntrinsicCurvatureSegmentationProfile",
+    "variants": [
+      {
+        "candidates": [
+          {
+            "component_count": 1,
+            "fit_ms": 10.632982,
+            "iterations": 1,
+            "selected": true
+          }
+        ],
+        "connectivity_publication_ms": 2.190881,
+        "curvature_estimation_ms": 0.0,
+        "descriptor_setup_ms": 126.73601,
+        "dual_edge_count": 15000,
+        "dual_graph_construction_ms": 9.922843,
+        "face_aggregation_ms": 6.435828,
+        "face_count": 10000,
+        "gmm_fitting_ms": 18.308039,
+        "misclassified_face_fraction": 0.0,
+        "name": "diagonal_a",
+        "segmentation_total_ms": 44.723593,
+        "selected_component_count": 1,
+        "spatial_iterations": 1,
+        "spatial_optimization_ms": 0.696385,
+        "unary_construction_ms": 7.087768
+      },
+      {
+        "candidates": [
+          {
+            "component_count": 1,
+            "fit_ms": 10.576914,
+            "iterations": 1,
+            "selected": true
+          }
+        ],
+        "connectivity_publication_ms": 2.154528,
+        "curvature_estimation_ms": 0.0,
+        "descriptor_setup_ms": 121.791501,
+        "dual_edge_count": 15000,
+        "dual_graph_construction_ms": 9.488279,
+        "face_aggregation_ms": 6.154115,
+        "face_count": 10000,
+        "gmm_fitting_ms": 18.270684,
+        "misclassified_face_fraction": 0.0,
+        "name": "diagonal_b",
+        "segmentation_total_ms": 44.070196,
+        "selected_component_count": 1,
+        "spatial_iterations": 1,
+        "spatial_optimization_ms": 0.687354,
+        "unary_construction_ms": 7.125692
+      }
+    ]
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_reuse_fixed.yaml",
+    "sha256": "7b6841f99de05b2827a118cb20ecf1af76b452756d275242814377bc2f0f0292"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "memory_peak_bytes": 12861440,
+    "population_count": 1,
+    "quality_error_l2": 0.0,
+    "runtime_ms": 44.723593
+  },
+  "resolved_params": {
+    "aggregation": "max_of_diagonal_pair_medians",
+    "backend": "cpu_reference_v1",
+    "component_count": 1,
+    "component_selection": "fixed",
+    "descriptor_lane": "reusable_precomputed_curvature",
+    "intent": "fixture_screen",
+    "live_faces": 10000,
+    "measured_iterations": 3,
+    "quality_error_l2_unit": "dominant_component_misclassified_face_fraction",
+    "threshold_scope": "harness_health_not_acceleration",
+    "triangulations": [
+      "diagonal_a",
+      "diagonal_b"
+    ],
+    "warmup_iterations": 1
+  },
+  "run_id": "method-038-scratch-003",
+  "schema_version": 2,
+  "source": {
+    "revision": "a944b1a1537ec9dc90ef2da75384f3ad515f0924",
+    "state": "unverified_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 10000,
+      "metric": "runtime_ms",
+      "observed": 44.723593,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "fixture_runtime_ms_max"
+    },
+    {
+      "limit": 2147483648,
+      "metric": "memory_peak_bytes",
+      "observed": 12861440,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "memory_peak_bytes_max"
+    },
+    {
+      "limit": 0.02,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 1,
+      "metric": "population_count",
+      "observed": 1,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "population_count_min"
+    },
+    {
+      "limit": 1,
+      "metric": "population_count",
+      "observed": 1,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "population_count_max"
+    }
+  ],
+  "thresholds": {
+    "fixture_runtime_ms_max": 10000,
+    "memory_peak_bytes_max": 2147483648,
+    "population_count_max": 1,
+    "population_count_min": 1,
+    "quality_error_l2_max": 0.02
+  },
+  "warmup_policy": {
+    "measured_iterations": 3,
+    "warmup_iterations": 1
+  }
+}

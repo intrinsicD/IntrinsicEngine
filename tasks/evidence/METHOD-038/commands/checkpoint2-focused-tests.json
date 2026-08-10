@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests --parallel 2; ctest --test-dir build/ci --output-on-failure -R 'CurvatureSegmentation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests --parallel 2; ctest --test-dir build/ci --output-on-failure -R '\"'\"'CurvatureSegmentation'\"'\"' -LE '\"'\"'gpu|vulkan|slow|flaky-quarantine'\"'\"' --timeout 120'",
+  "cwd": ".",
+  "duration_ms": 42026,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T18:39:01Z",
+  "label": "checkpoint2-focused-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T18:38:19Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint2-focused-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint2-focused-tests.stdout.log",
+  "stdout_sha256": "c815d4b66189758966c436fe855221be2dfc217fd68363a85997c9a42a9e5cb5",
+  "task_id": "METHOD-038"
+}

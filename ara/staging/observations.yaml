@@ -2527,3 +2527,27 @@ observations:
     promoted_to: "logic/claims.md:C40"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O143
+    timestamp: "2026-08-10T20:43+02:00"
+    provenance: ai-executed
+    content: >
+      On METHOD-038's bounded 10k fixture cohort, the unchanged METHOD-037
+      Fixed selector satisfies the planted component-count, label-error, and
+      planar continuous-boundary gates, while Automatic oversegments the planar,
+      cold-curvature sphere, and reusable-curvature sphere lanes to four
+      components and fails the sphere quality gate.
+    context: >
+      Scratch run 003 is non-claim-eligible and binds exact implementation,
+      manifest, source, task, result, raw-row, receipt, and bundle hashes. Fixed
+      recorded populations 2/1/1, maximum label error 0.005, and normalized
+      planar boundary upper bound 0.007071061. Automatic recorded populations
+      4/4/4 and maximum label error 0.656. An independent audit accepted the
+      custody and recomputation but retained claim_authorized=false. The result
+      is limited to these fixtures and makes no convergence, acceleration,
+      curved-geodesic, runtime/UI, GPU, or v2 statement.
+    potential_type: claim
+    bound_to: [N406]
+    promoted: true
+    promoted_to: "logic/claims.md:C41"
+    crystallized_via: artifact-commitment
+    stale: false
