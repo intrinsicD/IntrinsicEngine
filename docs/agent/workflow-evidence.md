@@ -152,6 +152,48 @@ python3 tools/agents/agent_work_graph.py reopen \
   --reason "Address blocking review findings"
 ```
 
+`reopen` is the bounded repair transition inside one slice: it retains that
+node's attempt count and rejects an exhausted budget. A task whose checked-in
+`## Slice plan` declares another implementation slice uses `advance-slice`
+instead. The transition preserves the run identity and append-only event chain,
+records the prior node/source projection and its `reviewed` disposition, then
+starts the selected plan subgraph with fresh per-slice attempt counters at the
+exact clean `HEAD` commit:
+
+```bash
+python3 tools/agents/agent_work_graph.py advance-slice \
+  --task-id PROC-999 --owner agent-label --from-node plan \
+  --reason "Begin the next declared slice"
+```
+
+The task must remain under `tasks/active/`, its live claim generation, owner,
+branch, worktree, profile, and checked-in recipe must match exactly, and the
+worktree must be clean. The reset root and its descendants must contain every
+active write node and the final surface binder; nodes outside that region must
+already have succeeded. Notes and ancestors are retained, while status,
+attempts, actors, timestamps, outcomes, artifacts, and surface bindings reset
+only inside the selected region. `show` and `list` expose the resulting slice
+index. Runs created before slice indexing are read as slice 1.
+
+There is one narrow recovery form for a committed source change after the last
+writer succeeded but before any downstream review/freeze node started. The
+operator must inspect and acknowledge both facts explicitly:
+
+```bash
+python3 tools/agents/agent_work_graph.py advance-slice \
+  --task-id PROC-999 --owner agent-label --from-node plan \
+  --reason "Roll the clean checkpoint into the next declared slice" \
+  --accept-pre-review-checkpoint --accept-stale-source
+```
+
+That event is recorded as `rolled-forward-before-review`, including the
+accepted stale bindings. It is not review evidence. Advancement rejects dirty
+state, inactive or plan-less tasks, claim/profile/recipe drift, running nodes,
+failed or blocked outcomes, any started downstream review attempt, and reset
+regions that omit a writer or final binder. A stale reviewed/final binding also
+requires `--accept-stale-source`; the flag acknowledges a committed transition
+to the next baseline and never permits dirty bytes.
+
 Later conversational input is attached to the node where it must be honored,
 without mutating graph topology:
 

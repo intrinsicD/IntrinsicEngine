@@ -118,9 +118,9 @@ contracts: [repo.task-contract-discovery, repo.agent-work-graph]
 
 ## Verification
 ```bash
-python3 -m unittest tests.regression.tooling.Test.AgentWorkGraph
-python3 -m unittest tests.regression.tooling.Test.TaskClaim
-python3 -m unittest tests.regression.tooling.Test.WorkflowEvidence
+python3 tests/regression/tooling/Test.AgentWorkGraph.py
+python3 tests/regression/tooling/Test.TaskClaim.py
+python3 tests/regression/tooling/Test.WorkflowEvidence.py
 python3 tools/agents/agent_work_graph.py validate-recipe \
   --recipe tools/agents/work_graphs/review-diamond.v1.json
 python3 tools/agents/validate_tasks.py --root tasks --strict

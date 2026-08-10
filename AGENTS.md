@@ -419,7 +419,10 @@ Every task execution should follow this sequence:
    Git-common-dir state binds the exact claim generation and writer-frozen
    review surface, but remains observability and control flow only: it never
    replaces the task, claim, verification receipt, fixed-surface review, or
-   experiment custody, and it cannot lower the task profile.
+   experiment custody, and it cannot lower the task profile. A task with a
+   declared `## Slice plan` uses the audited `advance-slice` transition between
+   clean slice cycles; `reopen` remains the bounded repair loop within one
+   cycle.
 5. Implement the smallest useful patch.
 6. Add or update tests.
 7. Add or update docs.

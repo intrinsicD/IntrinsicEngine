@@ -19,10 +19,11 @@ Agent workflow and task policy tooling.
   generation and no daemon is involved.
 - `agent_work_graph.py` validates checked-in schema-v1 work-graph recipes and
   manages one claimed non-micro task's live node state, bounded reopen,
-  exact-generation claim-handoff resume, node-addressed notes, permission
-  checks, writer-frozen review binding, locked inspection, terminal surface
-  binding, and hash-chained event trace in the Git common directory. It never
-  launches an agent or replaces task/evidence/review authority.
+  audited next-slice advancement from an exact clean commit, exact-generation
+  claim-handoff resume, node-addressed notes, permission checks, writer-frozen
+  review binding, locked inspection, terminal surface binding, and hash-chained
+  event trace in the Git common directory. It never launches an agent or
+  replaces task/evidence/review authority.
 - `check_task_maturity_followups.py` validates that open backend-facing `CPUContracted` maturity closures name an operational owner or explicitly state that no operational follow-up is owed. Invoked by `check_task_policy.py`.
 - `check_task_state_links.py` validates that task links and nearby lifecycle status claims agree with the actual `tasks/backlog/`, `tasks/active/`, and `tasks/done/` location of the referenced task ID. Runs strict in `ci-docs.yml`.
 - `check_codex_config.py` validates `.codex/config.yaml` stays meaningful and policy-light (delegating authority to `AGENTS.md` rather than duplicating it). Runs strict in `ci-docs.yml`.

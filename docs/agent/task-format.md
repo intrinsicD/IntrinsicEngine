@@ -177,10 +177,25 @@ and its descendants.
 Use `show` to expose the current/ready nodes, `note` to attach later ideas or
 constraints to the step where they must be honored, and `reopen` to invalidate
 the write node's descendants after blocking review findings or any source
-change past the writer-frozen review digest. Micro tasks are exempt. The live
-graph never grants a claim, changes task dependencies, lowers the workflow
-profile, or satisfies completion evidence; those authorities remain in the
-task front-matter, claim ledger, and profile-specific evidence described in
+change past the writer-frozen review digest. `reopen` spends the current
+slice's bounded attempt budget; it does not start another declared slice.
+
+A multi-slice task that may continue under one claim/run includes a non-empty
+`## Slice plan`. After a complete reviewed cycle, use `advance-slice --from-node
+plan` to record the prior disposition, bind the next slice to the exact clean
+`HEAD`, and reset only that plan/write/review subgraph's attempt counters. A
+clean writer-complete checkpoint whose downstream review nodes never started
+requires the explicit `--accept-pre-review-checkpoint` acknowledgement; stale
+writer/review bindings additionally require `--accept-stale-source`. The
+command rejects inactive tasks, dirty state, started/failed review cycles,
+claim/profile/recipe drift, and a reset root that omits an active writer or the
+final binder. See [`workflow-evidence.md`](workflow-evidence.md) for the exact
+transition contract.
+
+Micro tasks are exempt. The live graph never grants a claim, changes task
+dependencies, lowers the workflow profile, or satisfies completion evidence;
+those authorities remain in the task front-matter, claim ledger, and
+profile-specific evidence described in
 [`workflow-evidence.md`](workflow-evidence.md).
 
 ## Micro tasks

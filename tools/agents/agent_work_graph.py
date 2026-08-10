@@ -9,6 +9,7 @@ verification receipts, independent review, or experiment custody.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -635,6 +636,7 @@ def _commit_event(
         "schema_version": RUN_SCHEMA_VERSION,
         "run_id": state["run_id"],
         "task_id": state["task_id"],
+        "slice_index": state["source"].get("slice_index", 1),
         "recorded_at": utc_now(),
         "event": event_type,
         **payload,
@@ -750,6 +752,7 @@ def start(args: argparse.Namespace) -> int:
             "sha256": sha256_file(recipe_path),
         },
         "source": {
+            "slice_index": 1,
             "base_ref": args.base_ref,
             "base_revision": base_revision,
             "head_revision_at_start": git(repo_root, "rev-parse", "HEAD"),
@@ -924,6 +927,7 @@ def show(args: argparse.Namespace) -> int:
         derived = payload["derived"]
         print(
             f"{payload['task_id']} run={payload['run_id']} "
+            f"slice={payload['source'].get('slice_index', 1)} "
             f"profile={payload['task_profile']} status={derived['status']}"
         )
         for node_id, node in payload["nodes"].items():
@@ -952,6 +956,7 @@ def list_runs(args: argparse.Namespace) -> int:
         for payload in payloads:
             print(
                 f"{payload['task_id']} owner={payload['owner']} "
+                f"slice={payload['source'].get('slice_index', 1)} "
                 f"status={payload['derived']['status']} "
                 f"ready={payload['derived']['ready_nodes']}"
             )
@@ -1145,6 +1150,240 @@ def reopen(args: argparse.Namespace) -> int:
     return 0
 
 
+def advance_slice(args: argparse.Namespace) -> int:
+    """Begin another declared task slice without erasing the prior cycle."""
+    repo_root = repo_root_from(args.root)
+    with _state_lock(_work_graph_root(repo_root)):
+        state = _load_state(repo_root, args.task_id)
+        if state["status"] == "aborted":
+            raise WorkGraphError("aborted work graphs cannot advance a slice")
+
+        task_path = find_task(repo_root, state["task_id"])
+        parsed, metadata = load_task_metadata(task_path)
+        task_relative = relative_path(repo_root, task_path)
+        if not task_relative.startswith("tasks/active/"):
+            raise WorkGraphError("advance-slice requires a task under tasks/active/")
+        if not parsed.section_bodies.get("Slice plan", "").strip():
+            raise WorkGraphError("advance-slice requires a non-empty ## Slice plan")
+        if metadata.get("workflow_profile") != state["task_profile"]:
+            raise WorkGraphError("task workflow profile changed")
+
+        claim = _load_live_claim(repo_root, state["task_id"])
+        if args.owner != claim["owner"] or args.owner != state["owner"]:
+            raise WorkGraphError(
+                f"owner {args.owner!r} does not match the work graph and live "
+                f"claim owner {claim['owner']!r}"
+            )
+        claim_reasons = _claim_binding_reasons(state, claim, metadata)
+        if claim_reasons or state["source"].get("claim") != _claim_identity(claim):
+            detail = "; ".join(claim_reasons) or "claim generation is not exact"
+            raise WorkGraphError("work graph claim binding changed: " + detail)
+
+        recipe, recipe_reasons = _recipe_for_state(repo_root, state)
+        if recipe_reasons:
+            raise WorkGraphError(
+                "work graph recipe changed: " + "; ".join(recipe_reasons)
+            )
+        nodes = _node_map(recipe)
+        if args.from_node not in nodes:
+            raise WorkGraphError(f"unknown node: {args.from_node}")
+        active = {
+            node_id
+            for node_id, definition in nodes.items()
+            if _profile_active(
+                state["task_profile"], definition["minimum_profile"]
+            )
+        }
+        if args.from_node not in active:
+            raise WorkGraphError(
+                f"slice root {args.from_node} is inactive for profile "
+                f"{state['task_profile']}"
+            )
+        reset = {args.from_node, *_descendants(recipe, args.from_node)}
+        required_reset = {
+            node_id
+            for node_id in active
+            if nodes[node_id]["permission"] == "write"
+            or nodes[node_id]["binds_surface"]
+        }
+        missing_reset = sorted(required_reset - reset)
+        if missing_reset:
+            raise WorkGraphError(
+                "slice reset region must contain every active writer and final "
+                "surface binder; missing: " + ", ".join(missing_reset)
+            )
+
+        running = sorted(
+            node_id
+            for node_id in active
+            if state["nodes"][node_id]["status"] == "running"
+        )
+        if running:
+            raise WorkGraphError(
+                "cannot advance a slice while nodes are running: "
+                + ", ".join(running)
+            )
+        failed = sorted(
+            node_id
+            for node_id in active
+            if state["nodes"][node_id]["status"] in {"failed", "blocked"}
+        )
+        if failed:
+            raise WorkGraphError(
+                "cannot advance a failed or blocked cycle: " + ", ".join(failed)
+            )
+        incomplete_ancestors = sorted(
+            node_id
+            for node_id in active - reset
+            if state["nodes"][node_id]["status"] != "succeeded"
+        )
+        if incomplete_ancestors:
+            raise WorkGraphError(
+                "nodes outside the slice reset region must be succeeded: "
+                + ", ".join(incomplete_ancestors)
+            )
+
+        stale, _ = _stale_reasons(repo_root, state, recipe_reasons)
+        allowed_stale = {
+            "review source binding is stale",
+            "final source binding is stale",
+        }
+        blocking_stale = sorted(set(stale) - allowed_stale)
+        if blocking_stale:
+            raise WorkGraphError("work graph is stale: " + "; ".join(blocking_stale))
+        accepted_stale = sorted(set(stale) & allowed_stale)
+        if accepted_stale and not args.accept_stale_source:
+            raise WorkGraphError(
+                "source binding is stale; inspect the committed change and rerun "
+                "with --accept-stale-source"
+            )
+
+        fully_succeeded = all(
+            state["nodes"][node_id]["status"] == "succeeded" for node_id in active
+        )
+        if fully_succeeded:
+            prior_disposition = "reviewed"
+        else:
+            writers = [
+                node_id
+                for node_id in _topological_order(recipe)
+                if node_id in active and nodes[node_id]["permission"] == "write"
+            ]
+            last_writer = writers[-1]
+            post_writer = _descendants(recipe, last_writer) & active
+            completed_prefix = active - post_writer
+            incomplete_prefix = sorted(
+                node_id
+                for node_id in completed_prefix
+                if state["nodes"][node_id]["status"] != "succeeded"
+            )
+            attempted_review = sorted(
+                node_id
+                for node_id in post_writer
+                if state["nodes"][node_id]["attempts"] != 0
+                or state["nodes"][node_id]["status"] not in {"pending", "ready"}
+            )
+            if incomplete_prefix or attempted_review:
+                details: list[str] = []
+                if incomplete_prefix:
+                    details.append(
+                        "incomplete pre-review nodes: " + ", ".join(incomplete_prefix)
+                    )
+                if attempted_review:
+                    details.append(
+                        "started review descendants: " + ", ".join(attempted_review)
+                    )
+                raise WorkGraphError(
+                    "only a fully reviewed cycle or an unstarted pre-review "
+                    "checkpoint may advance; " + "; ".join(details)
+                )
+            if not args.accept_pre_review_checkpoint:
+                raise WorkGraphError(
+                    "cycle has not been reviewed; rerun with "
+                    "--accept-pre-review-checkpoint to record the roll-forward"
+                )
+            prior_disposition = "rolled-forward-before-review"
+
+        dirty = git(repo_root, "status", "--porcelain=v1", "--untracked-files=all")
+        if dirty:
+            raise WorkGraphError("advance-slice requires a clean worktree")
+
+        prior_slice = state["source"].get("slice_index", 1)
+        if type(prior_slice) is not int or prior_slice < 1:
+            raise WorkGraphError("work graph source slice_index is invalid")
+        prior_nodes = copy.deepcopy(state["nodes"])
+        prior_source = copy.deepcopy(state["source"])
+        prior_source.setdefault("slice_index", prior_slice)
+
+        head_revision = git(repo_root, "rev-parse", "HEAD")
+        entries, digest = _source_snapshot(
+            repo_root, head_revision, state["task_id"]
+        )
+        if entries:
+            raise WorkGraphError(
+                "advance-slice could not establish an empty exact-HEAD baseline"
+            )
+        for node_id in reset:
+            definition = nodes[node_id]
+            node_state = state["nodes"][node_id]
+            node_state.update(
+                {
+                    "status": (
+                        "pending"
+                        if _profile_active(
+                            state["task_profile"], definition["minimum_profile"]
+                        )
+                        else "profile_skipped"
+                    ),
+                    "attempts": 0,
+                    "actor": None,
+                    "started_at": None,
+                    "finished_at": None,
+                    "outcome_note": None,
+                    "artifacts": [],
+                    "surface_digest": None,
+                }
+            )
+
+        state["source"].update(
+            {
+                "slice_index": prior_slice + 1,
+                "base_ref": "HEAD",
+                "base_revision": head_revision,
+                "head_revision_at_start": head_revision,
+                "content_digest_at_start": digest,
+                "surface_at_start": entries,
+                "claim": _claim_identity(claim),
+                "review_content_digest": None,
+                "review_bound_by": None,
+                "final_content_digest": None,
+            }
+        )
+        state["status"] = "active"
+        _refresh_ready(state, recipe)
+        _commit_event(
+            repo_root,
+            state,
+            "slice_advanced",
+            actor=args.owner,
+            reason=args.reason,
+            from_node=args.from_node,
+            prior_slice_index=prior_slice,
+            prior_disposition=prior_disposition,
+            prior_nodes=prior_nodes,
+            prior_source=prior_source,
+            accepted_stale_reasons=accepted_stale,
+            accepted_pre_review_checkpoint=args.accept_pre_review_checkpoint,
+            reset_nodes=sorted(reset),
+            new_source=copy.deepcopy(state["source"]),
+        )
+    print(
+        f"Advanced {args.task_id} to slice {prior_slice + 1}; "
+        f"ready={[node_id for node_id in sorted(reset) if state['nodes'][node_id]['status'] == 'ready']}."
+    )
+    return 0
+
+
 def note(args: argparse.Namespace) -> int:
     repo_root = repo_root_from(args.root)
     if not task_claim.OWNER_RE.fullmatch(args.actor):
@@ -1263,6 +1502,29 @@ def build_parser() -> argparse.ArgumentParser:
     reopen_node.add_argument("--actor", required=True)
     reopen_node.add_argument("--reason", required=True)
     reopen_node.set_defaults(handler=reopen)
+
+    advance = commands.add_parser(
+        "advance-slice",
+        help="start another declared slice from the exact clean HEAD",
+    )
+    advance.add_argument("--root", type=Path, default=Path("."))
+    advance.add_argument("--task-id", required=True)
+    advance.add_argument("--owner", required=True, help="live task-claim owner")
+    advance.add_argument(
+        "--from-node", required=True, help="root of the repeated recipe subgraph"
+    )
+    advance.add_argument("--reason", required=True)
+    advance.add_argument(
+        "--accept-pre-review-checkpoint",
+        action="store_true",
+        help="record a writer-complete checkpoint whose reviews never started",
+    )
+    advance.add_argument(
+        "--accept-stale-source",
+        action="store_true",
+        help="acknowledge committed bytes after the prior source binding",
+    )
+    advance.set_defaults(handler=advance_slice)
 
     add_note = commands.add_parser("note")
     add_note.add_argument("--root", type=Path, default=Path("."))
