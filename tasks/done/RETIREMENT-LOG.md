@@ -8,6 +8,28 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GEOM-071`](GEOM-071-reusable-sharp-feature-classification.md) — reusable
+sharp-feature classification is now a focused geometry-owned CPU contract.
+`Geometry.HalfedgeMesh.Features` accepts an owning mesh plus caller-selected
+slot-aligned face normals, produces exact edge masks and endpoint/crease/junction
+incidence facts, and materializes a validated caller-named boolean edge property
+with canonical default `e:feature`. Submesh views fail explicitly, finite
+nonzero normals are normalized safely from denormal through near-maximum
+magnitudes, and invalid topology or normals remain feature-classified per edge.
+
+FA-QEM is the behavior-preserving first adopter. Its initial endpoint/line/corner
+policy comes from the shared result, while boundary turning stays local and
+collapse legality still reads recomputed one-ring normals. Exact tessellated-cube
+diagnostics and a warped-grid multi-collapse regression distinguish that current
+geometry path from a stale initialization mask. The narrow 18-case selector and
+all 4,209 selected CPU tests passed; the tracked `BUG-118` GLFW/LeakSanitizer
+control self-skipped, and strict repository checks passed.
+
+The reached maturity is `CPUContracted`; no runtime, UI, GPU, sanitizer, or
+performance capability is implied. `GEOM-072` is now unblocked as the concrete
+Catmull-Clark property consumer, and `METHOD-038` may consume the same strict
+`angle > threshold` facts after aligning its threshold-equality contract.
+
 [`METHOD-037`](METHOD-037-signed-curvature-mesh-segmentation.md) — signed
 principal-curvature segmentation is operational through the serial CPU
 geometry kernel, undoable runtime publication, schema-versioned config lane,

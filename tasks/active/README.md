@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`GEOM-071`](GEOM-071-reusable-sharp-feature-classification.md) — reusable
-  sharp-feature classification (`in-progress`, owner `codex-root`, branch
-  `main`). Next gate: pin FA-QEM feature behavior, extract the shared
-  geometry-owned classifier, and run the focused feature/simplification suite.
+- None.
 
 ## History
 

@@ -1,14 +1,14 @@
 schema_version: 1
 task_id: GEOM-071
 workflow_profile: high-risk
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-10T16:32:25Z'
+generated_at: '2026-08-10T16:34:39Z'
 claim_eligible: false
 source:
-  base_ref: HEAD
+  base_ref: HEAD^
   base_revision: 23c1080a6a9c9d994ed8a95dbdc6c39c4e029ca1
-  head_revision: 23c1080a6a9c9d994ed8a95dbdc6c39c4e029ca1
+  head_revision: 191861b24f25262aec5a0a067f3baea515ca235d
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: true
@@ -32,13 +32,17 @@ source:
   - path: src/geometry/Geometry.HalfedgeMesh.Simplification.cpp
     sha256: 565a9d6bcc8f1fc4c92c958873b5fb5f56f3885b5d3c28cbce1d0866d3db0f5d
   - path: tasks/SESSION-BRIEF.md
-    sha256: c330623c54ee5e73cb9f1a6b00fb024133e6a8afb1f931031b2dcf325f22a680
-  - path: tasks/active/GEOM-071-reusable-sharp-feature-classification.md
-    sha256: 77b1bd5a725fac1fd909ea15a0653be4e5f3fd01cb45ec5424b78b280b600be9
+    sha256: a9d00c97cf85c465728f16b918cd2a39c4c9eb47ef4f373ff98929f7cbd803a0
   - path: tasks/active/README.md
-    sha256: 0376422934ed0c76f77b1f24182e5ebacd8dbfd1ce7dfba25365aa897207c79f
+    sha256: 6ac05a2cebcdfb3450b322173fa308d2b4bde4ea193df723b6f432557bde17f9
+  - path: tasks/backlog/geometry/GEOM-071-reusable-sharp-feature-classification.md
+    sha256: null
   - path: tasks/backlog/geometry/README.md
-    sha256: d7441312052dd0d5f013d3331bd84597533bffdc23d53b092fd2c044e2645873
+    sha256: e62ca21567a79461ba22c51ab9998efff9f23b88086fa401cad5dd23f0661333
+  - path: tasks/done/GEOM-071-reusable-sharp-feature-classification.md
+    sha256: 7e622f7850d60112175281b9b6f967e2c3552da26a2a4da12275c1173583004e
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 183131a552f0bf0879b949904a5d69fb098f444ce0103ce20717cb4ccd66f8ed
   - path: tests/CMakeLists.txt
     sha256: 1c14a01d6f946b086c1280427b56a48af0f5e59aebc46b3f2459ea0364c29dae
   - path: tests/unit/geometry/Test.HalfedgeMeshFeatures.cpp
@@ -47,7 +51,7 @@ source:
     sha256: 7f3e391b18352f49ff02d3491544b175a3031a900344f0002bf1818f8ec34c65
   - path: tools/agents/contract_legacy_tasks.json
     sha256: 73366a0209affc658cb0108e96f1405165e7dca7a342f7c89c0c2a4f683f62e2
-  content_digest: dab126d25b10d3331cabf6f1133479009686210fe0b4c7bc6b80b57d5764fd3b
+  content_digest: b97286e5d85ac4293a9fa7d0ebff6104c7c612bb550096a142b2561f72a33d61
 touched:
   paths:
   - ara/logic/claims.md
@@ -60,9 +64,11 @@ touched:
   - src/geometry/Geometry.HalfedgeMesh.Features.cppm
   - src/geometry/Geometry.HalfedgeMesh.Simplification.cpp
   - tasks/SESSION-BRIEF.md
-  - tasks/active/GEOM-071-reusable-sharp-feature-classification.md
   - tasks/active/README.md
+  - tasks/backlog/geometry/GEOM-071-reusable-sharp-feature-classification.md
   - tasks/backlog/geometry/README.md
+  - tasks/done/GEOM-071-reusable-sharp-feature-classification.md
+  - tasks/done/RETIREMENT-LOG.md
   - tests/CMakeLists.txt
   - tests/unit/geometry/Test.HalfedgeMeshFeatures.cpp
   - tests/unit/geometry/Test_Simplification.cpp
@@ -147,7 +153,7 @@ diagnostics_and_previews:
   and clean-workshop checks passed.
 benchmark_or_parity_evidence: []
 docs_sync:
-  task_file: tasks/active/GEOM-071-reusable-sharp-feature-classification.md
+  task_file: tasks/done/GEOM-071-reusable-sharp-feature-classification.md
   session_brief_present: true
   canonical_docs_changed: true
   skill_mirrors_checked: true
@@ -178,6 +184,9 @@ artifacts:
   kind: file
 - path: ara/logic/claims.md
   sha256: 868fb03dfa6c82b7dee6d2ee774edb027341cf6b27349f73e50be514575b4fa5
+  kind: file
+- path: tasks/done/GEOM-071-reusable-sharp-feature-classification.md
+  sha256: 7e622f7850d60112175281b9b6f967e2c3552da26a2a4da12275c1173583004e
   kind: file
 self_review:
   completed: true

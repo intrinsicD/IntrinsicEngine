@@ -10,6 +10,7 @@ branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
 claimed_at: "2026-08-10T15:31:17Z"
 maturity_target: CPUContracted
+completed_on: 2026-08-10
 contract_schema: 1
 contracts: [repo.task-contract-discovery, geometry.property-coherence]
 contract_review: >-
@@ -23,16 +24,17 @@ contract_review: >-
 
 ## Status
 
-- In progress on `main` under owner `codex-root`.
-- Review revision complete. The first independent pass requested explicit
+- Completed and retired on 2026-08-10 at `CPUContracted` maturity.
+- Implementation commit: `191861b24f25262aec5a0a067f3baea515ca235d`.
+- The first independent pass requested explicit
   submesh-view rejection, scale-stable normalization at representable finite
   extremes, a real multi-collapse current-normal regression, diagnostic
   classification of the superseded policy receipt, and final-surface review.
   The revised 18-case direct/adoption selector and all 4,209 selected CPU tests
   are green; the tracked `GlfwLifecycleLsan` control self-skipped. Strict
   layering, test-layout, docs-link, task-policy/task-validation, root-hygiene,
-  ARA, generated-inventory, and clean-workshop checks passed. Next gate: bind
-  the final retirement surface and obtain high-risk review acceptance.
+  ARA, generated-inventory, and clean-workshop checks passed. The final
+  retirement surface is bound for high-risk review acceptance.
 
 ## Goal
 - Extract the proven FA-QEM boundary/dihedral feature logic into a small geometry-owned classifier and make Simplification its behavior-preserving first production adopter.
