@@ -2551,3 +2551,23 @@ observations:
     promoted_to: "logic/claims.md:C41"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O144
+    timestamp: "2026-08-11T00:47+02:00"
+    provenance: ai-suggested
+    content: >
+      A multi-slice task needs an auditable slice-cycle boundary distinct from
+      bounded within-cycle repair attempts; otherwise a completed writer node
+      either strands later declared slices or invites an untracked attempt-
+      budget reset. If the workflow remains one-run-per-task, task slicing must
+      occur before the first graph starts.
+    context: >
+      METHOD-038 declared four scientific slices but exhausted its four writer
+      attempts through checkpoint and evidence/epilogue rebindings before the
+      disjoint analytic corpus. The current tool correctly rejects an
+      unbounded reopen, and no supported next-cycle transition exists.
+    potential_type: architecture
+    bound_to: [N407, N408]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

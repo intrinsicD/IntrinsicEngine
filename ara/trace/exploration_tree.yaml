@@ -9545,3 +9545,42 @@ tree:
       fixtures only; it is not a general remeshing, convergence, performance,
       runtime/UI, GPU, or v2 result.
     status: resolved
+  - id: N407
+    type: dead_end
+    title: "Continue METHOD-038 after exhausting its frozen writer cycle"
+    provenance: ai-executed
+    timestamp: "2026-08-11T00:47+02:00"
+    also_depends_on: [N406]
+    hypothesis: >
+      METHOD-038's existing schema-v1 review diamond could carry the next
+      disjoint-corpus slice after checkpoint 2 without changing task identity
+      or weakening its frozen scratch custody.
+    failure_mode: >
+      The sole implement node already succeeded on attempt 4 of 4. The work-
+      graph CLI rejects reopening an exhausted node, permits exactly one run
+      per task, and would mark the review binding stale after any new tracked
+      source, method, task, documentation, or ARA edit. No supported transition
+      can admit another METHOD-038 writer slice.
+    lesson: >
+      Do not bypass or edit Git-common-dir graph state. Continued multi-slice
+      work needs either a separately reviewed task-cycle extension that keeps
+      repair attempts bounded or an explicit new task boundary; the operator
+      must authorize that scope decision before implementation resumes.
+    evidence:
+      - "tools/agents/agent_work_graph.py"
+      - "tools/agents/work_graphs/review-diamond.v1.json"
+      - "docs/agent/workflow-evidence.md"
+      - "tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md"
+    status: resolved
+  - id: N408
+    type: question
+    title: "Choose the auditable continuation boundary for METHOD-038"
+    provenance: ai-suggested
+    timestamp: "2026-08-11T00:47+02:00"
+    also_depends_on: [N407]
+    description: >
+      Should a separate high-risk process repair add an auditable next-slice
+      cycle to the one-run work graph so METHOD-038 retains its task identity,
+      or should the remaining corpus/candidate work move behind an explicit
+      new method task boundary?
+    status: open
