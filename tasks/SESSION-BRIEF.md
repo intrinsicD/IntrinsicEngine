@@ -47,6 +47,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
 - unblocked: `BUG-150` — Completed workflow reports lose their historical surface seal (tasks/backlog/bugs/BUG-150-workflow-report-historical-surface-seal.md)
+- unblocked: `BUG-152` — Geometry index presents retired GEOM-071 as active backlog work (tasks/backlog/bugs/BUG-152-geometry-index-retired-task-state-link.md)
 
 ## Theme H — Agentic workflow hardening
 
